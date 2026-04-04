@@ -256,7 +256,7 @@ const TrailerSearch = ({ film, onTrailerSaved, currentUserId }) => {
               placeholder="https://www.primevideo.com/..."
               className="flex-1 bg-bg border border-border text-text-primary rounded-xl px-4 py-2 text-sm focus:border-gold focus:outline-none"
             />
-            
+            <a
               href={externalUrl}
               target="_blank"
               rel="noopener noreferrer"

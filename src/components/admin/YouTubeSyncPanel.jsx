@@ -206,7 +206,7 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
                   </td>
                   <td className="p-4">
                     {film.trailer_youtube_id ? (
-                      
+                      <a
                         href={`https://youtube.com/watch?v=${film.trailer_youtube_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -302,7 +302,7 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
               </div>
 
               <div className="flex items-center gap-2">
-                
+                <a
                   href={channel.channel_url || `https://youtube.com/channel/${channel.channel_id}`}
                   target="_blank"
                   rel="noopener noreferrer"

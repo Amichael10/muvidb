@@ -68,7 +68,7 @@ const TrailerPlayer = ({ film }) => {
           <p className="text-text-muted text-sm mb-4">
             This trailer is hosted outside YouTube
           </p>
-          
+          <a
             href={film.trailer_external_url}
             target="_blank"
             rel="noopener noreferrer"
