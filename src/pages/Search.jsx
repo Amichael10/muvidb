@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
-import { films, people, genres } from '../data/mockData';
+import { people, genres } from '../data/mockData';
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -10,11 +11,30 @@ export default function Search() {
   
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState('films'); // 'films' | 'people'
+  const [films, setFilms] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     document.title = "FilmDba | Search";
+    fetchFilms();
   }, []);
   
+  const fetchFilms = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('films')
+        .select('*');
+        
+      if (error) throw error;
+      setFilms(data || []);
+    } catch (error) {
+      console.error('Error fetching films:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filters for films
   const [selectedGenre, setSelectedGenre] = useState('');
   const [yearRange, setYearRange] = useState(2000);
@@ -33,9 +53,10 @@ export default function Search() {
   // Filter logic
   const filteredFilms = films.filter(f => {
     const matchesQuery = f.title.toLowerCase().includes(initialQuery.toLowerCase());
-    const matchesGenre = selectedGenre ? f.genres.includes(selectedGenre) : true;
-    const matchesYear = f.year >= yearRange;
-    const matchesRating = f.rating >= minRating;
+    const filmGenres = f.genres || [];
+    const matchesGenre = selectedGenre ? filmGenres.includes(selectedGenre) : true;
+    const matchesYear = (f.year || 0) >= yearRange;
+    const matchesRating = (f.rating || 0) >= minRating;
     return matchesQuery && matchesGenre && matchesYear && matchesRating;
   });
 

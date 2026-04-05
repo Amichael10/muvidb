@@ -5,9 +5,9 @@ import SkeletonCard from '../ui/SkeletonCard';
 export default function FilmRow({ title, films, sortKey, isLoading = false }) {
   // Sort films if sortKey is provided
   const sortedFilms = [...films].sort((a, b) => {
-    if (sortKey === 'views') return b.views - a.views;
-    if (sortKey === 'year') return b.year - a.year;
-    if (sortKey === 'rating') return b.rating - a.rating;
+    if (sortKey === 'views') return (b.view_count || 0) - (a.view_count || 0);
+    if (sortKey === 'year') return (b.year || 0) - (a.year || 0);
+    if (sortKey === 'rating') return (b.rating || 0) - (a.rating || 0);
     return 0;
   });
 

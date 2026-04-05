@@ -70,7 +70,7 @@ export default function FilmCard({
           
           <div className="flex items-center justify-between mt-1">
             <div className="text-xs text-text-muted font-medium truncate pr-2">
-              {film.year} • {film.genres[0]}
+              {film.year} {film.genres && film.genres.length > 0 ? `• ${film.genres[0]}` : ''}
             </div>
             
             <div className="flex items-center gap-1 bg-gold text-bg px-1.5 py-0.5 rounded text-xs font-bold shrink-0">

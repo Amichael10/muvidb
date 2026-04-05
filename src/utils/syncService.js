@@ -20,7 +20,7 @@ export const syncAllFilmStats = async (onProgress = null) => {
 
     if (error) throw error
     if (!films || films.length === 0) {
-      return { success: true, synced: 0, message: newTrailersResult.message || 'No films to sync' }
+      return { success: true, synced: 0, message: newTrailersResult.message || 'No films to sync', debugLogs: newTrailersResult.debugLogs }
     }
 
     onProgress?.({ stage: 'fetching', total: films.length, done: 0, currentFilm: 'Fetching stats from YouTube...' })
@@ -73,7 +73,8 @@ export const syncAllFilmStats = async (onProgress = null) => {
       success: true,
       synced,
       errors,
-      message: `${newTrailersResult.message} Synced stats for ${synced} existing films.`
+      message: `${newTrailersResult.message} Synced stats for ${synced} existing films.`,
+      debugLogs: newTrailersResult.debugLogs
     }
 
   } catch (error) {
@@ -85,24 +86,53 @@ export const syncAllFilmStats = async (onProgress = null) => {
 // Fetch new trailers from trusted channels
 // ─────────────────────────────────────────
 export const syncNewTrailersFromChannels = async (onProgress = null) => {
+  const debugLogs = [];
   try {
-    const { data: channels } = await supabase.from('youtube_channels').select('*').eq('is_active', true)
+    const { data: channels, error: channelsError } = await supabase.from('youtube_channels').select('*').eq('is_active', true)
+    if (channelsError) {
+      return { success: false, message: `Error fetching channels: ${channelsError.message}` }
+    }
+    
+    debugLogs.push(`Found ${channels?.length || 0} active channels.`);
     if (!channels || channels.length === 0) return { success: true, message: 'No active channels.' }
     
     let totalAdded = 0
+    let totalFound = 0
+    let totalSkipped = 0
+    let totalErrors = 0
     
     for (const channel of channels) {
       onProgress?.({ stage: 'fetching', total: channels.length, done: 0, currentFilm: `Checking ${channel.name}...` })
       
-      const videos = await fetchRecentVideosFromChannel(channel.channel_id, 10)
-      
-      for (const video of videos) {
-        // Check if this video already exists in films
-        const { data: existing } = await supabase.from('films').select('id').eq('trailer_youtube_id', video.videoId).maybeSingle()
-        if (existing) continue
+      try {
+        const videos = await fetchRecentVideosFromChannel(channel.channel_id, 10)
+        debugLogs.push(`Channel ${channel.name}: Found ${videos.length} videos.`);
+        totalFound += videos.length;
         
-        // Add as a pending film
-        const newFilm = {
+        if (videos.length === 0) continue;
+
+        // Batch check existing videos
+        const videoIds = videos.map(v => v.videoId);
+        const { data: existingFilms, error: checkError } = await supabase
+          .from('films')
+          .select('trailer_youtube_id')
+          .in('trailer_youtube_id', videoIds);
+
+        if (checkError) {
+          debugLogs.push(`Error checking existing videos for ${channel.name}: ${checkError.message}`);
+          totalErrors += videos.length;
+          continue;
+        }
+
+        const existingIds = new Set(existingFilms?.map(f => f.trailer_youtube_id) || []);
+        const newVideos = videos.filter(v => !existingIds.has(v.videoId));
+        
+        totalSkipped += (videos.length - newVideos.length);
+
+        if (newVideos.length === 0) continue;
+
+        // Batch insert new videos
+        const newFilms = newVideos.map(video => ({
           title: video.title,
           synopsis: video.description?.substring(0, 500),
           poster: video.thumbnail,
@@ -110,21 +140,38 @@ export const syncNewTrailersFromChannels = async (onProgress = null) => {
           trailer_source: 'youtube',
           trailer_youtube_id: video.videoId,
           status: 'announced', // Pending review
-          year: new Date(video.publishedAt).getFullYear(),
-          view_count: video.viewCount,
+          year: new Date(video.publishedAt).getFullYear() || new Date().getFullYear(),
+          view_count: video.viewCount || 0,
           language: 'English',
-          nfvcb_rating: '18'
-        }
+          nfvcb_rating: '18',
+          genres: [],
+          cast: []
+        }));
+
+        const { error: insertError } = await supabase.from('films').insert(newFilms);
         
-        await supabase.from('films').insert([newFilm])
-        totalAdded++
+        if (insertError) {
+          debugLogs.push(`Batch insert error for ${channel.name}: ${insertError.message}`);
+          totalErrors += newVideos.length;
+        } else {
+          totalAdded += newVideos.length;
+        }
+      } catch (err) {
+        debugLogs.push(`Error processing channel ${channel.name}: ${err.message}`);
+        totalErrors++;
       }
     }
     
-    return { success: true, message: totalAdded > 0 ? `Found and added ${totalAdded} new trailers for review.` : 'No new trailers found.' }
+    const summary = `Added ${totalAdded} new trailers. (Found: ${totalFound}, Skipped: ${totalSkipped}, Errors: ${totalErrors})`;
+    console.log("Sync Debug Logs:", debugLogs);
+    
+    return { 
+      success: true, 
+      message: totalAdded > 0 ? summary : `No new trailers found. ${summary}`,
+      debugLogs
+    }
   } catch (error) {
-    console.error('syncNewTrailersFromChannels error:', error)
-    return { success: false, error: error.message, message: 'Error fetching from channels.' }
+    return { success: false, error: error.message, message: `Fatal error: ${error.message}` }
   }
 }
 

@@ -1,12 +1,12 @@
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { films } from '../../data/mockData';
 
-export default function HeroSection() {
-  const featuredFilm = films[0];
+export default function HeroSection({ featuredFilm }) {
+  if (!featuredFilm) return null;
 
   // Format views (e.g., 4200000 -> 4.2M)
   const formatViews = (views) => {
+    if (!views) return '0';
     if (views >= 1000000) {
       return (views / 1000000).toFixed(1) + 'M';
     }
@@ -46,7 +46,7 @@ export default function HeroSection() {
           >
             {/* Genre Pills */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {featuredFilm.genres.map((genre) => (
+              {(featuredFilm.genres || []).map((genre) => (
                 <span key={genre} className="px-3 py-1 text-xs font-medium bg-surface-2/80 backdrop-blur-sm text-text-primary rounded-full border border-border">
                   {genre}
                 </span>
@@ -74,7 +74,7 @@ export default function HeroSection() {
                   <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"/>
                   <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="var(--color-bg)"/>
                 </svg>
-                <span>{formatViews(featuredFilm.views)} views</span>
+                <span>{formatViews(featuredFilm.view_count)} views</span>
               </div>
               
               {/* Year */}

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
-import { films, genres } from '../data/mockData';
+import { genres } from '../data/mockData';
 
 export default function Browse() {
   const [searchParams] = useSearchParams();
@@ -9,11 +10,30 @@ export default function Browse() {
   const initialSort = searchParams.get('sort') || 'views';
 
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [films, setFilms] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     document.title = "FilmDba | Browse";
+    fetchFilms();
   }, []);
   
+  const fetchFilms = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('films')
+        .select('*');
+        
+      if (error) throw error;
+      setFilms(data || []);
+    } catch (error) {
+      console.error('Error fetching films:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filters state
   const [selectedGenres, setSelectedGenres] = useState(initialGenre ? [initialGenre] : []);
   const [yearRange, setYearRange] = useState(2000);
@@ -46,18 +66,19 @@ export default function Browse() {
 
   // Filter and sort logic
   let filteredFilms = films.filter(f => {
-    const matchesGenre = selectedGenres.length === 0 || f.genres.some(g => selectedGenres.includes(g));
-    const matchesYear = f.year >= yearRange;
+    const filmGenres = f.genres || [];
+    const matchesGenre = selectedGenres.length === 0 || filmGenres.some(g => selectedGenres.includes(g));
+    const matchesYear = (f.year || 0) >= yearRange;
     const matchesRating = selectedRatings.length === 0 || selectedRatings.includes(f.nfvcb_rating);
-    const matchesLanguage = !language || f.language.includes(language);
+    const matchesLanguage = !language || (f.language && f.language.includes(language));
     return matchesGenre && matchesYear && matchesRating && matchesLanguage;
   });
 
   filteredFilms.sort((a, b) => {
-    if (sortBy === 'views') return b.views - a.views;
-    if (sortBy === 'rating') return b.rating - a.rating;
-    if (sortBy === 'newest') return b.year - a.year;
-    if (sortBy === 'oldest') return a.year - b.year;
+    if (sortBy === 'views') return (b.view_count || 0) - (a.view_count || 0);
+    if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+    if (sortBy === 'newest') return (b.year || 0) - (a.year || 0);
+    if (sortBy === 'oldest') return (a.year || 0) - (b.year || 0);
     return 0;
   });
 

@@ -5,11 +5,13 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = async (authUser) => {
     if (!authUser) {
       setUser(null);
+      setRole(null);
       return;
     }
     
@@ -20,38 +22,37 @@ export function AuthProvider({ children }) {
         .eq('id', authUser.id)
         .single();
         
+      setUser(authUser);
+      const defaultAdminEmail = 'mychlewhale10@gmail.com';
+      const isDefaultAdmin = authUser.email === defaultAdminEmail;
+      
       if (data) {
-        setUser({
-          ...authUser,
-          app_metadata: data // Store the public.users data
-        });
+        setRole(isDefaultAdmin ? 'admin' : (data.role || authUser.user_metadata?.role || 'fan'));
       } else {
-        setUser(authUser);
+        setRole(isDefaultAdmin ? 'admin' : (authUser.user_metadata?.role || 'fan'));
       }
     } catch (err) {
       console.error('Error fetching user profile:', err);
       setUser(authUser);
+      setRole(authUser.user_metadata?.role || 'fan');
     }
   };
 
   useEffect(() => {
-    // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         fetchUserProfile(session.user).finally(() => setLoading(false));
       } else {
-        setUser(null);
         setLoading(false);
       }
     });
 
-    // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
         fetchUserProfile(session.user);
-      }
-      if (event === 'SIGNED_OUT') {
+      } else {
         setUser(null);
+        setRole(null);
       }
     });
 
@@ -77,14 +78,14 @@ export function AuthProvider({ children }) {
     if (error) console.error('Google login error:', error);
   };
 
-  const signup = async (name, email, password, role) => {
+  const signup = async (name, email, password, userRole) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           name,
-          role,
+          role: userRole,
         }
       }
     });
@@ -96,14 +97,15 @@ export function AuthProvider({ children }) {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setUser(null);
+    setRole(null);
   };
 
   const formattedUser = user ? {
     id: user.id,
-    name: user.app_metadata?.name || user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
+    name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
     email: user.email,
-    avatar_url: user.app_metadata?.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-    role: user.app_metadata?.role || user.user_metadata?.role || 'fan'
+    avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+    role: role || 'fan'
   } : null;
 
   const value = {
@@ -117,9 +119,17 @@ export function AuthProvider({ children }) {
     loading
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold"></div>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

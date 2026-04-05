@@ -6,7 +6,7 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { toast } from 'react-hot-toast';
+import { toast, Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import Home from './pages/Home';
@@ -75,6 +75,19 @@ export default function App() {
     <AuthProvider>
       <Router>
         <div className="min-h-screen flex flex-col bg-bg text-text-primary">
+          <Toaster position="top-center" toastOptions={{
+            style: {
+              background: '#1A1A1A',
+              color: '#F2F2F2',
+              border: '1px solid #333333',
+            },
+            success: {
+              iconTheme: {
+                primary: '#D4A017',
+                secondary: '#1A1A1A',
+              },
+            },
+          }} />
           <Navbar />
           <main className="flex-grow">
             <Routes>

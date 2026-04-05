@@ -134,6 +134,17 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
           </button>
         </div>
 
+        {/* Warning when syncing */}
+        {syncing && (
+          <div className="mb-4 p-3 bg-amber-900/30 border border-amber-800/50 rounded-xl flex items-start gap-3">
+            <span className="text-amber-400 text-xl">⚠️</span>
+            <div>
+              <p className="text-amber-400 font-medium text-sm">Please do not switch tabs or minimize the window</p>
+              <p className="text-amber-400/80 text-xs mt-0.5">Browsers pause background tasks to save memory. Switching tabs will stop the sync process.</p>
+            </div>
+          </div>
+        )}
+
         {/* Progress bar */}
         {syncProgress && syncing && (
           <div className="space-y-2">
@@ -165,13 +176,23 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
               ? 'bg-green-900/30 text-green-400 border border-green-800'
               : 'bg-red-900/30 text-red-400 border border-red-800'
           }`}>
-            {syncResult.message}
+            {syncResult.message || syncResult.error || 'An unknown error occurred.'}
             {syncResult.errors?.length > 0 && (
               <ul className="mt-2 space-y-1 text-xs opacity-80">
                 {syncResult.errors.map((e, i) => (
                   <li key={i}>⚠ {e.film}: {e.error}</li>
                 ))}
               </ul>
+            )}
+            {syncResult.debugLogs?.length > 0 && (
+              <div className="mt-4 pt-2 border-t border-green-800/50">
+                <p className="font-semibold mb-1">Debug Logs:</p>
+                <ul className="space-y-1 text-xs opacity-80 max-h-40 overflow-y-auto">
+                  {syncResult.debugLogs.map((log, i) => (
+                    <li key={i}>{log}</li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}

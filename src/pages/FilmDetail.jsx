@@ -1,29 +1,69 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { films, people } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 
 export default function FilmDetail() {
   const { id } = useParams();
-  // For now, default to films[0] if not found
-  const film = films.find(f => f.id === id) || films[0];
+  const [film, setFilm] = useState(null);
+  const [relatedFilms, setRelatedFilms] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    document.title = `FilmDba | ${film.title}`;
-  }, [film.title]);
+    fetchFilm();
+  }, [id]);
+
+  const fetchFilm = async () => {
+    setLoading(true);
+    try {
+      // Check if ID is a UUID (Supabase ID) or a string (mock data ID)
+      // For now, let's just try to fetch it. If it fails, maybe it's a mock ID.
+      // But since we updated Home, Browse, Search to use Supabase, all IDs should be UUIDs.
+      const { data, error } = await supabase
+        .from('films')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (error) throw error;
+      setFilm(data);
+      
+      if (data) {
+        document.title = `FilmDba | ${data.title}`;
+        // Fetch related films (just some random ones for now)
+        const { data: related } = await supabase
+          .from('films')
+          .select('*')
+          .neq('id', id)
+          .limit(3);
+        setRelatedFilms(related || []);
+      }
+    } catch (error) {
+      console.error('Error fetching film:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
-  const relatedFilms = films.filter(f => f.id !== film.id).slice(0, 3);
+  if (loading) {
+    return <div className="w-full min-h-screen flex items-center justify-center bg-bg text-text-primary">Loading...</div>;
+  }
+
+  if (!film) {
+    return <div className="w-full min-h-screen flex items-center justify-center bg-bg text-text-primary">Film not found</div>;
+  }
 
   // Format views
   const formatViews = (views) => {
+    if (!views) return '0';
     if (views >= 1000000) return (views / 1000000).toFixed(1) + 'M';
     if (views >= 1000) return (views / 1000).toFixed(1) + 'K';
     return views;
   };
 
   // Mock cast data based on the string array in film.cast
-  const castMocks = film.cast.map((name, i) => ({
+  const castMocks = (film.cast || []).map((name, i) => ({
     id: `cast-${i}`,
     name,
     role: i === 0 ? "Lead Character" : "Supporting Character",
@@ -32,11 +72,9 @@ export default function FilmDetail() {
   }));
 
   // Mock crew data
-  const crewMocks = [
-    { name: film.director, role: "Director", photo: `https://placehold.co/150x150/13192B/C1440E?text=${film.director.split(' ').map(n => n[0]).join('')}` },
-    { name: "Kemi Adetiba", role: "Writer", photo: `https://placehold.co/150x150/13192B/C1440E?text=KA` },
-    { name: "Makanaki Studios", role: "Producer", photo: `https://placehold.co/150x150/13192B/C1440E?text=MS` }
-  ];
+  const crewMocks = film.director ? [
+    { name: film.director, role: "Director", photo: `https://placehold.co/150x150/13192B/C1440E?text=${film.director.split(' ').map(n => n[0]).join('')}` }
+  ] : [];
 
   // Mock reviews
   const reviews = [
@@ -88,7 +126,7 @@ export default function FilmDetail() {
               </div>
 
               <div className="flex flex-wrap gap-2 mb-6">
-                {film.genres.map(genre => (
+                {(film.genres || []).map(genre => (
                   <span key={genre} className="px-3 py-1 text-xs font-medium bg-surface-2/60 backdrop-blur-md text-text-primary rounded-full border border-border">
                     {genre}
                   </span>
@@ -116,7 +154,7 @@ export default function FilmDetail() {
                     <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"/>
                     <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="var(--color-bg)"/>
                   </svg>
-                  <span className="font-medium">{formatViews(film.views)} views</span>
+                  <span className="font-medium">{formatViews(film.view_count)} views</span>
                 </div>
               </div>
             </div>
@@ -302,7 +340,7 @@ export default function FilmDetail() {
                         {relatedFilm.title}
                       </h4>
                       <div className="text-xs text-text-muted mb-2">
-                        {relatedFilm.year} • {relatedFilm.genres[0]}
+                        {relatedFilm.year} {relatedFilm.genres && relatedFilm.genres.length > 0 ? `• ${relatedFilm.genres[0]}` : ''}
                       </div>
                       <div className="flex items-center gap-1 text-gold text-xs font-bold">
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

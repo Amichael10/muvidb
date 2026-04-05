@@ -21,6 +21,7 @@ export const formatViewCount = (num) => {
 export const parseDuration = (iso) => {
   if (!iso) return null
   const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+  if (!match) return '0:00'
   const hours = parseInt(match[1] || 0)
   const minutes = parseInt(match[2] || 0)
   const seconds = parseInt(match[3] || 0)
@@ -115,13 +116,13 @@ export const searchTrailer = async (filmTitle, channelId = null) => {
     // Score each result and return sorted by confidence
     const scored = (detailData.items || []).map(video => ({
       videoId: video.id,
-      title: video.snippet.title,
-      channelTitle: video.snippet.channelTitle,
-      thumbnail: video.snippet.thumbnails.medium?.url,
-      duration: parseDuration(video.contentDetails.duration),
-      rawDuration: video.contentDetails.duration,
-      viewCount: parseInt(video.statistics.viewCount || 0),
-      publishedAt: video.snippet.publishedAt,
+      title: video.snippet?.title || 'Unknown Title',
+      channelTitle: video.snippet?.channelTitle || '',
+      thumbnail: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || '',
+      duration: parseDuration(video.contentDetails?.duration),
+      rawDuration: video.contentDetails?.duration,
+      viewCount: parseInt(video.statistics?.viewCount || 0),
+      publishedAt: video.snippet?.publishedAt || new Date().toISOString(),
       confidence: trailerConfidenceScore(video)
     }))
 
@@ -145,7 +146,7 @@ export const fetchVideoStats = async (videoId) => {
     const res = await fetch(
       `${BASE_URL}/videos?` +
       `part=statistics,contentDetails` +
-      `&id=${videoId}` +
+      `&id=${encodeURIComponent(videoId)}` +
       `&key=${API_KEY}`
     )
     const data = await res.json()
@@ -157,10 +158,10 @@ export const fetchVideoStats = async (videoId) => {
     const video = data.items[0]
     return {
       videoId,
-      viewCount: parseInt(video.statistics.viewCount || 0),
-      likeCount: parseInt(video.statistics.likeCount || 0),
-      commentCount: parseInt(video.statistics.commentCount || 0),
-      duration: parseDuration(video.contentDetails.duration)
+      viewCount: parseInt(video.statistics?.viewCount || 0),
+      likeCount: parseInt(video.statistics?.likeCount || 0),
+      commentCount: parseInt(video.statistics?.commentCount || 0),
+      duration: parseDuration(video.contentDetails?.duration)
     }
   } catch (error) {
     console.error('fetchVideoStats error:', error)
@@ -187,16 +188,16 @@ export const batchFetchVideoStats = async (videoIds) => {
       const res = await fetch(
         `${BASE_URL}/videos?` +
         `part=statistics` +
-        `&id=${chunk.join(',')}` +
+        `&id=${encodeURIComponent(chunk.join(','))}` +
         `&key=${API_KEY}`
       )
       const data = await res.json()
 
       for (const video of (data.items || [])) {
         results[video.id] = {
-          viewCount: parseInt(video.statistics.viewCount || 0),
-          likeCount: parseInt(video.statistics.likeCount || 0),
-          commentCount: parseInt(video.statistics.commentCount || 0)
+          viewCount: parseInt(video.statistics?.viewCount || 0),
+          likeCount: parseInt(video.statistics?.likeCount || 0),
+          commentCount: parseInt(video.statistics?.commentCount || 0)
         }
       }
 
@@ -246,15 +247,23 @@ export const resolveChannelId = async (handleOrUrl) => {
     let apiUrl = `${BASE_URL}/channels?part=id,snippet,statistics&key=${API_KEY}`
 
     if (channelId) {
-      apiUrl += `&id=${channelId}`
+      apiUrl += `&id=${encodeURIComponent(channelId)}`
     } else if (username) {
-      apiUrl += `&forUsername=${username}`
+      apiUrl += `&forUsername=${encodeURIComponent(username)}`
     } else if (handle) {
-      apiUrl += `&forHandle=@${handle}`
+      apiUrl += `&forHandle=@${encodeURIComponent(handle)}`
     }
 
-    let res = await fetch(apiUrl)
-    let data = await res.json()
+    let res;
+    let data;
+    try {
+      res = await fetch(apiUrl)
+      data = await res.json()
+    } catch (err) {
+      // If fetch fails (e.g. invalid handle format), we'll just set data to empty
+      // so it falls back to search
+      data = { items: [] }
+    }
 
     if (data.error) {
       console.error('YouTube API Error:', data.error)
@@ -307,38 +316,60 @@ export const fetchRecentVideosFromChannel = async (channelId, maxResults = 10) =
   try {
     // First get the uploads playlist ID for the channel
     const channelRes = await fetch(
-      `${BASE_URL}/channels?part=contentDetails&id=${channelId}&key=${API_KEY}`
+      `${BASE_URL}/channels?part=contentDetails&id=${encodeURIComponent(channelId)}&key=${API_KEY}`
     )
     const channelData = await channelRes.json()
-    if (!channelData.items || channelData.items.length === 0) return []
+    if (channelData.error) {
+      console.error(`YouTube API error for channel ${channelId}:`, channelData.error);
+      return [];
+    }
+    if (!channelData.items || channelData.items.length === 0) {
+      console.warn(`No items found for channel ${channelId}`);
+      return []
+    }
     
-    const uploadsPlaylistId = channelData.items[0].contentDetails.relatedPlaylists?.uploads
-    if (!uploadsPlaylistId) return []
+    const uploadsPlaylistId = channelData.items[0].contentDetails?.relatedPlaylists?.uploads
+    if (!uploadsPlaylistId) {
+      console.warn(`No uploads playlist found for channel ${channelId}`);
+      return []
+    }
     
     // Fetch videos from the uploads playlist
     const playlistRes = await fetch(
-      `${BASE_URL}/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${maxResults}&key=${API_KEY}`
+      `${BASE_URL}/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=${maxResults}&key=${API_KEY}`
     )
     const playlistData = await playlistRes.json()
+    if (playlistData.error) {
+      console.error(`YouTube API error fetching playlist ${uploadsPlaylistId}:`, playlistData.error);
+      return [];
+    }
     
-    if (!playlistData.items || playlistData.items.length === 0) return []
+    if (!playlistData.items || playlistData.items.length === 0) {
+      console.warn(`No items found in playlist ${uploadsPlaylistId}`);
+      return []
+    }
     
-    const videoIds = playlistData.items.map(item => item.snippet.resourceId.videoId).join(',')
+    const videoIds = playlistData.items.map(item => item.snippet.resourceId.videoId).filter(Boolean).join(',')
+    if (!videoIds) return [];
     
     // Get full details (duration, stats)
     const detailRes = await fetch(
-      `${BASE_URL}/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${API_KEY}`
+      `${BASE_URL}/videos?part=snippet,contentDetails,statistics&id=${encodeURIComponent(videoIds)}&key=${API_KEY}`
     )
     const detailData = await detailRes.json()
+    if (detailData.error) {
+      console.error(`YouTube API error fetching videos ${videoIds}:`, detailData.error);
+      return [];
+    }
     
     return (detailData.items || []).map(video => ({
       videoId: video.id,
-      title: video.snippet.title,
-      description: video.snippet.description,
-      thumbnail: video.snippet.thumbnails.maxres?.url || video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium?.url,
-      publishedAt: video.snippet.publishedAt,
-      duration: parseDuration(video.contentDetails.duration),
-      viewCount: parseInt(video.statistics.viewCount || 0)
+      title: video.snippet?.title || 'Unknown Title',
+      description: video.snippet?.description || '',
+      thumbnail: video.snippet?.thumbnails?.maxres?.url || video.snippet?.thumbnails?.high?.url || video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || '',
+      publishedAt: video.snippet?.publishedAt || new Date().toISOString(),
+      duration: parseDuration(video.contentDetails?.duration),
+      viewCount: parseInt(video.statistics?.viewCount || 0)
     }))
   } catch (error) {
     console.error('fetchRecentVideosFromChannel error:', error)

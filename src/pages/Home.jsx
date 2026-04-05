@@ -1,25 +1,41 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
 import PersonCard from '../components/person/PersonCard';
-import { films, people, genres } from '../data/mockData';
+import { people, genres } from '../data/mockData';
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
+  const [films, setFilms] = useState([]);
   const spotlightPerson = people[0];
   const otherPeople = people.slice(1, 4);
 
   useEffect(() => {
     document.title = "FilmDba | Home";
-    // Simulate network request for skeletons
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
+    fetchFilms();
   }, []);
+
+  const fetchFilms = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('films')
+        .select('*');
+        
+      if (error) throw error;
+      setFilms(data || []);
+    } catch (error) {
+      console.error('Error fetching films:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="w-full pb-20">
-      <HeroSection />
+      <HeroSection featuredFilm={films.length > 0 ? films[0] : null} />
       
       <div className="mt-8 space-y-4">
         <FilmRow 
