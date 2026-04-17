@@ -1,0 +1,21 @@
+id,name,city,location,is_active,booking_url
+ec8ce594-395a-432c-85ef-448dbcbf1a9f,Magic Land Cinemas,Abuja,Wuse 2,t,https://magiclandng.com
+e90649bc-461e-43f9-a9be-f27d35d18838,Silverbird Cinemas Abuja,Abuja,Central Business District,t,https://silverbirdcinemas.com
+2c0b6e77-d780-448d-9034-fcf4f4ac35cb,Viva Cinemas Abuja,Abuja,Jabi Lake Mall,t,https://vivacinemas.com
+95c302dd-809b-4f55-b429-5db6b465f2cc,Filmhouse Cinemas Akure,Akure,Akure Mall,t,https://www.filmhouseng.com
+e89db4e4-0c52-492b-a977-bf837343a91f,Filmhouse Cinemas Asaba,Asaba,Grand Hotel Asaba,t,https://www.filmhouseng.com
+e37ac4ea-50b7-407e-89cf-2544ebababda,Genesis Cinemas Enugu,Enugu,Polo Park Mall,t,https://www.genesiscinemas.com
+22f35fc5-92a5-4d51-9e79-7c3757fc325a,Filmhouse Cinemas Ibadan,Ibadan,Dugbe,t,https://www.filmhouseng.com
+2f45a859-c94d-4797-82a5-9cf091aa21ef,Viva Cinemas Ibadan,Ibadan,"Ventura Mall, Samonda",t,https://vivacinemas.com
+f163f8d3-aeae-4024-a37b-eb9ef937d0bb,EbonyLife Place,Lagos,Victoria Island,t,https://www.ebonylifeplace.com
+7b69bd58-dff4-4533-8a29-17bb6d138b16,Filmhouse Cinemas Apapa,Lagos,Apapa Mall,t,https://www.filmhouseng.com
+c9d9597a-6d9f-4ebc-aa25-b6548c9d603d,Filmhouse Cinemas IMAX Lekki,Lagos,Lekki Phase 1,t,https://www.filmhouseng.com
+6201cbdf-dcf7-44b4-982c-bc860bb70230,Filmhouse Cinemas Surulere,Lagos,"Adeniran Ogunsanya Mall, Surulere",t,https://www.filmhouseng.com
+92ae9a89-7dfc-44fb-9240-0d6c7f1e64f7,Genesis Cinemas Festac,Lagos,"Festival Mall, Festac",t,https://www.genesiscinemas.com
+c833f1dd-7c40-4f9a-ac31-0d8a4708caa6,Genesis Cinemas Lekki,Lagos,"The Palms Mall, Lekki",t,https://www.genesiscinemas.com
+29a1eeea-f498-4a17-8476-6f3c7bb76db7,Genesis Cinemas Maryland,Lagos,Maryland Mall,t,https://www.genesiscinemas.com
+f07032e8-377d-4421-bd4b-b6e78b0187e5,KADA Cinemas,Lagos,"Adeniran Ogunsanya St, Surulere",t,https://kadacinemas.com
+88618405-cf65-482f-848d-7a664aefd3d8,Silverbird Cinemas Galleria,Lagos,Victoria Island,t,https://silverbirdcinemas.com
+b71ad57a-5eac-497e-b450-7e7a587938e9,Silverbird Cinemas Ikeja,Lagos,Ikeja City Mall,t,https://silverbirdcinemas.com
+7c2945dd-b6c5-431b-81c9-b4ead987033f,Genesis Cinemas Owerri,Owerri,Owerri Mall,t,https://www.genesiscinemas.com
+884a39b2-8887-46e7-956e-a6ec9ed51ccb,Genesis Cinemas Port Harcourt,Port Harcourt,Port Harcourt Mall,t,https://www.genesiscinemas.com

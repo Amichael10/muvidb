@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { syncAllFilmStats, syncSingleFilmStats } from '../../utils/syncService'
 import { formatViewCount } from '../../utils/youtube'
 import AddChannel from './AddChannel'
+import Drawer from './Drawer'
 
 const YouTubeSyncPanel = ({ currentUserId }) => {
   const [films, setFilms] = useState([])
@@ -12,6 +13,12 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
   const [syncResult, setSyncResult] = useState(null)
   const [showAddChannel, setShowAddChannel] = useState(false)
   const [lastSynced, setLastSynced] = useState(null)
+  
+  // Drawer states
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [selectedChannel, setSelectedChannel] = useState(null)
+  const [editForm, setEditForm] = useState({ name: '', description: '', channel_url: '', channel_id: '' })
+  const [savingChannel, setSavingChannel] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -64,20 +71,68 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
     return result
   }
 
+  const handleOpenChannel = (channel) => {
+    setSelectedChannel(channel)
+    setEditForm({
+      name: channel.name || '',
+      description: channel.description || '',
+      channel_url: channel.channel_url || '',
+      channel_id: channel.channel_id || ''
+    })
+    setIsDrawerOpen(true)
+  }
+
+  const handleUpdateChannel = async (e) => {
+    e.preventDefault()
+    if (!selectedChannel) return
+    setSavingChannel(true)
+    
+    const { error } = await supabase
+      .from('youtube_channels')
+      .update({
+        name: editForm.name,
+        description: editForm.description,
+        channel_url: editForm.channel_url,
+        channel_id: editForm.channel_id // Keeping it editable as requested, though risky
+      })
+      .eq('id', selectedChannel.id)
+
+    if (error) {
+      alert('Error updating channel: ' + error.message)
+    } else {
+      setIsDrawerOpen(false)
+      loadData()
+    }
+    setSavingChannel(false)
+  }
+
   const handleToggleChannel = async (channelId, isActive) => {
     await supabase
       .from('youtube_channels')
       .update({ is_active: !isActive })
       .eq('id', channelId)
+    
+    // If the drawer is open with this channel, update local state too
+    if (selectedChannel?.id === channelId) {
+      setSelectedChannel(prev => ({ ...prev, is_active: !isActive }))
+    }
     loadData()
   }
 
   const handleDeleteChannel = async (channelId) => {
-    await supabase
+    if (!window.confirm('Are you sure you want to delete this channel?')) return
+    
+    const { error } = await supabase
       .from('youtube_channels')
       .delete()
       .eq('id', channelId)
-    loadData()
+      
+    if (error) {
+      alert('Error deleting channel: ' + error.message)
+    } else {
+      setIsDrawerOpen(false)
+      loadData()
+    }
   }
 
   const filmsWithYouTube = films.filter(
@@ -306,55 +361,173 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
           {channels.map(channel => (
             <div
               key={channel.id}
-              className="flex items-center gap-4 p-4 hover:bg-surface-2 transition-colors"
+              onClick={() => handleOpenChannel(channel)}
+              className="group flex items-center gap-4 p-4 hover:bg-surface-2 transition-colors cursor-pointer"
             >
               <div className="flex-1">
-                <p className="text-text-primary font-medium text-sm">
-                  {channel.name}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-text-primary font-medium text-sm group-hover:text-gold transition-colors">
+                    {channel.name}
+                  </p>
+                  {!channel.is_active && (
+                    <span className="text-[10px] bg-red-900/20 text-red-500 px-1.5 py-0.5 rounded border border-red-500/20">
+                      Inactive
+                    </span>
+                  )}
+                </div>
                 <p className="text-text-muted text-xs font-mono mt-0.5">
                   {channel.channel_id}
                 </p>
                 {channel.description && (
-                  <p className="text-text-muted text-xs mt-0.5">
+                  <p className="text-text-muted text-xs mt-0.5 truncate max-w-md">
                     {channel.description}
                   </p>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                 <a
                   href={channel.channel_url || `https://youtube.com/channel/${channel.channel_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
                   className="text-text-muted hover:text-gold text-xs transition-colors"
                 >
-                  ↗ View
+                  ↗
                 </a>
-
-                {/* Active toggle */}
                 <button
-                  onClick={() => handleToggleChannel(channel.id, channel.is_active)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleToggleChannel(channel.id, channel.is_active)
+                  }}
+                  className={`relative w-8 h-4 rounded-full transition-colors ${
                     channel.is_active ? 'bg-gold' : 'bg-surface-2'
                   }`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                    channel.is_active ? 'translate-x-5' : 'translate-x-0.5'
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${
+                    channel.is_active ? 'translate-x-4' : 'translate-x-0.5'
                   }`} />
-                </button>
-
-                <button
-                  onClick={() => handleDeleteChannel(channel.id)}
-                  className="text-text-muted hover:text-red-400 text-xs transition-colors p-1"
-                >
-                  🗑
                 </button>
               </div>
             </div>
           ))}
+
+          {channels.length === 0 && (
+            <div className="p-8 text-center text-text-muted text-sm">
+              No channels added yet.
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Channel Detail Drawer ── */}
+      <Drawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title="Channel Details"
+        width="480px"
+      >
+        {selectedChannel && (
+          <div className="space-y-8">
+            {/* Status Header */}
+            <div className="bg-surface-2 p-6 rounded-2xl border border-border flex items-center justify-between">
+              <div>
+                <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Current Status</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className={`w-2 h-2 rounded-full ${selectedChannel.is_active ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-text-primary font-medium">{selectedChannel.is_active ? 'Active' : 'Inactive'}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => handleToggleChannel(selectedChannel.id, selectedChannel.is_active)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  selectedChannel.is_active 
+                    ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' 
+                    : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'
+                }`}
+              >
+                {selectedChannel.is_active ? 'Deactivate' : 'Activate'}
+              </button>
+            </div>
+
+            {/* Edit Form */}
+            <form onSubmit={handleUpdateChannel} className="space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm text-text-muted">Display Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.name}
+                    onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full bg-surface-2 border border-border text-text-primary rounded-xl px-4 py-3 focus:border-gold focus:outline-none transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-text-muted">Channel ID</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.channel_id}
+                    onChange={e => setEditForm({ ...editForm, channel_id: e.target.value })}
+                    className="w-full bg-surface-2 border border-border text-text-primary rounded-xl px-4 py-3 focus:border-gold focus:outline-none transition-colors font-mono text-sm"
+                  />
+                  <p className="text-[10px] text-text-muted italic">Used by YouTube API to fetch trailers</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-text-muted">Channel URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={editForm.channel_url}
+                      onChange={e => setEditForm({ ...editForm, channel_url: e.target.value })}
+                      className="flex-1 bg-surface-2 border border-border text-text-primary rounded-xl px-4 py-3 focus:border-gold focus:outline-none transition-colors text-sm"
+                    />
+                    <a
+                      href={editForm.channel_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center p-3 rounded-xl bg-surface-2 border border-border text-text-muted hover:text-gold transition-colors"
+                    >
+                      ↗
+                    </a>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-text-muted">Description</label>
+                  <textarea
+                    rows={4}
+                    value={editForm.description}
+                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                    className="w-full bg-surface-2 border border-border text-text-primary rounded-xl px-4 py-3 focus:border-gold focus:outline-none transition-colors resize-none text-sm"
+                    placeholder="Notes about this channel..."
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-border flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteChannel(selectedChannel.id)}
+                  className="px-6 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/10 transition-all"
+                >
+                  Delete Channel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingChannel}
+                  className="px-8 py-3 bg-gold text-dark font-bold rounded-xl hover:bg-gold/90 transition-all disabled:opacity-50"
+                >
+                  {savingChannel ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </Drawer>
 
     </div>
   )

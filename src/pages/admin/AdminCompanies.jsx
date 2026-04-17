@@ -83,7 +83,7 @@ export default function AdminCompanies() {
       name: company.name || '',
       description: company.description || '',
       logo_url: company.logo_url || '',
-      website_url: company.website_url || '',
+      website_url: company.website || '',
       founded_year: company.founded_year || ''
     });
     setIsDrawerOpen(true);
@@ -94,11 +94,11 @@ export default function AdminCompanies() {
     setIsSaving(true);
     try {
       const dataToSave = {
-        ...formData,
-        founded_year: formData.founded_year ? parseInt(formData.founded_year, 10) : null,
-        logo_url: formData.logo_url || null,
-        website_url: formData.website_url || null,
+        name: formData.name,
         description: formData.description || null,
+        logo_url: formData.logo_url || null,
+        website: formData.website_url || null,
+        founded_year: formData.founded_year ? parseInt(formData.founded_year, 10) : null,
       };
 
       if (editingCompany) {
@@ -186,14 +186,14 @@ export default function AdminCompanies() {
                       {company.name}
                     </td>
                     <td className="px-6 py-4">
-                      {company.website_url ? (
+                      {company.website ? (
                         <a 
-                          href={company.website_url} 
+                          href={company.website} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-gold hover:underline truncate max-w-[200px] inline-block align-bottom"
                         >
-                          {company.website_url.replace(/^https?:\/\//, '')}
+                          {company.website.replace(/^https?:\/\//, '')}
                         </a>
                       ) : (
                         <span className="text-text-muted">—</span>

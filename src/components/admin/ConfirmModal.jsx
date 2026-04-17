@@ -1,10 +1,10 @@
-export default function ConfirmModal({ title, message, confirmLabel = 'Confirm', confirmColor = 'bg-red-500 hover:bg-red-600', onConfirm, onCancel }) {
+export default function ConfirmModal({ title, message, confirmLabel = 'Confirm', confirmColor = 'bg-red-500 hover:bg-red-600', onConfirm, onCancel, isProcessing = false }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={onCancel}
+        onClick={!isProcessing ? onCancel : undefined}
       />
       
       {/* Modal */}
@@ -19,15 +19,17 @@ export default function ConfirmModal({ title, message, confirmLabel = 'Confirm',
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-text-primary bg-surface hover:bg-surface-2 transition-colors border border-border"
+            disabled={isProcessing}
+            className="px-4 py-2 rounded-xl text-sm font-medium text-text-primary bg-surface hover:bg-surface-2 transition-colors border border-border disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors ${confirmColor}`}
+            disabled={isProcessing}
+            className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${confirmColor}`}
           >
-            {confirmLabel}
+            {isProcessing ? 'Processing...' : confirmLabel}
           </button>
         </div>
       </div>

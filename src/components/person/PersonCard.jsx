@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 
 export default function PersonCard({ person, variant = 'compact' }) {
+  if (!person) return null;
+
   // Format popularity (e.g., 12400000 -> 12.4M)
   const formatPopularity = (pop) => {
     if (pop >= 1000000) {
@@ -12,12 +14,12 @@ export default function PersonCard({ person, variant = 'compact' }) {
   if (variant === 'compact') {
     return (
       <Link 
-        to={`/person/${person.id}`}
+        to={`/people/${person.id}`}
         className="flex flex-col items-center text-center group"
       >
         <div className="relative mb-3">
           <img 
-            src={person.photo} 
+            src={person.photo_url || person.photo} 
             alt={person.name} 
             className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
           />
@@ -40,7 +42,7 @@ export default function PersonCard({ person, variant = 'compact' }) {
     <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
       <Link to={`/person/${person.id}`} className="shrink-0 group">
         <img 
-          src={person.photo} 
+          src={person.photo_url || person.photo} 
           alt={person.name} 
           className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
         />
@@ -71,7 +73,7 @@ export default function PersonCard({ person, variant = 'compact' }) {
         
         <div className="flex flex-wrap items-center gap-4 sm:gap-6">
           <div className="flex flex-col">
-            <span className="text-text-primary font-bold">{formatPopularity(person.popularity)}</span>
+            <span className="text-text-primary font-bold">{formatPopularity(person.popularity_score || person.popularity)}</span>
             <span className="text-text-muted text-xs uppercase tracking-wider">Views</span>
           </div>
           <div className="w-px h-8 bg-border"></div>

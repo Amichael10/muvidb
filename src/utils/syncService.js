@@ -105,13 +105,14 @@ export const syncNewTrailersFromChannels = async (onProgress = null) => {
       onProgress?.({ stage: 'fetching', total: channels.length, done: 0, currentFilm: `Checking ${channel.name}...` })
       
       try {
-        const videos = await fetchRecentVideosFromChannel(channel.channel_id, 10)
-        debugLogs.push(`Channel ${channel.name}: Found ${videos.length} videos.`);
+        // Fetch up to 100 recent videos to ensure we don't miss any due to ordering
+        const videos = await fetchRecentVideosFromChannel(channel.channel_id, 100)
+        debugLogs.push(`Channel ${channel.name}: Scanned ${videos.length} videos.`);
         totalFound += videos.length;
         
         if (videos.length === 0) continue;
 
-        // Batch check existing videos
+        // Batch check existing videos to skip duplicates
         const videoIds = videos.map(v => v.videoId);
         const { data: existingFilms, error: checkError } = await supabase
           .from('films')
@@ -120,41 +121,55 @@ export const syncNewTrailersFromChannels = async (onProgress = null) => {
 
         if (checkError) {
           debugLogs.push(`Error checking existing videos for ${channel.name}: ${checkError.message}`);
-          totalErrors += videos.length;
           continue;
         }
 
         const existingIds = new Set(existingFilms?.map(f => f.trailer_youtube_id) || []);
-        const newVideos = videos.filter(v => !existingIds.has(v.videoId));
         
-        totalSkipped += (videos.length - newVideos.length);
+        // Filter: Must be NEW and within 0-15 minutes (900 seconds)
+        const videosToInsert = videos.filter(v => {
+          const isDuplicate = existingIds.has(v.videoId);
+          const isTooLong = v.totalSeconds > 900;
+          
+          if (isDuplicate) {
+            // No log for duplicates to keep it clean, or maybe just a count
+            return false;
+          }
+          if (isTooLong) {
+            debugLogs.push(`Skipped "${v.title}": Too long (${v.duration})`);
+            return false;
+          }
+          return true;
+        });
 
-        if (newVideos.length === 0) continue;
+        totalSkipped += (videos.length - videosToInsert.length);
+
+        if (videosToInsert.length === 0) continue;
 
         // Batch insert new videos
-        const newFilms = newVideos.map(video => ({
+        const newFilms = videosToInsert.map(video => ({
           title: video.title,
           synopsis: video.description?.substring(0, 500),
-          poster: video.thumbnail,
-          backdrop: video.thumbnail,
+          poster_url: video.thumbnail,
+          backdrop_url: video.thumbnail, 
           trailer_source: 'youtube',
           trailer_youtube_id: video.videoId,
-          status: 'announced', // Pending review
+          status: 'announced', // Pending review flow
           year: new Date(video.publishedAt).getFullYear() || new Date().getFullYear(),
           view_count: video.viewCount || 0,
           language: 'English',
           nfvcb_rating: '18',
-          genres: [],
-          cast: []
+          genres: []
         }));
 
         const { error: insertError } = await supabase.from('films').insert(newFilms);
         
         if (insertError) {
           debugLogs.push(`Batch insert error for ${channel.name}: ${insertError.message}`);
-          totalErrors += newVideos.length;
+          totalErrors += videosToInsert.length;
         } else {
-          totalAdded += newVideos.length;
+          totalAdded += videosToInsert.length;
+          videosToInsert.forEach(v => debugLogs.push(`Added: "${v.title}"`));
         }
       } catch (err) {
         debugLogs.push(`Error processing channel ${channel.name}: ${err.message}`);

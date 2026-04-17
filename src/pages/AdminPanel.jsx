@@ -9,9 +9,12 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerType, setDrawerType] = useState(null); // 'film', 'person', 'credit'
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncComplete, setSyncComplete] = useState(false);
-  const [people, setPeople] = useState(initialPeople);
+  const [people, setPeople] = useState([]);
+  const [dbFilms, setDbFilms] = useState([]);
+  const [filmsCount, setFilmsCount] = useState(0);
+  const [peopleCount, setPeopleCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [recentActivity, setRecentActivity] = useState([]);
 
   const [claims, setClaims] = useState([
     {
@@ -58,7 +61,40 @@ export default function AdminPanel() {
 
   useEffect(() => {
     document.title = "FilmDba | Admin Panel";
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      // Get Counts
+      const { count: fCount } = await supabase.from('films').select('*', { count: 'exact', head: true });
+      const { count: pCount } = await supabase.from('people').select('*', { count: 'exact', head: true });
+      
+      setFilmsCount(fCount || 0);
+      setPeopleCount(pCount || 0);
+
+      // Get Lists
+      const { data: fList } = await supabase.from('films').select('*').order('created_at', { ascending: false }).limit(20);
+      const { data: pList } = await supabase.from('people').select('*').order('popularity_score', { ascending: false }).limit(20);
+      
+      setDbFilms(fList || []);
+      setPeople(pList || []);
+
+      // Get Recent Activity (simulated from updated_at)
+      const { data: recentFilms } = await supabase
+        .from('films')
+        .select('title, updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(3);
+        
+      setRecentActivity(recentFilms || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!user) {
     return <Navigate to="/login" />;
@@ -168,15 +204,15 @@ export default function AdminPanel() {
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-10">
                   <div className="bg-surface border border-border rounded-2xl p-6">
-                    <div className="text-3xl font-bold text-text-primary mb-1">{films.length}</div>
+                    <div className="text-3xl font-bold text-text-primary mb-1">{filmsCount}</div>
                     <div className="text-sm text-text-muted">Total Films</div>
                   </div>
                   <div className="bg-surface border border-border rounded-2xl p-6">
-                    <div className="text-3xl font-bold text-text-primary mb-1">{people.length}</div>
+                    <div className="text-3xl font-bold text-text-primary mb-1">{peopleCount}</div>
                     <div className="text-sm text-text-muted">Total People</div>
                   </div>
                   <div className="bg-surface border border-border rounded-2xl p-6">
-                    <div className="text-3xl font-bold text-text-primary mb-1">12</div>
+                    <div className="text-3xl font-bold text-text-primary mb-1">0</div>
                     <div className="text-sm text-text-muted">Total Reviews</div>
                   </div>
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6">
@@ -184,12 +220,12 @@ export default function AdminPanel() {
                     <div className="text-sm text-amber-500/80 font-medium">Pending Claims</div>
                   </div>
                   <div className="bg-surface border border-border rounded-2xl p-6">
-                    <div className="text-3xl font-bold text-text-primary mb-1">847</div>
+                    <div className="text-3xl font-bold text-text-primary mb-1">1</div>
                     <div className="text-sm text-text-muted">Total Users</div>
                   </div>
                   <div className="bg-surface border border-border rounded-2xl p-6">
-                    <div className="text-xl font-bold text-text-primary mb-3 mt-1">2 hours ago</div>
-                    <div className="text-sm text-text-muted">Last YouTube Sync</div>
+                    <div className="text-xl font-bold text-text-primary mb-3 mt-1">Just now</div>
+                    <div className="text-sm text-text-muted">Last TMDB Sync</div>
                   </div>
                 </div>
 
@@ -272,16 +308,16 @@ export default function AdminPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border text-sm">
-                      {films.map((film, i) => (
+                      {dbFilms.map((film, i) => (
                         <tr key={film.id} className={`hover:bg-surface-2 transition-colors ${i % 2 === 0 ? 'bg-bg/30' : 'bg-transparent'}`}>
                           <td className="p-4">
-                            <img src={film.poster} alt={film.title} className="w-10 h-14 object-cover rounded" />
+                            <img src={film.poster_url || film.poster} alt={film.title} className="w-10 h-14 object-cover rounded" />
                           </td>
                           <td className="p-4 font-bold text-text-primary">{film.title}</td>
                           <td className="p-4 text-text-muted">{film.year}</td>
-                          <td className="p-4 text-text-muted truncate max-w-[150px]">{film.genres.join(', ')}</td>
-                          <td className="p-4 text-gold font-medium">{film.rating}</td>
-                          <td className="p-4 text-text-muted">{(film.views / 1000000).toFixed(1)}M</td>
+                          <td className="p-4 text-text-muted truncate max-w-[150px]">{(film.genres || []).join(', ')}</td>
+                          <td className="p-4 text-gold font-medium">{film.tmdb_rating || film.rating}</td>
+                          <td className="p-4 text-text-muted">{( (film.view_count || film.views || 0) / 1000000).toFixed(1)}M</td>
                           <td className="p-4">
                             <span className="bg-green-500/10 text-green-400 text-xs px-2 py-1 rounded uppercase tracking-wider">{film.status}</span>
                           </td>
@@ -330,11 +366,11 @@ export default function AdminPanel() {
                       {people.map((person, i) => (
                         <tr key={person.id} className={`hover:bg-surface-2 transition-colors ${i % 2 === 0 ? 'bg-bg/30' : 'bg-transparent'}`}>
                           <td className="p-4">
-                            <img src={person.photo} alt={person.name} className="w-10 h-10 object-cover rounded-full" />
+                            <img src={person.photo_url || person.photo} alt={person.name} className="w-10 h-10 object-cover rounded-full" />
                           </td>
                           <td className="p-4 font-bold text-text-primary">{person.name}</td>
                           <td className="p-4 text-text-muted">{person.role}</td>
-                          <td className="p-4 text-text-muted">{person.film_count}</td>
+                          <td className="p-4 text-text-muted">{person.film_count || 0}</td>
                           <td className="p-4">
                             {person.is_verified ? (
                               <span className="bg-gold/10 text-gold text-xs px-2 py-1 rounded uppercase tracking-wider">Yes</span>

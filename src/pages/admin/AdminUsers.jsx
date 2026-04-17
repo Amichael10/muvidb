@@ -15,6 +15,9 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState('All');
   
   const [roleChangeData, setRoleChangeData] = useState(null);
+  const [banData, setBanData] = useState(null);
+  const [deleteData, setDeleteData] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -23,7 +26,7 @@ export default function AdminUsers() {
         .from('users')
         .select(`
           *,
-          people(name)
+          people!fk_users_linked_profile(name)
         `)
         .order('created_at', { ascending: false });
 
@@ -49,12 +52,13 @@ export default function AdminUsers() {
   const confirmRoleChange = async () => {
     if (!roleChangeData) return;
     const { user, newRole } = roleChangeData;
+    setIsProcessing(true);
     
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ role: newRole })
-        .eq('id', user.id);
+      const { error } = await supabase.rpc('admin_change_role', { 
+        target_user_id: user.id, 
+        new_role: newRole 
+      });
 
       if (error) throw error;
 
@@ -64,7 +68,54 @@ export default function AdminUsers() {
       console.error('Error updating role:', error);
       toast.error('Failed to update role');
     } finally {
+      setIsProcessing(false);
       setRoleChangeData(null);
+    }
+  };
+
+  const confirmBanUser = async () => {
+    if (!banData) return;
+    const { user, isBanning } = banData;
+    setIsProcessing(true);
+
+    try {
+      const { error } = await supabase.rpc('admin_ban_user', {
+        target_user_id: user.id,
+        ban_status: isBanning
+      });
+
+      if (error) throw error;
+
+      toast.success(`User ${isBanning ? 'banned' : 'unbanned'} successfully`);
+    } catch (error) {
+      console.error('Error banning user:', error);
+      toast.error('Failed to update ban status');
+    } finally {
+      setIsProcessing(false);
+      setBanData(null);
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteData) return;
+    const { user } = deleteData;
+    setIsProcessing(true);
+
+    try {
+      const { error } = await supabase.rpc('admin_delete_user', {
+        target_user_id: user.id
+      });
+
+      if (error) throw error;
+
+      toast.success('User deleted permanently');
+      setUsers(users.filter(u => u.id !== user.id));
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to delete user');
+    } finally {
+      setIsProcessing(false);
+      setDeleteData(null);
     }
   };
 
@@ -201,17 +252,37 @@ export default function AdminUsers() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end" title={u.id === currentUser?.id ? "You cannot change your own role." : ""}>
+                      <div className="flex items-center justify-end gap-3" title={u.id === currentUser?.id ? "You cannot alter your own access." : ""}>
                         <select
                           value={u.role}
                           onChange={(e) => handleRoleChangeSelect(u, e.target.value)}
-                          disabled={u.id === currentUser?.id}
+                          disabled={u.id === currentUser?.id || isProcessing}
                           className="bg-bg border border-border text-text-primary rounded-lg px-3 py-1.5 text-sm focus:border-gold focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <option value="fan">Fan</option>
                           <option value="professional">Professional</option>
                           <option value="admin">Admin</option>
                         </select>
+                        <button
+                          onClick={() => setBanData({ user: u, isBanning: true })}
+                          disabled={u.id === currentUser?.id || isProcessing}
+                          className="text-yellow-500 hover:text-yellow-400 p-1.5 rounded-lg hover:bg-yellow-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Ban User"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteData({ user: u })}
+                          disabled={u.id === currentUser?.id || isProcessing}
+                          className="text-red-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="Delete User"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -231,6 +302,33 @@ export default function AdminUsers() {
           confirmColor="bg-gold text-dark hover:bg-gold/90"
           onConfirm={confirmRoleChange}
           onCancel={() => setRoleChangeData(null)}
+          isProcessing={isProcessing}
+        />
+      )}
+
+      {/* Ban Confirmation Modal */}
+      {banData && (
+        <ConfirmModal
+          title={banData.isBanning ? "Ban User" : "Unban User"}
+          message={`Are you sure you want to ${banData.isBanning ? 'ban' : 'unban'} ${banData.user.name || banData.user.email}? They will be logged out and unable to access the system.`}
+          confirmLabel={banData.isBanning ? "Ban User" : "Unban User"}
+          confirmColor="bg-yellow-500 text-black hover:bg-yellow-400"
+          onConfirm={confirmBanUser}
+          onCancel={() => setBanData(null)}
+          isProcessing={isProcessing}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteData && (
+        <ConfirmModal
+          title="Delete User permanently"
+          message={`Are you sure you want to delete ${deleteData.user.name || deleteData.user.email}? This will completely remove them and all their associated data (comments, reviews) cascaded downstream.`}
+          confirmLabel="Delete User"
+          confirmColor="bg-red-500 text-white hover:bg-red-600"
+          onConfirm={confirmDeleteUser}
+          onCancel={() => setDeleteData(null)}
+          isProcessing={isProcessing}
         />
       )}
     </div>

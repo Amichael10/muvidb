@@ -1,0 +1,24 @@
+id,name,slug
+43c80833-d18a-49b6-9472-13c404e6bc30,Action,action
+d5bf1c7d-ad01-436b-954e-7e6a948a60b4,Adventure,adventure
+a249e1aa-92ff-4b36-bb30-a71c9bb579b7,Animation,animation
+9f73e691-da34-46ee-b0fb-1259674cef61,Biography,biography
+c173d98a-c792-48eb-9499-66f82a76f516,Comedy,comedy
+eda68160-1ee0-451f-a1f5-1f5e60ff1bd5,Crime,crime
+3f636b85-5a02-4da6-9e81-28b70d85b4ae,Documentary,documentary
+9d4815ad-4a1a-48c1-863b-fa5d1654b493,Drama,drama
+9ebb6f6c-b0eb-486c-b89e-f02bc5be4cd8,Epic,epic
+3d837675-b7f3-4b42-9975-12b7a640c58d,Family,family
+e69bf6be-e8ca-4c93-9983-10d9fb926748,Fantasy,fantasy
+3c4a637e-ff97-4d90-aca4-d3b458aeee10,Historical,historical
+1a777958-b68c-4150-9909-d1b57a20e8d7,History,history
+a42eb3a9-5c65-48fa-b293-d3af271f782a,Horror,horror
+c69bf8d5-f153-4d8b-ad6e-01baead7866d,Music,music
+015b614a-c602-474f-9d96-8f32156cd111,Musical,musical
+cc6bd1fb-b429-4338-a933-a05ceeaed5f1,Mystery,mystery
+c880327b-1ec9-4304-bf94-30b9fcc917fd,Romance,romance
+1db2847c-40fd-4edc-af5a-2a5b7682a38e,Science Fiction,science-fiction
+9175f0e7-742b-46f3-9460-c12835770c30,Thriller,thriller
+b3f4fe99-cd04-421b-82a6-dcce0537be7c,TV Movie,tv-movie
+a9a91aa0-60e3-42d6-b68c-d7dbddb11579,War,war
+185f0422-1e36-4dc8-9917-7b824f5408e7,Western,western

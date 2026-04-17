@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, ReactNode } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { toast, Toaster } from 'react-hot-toast';
 import Navbar from './components/layout/Navbar';
@@ -18,6 +18,13 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ProDashboard from './pages/ProDashboard';
 import ClaimProfile from './pages/ClaimProfile';
+import PersonDetail from './pages/PersonDetail';
+import Showtimes from './pages/Showtimes';
+import Cinemas from './pages/Cinemas';
+import CinemaDetail from './pages/CinemaDetail';
+import Companies from './pages/Companies';
+import CompanyDetail from './pages/CompanyDetail';
+import PeopleList from './pages/PeopleList';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminOverview from './pages/admin/AdminOverview';
 import AdminFilms from './pages/admin/AdminFilms';
@@ -27,6 +34,7 @@ import AdminCompanies from './pages/admin/AdminCompanies';
 import AdminClaims from './pages/admin/AdminClaims';
 import AdminYouTube from './pages/admin/AdminYouTube';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminCinemas from './pages/admin/AdminCinemas';
 
 function BackToTop() {
   const [visible, setVisible] = useState(false);
@@ -51,8 +59,13 @@ function BackToTop() {
   ) : null;
 }
 
-// Protected Route Wrapper
-function ProtectedRoute({ children, allowedRoles }: { children: ReactNode, allowedRoles?: string[] }) {
+function ProtectedRoute({ 
+  children, 
+  allowedRoles 
+}: { 
+  children: ReactNode, 
+  allowedRoles?: string[] 
+}) {
   const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
@@ -60,7 +73,6 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode, allow
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // We use a timeout to ensure the toast fires after the render cycle
     setTimeout(() => {
       toast.error("You don't have permission to access this page.");
     }, 0);
@@ -70,12 +82,29 @@ function ProtectedRoute({ children, allowedRoles }: { children: ReactNode, allow
   return children;
 }
 
+function Layout({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const isAdminPath = location.pathname.toLowerCase().startsWith('/admin');
+
+  return (
+    <div className={`min-h-screen flex flex-col bg-bg text-text-primary ${isAdminPath ? 'admin-mode' : ''}`}>
+      {!isAdminPath && <Navbar />}
+      <main className="flex-grow">
+        {children}
+      </main>
+      {!isAdminPath && <Footer />}
+      {!isAdminPath && <BackToTop />}
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <Router>
-        <div className="min-h-screen flex flex-col bg-bg text-text-primary">
-          <Toaster position="top-center" toastOptions={{
+        <Toaster 
+          position="top-center" 
+          toastOptions={{
             style: {
               background: '#1A1A1A',
               color: '#F2F2F2',
@@ -87,64 +116,83 @@ export default function App() {
                 secondary: '#1A1A1A',
               },
             },
-          }} />
-          <Navbar />
-          <main className="flex-grow">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/film/:id" element={<FilmDetail />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/browse" element={<Browse />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              
-              {/* Protected Routes */}
-              <Route 
-                path="/dashboard" 
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/dashboard/pro" 
-                element={
-                  <ProtectedRoute allowedRoles={['professional', 'admin']}>
-                    <ProDashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/claim" 
-                element={
-                  <ProtectedRoute>
-                    <ClaimProfile />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/admin" 
-                element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                } 
-              >
-                <Route index element={<AdminOverview />} />
-                <Route path="films" element={<AdminFilms />} />
-                <Route path="people" element={<AdminPeople />} />
-                <Route path="credits" element={<AdminCredits />} />
-                <Route path="companies" element={<AdminCompanies />} />
-                <Route path="claims" element={<AdminClaims />} />
-                <Route path="youtube" element={<AdminYouTube />} />
-                <Route path="users" element={<AdminUsers />} />
-              </Route>
-            </Routes>
-          </main>
-          <Footer />
-          <BackToTop />
-        </div>
+          }} 
+        />
+        <Layout>
+          <Routes>
+
+            {/* Public Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/film/:id" element={<FilmDetail />} />
+            <Route path="/films/:id" element={<FilmDetail />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/browse" element={<Browse />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+
+            {/* People */}
+            <Route path="/people" element={<PeopleList />} />
+            <Route path="/people/:id" element={<PersonDetail />} />
+
+            {/* Showtimes */}
+            <Route path="/showtimes" element={<Showtimes />} />
+
+            {/* Cinemas */}
+            <Route path="/cinemas" element={<Cinemas />} />
+            <Route path="/cinemas/:id" element={<CinemaDetail />} />
+
+            {/* Companies */}
+            <Route path="/companies" element={<Companies />} />
+            <Route path="/companies/:id" element={<CompanyDetail />} />
+
+            {/* Protected Routes */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/pro" 
+              element={
+                <ProtectedRoute allowedRoles={['professional', 'admin']}>
+                  <ProDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/claim" 
+              element={
+                <ProtectedRoute>
+                  <ClaimProfile />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Admin Routes */}
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              } 
+            >
+              <Route index element={<AdminOverview />} />
+              <Route path="films" element={<AdminFilms />} />
+              <Route path="people" element={<AdminPeople />} />
+              <Route path="credits" element={<AdminCredits />} />
+              <Route path="companies" element={<AdminCompanies />} />
+              <Route path="claims" element={<AdminClaims />} />
+              <Route path="youtube" element={<AdminYouTube />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="cinemas" element={<AdminCinemas />} />
+            </Route>
+
+          </Routes>
+        </Layout>
       </Router>
     </AuthProvider>
   );

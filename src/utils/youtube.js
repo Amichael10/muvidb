@@ -19,14 +19,22 @@ export const formatViewCount = (num) => {
 // "PT2M30S" → "2:30" 
 // ─────────────────────────────────────────
 export const parseDuration = (iso) => {
-  if (!iso) return null
+  if (!iso) return { formatted: null, totalSeconds: 0 }
   const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
-  if (!match) return '0:00'
+  if (!match) return { formatted: '0:00', totalSeconds: 0 }
   const hours = parseInt(match[1] || 0)
   const minutes = parseInt(match[2] || 0)
   const seconds = parseInt(match[3] || 0)
-  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
+  const totalSeconds = (hours * 3600) + (minutes * 60) + seconds
+  
+  let formatted = ''
+  if (hours > 0) {
+    formatted = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  } else {
+    formatted = `${minutes}:${String(seconds).padStart(2, '0')}`
+  }
+  
+  return { formatted, totalSeconds }
 }
 
 // ─────────────────────────────────────────
@@ -114,17 +122,21 @@ export const searchTrailer = async (filmTitle, channelId = null) => {
     const detailData = await detailRes.json()
 
     // Score each result and return sorted by confidence
-    const scored = (detailData.items || []).map(video => ({
-      videoId: video.id,
-      title: video.snippet?.title || 'Unknown Title',
-      channelTitle: video.snippet?.channelTitle || '',
-      thumbnail: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || '',
-      duration: parseDuration(video.contentDetails?.duration),
-      rawDuration: video.contentDetails?.duration,
-      viewCount: parseInt(video.statistics?.viewCount || 0),
-      publishedAt: video.snippet?.publishedAt || new Date().toISOString(),
-      confidence: trailerConfidenceScore(video)
-    }))
+    const scored = (detailData.items || []).map(video => {
+      const durationInfo = parseDuration(video.contentDetails?.duration)
+      return {
+        videoId: video.id,
+        title: video.snippet?.title || 'Unknown Title',
+        channelTitle: video.snippet?.channelTitle || '',
+        thumbnail: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || '',
+        duration: durationInfo.formatted,
+        totalSeconds: durationInfo.totalSeconds,
+        rawDuration: video.contentDetails?.duration,
+        viewCount: parseInt(video.statistics?.viewCount || 0),
+        publishedAt: video.snippet?.publishedAt || new Date().toISOString(),
+        confidence: trailerConfidenceScore(video)
+      }
+    })
 
     return scored
       .filter(v => v.confidence > 20)   // filter out obvious non-trailers
@@ -156,12 +168,14 @@ export const fetchVideoStats = async (videoId) => {
     }
 
     const video = data.items[0]
+    const durationInfo = parseDuration(video.contentDetails?.duration)
     return {
       videoId,
       viewCount: parseInt(video.statistics?.viewCount || 0),
       likeCount: parseInt(video.statistics?.likeCount || 0),
       commentCount: parseInt(video.statistics?.commentCount || 0),
-      duration: parseDuration(video.contentDetails?.duration)
+      duration: durationInfo.formatted,
+      totalSeconds: durationInfo.totalSeconds
     }
   } catch (error) {
     console.error('fetchVideoStats error:', error)
@@ -312,7 +326,8 @@ export const resolveChannelId = async (handleOrUrl) => {
 // FUNCTION 6: Fetch recent videos from a channel
 // Used to auto-sync new trailers from trusted channels
 // ─────────────────────────────────────────
-export const fetchRecentVideosFromChannel = async (channelId, maxResults = 10) => {
+export const fetchRecentVideosFromChannel = async (channelId, maxResults = 50) => {
+  const debugLogs = [];
   try {
     // First get the uploads playlist ID for the channel
     const channelRes = await fetch(
@@ -324,53 +339,73 @@ export const fetchRecentVideosFromChannel = async (channelId, maxResults = 10) =
       return [];
     }
     if (!channelData.items || channelData.items.length === 0) {
-      console.warn(`No items found for channel ${channelId}`);
       return []
     }
     
     const uploadsPlaylistId = channelData.items[0].contentDetails?.relatedPlaylists?.uploads
     if (!uploadsPlaylistId) {
-      console.warn(`No uploads playlist found for channel ${channelId}`);
       return []
     }
     
-    // Fetch videos from the uploads playlist
-    const playlistRes = await fetch(
-      `${BASE_URL}/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=${maxResults}&key=${API_KEY}`
-    )
-    const playlistData = await playlistRes.json()
-    if (playlistData.error) {
-      console.error(`YouTube API error fetching playlist ${uploadsPlaylistId}:`, playlistData.error);
-      return [];
+    let allVideoItems = [];
+    let nextPageToken = '';
+    const maxScanDepth = Math.min(maxResults, 100); // Scan up to 100 videos
+
+    // Pagination loop
+    do {
+      const playlistRes = await fetch(
+        `${BASE_URL}/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=50&pageToken=${nextPageToken}&key=${API_KEY}`
+      )
+      const playlistData = await playlistRes.json()
+      if (playlistData.error) {
+        console.error(`YouTube API error fetching playlist ${uploadsPlaylistId}:`, playlistData.error);
+        break;
+      }
+      
+      if (!playlistData.items || playlistData.items.length === 0) break;
+      
+      allVideoItems = [...allVideoItems, ...playlistData.items];
+      nextPageToken = playlistData.nextPageToken;
+
+    } while (nextPageToken && allVideoItems.length < maxScanDepth);
+
+    if (allVideoItems.length === 0) return [];
+
+    // Filter out items without Video IDs and limit to max depth
+    const videoIds = allVideoItems
+      .slice(0, maxScanDepth)
+      .map(item => item.snippet.resourceId.videoId)
+      .filter(Boolean);
+
+    if (videoIds.length === 0) return [];
+    
+    // Batch fetch details (YouTube API allows up to 50 IDs per call)
+    const detailedVideos = [];
+    for (let i = 0; i < videoIds.length; i += 50) {
+      const batchIds = videoIds.slice(i, i + 50).join(',');
+      const detailRes = await fetch(
+        `${BASE_URL}/videos?part=snippet,contentDetails,statistics&id=${encodeURIComponent(batchIds)}&key=${API_KEY}`
+      )
+      const detailData = await detailRes.json()
+      if (detailData.items) {
+        detailedVideos.push(...detailData.items);
+      }
     }
     
-    if (!playlistData.items || playlistData.items.length === 0) {
-      console.warn(`No items found in playlist ${uploadsPlaylistId}`);
-      return []
-    }
-    
-    const videoIds = playlistData.items.map(item => item.snippet.resourceId.videoId).filter(Boolean).join(',')
-    if (!videoIds) return [];
-    
-    // Get full details (duration, stats)
-    const detailRes = await fetch(
-      `${BASE_URL}/videos?part=snippet,contentDetails,statistics&id=${encodeURIComponent(videoIds)}&key=${API_KEY}`
-    )
-    const detailData = await detailRes.json()
-    if (detailData.error) {
-      console.error(`YouTube API error fetching videos ${videoIds}:`, detailData.error);
-      return [];
-    }
-    
-    return (detailData.items || []).map(video => ({
-      videoId: video.id,
-      title: video.snippet?.title || 'Unknown Title',
-      description: video.snippet?.description || '',
-      thumbnail: video.snippet?.thumbnails?.maxres?.url || video.snippet?.thumbnails?.high?.url || video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || '',
-      publishedAt: video.snippet?.publishedAt || new Date().toISOString(),
-      duration: parseDuration(video.contentDetails?.duration),
-      viewCount: parseInt(video.statistics?.viewCount || 0)
-    }))
+    return detailedVideos.map(video => {
+      const durationInfo = parseDuration(video.contentDetails?.duration);
+      return {
+        videoId: video.id,
+        title: video.snippet?.title || 'Unknown Title',
+        description: video.snippet?.description || '',
+        thumbnail: video.snippet?.thumbnails?.maxres?.url || video.snippet?.thumbnails?.high?.url || video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || '',
+        publishedAt: video.snippet?.publishedAt || new Date().toISOString(),
+        duration: durationInfo.formatted,
+        totalSeconds: durationInfo.totalSeconds,
+        viewCount: parseInt(video.statistics?.viewCount || 0)
+      };
+    });
+
   } catch (error) {
     console.error('fetchRecentVideosFromChannel error:', error)
     return []

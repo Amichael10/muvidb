@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
-import { genres } from '../data/mockData';
+// import { genres } from '../data/mockData';
 
 export default function Browse() {
   const [searchParams] = useSearchParams();
@@ -11,22 +11,47 @@ export default function Browse() {
 
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [films, setFilms] = useState([]);
+  const [dbGenres, setDbGenres] = useState([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     document.title = "FilmDba | Browse";
     fetchFilms();
+    fetchGenres();
   }, []);
+
+  const fetchGenres = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('genres')
+        .select('name')
+        .order('name');
+      if (error) throw error;
+      setDbGenres(data.map(g => g.name) || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
   
   const fetchFilms = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('films')
-        .select('*');
+        .select(`
+          *,
+          film_genres(genres(name))
+        `);
         
       if (error) throw error;
-      setFilms(data || []);
+      
+      // Flatten genres for easier filtering
+      const flattened = data.map(f => ({
+        ...f,
+        genres: f.film_genres?.map(fg => fg.genres?.name) || []
+      }));
+
+      setFilms(flattened || []);
     } catch (error) {
       console.error('Error fetching films:', error);
     } finally {
@@ -129,7 +154,7 @@ export default function Browse() {
             <div>
               <h4 className="font-bold text-text-primary mb-3">Genres</h4>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                {genres.map(genre => (
+                {dbGenres.map(genre => (
                   <label key={genre} className="flex items-center gap-3 cursor-pointer group">
                     <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedGenres.includes(genre) ? 'bg-gold border-gold' : 'border-border bg-surface group-hover:border-gold/50'}`}>
                       {selectedGenres.includes(genre) && (

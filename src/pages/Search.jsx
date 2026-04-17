@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
-import { people, genres } from '../data/mockData';
+// import { genres } from '../data/mockData';
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -12,24 +12,56 @@ export default function Search() {
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState('films'); // 'films' | 'people'
   const [films, setFilms] = useState([]);
+  const [people, setPeople] = useState([]);
+  const [dbGenres, setDbGenres] = useState([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     document.title = "FilmDba | Search";
-    fetchFilms();
-  }, []);
-  
-  const fetchFilms = async () => {
-    setLoading(true);
+    fetchGenres();
+    if (initialQuery) {
+      fetchAll();
+    } else {
+      setLoading(false);
+    }
+  }, [initialQuery]);
+
+  const fetchGenres = async () => {
     try {
       const { data, error } = await supabase
-        .from('films')
-        .select('*');
-        
+        .from('genres')
+        .select('name')
+        .order('name');
       if (error) throw error;
-      setFilms(data || []);
+      setDbGenres(data.map(g => g.name) || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch Films
+      const { data: filmData, error: filmError } = await supabase
+        .from('films')
+        .select('*')
+        .ilike('title', `%${initialQuery}%`);
+        
+      if (filmError) throw filmError;
+      setFilms(filmData || []);
+
+      // 2. Fetch People
+      const { data: peopleData, error: peopleError } = await supabase
+        .from('people')
+        .select('*')
+        .ilike('name', `%${initialQuery}%`);
+
+      if (peopleError) throw peopleError;
+      setPeople(peopleData || []);
+
     } catch (error) {
-      console.error('Error fetching films:', error);
+      console.error('Error searching:', error);
     } finally {
       setLoading(false);
     }
@@ -52,17 +84,14 @@ export default function Search() {
 
   // Filter logic
   const filteredFilms = films.filter(f => {
-    const matchesQuery = f.title.toLowerCase().includes(initialQuery.toLowerCase());
     const filmGenres = f.genres || [];
     const matchesGenre = selectedGenre ? filmGenres.includes(selectedGenre) : true;
     const matchesYear = (f.year || 0) >= yearRange;
-    const matchesRating = (f.rating || 0) >= minRating;
-    return matchesQuery && matchesGenre && matchesYear && matchesRating;
+    const matchesRating = (f.tmdb_rating || f.rating || 0) >= minRating;
+    return matchesGenre && matchesYear && matchesRating;
   });
 
-  const filteredPeople = people.filter(p => 
-    p.name.toLowerCase().includes(initialQuery.toLowerCase())
-  );
+  const filteredPeople = people;
 
   return (
     <div className="w-full bg-bg min-h-screen pt-24 pb-20">
@@ -122,7 +151,7 @@ export default function Search() {
                 className="bg-surface-2 border border-border text-text-primary text-sm rounded-lg focus:ring-gold focus:border-gold block p-2 outline-none"
               >
                 <option value="">All Genres</option>
-                {genres.map(g => <option key={g} value={g}>{g}</option>)}
+                {dbGenres.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
             

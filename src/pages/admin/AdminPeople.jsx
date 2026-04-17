@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
+import { extractChannelIdentifier, fetchChannelData } from '../../lib/youtube';
 
 export default function AdminPeople() {
   const [people, setPeople] = useState([]);
@@ -17,6 +18,7 @@ export default function AdminPeople() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
   const [deletingPerson, setDeletingPerson] = useState(null);
+  const [personCredits, setPersonCredits] = useState([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -26,9 +28,16 @@ export default function AdminPeople() {
     date_of_birth: '',
     gender: 'Prefer not to say',
     nationality: 'Nigerian',
-    is_verified: false
+    is_verified: false,
+    is_spotlight: false,
+    popularity_score: 0,
+    youtube_channel_id: '',
+    youtube_handle: '',
+    youtube_stats: { subscribers: '0', videos: '0', thumbnail: null, banner: null }
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchPeople = async () => {
     setIsLoading(true);
@@ -122,12 +131,13 @@ export default function AdminPeople() {
       date_of_birth: '',
       gender: 'Prefer not to say',
       nationality: 'Nigerian',
-      is_verified: false
+      is_verified: false,
+      is_spotlight: false
     });
     setIsDrawerOpen(true);
   };
 
-  const openEditDrawer = (person) => {
+  const openEditDrawer = async (person) => {
     setEditingPerson(person);
     setFormData({
       name: person.name || '',
@@ -136,9 +146,124 @@ export default function AdminPeople() {
       date_of_birth: person.date_of_birth || '',
       gender: person.gender || 'Prefer not to say',
       nationality: person.nationality || 'Nigerian',
-      is_verified: person.is_verified || false
+      is_verified: person.is_verified || false,
+      is_spotlight: person.is_spotlight || false,
+      popularity_score: person.popularity_score || 0
     });
+    
+    // Fetch credits for this person
+    const { data: credits } = await supabase
+      .from('credits')
+      .select(`
+        id, role, character_name, billing_order,
+        films(id, title, year, poster_url)
+      `)
+      .eq('person_id', person.id)
+      .order('billing_order');
+      
+    setPersonCredits(credits || []);
     setIsDrawerOpen(true);
+  };
+
+  const refreshFromTmdb = async () => {
+    if (!formData.tmdb_id) {
+      toast.error('No TMDB ID linked to this profile');
+      return;
+    }
+
+    const tmdbId = formData.tmdb_id;
+    setIsRefreshing(true);
+    toast.loading('Refreshing profile data...', { id: 'refresh-profile' });
+
+    try {
+      // 1. Refresh TMDB Metadata
+      const res = await fetch(`https://api.themoviedb.org/3/person/${tmdbId}?api_key=${import.meta.env.VITE_TMDB_API_KEY}&language=en-US`);
+      if (!res.ok) throw new Error('TMDB fetch failed');
+      const data = await res.json();
+
+      setFormData(prev => ({
+        ...prev,
+        bio: data.biography || prev.bio,
+        photo_url: data.profile_path ? `https://image.tmdb.org/t/p/w520${data.profile_path}` : prev.photo_url,
+      }));
+
+      // 2. Try to refresh YouTube stats if they have a channel linked
+      if (formData.youtube_channel_id || formData.youtube_handle) {
+        try {
+          const ident = { 
+            type: formData.youtube_channel_id ? 'id' : 'handle', 
+            value: formData.youtube_channel_id || formData.youtube_handle 
+          };
+          const ytData = await fetchChannelData(ident);
+          setFormData(prev => ({
+            ...prev,
+            youtube_stats: {
+              subscribers: ytData.subscribers,
+              videos: ytData.videos,
+              thumbnail: ytData.thumbnail,
+              banner: ytData.banner,
+              last_updated: ytData.lastUpdated
+            }
+          }));
+        } catch (ytErr) {
+          console.warn('YouTube refresh failed during TMDB sync:', ytErr);
+        }
+      }
+
+      toast.success('Profile Refreshed Successfully', { id: 'refresh-profile' });
+    } catch (error) {
+      console.error('Refresh Error:', error);
+      toast.error('Failed to refresh from TMDB', { id: 'refresh-profile' });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleFetchYoutube = async () => {
+    const identifierRaw = formData.youtube_channel_id || formData.youtube_handle;
+    if (!identifierRaw) {
+      toast.error('Enter a Channel ID, Handle, or URL first');
+      return;
+    }
+
+    const t = toast.loading('Connecting to YouTube API...');
+    try {
+      const ident = extractChannelIdentifier(identifierRaw);
+      const ytData = await fetchChannelData(ident);
+      
+      setFormData(prev => ({
+        ...prev,
+        youtube_channel_id: ytData.channelId,
+        youtube_handle: ytData.handle || prev.youtube_handle,
+        youtube_stats: {
+          subscribers: ytData.subscribers,
+          videos: ytData.videos,
+          thumbnail: ytData.thumbnail,
+          banner: ytData.banner,
+          last_updated: ytData.lastUpdated
+        }
+      }));
+      toast.success(`Fetched: ${ytData.title}`, { id: t });
+    } catch (err) {
+      toast.error(err.message || 'YouTube Fetch Failed', { id: t });
+    }
+  };
+
+  const handleRemoveCredit = async (creditId) => {
+    try {
+      const { error } = await supabase
+        .from('credits')
+        .delete()
+        .eq('id', creditId);
+        
+      if (error) throw error;
+      
+      setPersonCredits(personCredits.filter(c => c.id !== creditId));
+      toast.success('Credit removed');
+    } catch (error) {
+      console.error('Error removing credit:', error);
+      toast.error('Failed to remove credit');
+    }
   };
 
   const handleSave = async (e) => {
@@ -150,6 +275,7 @@ export default function AdminPeople() {
         ...formData,
         date_of_birth: formData.date_of_birth || null,
         photo_url: formData.photo_url || null,
+        popularity_score: parseInt(formData.popularity_score) || 0
       };
 
       if (editingPerson) {
@@ -183,6 +309,21 @@ export default function AdminPeople() {
     return num.toString();
   };
 
+  const handleRecalculateScores = async () => {
+    setIsRecalculating(true);
+    try {
+      const { error } = await supabase.rpc('refresh_all_popularity_scores');
+      if (error) throw error;
+      toast.success('Popularity scores updated');
+      await fetchPeople();
+    } catch (error) {
+      console.error('Error recalculating scores:', error);
+      toast.error('Failed to update scores');
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
   const getInitials = (name) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -198,12 +339,36 @@ export default function AdminPeople() {
             {people.length}
           </span>
         </div>
-        <button
-          onClick={openAddDrawer}
-          className="bg-gold text-dark font-semibold px-4 py-2 rounded-xl hover:bg-gold/90 transition-colors"
-        >
-          + Add Person
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRecalculateScores}
+            disabled={isRecalculating}
+            className="flex items-center gap-2 bg-surface text-text-primary border border-border px-4 py-2 rounded-xl hover:bg-surface-2 transition-colors disabled:opacity-50"
+          >
+            {isRecalculating ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-gold" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Calculating...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Recalculate Scores</span>
+              </>
+            )}
+          </button>
+          <button
+            onClick={openAddDrawer}
+            className="bg-gold text-dark font-semibold px-4 py-2 rounded-xl hover:bg-gold/90 transition-colors"
+          >
+            + Add Person
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -343,6 +508,20 @@ export default function AdminPeople() {
         title={editingPerson ? "Edit Person" : "Add Person"}
       >
         <form onSubmit={handleSave} className="space-y-6">
+          <div className="flex items-center justify-between border-b border-gold/10 pb-4">
+            <h3 className="text-xs font-black text-gold uppercase tracking-[0.2em]">Personal Information</h3>
+            {editingPerson && formData.tmdb_id && (
+              <button
+                type="button"
+                onClick={() => refreshFromTmdb(formData.tmdb_id)}
+                disabled={isRefreshing}
+                className="text-[10px] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1 rounded-full hover:bg-blue-500/20 transition-all flex items-center gap-1.5"
+              >
+                {isRefreshing ? 'REFRESHING...' : '✨ REFRESH FROM TMDB'}
+              </button>
+            )}
+          </div>
+
           {/* Photo Preview */}
           <div className="flex flex-col items-center gap-4">
             {formData.photo_url ? (
@@ -427,23 +606,84 @@ export default function AdminPeople() {
             />
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-surface-2 rounded-xl border border-border">
-            <div>
-              <p className="text-sm font-medium text-text-primary">Verified Profile</p>
-              <p className="text-xs text-text-muted">Show the gold verification badge</p>
+          <div className="flex flex-col gap-4 bg-surface-2 p-4 rounded-2xl border border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary">Verified Profile</p>
+                <p className="text-xs text-text-muted italic">Show gold verification badge</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_verified: !formData.is_verified })}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  formData.is_verified ? 'bg-gold' : 'bg-surface'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  formData.is_verified ? 'translate-x-7' : 'translate-x-1'
+                }`} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, is_verified: !formData.is_verified })}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                formData.is_verified ? 'bg-gold' : 'bg-surface'
-              }`}
-            >
-              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                formData.is_verified ? 'translate-x-7' : 'translate-x-1'
-              }`} />
-            </button>
+
+            <div className="pt-4 border-t border-border/50 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-extrabold text-gold uppercase tracking-tight">Spotlight Filmmaker</p>
+                <p className="text-xs text-text-muted italic">Feature on homepage spotlight</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_spotlight: !formData.is_spotlight })}
+                className={`relative w-12 h-6 rounded-full transition-colors ${
+                  formData.is_spotlight ? 'bg-gold' : 'bg-surface'
+                }`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  formData.is_spotlight ? 'translate-x-7' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
           </div>
+
+          {/* Filmography Section */}
+          {editingPerson && (
+            <div className="space-y-4 pt-4 border-t border-border">
+              <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Filmography</h3>
+              {personCredits.length === 0 ? (
+                <p className="text-xs text-text-muted italic">No credits found for this person.</p>
+              ) : (
+                <div className="space-y-2">
+                  {personCredits.map((credit) => (
+                    <div key={credit.id} className="flex items-center gap-3 bg-surface p-2 rounded-xl border border-border group/credit">
+                      <img 
+                        src={credit.films?.poster_url || 'https://via.placeholder.com/40x60?text=No+Poster'} 
+                        alt="" 
+                        className="w-10 h-14 rounded object-cover bg-surface-2" 
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-text-primary truncate">
+                          {credit.films?.title} <span className="text-text-muted font-normal">({credit.films?.year})</span>
+                        </p>
+                        <p className="text-[10px] text-text-muted uppercase font-black tracking-tighter">
+                          {credit.role} {credit.character_name && `as ${credit.character_name}`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCredit(credit.id)}
+                        className="p-2 text-text-muted hover:text-red-500 opacity-0 group-hover/credit:opacity-100 transition-all"
+                        title="Remove Credit"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[10px] text-text-muted italic">
+                * To add credits, use the Film Library tab.
+              </p>
+            </div>
+          )}
 
           <div className="pt-4 flex flex-col gap-3">
             <button

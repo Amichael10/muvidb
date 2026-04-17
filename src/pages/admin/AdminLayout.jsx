@@ -11,8 +11,9 @@ export default function AdminLayout() {
     { path: '/admin/credits', label: 'Credits', icon: '🎭' },
     { path: '/admin/companies', label: 'Companies', icon: '🏢' },
     { path: '/admin/claims', label: 'Pending Claims', icon: '📋' },
-    { path: '/admin/youtube', label: 'YouTube Sync', icon: '🔄' },
+    { path: '/admin/youtube', label: 'Data Sources', icon: '💾' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
+    { path: '/admin/cinemas', label: 'Cinemas', icon: '🎭' },
   ];
 
   return (

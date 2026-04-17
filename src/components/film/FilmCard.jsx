@@ -29,7 +29,7 @@ export default function FilmCard({
       >
         {/* Poster Image */}
         <img 
-          src={film.poster} 
+          src={film.poster_url || film.poster} 
           alt={film.title} 
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           loading="lazy"
@@ -74,7 +74,7 @@ export default function FilmCard({
             </div>
             
             <div className="flex items-center gap-1 bg-gold text-bg px-1.5 py-0.5 rounded text-xs font-bold shrink-0">
-              <span>{film.rating}</span>
+              <span>{film.tmdb_rating || film.rating}</span>
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
               </svg>
