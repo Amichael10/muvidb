@@ -16,6 +16,8 @@ export default function AdminLayout() {
     { path: '/admin/cinemas', label: 'Cinemas', icon: '🎭' },
     { path: '/admin/channels', label: 'Channels', icon: '📺' },
     { path: '/admin/youtube-videos', label: 'YT Videos', icon: '🎞️' },
+    { path: '/admin/cinema-films', label: 'Cinema Films', icon: '🎟️' },
+    { path: '/admin/cinema-scraping', label: 'Scraping', icon: '🔄' },
   ];
 
   return (
