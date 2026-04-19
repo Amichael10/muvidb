@@ -198,7 +198,7 @@ export default function AdminPeople() {
 
     try {
       // 1. Refresh TMDB Metadata
-      const res = await fetch(`https://api.themoviedb.org/3/person/${tmdbId}?api_key=${import.meta.env.VITE_TMDB_API_KEY}&language=en-US`);
+      const res = await fetch(`/api/tmdb?endpoint=/person/${tmdbId}&language=en-US`);
       if (!res.ok) throw new Error('TMDB fetch failed');
       const data = await res.json();
 
