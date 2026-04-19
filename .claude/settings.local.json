@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat: add Vercel serverless API layer for films, people, and security' --body ' *)",
+      "Bash(winpty gh *)",
+      "Bash(cmd.exe /c \"gh --version\")",
+      "Bash(cmd.exe /c \"where gh 2>&1\")",
+      "Bash(curl -s -X POST -H 'Authorization: token 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' -H 'Accept: application/vnd.github+json' https://api.github.com/repos/Amichael10/lumi/pulls -d '{ *)",
+      "Bash(npm uninstall *)",
+      "Bash(py --version)",
+      "Bash(where python *)",
+      "Bash(where py *)",
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "Bash(xargs basename *)",
+      "Bash(py -3 -c \"import pandas; print\\(pandas.__version__\\)\")",
+      "Bash(py -3 -c ' *)",
+      "Bash(python3 -c \"import openpyxl; print\\('openpyxl available'\\)\")",
+      "Bash(python -c \"import openpyxl; print\\('openpyxl available'\\)\")",
+      "Bash(python3 -c \"import pandas; print\\('pandas available'\\)\")",
+      "Bash(python -c \"import pandas; print\\('pandas available'\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(ls /c/Python*/python.exe /c/Users/User/AppData/Local/Programs/Python/*/python.exe)",
+      "Bash(command -v python3 python py)",
+      "Bash(/c/Python313/python -c \"import pandas; print\\('pandas ok'\\); import openpyxl; print\\('openpyxl ok'\\)\")",
+      "Bash(npx tsx *)",
+      "Bash(copy \"C:\\\\Users\\\\User\\\\lumi\\\\.env\" \"C:\\\\Users\\\\User\\\\lumi\\\\.claude\\\\worktrees\\\\vibrant-mclean-10f3a7\\\\.env\")",
+      "Bash(npm list *)",
+      "Bash(node -e \"import\\('xlsx'\\).then\\(m => console.log\\(Object.keys\\(m\\)\\)\\)\")",
+      "Bash(node -e \"import\\('xlsx'\\).then\\(m => { const d = m.default; console.log\\('default keys:', Object.keys\\(d\\).filter\\(k => k.includes\\('read'\\) || k.includes\\('File'\\)\\)\\); }\\)\")"
+    ]
+  }
+}

@@ -21,7 +21,13 @@ const PUBLIC_FIELDS = [
   'nfvcb_rating',
   'status',
   'is_featured',
+  'synopsis',
+  'tagline',
+  'release_type',
+  'trailer_youtube_id',
+  'is_trending',
   'film_genres(genres(name))',
+  'film_watch_links(id, distributor, url)',
 ].join(', ');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -71,10 +77,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to fetch film' });
   }
 
+  const raw = data as any;
   const film = {
-    ...data,
+    ...raw,
     film_genres: undefined,
-    genres: data.film_genres?.map((fg: any) => fg.genres?.name).filter(Boolean) ?? [],
+    genres: raw.film_genres?.map((fg: any) => fg.genres?.name).filter(Boolean) ?? [],
+    watch_links: raw.film_watch_links ?? [],
+    film_watch_links: undefined,
   };
 
   return res.status(200).json({ film });

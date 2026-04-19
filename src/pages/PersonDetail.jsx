@@ -6,11 +6,38 @@ import { useAuth } from '../context/AuthContext'
 import { formatViewCount } from '../utils/youtube'
 import { getPersonYoutubeChannelUrl } from '../lib/youtube'
 
+const PLATFORM_STYLES = {
+  cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
+  netflix:  { label: 'Netflix',  bg: 'bg-red-600/20',     text: 'text-red-400',     dot: 'bg-red-500'    },
+  youtube:  { label: 'YouTube',  bg: 'bg-red-500/20',     text: 'text-red-400',     dot: 'bg-red-500'    },
+  amazon:   { label: 'Prime',    bg: 'bg-blue-500/20',    text: 'text-blue-400',    dot: 'bg-blue-400'   },
+  showmax:  { label: 'Showmax',  bg: 'bg-purple-500/20',  text: 'text-purple-400',  dot: 'bg-purple-400' },
+  iroko:    { label: 'iROKO',    bg: 'bg-green-500/20',   text: 'text-green-400',   dot: 'bg-green-400'  },
+}
+
+function PlatformBadge({ releaseType }) {
+  if (!releaseType) return null
+  const key = releaseType.toLowerCase()
+  const style = PLATFORM_STYLES[key]
+  if (!style) return (
+    <span className="text-[9px] font-bold uppercase tracking-widest text-[#7A8099] bg-[#1C2440] px-1.5 py-0.5 rounded">
+      {releaseType}
+    </span>
+  )
+  return (
+    <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest ${style.text} ${style.bg} px-1.5 py-0.5 rounded`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+      {style.label}
+    </span>
+  )
+}
+
 const PersonDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [person, setPerson] = useState(null)
+  const [channel, setChannel] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeRole, setActiveRole] = useState('actor')
@@ -39,6 +66,7 @@ const PersonDetail = () => {
           films(
             id, title, year, poster_url,
             view_count, average_rating,
+            release_type, trailer_youtube_id,
             film_genres(genres(name))
           )
         )
@@ -53,6 +81,14 @@ const PersonDetail = () => {
     }
 
     setPerson(data)
+
+    // Fetch linked YouTube channel
+    const { data: ch } = await supabase
+      .from('channels')
+      .select('id, name, channel_handle, channel_url, thumbnail_url, banner_url, subscriber_count, description, category')
+      .eq('owner_person_id', id)
+      .maybeSingle()
+    setChannel(ch ?? null)
 
     // Set default active role tab
     const roles = ['actor', 'director', 'writer', 'producer']
@@ -224,9 +260,9 @@ const PersonDetail = () => {
               </div>
 
               {/* Bio */}
-              {person.bio && (
+              {person.biography && (
                 <p className="text-[#F5F0E8] text-sm leading-relaxed max-w-2xl">
-                  {person.bio}
+                  {person.biography}
                 </p>
               )}
 
@@ -237,10 +273,10 @@ const PersonDetail = () => {
                     🌍 {person.nationality}
                   </span>
                 )}
-                {person.date_of_birth && (
+                {person.birth_date && (
                   <span className="text-[#7A8099]">
                     🎂 {new Date(
-                      person.date_of_birth
+                      person.birth_date
                     ).toLocaleDateString('en-NG', {
                       day: 'numeric',
                       month: 'long',
@@ -355,9 +391,12 @@ const PersonDetail = () => {
                     <p className="text-[#F5F0E8] text-xs font-semibold line-clamp-2">
                       {credit.films?.title}
                     </p>
-                    <p className="text-[#7A8099] text-xs mt-0.5">
-                      {credit.films?.year}
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <p className="text-[#7A8099] text-xs">
+                        {credit.films?.year}
+                      </p>
+                      <PlatformBadge releaseType={credit.films?.release_type} />
+                    </div>
                     {credit.character_name && (
                       <p className="text-[#D4A017] text-xs mt-0.5 italic">
                         as {credit.character_name}
@@ -377,6 +416,61 @@ const PersonDetail = () => {
           </div>
         )}
       </div>
+
+      {/* YouTube Channel Section */}
+      {channel && (
+        <div className="max-w-6xl mx-auto px-4 pb-12">
+          <h2 className="text-[#F5F0E8] text-2xl font-bold mb-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#FF0000">
+              <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+            </svg>
+            YouTube Channel
+          </h2>
+
+          <Link
+            to={`/channels/${channel.id}`}
+            className="group flex items-center gap-5 bg-[#13192B] rounded-2xl border border-[#252D45] hover:border-[#FF0000]/40 transition-all duration-300 overflow-hidden hover:shadow-lg hover:shadow-[#FF0000]/5 p-4 max-w-xl"
+          >
+            {/* Thumbnail */}
+            {channel.thumbnail_url ? (
+              <img
+                src={channel.thumbnail_url}
+                alt={channel.name}
+                className="w-16 h-16 rounded-full border-2 border-[#252D45] object-cover flex-shrink-0 group-hover:scale-105 transition-transform duration-300"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full border-2 border-[#252D45] bg-[#1C2440] flex items-center justify-center flex-shrink-0">
+                <span className="text-[#D4A017] font-bold text-2xl">{channel.name?.charAt(0)}</span>
+              </div>
+            )}
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[#F5F0E8] font-bold text-base group-hover:text-[#FF4444] transition-colors truncate">
+                {channel.name}
+              </p>
+              {channel.channel_handle && (
+                <p className="text-[#7A8099] text-xs mt-0.5">@{channel.channel_handle.replace(/^@/, '')}</p>
+              )}
+              {channel.subscriber_count > 0 && (
+                <p className="text-[#7A8099] text-xs mt-1">
+                  {formatViewCount(channel.subscriber_count)} subscribers
+                </p>
+              )}
+              {channel.description && (
+                <p className="text-[#7A8099] text-xs mt-1.5 line-clamp-2 leading-relaxed">
+                  {channel.description}
+                </p>
+              )}
+            </div>
+
+            {/* Arrow */}
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7A8099] group-hover:text-[#FF4444] flex-shrink-0 transition-colors">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

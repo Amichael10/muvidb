@@ -9,7 +9,7 @@
 // );
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../../_lib/supabase';
+import { supabase } from '../_lib/supabase';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ip =

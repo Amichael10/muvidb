@@ -22,6 +22,11 @@ const FIELDS = [
   'nfvcb_rating',
   'status',
   'is_featured',
+  'synopsis',
+  'tagline',
+  'release_type',
+  'trailer_youtube_id',
+  'is_trending',
   'film_genres(genres(name))',
 ].join(', ');
 
@@ -53,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to fetch films' });
   }
 
-  const films = (data ?? []).map(f => ({
+  const films = ((data ?? []) as any[]).map(f => ({
     ...f,
     film_genres: undefined,
     genres: f.film_genres?.map((fg: any) => fg.genres?.name).filter(Boolean) ?? [],

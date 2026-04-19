@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@mendable/firecrawl-js": "^4.18.3",
     "@supabase/supabase-js": "^2.101.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",

@@ -35,6 +35,12 @@ import AdminClaims from './pages/admin/AdminClaims';
 import AdminYouTube from './pages/admin/AdminYouTube';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminCinemas from './pages/admin/AdminCinemas';
+import Channels from './pages/Channels';
+import ChannelDetail from './pages/ChannelDetail';
+import AdminChannels from './pages/admin/AdminChannels';
+import AdminYouTubeVideos from './pages/admin/AdminYouTubeVideos';
+import AdminCinemaFilms from './pages/admin/AdminCinemaFilms';
+import AdminCinemaScraping from './pages/admin/AdminCinemaScraping';
 
 function BackToTop() {
   const [visible, setVisible] = useState(false);
@@ -141,6 +147,10 @@ export default function App() {
             <Route path="/cinemas" element={<Cinemas />} />
             <Route path="/cinemas/:id" element={<CinemaDetail />} />
 
+            {/* Channels */}
+            <Route path="/channels" element={<Channels />} />
+            <Route path="/channels/:id" element={<ChannelDetail />} />
+
             {/* Companies */}
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/:id" element={<CompanyDetail />} />
@@ -189,6 +199,10 @@ export default function App() {
               <Route path="youtube" element={<AdminYouTube />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="cinemas" element={<AdminCinemas />} />
+              <Route path="channels" element={<AdminChannels />} />
+              <Route path="youtube-videos" element={<AdminYouTubeVideos />} />
+              <Route path="cinema-films" element={<AdminCinemaFilms />} />
+              <Route path="cinema-scraping" element={<AdminCinemaScraping />} />
             </Route>
 
           </Routes>

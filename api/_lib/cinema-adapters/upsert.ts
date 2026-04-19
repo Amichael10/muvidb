@@ -1,0 +1,192 @@
+/**
+ * Shared match/upsert pipeline for cinema showtime scrapers.
+ *
+ *   scraped showtime  →  matchNollywoodFilm  →  upsert showtime (if matched)
+ *                                            →  record in pending_cinema_films (if unmatched)
+ *
+ * KEY RULE: we only create `showtimes` rows for films already in our Nollywood
+ * catalog (films.is_nollywood = true). Unmatched titles (Hollywood, anime, etc.)
+ * go into `pending_cinema_films` for admin triage. They never pollute the main
+ * catalog or the user-facing CinemaDetail page.
+ *
+ * Admin workflow (/admin/cinema-films):
+ *   • "Promote"   → copies into films (is_nollywood=true), future scrapes link here
+ *   • "Blacklist" → sets admin_decision='blacklisted', future scrapes skip
+ */
+
+import { supabase } from '../supabase';
+import type { ScrapedShowtime } from './types';
+
+type MatchCache = Map<string, string | null>; // normalized title → films.id | null (= pending)
+
+function normalizeTitle(t: string): string {
+  return t.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Find an existing Nollywood film whose title exactly matches (case-insensitive,
+ * trimmed, collapsed whitespace). Returns films.id or null.
+ *
+ * We intentionally do NOT do fuzzy/substring matching here — the cost of a false
+ * positive (wrong film linked to a showtime) is much higher than admin triage on
+ * a new title. Unmatched scrapes go to pending_cinema_films; once an admin
+ * promotes a title or aliases it to an existing film, this exact matcher will
+ * start linking it automatically next run.
+ */
+async function matchNollywoodFilm(title: string): Promise<string | null> {
+  const clean = title.trim().replace(/\s+/g, ' ');
+  if (!clean) return null;
+
+  const { data } = await supabase
+    .from('films')
+    .select('id')
+    .eq('is_nollywood', true)
+    .ilike('title', clean)       // ilike with no %..% = case-insensitive exact
+    .limit(1);
+  return data && data.length ? data[0].id : null;
+}
+
+/** Upsert into pending_cinema_films (or update last_seen + count). */
+async function recordPending(
+  st: ScrapedShowtime,
+  cinemaId: string,
+  source: string,
+): Promise<void> {
+  // Skip blacklisted titles — if admin previously rejected "The Super Mario Movie",
+  // we won't keep re-inserting it.
+  const { data: existing } = await supabase
+    .from('pending_cinema_films')
+    .select('id, showtime_count, admin_decision')
+    .eq('title', st.filmTitle.trim())
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.admin_decision === 'blacklisted' || existing.admin_decision === 'promoted') return;
+    await supabase
+      .from('pending_cinema_films')
+      .update({
+        last_seen_at: new Date().toISOString(),
+        last_seen_cinema_id: cinemaId,
+        showtime_count: (existing.showtime_count ?? 0) + 1,
+        // Refresh poster/synopsis in case the source updated them
+        poster_url: st.filmMeta?.posterUrl ?? null,
+        synopsis:   st.filmMeta?.synopsis   ?? null,
+        rating:     st.filmMeta?.rating     ?? null,
+      })
+      .eq('id', existing.id);
+    return;
+  }
+
+  await supabase.from('pending_cinema_films').insert({
+    title:               st.filmTitle.trim(),
+    external_id:         st.externalFilmId,
+    poster_url:          st.filmMeta?.posterUrl  ?? null,
+    synopsis:            st.filmMeta?.synopsis   ?? null,
+    rating:              st.filmMeta?.rating     ?? null,
+    runtime_minutes:     st.filmMeta?.runtimeMinutes ?? null,
+    source,
+    last_seen_cinema_id: cinemaId,
+    showtime_count:      1,
+  });
+}
+
+/**
+ * Insert or update showtime rows for a cinema. Marks any showtimes for this
+ * cinema+date range not present in the new batch as is_available=false, so
+ * cancelled screenings disappear from the UI without being hard-deleted.
+ */
+export async function upsertShowtimes(
+  cinemaId: string,
+  scraped: ScrapedShowtime[],
+  source: string,
+): Promise<{ matched_showtimes: number; unmatched_titles: number; marked_unavailable: number }> {
+  if (!scraped.length) return { matched_showtimes: 0, unmatched_titles: 0, marked_unavailable: 0 };
+
+  const cache: MatchCache = new Map();
+  const rows: Record<string, unknown>[] = [];
+  const unmatchedSeen = new Set<string>();
+
+  // Track the date range so we know what to mark unavailable
+  let minDate = scraped[0].showDate;
+  let maxDate = scraped[0].showDate;
+
+  for (const st of scraped) {
+    const key = normalizeTitle(st.filmTitle);
+    let filmId = cache.get(key);
+    if (filmId === undefined) {
+      filmId = await matchNollywoodFilm(st.filmTitle);
+      cache.set(key, filmId);
+    }
+
+    if (!filmId) {
+      // Not a Nollywood film — route to pending table once per unique title per run
+      if (!unmatchedSeen.has(key)) {
+        await recordPending(st, cinemaId, source);
+        unmatchedSeen.add(key);
+      }
+      continue;
+    }
+
+    if (st.showDate < minDate) minDate = st.showDate;
+    if (st.showDate > maxDate) maxDate = st.showDate;
+
+    rows.push({
+      cinema_id:    cinemaId,
+      film_id:      filmId,
+      show_date:    st.showDate,
+      show_time:    st.showTime,
+      format:       st.format || 'Standard',
+      screen_name:  st.screenName ?? null,
+      ticket_url:   st.ticketUrl ?? null,
+      price:        st.price ?? null,
+      is_available: true,
+      source,
+      last_seen_at: new Date().toISOString(),
+    });
+  }
+
+  if (!rows.length) {
+    return { matched_showtimes: 0, unmatched_titles: unmatchedSeen.size, marked_unavailable: 0 };
+  }
+
+  // Batch upsert — conflict key matches showtimes_cinema_film_date_time_fmt_uidx
+  const { error } = await supabase
+    .from('showtimes')
+    .upsert(rows, { onConflict: 'cinema_id,film_id,show_date,show_time,format' });
+
+  if (error) {
+    console.error(`[cinema-upsert] showtime upsert failed for cinema ${cinemaId}:`, error.message);
+    return { matched_showtimes: 0, unmatched_titles: unmatchedSeen.size, marked_unavailable: 0 };
+  }
+
+  // Mark old showtimes in the same cinema+date range as unavailable if
+  // they weren't seen in this scrape (they got cancelled/removed).
+  const seenKeys = new Set(rows.map(r => `${r.film_id}|${r.show_date}|${r.show_time}|${r.format}`));
+  const { data: stale } = await supabase
+    .from('showtimes')
+    .select('id, film_id, show_date, show_time, format')
+    .eq('cinema_id', cinemaId)
+    .gte('show_date', minDate)
+    .lte('show_date', maxDate)
+    .eq('is_available', true);
+
+  let markedUnavailable = 0;
+  if (stale && stale.length) {
+    const staleIds = stale
+      .filter(s => !seenKeys.has(`${s.film_id}|${s.show_date}|${s.show_time}|${s.format || 'Standard'}`))
+      .map(s => s.id);
+    if (staleIds.length) {
+      const { error: updErr } = await supabase
+        .from('showtimes')
+        .update({ is_available: false })
+        .in('id', staleIds);
+      if (!updErr) markedUnavailable = staleIds.length;
+    }
+  }
+
+  return {
+    matched_showtimes:  rows.length,
+    unmatched_titles:   unmatchedSeen.size,
+    marked_unavailable: markedUnavailable,
+  };
+}
