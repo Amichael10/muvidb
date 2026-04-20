@@ -33,8 +33,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS films_source_video_id_uidx
 ALTER TABLE credits ALTER COLUMN billing_order DROP NOT NULL;
 ALTER TABLE credits ALTER COLUMN billing_order SET DEFAULT 0;
 
--- Unique index to prevent duplicate (film, person, role) entries
--- The spreadsheet has one; make sure ours matches
+-- Deduplicate credits before creating unique index:
+-- Keep the row with the lowest ctid (physical insertion order) for each duplicate group
+DELETE FROM credits
+WHERE id IN (
+  SELECT id FROM (
+    SELECT id,
+           ROW_NUMBER() OVER (
+             PARTITION BY film_id, person_id, role
+             ORDER BY ctid
+           ) AS rn
+    FROM credits
+  ) ranked
+  WHERE rn > 1
+);
+
+-- Now safe to create the unique index
 CREATE UNIQUE INDEX IF NOT EXISTS credits_film_person_role_uidx
   ON credits (film_id, person_id, role);
 

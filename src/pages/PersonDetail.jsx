@@ -32,12 +32,26 @@ function PlatformBadge({ releaseType }) {
   )
 }
 
+/** Format seconds → "1:23:45" or "23:45" */
+function fmtDuration(secs) {
+  if (!secs) return null
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = secs % 60
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+  return `${m}:${String(s).padStart(2,'0')}`
+}
+
+const VIDEOS_PREVIEW = 8   // how many YT videos to show before "show more"
+
 const PersonDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [person, setPerson] = useState(null)
   const [channel, setChannel] = useState(null)
+  const [channelVideos, setChannelVideos] = useState([])
+  const [showAllVideos, setShowAllVideos] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeRole, setActiveRole] = useState('actor')
@@ -89,6 +103,18 @@ const PersonDetail = () => {
       .eq('owner_person_id', id)
       .maybeSingle()
     setChannel(ch ?? null)
+
+    // Fetch that channel's videos (most recent first)
+    if (ch?.id) {
+      const { data: vids } = await supabase
+        .from('channel_videos')
+        .select('id, video_id, title, thumbnail_url, published_at, duration_seconds, film_id, match_status')
+        .eq('channel_id', ch.id)
+        .eq('is_hidden', false)
+        .order('published_at', { ascending: false })
+        .limit(50)
+      setChannelVideos(vids ?? [])
+    }
 
     // Set default active role tab
     const roles = ['actor', 'director', 'writer', 'producer']
@@ -273,10 +299,10 @@ const PersonDetail = () => {
                     🌍 {person.nationality}
                   </span>
                 )}
-                {person.birth_date && (
+                {person.date_of_birth && (
                   <span className="text-[#7A8099]">
                     🎂 {new Date(
-                      person.birth_date
+                      person.date_of_birth
                     ).toLocaleDateString('en-NG', {
                       day: 'numeric',
                       month: 'long',
@@ -416,6 +442,97 @@ const PersonDetail = () => {
           </div>
         )}
       </div>
+
+      {/* YouTube Videos Section */}
+      {channelVideos.length > 0 && (
+        <div className="max-w-6xl mx-auto px-4 pb-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[#F5F0E8] text-2xl font-bold flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#FF0000">
+                <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+              </svg>
+              YouTube Videos
+              <span className="text-[#7A8099] text-base font-normal ml-1">({channelVideos.length})</span>
+            </h2>
+            {channelVideos.length > VIDEOS_PREVIEW && (
+              <button
+                onClick={() => setShowAllVideos(v => !v)}
+                className="text-sm text-[#D4A017] hover:underline"
+              >
+                {showAllVideos ? 'Show less' : `Show all ${channelVideos.length}`}
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {(showAllVideos ? channelVideos : channelVideos.slice(0, VIDEOS_PREVIEW)).map(video => (
+              <a
+                key={video.id}
+                href={`https://www.youtube.com/watch?v=${video.video_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block"
+              >
+                {/* Thumbnail */}
+                <div className="relative overflow-hidden rounded-xl aspect-video bg-[#13192B]">
+                  {video.thumbnail_url ? (
+                    <img
+                      src={video.thumbnail_url}
+                      alt={video.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#FF0000" className="opacity-40">
+                        <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+                      </svg>
+                    </div>
+                  )}
+
+                  {/* Play overlay on hover */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-[#FF0000] rounded-full p-2.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="white">
+                        <polygon points="5,3 19,12 5,21" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Duration badge */}
+                  {video.duration_seconds > 0 && (
+                    <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] font-medium px-1.5 py-0.5 rounded">
+                      {fmtDuration(video.duration_seconds)}
+                    </span>
+                  )}
+
+                  {/* YouTube badge */}
+                  <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-red-400 bg-red-500/20 px-1.5 py-0.5 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    YouTube
+                  </span>
+
+                  {/* Matched to film badge */}
+                  {video.film_id && (
+                    <span className="absolute top-1.5 right-1.5 bg-[#D4A017]/90 text-black text-[9px] font-bold px-1.5 py-0.5 rounded">
+                      In Catalog
+                    </span>
+                  )}
+                </div>
+
+                {/* Title */}
+                <p className="text-[#F5F0E8] text-xs font-medium mt-2 line-clamp-2 leading-relaxed group-hover:text-[#FF4444] transition-colors">
+                  {video.title}
+                </p>
+                {video.published_at && (
+                  <p className="text-[#7A8099] text-[10px] mt-0.5">
+                    {new Date(video.published_at).toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' })}
+                  </p>
+                )}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* YouTube Channel Section */}
       {channel && (

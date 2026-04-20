@@ -58,9 +58,9 @@ const CinemaCard = ({ cinema, showCount }) => {
         </div>
 
         {/* Location */}
-        {(cinema.location || cinema.city) && (
+        {(cinema.address || cinema.city) && (
           <p className="text-[#7A8099] text-sm mt-3 line-clamp-1">
-            📍 {[cinema.location, cinema.city].filter(Boolean).join(', ')}
+            📍 {[cinema.address, cinema.city].filter(Boolean).join(', ')}
           </p>
         )}
 
@@ -110,7 +110,7 @@ const Cinemas = () => {
 
     const { data } = await supabase
       .from('cinemas')
-      .select('id, name, city, location, is_active, booking_url')
+      .select('id, name, city, address, state, is_active, booking_url')
       .eq('is_active', true)
       .order('city')
       .order('name')
@@ -150,7 +150,7 @@ const Cinemas = () => {
     const matchSearch = !search ||
       c.name?.toLowerCase().includes(search.toLowerCase()) ||
       c.city?.toLowerCase().includes(search.toLowerCase()) ||
-      c.location?.toLowerCase().includes(search.toLowerCase())
+      c.address?.toLowerCase().includes(search.toLowerCase())
     return matchCity && matchChain && matchSearch
   })
 

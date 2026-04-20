@@ -65,16 +65,29 @@ function cleanRow(row: Record<string, unknown>): Record<string, unknown> {
 async function upsertBatched(
   table: string,
   rows: Record<string, unknown>[],
-  conflictCol = 'id'
+  conflictCol = 'id',
+  ignoreDuplicates = false,
 ) {
   let done = 0;
+  let errors = 0;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
-    const { error } = await supabase.from(table).upsert(batch, { onConflict: conflictCol });
-    if (error) console.error(`  [${table}] batch ${i / BATCH_SIZE + 1} error:`, error.message);
-    done += batch.length;
+    const { error } = await supabase
+      .from(table)
+      .upsert(batch, { onConflict: conflictCol, ignoreDuplicates });
+    if (error) {
+      console.error(`  [${table}] batch ${Math.floor(i / BATCH_SIZE) + 1} error:`, error.message);
+      errors++;
+    } else {
+      done += batch.length;
+    }
   }
-  console.log(`  ✓ ${table}: ${done} rows upserted`);
+  const total = rows.length;
+  if (errors > 0) {
+    console.log(`  ✓ ${table}: ${done}/${total} rows upserted (${errors} batch(es) failed)`);
+  } else {
+    console.log(`  ✓ ${table}: ${done} rows upserted`);
+  }
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
@@ -126,12 +139,13 @@ async function main() {
     return {
       id:                    c.id,
       name:                  c.name,
-      biography:             c.biography,   // added via setup-youtube.sql
+      biography:             c.biography,
       photo_url:             c.photo_url,
-      known_for_department:  c.known_for_department,
-      popularity_score:      c.popularity_score ? Number(c.popularity_score) : null,
+      // known_for_department added via SQL patch — omit if column not yet present
+      // known_for_department:  c.known_for_department,
+      popularity_score:      c.popularity_score ? parseFloat(Number(c.popularity_score).toFixed(4)) : null,
       is_spotlight:          c.is_spotlight === 't' || c.is_spotlight === true,
-      birth_date:            c.birth_date,
+      date_of_birth:         c.birth_date,     // DB uses date_of_birth, xlsx uses birth_date
       birthplace:            c.birthplace,
     };
   }).filter(Boolean) as Record<string, unknown>[];
@@ -139,24 +153,39 @@ async function main() {
 
   // ── Credits ────────────────────────────────────────────────────────────
   console.log('▸ Credits');
-  const credits = readSheet<any>(wb, 'Credits').map(r => {
+  const creditsRaw = readSheet<any>(wb, 'Credits').map(r => {
     const c = cleanRow(r);
-    if (!c.id || !c.film_id || !c.person_id) return null;
+    // Require at minimum film_id + person_id (id is intentionally omitted so DB generates UUID)
+    if (!c.film_id || !c.person_id) return null;
     return {
-      id:             c.id,
+      // no id — let the DB generate a fresh UUID; deduplication is handled by the
+      // credits_film_person_role_uidx unique index via onConflict below
       film_id:        c.film_id,
       person_id:      c.person_id,
-      role:           c.role,
+      role:           (c.role as string) || 'actor',
       character_name: c.character_name,
       billing_order:  c.billing_order != null ? Number(c.billing_order) : 0,
     };
   }).filter(Boolean) as Record<string, unknown>[];
-  await upsertBatched('credits', credits);
+
+  // Deduplicate by (film_id, person_id, role) — keep first occurrence
+  // The spreadsheet has duplicate entries that would violate the unique index
+  const creditsSeen = new Set<string>();
+  const credits = creditsRaw.filter(r => {
+    const key = `${r.film_id}|${r.person_id}|${r.role}`;
+    if (creditsSeen.has(key)) return false;
+    creditsSeen.add(key);
+    return true;
+  });
+  console.log(`  (deduplicated ${creditsRaw.length - credits.length} duplicate credits)`);
+  // Use film_id,person_id,role as conflict key so existing DB records are updated in-place
+  await upsertBatched('credits', credits, 'film_id,person_id,role');
 
   // ── Channels ───────────────────────────────────────────────────────────
   console.log('▸ Channels');
   const channels = readSheet<any>(wb, 'Channels').map(r => {
     const c = cleanRow(r);
+    if (!c.id) return null;
     return {
       id:                     c.id,
       name:                   c.name,
@@ -169,11 +198,11 @@ async function main() {
       thumbnail_url:          c.thumbnail_url,
       banner_url:             c.banner_url,
       is_featured:            c.is_featured === 't' || c.is_featured === true,
-      owner_person_id:        c.owner_person_id,
+      // owner_person_id set in Channel_Owners step below to avoid FK failures
       owner_name:             c.owner_name,
       videos_last_fetched_at: c.videos_last_fetched_at,
     };
-  }).filter(r => r.id);
+  }).filter(Boolean) as Record<string, unknown>[];
   await upsertBatched('channels', channels);
 
   // ── Channel_Owners (people → channels) ────────────────────────────────
@@ -201,10 +230,10 @@ async function main() {
       thumbnail_url:    c.thumbnail_url,
       published_at:     c.published_at,
       duration_seconds: c.duration_seconds ? Number(c.duration_seconds) : null,
-      film_id:          c.film_id || null,
-      match_status:     c.match_status || 'unmatched',
-      // match_confidence added via setup-youtube.sql migration — omit until applied
-      // match_confidence: c.match_confidence ? Number(c.match_confidence) : null,
+      // Null out film_id — referenced films may not exist yet in the DB.
+      // The cron job will re-link them once films are upserted.
+      film_id:          null,
+      match_status:     'unmatched',
     };
   }).filter(Boolean) as Record<string, unknown>[];
   await upsertBatched('channel_videos', videos);
@@ -218,10 +247,10 @@ async function main() {
       id:          c.id,
       name:        c.name,
       city:        c.city,
-      location:    c.location,
+      address:     c.location,              // xlsx "location" → DB "address"
+      state:       (c.location as string)?.split(',').pop()?.trim() || null,
       is_active:   c.is_active === 't' || c.is_active === true,
-      // booking_url added via setup-youtube.sql migration — include once applied
-      // booking_url: c.booking_url,
+      booking_url: c.booking_url,
     };
   }).filter(Boolean) as Record<string, unknown>[];
   await upsertBatched('cinemas', cinemas);
