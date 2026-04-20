@@ -43,12 +43,9 @@ export default function Search() {
     setLoading(true);
     try {
       // 1. Fetch Films
-      const { data: filmData, error: filmError } = await supabase
-        .from('films')
-        .select('*')
-        .ilike('title', `%${initialQuery}%`);
-        
-      if (filmError) throw filmError;
+      const res = await fetch(`/api/films?search=${encodeURIComponent(initialQuery)}&limit=50`);
+      if (!res.ok) throw new Error(`Failed to fetch films: ${res.status}`);
+      const { films: filmData } = await res.json();
       setFilms(filmData || []);
 
       // 2. Fetch People

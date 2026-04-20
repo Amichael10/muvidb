@@ -1,11 +1,10 @@
 // ─────────────────────────────────────────
 // TMDB API Utility Module
-// Uses VITE_TMDB_API_KEY for client-side calls
+// All API calls are proxied through /api/tmdb so the key
+// never appears in the browser bundle.
 // Docs: https://developer.themoviedb.org/docs
 // ─────────────────────────────────────────
 
-const API_KEY = import.meta.env.VITE_TMDB_API_KEY
-const BASE_URL = 'https://api.themoviedb.org/3'
 const IMAGE_BASE = 'https://image.tmdb.org/t/p'
 
 // ─── Image URL Helper ────────────────────
@@ -79,22 +78,18 @@ export const mapTmdbGenre = (tmdbGenreId) => {
 }
 
 // ─── API Fetch Helper ────────────────────
+// Routes through the server-side /api/tmdb proxy so the API key
+// is never included in the client bundle.
 const tmdbFetch = async (endpoint, params = {}) => {
-  if (!API_KEY) {
-    console.error('TMDB API key is missing. Add VITE_TMDB_API_KEY to your .env file.')
-    return null
-  }
-
-  const url = new URL(`${BASE_URL}${endpoint}`)
-  url.searchParams.set('api_key', API_KEY)
+  const searchParams = new URLSearchParams({ endpoint })
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
-      url.searchParams.set(key, value)
+      searchParams.set(key, value)
     }
   })
 
   try {
-    const res = await fetch(url.toString())
+    const res = await fetch(`/api/tmdb?${searchParams}`)
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}))
       console.error(`TMDB API error (${res.status}):`, errData)

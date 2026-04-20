@@ -14,6 +14,10 @@ export default function AdminLayout() {
     { path: '/admin/youtube', label: 'Data Sources', icon: '💾' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
     { path: '/admin/cinemas', label: 'Cinemas', icon: '🎭' },
+    { path: '/admin/channels', label: 'Channels', icon: '📺' },
+    { path: '/admin/youtube-videos', label: 'YT Videos', icon: '🎞️' },
+    { path: '/admin/cinema-films', label: 'Cinema Films', icon: '🎟️' },
+    { path: '/admin/cinema-scraping', label: 'Scraping', icon: '🔄' },
   ];
 
   return (

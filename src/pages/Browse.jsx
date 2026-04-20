@@ -36,22 +36,10 @@ export default function Browse() {
   const fetchFilms = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('films')
-        .select(`
-          *,
-          film_genres(genres(name))
-        `);
-        
-      if (error) throw error;
-      
-      // Flatten genres for easier filtering
-      const flattened = data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name) || []
-      }));
-
-      setFilms(flattened || []);
+      const res = await fetch('/api/films?limit=50');
+      if (!res.ok) throw new Error(`Failed to fetch films: ${res.status}`);
+      const { films } = await res.json();
+      setFilms(films || []);
     } catch (error) {
       console.error('Error fetching films:', error);
     } finally {

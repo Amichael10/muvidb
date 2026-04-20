@@ -87,12 +87,10 @@ export default function Home() {
   const fetchFilms = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('films')
-        .select('*');
-
-      if (error) throw error;
-      setFilms(data || []);
+      const res = await fetch('/api/films?limit=50');
+      if (!res.ok) throw new Error(`Failed to fetch films: ${res.status}`);
+      const { films } = await res.json();
+      setFilms(films || []);
     } catch (error) {
       console.error('Error fetching films:', error);
     } finally {

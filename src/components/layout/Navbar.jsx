@@ -60,6 +60,7 @@ export default function Navbar() {
     { name: 'Browse', path: '/browse' },
     { name: 'Showtimes', path: '/showtimes' },
     { name: 'Cinemas', path: '/cinemas' },
+    { name: 'Channels', path: '/channels' },
     { name: 'People', path: '/people' },
     { name: 'Companies', path: '/companies' },
   ];

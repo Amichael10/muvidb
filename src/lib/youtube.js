@@ -1,5 +1,5 @@
-const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
-const BASE_URL = 'https://www.googleapis.com/youtube/v3';
+// YouTube API calls are proxied through /api/youtube so the key
+// is never included in the client bundle.
 
 /**
  * Extracts Video ID from various YouTube URL formats
@@ -48,31 +48,30 @@ export const extractChannelIdentifier = (url) => {
 };
 
 /**
- * Fetches subscriber count, video count, thumbnail, and banner for a channel
+ * Fetches subscriber count, video count, thumbnail, and banner for a channel.
+ * Routes through /api/youtube so the API key stays server-side.
  */
 export const fetchChannelData = async (identifier) => {
-  if (!YOUTUBE_API_KEY || YOUTUBE_API_KEY === 'your_youtube_api_key') {
-    throw new Error('YouTube API Key not configured');
-  }
-
   try {
     let channelId = identifier.value;
 
-    // If it's a handle, we first need to search for the channel ID
+    // If it's a handle, resolve it to a channel ID first
     if (identifier.type === 'handle') {
-      const searchUrl = `${BASE_URL}/search?part=snippet&type=channel&q=${identifier.value}&key=${YOUTUBE_API_KEY}`;
-      const searchRes = await fetch(searchUrl);
+      const searchRes = await fetch(
+        `/api/youtube?endpoint=search&part=snippet&type=channel&q=${encodeURIComponent(identifier.value)}`
+      );
       const searchData = await searchRes.json();
-      
+
       if (!searchData.items || searchData.items.length === 0) {
         throw new Error('Channel not found');
       }
       channelId = searchData.items[0].id.channelId;
     }
 
-    // Now fetch full stats and branding
-    const detailUrl = `${BASE_URL}/channels?part=snippet,statistics,brandingSettings&id=${channelId}&key=${YOUTUBE_API_KEY}`;
-    const detailRes = await fetch(detailUrl);
+    // Fetch full stats and branding
+    const detailRes = await fetch(
+      `/api/youtube?endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(channelId)}`
+    );
     const detailData = await detailRes.json();
 
     if (!detailData.items || detailData.items.length === 0) {
