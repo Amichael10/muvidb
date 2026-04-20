@@ -106,12 +106,23 @@ async function processPeopleSheet(filePath) {
     const nameKey = p.name.trim().toLowerCase();
     
     let dbPayload = { ...p };
+    // Strip empty-string values
+    for (const key of Object.keys(dbPayload)) {
+      if (dbPayload[key] === '') delete dbPayload[key];
+    }
     delete dbPayload.known_for_department;
     delete dbPayload.birthplace;
     if (dbPayload.biography !== undefined) {
       dbPayload.bio = dbPayload.biography;
       delete dbPayload.biography;
     }
+    // Drop columns that don't exist in the people DB schema
+    delete dbPayload.id;
+    delete dbPayload.birth_date;
+    delete dbPayload.popularity_score;
+    delete dbPayload.is_spotlight;
+    delete dbPayload.created_at;
+    delete dbPayload.updated_at;
 
     if (personNameToId.has(nameKey)) {
       const pid = personNameToId.get(nameKey);
@@ -132,7 +143,7 @@ async function processPeopleSheet(filePath) {
         personNameToId.set(nameKey, data.id);
         logEvent('inserted', `Person: ${p.name}`);
       } else {
-        logEvent('errors', `Person Insert: ${p.name}`);
+        logEvent('errors', `Person Insert: ${p.name} - ${error?.message}`);
       }
     }
   }
@@ -144,6 +155,17 @@ async function processFilmsSheet(filePath, sheetName) {
     if (!f.title) continue;
     const titleKey = f.title.trim().toLowerCase();
     
+    // Strip empty-string values so Supabase uses column defaults
+    for (const key of Object.keys(f)) {
+      if (f[key] === '') delete f[key];
+    }
+
+    // AMDB/NollyData use 'film_id' as PK column — rename to 'id'
+    if (f.film_id && !f.id) {
+      f.id = f.film_id;
+    }
+    delete f.film_id;
+
     // Nollydata maps runtime_min to runtime_minutes
     if (f.runtime_min) {
       f.runtime_minutes = f.runtime_min;
@@ -159,6 +181,23 @@ async function processFilmsSheet(filePath, sheetName) {
     delete f.amdb_url;
     delete f.amdb_slug;
     delete f.country;
+    delete f.partyjollof_url;
+    delete f.partyjollof_slug;
+    // Columns that don't exist in the films DB schema
+    delete f.genres;
+    delete f.languages;
+    delete f.type;
+    delete f.rating_avg;
+    delete f.rating_count;
+    delete f.release_date;
+    delete f.fetched_at;
+    delete f.watch_link_count;
+    delete f.nd_genre;
+    delete f.nd_type;
+    delete f.nd_runtime_min;
+    delete f.nd_overview;
+    delete f.nd_poster_url;
+    delete f.nd_distributors;
 
     if (filmTitleToId.has(titleKey)) {
       const fid = filmTitleToId.get(titleKey);
@@ -202,7 +241,7 @@ async function processCredits(filePath, castSheet, crewSheet) {
       person_id: pId,
       role: 'actor',
       character_name: c.character_name || c.character,
-      billing_order: c.billing_order !== undefined ? c.billing_order : 999
+      billing_order: (c.billing_order !== undefined && c.billing_order !== '') ? Number(c.billing_order) : 999
     };
     
     const { error } = await supabase.from('credits').insert([payload]);
@@ -226,6 +265,40 @@ async function processCredits(filePath, castSheet, crewSheet) {
 
     const { error } = await supabase.from('credits').insert([payload]);
     if (!error) logEvent('inserted', `Crew Credit: ${c.person_name} (${c.role}) in ${c.film_title}`);
+  }
+}
+
+async function processPartyJollofCredits(filePath) {
+  const credits = readSheet(filePath, 'Credits');
+
+  for (const c of credits) {
+    if (!c.film_title || !c.person_name) continue;
+
+    const fId = filmTitleToId.get(c.film_title.trim().toLowerCase());
+    if (!fId) {
+      logEvent('errors', `Credit link failed: missing film "${c.film_title}"`);
+      continue;
+    }
+
+    let pId = personNameToId.get(c.person_name.trim().toLowerCase());
+    if (!pId) {
+      logEvent('errors', `Credit link failed: missing person "${c.person_name}"`);
+      continue;
+    }
+
+    const billingOrder = (c.billing_order !== undefined && c.billing_order !== '') ? Number(c.billing_order) : 999;
+    const payload = {
+      film_id: fId,
+      person_id: pId,
+      role: (c.role || 'actor').toLowerCase(),
+      character_name: c.character_name || null,
+      billing_order: isNaN(billingOrder) ? 999 : billingOrder
+    };
+
+    const { error } = await supabase.from('credits').insert([payload]);
+    if (!error) logEvent('inserted', `Credit: ${c.person_name} (${c.role}) in ${c.film_title}`);
+    else if (error.message.includes('duplicate key')) logEvent('skipped', `Credit exists: ${c.person_name} in ${c.film_title}`);
+    else logEvent('errors', `Credit insert failed: ${c.person_name} in ${c.film_title} - ${error.message}`);
   }
 }
 
@@ -281,6 +354,7 @@ async function runImporter() {
 
   const amdbFilePath = path.join(dataDir, 'africanmoviedb_only.xlsx');
   const ndFilePath = path.join(dataDir, 'nollydata_only.xlsx');
+  const pjFilePath = path.join(dataDir, 'partyjollof_only.xlsx');
 
   // Process African Movie DB
   console.log("\n-> Ingesting AfricanMovieDB...");
@@ -295,6 +369,12 @@ async function runImporter() {
   await processWatchLinks(ndFilePath, 'nollydata_watch_links');
   // Nollydata cast & crew sheets are currently returned empty, but just in case we hit them
   await processCredits(ndFilePath, 'nollydata_cast', 'nollydata_crew');
+
+  // Process PartyJollof
+  console.log("\n-> Ingesting PartyJollof...");
+  await processFilmsSheet(pjFilePath, 'Films');
+  await processPeopleSheet(pjFilePath, 'People');
+  await processPartyJollofCredits(pjFilePath);
 
   // Write report
   let report = `=== EXCEL BATCH IMPORT REPORT ===\n\n`;

@@ -3,7 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
-import { formatViewCount } from '../utils/youtube'
+import {
+  formatViewCount,
+  fetchRecentVideosFromChannel,
+  resolveChannelId
+} from '../utils/youtube'
 import { getPersonYoutubeChannelUrl } from '../lib/youtube'
 
 const PersonDetail = () => {
@@ -14,6 +18,9 @@ const PersonDetail = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeRole, setActiveRole] = useState('actor')
+  const [youtubeFilms, setYoutubeFilms] = useState([])
+  const [youtubeVideoIds, setYoutubeVideoIds] = useState([])
+  const [youtubeLoading, setYoutubeLoading] = useState(false)
 
   const {
     isFollowing,
@@ -29,6 +36,8 @@ const PersonDetail = () => {
   const fetchPerson = async () => {
     setLoading(true)
     setError(null)
+    setYoutubeFilms([])
+    setYoutubeVideoIds([])
 
     const { data, error } = await supabase
       .from('people')
@@ -37,7 +46,7 @@ const PersonDetail = () => {
         credits(
           id, role, character_name, billing_order,
           films(
-            id, title, year, poster_url,
+            id, title, year, poster_url, trailer_youtube_id,
             view_count, average_rating,
             film_genres(genres(name))
           )
@@ -53,6 +62,7 @@ const PersonDetail = () => {
     }
 
     setPerson(data)
+    fetchYoutubeFilms(data)
 
     // Set default active role tab
     const roles = ['actor', 'director', 'writer', 'producer']
@@ -62,6 +72,96 @@ const PersonDetail = () => {
     if (firstRole) setActiveRole(firstRole)
 
     setLoading(false)
+  }
+
+  const fetchYoutubeFilms = async (personData) => {
+    if (!personData?.youtube_channel_id && !personData?.youtube_handle) {
+      setYoutubeFilms([])
+      setYoutubeVideoIds([])
+      return
+    }
+
+    setYoutubeLoading(true)
+
+    try {
+      let channelId = personData.youtube_channel_id
+
+      if (!channelId && personData.youtube_handle) {
+        const resolved = await resolveChannelId(
+          `@${String(personData.youtube_handle).replace(/^@/, '')}`
+        )
+
+        if (resolved?.error || !resolved?.channelId) {
+          setYoutubeFilms([])
+          setYoutubeVideoIds([])
+          return
+        }
+
+        channelId = resolved.channelId
+      }
+
+      if (!channelId) {
+        setYoutubeFilms([])
+        setYoutubeVideoIds([])
+        return
+      }
+
+      const videos = await fetchRecentVideosFromChannel(channelId, 50)
+      const orderedVideoIds = [...new Set(
+        videos.map(video => video.videoId).filter(Boolean)
+      )]
+
+      if (orderedVideoIds.length === 0) {
+        setYoutubeFilms([])
+        setYoutubeVideoIds([])
+        return
+      }
+
+      setYoutubeVideoIds(orderedVideoIds)
+
+      const { data: matchedFilms, error: filmsError } = await supabase
+        .from('films')
+        .select(`
+          id, title, year, poster_url, trailer_youtube_id,
+          view_count, average_rating, release_type, youtube_watch_url,
+          film_genres(genres(name))
+        `)
+        .in('trailer_youtube_id', orderedVideoIds)
+
+      if (filmsError) {
+        throw filmsError
+      }
+
+      const creditedFilmIds = new Set(
+        (personData.credits || [])
+          .map(credit => credit.films?.id)
+          .filter(Boolean)
+      )
+
+      const videoOrder = new Map(
+        orderedVideoIds.map((videoId, index) => [videoId, index])
+      )
+
+      const normalizedYoutubeFilms = (matchedFilms || [])
+        .filter(film => !creditedFilmIds.has(film.id))
+        .map(film => ({
+          ...film,
+          genres: film.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        }))
+        .sort((a, b) => {
+          const aIndex = videoOrder.get(a.trailer_youtube_id) ?? Number.MAX_SAFE_INTEGER
+          const bIndex = videoOrder.get(b.trailer_youtube_id) ?? Number.MAX_SAFE_INTEGER
+          return aIndex - bIndex
+        })
+
+      setYoutubeFilms(normalizedYoutubeFilms)
+    } catch (err) {
+      console.error('Error fetching YouTube films for person:', err)
+      setYoutubeFilms([])
+      setYoutubeVideoIds([])
+    } finally {
+      setYoutubeLoading(false)
+    }
   }
 
   const handleFollow = async () => {
@@ -97,6 +197,11 @@ const PersonDetail = () => {
     director: 'Director',
     writer: 'Writer',
     producer: 'Producer'
+  }
+
+  const isYoutubeFilm = (film) => {
+    if (!film?.trailer_youtube_id) return false
+    return youtubeVideoIds.includes(film.trailer_youtube_id)
   }
 
   if (loading) {
@@ -295,6 +400,85 @@ const PersonDetail = () => {
 
       {/* Filmography */}
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {(youtubeLoading || youtubeFilms.length > 0) && (
+          <div className="mb-10">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-[#F5F0E8] text-2xl font-bold">
+                  From YouTube Channel
+                </h2>
+                <p className="text-[#7A8099] text-sm mt-1">
+                  Titles matched from this creator&apos;s official uploads
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#FF0000]/30 bg-[#FF0000]/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#FF6B6B]">
+                <span className="h-2 w-2 rounded-full bg-[#FF0000]" />
+                YouTube
+              </span>
+            </div>
+
+            {youtubeLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="aspect-[2/3] rounded-xl bg-[#13192B] animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
+                {youtubeFilms.map(film => (
+                  <Link
+                    key={film.id}
+                    to={`/films/${film.id}`}
+                    className="group block"
+                  >
+                    <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[#13192B]">
+                      {film.poster_url ? (
+                        <img
+                          src={film.poster_url}
+                          alt={film.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="text-4xl">🎬</span>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+
+                      <div className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#FF0000] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+                        </svg>
+                        YouTube
+                      </div>
+
+                      {film.average_rating > 0 && (
+                        <div className="absolute top-2 right-2 bg-[#D4A017] text-black text-xs font-bold px-2 py-0.5 rounded-lg">
+                          {film.average_rating} ★
+                        </div>
+                      )}
+
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="text-[#F5F0E8] text-xs font-semibold line-clamp-2">
+                          {film.title}
+                        </p>
+                        <p className="text-[#7A8099] text-xs mt-0.5">
+                          {film.year}
+                          {film.genres?.[0] ? ` • ${film.genres[0]}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <h2 className="text-[#F5F0E8] text-2xl font-bold mb-6">
           Filmography
         </h2>
@@ -347,6 +531,15 @@ const PersonDetail = () => {
                   {credit.films?.average_rating > 0 && (
                     <div className="absolute top-2 right-2 bg-[#D4A017] text-black text-xs font-bold px-2 py-0.5 rounded-lg">
                       {credit.films.average_rating} ★
+                    </div>
+                  )}
+
+                  {isYoutubeFilm(credit.films) && (
+                    <div className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#FF0000] px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+                      </svg>
+                      YouTube
                     </div>
                   )}
 
