@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';

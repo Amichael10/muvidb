@@ -80,7 +80,7 @@ export default function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="name@example.com"
-            className={`w-full bg-bg border ${error ? 'border-red-500' : 'border-border'} text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all`}
+            className={`w-full bg-surface border ${error ? 'border-red-500' : 'border-border'} text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all`}
           />
         </div>
 
@@ -90,7 +90,7 @@ export default function Login() {
             <label className="block text-xs font-medium text-text-muted uppercase tracking-wider">
               Password
             </label>
-            <Link to="/forgot-password" className="text-xs font-medium text-gold hover:underline">
+            <Link to="/forgot-password" className="text-xs font-medium text-brand hover:underline">
               Forgot password?
             </Link>
           </div>
@@ -100,7 +100,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className={`w-full bg-bg border ${error ? 'border-red-500' : 'border-border'} text-text-primary placeholder-text-muted rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all`}
+              className={`w-full bg-surface border ${error ? 'border-red-500' : 'border-border'} text-text-primary placeholder-text-muted rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all`}
             />
             <button
               type="button"
@@ -127,7 +127,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-gold text-bg font-bold py-3.5 rounded-xl hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px] mt-2"
+          className="w-full bg-brand text-white font-bold py-3.5 rounded-xl hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px] mt-2 shadow-lg shadow-brand/20"
         >
           {isLoading ? 'Signing in...' : 'Sign In'}
         </button>
@@ -158,7 +158,7 @@ export default function Login() {
       {/* Sign Up Link */}
       <p className="text-center text-text-muted mt-8 text-sm">
         Don't have an account?{' '}
-        <Link to="/signup" className="text-gold font-bold hover:underline">
+        <Link to="/signup" className="text-brand font-bold hover:underline">
           Sign up
         </Link>
       </p>

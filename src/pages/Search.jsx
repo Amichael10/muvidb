@@ -105,7 +105,7 @@ export default function Search() {
         <div className="max-w-3xl mx-auto mb-12">
           <form onSubmit={handleSearch} className="relative group">
             <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
-              <svg className="w-5 h-5 text-text-muted group-focus-within:text-gold transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
@@ -114,15 +114,15 @@ export default function Search() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search films, people, or studios..." 
-              className="w-full bg-surface border-2 border-border rounded-2xl py-5 pl-14 pr-32 text-xl text-text-primary placeholder-text-muted focus:outline-none focus:border-gold transition-all shadow-xl"
+              className="w-full bg-surface border-2 border-border rounded-2xl py-5 pl-14 pr-32 text-xl text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-all shadow-xl"
             />
-            <button type="submit" className="absolute inset-y-3 right-3 bg-gold text-bg px-8 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all">
+            <button type="submit" className="absolute inset-y-3 right-3 bg-brand text-white px-8 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-brand/20">
               Search
             </button>
           </form>
           {initialQuery && (
             <p className="mt-4 text-center text-text-muted">
-              Results and insights for <span className="text-gold font-bold">"{initialQuery}"</span>
+              Results and insights for <span className="text-brand font-bold">"{initialQuery}"</span>
             </p>
           )}
         </div>
@@ -139,7 +139,7 @@ export default function Search() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
                 activeTab === tab.id 
-                  ? 'bg-gold text-bg shadow-lg shadow-gold/20' 
+                  ? 'bg-brand text-white shadow-lg shadow-brand/20' 
                   : 'bg-surface-2 text-text-muted hover:text-text-primary border border-border'
               }`}
             >
@@ -178,13 +178,13 @@ export default function Search() {
                 companies.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {companies.map(company => (
-                      <div key={company.id} className="bg-surface border border-border p-6 rounded-2xl flex flex-col items-center text-center group hover:border-gold/50 transition-all">
-                        <div className="w-16 h-16 bg-gold/10 rounded-xl flex items-center justify-center text-gold mb-4 group-hover:scale-110 transition-transform">
+                      <div key={company.id} className="bg-surface border border-border p-6 rounded-2xl flex flex-col items-center text-center group hover:border-brand/40 transition-all">
+                        <div className="w-16 h-16 bg-brand/10 rounded-xl flex items-center justify-center text-brand mb-4 group-hover:scale-110 transition-transform">
                           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                           </svg>
                         </div>
-                        <h3 className="font-heading font-bold text-lg text-text-primary group-hover:text-gold transition-colors">{company.name}</h3>
+                        <h3 className="font-heading font-bold text-lg text-text-primary group-hover:text-brand transition-colors">{company.name}</h3>
                         <p className="text-sm text-text-muted mt-1">{company.country || 'International'}</p>
                       </div>
                     ))}

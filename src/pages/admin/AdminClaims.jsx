@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AdminClaims() {

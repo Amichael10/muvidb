@@ -24,7 +24,7 @@ function PlatformBadge({ releaseType }) {
   const key = releaseType.toLowerCase()
   const style = PLATFORM_STYLES[key]
   if (!style) return (
-    <span className="text-[9px] font-bold uppercase tracking-widest text-[#7A8099] bg-[#1C2440] px-1.5 py-0.5 rounded">
+    <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted bg-surface-2 px-1.5 py-0.5 rounded">
       {releaseType}
     </span>
   )
@@ -352,7 +352,7 @@ const PersonDetail = () => {
           </p>
           <button
             onClick={() => navigate(-1)}
-            className="text-[#D4A017] hover:underline"
+            className="text-brand hover:underline"
           >
             Go back
           </button>
@@ -367,9 +367,9 @@ const PersonDetail = () => {
   ) || 0
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E]">
+    <div className="min-h-screen bg-bg">
       {/* Hero Section */}
-      <div className="bg-[#13192B] border-b border-[#252D45]">
+      <div className="bg-surface border-b border-border">
         <div className="max-w-6xl mx-auto px-4 py-8 pt-24">
           <div className="flex flex-col md:flex-row gap-8">
 
@@ -382,8 +382,8 @@ const PersonDetail = () => {
                   className="w-48 h-48 md:w-56 md:h-56 rounded-2xl object-cover shadow-2xl"
                 />
               ) : (
-                <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl bg-[#1C2440] flex items-center justify-center shadow-2xl">
-                  <span className="text-6xl font-bold text-[#D4A017]">
+                <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl bg-surface-2 flex items-center justify-center shadow-2xl">
+                  <span className="text-6xl font-bold text-brand">
                     {person.name?.charAt(0)}
                   </span>
                 </div>
@@ -394,11 +394,11 @@ const PersonDetail = () => {
             <div className="flex-1 space-y-4">
               {/* Name + verified */}
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-3xl md:text-4xl font-bold text-[#F5F0E8]">
+                <h1 className="text-3xl md:text-4xl font-heading font-bold text-text-primary">
                   {person.name}
                 </h1>
                 {person.is_verified && (
-                  <span className="bg-[#D4A017] text-black text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                  <span className="bg-brand text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                     ✓ Verified
                   </span>
                 )}
@@ -407,9 +407,9 @@ const PersonDetail = () => {
               {/* Roles */}
               <div className="flex flex-wrap gap-2">
                 {availableRoles.map(role => (
-                  <span
+                   <span
                     key={role}
-                    className="text-[#7A8099] text-sm capitalize"
+                    className="text-text-secondary text-sm capitalize"
                   >
                     {roleLabels[role]}
                     {availableRoles.indexOf(role) <
@@ -421,28 +421,28 @@ const PersonDetail = () => {
               {/* Stats */}
               <div className="flex flex-wrap gap-6">
                 <div>
-                  <p className="text-[#D4A017] text-2xl font-bold">
+                  <p className="text-brand text-2xl font-bold">
                     {formatViewCount(
                       person.popularity_score || totalViews
                     )}
                   </p>
-                  <p className="text-[#7A8099] text-xs">
+                  <p className="text-text-muted text-xs">
                     Total Views
                   </p>
                 </div>
                 <div>
-                  <p className="text-[#D4A017] text-2xl font-bold">
+                  <p className="text-brand text-2xl font-bold">
                     {totalFilms}
                   </p>
-                  <p className="text-[#7A8099] text-xs">
+                  <p className="text-text-muted text-xs">
                     Credits
                   </p>
                 </div>
                 <div>
-                  <p className="text-[#D4A017] text-2xl font-bold">
+                  <p className="text-brand text-2xl font-bold">
                     {followerCount.toLocaleString()}
                   </p>
-                  <p className="text-[#7A8099] text-xs">
+                  <p className="text-text-muted text-xs">
                     Followers
                   </p>
                 </div>
@@ -499,14 +499,14 @@ const PersonDetail = () => {
                     href={getPersonYoutubeChannelUrl(person)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold text-sm transition-all border-2 border-[#FF0000]/40 text-[#F5F0E8] bg-[#13192B] hover:bg-[#FF0000]/10 hover:border-[#FF0000]"
+                    className="inline-flex items-center gap-2 px-8 py-3 rounded-full font-semibold text-sm transition-all border-2 border-red-500/40 text-text-primary bg-surface hover:bg-red-500/10 hover:border-red-500"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-[#FF0000]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
                       <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
                     </svg>
                     View channel
                     {person.youtube_stats?.subscribers != null && (
-                      <span className="text-[11px] font-normal text-[#7A8099] tabular-nums">
+                      <span className="text-[11px] font-normal text-text-secondary tabular-nums">
                         ({formatViewCount(Number(person.youtube_stats.subscribers))})
                       </span>
                     )}
@@ -522,21 +522,21 @@ const PersonDetail = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Main Filmography */}
 
-        <h2 className="text-[#F5F0E8] text-2xl font-bold mb-6">
+        <h2 className="text-text-primary text-2xl font-bold font-heading mb-6">
           Filmography
         </h2>
 
         {/* Role tabs */}
         {availableRoles.length > 1 && (
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
             {availableRoles.map(role => (
               <button
                 key={role}
                 onClick={() => setActiveRole(role)}
                 className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                   activeRole === role
-                    ? 'bg-[#D4A017] text-black'
-                    : 'bg-[#13192B] text-[#7A8099] hover:text-[#F5F0E8]'
+                    ? 'bg-brand text-white'
+                    : 'bg-surface border border-border text-text-secondary hover:text-text-primary'
                 }`}
               >
                 {roleLabels[role]} ({creditsByRole(role).length})
@@ -570,7 +570,7 @@ const PersonDetail = () => {
                   }}
                   className="group block"
                 >
-                  <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[#13192B]">
+                  <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-surface-2 border border-border group-hover:border-brand/40 transition-all">
                     {poster ? (
                       <img
                         src={poster}
@@ -579,24 +579,24 @@ const PersonDetail = () => {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-4xl text-[#7A8099]">🎬</span>
+                        <span className="text-4xl text-text-muted">🎬</span>
                       </div>
                     )}
 
                     {/* Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-bg/90 via-transparent to-transparent" />
 
                     {/* Rating badge */}
                     {film?.average_rating > 0 && (
-                      <div className="absolute top-2 right-2 bg-[#D4A017] text-black text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-lg">
+                      <div className="absolute top-2 right-2 bg-brand text-white text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-lg">
                         {film.average_rating} ★
                       </div>
                     )}
 
                     {isYoutubeItem(credit) && (
-                      <div className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#FF0000] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow-lg">
+                      <div className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow-lg">
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029 6.185.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+                          <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
                         </svg>
                         YouTube
                       </div>

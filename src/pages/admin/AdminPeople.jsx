@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';

@@ -206,10 +206,20 @@ const TMDBSyncPanel = () => {
         })
       }
 
-      // 6. Import companies
+      // 6. Import companies & link them
       setImportProgress('Importing production companies...')
+      const companyLinks = []
       for (const company of details.companies) {
-        await upsertCompany(company)
+        const companyId = await upsertCompany(company)
+        if (companyId) {
+          companyLinks.push({ 
+            film_id: filmId, 
+            company_id: companyId 
+          })
+        }
+      }
+      if (companyLinks.length > 0) {
+        await supabase.from('film_companies').insert(companyLinks)
       }
 
       // Done!
@@ -297,10 +307,13 @@ const TMDBSyncPanel = () => {
       return byName.id
     }
 
-    await supabase.from('companies').insert({
+    const { data: newCompany, error } = await supabase.from('companies').insert({
       name: tmdbCompany.name,
       tmdb_id: tmdbCompany.tmdbId,
-    })
+    }).select('id').single()
+
+    if (error) return null
+    return newCompany.id
   }
 
   const addLog = (msg) => {
@@ -334,7 +347,7 @@ const TMDBSyncPanel = () => {
       {/* Stats Overview */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
-          { label: 'Total Films in DB', value: stats.totalFilms, color: 'text-gold' },
+          { label: 'Total Films in DB', value: stats.totalFilms, color: 'text-brand' },
           { label: 'Imported from TMDB', value: stats.tmdbFilms, color: 'text-green-400' },
           { label: 'Manual / YouTube', value: stats.totalFilms - stats.tmdbFilms, color: 'text-blue-400' },
         ].map(stat => (
@@ -351,7 +364,7 @@ const TMDBSyncPanel = () => {
           onClick={() => setActiveTab('search')}
           className={`flex-1 py-2.5 rounded-md text-sm font-semibold transition-all ${
             activeTab === 'search'
-              ? 'bg-gold text-dark'
+              ? 'bg-brand text-white shadow-lg shadow-brand/20'
               : 'text-text-muted hover:text-text-primary'
           }`}
         >
@@ -361,7 +374,7 @@ const TMDBSyncPanel = () => {
           onClick={() => setActiveTab('discover')}
           className={`flex-1 py-2.5 rounded-md text-sm font-semibold transition-all ${
             activeTab === 'discover'
-              ? 'bg-gold text-dark'
+              ? 'bg-brand text-white shadow-lg shadow-brand/20'
               : 'text-text-muted hover:text-text-primary'
           }`}
         >
@@ -378,12 +391,12 @@ const TMDBSyncPanel = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search TMDB for a film title..."
-              className="flex-1 bg-surface-2 border border-border text-text-primary rounded-md px-4 py-3 focus:border-gold focus:outline-none transition-colors"
+              className="flex-1 bg-surface-2 border border-border text-text-primary rounded-md px-4 py-3 focus:border-brand focus:outline-none transition-colors"
             />
             <button
               type="submit"
               disabled={searching || !searchQuery.trim()}
-              className="bg-gold text-dark font-semibold px-6 py-3 rounded-md hover:bg-gold/90 transition-all disabled:opacity-50"
+              className="bg-brand text-white font-semibold px-6 py-3 rounded-md hover:scale-[1.02] shadow-lg shadow-brand/20 transition-all disabled:opacity-50"
             >
               {searching ? 'Searching...' : 'Search'}
             </button>
@@ -428,7 +441,7 @@ const TMDBSyncPanel = () => {
             <button
               onClick={() => handleDiscover(1)}
               disabled={discovering}
-              className="bg-gold text-dark font-semibold px-6 py-3 rounded-md hover:bg-gold/90 transition-all disabled:opacity-50"
+              className="bg-brand text-white font-semibold px-6 py-3 rounded-md hover:scale-[1.02] shadow-lg shadow-brand/20 transition-all disabled:opacity-50"
             >
               {discovering ? 'Loading...' : '🇳🇬 Discover'}
             </button>
@@ -457,7 +470,7 @@ const TMDBSyncPanel = () => {
               <button
                 onClick={() => handleDiscover(discoverPage - 1)}
                 disabled={discoverPage <= 1 || discovering}
-                className="text-text-muted hover:text-gold disabled:opacity-30 text-sm font-semibold transition-colors"
+                className="text-text-muted hover:text-brand disabled:opacity-30 text-sm font-semibold transition-colors"
               >
                 ← Previous
               </button>
@@ -467,7 +480,7 @@ const TMDBSyncPanel = () => {
               <button
                 onClick={() => handleDiscover(discoverPage + 1)}
                 disabled={discoverPage >= discoverTotalPages || discovering}
-                className="text-text-muted hover:text-gold disabled:opacity-30 text-sm font-semibold transition-colors"
+                className="text-text-muted hover:text-brand disabled:opacity-30 text-sm font-semibold transition-colors"
               >
                 Next →
               </button>
@@ -483,7 +496,7 @@ const TMDBSyncPanel = () => {
             <h3 className="text-text-primary font-semibold">Import Log</h3>
             <button
               onClick={() => setImportLog([])}
-              className="text-text-muted text-xs hover:text-gold transition-colors"
+              className="text-text-muted text-xs hover:text-brand transition-colors"
             >
               Clear
             </button>
@@ -523,7 +536,7 @@ const MovieList = ({ movies, importedTmdbIds, importingId, importProgress, onImp
             className={`flex gap-4 p-4 rounded-md border transition-all ${
               isImported
                 ? 'bg-green-900/10 border-green-800/30'
-                : 'bg-surface-2 border-border hover:border-gold/30'
+                : 'bg-surface-2 border-border hover:border-brand/30'
             }`}
           >
             {/* Poster */}
@@ -560,7 +573,7 @@ const MovieList = ({ movies, importedTmdbIds, importingId, importProgress, onImp
                     {movie.rating > 0 && (
                       <>
                         <span className="w-1 h-1 rounded-full bg-border" />
-                        <span className="text-gold">⭐ {movie.rating.toFixed(1)}</span>
+                        <span className="text-brand">⭐ {movie.rating.toFixed(1)}</span>
                       </>
                     )}
                   </div>
@@ -574,15 +587,15 @@ const MovieList = ({ movies, importedTmdbIds, importingId, importProgress, onImp
                     </span>
                   ) : isImporting ? (
                     <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[10px] text-gold font-semibold">
+                      <span className="w-3 h-3 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] text-brand font-semibold">
                         {importProgress || 'Importing...'}
                       </span>
                     </div>
                   ) : (
                     <button
                       onClick={() => onImport(movie.tmdbId, movie.title)}
-                      className="text-[10px] bg-gold/10 text-gold px-3 py-1.5 rounded-lg border border-gold/20 font-semibold hover:bg-gold/20 transition-all"
+                      className="text-[10px] bg-brand/10 text-brand px-3 py-1.5 rounded-lg border border-brand/20 font-semibold hover:bg-brand/20 transition-all"
                     >
                       + Import
                     </button>

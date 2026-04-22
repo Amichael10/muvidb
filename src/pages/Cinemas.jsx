@@ -9,13 +9,13 @@ function extractChain(name = '') {
 }
 
 const chainStyles = {
-  Filmhouse:  'bg-[#D4A017]/20 text-[#D4A017]',
-  Genesis:    'bg-blue-900/40 text-blue-400',
-  Silverbird: 'bg-purple-900/40 text-purple-400',
-  Ozone:      'bg-green-900/40 text-green-400',
-  'Blu Star': 'bg-orange-900/40 text-orange-400',
-  Kada:       'bg-teal-900/40 text-teal-400',
-  Viva:       'bg-pink-900/40 text-pink-400',
+  Filmhouse:  'bg-brand/20 text-brand',
+  Genesis:    'bg-blue-500/20 text-blue-400',
+  Silverbird: 'bg-purple-500/20 text-purple-400',
+  Ozone:      'bg-green-500/20 text-green-400',
+  'Blu Star': 'bg-orange-500/20 text-orange-400',
+  Kada:       'bg-teal-500/20 text-teal-400',
+  Viva:       'bg-pink-500/20 text-pink-400',
 }
 
 const CinemaCard = ({ cinema, showCount }) => {
@@ -25,26 +25,26 @@ const CinemaCard = ({ cinema, showCount }) => {
   return (
     <Link
       to={`/cinemas/${cinema.id}`}
-      className="group block bg-[#13192B] rounded-2xl overflow-hidden border border-[#252D45] hover:border-[#D4A017]/40 transition-all hover:shadow-lg hover:shadow-[#D4A017]/5"
+      className="group block bg-surface rounded-2xl overflow-hidden border border-border hover:border-brand/40 transition-all hover:shadow-lg hover:shadow-brand/5"
     >
       {/* Top section */}
       <div className="p-5">
         <div className="flex items-start gap-4">
           {/* Logo / initials */}
           <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold flex-shrink-0 ${
-            chainStyles[chain] || 'bg-[#1C2440] text-[#7A8099]'
+            chainStyles[chain] || 'bg-surface-2 text-text-muted'
           }`}>
             {initials}
           </div>
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h3 className="text-[#F5F0E8] font-bold text-base group-hover:text-[#D4A017] transition-colors line-clamp-1">
+            <h3 className="text-text-primary font-bold text-base group-hover:text-brand transition-colors line-clamp-1">
               {cinema.name}
             </h3>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {chain && (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${chainStyles[chain] || 'bg-[#252D45] text-[#7A8099]'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${chainStyles[chain] || 'bg-surface-2 text-text-muted'}`}>
                   {chain}
                 </span>
               )}
@@ -59,29 +59,29 @@ const CinemaCard = ({ cinema, showCount }) => {
 
         {/* Location */}
         {(cinema.address || cinema.city) && (
-          <p className="text-[#7A8099] text-sm mt-3 line-clamp-1">
+          <p className="text-text-muted text-sm mt-3 line-clamp-1">
             📍 {[cinema.address, cinema.city].filter(Boolean).join(', ')}
           </p>
         )}
 
         {/* Now showing badge */}
         {showCount > 0 && (
-          <p className="text-[#D4A017] text-xs font-medium mt-2">
+          <p className="text-brand text-xs font-medium mt-2">
             🎬 {showCount} film{showCount !== 1 ? 's' : ''} showing now
           </p>
         )}
       </div>
 
       {/* Bottom bar */}
-      <div className="px-5 py-3 bg-[#0A0F1E]/50 border-t border-[#252D45] flex items-center justify-between">
-        <span className="text-[#7A8099] text-xs truncate">
+      <div className="px-5 py-3 bg-surface-2/50 border-t border-border flex items-center justify-between">
+        <span className="text-text-muted text-xs truncate">
           {cinema.city || '—'}
         </span>
         <div className="flex items-center gap-3 flex-shrink-0">
           {cinema.booking_url && (
-            <span className="text-[#D4A017] text-xs">🎟 Book</span>
+            <span className="text-brand text-xs">🎟 Book</span>
           )}
-          <span className="text-[#7A8099] text-xs group-hover:text-[#D4A017] transition-colors">
+          <span className="text-text-muted text-xs group-hover:text-brand transition-colors">
             View →
           </span>
         </div>
@@ -163,13 +163,11 @@ const Cinemas = () => {
   }, {})
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] pt-20">
+    <div className="min-h-screen bg-bg pt-20">
       <div className="max-w-6xl mx-auto px-4 py-8">
-
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#F5F0E8] mb-2">Cinemas</h1>
-          <p className="text-[#7A8099]">Find Nollywood films showing near you</p>
+          <h1 className="text-3xl font-bold text-text-primary mb-2">Cinemas</h1>
+          <p className="text-text-muted">Find Nollywood films showing near you</p>
         </div>
 
         {/* Filters */}
@@ -179,19 +177,19 @@ const Cinemas = () => {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search cinemas…"
-            className="bg-[#13192B] border border-[#252D45] text-[#F5F0E8] rounded-xl px-4 py-2.5 text-sm focus:border-[#D4A017] focus:outline-none placeholder-[#7A8099]"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2.5 text-sm focus:border-brand focus:outline-none placeholder-text-muted"
           />
           <select
             value={selectedCity}
             onChange={e => setSelectedCity(e.target.value)}
-            className="bg-[#13192B] border border-[#252D45] text-[#F5F0E8] rounded-xl px-4 py-2.5 text-sm focus:border-[#D4A017] focus:outline-none"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2.5 text-sm focus:border-brand focus:outline-none"
           >
             {cities.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <select
             value={selectedChain}
             onChange={e => setSelectedChain(e.target.value)}
-            className="bg-[#13192B] border border-[#252D45] text-[#F5F0E8] rounded-xl px-4 py-2.5 text-sm focus:border-[#D4A017] focus:outline-none"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2.5 text-sm focus:border-brand focus:outline-none"
           >
             {CHAINS.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -201,7 +199,7 @@ const Cinemas = () => {
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-[#13192B] rounded-2xl h-44 animate-pulse" />
+              <div key={i} className="bg-surface border border-border rounded-2xl h-44 animate-pulse" />
             ))}
           </div>
         )}
@@ -210,8 +208,8 @@ const Cinemas = () => {
         {!loading && filtered.length === 0 && (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🎭</div>
-            <h3 className="text-[#F5F0E8] text-xl font-bold mb-2">No cinemas found</h3>
-            <p className="text-[#7A8099]">Try adjusting your filters</p>
+            <h3 className="text-text-primary text-xl font-bold mb-2">No cinemas found</h3>
+            <p className="text-text-muted">Try adjusting your filters</p>
           </div>
         )}
 
@@ -221,8 +219,8 @@ const Cinemas = () => {
             {Object.entries(groupedByCity).map(([city, cityCinemas]) => (
               <div key={city}>
                 <div className="flex items-center gap-3 mb-4">
-                  <h2 className="text-[#F5F0E8] text-xl font-bold">{city}</h2>
-                  <span className="text-[#7A8099] text-sm">
+                  <h2 className="text-text-primary text-xl font-bold">{city}</h2>
+                  <span className="text-text-muted text-sm">
                     {cityCinemas.length} cinema{cityCinemas.length !== 1 ? 's' : ''}
                   </span>
                 </div>

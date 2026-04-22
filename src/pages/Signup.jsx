@@ -107,7 +107,7 @@ export default function Signup() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Tolu Okafor"
-            className="w-full bg-bg border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all"
+            className="w-full bg-surface border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
           />
         </div>
 
@@ -121,7 +121,7 @@ export default function Signup() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="name@example.com"
-            className="w-full bg-bg border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all"
+            className="w-full bg-surface border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
           />
         </div>
 
@@ -136,7 +136,7 @@ export default function Signup() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-bg border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all"
+              className="w-full bg-surface border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
             />
             <button
               type="button"
@@ -174,7 +174,7 @@ export default function Signup() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full bg-bg border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all"
+            className="w-full bg-surface border border-border text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
           />
         </div>
 
@@ -190,11 +190,11 @@ export default function Signup() {
               onClick={() => setRole('fan')}
               className={`flex flex-col items-start p-4 rounded-xl border-2 text-left transition-all duration-300 ${
                 role === 'fan' 
-                  ? 'border-gold bg-gold/5' 
-                  : 'border-border bg-bg hover:border-text-muted'
+                  ? 'border-brand bg-brand/5' 
+                  : 'border-border bg-surface hover:border-text-muted'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`mb-3 ${role === 'fan' ? 'text-gold' : 'text-text-muted'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`mb-3 ${role === 'fan' ? 'text-brand' : 'text-text-muted'}`}>
                 <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
                 <line x1="7" y1="2" x2="7" y2="22"/>
                 <line x1="17" y1="2" x2="17" y2="22"/>
@@ -204,7 +204,7 @@ export default function Signup() {
                 <line x1="17" y1="17" x2="22" y2="17"/>
                 <line x1="17" y1="7" x2="22" y2="7"/>
               </svg>
-              <span className={`font-bold mb-1 ${role === 'fan' ? 'text-gold' : 'text-text-primary'}`}>
+              <span className={`font-bold mb-1 ${role === 'fan' ? 'text-brand' : 'text-text-primary'}`}>
                 A Film Fan
               </span>
               <span className="text-xs text-text-muted leading-relaxed">
@@ -218,11 +218,11 @@ export default function Signup() {
               onClick={() => setRole('professional')}
               className={`flex flex-col items-start p-4 rounded-xl border-2 text-left transition-all duration-300 ${
                 role === 'professional' 
-                  ? 'border-gold bg-gold/5' 
-                  : 'border-border bg-bg hover:border-text-muted'
+                  ? 'border-brand bg-brand/5' 
+                  : 'border-border bg-surface hover:border-text-muted'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`mb-3 ${role === 'professional' ? 'text-gold' : 'text-text-muted'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`mb-3 ${role === 'professional' ? 'text-brand' : 'text-text-muted'}`}>
                 <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.4-2.2 1.5-2.5l13.5-4c1.1-.3 2.2.4 2.5 1.5l.6 2.4z"/>
                 <path d="m2.6 10.4 17.2-5.1"/>
                 <path d="m6 3.4 1.4 4.1"/>
@@ -236,7 +236,7 @@ export default function Signup() {
                 <path d="m14.6 22 1.4-4.1"/>
                 <path d="m18.9 23.3 1.4-4.1"/>
               </svg>
-              <span className={`font-bold mb-1 ${role === 'professional' ? 'text-gold' : 'text-text-primary'}`}>
+              <span className={`font-bold mb-1 ${role === 'professional' ? 'text-brand' : 'text-text-primary'}`}>
                 Industry Professional
               </span>
               <span className="text-xs text-text-muted leading-relaxed">
@@ -254,7 +254,7 @@ export default function Signup() {
               id="terms"
               checked={agreedToTerms}
               onChange={(e) => setAgreedToTerms(e.target.checked)}
-              className="peer appearance-none w-5 h-5 border-2 border-border rounded bg-bg checked:bg-gold checked:border-gold transition-colors cursor-pointer"
+              className="peer appearance-none w-5 h-5 border-2 border-border rounded bg-surface checked:bg-brand checked:border-brand transition-colors cursor-pointer"
             />
             <svg 
               className="absolute w-3.5 h-3.5 pointer-events-none opacity-0 peer-checked:opacity-100 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-bg" 
@@ -264,7 +264,7 @@ export default function Signup() {
             </svg>
           </div>
           <label htmlFor="terms" className="text-sm text-text-muted cursor-pointer select-none">
-            I agree to FilmDba's <Link to="#" className="text-gold hover:underline">Terms of Service</Link> and <Link to="#" className="text-gold hover:underline">Privacy Policy</Link>
+            I agree to FilmDba's <Link to="#" className="text-brand hover:underline">Terms of Service</Link> and <Link to="#" className="text-brand hover:underline">Privacy Policy</Link>
           </label>
         </div>
 
@@ -274,7 +274,7 @@ export default function Signup() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-gold text-bg font-bold py-3.5 rounded-xl hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px] mt-4"
+          className="w-full bg-brand text-white font-bold py-3.5 rounded-xl hover:scale-[1.02] active:scale-95 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px] mt-4 shadow-lg shadow-brand/20"
         >
           {isLoading ? 'Creating Account...' : 'Create Account'}
         </button>
@@ -295,7 +295,7 @@ export default function Signup() {
       {/* Sign In Link */}
       <p className="text-center text-text-muted mt-8 text-sm">
         Already have an account?{' '}
-        <Link to="/login" className="text-gold font-bold hover:underline">
+        <Link to="/login" className="text-brand font-bold hover:underline">
           Sign in
         </Link>
       </p>

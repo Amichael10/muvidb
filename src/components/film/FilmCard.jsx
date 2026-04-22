@@ -22,8 +22,8 @@ export default function FilmCard({
   return (
     <div className="relative flex flex-col gap-2">
       <Link 
-        to={`/film/${film.id}`}
-        className={`relative block rounded-2xl overflow-hidden group transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(212,160,23,0.3)] hover:z-10 ${sizeClasses[size]}`}
+        to={`/films/${film.id}`}
+        className={`relative block rounded-2xl overflow-hidden group transition-all duration-300 transform hover:-translate-y-1 hover:shadow-[0_0_20px_var(--color-brand-muted)] hover:z-10 ${sizeClasses[size]}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -36,7 +36,7 @@ export default function FilmCard({
         />
 
         {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1E] via-[#0A0F1E]/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity duration-300"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity duration-300"></div>
 
         {/* Action Button (Hover State) */}
         <div className={`absolute top-3 right-3 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
@@ -73,7 +73,7 @@ export default function FilmCard({
               {film.year} {film.genres && film.genres.length > 0 ? `• ${film.genres[0]}` : ''}
             </div>
             
-            <div className="flex items-center gap-1 bg-gold text-bg px-1.5 py-0.5 rounded text-xs font-bold shrink-0">
+            <div className="flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded text-xs font-bold shrink-0">
               <span>{film.tmdb_rating || film.rating}</span>
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>

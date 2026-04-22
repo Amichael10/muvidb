@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
 
@@ -87,6 +87,7 @@ export default function AdminUsers() {
       if (error) throw error;
 
       toast.success(`User ${isBanning ? 'banned' : 'unbanned'} successfully`);
+      setUsers(users.map(u => u.id === user.id ? { ...u, is_banned: isBanning } : u));
     } catch (error) {
       console.error('Error banning user:', error);
       toast.error('Failed to update ban status');
@@ -137,17 +138,17 @@ export default function AdminUsers() {
 
   const getAvatarColor = (role) => {
     switch(role) {
-      case 'admin': return 'bg-gold text-dark';
-      case 'professional': return 'bg-blue-500 text-white';
+      case 'admin': return 'bg-brand text-white';
+      case 'professional': return 'bg-orange-500/20 text-brand';
       default: return 'bg-surface-2 text-text-primary';
     }
   };
 
   const getRoleBadge = (role) => {
     switch(role) {
-      case 'admin': return 'bg-gold text-dark';
-      case 'professional': return 'bg-blue-500/20 text-blue-400';
-      default: return 'bg-surface-2 text-text-muted';
+      case 'admin': return 'bg-brand text-white';
+      case 'professional': return 'bg-orange-500/10 text-brand border-brand/20';
+      default: return 'bg-surface-2 text-text-muted border-border/50';
     }
   };
 
@@ -155,21 +156,20 @@ export default function AdminUsers() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-10">
         <div>
-          <p className="text-gold text-xs font-bold uppercase tracking-[0.2em] mb-1 italic">Access Control</p>
+          <p className="text-brand text-xs font-bold uppercase tracking-[0.2em] mb-1 italic">Access Control</p>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">User Management</h1>
           <p className="text-text-muted text-sm mt-1 font-medium">Lumi Ecosystem Accounts • <span className="text-text-primary">{users.length}</span> active souls</p>
         </div>
       </div>
 
-      {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
         {[
-          { label: 'Total Base', count: users.length, icon: '👥', color: 'from-blue-500/10 to-transparent' },
-          { label: 'Professionals', count: users.filter(u => u.role === 'professional').length, icon: '🌟', color: 'from-purple-500/10 to-transparent' },
-          { label: 'Lumi Admins', count: users.filter(u => u.role === 'admin').length, icon: '🛡️', color: 'from-gold/10 to-transparent' },
+          { label: 'Total Base', count: users.length, icon: '👥', color: 'from-brand/10 to-transparent' },
+          { label: 'Professionals', count: users.filter(u => u.role === 'professional').length, icon: '🌟', color: 'from-orange-500/10 to-transparent' },
+          { label: 'Lumi Admins', count: users.filter(u => u.role === 'admin').length, icon: '🛡️', color: 'from-brand/10 to-transparent' },
           { label: 'Banned Users', count: users.filter(u => u.is_banned).length, icon: '⛔', color: 'from-red-500/10 to-transparent' }
         ].map((stat, i) => (
-          <div key={i} className="relative group bg-surface border border-border p-5 rounded-md overflow-hidden transition-all duration-300 hover:border-gold/30">
+          <div key={i} className="relative group bg-surface border border-border p-5 rounded-md overflow-hidden transition-all duration-300 hover:border-brand/30">
             <div className={`absolute top-0 right-0 w-20 h-20 bg-gradient-to-br ${stat.color} opacity-40`} />
             <div className="relative z-10">
               <span className="text-xl mb-3 block">{stat.icon}</span>
@@ -180,7 +180,6 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {/* Filter Bar Card */}
       <div className="bg-surface border border-border rounded-lg p-5 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
           <div className="md:col-span-2 relative">
@@ -191,7 +190,7 @@ export default function AdminUsers() {
                 placeholder="Search by full name, email, or user ID..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 pl-10 text-text-primary text-sm focus:border-gold focus:outline-none transition-all placeholder-[#7A8099]"
+                className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 pl-10 text-text-primary text-sm focus:border-brand focus:outline-none transition-all placeholder-[#7A8099]"
               />
               <span className="absolute left-3.5 top-3 text-text-muted">🔍</span>
             </div>
@@ -202,7 +201,7 @@ export default function AdminUsers() {
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-text-primary text-sm focus:border-gold focus:outline-none appearance-none cursor-pointer pr-10"
+              className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-text-primary text-sm focus:border-brand focus:outline-none appearance-none cursor-pointer pr-10"
             >
               <option value="All">ALL ROLES</option>
               <option value="Fan">FANS / GENERAL</option>
@@ -213,7 +212,6 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {/* Data Table Card */}
       <div className="bg-surface border border-border rounded-md shadow-2xl overflow-hidden mb-12">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse">
@@ -251,20 +249,20 @@ export default function AdminUsers() {
                       <div className="flex items-center gap-4">
                         <div className="relative">
                           {u.avatar_url ? (
-                            <img src={u.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover border-2 border-border group-hover:border-gold transition-colors duration-300" />
+                            <img src={u.avatar_url} alt="" className="w-11 h-11 rounded-full object-cover border-2 border-border group-hover:border-brand transition-colors duration-300" />
                           ) : (
                             <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm border-2 border-border ${getAvatarColor(u.role)}`}>
                               {getInitials(u.name || u.email)}
                             </div>
                           )}
                           {u.is_verified && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-[#13192B] flex items-center justify-center">
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-brand rounded-full border-2 border-surface flex items-center justify-center">
                               <span className="text-[8px] text-white font-black">✓</span>
                             </div>
                           )}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-bold text-text-primary text-sm truncate group-hover:text-gold transition-colors">{u.name || 'Anonymous User'}</div>
+                          <div className="font-bold text-text-primary text-sm truncate group-hover:text-brand transition-colors">{u.name || 'Anonymous User'}</div>
                           <div className="text-[10px] text-text-muted font-medium truncate mt-0.5">{u.email}</div>
                         </div>
                       </div>
@@ -288,13 +286,13 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="px-6 py-6 border-l border-border/30">
-                      {u.linked_profile_id && u.people ? (
+                      {u.linked_profile_id ? (
                         <Link 
                           to={`/people/${u.linked_profile_id}`} 
-                          className="flex items-center gap-2 px-3 py-1.5 bg-surface-2 border border-border rounded-md text-gold text-[10px] font-black uppercase tracking-tighter hover:border-gold/40 transition-all shadow-sm w-fit"
+                          className="flex items-center gap-2 px-3 py-1.5 bg-surface-2 border border-border rounded-md text-brand text-[10px] font-black uppercase tracking-tighter hover:border-brand/40 transition-all shadow-sm w-fit"
                           target="_blank"
                         >
-                          👤 {u.people.name}
+                          👤 {u.people?.name || 'Linked Profile'}
                         </Link>
                       ) : (
                         <div className="flex items-center gap-1.5 opacity-30">
@@ -310,13 +308,13 @@ export default function AdminUsers() {
                             value={u.role}
                             onChange={(e) => handleRoleChangeSelect(u, e.target.value)}
                             disabled={u.id === currentUser?.id || isProcessing}
-                            className="bg-surface-2 border border-border text-text-primary rounded-md pl-3 pr-8 py-2 text-[10px] font-black uppercase tracking-widest focus:border-gold focus:outline-none appearance-none disabled:opacity-50 cursor-pointer group-hover/select:border-gold/50 transition-all"
+                            className="bg-surface-2 border border-border text-text-primary rounded-md pl-3 pr-8 py-2 text-[10px] font-black uppercase tracking-widest focus:border-brand focus:outline-none appearance-none disabled:opacity-50 cursor-pointer group-hover/select:border-brand/50 transition-all"
                           >
                             <option value="fan">FAN</option>
                             <option value="professional">PRO</option>
                             <option value="admin">ADMIN</option>
                           </select>
-                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted group-hover/select:text-gold transition-colors">
+                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted group-hover/select:text-brand transition-colors">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                           </div>
                         </div>
@@ -353,20 +351,18 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {/* Role Change Confirmation Modal */}
       {roleChangeData && (
         <ConfirmModal
           title="Change Role"
           message={`Change ${roleChangeData.user.name || roleChangeData.user.email}'s role to ${roleChangeData.newRole}?`}
           confirmLabel="Change Role"
-          confirmColor="bg-gold text-dark hover:bg-gold/90"
+          confirmColor="bg-brand text-white hover:bg-brand/90"
           onConfirm={confirmRoleChange}
           onCancel={() => setRoleChangeData(null)}
           isProcessing={isProcessing}
         />
       )}
 
-      {/* Ban Confirmation Modal */}
       {banData && (
         <ConfirmModal
           title={banData.isBanning ? "Ban User" : "Unban User"}
@@ -379,7 +375,6 @@ export default function AdminUsers() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       {deleteData && (
         <ConfirmModal
           title="Delete User permanently"

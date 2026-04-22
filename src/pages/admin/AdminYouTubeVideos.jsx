@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { formatViewCount } from '../../utils/youtube';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 const FILM_MIN = 1800; // 30 min in seconds
 

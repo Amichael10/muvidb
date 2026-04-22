@@ -82,8 +82,12 @@ function cleanTitle(raw: string): string {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  // Auth — skip check when called without a secret (dev / manual sync)
-  if (CRON_SECRET && req.headers['x-cron-secret'] !== CRON_SECRET) {
+  // Auth — support both x-cron-secret and native Vercel Authorization header
+  const authHeader = req.headers['authorization'];
+  const cronSecretHeader = req.headers['x-cron-secret'];
+  const isValidAuth = (CRON_SECRET && (cronSecretHeader === CRON_SECRET || authHeader === `Bearer ${CRON_SECRET}`));
+
+  if (CRON_SECRET && !isValidAuth) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

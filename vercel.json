@@ -4,5 +4,15 @@
     { "source": "/api/tmdb", "destination": "/api/external?provider=tmdb" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/refresh-videos",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-showtimes",
+      "schedule": "0 */6 * * *"
+    }
   ]
 }

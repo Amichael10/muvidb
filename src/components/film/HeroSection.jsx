@@ -50,10 +50,10 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
             />
             
             {/* Gradient Overlay: Transparent right to dark left */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0A0F1E]/95 via-[#0A0F1E]/70 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-bg/95 via-bg/70 to-transparent"></div>
             
             {/* Subtle animated gradient shimmer */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-gold/5 via-transparent to-terracotta/5 animate-gradient-x mix-blend-overlay"></div>
+            <div className="absolute inset-0 bg-gradient-to-tr from-brand/5 via-transparent to-brand/5 animate-gradient-x mix-blend-overlay"></div>
             
             {/* Bottom fade into page background */}
             <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg to-transparent"></div>
@@ -87,7 +87,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 {/* Meta Info */}
                 <div className="flex flex-wrap items-center gap-4 md:gap-6 mb-6 text-sm font-medium">
                   {/* Rating */}
-                  <div className="flex items-center gap-1 text-gold">
+                  <div className="flex items-center gap-1 text-brand">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                     </svg>
@@ -127,7 +127,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       featuredFilm.release_type === 'netflix' ? 'bg-[#E50914] hover:shadow-[0_0_15px_rgba(229,9,20,0.4)]' :
                       featuredFilm.release_type === 'prime_video' ? 'bg-[#00A8E1] hover:shadow-[0_0_15px_rgba(0,168,225,0.4)]' :
                       featuredFilm.release_type === 'showmax' ? 'bg-[#E10098] hover:shadow-[0_0_15px_rgba(225,0,152,0.4)]' :
-                      'bg-gold text-dark hover:shadow-[0_0_15px_rgba(212,160,23,0.4)]'
+                      'bg-brand text-white hover:shadow-brand/40'
                      }`}>
                       {featuredFilm.release_type === 'youtube' ? (
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -148,7 +148,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       Watch Trailer
                     </button>
                   )}
-                  <Link to={`/film/${featuredFilm.id}`} className="flex items-center justify-center gap-2 bg-transparent border-2 border-gold text-gold px-8 py-3 rounded-full font-semibold hover:bg-gold/10 hover:scale-105 transition-all duration-300">
+                  <Link to={`/films/${featuredFilm.id}`} className="flex items-center justify-center gap-2 bg-transparent border-2 border-brand text-brand px-8 py-3 rounded-full font-semibold hover:bg-brand/10 hover:scale-105 transition-all duration-300">
                     View Details
                   </Link>
                 </div>
@@ -159,14 +159,16 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 initial={{ opacity: 0, scale: 0.9, x: 20 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
-                className="hidden lg:block relative group"
+                className="hidden lg:block relative group cursor-pointer"
               >
-                <div className="absolute inset-0 bg-gold rounded-2xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
-                <img 
-                  src={featuredFilm.poster_url || featuredFilm.poster} 
-                  alt={`${featuredFilm.title} Poster`} 
-                  className="relative w-64 h-auto rounded-2xl border border-gold/30 shadow-[0_0_20px_rgba(212,160,23,0.2)] opacity-90 object-cover"
-                />
+                <Link to={`/films/${featuredFilm.id}`} className="block relative">
+                  <div className="absolute inset-0 bg-brand rounded-2xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
+                  <img 
+                    src={featuredFilm.poster_url || featuredFilm.poster} 
+                    alt={`${featuredFilm.title} Poster`} 
+                    className="relative w-64 h-auto rounded-2xl border border-brand/30 shadow-[0_0_20px_var(--color-brand-muted)] opacity-90 object-cover transform transition-transform duration-500 group-hover:scale-105"
+                  />
+                </Link>
               </motion.div>
 
             </div>
@@ -182,7 +184,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
               key={index}
               onClick={() => setCurrentIndex(index)}
               className={`h-2 rounded-full transition-all duration-300 ${
-                index === currentIndex ? 'w-8 bg-gold' : 'w-2 bg-text-muted hover:bg-text-primary'
+                index === currentIndex ? 'w-8 bg-brand' : 'w-2 bg-text-muted hover:bg-text-primary'
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />

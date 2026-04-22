@@ -17,7 +17,7 @@ export default function Home() {
   const [creators, setCreators] = useState([]);
 
   useEffect(() => {
-    document.title = "FilmDba | Home";
+    document.title = "Lumi | Home";
     fetchAllData();
   }, []);
 
@@ -156,11 +156,19 @@ export default function Home() {
 
       <div className="mt-8 space-y-12">
         {/* In Cinemas Section */}
-        {inCinemas.length > 0 && (
+        {inCinemas.length > 0 ? (
           <FilmRow
             title={inCinemas.some(f => f.is_today) ? "Showing in Cinemas Today" : "Coming Soon to Cinemas"}
             subtitle={inCinemas.some(f => f.is_today) ? "Catch these productions on the big screen near you" : "Upcoming screenings scheduled for this week"}
             films={inCinemas}
+            isLoading={isLoading}
+          />
+        ) : (
+          /* Fallback if no showtimes found, to ensure the section isn't "missed" */
+          <FilmRow
+            title="Showing in Cinemas"
+            subtitle="Catch the latest Nollywood productions on the big screen"
+            films={films.slice(0, 4)} // Show some top films as placeholders
             isLoading={isLoading}
           />
         )}

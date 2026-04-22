@@ -41,8 +41,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (req.headers['x-cron-secret'] !== CRON_SECRET) {
-    return res.status(401).json({ error: 'Invalid cron secret' });
+  // Auth — support both x-cron-secret and native Vercel Authorization header
+  const authHeader = req.headers['authorization'];
+  const cronSecretHeader = req.headers['x-cron-secret'];
+  const isValidAuth = (CRON_SECRET && (cronSecretHeader === CRON_SECRET || authHeader === `Bearer ${CRON_SECRET}`));
+
+  if (CRON_SECRET && !isValidAuth) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const startedAt = Date.now();

@@ -75,10 +75,10 @@ export default function Navbar() {
       >
         {/* Left: Logo */}
         <Link to="/" className="flex items-center gap-2 group shrink-0">
-          <div className="w-10 h-10 bg-gold rounded-xl flex items-center justify-center text-black shadow-lg shadow-gold/20 group-hover:scale-110 transition-transform">
+          <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20 group-hover:scale-110 transition-transform">
             <Clapperboard size={24} />
           </div>
-          <span className="font-heading font-bold text-gold text-2xl tracking-tight hidden sm:block">
+          <span className="font-heading font-bold text-brand text-2xl tracking-tight hidden sm:block">
             Lumi
           </span>
         </Link>
@@ -93,7 +93,7 @@ export default function Navbar() {
                 to={link.path}
                 className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 whitespace-nowrap
                   ${isActive 
-                    ? 'bg-gold text-black shadow-md' 
+                    ? 'bg-brand text-white shadow-md' 
                     : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                   }
                 `}
@@ -109,7 +109,7 @@ export default function Navbar() {
           {/* Search Button */}
           <button 
             onClick={() => setIsSearchOpen(true)}
-            className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-gold hover:bg-gold/10 rounded-full transition-all active:scale-90"
+            className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
             aria-label="Search"
           >
             <Search size={20} />
@@ -118,7 +118,7 @@ export default function Navbar() {
           {/* Theme Toggle */}
           <button 
             onClick={toggleTheme}
-            className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-gold hover:bg-gold/10 rounded-full transition-all active:scale-90"
+            className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
             aria-label="Toggle theme"
           >
             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
@@ -127,9 +127,9 @@ export default function Navbar() {
           {isAuthenticated ? (
             <div className="flex items-center gap-2 md:gap-4">
               {/* Notification Bell */}
-              <button className="relative w-10 h-10 flex items-center justify-center text-text-secondary hover:text-gold hover:bg-gold/10 rounded-full transition-all active:scale-90">
+              <button className="relative w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90">
                 <Bell size={20} />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-terracotta rounded-full border-2 border-surface"></span>
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
               </button>
 
               {/* User Avatar & Dropdown */}
@@ -138,7 +138,7 @@ export default function Navbar() {
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center gap-2 p-1 pl-1 pr-3 bg-surface-2 hover:bg-surface-3 border border-border rounded-full transition-all active:scale-95 shadow-sm"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gold/20 border border-gold/30 flex items-center justify-center text-gold font-bold text-xs">
+                  <div className="w-8 h-8 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs">
                     {user.name?.charAt(0) || 'U'}
                   </div>
                   <ChevronDown size={14} className={`text-text-muted transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
@@ -151,7 +151,7 @@ export default function Navbar() {
                       <p className="text-sm font-bold text-text-primary line-clamp-1">{user.name}</p>
                       <p className="text-xs text-text-muted line-clamp-1">{user.email}</p>
                       {user.role === 'admin' && (
-                        <span className="mt-2 inline-block px-2 py-0.5 bg-terracotta/10 text-terracotta text-[10px] font-bold rounded uppercase tracking-wider">
+                        <span className="mt-2 inline-block px-2 py-0.5 bg-brand/10 text-brand text-[10px] font-bold rounded uppercase tracking-wider">
                           Admin
                         </span>
                       )}
@@ -162,7 +162,7 @@ export default function Navbar() {
                         My Profile
                       </Link>
                       {user.role === 'admin' && (
-                        <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-sm text-terracotta hover:bg-terracotta/5 rounded-lg transition-colors">
+                        <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-sm text-brand hover:bg-brand/5 rounded-lg transition-colors">
                           <Clapperboard size={16} />
                           Admin Panel
                         </Link>
@@ -182,7 +182,7 @@ export default function Navbar() {
           ) : (
             <Link 
               to="/login"
-              className="px-6 py-2 border-2 border-gold text-gold rounded-full font-bold text-sm btn-hover shadow-lg shadow-gold/5"
+              className="px-6 py-2 border-2 border-brand text-brand rounded-full font-bold text-sm btn-hover shadow-lg shadow-brand/5"
             >
               Sign In
             </Link>
@@ -212,14 +212,14 @@ export default function Navbar() {
             </div>
 
             <form onSubmit={handleSearch} className="relative group">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-gold transition-colors" size={24} />
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand transition-colors" size={24} />
               <input 
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search films, actors, directors..."
-                className="w-full bg-white/5 border-2 border-white/10 focus:border-gold rounded-3xl py-6 pl-16 pr-6 text-xl md:text-2xl text-text-primary placeholder-text-muted outline-none transition-all shadow-2xl"
+                className="w-full bg-white/5 border-2 border-white/10 focus:border-brand rounded-3xl py-6 pl-16 pr-6 text-xl md:text-2xl text-text-primary placeholder-text-muted outline-none transition-all shadow-2xl"
               />
             </form>
 
@@ -234,7 +234,7 @@ export default function Navbar() {
                       navigate(`/search?q=${encodeURIComponent(term)}`);
                       setIsSearchOpen(false);
                     }}
-                    className="px-5 py-2.5 bg-white/5 hover:bg-gold hover:text-black border border-white/10 rounded-full text-sm text-text-secondary transition-all active:scale-95"
+                    className="px-5 py-2.5 bg-white/5 hover:bg-brand hover:text-white border border-white/10 rounded-full text-sm text-text-secondary transition-all active:scale-95"
                   >
                     {term}
                   </button>

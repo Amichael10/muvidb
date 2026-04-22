@@ -23,7 +23,7 @@ export default function AuthLayout({ children }) {
 
         {/* Logo */}
         <div className="relative z-10">
-          <Link to="/" className="flex items-center gap-2 text-gold font-heading font-bold text-2xl hover:opacity-80 transition-opacity">
+          <Link to="/" className="flex items-center gap-2 text-brand font-heading font-bold text-2xl hover:opacity-80 transition-opacity">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
               <line x1="7" y1="2" x2="7" y2="22"/>
@@ -76,7 +76,7 @@ export default function AuthLayout({ children }) {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-surface relative">
         {/* Mobile Logo */}
         <div className="absolute top-6 left-6 lg:hidden">
-          <Link to="/" className="flex items-center gap-2 text-gold font-heading font-bold text-xl">
+          <Link to="/" className="flex items-center gap-2 text-brand font-heading font-bold text-xl">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
               <line x1="7" y1="2" x2="7" y2="22"/>

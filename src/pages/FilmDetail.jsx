@@ -81,7 +81,7 @@ export default function FilmDetail() {
       setFilm(data);
 
       if (data) {
-        document.title = `FilmDba | ${data.title}`;
+        document.title = `Lumi | ${data.title}`;
         const { data: related } = await supabase
           .from('films')
           .select('*')
@@ -141,13 +141,13 @@ export default function FilmDetail() {
     id: `cast-${i}`,
     name,
     role: i === 0 ? "Lead Character" : "Supporting Character",
-    photo: `https://placehold.co/300x300/13192B/D4A017?text=${name.split(' ').map(n => n[0]).join('')}`,
+    photo: `https://placehold.co/300x300/1A1A1A/FF5C00?text=${name.split(' ').map(n => n[0]).join('')}`,
     film_count: Math.floor(Math.random() * 15) + 2
   }));
 
   // Mock crew data
   const crewMocks = film.director ? [
-    { name: film.director, role: "Director", photo: `https://placehold.co/150x150/13192B/C1440E?text=${film.director.split(' ').map(n => n[0]).join('')}` }
+    { name: film.director, role: "Director", photo: `https://placehold.co/150x150/1A1A1A/FF5C00?text=${film.director.split(' ').map(n => n[0]).join('')}` }
   ] : [];
 
   return (
@@ -160,7 +160,7 @@ export default function FilmDetail() {
           className="absolute inset-0 w-full h-full object-cover"
         />
         {/* Heavy dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1E] via-[#0A0F1E]/80 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent"></div>
 
         <div className="absolute bottom-0 left-0 w-full">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-end gap-8 pb-8">
@@ -202,12 +202,12 @@ export default function FilmDetail() {
 
               <div className="flex flex-wrap items-end gap-6">
                 <div className="flex items-center gap-3">
-                  <span className="text-gold text-4xl md:text-5xl font-bold leading-none">{film.tmdb_rating || film.rating}</span>
+                  <span className="text-brand text-4xl md:text-5xl font-bold font-heading leading-none">{film.tmdb_rating || film.rating}</span>
                   <div className="flex flex-col justify-end pb-1">
                     <span className="text-text-muted text-sm font-medium">/ 10</span>
                     <div className="flex items-center gap-1 mt-1">
                       {[1, 2, 3, 4, 5].map(star => (
-                        <svg key={star} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill={star <= Math.round((film.tmdb_rating || film.rating) / 2) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="text-gold">
+                        <svg key={star} xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill={star <= Math.round((film.tmdb_rating || film.rating) / 2) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="text-brand">
                           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                         </svg>
                       ))}
@@ -279,7 +279,7 @@ export default function FilmDetail() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                   {crew.map((member, idx) => (
                     <div key={idx} className="flex items-center gap-3 bg-surface p-3 rounded-xl border border-border">
-                      <img src={member.photo_url || `https://placehold.co/150x150/13192B/C1440E?text=${member.name.split(' ').map(n => n[0]).join('')}`} alt={member.name} className="w-12 h-12 rounded-full object-cover" />
+                      <img src={member.photo_url || `https://placehold.co/150x150/1A1A1A/FF5C00?text=${member.name.split(' ').map(n => n[0]).join('')}`} alt={member.name} className="w-12 h-12 rounded-full object-cover" />
                       <div>
                         <div className="font-bold text-text-primary text-sm line-clamp-1">{member.name}</div>
                         <div className="text-text-muted text-xs capitalize">{member.role}</div>
@@ -305,8 +305,8 @@ export default function FilmDetail() {
 
             {/* Production Company */}
             {film.film_companies?.length > 0 ? (
-              <div className="bg-surface rounded-2xl p-6 border border-border flex items-center gap-4 group hover:border-gold/30 transition-all cursor-default">
-                <div className="w-12 h-12 bg-surface-2 rounded-xl overflow-hidden flex items-center justify-center text-gold font-bold text-xl shrink-0 border border-border/50">
+              <div className="bg-surface rounded-2xl p-6 border border-border flex items-center gap-4 group hover:border-brand/30 transition-all cursor-default">
+                <div className="w-12 h-12 bg-surface-2 rounded-xl overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50">
                   {film.film_companies[0].companies?.logo_url ? (
                     <img src={film.film_companies[0].companies.logo_url} className="w-full h-full object-contain p-1" />
                   ) : (
@@ -320,7 +320,7 @@ export default function FilmDetail() {
               </div>
             ) : (
               <div className="bg-surface rounded-2xl p-6 border border-border flex items-center gap-4">
-                <div className="w-12 h-12 bg-surface-2 rounded-full flex items-center justify-center text-gold font-bold text-xl shrink-0">
+                <div className="w-12 h-12 bg-surface-2 rounded-full flex items-center justify-center text-brand font-bold text-xl shrink-0">
                   {film.director?.charAt(0) || 'L'}
                 </div>
                 <div>
@@ -367,7 +367,7 @@ export default function FilmDetail() {
                     film.release_type === 'netflix' ? 'bg-[#E50914] hover:shadow-[0_0_15px_rgba(229,9,20,0.4)]' :
                     film.release_type === 'prime_video' ? 'bg-[#00A8E1] hover:shadow-[0_0_15px_rgba(0,168,225,0.4)]' :
                     film.release_type === 'showmax' ? 'bg-[#E10098] hover:shadow-[0_0_15px_rgba(225,0,152,0.4)]' :
-                    'bg-gold text-dark hover:shadow-[0_0_15px_rgba(212,160,23,0.4)]'
+                    'bg-brand text-white hover:shadow-[0_0_15px_rgba(255,92,0,0.4)]'
                   }`}
                 >
                   {film.release_type === 'youtube' ? (
@@ -386,8 +386,8 @@ export default function FilmDetail() {
                   onClick={handleWatchlist}
                   disabled={watchlistLoading}
                   className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full font-bold transition-all duration-300 active:scale-95 min-h-[44px] disabled:opacity-50 ${inWatchlist
-                    ? 'bg-surface-2 border border-gold text-gold'
-                    : 'bg-gold text-bg hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(212,160,23,0.4)]'
+                    ? 'bg-surface-2 border border-brand text-brand'
+                    : 'bg-brand text-white hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(255,92,0,0.4)]'
                     }`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -399,7 +399,7 @@ export default function FilmDetail() {
               )}
               <button
                 onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 border border-border text-text-primary hover:border-gold hover:text-gold px-6 py-3.5 rounded-full font-bold transition-all duration-300 active:scale-95 min-h-[44px]"
+                className="w-full flex items-center justify-center gap-2 border border-border text-text-primary hover:border-brand hover:text-brand px-6 py-3.5 rounded-full font-bold transition-all duration-300 active:scale-95 min-h-[44px]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="5" r="3" />
@@ -419,8 +419,8 @@ export default function FilmDetail() {
                 {relatedFilms.map(relatedFilm => (
                   <Link
                     key={relatedFilm.id}
-                    to={`/film/${relatedFilm.id}`}
-                    className="flex gap-4 bg-surface hover:bg-surface-2 p-3 rounded-xl border border-border hover:border-gold/50 transition-all group"
+                    to={`/films/${relatedFilm.id}`}
+                    className="flex gap-4 bg-surface hover:bg-surface-2 p-3 rounded-xl border border-border hover:border-brand/50 transition-all group"
                   >
                     <img
                       src={relatedFilm.poster_url || relatedFilm.poster} 
@@ -428,13 +428,13 @@ export default function FilmDetail() {
                       className="w-16 h-24 object-cover rounded-lg"
                     />
                     <div className="flex flex-col justify-center">
-                      <h4 className="font-bold text-text-primary text-sm group-hover:text-gold transition-colors line-clamp-2 mb-1">
+                      <h4 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-2 mb-1">
                         {relatedFilm.title}
                       </h4>
                       <div className="text-xs text-text-muted mb-2">
                         {relatedFilm.year} {relatedFilm.genres && relatedFilm.genres.length > 0 ? `• ${relatedFilm.genres[0]}` : ''}
                       </div>
-                      <div className="flex items-center gap-1 text-gold text-xs font-bold">
+                      <div className="flex items-center gap-1 text-brand text-xs font-bold">
                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                         </svg>

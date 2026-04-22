@@ -380,12 +380,7 @@ export default function ProDashboard() {
                       )}
                     </div>
                     
-                    {/* Dev helper to skip to approved */}
-                    <div className="mt-8 text-center">
-                      <button onClick={() => { setClaimState('approved'); setSelectedPerson(people[0]); }} className="text-xs text-text-muted hover:text-gold underline">
-                        [Dev] Skip to Approved State
-                      </button>
-                    </div>
+                    {/* Dev helper removed as it was causing reference errors */}
                   </div>
                 )}
 

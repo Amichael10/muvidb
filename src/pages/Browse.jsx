@@ -145,12 +145,12 @@ export default function Browse() {
           <div className={`md:w-64 shrink-0 space-y-8 ${isMobileFiltersOpen ? 'block' : 'hidden md:block'}`}>
             <div className="flex items-center justify-between">
               <h3 className="font-heading font-bold text-xl text-text-primary">Filters</h3>
-              <button onClick={clearAll} className="text-sm text-gold hover:underline">Clear All</button>
+              <button onClick={clearAll} className="text-sm text-brand hover:underline">Clear All</button>
             </div>
 
             <div>
               <h4 className="font-bold text-text-primary mb-3 text-xs uppercase tracking-widest">Sort By</h4>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-2.5 outline-none focus:border-gold">
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-2.5 outline-none focus:border-brand">
                 <option value="views">Most Viewed</option>
                 <option value="rating">Top Rated</option>
                 <option value="newest">Newest</option>
@@ -164,8 +164,8 @@ export default function Browse() {
                 {dbGenres.length === 0 && <p className="text-xs text-text-muted italic">Connecting genres...</p>}
                 {dbGenres.map(genre => (
                   <label key={genre} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleGenre(genre)}>
-                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedGenres.includes(genre) ? 'bg-gold border-gold' : 'border-border bg-surface group-hover:border-gold/50'}`}>
-                      {selectedGenres.includes(genre) && <div className="w-2 h-2 rounded-full bg-bg" />}
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedGenres.includes(genre) ? 'bg-brand border-brand' : 'border-border bg-surface group-hover:border-brand/50'}`}>
+                      {selectedGenres.includes(genre) && <div className="w-2 h-2 rounded-full bg-white shadow-sm" />}
                     </div>
                     <span className={`text-sm ${selectedGenres.includes(genre) ? 'text-text-primary font-medium' : 'text-text-muted group-hover:text-text-primary'}`}>{genre}</span>
                   </label>
@@ -176,16 +176,16 @@ export default function Browse() {
             <div>
               <div className="flex justify-between mb-3">
                 <h4 className="font-bold text-text-primary text-xs uppercase tracking-widest">Release Year</h4>
-                <span className="text-sm text-gold font-medium">{yearRange}+</span>
+                <span className="text-sm text-brand font-medium">{yearRange}+</span>
               </div>
-              <input type="range" min="1990" max="2025" value={yearRange} onChange={(e) => setYearRange(parseInt(e.target.value))} className="w-full h-2 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-gold" />
+              <input type="range" min="1990" max="2025" value={yearRange} onChange={(e) => setYearRange(parseInt(e.target.value))} className="w-full h-2 bg-surface-2 rounded-lg appearance-none cursor-pointer accent-brand" />
             </div>
 
             <div>
               <h4 className="font-bold text-text-primary mb-3 text-xs uppercase tracking-widest">Rating</h4>
               <div className="flex flex-wrap gap-2">
                 {nfvcbRatings.map(r => (
-                  <button key={r} onClick={() => toggleRating(r)} className={`px-3 py-1 rounded-md text-xs font-bold border ${selectedRatings.includes(r) ? 'bg-gold border-gold text-bg' : 'border-border text-text-muted'}`}>
+                  <button key={r} onClick={() => toggleRating(r)} className={`px-3 py-1 rounded-md text-xs font-bold border ${selectedRatings.includes(r) ? 'bg-brand border-brand text-white' : 'border-border text-text-muted'}`}>
                     {r}
                   </button>
                 ))}
@@ -205,7 +205,7 @@ export default function Browse() {
             ) : (
               <div className="bg-surface border border-border rounded-2xl p-12 text-center">
                 <p className="text-text-muted mb-4">No matching films found.</p>
-                <button onClick={clearAll} className="text-gold font-bold">Clear Filters</button>
+                <button onClick={clearAll} className="text-brand font-bold">Clear Filters</button>
               </div>
             )}
           </div>

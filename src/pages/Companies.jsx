@@ -8,7 +8,7 @@ const CompanyCard = ({ company, filmCount }) => {
   return (
     <Link
       to={`/companies/${company.id}`}
-      className="group block bg-[#13192B] rounded-2xl overflow-hidden border border-[#252D45] hover:border-[#D4A017]/40 transition-all hover:shadow-lg hover:shadow-[#D4A017]/5"
+      className="group block bg-surface rounded-2xl overflow-hidden border border-border hover:border-brand/40 transition-all hover:shadow-lg hover:shadow-brand/5"
     >
       <div className="p-5">
         <div className="flex items-start gap-4">
@@ -21,7 +21,7 @@ const CompanyCard = ({ company, filmCount }) => {
                 className="w-16 h-16 rounded-xl object-contain bg-white p-1"
               />
             ) : (
-              <div className="w-16 h-16 rounded-xl bg-[#1C2440] flex items-center justify-center text-2xl font-bold text-[#D4A017]">
+              <div className="w-16 h-16 rounded-xl bg-surface-2 flex items-center justify-center text-2xl font-bold text-brand">
                 {initial}
               </div>
             )}
@@ -29,16 +29,16 @@ const CompanyCard = ({ company, filmCount }) => {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h3 className="text-[#F5F0E8] font-bold text-base group-hover:text-[#D4A017] transition-colors">
+            <h3 className="text-text-primary font-bold text-base group-hover:text-brand transition-colors">
               {company.name}
             </h3>
             {company.founded_year && (
-              <p className="text-[#7A8099] text-xs mt-1">
+              <p className="text-text-muted text-xs mt-1">
                 Est. {company.founded_year}
               </p>
             )}
             {company.description && (
-              <p className="text-[#7A8099] text-sm mt-2 line-clamp-2">
+              <p className="text-text-muted text-sm mt-2 line-clamp-2">
                 {company.description}
               </p>
             )}
@@ -47,12 +47,12 @@ const CompanyCard = ({ company, filmCount }) => {
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 bg-[#0A0F1E]/50 border-t border-[#252D45] flex items-center justify-between">
-        <span className="text-[#7A8099] text-xs">
+      <div className="px-5 py-3 bg-surface-2/50 border-t border-border flex items-center justify-between">
+        <span className="text-text-muted text-xs">
           🎬 {filmCount} film{filmCount !== 1 ? 's' : ''}
         </span>
         {company.website && (
-          <span className="text-[#D4A017] text-xs">
+          <span className="text-brand text-xs">
             Visit ↗
           </span>
         )}
@@ -101,15 +101,13 @@ const Companies = () => {
   )
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] pt-20">
+    <div className="min-h-screen bg-bg pt-20">
       <div className="max-w-6xl mx-auto px-4 py-8">
-
-        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#F5F0E8] mb-2">
+          <h1 className="text-3xl font-bold text-text-primary mb-2">
             Production Companies
           </h1>
-          <p className="text-[#7A8099]">
+          <p className="text-text-muted">
             The studios and companies behind Nollywood
           </p>
         </div>
@@ -121,7 +119,7 @@ const Companies = () => {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search companies..."
-            className="w-full md:w-80 bg-[#13192B] border border-[#252D45] text-[#F5F0E8] rounded-xl px-4 py-2.5 text-sm focus:border-[#D4A017] focus:outline-none placeholder-[#7A8099]"
+            className="w-full md:w-80 bg-surface border border-border text-text-primary rounded-xl px-4 py-2.5 text-sm focus:border-brand focus:outline-none placeholder-text-muted"
           />
         </div>
 
@@ -131,7 +129,7 @@ const Companies = () => {
             {[1, 2, 3, 4, 5, 6].map(i => (
               <div
                 key={i}
-                className="bg-[#13192B] rounded-2xl h-40 animate-pulse"
+                className="bg-surface border border-border rounded-2xl h-40 animate-pulse"
               />
             ))}
           </div>
@@ -141,10 +139,10 @@ const Companies = () => {
         {!loading && filtered.length === 0 && (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🏢</div>
-            <h3 className="text-[#F5F0E8] text-xl font-bold mb-2">
+            <h3 className="text-text-primary text-xl font-bold mb-2">
               No companies found
             </h3>
-            <p className="text-[#7A8099]">
+            <p className="text-text-muted">
               Try a different search term
             </p>
           </div>

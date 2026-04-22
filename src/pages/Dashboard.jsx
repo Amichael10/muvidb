@@ -6,25 +6,7 @@ import { toast } from 'react-hot-toast';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
 
-// Mock Data
-const initialWatchlist = [films[1], films[2], films[4]];
-const initialFollowing = [people[0], people[2]];
-const initialReviews = [
-  {
-    id: "r1",
-    film: films[0],
-    rating: 9,
-    body: "Sola Sobowale is absolutely terrifying and brilliant. One of the best Nigerian films ever made.",
-    created_at: "2024-11-10"
-  },
-  {
-    id: "r2",
-    film: films[3],
-    rating: 8,
-    body: "Kunle Afolayan at his absolute best. The cinematography, the story — deeply Nigerian and deeply human.",
-    created_at: "2024-09-22"
-  }
-];
+// Mock data removed as it was causing reference errors
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -304,12 +286,9 @@ export default function Dashboard() {
                           </Link>
                           <p className="text-sm text-text-muted">{person.role}</p>
                         </div>
-                        <div className="hidden md:flex items-center gap-3 px-6 border-l border-border">
-                          <div className="text-xs text-text-muted text-right">
-                            Latest<br/>Film
+                          <div className="text-[10px] bg-brand/10 text-brand px-2 py-1 rounded font-bold uppercase tracking-wider">
+                            Active
                           </div>
-                          <img src={films[0].poster} alt="Latest film" className="w-10 h-14 object-cover rounded" />
-                        </div>
                         <button 
                           onClick={() => handleUnfollow(person.id)}
                           className="w-full sm:w-auto px-4 py-2 rounded-full border border-border text-text-muted hover:text-red-400 hover:border-red-400 transition-colors text-sm font-medium"
