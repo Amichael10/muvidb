@@ -320,9 +320,10 @@ export default function Home() {
                       >
                         <div className="flex items-center gap-5">
                           <img 
-                            src={stats.thumbnail || creator.photo_url} 
+                            src={stats.thumbnail || creator.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
                             alt={creator.name} 
                             className="w-16 h-16 rounded-lg object-cover shadow-sm border border-border group-hover:scale-105 transition-transform" 
+                            onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
                           />
                           <div>
                             <h3 className="text-lg font-black text-text-primary group-hover:text-brand transition-colors tracking-tight">

@@ -7,6 +7,7 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
 import { extractChannelIdentifier, fetchChannelData, getPersonYoutubeChannelUrl } from '../../lib/youtube';
 import MergeModal from '../../components/admin/MergeModal';
+import { Icon } from '@iconify/react';
 
 export default function AdminPeople() {
   const [people, setPeople] = useState([]);
@@ -376,8 +377,9 @@ export default function AdminPeople() {
           <button onClick={handleRecalculateScores} disabled={isRecalculating} className="bg-surface-2 border border-border px-4 py-2 rounded-lg text-xs font-bold text-text-primary hover:bg-surface-3 transition-colors">
             {isRecalculating ? 'Updating...' : 'Synchronize popularity'}
           </button>
-          <button onClick={openAddDrawer} className="bg-brand text-white font-bold px-6 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all">
-            Add profile
+          <button onClick={openAddDrawer} className="bg-brand text-white font-black px-6 py-2.5 rounded-xl text-xs hover:scale-[1.05] active:scale-[0.95] transition-all flex items-center gap-2 shadow-lg shadow-brand/20">
+            <Icon icon="solar:plus-linear" className="text-lg" />
+            Add New Actor
           </button>
         </div>
       </div>

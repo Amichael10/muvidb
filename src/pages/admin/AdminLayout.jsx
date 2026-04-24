@@ -43,16 +43,17 @@ export default function AdminLayout() {
     { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear' },
     { path: '/admin/cinema-scraping', label: 'Scraping', icon: 'solar:refresh-linear' },
     { path: '/admin/ai', label: 'AI Agent', icon: 'solar:cpu-linear' },
+    { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
   ];
 
   const currentPage = navItems.find(item => location.pathname === item.path) || 
                       navItems.find(item => location.pathname.startsWith(item.path));
 
   return (
-    <div className={`flex h-screen overflow-hidden font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300`}>
+    <div className={`flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300`}>
       {/* Sidebar - Always Dark for Hybrid Look */}
       <aside 
-        className={`bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 ${
+        className={`bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 h-screen sticky top-0 ${
           isCollapsed ? 'w-[72px]' : 'w-[260px]'
         }`}
       >
@@ -141,7 +142,7 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header Bar */}
         <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-8 flex-shrink-0 z-20">
           <div className="flex items-center gap-4">

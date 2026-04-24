@@ -4,8 +4,7 @@
     { "source": "/api/channel/:id", "destination": "/api/channels?id=:id" },
     { "source": "/api/youtube", "destination": "/api/external?provider=youtube" },
     { "source": "/api/tmdb", "destination": "/api/external?provider=tmdb" },
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!api|src|node_modules|@vite|@react-refresh|assets|favicon\\.ico|manifest\\.webmanifest|.*\\.(js|css|png|jpg|svg|ico|json|map)).*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [
     {

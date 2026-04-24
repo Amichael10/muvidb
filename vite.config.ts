@@ -50,6 +50,59 @@ export default defineConfig(({ mode }) => {
       'process.env.SUPABASE_URL':      JSON.stringify(env.VITE_SUPABASE_URL      || env.SUPABASE_URL      || ''),
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''),
     },
+    server: {
+      port: 3001,
+      host: '0.0.0.0',
+      proxy: {
+        '/api/youtube': {
+          target: 'https://www.googleapis.com/youtube/v3',
+          changeOrigin: true,
+          rewrite: (path) => {
+            const url = new URL(path, 'http://localhost:3001');
+            const endpoint = url.searchParams.get('endpoint');
+            url.searchParams.delete('endpoint');
+            url.searchParams.set('key', env.YOUTUBE_API_KEY || env.VITE_YOUTUBE_API_KEY || '');
+            return `/${endpoint}?${url.searchParams.toString()}`;
+          },
+        },
+        '/api/tmdb': {
+          target: 'https://api.themoviedb.org/3',
+          changeOrigin: true,
+          rewrite: (path) => {
+            const url = new URL(path, 'http://localhost:3001');
+            const endpoint = url.searchParams.get('endpoint');
+            url.searchParams.delete('endpoint');
+            url.searchParams.set('api_key', env.TMDB_API_KEY || env.VITE_TMDB_API_KEY || '');
+            return `${endpoint}?${url.searchParams.toString()}`;
+          },
+        },
+        '/api/health': {
+          target: 'http://localhost:3001',
+          bypass: (req, res) => {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ status: 'ok', local: true }));
+            return false;
+          }
+        },
+        '/api': {
+          target: 'http://localhost:3001',
+          bypass: (req, res) => {
+            // Only handle if it's actually an API call that hasn't been caught above
+            if (req.url.startsWith('/api')) {
+              res.statusCode = 404;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ 
+                error: 'API route not implemented in local dev proxy', 
+                message: 'This route exists in Vercel but is not proxied in vite.config.ts',
+                path: req.url 
+              }));
+              return false;
+            }
+          }
+        }
+      }
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

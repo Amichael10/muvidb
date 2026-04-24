@@ -41,6 +41,7 @@ import AdminYouTubeVideos from './pages/admin/AdminYouTubeVideos';
 import AdminCinemaFilms from './pages/admin/AdminCinemaFilms';
 import AdminCinemaScraping from './pages/admin/AdminCinemaScraping';
 import AdminChannelDetail from './pages/admin/AdminChannelDetail';
+import AdminImport from './pages/admin/AdminImport';
 import AdminAI from './pages/admin/AdminAI';
 
 // Components
@@ -171,6 +172,7 @@ export default function App() {
                   <Route path="youtube-videos" element={<AdminYouTubeVideos />} />
                   <Route path="youtube" element={<AdminYouTube />} />
                   <Route path="ai" element={<AdminAI />} />
+                  <Route path="import" element={<AdminImport />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />
