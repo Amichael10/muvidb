@@ -359,6 +359,8 @@ export default function AdminFilms() {
         ...formData,
         year: parseInt(formData.year) || null,
         runtime_minutes: parseInt(formData.runtime_minutes) || null,
+        tmdb_id: parseInt(formData.tmdb_id) || null,
+        tmdb_rating: parseFloat(formData.tmdb_rating) || null,
       };
 
       const { genres: selectedGenreIds, ...cleanFilmPayload } = filmPayload;
