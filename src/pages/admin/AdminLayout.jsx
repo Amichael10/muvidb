@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { Icon } from '@iconify/react';
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
@@ -29,19 +30,19 @@ export default function AdminLayout() {
   }, [isDark]);
 
   const navItems = [
-    { path: '/admin', label: 'Overview', icon: '📊', exact: true },
-    { path: '/admin/films', label: 'Films', icon: '🎬' },
-    { path: '/admin/people', label: 'People', icon: '👤' },
-    { path: '/admin/credits', label: 'Credits', icon: '🎭' },
-    { path: '/admin/companies', label: 'Companies', icon: '🏢' },
-    { path: '/admin/claims', label: 'Pending Claims', icon: '📋' },
-    { path: '/admin/users', label: 'Users', icon: '👥' },
-    { path: '/admin/cinemas', label: 'Cinemas', icon: '🎭' },
-    { path: '/admin/channels', label: 'Channels', icon: '📺' },
-    { path: '/admin/youtube-videos', label: 'YT Videos', icon: '🎞️' },
-    { path: '/admin/cinema-films', label: 'Cinema Films', icon: '🎟️' },
-    { path: '/admin/cinema-scraping', label: 'Scraping', icon: '🔄' },
-    { path: '/admin/ai', label: 'AI Agent', icon: '🤖' },
+    { path: '/admin', label: 'Overview', icon: 'solar:graph-up-linear', exact: true },
+    { path: '/admin/films', label: 'Films', icon: 'solar:clapperboard-play-linear' },
+    { path: '/admin/people', label: 'People', icon: 'solar:user-linear' },
+    { path: '/admin/credits', label: 'Credits', icon: 'solar:case-linear' },
+    { path: '/admin/companies', label: 'Companies', icon: 'solar:buildings-linear' },
+    { path: '/admin/claims', label: 'Pending Claims', icon: 'solar:clipboard-list-linear' },
+    { path: '/admin/users', label: 'Users', icon: 'solar:users-group-two-rounded-linear' },
+    { path: '/admin/cinemas', label: 'Cinemas', icon: 'solar:buildings-2-linear' },
+    { path: '/admin/channels', label: 'Channels', icon: 'solar:videocamera-record-linear' },
+    { path: '/admin/youtube-videos', label: 'YT Videos', icon: 'solar:video-library-linear' },
+    { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear' },
+    { path: '/admin/cinema-scraping', label: 'Scraping', icon: 'solar:refresh-linear' },
+    { path: '/admin/ai', label: 'AI Agent', icon: 'solar:cpu-linear' },
   ];
 
   const currentPage = navItems.find(item => location.pathname === item.path) || 
@@ -60,7 +61,7 @@ export default function AdminLayout() {
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="absolute -right-3 top-8 w-6 h-6 bg-brand text-white rounded-full flex items-center justify-center shadow-lg z-40 hover:scale-110 transition-transform cursor-pointer border-2 border-sidebar"
         >
-          {isCollapsed ? '›' : '‹'}
+          <Icon icon={isCollapsed ? "solar:alt-arrow-right-linear" : "solar:alt-arrow-left-linear"} width="12" />
         </button>
 
         <div className={`h-16 flex items-center px-6 mb-4 ${isCollapsed ? 'justify-center' : ''}`}>
@@ -69,7 +70,7 @@ export default function AdminLayout() {
               L
             </div>
             {!isCollapsed && (
-              <span className="text-text-primary font-bold text-lg tracking-tight">Lumi Admin</span>
+              <span className="text-text-primary font-bold text-lg tracking-tight">Admin Panel</span>
             )}
           </div>
         </div>
@@ -91,9 +92,7 @@ export default function AdminLayout() {
             >
               {({ isActive }) => (
                 <>
-                  <span className={`text-xl transition-transform duration-200 ${isCollapsed ? 'scale-110' : ''}`}>
-                    {item.icon}
-                  </span>
+                  <Icon icon={item.icon} className={`text-xl transition-transform duration-200 ${isCollapsed ? 'scale-110' : ''}`} />
                   {!isCollapsed && (
                     <span className="text-sm whitespace-nowrap">{item.label}</span>
                   )}
@@ -115,7 +114,7 @@ export default function AdminLayout() {
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-text-primary font-medium truncate text-xs">{user?.name || 'Admin User'}</p>
+                <p className="text-text-primary font-medium truncate text-xs">{user?.name || 'Admin'}</p>
                 <p className="text-text-muted text-[10px] truncate">{user?.email}</p>
               </div>
             )}
@@ -125,15 +124,16 @@ export default function AdminLayout() {
             <div className="mt-4 flex flex-col gap-2">
               <button
                 onClick={logout}
-                className="w-full text-center py-3 text-[10px] bg-red-500/10 rounded-md text-red-500 hover:text-white hover:bg-red-500 transition-all font-black uppercase tracking-wider flex items-center justify-center gap-2 border border-red-500/20"
+                className="w-full text-center py-2.5 text-xs bg-red-500/5 rounded-lg text-red-500 hover:text-white hover:bg-red-500 transition-all font-bold flex items-center justify-center gap-2 border border-red-500/10"
               >
-                <span>🚪</span> Sign Out
+                <Icon icon="solar:logout-linear" width="14" />
+                Sign out
               </button>
               <Link
                 to="/"
-                className="w-full text-center py-2 text-[10px] bg-surface-2 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-3 transition-all font-medium uppercase tracking-wider"
+                className="w-full text-center py-2 text-xs bg-surface-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-3 transition-all font-bold"
               >
-                Go to Website
+                Go to website
               </Link>
             </div>
           )}
@@ -149,11 +149,11 @@ export default function AdminLayout() {
               {currentPage?.label || 'Dashboard'}
             </h1>
             <div className="hidden md:flex ml-8 items-center bg-surface-2 rounded-lg px-3 py-1.5 border border-border group">
-              <span className="text-text-muted transition-colors group-focus-within:text-brand">🔍</span>
+              <Icon icon="solar:magnifer-linear" className="text-text-muted transition-colors group-focus-within:text-brand" />
               <input 
                 type="text" 
                 placeholder="Search resources..." 
-                className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-text-muted ml-2 text-text-primary"
+                className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-text-muted ml-2 text-text-primary outline-none"
               />
             </div>
           </div>
@@ -162,10 +162,10 @@ export default function AdminLayout() {
             {/* Theme Toggle */}
             <button 
               onClick={() => setIsDark(!isDark)}
-              className="p-2 rounded-lg bg-surface-2 border border-border text-text-muted hover:text-brand hover:border-brand/30 transition-all flex items-center justify-center shadow-sm"
+              className="w-10 h-10 rounded-lg bg-surface-2 border border-border text-text-muted hover:text-brand hover:border-brand/30 transition-all flex items-center justify-center shadow-sm"
               title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
             >
-              {isDark ? '☀️' : '🌙'}
+              <Icon icon={isDark ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="20" />
             </button>
 
             <Link
@@ -178,7 +178,7 @@ export default function AdminLayout() {
             </Link>
             
             <button className="relative w-10 h-10 rounded-lg bg-surface-2 border border-border text-text-muted hover:text-brand transition-all flex items-center justify-center shadow-sm">
-              <span className="text-lg">🔔</span>
+              <Icon icon="solar:bell-linear" width="20" />
               <span className="absolute top-2 right-2 bg-brand text-white text-[8px] font-bold w-3 h-3 rounded-full flex items-center justify-center border border-surface ring-2 ring-transparent">
                 3
               </span>

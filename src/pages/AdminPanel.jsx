@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { Icon } from '@iconify/react';
 import { films, people as initialPeople } from '../data/mockData';
 import PersonCard from '../components/person/PersonCard';
 
@@ -145,14 +147,14 @@ export default function AdminPanel() {
   };
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'films', label: 'Films', icon: '🎬' },
-    { id: 'people', label: 'People', icon: '👤' },
-    { id: 'credits', label: 'Credits', icon: '🎭' },
-    { id: 'companies', label: 'Companies', icon: '🏢' },
-    { id: 'verifications', label: 'Verifications', icon: '🛡️', badge: (claims.length + verifications.length) > 0 ? (claims.length + verifications.length) : null },
-    { id: 'sync', label: 'YouTube Sync', icon: '🔄' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' }
+    { id: 'overview', label: 'Overview', icon: 'solar:chart-bold' },
+    { id: 'films', label: 'Films', icon: 'solar:clapperboard-play-bold' },
+    { id: 'people', label: 'People', icon: 'solar:user-bold' },
+    { id: 'credits', label: 'Credits', icon: 'solar:masks-bold' },
+    { id: 'companies', label: 'Companies', icon: 'solar:buildings-bold' },
+    { id: 'verifications', label: 'Verifications', icon: 'solar:shield-check-bold', badge: (claims.length + verifications.length) > 0 ? (claims.length + verifications.length) : null },
+    { id: 'sync', label: 'YouTube Sync', icon: 'solar:refresh-bold' },
+    { id: 'settings', label: 'Settings', icon: 'solar:settings-bold' }
   ];
 
   return (
@@ -173,7 +175,7 @@ export default function AdminPanel() {
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="font-heading font-bold text-xl text-text-primary">Admin Panel</h1>
-            <span className="bg-brand/20 text-brand text-[10px] font-black px-3 py-1 rounded uppercase tracking-[0.2em]">Lumi Admin</span>
+            <span className="bg-brand/20 text-brand text-[10px] font-bold px-3 py-1 rounded">Lumi Staff</span>
           </div>
         </div>
 
@@ -192,14 +194,14 @@ export default function AdminPanel() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all duration-300 ${
                   activeTab === tab.id 
                     ? 'bg-brand/10 text-brand border-l-2 border-brand' 
                     : 'text-text-muted hover:text-brand hover:bg-surface-2 border-l-2 border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-lg">{tab.icon}</span>
+                  <Icon icon={tab.icon} className="text-xl" />
                   {tab.label}
                 </div>
                 {tab.badge && (
@@ -241,7 +243,7 @@ export default function AdminPanel() {
                        <span className="text-sm text-text-muted">YouTube API</span>
                        <span className={`w-2 h-2 rounded-full ${apiStatus.youtube === 'active' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
                     </div>
-                    <div className="text-xl font-bold text-text-primary uppercase tracking-tight">{apiStatus.youtube}</div>
+                    <div className="text-xl font-bold text-text-primary tracking-tight">{apiStatus.youtube}</div>
                   </div>
                   
                   <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col justify-between">
@@ -249,7 +251,7 @@ export default function AdminPanel() {
                        <span className="text-sm text-text-muted">TMDB API</span>
                        <span className={`w-2 h-2 rounded-full ${apiStatus.tmdb === 'active' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
                     </div>
-                    <div className="text-xl font-bold text-text-primary uppercase tracking-tight">{apiStatus.tmdb}</div>
+                    <div className="text-xl font-bold text-text-primary tracking-tight">{apiStatus.tmdb}</div>
                   </div>
 
                   <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col justify-between">
@@ -257,7 +259,7 @@ export default function AdminPanel() {
                        <span className="text-sm text-text-muted">Lumi AI Core</span>
                        <span className="w-2 h-2 rounded-full bg-green-500" />
                     </div>
-                    <div className="text-lg font-bold text-text-primary uppercase tracking-tight">Gemini-1.5-Flash</div>
+                    <div className="text-lg font-bold text-text-primary tracking-tight">Gemini-1.5-Flash</div>
                   </div>
                 </div>
 
@@ -265,28 +267,28 @@ export default function AdminPanel() {
                 <div className="bg-surface border border-border rounded-2xl overflow-hidden">
                   <div className="divide-y divide-border">
                     <div className="p-4 flex items-start gap-4 border-l-4 border-brand bg-surface-2/50">
-                      <div className="text-2xl mt-1">⭐</div>
+                      <Icon icon="solar:star-bold" className="text-2xl mt-1 text-brand" />
                       <div>
                         <p className="text-text-primary font-medium">New review on King of Boys</p>
                         <p className="text-sm text-text-muted">5 mins ago</p>
                       </div>
                     </div>
                     <div className="p-4 flex items-start gap-4 border-l-4 border-amber-500">
-                      <div className="text-2xl mt-1">📋</div>
+                      <Icon icon="solar:clipboard-list-bold" className="text-2xl mt-1 text-amber-500" />
                       <div>
                         <p className="text-text-primary font-medium">Profile claim submitted — Genevieve Nnaji</p>
                         <p className="text-sm text-text-muted">1 hour ago</p>
                       </div>
                     </div>
                     <div className="p-4 flex items-start gap-4 border-l-4 border-blue-500">
-                      <div className="text-2xl mt-1">👤</div>
+                      <Icon icon="solar:user-plus-bold" className="text-2xl mt-1 text-blue-500" />
                       <div>
                         <p className="text-text-primary font-medium">New user signup (fan)</p>
                         <p className="text-sm text-text-muted">2 hours ago</p>
                       </div>
                     </div>
                     <div className="p-4 flex items-start gap-4 border-l-4 border-green-500">
-                      <div className="text-2xl mt-1">🔄</div>
+                      <Icon icon="solar:refresh-bold" className="text-2xl mt-1 text-green-500" />
                       <div>
                         <p className="text-text-primary font-medium">YouTube sync completed — 6 films updated</p>
                         <p className="text-sm text-text-muted">3 hours ago</p>
@@ -302,8 +304,8 @@ export default function AdminPanel() {
               <div className="animate-in fade-in duration-500">
                 <div className="flex justify-between items-center mb-8">
                   <h2 className="font-heading font-bold text-3xl text-text-primary">Films Database</h2>
-                  <button onClick={() => openDrawer('film')} className="bg-brand text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-brand/20">
-                    + Add Film
+                  <button onClick={() => openDrawer('film')} className="bg-brand text-white px-6 py-2 rounded-xl text-xs font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-brand/20">
+                    + Add Movie
                   </button>
                 </div>
 
@@ -490,19 +492,19 @@ export default function AdminPanel() {
               <div className="animate-in fade-in duration-500">
                 <div className="flex items-center justify-between mb-10">
                   <div className="space-y-1">
-                    <h2 className="font-heading font-bold text-3xl text-text-primary uppercase tracking-tighter italic">Verification Center</h2>
-                    <p className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">Manage professional identity and archive integrity</p>
+                    <h2 className="font-heading font-bold text-3xl text-text-primary tracking-tighter">Review Hub</h2>
+                    <p className="text-xs font-bold text-text-muted opacity-60">Manage professional profiles and database integrity</p>
                   </div>
                   <div className="flex bg-surface border border-border p-1 rounded-xl">
                     <button 
                       onClick={() => setVerifySubTab('new')} 
-                      className={`px-6 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${verifySubTab === 'new' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-text-muted hover:text-text-primary'}`}
+                      className={`px-6 py-2 rounded-lg text-[10px] font-bold transition-all ${verifySubTab === 'new' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-text-muted hover:text-text-primary'}`}
                     >
                       New Profiles ({verifications.length})
                     </button>
                     <button 
                       onClick={() => setVerifySubTab('claims')} 
-                      className={`px-6 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${verifySubTab === 'claims' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-text-muted hover:text-text-primary'}`}
+                      className={`px-6 py-2 rounded-lg text-[10px] font-bold transition-all ${verifySubTab === 'claims' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-text-muted hover:text-text-primary'}`}
                     >
                       Claims ({claims.length})
                     </button>
@@ -522,12 +524,12 @@ export default function AdminPanel() {
                                             <div className="flex-1 space-y-4">
                                                 <div>
                                                     <h4 className="font-bold text-text-primary">{p.name}</h4>
-                                                    <p className="text-brand text-[10px] font-black uppercase tracking-widest">{p.role}</p>
+                                                    <p className="text-brand text-xs font-bold">{p.role}</p>
                                                 </div>
-                                                <p className="text-[10px] text-text-muted italic line-clamp-2">"{p.bio}"</p>
+                                                <p className="text-xs text-text-muted line-clamp-2">"{p.bio}"</p>
                                                 <div className="flex gap-2">
-                                                    <button onClick={() => handleApproveVerification(p)} className="flex-1 bg-green-500/10 text-green-500 text-[9px] font-black uppercase py-2 rounded-lg border border-green-500/20 hover:bg-green-500 hover:text-bg transition-all">APPROVE</button>
-                                                    <button className="flex-1 bg-red-500/10 text-red-500 text-[9px] font-black uppercase py-2 rounded-lg border border-red-500/20 hover:bg-red-500 hover:text-bg transition-all">REJECT</button>
+                                                    <button onClick={() => handleApproveVerification(p)} className="flex-1 bg-green-500/10 text-green-500 text-[10px] font-bold py-2 rounded-lg border border-green-500/20 hover:bg-green-500 hover:text-bg transition-all">Approve</button>
+                                                    <button className="flex-1 bg-red-500/10 text-red-500 text-[10px] font-bold py-2 rounded-lg border border-red-500/20 hover:bg-red-500 hover:text-bg transition-all">Reject</button>
                                                 </div>
                                             </div>
                                         </div>
@@ -535,8 +537,8 @@ export default function AdminPanel() {
                                 </div>
                             ) : (
                                 <div className="p-20 border-2 border-dashed border-border rounded-3xl text-center space-y-4">
-                                    <div className="text-4xl opacity-20">✨</div>
-                                    <p className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-40">No new profile requests at this time</p>
+                                    <Icon icon="solar:stars-minimalistic-bold" className="text-4xl mx-auto opacity-20" />
+                                    <p className="text-xs font-bold text-text-muted opacity-40">No new profile requests at this time</p>
                                 </div>
                             )}
                         </section>
@@ -549,26 +551,26 @@ export default function AdminPanel() {
                                             <div className="flex items-center gap-4 min-w-[200px]">
                                                 <img src={claim.people?.photo_url || claim.people?.photo} className="w-12 h-12 rounded-full object-cover border border-border" />
                                                 <div>
-                                                    <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">Archive Profile</p>
+                                                    <p className="text-xs font-bold text-text-muted">Database Profile</p>
                                                     <p className="font-bold text-text-primary">{claim.people?.name}</p>
                                                 </div>
                                             </div>
                                             <div className="flex-1 text-center md:text-left">
-                                                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1">Claimant Identity</p>
+                                                <p className="text-xs font-bold text-text-muted mb-1">Claimant Identity</p>
                                                 <p className="text-sm font-medium text-text-primary">{claim.claimantName} ({claim.claimantEmail})</p>
-                                                <p className="text-[10px] text-text-muted mt-2 italic">"{claim.message}"</p>
+                                                <p className="text-xs text-text-muted mt-2">"{claim.message}"</p>
                                             </div>
                                             <div className="flex gap-2 shrink-0">
-                                                <button onClick={() => handleApproveClaim(claim)} className="bg-brand text-white text-[9px] font-black uppercase px-6 py-3 rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand/20">APPROVE CLAIM</button>
-                                                <button className="text-red-500 text-[9px] font-black uppercase px-6 py-3 border border-red-500/20 rounded-xl hover:bg-red-500/10 transition-all">REJECT</button>
+                                                <button onClick={() => handleApproveClaim(claim)} className="bg-brand text-white text-[10px] font-bold px-6 py-3 rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand/20">Approve Claim</button>
+                                                <button className="text-red-500 text-[10px] font-bold px-6 py-3 border border-red-500/20 rounded-xl hover:bg-red-500/10 transition-all">Reject</button>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
                                 <div className="p-20 border-2 border-dashed border-border rounded-3xl text-center space-y-4">
-                                    <div className="text-4xl opacity-20">📋</div>
-                                    <p className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-40">No profile claims pending review</p>
+                                    <Icon icon="solar:clipboard-list-bold" className="text-4xl mx-auto opacity-20" />
+                                    <p className="text-xs font-bold text-text-muted opacity-40">No profile claims pending review</p>
                                 </div>
                             )}
                         </section>

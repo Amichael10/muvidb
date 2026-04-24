@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Icon } from '@iconify/react'
 
 const formatTime = (timeStr) => {
     if (!timeStr) return ''
@@ -127,8 +128,9 @@ const CinemaList = ({ filmCinemas }) => {
                             <Link to={`/cinemas/${cinema?.id}`} className="text-text-primary font-bold text-xs uppercase tracking-tight hover:text-brand transition-colors">
                                 {cinema?.name}
                             </Link>
-                            <p className="text-text-muted text-[9px] font-black uppercase tracking-widest mt-0.5">
-                                📍 {cinema?.city} {cinema?.address && ` · ${cinema.address}`}
+                            <p className="text-text-muted text-[9px] font-black uppercase tracking-widest mt-0.5 flex items-center gap-1.5 opacity-60">
+                                <Icon icon="solar:map-point-linear" className="text-brand" width="10" />
+                                {cinema?.city} {cinema?.address && ` · ${cinema.address}`}
                             </p>
                         </div>
                         {cinema?.google_maps_url && (
@@ -352,7 +354,7 @@ const Showtimes = () => {
                                 </div>
                             ) : Object.keys(groupedByFilm).length === 0 ? (
                                 <div className="text-center py-32 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-                                    <p className="text-4xl mb-4">🎭</p>
+                                    <Icon icon="solar:masks-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
                                     <h3 className="text-text-muted font-black uppercase tracking-widest text-xs">No screenings archived for this search</h3>
                                 </div>
                             ) : (
@@ -376,7 +378,7 @@ const Showtimes = () => {
                                                         />
                                                     ) : (
                                                         <div className="w-full h-48 sm:h-full bg-surface-2 flex items-center justify-center">
-                                                            <span className="text-3xl">🎬</span>
+                                                            <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-brand/30" />
                                                         </div>
                                                     )}
                                                     <div className="absolute inset-0 bg-gradient-to-t from-bg/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

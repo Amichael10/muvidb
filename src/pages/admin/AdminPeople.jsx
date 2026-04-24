@@ -369,15 +369,15 @@ export default function AdminPeople() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <p className="text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-1 italic">Talent Registry</p>
-          <h1 className="text-3xl font-black text-text-primary tracking-tight">People Directory</h1>
+          <p className="text-brand text-xs font-bold mb-1">Database</p>
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">People</h1>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={handleRecalculateScores} disabled={isRecalculating} className="bg-surface-2 border border-border px-4 py-2 rounded-lg text-xs font-bold text-text-primary">
-            {isRecalculating ? 'Syncing...' : 'Sync Popularity'}
+          <button onClick={handleRecalculateScores} disabled={isRecalculating} className="bg-surface-2 border border-border px-4 py-2 rounded-lg text-xs font-bold text-text-primary hover:bg-surface-3 transition-colors">
+            {isRecalculating ? 'Updating...' : 'Synchronize popularity'}
           </button>
-          <button onClick={openAddDrawer} className="bg-brand text-white font-bold px-6 py-2 rounded-lg text-xs">
-            + Add Person
+          <button onClick={openAddDrawer} className="bg-brand text-white font-bold px-6 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all">
+            Add profile
           </button>
         </div>
       </div>
@@ -387,33 +387,33 @@ export default function AdminPeople() {
           <div className="md:col-span-2 relative">
             <input
               type="text"
-              placeholder="Search database globally..."
+              placeholder="Search records..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary outline-none focus:border-brand"
+              className="w-full bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
             />
           </div>
-          <select value={verifiedFilter} onChange={(e) => setVerifiedFilter(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary">
-            <option value="All">All Status</option>
+          <select value={verifiedFilter} onChange={(e) => setVerifiedFilter(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+            <option value="All">All statuses</option>
             <option value="Verified">Verified</option>
             <option value="Unverified">Unverified</option>
           </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="Most Popular">Popularity</option>
-            <option value="A-Z">A-Z</option>
-            <option value="Newest">Newest</option>
+            <option value="A-Z">Alphabetical</option>
+            <option value="Newest">Recently added</option>
           </select>
         </div>
       </div>
 
       {selectedPersonIds.length > 0 && (
-        <div className="flex items-center justify-between p-4 bg-brand/5 border border-brand/20 rounded-lg">
+        <div className="flex items-center justify-between p-4 bg-brand/5 border border-brand/20 rounded-lg animate-in slide-in-from-top-2">
           <span className="text-sm font-bold text-brand">{selectedPersonIds.length} profiles selected</span>
           <div className="flex gap-2">
             {selectedPersonIds.length >= 2 && (
-              <button onClick={() => setIsMergeModalOpen(true)} className="bg-brand text-white px-4 py-1.5 rounded text-xs font-bold">Merge Selected</button>
+              <button onClick={() => setIsMergeModalOpen(true)} className="bg-brand text-white px-4 py-1.5 rounded text-xs font-bold hover:scale-[1.02] transition-all">Merge</button>
             )}
-            <button onClick={() => setPersonBatchDeleteIds([...selectedPersonIds])} className="bg-red-500 text-white px-4 py-1.5 rounded text-xs font-bold">Delete Selected</button>
+            <button onClick={() => setPersonBatchDeleteIds([...selectedPersonIds])} className="bg-red-500 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-red-600 transition-colors">Delete</button>
           </div>
         </div>
       )}
@@ -421,12 +421,12 @@ export default function AdminPeople() {
       <div className="card-cal p-0 overflow-hidden">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-border text-[10px] font-bold text-text-muted uppercase bg-surface-2/30">
-              <th className="px-6 py-4 w-12"><input type="checkbox" onChange={toggleSelectAllFilteredPeople} checked={people.length > 0 && people.every(p => selectedPersonIds.includes(p.id))} /></th>
-              <th className="px-6 py-4">Identity</th>
-              <th className="px-6 py-4">Stats</th>
-              <th className="px-6 py-4 text-center">Status</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+            <tr className="border-b border-border text-[10px] font-bold text-text-muted bg-surface-2/30 uppercase tracking-wider">
+              <th className="px-6 py-5 w-12"><input type="checkbox" onChange={toggleSelectAllFilteredPeople} checked={people.length > 0 && people.every(p => selectedPersonIds.includes(p.id))} className="rounded border-border bg-surface-3 text-brand focus:ring-brand accent-brand" /></th>
+              <th className="px-6 py-5">Profile</th>
+              <th className="px-6 py-5">Statistics</th>
+              <th className="px-6 py-5 text-center">Status</th>
+              <th className="px-6 py-5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -437,34 +437,34 @@ export default function AdminPeople() {
                 </td>
               </tr>
             )) : people.length === 0 ? (
-              <tr><td colSpan="5" className="px-6 py-10 text-center text-text-muted">No one found in database.</td></tr>
+              <tr><td colSpan="5" className="px-6 py-10 text-center text-text-muted">No records found.</td></tr>
             ) : people.map(p => (
-              <tr key={p.id} className="group hover:bg-surface-2/50">
-                <td className="px-6 py-4"><input type="checkbox" checked={selectedPersonIds.includes(p.id)} onChange={() => togglePersonSelect(p.id)} /></td>
+              <tr key={p.id} className={`group hover:bg-surface-2/50 transition-colors ${selectedPersonIds.includes(p.id) ? 'bg-brand/5' : ''}`}>
+                <td className="px-6 py-4"><input type="checkbox" checked={selectedPersonIds.includes(p.id)} onChange={() => togglePersonSelect(p.id)} className="rounded border-border bg-surface-3 text-brand focus:ring-brand accent-brand" /></td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    {p.photo_url ? <img src={p.photo_url} className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-surface-2 flex items-center justify-center text-[10px] font-bold">?</div>}
+                    {p.photo_url ? <img src={p.photo_url} className="w-10 h-10 rounded object-cover shadow-sm grayscale group-hover:grayscale-0 transition-all" /> : <div className="w-10 h-10 rounded bg-surface-2 flex items-center justify-center text-[10px] font-bold text-text-muted">?</div>}
                     <div>
-                      <span className="font-bold text-text-primary block">{p.name}</span>
-                      <span className="text-[9px] text-text-muted uppercase">ID: {p.id.slice(0, 8)}</span>
+                      <span className="font-bold text-text-primary block leading-tight">{p.name}</span>
+                      <span className="text-[10px] text-text-muted font-mono">{p.id.slice(0, 8)}</span>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-4 text-xs font-bold text-text-primary">
-                    <span>🎬 {p.credits?.[0]?.count || 0}</span>
-                    <span>👁 {formatNumber(p.popularity_score)}</span>
+                    <span title="Total Credits">🎬 {p.credits?.[0]?.count || 0}</span>
+                    <span title="Popularity Score">👁 {formatNumber(p.popularity_score)}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-center">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${p.is_verified ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'}`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${p.is_verified ? 'bg-brand/10 text-brand border-brand/20' : 'bg-surface-2 text-text-muted border-border'}`}>
                     {p.is_verified ? 'Verified' : 'Member'}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => openEditDrawer(p)} className="p-2 bg-surface-2 rounded hover:bg-brand hover:text-white transition-colors">✎</button>
-                    <button onClick={() => setDeletingPerson(p)} className="p-2 bg-surface-2 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors">✖</button>
+                    <button onClick={() => openEditDrawer(p)} className="p-2 bg-surface-2 rounded-lg hover:bg-brand hover:text-white transition-all">✎</button>
+                    <button onClick={() => setDeletingPerson(p)} className="p-2 bg-surface-2 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all">✖</button>
                   </div>
                 </td>
               </tr>
@@ -473,75 +473,21 @@ export default function AdminPeople() {
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="flex items-center justify-between px-6 py-6 border-t border-border bg-surface-2/30">
-        <div className="text-xs font-bold text-text-muted uppercase tracking-widest">
-          Showing <span className="text-text-primary">{(page - 1) * pageSize + 1}</span> to <span className="text-text-primary">{Math.min(page * pageSize, totalCount)}</span> of <span className="text-text-primary">{totalCount}</span> Profiles
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPage(prev => Math.max(1, prev - 1))}
-            disabled={page === 1 || isLoading}
-            className="px-4 py-2 bg-surface border border-border text-xs font-bold text-text-primary rounded-md hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          >
-            Previous
-          </button>
-          <div className="flex items-center px-4 text-xs font-bold text-brand bg-brand/10 border border-brand/20 rounded-md">
-            Page {page}
-          </div>
-          <button
-            onClick={() => setPage(prev => (prev * pageSize < totalCount ? prev + 1 : prev))}
-            disabled={page * pageSize >= totalCount || isLoading}
-            className="px-4 py-2 bg-surface border border-border text-xs font-bold text-text-primary rounded-md hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
-      {/* Modals */}
-      <MergeModal 
-        isOpen={isMergeModalOpen} 
-        onClose={() => setIsMergeModalOpen(false)} 
-        items={people.filter(p => selectedPersonIds.includes(p.id))} 
-        onConfirm={handleMergePeople} 
-        type="person" 
-      />
-      
-      {deletingPerson && (
-        <ConfirmModal 
-          title="Delete Profile" 
-          message={`Are you sure you want to delete ${deletingPerson.name}? This action is irreversible.`} 
-          onConfirm={handleDelete} 
-          onCancel={() => setDeletingPerson(null)} 
-        />
-      )}
-      
-      {personBatchDeleteIds && (
-        <ConfirmModal 
-          title="Batch Delete" 
-          message={`Delete ${personBatchDeleteIds.length} selected profiles? This action is irreversible.`} 
-          onConfirm={handleConfirmBatchDeletePeople} 
-          onCancel={() => setPersonBatchDeleteIds(null)} 
-        />
-      )}
-
-      <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title={editingPerson ? 'Edit Talent Profile' : 'Register New Talent'}>
+      <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title={editingPerson ? 'Edit Record' : 'Add New Record'}>
         <form onSubmit={handleSave} className="p-8 space-y-10">
-          {/* Identity & Bio */}
           <section className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-border">
               <span className="text-xl">👤</span>
-              <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest">Public Identity</h4>
+              <h4 className="text-xs font-bold text-text-muted">Personal Details</h4>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-text-primary mb-2">Full Name *</label>
+                <label className="block text-xs font-bold text-text-primary mb-2">Full Name</label>
                 <input 
                   required 
                   value={formData.name} 
                   onChange={e => setFormData({...formData, name: e.target.value})} 
-                  className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none" 
+                  className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none transition-colors" 
                   placeholder="e.g. Funke Akindele" 
                 />
               </div>
@@ -551,7 +497,7 @@ export default function AdminPeople() {
                   <select 
                     value={formData.gender} 
                     onChange={e => setFormData({...formData, gender: e.target.value})} 
-                    className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none appearance-none"
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none appearance-none cursor-pointer"
                   >
                     <option>Female</option>
                     <option>Male</option>
@@ -560,11 +506,11 @@ export default function AdminPeople() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-text-primary mb-2">Country of Origin</label>
+                  <label className="block text-xs font-bold text-text-primary mb-2">Nationality</label>
                   <input 
                     value={formData.nationality} 
                     onChange={e => setFormData({...formData, nationality: e.target.value})} 
-                    className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none" 
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
                     placeholder="e.g. Nigerian" 
                   />
                 </div>
@@ -575,7 +521,7 @@ export default function AdminPeople() {
                   type="date" 
                   value={formData.date_of_birth} 
                   onChange={e => setFormData({...formData, date_of_birth: e.target.value})} 
-                  className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none" 
+                  className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
                 />
               </div>
               <div>
@@ -583,7 +529,7 @@ export default function AdminPeople() {
                 <input 
                   value={formData.photo_url} 
                   onChange={e => setFormData({...formData, photo_url: e.target.value})} 
-                  className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none" 
+                  className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
                   placeholder="https://..." 
                 />
               </div>
@@ -592,73 +538,71 @@ export default function AdminPeople() {
                 <textarea 
                   value={formData.bio} 
                   onChange={e => setFormData({...formData, bio: e.target.value})} 
-                  className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none h-32 resize-none leading-relaxed" 
-                  placeholder="Write a short biography..." 
+                  className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none h-32 resize-none leading-relaxed custom-scrollbar" 
+                  placeholder="Professional biography..." 
                 />
               </div>
             </div>
           </section>
 
-          {/* YouTube Sync */}
           <section className="space-y-6">
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🎬</span>
-                <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest">YouTube Presence</h4>
+                <span className="text-xl">📺</span>
+                <h4 className="text-xs font-bold text-text-muted">YouTube Data</h4>
               </div>
               <button
                 type="button"
                 onClick={handleFetchYoutube}
                 className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-full hover:bg-brand/10 transition-all flex items-center gap-1.5"
               >
-                🔄 Fetch Stats
+                Refresh Stats
               </button>
             </div>
             <div className="p-4 bg-surface-2 border border-border rounded-lg space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">Channel URL / Handle / ID</label>
+                <label className="block text-xs font-bold text-text-muted mb-1.5">Channel URL or ID</label>
                 <input 
                   value={youtubeChannelInput} 
                   onChange={e => setYoutubeChannelInput(e.target.value)} 
-                  className="w-full bg-surface border border-border p-3 rounded-md text-xs focus:border-brand outline-none" 
+                  className="w-full bg-surface border border-border p-3 rounded-lg text-xs focus:border-brand outline-none" 
                   placeholder="https://youtube.com/@handle" 
                 />
               </div>
               {formData.youtube_stats && (
                 <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="bg-surface p-3 rounded border border-border/50 text-center">
-                    <div className="text-xs font-black text-text-primary">{(formData.youtube_stats.subscribers || 0).toLocaleString()}</div>
-                    <div className="text-[9px] font-bold text-text-muted uppercase">Subscribers</div>
+                  <div className="bg-surface p-3 rounded-lg border border-border/50 text-center">
+                    <div className="text-xs font-bold text-text-primary">{(formData.youtube_stats.subscribers || 0).toLocaleString()}</div>
+                    <div className="text-[9px] font-bold text-text-muted">Subscribers</div>
                   </div>
-                  <div className="bg-surface p-3 rounded border border-border/50 text-center">
-                    <div className="text-xs font-black text-text-primary">{(formData.youtube_stats.videos || 0).toLocaleString()}</div>
-                    <div className="text-[9px] font-bold text-text-muted uppercase">Videos</div>
+                  <div className="bg-surface p-3 rounded-lg border border-border/50 text-center">
+                    <div className="text-xs font-bold text-text-primary">{(formData.youtube_stats.videos || 0).toLocaleString()}</div>
+                    <div className="text-[9px] font-bold text-text-muted">Videos</div>
                   </div>
                 </div>
               )}
             </div>
           </section>
 
-          {/* Filmography / Credits */}
           {editingPerson && personCredits.length > 0 && (
             <section className="space-y-6">
               <div className="flex items-center gap-2 pb-2 border-b border-border">
                 <span className="text-xl">🎞️</span>
-                <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest">Filmography</h4>
+                <h4 className="text-xs font-bold text-text-muted">Credits</h4>
               </div>
               <div className="space-y-3">
                 {personCredits.map(credit => (
-                  <div key={credit.id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-lg group">
+                  <div key={credit.id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
                     <div className="w-10 h-14 bg-surface rounded border border-border overflow-hidden flex-shrink-0">
                       {credit.films?.poster_url ? (
-                        <img src={credit.films.poster_url} className="w-full h-full object-cover" />
+                        <img src={credit.films.poster_url} className="w-full h-full object-cover" alt="" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[8px] bg-surface-3">NO IMAGE</div>
+                        <div className="w-full h-full flex items-center justify-center text-[8px] bg-surface-3 text-text-muted">NO POSTER</div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
-                      <div className="text-[10px] text-text-muted mt-0.5">
+                      <div className="text-[10px] text-text-muted mt-0.5 font-medium">
                         <span className="capitalize">{credit.role}</span>
                         {credit.character_name && ` as ${credit.character_name}`}
                         {credit.films?.year && ` (${credit.films.year})`}
@@ -670,11 +614,10 @@ export default function AdminPeople() {
             </section>
           )}
 
-          {/* Configuration & Status */}
           <section className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-border">
               <span className="text-xl">⚙️</span>
-              <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest">Profile Configuration</h4>
+              <h4 className="text-xs font-bold text-text-muted">Settings</h4>
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -683,7 +626,7 @@ export default function AdminPeople() {
                   <input 
                     value={formData.tmdb_id || ''} 
                     onChange={e => setFormData({...formData, tmdb_id: e.target.value})} 
-                    className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none" 
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
                   />
                 </div>
                 <div>
@@ -692,21 +635,21 @@ export default function AdminPeople() {
                     type="number" 
                     value={formData.popularity_score} 
                     onChange={e => setFormData({...formData, popularity_score: e.target.value})} 
-                    className="w-full bg-surface-2 border border-border p-3 rounded-md text-sm focus:border-brand outline-none" 
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
                   />
                 </div>
               </div>
               
-              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-lg hover:border-brand/20 transition-all">
                 <div>
-                  <h4 className="text-sm font-bold text-text-primary">Verified Artist</h4>
-                  <p className="text-[10px] text-text-muted">Display verification badge on profile.</p>
+                  <h4 className="text-sm font-bold text-text-primary">Verified Profile</h4>
+                  <p className="text-[10px] text-text-muted font-bold">Display verification badge.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, is_verified: !formData.is_verified })}
                   className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                    formData.is_verified ? 'bg-brand' : 'bg-border'
+                    formData.is_verified ? 'bg-brand shadow-lg shadow-brand/20' : 'bg-border'
                   }`}
                 >
                   <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${
@@ -715,16 +658,16 @@ export default function AdminPeople() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-lg hover:border-brand/20 transition-all">
                 <div>
-                  <h4 className="text-sm font-bold text-text-primary">Featured Spotlight</h4>
-                  <p className="text-[10px] text-text-muted">Highlight this person on the home page.</p>
+                  <h4 className="text-sm font-bold text-text-primary">Spotlight</h4>
+                  <p className="text-[10px] text-text-muted font-bold">Feature on landing page.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, is_spotlight: !formData.is_spotlight })}
                   className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                    formData.is_spotlight ? 'bg-brand' : 'bg-border'
+                    formData.is_spotlight ? 'bg-brand shadow-lg shadow-brand/20' : 'bg-border'
                   }`}
                 >
                   <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${
@@ -739,9 +682,9 @@ export default function AdminPeople() {
             <button 
               type="submit" 
               disabled={isSaving} 
-              className="w-full bg-brand text-white p-4 rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-brand/20 disabled:opacity-50"
+              className="w-full bg-brand text-white p-4 rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 disabled:opacity-50"
             >
-              {isSaving ? 'Synchronizing Archive...' : editingPerson ? 'Update Talent Profile' : 'Register Talent Profile'}
+              {isSaving ? 'Saving...' : editingPerson ? 'Update' : 'Add Profile'}
             </button>
           </div>
         </form>

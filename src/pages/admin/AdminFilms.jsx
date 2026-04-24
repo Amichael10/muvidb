@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { Icon } from '@iconify/react';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
@@ -58,7 +59,8 @@ export default function AdminFilms() {
     tagline: '',
     is_featured: false,
     release_type: 'cinema',
-    youtube_watch_url: ''
+    youtube_watch_url: '',
+    streaming_links: {}
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -250,7 +252,8 @@ export default function AdminFilms() {
         runtime_minutes: film.runtime_minutes || '',
         is_featured: film.is_featured || false,
         release_type: film.release_type || 'cinema',
-        youtube_watch_url: film.youtube_watch_url || ''
+        youtube_watch_url: film.youtube_watch_url || '',
+        streaming_links: film.streaming_links || {},
       });
       await fetchFilmDetails(film.id);
     } else {
@@ -513,17 +516,16 @@ export default function AdminFilms() {
     <div className="p-10 max-w-[1600px] mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
         <div>
-          <h1 className="text-4xl font-bold text-text-primary tracking-tight">Catalogue</h1>
-          <p className="text-text-muted text-base mt-2 font-medium">Manage and monitor the Nollywood digital asset library.</p>
+          <p className="text-brand text-xs font-bold mb-1">Database</p>
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Movies</h1>
+          <p className="text-text-muted text-sm mt-1 font-medium">Manage and monitor the digital film library.</p>
         </div>
         <button
           onClick={() => handleOpenDrawer()}
           className="bg-brand text-white font-bold px-8 py-3.5 rounded-md text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-brand/20 flex items-center gap-2"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add New Production
+          <Icon icon="solar:add-circle-linear" className="w-5 h-5" />
+          Add movie record
         </button>
       </div>
 
@@ -595,7 +597,7 @@ export default function AdminFilms() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse">
             <thead>
-              <tr className="border-b border-border text-text-muted text-[11px] font-bold uppercase tracking-widest bg-surface-2/30">
+              <tr className="border-b border-border text-text-muted text-xs font-bold bg-surface-2/30">
                 <th className="pl-6 py-4 w-12">
                   <input
                     type="checkbox"
@@ -613,7 +615,7 @@ export default function AdminFilms() {
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
-                <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">Synchronizing database records...</td></tr>
+                <tr><td colSpan="5" className="p-20 text-center text-text-muted">Loading database records...</td></tr>
               ) : filteredFilms.length === 0 ? (
                 <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">No productions found.</td></tr>
               ) : filteredFilms.map((film, i) => (
@@ -635,7 +637,7 @@ export default function AdminFilms() {
                         {film.poster_url ? (
                           <img src={film.poster_url} alt="" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[8px] font-black italic text-text-muted uppercase">Empty</div>
+                          <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-text-muted">Empty</div>
                         )}
                       </div>
                       <div className="min-w-0">
@@ -647,7 +649,7 @@ export default function AdminFilms() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight border ${
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                       film.status === 'released' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
                       film.status === 'post-production' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
                       film.status === 'filming' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
@@ -693,7 +695,7 @@ export default function AdminFilms() {
         {/* Pagination Footer */}
         <div className="flex items-center justify-between px-6 py-6 border-t border-border bg-surface-2/30">
           <div className="text-xs font-bold text-text-muted uppercase tracking-widest">
-            Showing <span className="text-text-primary">{(page - 1) * pageSize + 1}</span> to <span className="text-text-primary">{Math.min(page * pageSize, totalCount)}</span> of <span className="text-text-primary">{totalCount}</span> Productions
+            Showing <span className="text-text-primary">{(page - 1) * pageSize + 1}</span> to <span className="text-text-primary">{Math.min(page * pageSize, totalCount)}</span> of <span className="text-text-primary">{totalCount}</span> Films
           </div>
           <div className="flex gap-2">
             <button
@@ -728,7 +730,7 @@ export default function AdminFilms() {
       <Drawer
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
-        title={editingFilm ? 'Edit Production Profile' : 'Register New Production'}
+        title={editingFilm ? 'Edit Movie Profile' : 'Add New Movie'}
         width="800px"
       >
         <form onSubmit={handleSubmit} className="space-y-12">
@@ -736,7 +738,7 @@ export default function AdminFilms() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <section className="space-y-6">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest">Core Identity</h4>
+                <h4 className="text-xs font-bold text-text-muted">Core Information</h4>
                 {editingFilm && formData.tmdb_id && (
                   <button
                     type="button"
@@ -744,21 +746,26 @@ export default function AdminFilms() {
                     disabled={isRefreshing}
                     className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-full hover:bg-brand/10 transition-all flex items-center gap-1.5"
                   >
-                    {isRefreshing ? 'Refreshing...' : '✨ Sync TMDB'}
+                    {isRefreshing ? 'Refreshing...' : (
+                      <>
+                        <Icon icon="solar:stars-minimalistic-bold" />
+                        Sync TMDB
+                      </>
+                    )}
                   </button>
                 )}
               </div>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-text-primary mb-2">Production Title *</label>
+                  <label className="block text-xs font-bold text-text-primary mb-2">Movie Title *</label>
                   <input 
                     required 
                     name="title" 
                     value={formData.title} 
                     onChange={handleChange} 
                     className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" 
-                    placeholder="Enter production title..."
+                    placeholder="Enter movie title..."
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -931,28 +938,74 @@ export default function AdminFilms() {
                   <h4 className="text-[10px] font-bold text-brand uppercase tracking-widest">Public Access Control</h4>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Release Stream Type</label>
+                  <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kaba', 'showmax'].map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, release_type: type })}
-                        className={`py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all ${
-                          formData.release_type === type 
-                            ? 'bg-brand text-white border-brand shadow-sm' 
-                            : 'bg-surface text-text-muted border-border hover:border-brand/40'
-                        }`}
-                      >
-                        {type.replace('_', ' ')}
-                      </button>
-                    ))}
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax'].map((type) => {
+                      const isActive = type === 'cinema' 
+                        ? formData.release_type === 'cinema'
+                        : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
+                      
+                      const isPrimary = formData.release_type === type;
+
+                      return (
+                        <div key={type} className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (type === 'cinema') {
+                                setFormData({ ...formData, release_type: 'cinema' });
+                              } else {
+                                const newLinks = { ...formData.streaming_links };
+                                if (isActive && !isPrimary) {
+                                  delete newLinks[type];
+                                } else {
+                                  newLinks[type] = newLinks[type] || '';
+                                }
+                                setFormData({ 
+                                  ...formData, 
+                                  streaming_links: newLinks,
+                                  // If we just activated it and nothing is primary, make it primary
+                                  release_type: (!formData.release_type || formData.release_type === 'cinema') ? type : formData.release_type
+                                });
+                              }
+                            }}
+                            className={`py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all flex items-center gap-2 ${
+                              isActive 
+                                ? 'bg-brand/10 text-brand border-brand/50 shadow-sm' 
+                                : 'bg-surface text-text-muted border-border hover:border-brand/40'
+                            }`}
+                          >
+                            {isActive && (
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                            {type.replace('_', ' ')}
+                          </button>
+                          
+                          {isActive && type !== 'cinema' && (
+                            <button
+                              type="button"
+                              title="Set as Primary"
+                              onClick={() => setFormData({ ...formData, release_type: type })}
+                              className={`p-1.5 rounded-md transition-all ${
+                                isPrimary ? 'text-gold' : 'text-text-muted hover:text-gold'
+                              }`}
+                            >
+                              <svg className="w-4 h-4" fill={isPrimary ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
                 {formData.release_type !== 'cinema' && (
                   <div className="pt-2 animate-in fade-in slide-in-from-top-2">
                     <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">
-                      {formData.release_type.replace('_', ' ')} Destination / Watch URL
+                      Primary Watch URL (Shown on Button)
                     </label>
                     <input 
                       name="youtube_watch_url" 
@@ -963,6 +1016,62 @@ export default function AdminFilms() {
                     />
                   </div>
                 )}
+
+                {/* Multi-Platform Links */}
+                <div className="pt-4 space-y-4 border-t border-border mt-4">
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-text-primary">Watch Destination Links</h5>
+                  <div className="grid grid-cols-1 gap-3">
+                    {[
+                      { id: 'netflix', label: 'Netflix', placeholder: 'https://netflix.com/...' },
+                      { id: 'prime_video', label: 'Prime Video', placeholder: 'https://primevideo.com/...' },
+                      { id: 'kava', label: 'Kava', placeholder: 'https://kava.tv/...' },
+                      { id: 'youtube', label: 'YouTube (Full Movie)', placeholder: 'https://youtube.com/watch?v=...' },
+                      { id: 'showmax', label: 'Showmax', placeholder: 'https://showmax.com/...' },
+                    ].map(platform => {
+                      const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
+                      if (!isActive) return null;
+
+                      return (
+                        <div key={platform.id} className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-left-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider">
+                              {platform.label} {formData.release_type === platform.id && <span className="text-gold ml-1">(PRIMARY)</span>}
+                            </label>
+                          </div>
+                          <input
+                            type="text"
+                            value={platform.id === formData.release_type ? (formData.youtube_watch_url || formData.streaming_links?.[platform.id] || '') : (formData.streaming_links?.[platform.id] || '')}
+                            onChange={(e) => {
+                              if (platform.id === formData.release_type) {
+                                setFormData({
+                                  ...formData,
+                                  youtube_watch_url: e.target.value,
+                                  streaming_links: {
+                                    ...formData.streaming_links,
+                                    [platform.id]: e.target.value
+                                  }
+                                });
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  streaming_links: {
+                                    ...formData.streaming_links,
+                                    [platform.id]: e.target.value
+                                  }
+                                });
+                              }
+                            }}
+                            placeholder={platform.placeholder}
+                            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[10px] focus:border-brand outline-none"
+                          />
+                        </div>
+                      );
+                    })}
+                    {(!formData.streaming_links || Object.keys(formData.streaming_links).length === 0) && formData.release_type === 'cinema' && (
+                      <p className="text-[10px] text-text-muted italic">No streaming platforms selected.</p>
+                    )}
+                  </div>
+                </div>
                 <div className="pt-2">
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">YouTube Video Override (Trailers)</label>
                   <input 

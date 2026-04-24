@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Icon } from '@iconify/react'
 
 // Extract chain name from the cinema's display name
 function extractChain(name = '') {
@@ -56,7 +57,8 @@ const CinemaCard = ({ cinema, showCount }) => {
         </div>
 
         {(cinema.address || cinema.city) && (
-          <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-4 line-clamp-1 opacity-60">
+          <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-4 line-clamp-1 opacity-60 flex items-center gap-2">
+             <Icon icon="solar:map-point-linear" className="text-brand/50" width="12" />
              {[cinema.city, cinema.state].filter(Boolean).join(', ')}
           </p>
         )}
@@ -81,9 +83,7 @@ const CinemaCard = ({ cinema, showCount }) => {
                TICKETS
             </span>
           )}
-          <svg className="w-4 h-4 text-text-muted group-hover:text-brand group-hover:translate-x-1 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-          </svg>
+          <Icon icon="solar:arrow-right-linear" className="w-4 h-4 text-text-muted group-hover:text-brand group-hover:translate-x-1 transition-all" />
         </div>
       </div>
     </Link>
@@ -196,13 +196,16 @@ const Cinemas = () => {
         {/* Filters Section */}
         <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-border border-b border-border">
           <div className="lg:col-span-2 p-8 space-y-4 bg-surface-2/5">
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="SEARCH THEATRES..."
-              className="w-full bg-surface border border-border text-text-primary rounded-lg px-6 py-4 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="SEARCH THEATRES..."
+                className="w-full bg-surface border border-border text-text-primary rounded-lg px-6 py-4 pl-12 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
+              />
+              <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 text-text-primary" width="20" />
+            </div>
           </div>
           
           <div className="lg:col-span-1 p-8">
@@ -234,7 +237,7 @@ const Cinemas = () => {
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-32 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-              <p className="text-4xl mb-4">🎭</p>
+              <Icon icon="solar:buildings-2-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
               <h3 className="text-text-muted font-black uppercase tracking-widest text-xs">No theatres discovered in this sector</h3>
             </div>
           ) : (

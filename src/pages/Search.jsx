@@ -122,16 +122,16 @@ export default function Search() {
                 type="text" 
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="SEARCH ARCHIVES, CREATIVES, STUDIOS..." 
+                placeholder="Search movies, people, studios..." 
                 className="w-full bg-surface border border-border rounded-xl py-6 pl-16 pr-32 text-xs font-black uppercase tracking-widest text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-all shadow-sm"
               />
-              <button type="submit" className="absolute inset-y-3 right-3 bg-brand text-white px-8 rounded-lg text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20">
-                INITIATE
+              <button type="submit" className="absolute inset-y-3 right-3 bg-brand text-white px-8 rounded-lg text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20">
+                Search
               </button>
             </form>
             {initialQuery && (
-              <p className="mt-6 text-center text-[10px] font-black uppercase tracking-widest text-text-muted opacity-60">
-                SCANNING RECORDS FOR <span className="text-brand italic">"{initialQuery.toUpperCase()}"</span>
+              <p className="mt-6 text-center text-xs font-bold text-text-muted opacity-60">
+                Results for <span className="text-brand">"{initialQuery}"</span>
               </p>
             )}
           </div>
@@ -142,20 +142,20 @@ export default function Search() {
         {/* Categories Tabs */}
         <div className="flex justify-center border-b border-border bg-surface-2/5 divide-x divide-border overflow-x-auto">
           {[
-            { id: 'films', label: 'FILMS', count: films.length },
-            { id: 'people', label: 'PEOPLE', count: people.length },
-            { id: 'companies', label: 'COMPANIES', count: companies.length }
+            { id: 'films', label: 'Movies', count: films.length },
+            { id: 'people', label: 'People', count: people.length },
+            { id: 'companies', label: 'Studios', count: companies.length }
           ].map(tab => (
             <button 
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-12 py-6 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative shrink-0 ${
+              className={`px-12 py-6 text-xs font-bold transition-all relative shrink-0 ${
                 activeTab === tab.id 
                   ? 'text-brand' 
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
-              {tab.label} <span className="ml-2 opacity-40">[{tab.count}]</span>
+              {tab.label} <span className="ml-2 opacity-40">({tab.count})</span>
               {activeTab === tab.id && (
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-brand" />
               )}
@@ -200,8 +200,8 @@ export default function Search() {
                            {company.logo_url ? <img src={company.logo_url} className="w-full h-full object-contain p-2" /> : company.name.charAt(0)}
                         </div>
                         <div className="min-w-0">
-                            <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors uppercase tracking-tight truncate leading-tight">{company.name}</h3>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-text-muted mt-1 opacity-60">{company.country || 'INTERNATIONAL ARCHIVE'}</p>
+                            <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors tracking-tight truncate leading-tight">{company.name}</h3>
+                            <p className="text-[10px] font-bold text-text-muted mt-1 opacity-60">{company.country || 'International'}</p>
                         </div>
                       </Link>
                     ))}
@@ -224,9 +224,9 @@ function EmptyState({ query }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
-      <h3 className="font-heading font-bold text-2xl text-text-primary mb-4 tracking-tighter uppercase italic">No records discovered</h3>
-      <p className="text-text-muted text-xs font-black uppercase tracking-widest max-w-sm leading-relaxed opacity-60">
-        The archive contains no matches for "{query?.toUpperCase()}". Please adjust your search parameters and try again.
+      <h3 className="font-heading font-bold text-2xl text-text-primary mb-4 tracking-tighter">No results found</h3>
+      <p className="text-text-muted text-xs font-bold max-w-sm leading-relaxed opacity-60">
+        No matches found for "{query}". Please adjust your search and try again.
       </p>
     </div>
   );

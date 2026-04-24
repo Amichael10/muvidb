@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
+import { Icon } from '@iconify/react'
 import {
   formatViewCount,
   fetchRecentVideosFromChannel,
@@ -18,6 +19,7 @@ const PLATFORM_STYLES = {
   amazon:   { label: 'Prime',    bg: 'bg-blue-500/20',    text: 'text-blue-400',    dot: 'bg-blue-400'   },
   showmax:  { label: 'Showmax',  bg: 'bg-purple-500/20',  text: 'text-purple-400',  dot: 'bg-purple-400' },
   iroko:    { label: 'iROKO',    bg: 'bg-green-500/20',   text: 'text-green-400',   dot: 'bg-green-400'  },
+  kava:     { label: 'Kava',     bg: 'bg-orange-500/20',  text: 'text-orange-400',  dot: 'bg-orange-400' },
 }
 
 function PlatformBadge({ releaseType }) {
@@ -397,12 +399,12 @@ const PersonDetail = () => {
             <div className="flex-1 space-y-6">
               <div>
                 <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start mb-2">
-                  <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter uppercase italic">
+                  <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">
                     {person.name}
                   </h1>
                   {person.is_verified && (
-                    <span className="bg-brand/10 text-brand text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border border-brand/20">
-                      ✓ VERIFIED
+                    <span className="bg-brand/10 text-brand text-[10px] font-bold px-3 py-1 rounded-lg border border-brand/20">
+                      Verified
                     </span>
                   )}
                 </div>
@@ -411,7 +413,7 @@ const PersonDetail = () => {
                   {availableRoles.map(role => (
                      <span
                       key={role}
-                      className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em]"
+                      className="text-text-muted text-[10px] font-bold tracking-wider"
                     >
                       {roleLabels[role]}
                       {availableRoles.indexOf(role) <
@@ -426,33 +428,37 @@ const PersonDetail = () => {
                   <p className="text-brand text-xl font-bold font-heading">
                     {formatViewCount(person.popularity_score || totalViews)}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Views</p>
+                  <p className="text-text-muted text-[9px] font-bold">Views</p>
                 </div>
                 <div className="p-4 border-r border-border text-center">
                   <p className="text-text-primary text-xl font-bold font-heading">
                     {totalFilms}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Credits</p>
+                  <p className="text-text-muted text-[9px] font-bold">Credits</p>
                 </div>
                 <div className="p-4 text-center">
                   <p className="text-text-primary text-xl font-bold font-heading">
                     {followerCount.toLocaleString()}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Followers</p>
+                  <p className="text-text-muted text-[9px] font-bold">Followers</p>
                 </div>
               </div>
 
               {person.biography && (
-                <Biography text={person.biography} />
+                <div className="space-y-4">
+                  <p className="text-text-muted text-sm leading-relaxed max-w-2xl">
+                    {person.biography}
+                  </p>
+                </div>
               )}
 
-              <div className="flex flex-wrap gap-6 text-[10px] font-black uppercase tracking-[0.2em] justify-center md:justify-start">
+              <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
                 {person.nationality && (
-                  <span className="text-text-muted">NATIONALITY: {person.nationality}</span>
+                  <span className="text-text-muted">Nationality: {person.nationality}</span>
                 )}
                 {person.date_of_birth && (
                   <span className="text-text-muted">
-                    BORN: {new Date(person.date_of_birth).toLocaleDateString('en-NG', {
+                    Born: {new Date(person.date_of_birth).toLocaleDateString('en-NG', {
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric'
@@ -465,13 +471,13 @@ const PersonDetail = () => {
                 <button
                   onClick={handleFollow}
                   disabled={followLoading}
-                  className={`px-8 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 min-h-[44px] ${
+                  className={`px-8 py-3 rounded-lg font-bold text-xs transition-all disabled:opacity-50 min-h-[44px] ${
                     isFollowing
                       ? 'bg-surface border border-brand text-brand hover:bg-brand/5'
                       : 'bg-brand text-white hover:shadow-brand/20 hover:scale-[1.02]'
                   }`}
                 >
-                  {isFollowing ? 'FOLLOWING' : 'FOLLOW PROFILE'}
+                  {isFollowing ? 'Following' : 'Follow'}
                 </button>
 
                 {getPersonYoutubeChannelUrl(person) && (
@@ -479,9 +485,9 @@ const PersonDetail = () => {
                     href={getPersonYoutubeChannelUrl(person)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-8 py-3 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all border border-border text-text-primary bg-surface hover:border-brand hover:text-brand min-h-[44px]"
+                    className="inline-flex items-center gap-2 px-8 py-3 rounded-lg font-bold text-xs transition-all border border-border text-text-primary bg-surface hover:border-brand hover:text-brand min-h-[44px]"
                   >
-                    OFFICIAL CHANNEL
+                    Official Channel
                   </a>
                 )}
               </div>
@@ -492,8 +498,8 @@ const PersonDetail = () => {
 
       <div className="max-w-7xl mx-auto border-x border-border pb-20">
         <div className="p-8 md:p-12">
-          <h2 className="text-text-primary text-3xl font-bold font-heading mb-8 tracking-tighter uppercase italic">
-            Filmography Archive
+          <h2 className="text-text-primary text-3xl font-bold font-heading mb-8 tracking-tighter">
+            Filmography
           </h2>
 
           {availableRoles.length > 1 && (
@@ -502,7 +508,7 @@ const PersonDetail = () => {
                 <button
                   key={role}
                   onClick={() => setActiveRole(role)}
-                  className={`px-6 py-2 rounded-md text-[10px] font-black tracking-widest uppercase transition-all whitespace-nowrap ${
+                  className={`px-6 py-2 rounded-md text-[10px] font-bold transition-all whitespace-nowrap ${
                     activeRole === role
                       ? 'bg-brand text-white shadow-md'
                       : 'text-text-muted hover:text-text-primary'
@@ -547,7 +553,7 @@ const PersonDetail = () => {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-4xl text-text-muted">🎬</span>
+                          <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-text-muted/30" />
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-80" />
@@ -560,8 +566,8 @@ const PersonDetail = () => {
                             {film?.year || (video?.published_at && new Date(video.published_at).getFullYear())}
                           </p>
                           {credit.character_name && (
-                            <p className="text-brand text-[9px] font-black uppercase tracking-widest truncate">
-                              AS {credit.character_name}
+                          <p className="text-brand text-[9px] font-bold truncate">
+                              as {credit.character_name}
                             </p>
                           )}
                         </div>
@@ -573,8 +579,8 @@ const PersonDetail = () => {
             </div>
           ) : (
             <div className="text-center py-20 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-              <p className="text-text-muted font-black tracking-widest uppercase text-xs">
-                No {roleLabels[activeRole]} credits archived yet
+              <p className="text-text-muted font-bold text-xs">
+                No credits available yet
               </p>
             </div>
           )}
@@ -583,8 +589,8 @@ const PersonDetail = () => {
         {channel && (
           <div className="p-8 md:p-12 border-t border-border bg-surface-2/5 relative overflow-hidden">
             <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-            <h2 className="text-text-primary text-2xl font-bold mb-8 font-heading tracking-tighter uppercase italic relative z-10">
-              OFFICIAL HUB
+            <h2 className="text-text-primary text-2xl font-bold mb-8 font-heading tracking-tighter relative z-10">
+              Official Channel
             </h2>
 
             <Link

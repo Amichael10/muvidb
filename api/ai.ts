@@ -46,7 +46,7 @@ async function enrichMetadata(res: VercelResponse) {
   const missingData = { films, people, companies };
   const prompt = `
     Enrich this Nollywood metadata. 
-    - Films: factual synopsis. 
+    - Films: factual synopsis. Use sources like TMDB, IMDb, and kava.tv.
     - People/Companies: REAL photo/logo URL.
     - If no photo, use: https://ui-avatars.com/api/?name=NAME&background=random
     
@@ -64,6 +64,7 @@ async function discoverActors(data: any, res: VercelResponse) {
 
   const prompt = `
     Research 20 UPCOMING actors from ${region} Nollywood. 
+    Research across YouTube, social media, and kava.tv for recent releases.
     Exclude: ${JSON.stringify(existing)}.
     Return ONLY JSON: [{"name": "...", "bio": "...", "image_url": "...", "notable_movies": [], "type": "person"}]
   `;

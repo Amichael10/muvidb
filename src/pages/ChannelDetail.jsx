@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatViewCount, parseDuration } from '../utils/youtube';
 import { Skeleton } from '../components/ui/Skeleton';
+import { Icon } from '@iconify/react';
 
 const CATEGORY_LABELS = {
   skit_maker: 'Skit Makers', movie_channel: 'Movie Channel',
@@ -48,46 +49,46 @@ function FlagModal({ channelId, onClose }) {
         <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
         {done ? (
           <div className="relative z-10 text-center py-6">
-            <p className="text-4xl mb-4">✅</p>
-            <h3 className="text-text-primary font-heading font-bold text-xl uppercase tracking-tighter italic mb-3">Report submitted</h3>
-            <p className="text-text-muted text-[11px] font-black uppercase tracking-widest mb-8">Our security team will review this hub shortly.</p>
-            <button onClick={onClose} className="w-full bg-brand text-white font-black uppercase tracking-widest py-4 rounded-lg text-[10px]">
-              CLOSE ARCHIVE
+            <Icon icon="solar:check-circle-bold" className="text-5xl text-green-500 mx-auto mb-4" />
+            <h3 className="text-text-primary font-heading font-bold text-xl mb-3">Report submitted</h3>
+            <p className="text-text-muted text-xs font-bold mb-8">Our security team will review this report shortly.</p>
+            <button onClick={onClose} className="w-full bg-brand text-white font-bold py-4 rounded-lg text-xs">
+              Close
             </button>
           </div>
         ) : (
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-text-primary font-heading font-bold text-xl uppercase tracking-tighter italic">Flag this hub</h3>
+              <h3 className="text-text-primary font-heading font-bold text-xl">Flag this channel</h3>
               <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-4">
-                <label className="text-text-muted text-[10px] font-black uppercase tracking-widest block pl-1">SELECT REASON</label>
+                <label className="text-text-muted text-xs font-bold block pl-1">Select Reason</label>
                 <div className="space-y-3">
                   {REASONS.map(r => (
                     <label key={r} className="flex items-center gap-3 cursor-pointer group">
                       <div className={`w-4 h-4 rounded-full border-2 transition-all ${reason === r ? 'border-brand bg-brand shadow-[0_0_8px_var(--brand)]' : 'border-border group-hover:border-brand/50'}`} />
                       <input type="radio" name="reason" value={r} onChange={() => setReason(r)} className="sr-only" />
-                      <span className={`text-[11px] font-black uppercase tracking-widest transition-colors ${reason === r ? 'text-brand' : 'text-text-primary'}`}>{r}</span>
+                      <span className={`text-xs font-bold transition-colors ${reason === r ? 'text-brand' : 'text-text-primary'}`}>{r}</span>
                     </label>
                   ))}
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-text-muted text-[10px] font-black uppercase tracking-widest block pl-1">ADDITIONAL DETAILS</label>
+                <label className="text-text-muted text-xs font-bold block pl-1">Additional Details</label>
                 <textarea
                   value={details}
                   onChange={e => setDetails(e.target.value)}
                   rows={3}
-                  placeholder="PROVIDE CONTEXT..."
-                  className="w-full bg-surface-2 border border-border rounded-lg px-4 py-3 text-[10px] font-black tracking-widest text-text-primary placeholder-text-muted/30 focus:outline-none focus:border-brand resize-none transition-all"
+                  placeholder="Provide context..."
+                  className="w-full bg-surface-2 border border-border rounded-lg px-4 py-3 text-xs font-bold text-text-primary placeholder-text-muted/30 focus:outline-none focus:border-brand resize-none transition-all"
                 />
               </div>
               <div className="flex gap-3 pt-4">
                 <button type="submit" disabled={!reason || submitting}
-                  className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-black uppercase tracking-widest py-4 rounded-lg text-[10px] transition-all shadow-lg shadow-red-500/20">
-                  {submitting ? 'PROCESSING...' : 'SUBMIT REPORT'}
+                  className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-bold py-4 rounded-lg text-xs transition-all shadow-lg shadow-red-500/20">
+                  {submitting ? 'Processing...' : 'Submit Report'}
                 </button>
               </div>
             </form>
@@ -139,7 +140,7 @@ function VideoCard({ video }) {
           {video.title}
         </p>
         {video.published_at && (
-          <p className="text-text-muted text-[9px] font-black uppercase tracking-widest mt-2 opacity-60">
+          <p className="text-[9px] text-text-muted mt-2 font-bold uppercase tracking-widest opacity-60">
             {new Date(video.published_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         )}
@@ -190,9 +191,9 @@ const Description = ({ text }) => {
       {isLong && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-brand text-[9px] font-black uppercase tracking-widest hover:underline ml-7 transition-all"
+          className="text-brand text-xs font-bold hover:underline ml-7 transition-all"
         >
-          {isExpanded ? 'READ LESS ↑' : 'READ FULL DESCRIPTION ↓'}
+          {isExpanded ? 'Read Less ↑' : 'Read Full Description ↓'}
         </button>
       )}
     </div>
@@ -265,10 +266,10 @@ export default function ChannelDetail() {
   if (error || !channel) return (
     <div className="min-h-screen bg-bg flex items-center justify-center">
       <div className="max-w-7xl mx-auto px-4 border-x border-border py-32 text-center w-full">
-        <p className="text-4xl mb-4">📺</p>
-        <p className="text-text-primary font-heading font-bold text-xl uppercase tracking-tighter italic mb-8">{error || 'Channel not found'}</p>
-        <button onClick={() => navigate('/channels')} className="bg-brand text-white font-black uppercase tracking-widest px-8 py-4 rounded-lg hover:shadow-brand/20 transition-all">
-          ← BACK TO HUBS
+        <Icon icon="solar:videocamera-record-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
+        <p className="text-text-primary font-heading font-bold text-xl mb-8">{error || 'Channel not found'}</p>
+        <button onClick={() => navigate('/channels')} className="bg-brand text-white font-bold px-8 py-4 rounded-lg hover:shadow-brand/20 transition-all">
+          Back to Channels
         </button>
       </div>
     </div>
@@ -289,8 +290,8 @@ export default function ChannelDetail() {
           <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/20 to-transparent" />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 h-full relative">
             <button onClick={() => navigate('/channels')}
-              className="absolute top-24 left-4 md:left-8 flex items-center gap-2 text-text-primary text-[10px] font-black uppercase tracking-widest bg-bg/60 hover:bg-brand hover:text-white backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 transition-all z-20">
-              ← CHANNELS
+              className="absolute top-24 left-4 md:left-8 flex items-center gap-2 text-text-primary text-xs font-bold bg-bg/60 hover:bg-brand hover:text-white backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 transition-all z-20">
+              Back to Channels
             </button>
           </div>
         </div>
@@ -313,10 +314,10 @@ export default function ChannelDetail() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div>
                   <div className="flex items-center gap-3 flex-wrap mb-2">
-                    <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter uppercase italic">{channel.name}</h1>
+                    <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">{channel.name}</h1>
                     {channel.is_featured && (
-                      <span className="text-[10px] font-black uppercase tracking-widest text-brand bg-brand/10 px-3 py-1 rounded-lg border border-brand/20">
-                        FEATURED HUB
+                      <span className="text-[10px] font-bold text-brand bg-brand/10 px-3 py-1 rounded-lg border border-brand/20">
+                        Featured Channel
                       </span>
                     )}
                   </div>
@@ -334,21 +335,19 @@ export default function ChannelDetail() {
                   {channel.subscriber_count > 0 && (
                     <p className="text-brand font-bold text-xl mt-4 font-heading">
                       {formatViewCount(channel.subscriber_count)}
-                      <span className="text-text-muted font-black text-[10px] uppercase tracking-widest ml-2">SUBSCRIBERS</span>
+                      <span className="text-text-muted font-bold text-xs ml-2">Subscribers</span>
                     </p>
                   )}
                 </div>
 
                 <div className="flex items-center gap-4 flex-wrap">
-                  {channel.channel_url && (
-                    <a href={channel.channel_url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#FF0000]/90 text-white font-black text-[10px] uppercase tracking-[0.2em] px-8 py-4 rounded-lg transition-all shadow-xl hover:scale-[1.02]">
-                      SUBSCRIBE
-                    </a>
-                  )}
+                  <a href={channel.channel_url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#FF0000]/90 text-white font-bold text-xs px-8 py-4 rounded-lg transition-all shadow-xl hover:scale-[1.02]">
+                    Subscribe
+                  </a>
                   <button onClick={() => setShowFlag(true)}
-                    className="flex items-center gap-2 border border-border bg-surface text-text-muted hover:text-red-400 hover:border-red-400/50 font-black text-[10px] uppercase tracking-[0.2em] px-6 py-4 rounded-lg transition-all">
-                    REPORT
+                    className="flex items-center gap-2 border border-border bg-surface text-text-muted hover:text-red-400 hover:border-red-400/50 font-bold text-xs px-6 py-4 rounded-lg transition-all">
+                    Report
                   </button>
                 </div>
               </div>
@@ -367,33 +366,33 @@ export default function ChannelDetail() {
             <div className="p-8 md:p-12 border-b border-border bg-surface-2/5 relative overflow-hidden">
                <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <h2 className="text-text-primary font-bold text-2xl font-heading tracking-tighter uppercase italic">
-                    Media Archive
-                    <span className="ml-4 text-[10px] font-black tracking-[0.2em] text-text-muted bg-surface px-3 py-1 rounded-full border border-border">
-                      {filteredVideos.length} ITEMS
+                  <h2 className="text-text-primary font-bold text-2xl font-heading tracking-tighter">
+                    Media Library
+                    <span className="ml-4 text-xs font-bold text-text-muted bg-surface px-3 py-1 rounded-full border border-border">
+                      {filteredVideos.length} items
                     </span>
                   </h2>
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="SEARCH ARCHIVE..."
+                        placeholder="Search videos..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="bg-surface border border-border text-text-primary rounded-lg px-6 py-2 pl-12 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none w-full md:w-64 transition-all"
+                        className="bg-surface border border-border text-text-primary rounded-lg px-6 py-2 pl-12 text-xs font-bold focus:border-brand focus:outline-none w-full md:w-64 transition-all"
                       />
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
+                      <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 text-text-primary" width="20" />
                     </div>
                     <button
                       onClick={() => setOnlyMovies(!onlyMovies)}
-                      className={`text-[9px] font-black uppercase tracking-widest px-6 py-2.5 rounded-lg border transition-all flex items-center gap-3 ${
+                      className={`text-xs font-bold px-6 py-2.5 rounded-lg border transition-all flex items-center gap-3 ${
                         onlyMovies 
                           ? 'bg-brand text-white border-brand shadow-lg shadow-brand/20' 
                           : 'bg-surface border-border text-text-muted hover:text-text-primary'
                       }`}
                     >
                       <div className={`w-1.5 h-1.5 rounded-full ${onlyMovies ? 'bg-white animate-pulse' : 'bg-text-muted'}`} />
-                      MOVIES ONLY
+                      Movies Only
                     </button>
                   </div>
                </div>
@@ -402,8 +401,8 @@ export default function ChannelDetail() {
             <div className="p-8 md:p-12 min-h-[400px]">
               {filteredVideos.length === 0 ? (
                 <div className="text-center py-24 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-                  <p className="text-4xl mb-4">🎬</p>
-                  <p className="text-text-muted font-black tracking-widest uppercase text-xs">No media matching your archive filters</p>
+                  <Icon icon="solar:clapperboard-play-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
+                  <p className="text-text-muted font-bold text-xs">No media matching your library filters</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -418,7 +417,7 @@ export default function ChannelDetail() {
           <div className="lg:col-span-1 divide-y divide-border">
             {owner && (
               <div className="p-8">
-                <h3 className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-6">Archive Lead</h3>
+                <h3 className="text-text-muted text-xs font-bold mb-6">Owner</h3>
                 <Link to={`/people/${owner.id}`} className="group flex flex-col items-center text-center p-6 bg-surface-2/20 rounded-xl border border-border hover:border-brand transition-all duration-300">
                   {owner.photo_url ? (
                     <img src={owner.photo_url} alt={owner.name}
@@ -430,29 +429,29 @@ export default function ChannelDetail() {
                   )}
                   <p className="text-text-primary font-bold uppercase tracking-tight group-hover:text-brand transition-colors">{owner.name}</p>
                   {owner.known_for_department && (
-                    <p className="text-text-muted text-[10px] uppercase font-black tracking-widest mt-1 italic">{owner.known_for_department}</p>
+                    <p className="text-text-muted text-xs font-bold mt-1">{owner.known_for_department}</p>
                   )}
-                  <div className="mt-6 w-full border-t border-border pt-4 text-[9px] font-black uppercase tracking-widest text-brand group-hover:tracking-[0.2em] transition-all">
-                    VIEW ARCHIVE PROFILE →
+                  <div className="mt-6 w-full border-t border-border pt-4 text-[10px] font-bold text-brand transition-all">
+                    View Profile →
                   </div>
                 </Link>
               </div>
             )}
 
             <div className="p-8">
-               <h3 className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-6">External Hubs</h3>
+               <h3 className="text-text-muted text-xs font-bold mb-6">External Links</h3>
                <div className="space-y-3">
                   {channel.channel_url && (
                     <a href={channel.channel_url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between p-4 bg-surface rounded-lg border border-border hover:border-brand group transition-all">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-text-primary group-hover:text-brand">YouTube</span>
+                      <span className="text-xs font-bold text-text-primary group-hover:text-brand">YouTube</span>
                       <span className="text-text-muted group-hover:translate-x-1 transition-transform">↗</span>
                     </a>
                   )}
                   {channel.channel_url && (
                     <a href={`${channel.channel_url}/videos`} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between p-4 bg-surface rounded-lg border border-border hover:border-brand group transition-all">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-text-primary group-hover:text-brand">Full Archive</span>
+                      <span className="text-xs font-bold text-text-primary group-hover:text-brand">Full Library</span>
                       <span className="text-text-muted group-hover:translate-x-1 transition-transform">↗</span>
                     </a>
                   )}

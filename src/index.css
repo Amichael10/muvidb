@@ -118,13 +118,38 @@
 
 @layer base {
   html {
-    scroll-behavior: smooth;
-    transition: background-color 0.3s, color 0.3s;
+    scroll-behavior: auto !important; /* Disable CSS smooth scroll for Lenis */
+    height: auto;
   }
   
   body {
     @apply bg-bg text-text-primary font-sans antialiased;
+    width: 100%;
+    min-height: 100%;
+    position: relative;
     overflow-x: hidden;
+  }
+
+  /* Fix for Lenis smooth scrolling */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  .lenis.lenis-scrolling iframe {
+    pointer-events: none;
   }
 }
 

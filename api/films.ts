@@ -39,7 +39,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 
-  const { country, year, language, search, genre, rating } = req.query;
+  const { id, country, year, language, search, genre, rating } = req.query;
+
+  // ── Single Film Detail ──────────────────────────────────────────────────────
+  if (id && !Array.isArray(id)) {
+    const { data, error } = await supabase
+      .from('films')
+      .select(`${FIELDS}, film_watch_links(id, distributor, url)`)
+      .eq('id', id)
+      .single();
+
+    if (error?.code === 'PGRST116' || !data) return res.status(404).json({ error: 'Film not found' });
+    if (error) return res.status(500).json({ error: 'Failed to fetch film' });
+
+    const raw = data as any;
+    return res.status(200).json({ 
+      film: {
+        ...raw,
+        film_genres: undefined,
+        genres: raw.film_genres?.map((fg: any) => fg.genres?.name).filter(Boolean) ?? [],
+        watch_links: raw.film_watch_links ?? [],
+        film_watch_links: undefined,
+      } 
+    });
+  }
+
+  // ── Film List ───────────────────────────────────────────────────────────────
   const limitValue = Math.min(Number(req.query.limit) || 24, 100);
   const offsetValue = Math.max(Number(req.query.offset) || 0, 0);
 

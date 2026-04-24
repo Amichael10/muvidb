@@ -2,17 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { 
-  Search, 
-  Moon, 
-  Sun, 
-  Bell, 
-  User, 
-  LogOut, 
-  ChevronDown, 
-  X,
-  Clapperboard
-} from 'lucide-react';
+import { Icon } from '@iconify/react';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -38,6 +28,16 @@ export default function Navbar() {
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
       searchInputRef.current.focus();
+    }
+    
+    // Stop/Start Lenis scrolling when search is open
+    const lenis = window.lenis;
+    if (lenis) {
+      if (isSearchOpen) {
+        lenis.stop();
+      } else {
+        lenis.start();
+      }
     }
   }, [isSearchOpen]);
 
@@ -75,10 +75,10 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-x border-white/5">
         {/* Left: Logo */}
         <Link to="/" className="flex items-center gap-2 group shrink-0">
-          <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20 group-hover:scale-110 transition-transform">
-            <Clapperboard size={24} />
+          <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20 group-hover:scale-110 transition-all duration-500">
+            <Icon icon="solar:clapperboard-play-bold-duotone" width="28" height="28" />
           </div>
-          <span className="font-heading font-bold text-brand text-2xl tracking-tight hidden sm:block">
+          <span className="font-heading font-bold text-brand text-2xl tracking-tighter hidden sm:block">
             Lumi
           </span>
         </Link>
@@ -112,7 +112,7 @@ export default function Navbar() {
             className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
             aria-label="Search"
           >
-            <Search size={20} />
+            <Icon icon="solar:magnifer-linear" width="22" height="22" />
           </button>
 
           {/* Theme Toggle */}
@@ -121,14 +121,14 @@ export default function Navbar() {
             className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
             aria-label="Toggle theme"
           >
-            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="22" height="22" />
           </button>
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2 md:gap-4">
               {/* Notification Bell */}
               <button className="relative w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90">
-                <Bell size={20} />
+                <Icon icon="solar:bell-linear" width="22" height="22" />
                 <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
               </button>
 
@@ -139,15 +139,19 @@ export default function Navbar() {
                   className="flex items-center gap-3 p-1 pl-3 pr-3 bg-surface-2 hover:bg-surface-3 border border-border rounded-full transition-all active:scale-95 shadow-sm group"
                 >
                   <div className="text-right hidden sm:block">
-                    <p className="text-[10px] font-black uppercase tracking-tight text-text-primary group-hover:text-brand transition-colors">{user.name}</p>
-                    <p className="text-[8px] font-bold text-brand uppercase tracking-widest">
-                      {user.role === 'user' ? 'FAN' : user.role === 'professional' ? 'PRO' : user.role}
+                    <p className="text-[10px] font-bold tracking-tight text-text-primary group-hover:text-brand transition-colors">{user.name}</p>
+                    <p className="text-[8px] font-bold text-brand tracking-wider">
+                      {user.role === 'user' ? 'Member' : user.role === 'professional' ? 'Pro' : user.role}
                     </p>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs">
-                    {user.name?.charAt(0) || 'U'}
+                  <div className="w-8 h-8 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden">
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      user.name?.charAt(0) || 'U'
+                    )}
                   </div>
-                  <ChevronDown size={14} className={`text-text-muted transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                  <Icon icon="solar:alt-arrow-down-linear" width="14" height="14" className={`text-text-muted transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* User Dropdown Menu */}
@@ -157,7 +161,7 @@ export default function Navbar() {
                       <p className="text-sm font-bold text-text-primary line-clamp-1">{user.name}</p>
                       <p className="text-xs text-text-muted line-clamp-1">{user.email}</p>
                       {user.role === 'admin' && (
-                        <span className="mt-2 inline-block px-2 py-0.5 bg-brand/10 text-brand text-[10px] font-bold rounded uppercase tracking-wider">
+                        <span className="mt-2 inline-block px-2 py-0.5 bg-brand/10 text-brand text-[10px] font-bold rounded tracking-wide">
                           Admin
                         </span>
                       )}
@@ -167,12 +171,12 @@ export default function Navbar() {
                         to={(user.role === 'professional' || user.role === 'admin') ? "/pro-dashboard" : "/dashboard"} 
                         className="flex items-center gap-3 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors"
                       >
-                        <User size={16} />
-                        My Profile
+                        <Icon icon="solar:user-linear" width="18" height="18" />
+                        Your Profile
                       </Link>
                       {user.role === 'admin' && (
                         <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-sm text-brand hover:bg-brand/5 rounded-lg transition-colors">
-                          <Clapperboard size={16} />
+                          <Icon icon="solar:clapperboard-play-linear" width="18" height="18" />
                           Admin Panel
                         </Link>
                       )}
@@ -180,8 +184,8 @@ export default function Navbar() {
                         onClick={logout}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors mt-1"
                       >
-                        <LogOut size={16} />
-                        Sign Out
+                        <Icon icon="solar:logout-linear" width="18" height="18" />
+                        Logout
                       </button>
                     </div>
                   </div>
@@ -212,17 +216,17 @@ export default function Navbar() {
           {/* Content */}
           <div className="relative w-full max-w-4xl mx-auto px-4 mt-12 md:mt-24">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="font-heading text-2xl md:text-3xl text-text-primary">Search Lumi</h2>
+              <h2 className="font-heading text-2xl md:text-3xl text-text-primary">Search</h2>
               <button 
                 onClick={() => setIsSearchOpen(false)}
                 className="w-12 h-12 flex items-center justify-center text-text-muted hover:text-text-primary bg-white/5 hover:bg-white/10 rounded-full transition-all"
               >
-                <X size={24} />
+                <Icon icon="solar:close-circle-linear" width="28" height="28" />
               </button>
             </div>
 
             <form onSubmit={handleSearch} className="relative group">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand transition-colors" size={24} />
+              <Icon icon="solar:magnifer-linear" className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand transition-colors" width="28" height="28" />
               <input 
                 ref={searchInputRef}
                 type="text"
@@ -234,7 +238,7 @@ export default function Navbar() {
             </form>
 
             <div className="mt-12">
-              <h3 className="text-sm font-bold text-text-muted uppercase tracking-widest mb-4">Trending Searches</h3>
+              <h3 className="text-sm font-bold text-text-muted tracking-wide mb-4">Popular Searches</h3>
               <div className="flex flex-wrap gap-2">
                 {recentSearches.map((term) => (
                   <button 

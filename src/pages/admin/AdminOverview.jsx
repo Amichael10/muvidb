@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { Icon } from '@iconify/react';
 
 export default function AdminOverview() {
   const [counts, setCounts] = useState({
@@ -116,12 +117,12 @@ export default function AdminOverview() {
 
   const getActivityIcon = (type) => {
     switch (type) {
-      case 'film': return '🎬';
-      case 'claim': return '📋';
-      case 'user': return '👤';
-      case 'review': return '⭐';
-      case 'sync': return '🔄';
-      default: return '📌';
+      case 'film': return 'solar:clapperboard-play-linear';
+      case 'claim': return 'solar:clipboard-list-linear';
+      case 'user': return 'solar:user-linear';
+      case 'review': return 'solar:star-linear';
+      case 'sync': return 'solar:refresh-linear';
+      default: return 'solar:info-circle-linear';
     }
   };
 
@@ -160,20 +161,20 @@ export default function AdminOverview() {
       {/* Welcome Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <p className="text-brand text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Admin Dashboard</p>
-          <h1 className="text-3xl font-black text-text-primary tracking-tight">Overview</h1>
+          <p className="text-brand text-xs font-bold mb-1">Administration</p>
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Overview</h1>
           <p className="text-text-muted text-sm mt-1 max-w-xl font-medium">
-            Manage users, films, claims, and system settings.
+            System metrics and administrative control center.
           </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-brand/10 rounded-full border border-brand/20">
-            <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-            <span className="text-[10px] font-black text-brand uppercase tracking-widest">AI: Gemini-1.5</span>
+            <Icon icon="solar:cpu-bold" className="text-brand text-xs" />
+            <span className="text-[10px] font-bold text-brand">AI: Gemini 1.5</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 rounded-full border border-green-500/20">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest">System Online</span>
+            <span className="text-[10px] font-bold text-green-600 dark:text-green-400">System online</span>
           </div>
         </div>
       </header>
@@ -181,16 +182,16 @@ export default function AdminOverview() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
         {[
-          { label: 'Films', value: counts.films, icon: '🎬' },
-          { label: 'Talent', value: counts.people, icon: '👤' },
-          { label: 'Credits', value: counts.credits, icon: '📜' },
-          { label: 'AI Engine', value: 'Gemini', icon: '🧠', isStatic: true },
-          { label: 'Reviews', value: counts.reviews, icon: '⭐' },
-          { label: 'Claims', value: counts.pendingClaims, icon: '📋', warning: counts.pendingClaims > 0 }
+          { label: 'Movies', value: counts.films, icon: 'solar:clapperboard-play-linear' },
+          { label: 'People', value: counts.people, icon: 'solar:user-linear' },
+          { label: 'Credits', value: counts.credits, icon: 'solar:document-text-linear' },
+          { label: 'AI status', value: 'Active', icon: 'solar:cpu-linear', isStatic: true },
+          { label: 'Reviews', value: counts.reviews, icon: 'solar:star-linear' },
+          { label: 'Claims', value: counts.pendingClaims, icon: 'solar:clipboard-list-linear', warning: counts.pendingClaims > 0 }
         ].map((stat, i) => (
           <div key={i} className="card-cal p-6 group transition-all hover:border-brand/30 relative overflow-hidden">
             <div className="flex items-center justify-between mb-4 relative z-10">
-              <span className="text-2xl" role="img" aria-label={stat.label}>{stat.icon}</span>
+              <Icon icon={stat.icon} className="text-2xl text-text-muted group-hover:text-brand transition-colors" />
               {stat.warning && (
                 <span className="flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -198,14 +199,13 @@ export default function AdminOverview() {
                 </span>
               )}
             </div>
-            <div className="text-xl font-black text-text-primary tabular-nums relative z-10 truncate">
+            <div className="text-xl font-bold text-text-primary tabular-nums relative z-10 truncate">
               {isLoading ? (
                 <div className="h-8 w-16 bg-surface-2 rounded-lg animate-pulse" />
               ) : stat.isStatic ? stat.value : (stat.value || 0).toLocaleString()}
             </div>
-            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-1.5 opacity-60">{stat.label}</p>
+            <p className="text-[10px] font-bold text-text-muted mt-1.5 opacity-60 uppercase tracking-wider">{stat.label}</p>
             
-            {/* Subtle brand glow on hover */}
             <div className="absolute -right-4 -bottom-4 w-12 h-12 bg-brand/5 rounded-full blur-2xl group-hover:bg-brand/10 transition-colors" />
           </div>
         ))}
@@ -216,11 +216,11 @@ export default function AdminOverview() {
         <div className="lg:col-span-2 xl:col-span-2 card-cal p-0 overflow-hidden">
           <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-surface-2/30">
             <div>
-              <h2 className="text-lg font-bold text-text-primary">Recent Activity</h2>
-              <p className="text-xs text-text-muted mt-0.5">Latest actions across the platform</p>
+              <h2 className="text-lg font-bold text-text-primary">Recent activity</h2>
+              <p className="text-xs text-text-muted mt-0.5">Platform logs and event history</p>
             </div>
             <button className="text-[11px] font-bold text-brand bg-brand/10 px-3 py-1.5 rounded-lg hover:bg-brand/20 transition-all">
-              View All
+              View all
             </button>
           </div>
           <div className="divide-y divide-border">
@@ -231,12 +231,12 @@ export default function AdminOverview() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-md bg-surface-2 flex items-center justify-center text-lg border border-border group-hover:border-brand/30 transition-colors">
-                    {getActivityIcon(activity.type)}
+                    <Icon icon={getActivityIcon(activity.type)} className="text-xl text-text-muted group-hover:text-brand transition-colors" />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-text-primary leading-tight">{activity.text}</p>
                     <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[9px] font-bold text-brand uppercase tracking-widest px-2 py-0.5 bg-brand/5 rounded-md border border-brand/10">
+                      <span className="text-[9px] font-bold text-brand px-2 py-0.5 bg-brand/5 rounded-md border border-brand/10">
                         {activity.type}
                       </span>
                       <span className="text-[10px] font-medium text-text-muted opacity-60">
@@ -246,7 +246,7 @@ export default function AdminOverview() {
                   </div>
                 </div>
                 <div className="text-text-muted opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-5 h-5" />
                 </div>
               </div>
             ))}
@@ -256,23 +256,23 @@ export default function AdminOverview() {
         {/* Quick Actions & Status */}
         <div className="lg:col-span-1 xl:col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="card-cal p-6">
-            <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-5 flex items-center gap-2">
+            <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-5 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-              Quick Actions
+              Quick actions
             </h3>
             <div className="space-y-3">
               {[
-                { label: 'Register Film', icon: '🎬', path: '/admin/films' },
-                { label: 'AI Command Center', icon: '🪄', path: '/admin/ai' },
-                { label: 'Fetch Cinemas', icon: '🔄', path: '/admin/cinema-scraping' },
-                { label: 'Review Claims', icon: '📋', path: '/admin/claims' }
+                { label: 'Add movie record', icon: 'solar:clapperboard-play-linear', path: '/admin/films' },
+                { label: 'AI review center', icon: 'solar:magic-stick-linear', path: '/admin/ai' },
+                { label: 'Sync cinema data', icon: 'solar:refresh-linear', path: '/admin/cinema-scraping' },
+                { label: 'Review identity claims', icon: 'solar:clipboard-list-linear', path: '/admin/claims' }
               ].map((action, i) => (
                 <a 
                   key={i} 
                   href={action.path}
                   className="w-full flex items-center gap-3 p-3 bg-surface-2/50 border border-border rounded-md hover:border-brand/40 hover:bg-surface-2 transition-all text-left group"
                 >
-                  <span className="text-xl group-hover:scale-110 transition-transform">{action.icon}</span>
+                  <Icon icon={action.icon} className="text-xl text-text-muted group-hover:text-brand transition-transform" />
                   <span className="text-sm font-bold text-text-primary group-hover:text-brand transition-colors">{action.label}</span>
                 </a>
               ))}
@@ -281,8 +281,8 @@ export default function AdminOverview() {
 
           {/* System Health & APIs */}
           <div className="card-cal p-6">
-            <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-5 flex items-center justify-between">
-              <span>System APIs</span>
+            <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-5 flex items-center justify-between">
+              <span>System status</span>
               <div className="flex gap-1">
                 <div className="w-1 h-1 rounded-full bg-green-500" />
                 <div className="w-1 h-1 rounded-full bg-green-500" />
@@ -290,20 +290,20 @@ export default function AdminOverview() {
             </h3>
             <div className="space-y-4">
               {[
-                { name: 'Analyze Engine', status: 'active', icon: '🧠' },
-                { name: 'Movie Data (TMDB)', status: apiStatus.tmdb, icon: '🎬' },
-                { name: 'YouTube Data', status: apiStatus.youtube, icon: '🎞️' }
+                { name: 'Metadata processing', status: 'active', icon: 'solar:cpu-linear' },
+                { name: 'Movie data (TMDB)', status: apiStatus.tmdb, icon: 'solar:clapperboard-linear' },
+                { name: 'YouTube sync service', status: apiStatus.youtube, icon: 'solar:videocamera-record-linear' }
               ].map((api, i) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-surface-2 rounded-md border border-border">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">{api.icon}</span>
+                    <Icon icon={api.icon} className="text-lg text-text-muted" />
                     <span className="text-xs font-bold text-text-primary">{api.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`w-1.5 h-1.5 rounded-full ${
                       api.status === 'active' ? 'bg-green-500' : api.status === 'checking' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'
                     }`} />
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-60">
+                    <span className="text-[10px] font-bold opacity-60">
                       {api.status}
                     </span>
                   </div>
@@ -314,38 +314,38 @@ export default function AdminOverview() {
 
           {/* Automation Hub */}
           <div className="card-cal p-6 md:col-span-2 lg:col-span-1 xl:col-span-2">
-            <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-5">
-              Scripts & Utilities
+            <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-5">
+              Maintenance
             </h3>
             <div className="space-y-4">
               {[
-                { name: 'Sync YouTube Videos', script: 'refresh-videos', desc: 'Fetch latest trailers', last: lastSyncs.videos, count: lastSyncs.videosCount },
-                { name: 'Sync Showtimes', script: 'refresh-showtimes', desc: 'Auto-fetch from cinemas', last: lastSyncs.showtimes, count: lastSyncs.showtimesCount }
+                { name: 'Fetch YouTube records', script: 'refresh-videos', desc: 'Sync latest external content', last: lastSyncs.videos, count: lastSyncs.videosCount },
+                { name: 'Update cinema listings', script: 'refresh-showtimes', desc: 'Sync local theater data', last: lastSyncs.showtimes, count: lastSyncs.showtimesCount }
               ].map((job, i) => (
                 <div key={i} className="group">
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-xs font-black text-text-primary line-clamp-1">{job.name}</p>
+                        <p className="text-xs font-bold text-text-primary line-clamp-1">{job.name}</p>
                         {job.count > 0 && (
-                          <span className="text-[8px] font-black bg-brand/10 text-brand px-1.5 py-0.5 rounded-full">
+                          <span className="text-[8px] font-bold bg-brand/10 text-brand px-1.5 py-0.5 rounded-full">
                             +{job.count} recently
                           </span>
                         )}
                       </div>
                       <p className="text-[10px] text-text-muted font-medium">
-                        {job.last ? `Last: ${new Date(job.last).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : job.desc}
+                        {job.last ? `Last run: ${new Date(job.last).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : job.desc}
                       </p>
                     </div>
                     <button 
                       onClick={() => handleRunScript(job.script)}
-                      className="p-2 bg-brand/5 border border-brand/20 text-brand rounded-lg hover:bg-brand hover:text-white transition-all shadow-sm"
-                      title="Run Script Now"
+                      className="w-8 h-8 flex items-center justify-center bg-brand/5 border border-brand/20 text-brand rounded-lg hover:bg-brand hover:text-white transition-all shadow-sm"
+                      title="Run task"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <Icon icon="solar:play-bold" className="text-[10px]" />
                     </button>
                   </div>
-                  {i < 2 && <div className="h-[1px] w-full bg-border mt-3 opacity-50" />}
+                  {i < 1 && <div className="h-[1px] w-full bg-border mt-3 opacity-50" />}
                 </div>
               ))}
             </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
+import { Icon } from '@iconify/react';
 
 export default function Onboarding() {
   const [role, setRole] = useState('fan');
@@ -72,10 +73,7 @@ export default function Onboarding() {
               {preview ? (
                 <img src={preview} alt="Preview" className="w-full h-full object-cover" />
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted opacity-40">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
+                <Icon icon="solar:user-circle-linear" className="text-6xl text-text-muted opacity-40" />
               )}
             </div>
             <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-full">
@@ -102,7 +100,7 @@ export default function Onboarding() {
               }`}
             >
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${role === 'fan' ? 'bg-brand text-white' : 'bg-surface-2 text-text-muted'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <Icon icon="solar:heart-bold" className="text-xl" />
               </div>
               <span className="text-[9px] font-black uppercase tracking-widest">FAN HUB</span>
             </button>
@@ -115,7 +113,7 @@ export default function Onboarding() {
               }`}
             >
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${role === 'professional' ? 'bg-brand text-white' : 'bg-surface-2 text-text-muted'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <Icon icon="solar:user-id-bold" className="text-xl" />
               </div>
               <span className="text-[9px] font-black uppercase tracking-widest">INDUSTRY</span>
             </button>
@@ -127,7 +125,9 @@ export default function Onboarding() {
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="p-8 bg-surface-2/30 border-2 border-brand/20 rounded-2xl space-y-6">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-brand/10 text-brand rounded-xl flex items-center justify-center text-xl">🔍</div>
+                    <div className="w-12 h-12 bg-brand/10 text-brand rounded-xl flex items-center justify-center text-xl">
+                        <Icon icon="solar:magnifer-linear" />
+                    </div>
                     <div className="space-y-1">
                         <h3 className="font-heading font-bold text-lg text-text-primary tracking-tight uppercase italic">Identify Yourself</h3>
                         <p className="text-[9px] font-black text-text-muted uppercase tracking-widest opacity-60">Search for your existing archive profile</p>

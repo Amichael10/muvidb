@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatViewCount } from '../utils/youtube'
+import { Icon } from '@iconify/react'
 
 const FilmCard = ({ film }) => (
   <Link
@@ -17,7 +18,7 @@ const FilmCard = ({ film }) => (
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <span className="text-4xl">🎬</span>
+          <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-text-muted/30" />
         </div>
       )}
 
@@ -26,8 +27,8 @@ const FilmCard = ({ film }) => (
 
       {/* Rating */}
       {film.average_rating > 0 && (
-        <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg shadow-brand/20">
-          OFFICIAL
+        <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-bold px-3 py-1 rounded-full shadow-lg shadow-brand/20">
+          Official
         </div>
       )}
 
@@ -57,9 +58,9 @@ const Description = ({ text }) => {
       {isLong && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-brand text-[9px] font-black uppercase tracking-widest hover:underline ml-7 transition-all"
+          className="text-brand text-[10px] font-bold hover:underline ml-7 transition-all"
         >
-          {isExpanded ? 'READ LESS ↑' : 'READ FULL DESCRIPTION ↓'}
+          {isExpanded ? 'Read less' : 'Read full description'}
         </button>
       )}
     </div>
@@ -199,18 +200,18 @@ const CompanyDetail = () => {
             <div className="flex-1 space-y-6">
               <div>
                 <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start mb-2">
-                  <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter uppercase italic">
+                  <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">
                     {company.name}
                   </h1>
                   {company.founded_year && (
-                    <span className="bg-surface-2 text-text-muted text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border border-border">
-                      EST. {company.founded_year}
+                    <span className="bg-surface-2 text-text-muted text-[10px] font-bold px-3 py-1 rounded-lg border border-border">
+                      Est. {company.founded_year}
                     </span>
                   )}
                 </div>
                 
-                <p className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center md:justify-start gap-2">
-                  <span className="text-brand">OFFICIAL HUB</span> ARCHIVE VERIFIED
+                <p className="text-text-muted text-[10px] font-bold tracking-wider flex items-center justify-center md:justify-start gap-2">
+                  <span className="text-brand">Verified Studio</span>
                 </p>
               </div>
 
@@ -224,13 +225,13 @@ const CompanyDetail = () => {
                   <p className="text-brand text-xl font-bold font-heading">
                     {totalFilms}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Films</p>
+                  <p className="text-text-muted text-[9px] font-bold">Movies</p>
                 </div>
                 <div className="p-4 text-center">
                   <p className="text-text-primary text-xl font-bold font-heading">
                     {formatViewCount(totalViews)}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Total Views</p>
+                  <p className="text-text-muted text-[9px] font-bold">Total Views</p>
                 </div>
               </div>
 
@@ -241,9 +242,9 @@ const CompanyDetail = () => {
                     href={company.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-brand text-white text-[10px] font-black uppercase tracking-widest px-8 py-4 rounded-lg hover:shadow-brand/20 hover:scale-[1.02] transition-all min-h-[44px]"
+                    className="inline-flex items-center gap-2 bg-brand text-white text-xs font-bold px-8 py-4 rounded-lg hover:shadow-brand/20 hover:scale-[1.02] transition-all min-h-[44px]"
                   >
-                    VISIT WEBSITE ↗
+                    Visit Website
                   </a>
                 </div>
               )}
@@ -258,8 +259,8 @@ const CompanyDetail = () => {
         <div className="p-8 md:p-12 border-b border-border bg-surface-2/5 relative overflow-hidden">
            <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <h2 className="text-text-primary text-2xl font-bold font-heading tracking-tighter uppercase italic">
-                Credit Archive
+              <h2 className="text-text-primary text-2xl font-bold font-heading tracking-tighter">
+                Credits
               </h2>
 
               {/* Tabs */}
@@ -269,7 +270,7 @@ const CompanyDetail = () => {
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`px-6 py-2 rounded-md text-[10px] font-black tracking-widest uppercase transition-all whitespace-nowrap ${
+                      className={`px-6 py-2 rounded-md text-[10px] font-bold transition-all whitespace-nowrap ${
                         activeTab === tab
                           ? 'bg-brand text-white shadow-md'
                           : 'text-text-muted hover:text-text-primary'
@@ -295,7 +296,8 @@ const CompanyDetail = () => {
                 </div>
               ) : (
                 <div className="text-center py-20 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-                  <p className="text-text-muted font-black tracking-widest uppercase text-xs">No production credits archived</p>
+                  <Icon icon="solar:clapperboard-play-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
+                  <p className="text-text-muted font-bold text-xs">No production credits available</p>
                 </div>
               )}
             </>
@@ -311,7 +313,8 @@ const CompanyDetail = () => {
                 </div>
               ) : (
                 <div className="text-center py-20 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-                  <p className="text-text-muted font-black tracking-widest uppercase text-xs">No distribution credits archived</p>
+                  <Icon icon="solar:clapperboard-play-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
+                  <p className="text-text-muted font-bold text-xs">No distribution credits available</p>
                 </div>
               )}
             </>

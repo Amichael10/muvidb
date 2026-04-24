@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Icon } from '@iconify/react'
 
 const CompanyCard = ({ company, filmCount }) => {
   const initial = company.name?.charAt(0)
@@ -48,9 +49,12 @@ const CompanyCard = ({ company, filmCount }) => {
       </div>
 
       <div className="px-6 py-4 bg-surface-2/30 border-t border-border flex items-center justify-between">
-        <span className="text-text-muted text-[9px] font-black uppercase tracking-widest">
-          🎬 {filmCount} FILMS PRODUCED
-        </span>
+        <div className="flex items-center gap-2">
+          <Icon icon="solar:clapperboard-play-linear" className="text-text-muted" width="14" />
+          <span className="text-text-muted text-[9px] font-black uppercase tracking-widest">
+            {filmCount} FILMS PRODUCED
+          </span>
+        </div>
         {company.website && (
           <span className="text-brand text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
             WEBSITE
@@ -155,7 +159,7 @@ const Companies = () => {
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-32 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-              <p className="text-4xl mb-4">🏢</p>
+              <Icon icon="solar:buildings-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
               <h3 className="text-text-muted font-black uppercase tracking-widest text-xs">No studios discovered in this search</h3>
             </div>
           ) : (

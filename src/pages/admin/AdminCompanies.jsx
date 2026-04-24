@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { Icon } from '@iconify/react';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
@@ -133,18 +134,16 @@ export default function AdminCompanies() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-text-primary">Companies</h1>
-          <span className="bg-surface-2 text-text-muted px-3 py-1 rounded-full text-sm font-medium">
-            {companies.length}
-          </span>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <p className="text-brand text-xs font-bold mb-1">Administration</p>
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Companies</h1>
         </div>
         <button
           onClick={openAddDrawer}
-          className="bg-gold text-dark font-semibold px-4 py-2 rounded-md hover:bg-gold/90 transition-colors"
+          className="bg-brand text-white font-bold px-6 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
-          + Add Company
+          Add company record
         </button>
       </div>
 
@@ -177,7 +176,7 @@ export default function AdminCompanies() {
                       {company.logo_url ? (
                         <img src={company.logo_url} alt={company.name} className="w-10 h-10 rounded-lg object-cover bg-white" />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gold flex items-center justify-center text-dark font-bold text-lg">
+                        <div className="w-10 h-10 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-lg">
                           {getInitials(company.name)}
                         </div>
                       )}
@@ -191,7 +190,7 @@ export default function AdminCompanies() {
                           href={company.website} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-gold hover:underline truncate max-w-[200px] inline-block align-bottom"
+                          className="text-brand hover:underline truncate max-w-[200px] inline-block align-bottom font-bold"
                         >
                           {company.website.replace(/^https?:\/\//, '')}
                         </a>
@@ -206,17 +205,17 @@ export default function AdminCompanies() {
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => openEditDrawer(company)}
-                          className="p-2 text-text-muted hover:text-blue-400 hover:bg-surface rounded-lg transition-colors"
+                          className="p-2 text-text-muted hover:text-brand hover:bg-surface-2 rounded-lg transition-colors"
                           title="Edit"
                         >
-                          ✏️
+                          <Icon icon="solar:pen-new-square-linear" className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeletingCompany(company)}
-                          className="p-2 text-text-muted hover:text-red-400 hover:bg-surface rounded-lg transition-colors"
+                          className="p-2 text-text-muted hover:text-red-500 hover:bg-surface-2 rounded-lg transition-colors"
                           title="Delete"
                         >
-                          🗑️
+                          <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -240,7 +239,7 @@ export default function AdminCompanies() {
             {formData.logo_url ? (
               <img src={formData.logo_url} alt="Preview" className="w-20 h-20 rounded-lg object-cover border-2 border-border bg-white" />
             ) : (
-              <div className="w-20 h-20 rounded-lg bg-gold flex items-center justify-center text-dark font-bold text-3xl">
+              <div className="w-20 h-20 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-3xl">
                 {formData.name ? getInitials(formData.name) : '?'}
               </div>
             )}
@@ -306,9 +305,9 @@ export default function AdminCompanies() {
             <button
               type="submit"
               disabled={isSaving}
-              className="w-full bg-gold text-dark font-semibold py-3 rounded-md hover:bg-gold/90 transition-colors disabled:opacity-50"
+              className="w-full bg-brand text-white font-bold py-3.5 rounded-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-brand/20"
             >
-              {isSaving ? 'Saving...' : 'Save'}
+              {isSaving ? 'Saving...' : 'Save changes'}
             </button>
             <button
               type="button"

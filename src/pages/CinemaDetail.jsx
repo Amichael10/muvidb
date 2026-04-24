@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-
 import { Skeleton } from '../components/ui/Skeleton'
+import { Icon } from '@iconify/react'
 
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
@@ -95,10 +95,10 @@ const ShowtimeGrid = ({ times }) => {
                 : 'bg-surface border-border text-text-primary hover:border-brand hover:text-brand'
             } ${!showtime.ticket_url && 'cursor-default opacity-80'}`}
           >
-            <span className="text-[11px] font-black tracking-tight">
+            <span className="text-[11px] font-bold tracking-tight">
               {formatTime(showtime.show_time)}
             </span>
-            <span className="text-[9px] font-black uppercase tracking-widest mt-1 opacity-60">
+            <span className="text-[9px] font-bold mt-1 opacity-60">
               {showtime.format}
             </span>
           </a>
@@ -107,16 +107,16 @@ const ShowtimeGrid = ({ times }) => {
       {hasMore && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full sm:w-auto px-6 py-2.5 bg-surface-2/30 hover:bg-surface-2 border border-border hover:border-brand rounded-lg text-[9px] font-black uppercase tracking-[0.2em] text-text-muted hover:text-brand transition-all flex items-center justify-center gap-3 group shadow-sm"
+          className="w-full sm:w-auto px-6 py-2.5 bg-surface-2/30 hover:bg-surface-2 border border-border hover:border-brand rounded-lg text-xs font-bold text-text-muted hover:text-brand transition-all flex items-center justify-center gap-3 group shadow-sm"
         >
           {isExpanded ? (
             <>
-              <span>COLLAPSE TIMES</span>
+              <span>Collapse Times</span>
               <span className="text-xs group-hover:-translate-y-0.5 transition-transform">↑</span>
             </>
           ) : (
             <>
-              <span>+ {times.length - 4} MORE SHOWINGS</span>
+              <span>+ {times.length - 4} More Showings</span>
               <span className="text-xs group-hover:translate-y-0.5 transition-transform">↓</span>
             </>
           )}
@@ -139,9 +139,9 @@ const Description = ({ text }) => {
       {isLong && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-brand text-[9px] font-black uppercase tracking-widest hover:underline ml-7 transition-all"
+          className="text-brand text-xs font-bold hover:underline ml-7 transition-all"
         >
-          {isExpanded ? 'READ LESS ↑' : 'READ FULL DESCRIPTION ↓'}
+          {isExpanded ? 'Read Less ↑' : 'Read Full Description ↓'}
         </button>
       )}
     </div>
@@ -235,14 +235,14 @@ const CinemaDetail = () => {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="max-w-7xl mx-auto px-4 border-x border-border py-32 text-center w-full">
-          <p className="text-red-400 text-lg mb-8 font-black uppercase tracking-widest">
+          <p className="text-red-400 text-lg mb-8 font-bold">
             {error || 'Cinema not found'}
           </p>
           <button
             onClick={() => navigate('/cinemas')}
-            className="bg-brand text-white font-black uppercase tracking-widest px-8 py-4 rounded-lg hover:shadow-brand/20 transition-all"
+            className="bg-brand text-white font-bold px-8 py-4 rounded-lg hover:shadow-brand/20 transition-all"
           >
-            BACK TO CINEMAS
+            Back to Cinemas
           </button>
         </div>
       </div>
@@ -279,10 +279,10 @@ const CinemaDetail = () => {
             <div className="flex-1 space-y-6">
               <div>
                 <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start mb-2">
-                  <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter uppercase italic">
+                  <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">
                     {cinema.name}
                   </h1>
-                  <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border ${
+                  <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${
                     chainColors[cinema.chain] || 'bg-surface-2 text-text-muted border-border'
                   }`}>
                     {cinema.chain}
@@ -290,8 +290,9 @@ const CinemaDetail = () => {
                 </div>
 
                 {cinema.address && (
-                  <p className="text-text-muted text-[11px] font-black uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
-                    <span className="text-brand">LOCATION</span> {cinema.address}, {cinema.city}, {cinema.state}
+                  <p className="text-text-muted text-xs font-bold flex items-center justify-center md:justify-start gap-2">
+                    <Icon icon="solar:map-point-linear" className="text-brand" width="14" />
+                    {cinema.address}, {cinema.city}, {cinema.state}
                   </p>
                 )}
               </div>
@@ -306,19 +307,19 @@ const CinemaDetail = () => {
                   <p className="text-brand text-xl font-bold font-heading">
                     {cinema.screens_count || '0'}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Screens</p>
+                  <p className="text-text-muted text-[10px] font-bold">Screens</p>
                 </div>
                 <div className="p-4 border-r border-border text-center">
                   <p className="text-text-primary text-xl font-bold font-heading">
                     {cinema.seating_capacity ? (cinema.seating_capacity / 1000).toFixed(1) + 'k' : '—'}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Capacity</p>
+                  <p className="text-text-muted text-[10px] font-bold">Capacity</p>
                 </div>
                 <div className="p-4 text-center">
                   <p className="text-text-primary text-xl font-bold font-heading">
                     {Object.keys(groupedByFilm).length}
                   </p>
-                  <p className="text-text-muted text-[9px] font-black uppercase tracking-widest">Now Playing</p>
+                  <p className="text-text-muted text-[10px] font-bold">Now Playing</p>
                 </div>
               </div>
 
@@ -329,9 +330,9 @@ const CinemaDetail = () => {
                     href={cinema.google_maps_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-surface border border-border text-text-primary text-[10px] font-black uppercase tracking-widest px-8 py-4 rounded-lg hover:border-brand hover:text-brand transition-all min-h-[44px]"
+                    className="inline-flex items-center gap-2 bg-surface border border-border text-text-primary text-xs font-bold px-8 py-4 rounded-lg hover:border-brand hover:text-brand transition-all min-h-[44px]"
                   >
-                    DIRECTIONS
+                    Directions
                   </a>
                 )}
                 {cinema.website && (
@@ -339,9 +340,9 @@ const CinemaDetail = () => {
                     href={cinema.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-brand text-white text-[10px] font-black uppercase tracking-widest px-8 py-4 rounded-lg hover:shadow-brand/20 hover:scale-[1.02] transition-all min-h-[44px]"
+                    className="inline-flex items-center gap-2 bg-brand text-white text-xs font-bold px-8 py-4 rounded-lg hover:shadow-brand/20 hover:scale-[1.02] transition-all min-h-[44px]"
                   >
-                    OFFICIAL SITE
+                    Official Site
                   </a>
                 )}
               </div>
@@ -395,8 +396,8 @@ const CinemaDetail = () => {
               {/* No films on selected date */}
               {Object.keys(groupedByFilm).length === 0 && (
                 <div className="text-center py-24 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-                  <p className="text-4xl mb-4">🎬</p>
-                  <p className="text-text-muted font-black tracking-widest uppercase text-xs">No screenings archived for this date</p>
+                  <Icon icon="solar:clapperboard-play-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
+                  <p className="text-text-muted font-bold text-xs">No screenings scheduled for this date</p>
                 </div>
               )}
 
@@ -421,7 +422,7 @@ const CinemaDetail = () => {
                           />
                         ) : (
                           <div className="w-full h-48 sm:h-full bg-surface-2 flex items-center justify-center">
-                            <span className="text-3xl">🎬</span>
+                            <Icon icon="solar:clapperboard-play-linear" className="text-3xl text-brand/30" />
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-bg/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

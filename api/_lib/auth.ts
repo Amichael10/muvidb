@@ -10,6 +10,10 @@ const CRON_SECRET = process.env.CRON_SECRET;
  * 3. A Supabase Access Token from an Admin user
  */
 export async function isValidAuth(req: VercelRequest): Promise<boolean> {
+  if (!req?.headers) {
+    console.error('Auth check: [CRITICAL] Request headers are missing.');
+    return false;
+  }
   const authHeader = req.headers['authorization'];
   const cronSecretHeader = req.headers['x-cron-secret'];
   

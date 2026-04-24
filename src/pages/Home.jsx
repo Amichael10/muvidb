@@ -5,6 +5,7 @@ import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
 import PersonCard from '../components/person/PersonCard';
+import { Icon } from '@iconify/react';
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
@@ -155,6 +156,13 @@ export default function Home() {
   // Show 2026/2025 movies for New Releases
   const newReleases = films.filter(f => f.year === 2026 || f.year === 2025).sort((a, b) => b.year - a.year);
 
+  const formatViews = (count) => {
+    if (!count) return '0';
+    if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
+    if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
+    return count.toString();
+  };
+
   return (
     <div className="w-full pb-20 bg-bg min-h-screen">
       <HeroSection 
@@ -166,15 +174,15 @@ export default function Home() {
         <div className="border-b border-border py-12">
           {inCinemas.length > 0 ? (
             <FilmRow
-              title={inCinemas.some(f => f.is_today) ? "Showing in Cinemas Today" : "Coming Soon to Cinemas"}
-              subtitle={inCinemas.some(f => f.is_today) ? "Catch these productions on the big screen near you" : "Upcoming screenings scheduled for this week"}
+              title="In Cinemas"
+              subtitle="Movies playing in theaters near you"
               films={inCinemas}
               isLoading={isLoading}
             />
           ) : (
             <FilmRow
-              title="Showing in Cinemas"
-              subtitle="Catch the latest Nollywood productions on the big screen"
+              title="In Cinemas"
+              subtitle="Latest releases in theaters"
               films={films.slice(0, 4)}
               isLoading={isLoading}
             />
@@ -186,7 +194,7 @@ export default function Home() {
           <div className="border-b border-border py-12">
             <FilmRow
               title="New Releases"
-              subtitle="The latest additions to the Nollywood archive (2026)"
+              subtitle="Recently added movies"
               films={newReleases}
               isLoading={isLoading}
             />
@@ -196,8 +204,8 @@ export default function Home() {
         {/* Trending This Week */}
         <div className="border-b border-border py-12">
           <FilmRow
-            title="Trending This Week"
-            subtitle="Top productions across Netflix, Prime Video & Kava"
+            title="Popular"
+            subtitle="What everyone is watching this week"
             films={trendingFilms}
             isLoading={isLoading}
           />
@@ -211,22 +219,22 @@ export default function Home() {
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
                 <div className="space-y-1">
                   <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                    New on YouTube
+                    Recently Added
                   </h2>
-                  <p className="text-text-muted text-sm font-medium opacity-80 italic">Nollywood Daily: Latest imports from the last 24 hours</p>
+                  <p className="text-text-muted text-sm font-medium opacity-80">Latest videos from the last 24 hours</p>
                 </div>
                 <div className="flex bg-surface p-1 rounded-lg border border-border shadow-sm">
                   {['All', 'Movies', 'Skits'].map(filter => (
                     <button
                       key={filter}
                       onClick={() => setYoutubeFilter(filter)}
-                      className={`px-6 py-2 rounded-md text-[10px] font-black tracking-widest transition-all ${
+                      className={`px-6 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all ${
                         youtubeFilter === filter 
                           ? 'bg-brand text-white shadow-md' 
                           : 'text-text-muted hover:text-text-primary'
                       }`}
                     >
-                      {filter.toUpperCase()}
+                      {filter}
                     </button>
                   ))}
                 </div>
@@ -249,19 +257,17 @@ export default function Home() {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-end justify-between mb-10">
                   <div className="space-y-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary italic tracking-tighter">
-                      Filmmaker Spotlight
+                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                      People
                     </h2>
-                    <p className="text-brand text-[10px] font-black uppercase tracking-[0.3em] italic">The Visionaries behind the screens</p>
+                    <p className="text-brand text-[10px] font-bold tracking-[0.1em]">Industry Professionals</p>
                   </div>
                   <Link
                     to="/people"
-                    className="bg-surface border border-border text-text-primary font-black text-[10px] uppercase tracking-widest px-6 py-3 rounded-lg hover:border-brand hover:text-brand transition-all duration-300 active:scale-95 flex items-center gap-2"
+                    className="bg-surface border border-border text-text-primary font-bold text-[10px] px-6 py-3 rounded-lg hover:border-brand hover:text-brand transition-all duration-300 active:scale-95 flex items-center gap-2"
                   >
-                    DIRECTORY
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    View all
+                    <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
                   </Link>
                 </div>
 
@@ -293,11 +299,11 @@ export default function Home() {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center mb-16">
                   <h2 className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter">
-                    Nollywood Creator Hub
+                    Featured Channels
                   </h2>
                   <div className="h-px w-20 bg-brand mx-auto mt-4" />
-                  <p className="text-text-muted mt-6 max-w-lg mx-auto text-sm leading-relaxed italic">
-                    Direct from the official YouTube channels of Nigeria's most influential storytellers.
+                  <p className="text-text-muted mt-6 max-w-lg mx-auto text-sm leading-relaxed">
+                    Official channels from top storytellers.
                   </p>
                 </div>
 
@@ -323,8 +329,11 @@ export default function Home() {
                               {creator.name}
                             </h3>
                             <div className="mt-2 flex items-center gap-4">
-                              <span className="text-[9px] font-black text-brand uppercase tracking-widest">{parseInt(stats.subscribers || 0).toLocaleString()} SUBS</span>
-                              <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">{parseInt(stats.videos || 0).toLocaleString()} 🎞️</span>
+                              <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers || 0).toLocaleString()} subscribers</span>
+                              <span className="text-[9px] font-bold text-text-muted flex items-center gap-1.5">
+                                {parseInt(stats.videos || 0).toLocaleString()} videos
+                                <Icon icon="solar:clapperboard-linear" className="text-xs" />
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -341,8 +350,8 @@ export default function Home() {
         <div className="py-16 relative overflow-hidden">
           <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
           <FilmRow
-            title="Most Critically Acclaimed"
-            subtitle="Top rated productions by the Lumi community"
+            title="Top Rated"
+            subtitle="Highly rated by the community"
             films={films}
             sortKey="rating"
             isLoading={isLoading}

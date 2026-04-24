@@ -1,22 +1,28 @@
 {
   "rewrites": [
+    { "source": "/api/film/:id", "destination": "/api/films?id=:id" },
+    { "source": "/api/channel/:id", "destination": "/api/channels?id=:id" },
     { "source": "/api/youtube", "destination": "/api/external?provider=youtube" },
     { "source": "/api/tmdb", "destination": "/api/external?provider=tmdb" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!api|src|node_modules|@vite|@react-refresh|assets|favicon.ico).*)", "destination": "/index.html" }
+    { "source": "/((?!api|src|node_modules|@vite|@react-refresh|assets|favicon\\.ico|manifest\\.webmanifest|.*\\.(js|css|png|jpg|svg|ico|json|map)).*)", "destination": "/index.html" }
   ],
   "crons": [
     {
-      "path": "/api/cron/refresh-videos",
+      "path": "/api/cron/sync?task=videos",
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/refresh-showtimes",
+      "path": "/api/cron/sync?task=showtimes",
       "schedule": "0 1 * * *"
     },
     {
-      "path": "/api/cron/refresh-tmdb",
+      "path": "/api/cron/sync?task=tmdb",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync?task=kava",
+      "schedule": "0 3 * * *"
     }
   ]
 }

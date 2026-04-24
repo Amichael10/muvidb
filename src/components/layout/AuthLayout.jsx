@@ -67,11 +67,11 @@ export default function AuthLayout({ children }) {
 
         {/* Bottom Text */}
         <div className="relative z-10 mt-12 space-y-6">
-          <h1 className="font-heading font-bold text-6xl text-white tracking-tighter uppercase italic leading-[0.9]">
-            The Digital <br />Archive of <br /><span className="text-brand">Nollywood.</span>
+          <h1 className="font-heading font-bold text-6xl text-white tracking-tighter leading-[0.9]">
+            The Digital <br />Database of <br /><span className="text-brand">Nollywood.</span>
           </h1>
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.5em] opacity-60">
-            SECURE. VERIFIED. CINEMATIC.
+          <p className="text-xs font-bold text-text-muted opacity-60">
+            The premier industry film database.
           </p>
         </div>
       </div>

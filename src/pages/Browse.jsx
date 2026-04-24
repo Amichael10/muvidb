@@ -126,18 +126,18 @@ export default function Browse() {
         <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-4">
-              <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary tracking-tighter uppercase italic">
-                The Archive
+              <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary tracking-tighter">
+                Movies
               </h1>
-              <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6">
-                Explore the complete collection of Nollywood masterpieces, from digital premieres to theatrical blockbusters.
+              <p className="text-text-muted text-sm max-w-xl border-l-2 border-brand pl-6">
+                Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters.
               </p>
             </div>
             <button 
-              className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-text-primary"
+              className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-xs font-bold text-text-primary"
               onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
             >
-              FILTERS
+              Filters
             </button>
           </div>
         </div>
@@ -148,29 +148,29 @@ export default function Browse() {
           {/* Filters Sidebar */}
           <div className={`md:w-80 shrink-0 p-8 space-y-12 bg-surface-2/5 ${isMobileFiltersOpen ? 'block' : 'hidden md:block'}`}>
             <div className="flex items-center justify-between border-b border-border pb-4">
-              <h3 className="font-heading font-bold text-sm text-text-primary uppercase tracking-widest italic">Filters</h3>
-              <button onClick={clearAll} className="text-[9px] font-black uppercase tracking-widest text-brand hover:underline">Clear Archive</button>
+              <h3 className="font-heading font-bold text-sm text-text-primary">Filters</h3>
+              <button onClick={clearAll} className="text-[9px] font-bold text-brand hover:underline">Clear Filters</button>
             </div>
 
             <div className="space-y-4">
-              <h4 className="font-black text-text-muted text-[10px] uppercase tracking-widest">Sort Protocol</h4>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-black uppercase tracking-widest outline-none focus:border-brand transition-all">
-                <option value="views">MOST VIEWED</option>
-                <option value="rating">TOP RATED</option>
-                <option value="newest">NEWEST ARRIVALS</option>
-                <option value="oldest">VINTAGE</option>
+              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Sort By</h4>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all">
+                <option value="views">Most Viewed</option>
+                <option value="rating">Top Rated</option>
+                <option value="newest">Newest Arrivals</option>
+                <option value="oldest">Vintage</option>
               </select>
             </div>
 
             <div className="space-y-6">
-              <h4 className="font-black text-text-muted text-[10px] uppercase tracking-widest">Genres Sector</h4>
+              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Genres</h4>
               <div className="space-y-3 max-h-96 overflow-y-auto pr-4 custom-scrollbar">
                 {dbGenres.map(genre => (
                   <label key={genre} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleGenre(genre)}>
                     <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedGenres.includes(genre) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
                       {selectedGenres.includes(genre) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </div>
-                    <span className={`text-[11px] font-black uppercase tracking-widest transition-colors ${selectedGenres.includes(genre) ? 'text-brand' : 'text-text-primary group-hover:text-brand'}`}>{genre}</span>
+                    <span className={`text-[11px] font-bold tracking-wider transition-colors ${selectedGenres.includes(genre) ? 'text-brand' : 'text-text-primary group-hover:text-brand'}`}>{genre}</span>
                   </label>
                 ))}
               </div>
@@ -178,17 +178,17 @@ export default function Browse() {
 
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h4 className="font-black text-text-muted text-[10px] uppercase tracking-widest">Timeline</h4>
-                <span className="text-[10px] font-black uppercase tracking-widest text-brand">{yearRange}+</span>
+                <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Timeline</h4>
+                <span className="text-[10px] font-bold text-brand">{yearRange}+</span>
               </div>
               <input type="range" min="1990" max="2025" value={yearRange} onChange={(e) => setYearRange(parseInt(e.target.value))} className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-brand" />
             </div>
 
             <div className="space-y-6">
-              <h4 className="font-black text-text-muted text-[10px] uppercase tracking-widest">Classification</h4>
+              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Rating</h4>
               <div className="flex flex-wrap gap-2">
                 {nfvcbRatings.map(r => (
-                  <button key={r} onClick={() => toggleRating(r)} className={`px-4 py-2 rounded text-[10px] font-black border transition-all ${selectedRatings.includes(r) ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20' : 'border-border text-text-muted hover:border-brand/50 hover:text-text-primary'}`}>
+                  <button key={r} onClick={() => toggleRating(r)} className={`px-4 py-2 rounded text-[10px] font-bold border transition-all ${selectedRatings.includes(r) ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20' : 'border-border text-text-muted hover:border-brand/50 hover:text-text-primary'}`}>
                     {r}
                   </button>
                 ))}
@@ -212,8 +212,8 @@ export default function Browse() {
               </div>
             ) : (
               <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-32 text-center">
-                <p className="text-text-muted text-xs font-black uppercase tracking-widest mb-6">No matching records found in the archive.</p>
-                <button onClick={clearAll} className="bg-brand text-white text-[10px] font-black uppercase tracking-widest px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">RESET FILTERS</button>
+                <p className="text-text-muted text-xs font-bold mb-6">No matching results found.</p>
+                <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">Reset Filters</button>
               </div>
             )}
           </div>

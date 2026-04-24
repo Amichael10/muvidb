@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { Icon } from '@iconify/react';
 import { useWatchlist } from '../hooks/useWatchlist';
 import ReviewSection from '../components/film/ReviewSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
+import WatchOptions from '../components/film/WatchOptions';
 import { Skeleton } from '../components/ui/Skeleton';
 
 const FilmDetailSkeleton = () => (
@@ -146,10 +148,10 @@ export default function FilmDetail() {
     return (
       <div className="w-full min-h-screen bg-bg flex items-center justify-center">
         <div className="max-w-7xl mx-auto px-4 border-x border-border py-32 text-center w-full">
-          <p className="text-4xl mb-4">🎬</p>
-          <p className="text-text-primary font-heading font-bold text-xl uppercase tracking-tighter italic mb-8">Film not found</p>
-          <button onClick={() => navigate('/browse')} className="bg-brand text-white font-black uppercase tracking-widest px-8 py-4 rounded-lg hover:shadow-brand/20 transition-all">
-            ← BROWSE ARCHIVE
+          <Icon icon="solar:clapperboard-play-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
+          <p className="text-text-primary font-heading font-bold text-xl tracking-tighter mb-8">Movie not found</p>
+          <button onClick={() => navigate('/browse')} className="bg-brand text-white font-bold px-8 py-4 rounded-lg hover:shadow-brand/20 transition-all">
+            ← Browse Movies
           </button>
         </div>
       </div>
@@ -173,7 +175,7 @@ export default function FilmDetail() {
           alt={`${film.title} Backdrop`} 
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-bg/90 via-bg/20 to-transparent w-full md:w-1/2"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent w-full md:w-1/2"></div>
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg to-transparent"></div>
 
         <div className="absolute bottom-0 left-0 w-full">
@@ -187,25 +189,25 @@ export default function FilmDetail() {
             </div>
 
             <div className="flex-1 z-10 w-full">
-              <h1 className="font-heading font-bold text-4xl md:text-6xl text-text-primary mb-4 leading-tight tracking-tighter uppercase italic">
+              <h1 className="font-heading font-bold text-4xl md:text-6xl text-white mb-4 leading-tight tracking-tighter drop-shadow-2xl">
                 {film.title}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-text-muted font-black uppercase tracking-widest mb-4">
+              <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-white/80 font-bold mb-4">
                 <span>{film.year}</span>
-                <span className="w-1 h-1 rounded-full bg-border"></span>
-                <span>{film.runtime_minutes || film.runtime} MIN</span>
-                <span className="w-1 h-1 rounded-full bg-border"></span>
+                <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                <span>{film.runtime_minutes || film.runtime} min</span>
+                <span className="w-1 h-1 rounded-full bg-white/20"></span>
                 <span>{film.language}</span>
-                <span className="w-1 h-1 rounded-full bg-border"></span>
-                <span className="bg-brand/10 text-brand px-2 py-0.5 rounded text-[10px] font-black border border-brand/20">
+                <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                <span className="bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold">
                   {film.nfvcb_rating}
                 </span>
               </div>
 
               <div className="flex flex-wrap gap-2 mb-6">
                 {(film.genres || []).map(genre => (
-                  <span key={genre} className="px-3 py-1 text-[10px] font-black uppercase tracking-wider bg-surface-2/40 backdrop-blur-md text-text-primary rounded-lg border border-border">
+                  <span key={genre} className="px-3 py-1 text-[10px] font-bold bg-black/40 backdrop-blur-md text-white rounded-lg border border-white/10">
                     {genre}
                   </span>
                 ))}
@@ -213,9 +215,9 @@ export default function FilmDetail() {
 
               <div className="flex flex-wrap items-end gap-6">
                 <div className="flex items-center gap-3">
-                  <span className="text-brand text-4xl md:text-5xl font-bold font-heading leading-none tracking-tighter italic">{film.tmdb_rating || film.rating}</span>
+                  <span className="text-brand text-4xl md:text-5xl font-bold font-heading leading-none tracking-tighter drop-shadow-lg">{film.tmdb_rating || film.rating}</span>
                   <div className="flex flex-col justify-end pb-1">
-                    <span className="text-text-muted text-[10px] font-black tracking-widest uppercase">/ 10 Rating</span>
+                    <span className="text-white/60 text-[10px] font-bold tracking-wide">Rating</span>
                     <div className="flex items-center gap-1 mt-1">
                       {[1, 2, 3, 4, 5].map(star => (
                         <svg key={star} xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill={star <= Math.round((film.tmdb_rating || film.rating) / 2) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="text-brand">
@@ -226,12 +228,9 @@ export default function FilmDetail() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-text-muted pb-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z" />
-                    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="#000" />
-                  </svg>
-                  <span className="text-[10px] font-black tracking-widest uppercase">{formatViews(film.view_count)} VIEWS</span>
+                <div className="flex items-center gap-1.5 text-white/60 pb-1">
+                  <Icon icon="solar:fire-bold" className="text-orange-500 text-lg" />
+                  <span className="text-[10px] font-bold tracking-wide">Trending</span>
                 </div>
               </div>
             </div>
@@ -247,8 +246,8 @@ export default function FilmDetail() {
           <div className="lg:col-span-2">
             {/* Synopsis */}
             <section className="p-8 md:p-12 border-b border-border">
-              <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter uppercase italic">Synopsis</h2>
-              <p className="text-text-muted text-lg leading-relaxed italic opacity-80 border-l-2 border-brand pl-6">
+              <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Synopsis</h2>
+              <p className="text-text-muted text-lg leading-relaxed opacity-80 border-l-2 border-brand pl-6">
                 {film.synopsis}
               </p>
             </section>
@@ -256,7 +255,7 @@ export default function FilmDetail() {
             {/* Trailer */}
             <section id="trailer-section" className="p-8 md:p-12 border-b border-border bg-surface-2/10 relative overflow-hidden">
                <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-              <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter uppercase italic relative z-10">Official Trailer</h2>
+              <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter relative z-10">Official Trailer</h2>
               <div className="relative z-10 aspect-video rounded-xl overflow-hidden border border-border bg-surface-2 shadow-sm">
                 <iframe
                   className="w-full h-full"
@@ -271,7 +270,7 @@ export default function FilmDetail() {
             {/* Cast */}
             {cast.length > 0 && (
               <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter uppercase italic">Primary Cast</h2>
+                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Cast</h2>
                 <div className="flex overflow-x-auto gap-8 pb-4 scrollbar-hide">
                   {cast.map(person => (
                     <div key={person.id} className="shrink-0 w-32">
@@ -285,14 +284,14 @@ export default function FilmDetail() {
             {/* Crew */}
             {crew.length > 0 && (
               <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter uppercase italic">Key Crew</h2>
+                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Crew</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden">
                   {crew.map((member, idx) => (
                     <div key={idx} className="flex items-center gap-4 bg-surface p-4 border-r border-b border-border last:border-r-0 last:border-b-0">
                       <img src={member.photo_url || `https://placehold.co/150x150/1A1A1A/FF5C00?text=${member.name.split(' ').map(n => n[0]).join('')}`} alt={member.name} className="w-10 h-10 rounded-lg object-cover border border-border" />
                       <div>
-                        <div className="font-bold text-text-primary text-xs line-clamp-1 uppercase tracking-tight">{member.name}</div>
-                        <div className="text-text-muted text-[10px] uppercase font-black tracking-widest">{member.role}</div>
+                        <div className="font-bold text-text-primary text-xs line-clamp-1 tracking-tight">{member.name}</div>
+                        <div className="text-text-muted text-[10px] font-bold">{member.role}</div>
                       </div>
                     </div>
                   ))}
@@ -322,8 +321,8 @@ export default function FilmDetail() {
                     )}
                   </div>
                   <div>
-                    <div className="text-[9px] text-text-muted uppercase font-black tracking-[0.2em] mb-0.5">Production House</div>
-                    <div className="font-bold text-text-primary text-sm line-clamp-1 uppercase tracking-tight">{film.film_companies[0].companies?.name}</div>
+                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Studio</div>
+                    <div className="font-bold text-text-primary text-sm line-clamp-1 tracking-tight">{film.film_companies[0].companies?.name}</div>
                   </div>
                 </div>
               ) : (
@@ -332,31 +331,31 @@ export default function FilmDetail() {
                     {film.director?.charAt(0) || 'L'}
                   </div>
                   <div>
-                    <div className="text-[9px] text-text-muted uppercase font-black tracking-[0.2em] mb-0.5">Production Lead</div>
-                    <div className="font-bold text-text-primary text-sm uppercase tracking-tight">{film.director || 'Lumi Productions'}</div>
+                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Director</div>
+                    <div className="font-bold text-text-primary text-sm tracking-tight">{film.director || 'Lumi Originals'}</div>
                   </div>
                 </div>
               )}
             </div>
 
             <div className="p-8 bg-surface-2/5">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 uppercase tracking-widest italic">Metadata</h3>
+              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider">About</h3>
               <div className="space-y-4 text-[11px] font-bold">
                 <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted uppercase tracking-widest">Status</span>
-                  <span className="text-text-primary uppercase">{film.status}</span>
+                  <span className="text-text-muted tracking-wider">Status</span>
+                  <span className="text-text-primary">{film.status}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted uppercase tracking-widest">Language</span>
-                  <span className="text-text-primary uppercase">{film.language}</span>
+                  <span className="text-text-muted tracking-wider">Language</span>
+                  <span className="text-text-primary">{film.language}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted uppercase tracking-widest">Runtime</span>
-                  <span className="text-text-primary">{film.runtime_minutes || film.runtime} MIN</span>
+                  <span className="text-text-muted tracking-wider">Runtime</span>
+                  <span className="text-text-primary">{film.runtime_minutes || film.runtime} min</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-text-muted uppercase tracking-widest">NFVCB</span>
-                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-black uppercase tracking-widest">
+                  <span className="text-text-muted tracking-wider">Rating</span>
+                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-bold">
                     {film.nfvcb_rating}
                   </span>
                 </div>
@@ -364,43 +363,27 @@ export default function FilmDetail() {
             </div>
 
             <div className="p-8 space-y-3">
-              {film.release_type && film.release_type !== 'cinema' && film.youtube_watch_url ? (
-                <a
-                  href={film.youtube_watch_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 min-h-[44px] text-white hover:scale-[1.02] ${
-                    film.release_type === 'youtube' ? 'bg-[#FF0000] hover:shadow-[0_0_15px_rgba(255,0,0,0.4)]' :
-                    film.release_type === 'netflix' ? 'bg-[#E50914] hover:shadow-[0_0_15px_rgba(229,9,20,0.4)]' :
-                    film.release_type === 'prime_video' ? 'bg-[#00A8E1] hover:shadow-[0_0_15px_rgba(0,168,225,0.4)]' :
-                    film.release_type === 'showmax' ? 'bg-[#E10098] hover:shadow-[0_0_15px_rgba(225,0,152,0.4)]' :
-                    'bg-brand text-white hover:shadow-[0_0_15px_rgba(255,92,0,0.4)]'
+              <WatchOptions film={film} isFullWidth />
+              <button
+                onClick={handleWatchlist}
+                disabled={watchlistLoading}
+                className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-bold text-[10px] tracking-widest transition-all duration-300 active:scale-95 min-h-[44px] disabled:opacity-50 ${inWatchlist
+                  ? 'bg-brand text-white'
+                  : 'bg-surface-2 border border-border text-text-primary hover:border-brand hover:text-brand'
                   }`}
-                >
-                  Watch on {film.release_type.replace('_', ' ')}
-                </a>
-              ) : (
-                <button
-                  onClick={handleWatchlist}
-                  disabled={watchlistLoading}
-                  className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 min-h-[44px] disabled:opacity-50 ${inWatchlist
-                    ? 'bg-surface-2 border border-brand text-brand'
-                    : 'bg-brand text-white hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(255,92,0,0.4)]'
-                    }`}
-                >
-                  {inWatchlist ? 'IN WATCHLIST' : 'ADD TO WATCHLIST'}
-                </button>
-              )}
+              >
+                {inWatchlist ? 'Added' : 'Add to Watchlist'}
+              </button>
               <button
                 onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 border border-border text-text-primary hover:border-brand hover:text-brand px-6 py-4 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 min-h-[44px]"
+                className="w-full flex items-center justify-center gap-2 border border-border text-text-primary hover:border-brand hover:text-brand px-6 py-4 rounded-lg font-bold text-[10px] tracking-widest transition-all duration-300 active:scale-95 min-h-[44px]"
               >
-                SHARE ARCHIVE
+                Share
               </button>
             </div>
 
             <div className="p-8">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 uppercase tracking-widest italic">Related Media</h3>
+              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider">More Like This</h3>
               <div className="flex flex-col gap-0 border border-border rounded-lg overflow-hidden shadow-sm">
                 {relatedFilms.map(relatedFilm => (
                   <Link
@@ -414,10 +397,10 @@ export default function FilmDetail() {
                       className="w-12 h-16 object-cover rounded-md border border-border"
                     />
                     <div className="flex flex-col justify-center">
-                      <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1 mb-1 tracking-tight uppercase">
+                      <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1 mb-1 tracking-tight">
                         {relatedFilm.title}
                       </h4>
-                      <div className="text-[10px] font-black text-text-muted mb-2 uppercase tracking-widest">
+                      <div className="text-[10px] font-bold text-text-muted mb-2">
                         {relatedFilm.year} • {relatedFilm.genres && relatedFilm.genres.length > 0 ? relatedFilm.genres[0] : 'Media'}
                       </div>
                     </div>

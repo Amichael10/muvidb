@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import FilmCard from './FilmCard';
 import SkeletonCard from '../ui/SkeletonCard';
+import { Icon } from '@iconify/react';
 
 export default function FilmRow({ title, subtitle, films, sortKey, isLoading = false, noHeader = false }) {
   const scrollRef = useRef(null);
@@ -45,21 +46,19 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
         {!noHeader && (
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
             <div className="space-y-1">
-              <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+              <h2 className="text-2xl font-bold text-text-primary tracking-tight">
                 {title}
               </h2>
               {subtitle && (
-                <p className="text-text-muted text-sm font-medium opacity-80 italic">{subtitle}</p>
+                <p className="text-text-muted text-sm font-medium opacity-80">{subtitle}</p>
               )}
             </div>
             <Link 
               to={`/browse${sortKey ? `?sort=${sortKey}` : ''}`} 
-              className="text-brand font-black text-[10px] uppercase tracking-widest px-5 py-2 border border-border rounded-xl hover:border-brand hover:text-brand transition-all duration-300 active:scale-95 flex items-center gap-2 w-fit bg-surface/50 backdrop-blur-sm"
+              className="text-text-primary font-bold text-xs px-5 py-2.5 border border-border rounded-lg hover:border-brand hover:text-brand transition-all duration-300 flex items-center gap-2 w-fit bg-surface/50 backdrop-blur-sm"
             >
-              BROWSING ARCHIVE 
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+              Browse all
+              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5" />
             </Link>
           </div>
         )}
@@ -73,38 +72,38 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
           {/* Navigation Arrows */}
           <button 
             onClick={() => scroll('left')}
-            className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-12 h-12 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollLeft && 'pointer-events-none !opacity-0'}`}
+            className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollLeft && 'pointer-events-none !opacity-0'}`}
             aria-label="Previous"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <Icon icon="solar:alt-arrow-left-linear" width="20" height="20" />
           </button>
           
           <button 
             onClick={() => scroll('right')}
-            className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-12 h-12 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollRight && 'pointer-events-none !opacity-0'}`}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollRight && 'pointer-events-none !opacity-0'}`}
             aria-label="Next"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            <Icon icon="solar:alt-arrow-right-linear" width="20" height="20" />
           </button>
 
           <div 
             ref={scrollRef}
             onScroll={checkScroll}
-            className="flex overflow-x-auto gap-4 md:gap-8 pb-10 pt-2 px-4 sm:px-0 snap-x snap-mandatory scrollbar-hide touch-pan-x"
+            className="flex overflow-x-auto gap-4 md:gap-6 pb-6 pt-2 px-4 sm:px-0 scrollbar-hide touch-pan-x"
           >
             {isLoading ? (
               [...Array(6)].map((_, i) => (
-                <div key={i} className="snap-start shrink-0">
+                <div key={i} className="shrink-0">
                   <SkeletonCard size="md" />
                 </div>
               ))
             ) : films.length === 0 ? (
-              <div className="w-full py-16 text-center text-text-muted italic text-sm bg-surface/30 rounded-3xl border-2 border-dashed border-border/50">
-                No active productions available in this section.
+              <div className="w-full py-16 text-center text-text-muted text-sm bg-surface-2/10 rounded-2xl border border-dashed border-border/50 mx-4">
+                No titles available in this section.
               </div>
             ) : (
               sortedFilms.map((film) => (
-                <div key={film.id} className="snap-start shrink-0 group/card">
+                <div key={film.id} className="shrink-0">
                   <FilmCard film={film} size="md" />
                 </div>
               ))

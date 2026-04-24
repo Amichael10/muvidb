@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import { Icon } from '@iconify/react';
 
 export default function FilmCard({ 
   film, 
@@ -20,65 +21,58 @@ export default function FilmCard({
   };
 
   return (
-    <div className="relative flex flex-col gap-2">
+    <div className="relative flex flex-col gap-3">
       <Link 
         to={`/films/${film.id}`}
-        className={`relative block rounded-xl overflow-hidden group transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg hover:z-10 ${sizeClasses[size]}`}
+        className={`relative block rounded-xl overflow-hidden group transition-all duration-500 hover:shadow-2xl z-0 hover:z-10 ${sizeClasses[size]}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Poster Image */}
         <img 
           src={film.poster_url || film.poster} 
-          alt={film.title} 
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          alt="" 
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           loading="lazy"
         />
 
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity duration-300"></div>
+        {/* Professional Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
+
+        {/* Rating Badge (Top Left) */}
+        <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-md text-white px-1.5 py-0.5 rounded-md border border-white/10 shadow-lg z-20">
+          <Icon icon="solar:star-bold" className="text-brand text-[10px]" />
+          <span className="text-[10px] font-bold">
+            {Number(film.tmdb_rating || film.average_rating || film.rating || 0).toFixed(1)}
+          </span>
+        </div>
 
         {/* Action Button (Hover State) */}
-        <div className={`absolute top-3 right-3 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`absolute top-2 right-2 transition-all duration-500 z-20 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'}`}>
           <button 
-            className="bg-surface-2/80 backdrop-blur-md hover:bg-gold text-text-primary hover:text-bg p-2 rounded-full transition-all duration-300 active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="bg-brand hover:bg-white text-white hover:text-brand w-7 h-7 rounded-lg transition-all duration-300 active:scale-90 shadow-xl flex items-center justify-center border border-white/10"
             onClick={(e) => {
-              e.preventDefault(); // Prevent navigating to film detail
+              e.preventDefault();
               if (onAction) onAction(film);
             }}
-            aria-label={actionType === 'add' ? "Add to watchlist" : "Remove from watchlist"}
           >
-            {actionType === 'add' ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            )}
+            <Icon icon={actionType === 'add' ? "solar:add-circle-linear" : "solar:close-circle-linear"} width="14" />
           </button>
         </div>
 
-        {/* Bottom Content */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 flex flex-col justify-end">
-          <h3 className="font-heading font-bold text-text-primary text-lg leading-tight mb-1 line-clamp-2 group-hover:text-gold transition-colors">
+        {/* Bottom Content Overlay - Improved Legibility */}
+        <div className="absolute inset-x-0 bottom-0 p-3 z-20 bg-gradient-to-t from-black/90 via-black/40 to-transparent pt-10">
+          <h3 className="text-white text-xs font-bold leading-tight mb-1 line-clamp-2 group-hover:text-brand transition-colors">
             {film.title}
           </h3>
-          
-          <div className="flex items-center justify-between mt-1">
-            <div className="text-xs text-text-muted font-medium truncate pr-2">
-              {film.year} {film.genres && film.genres.length > 0 ? `• ${film.genres[0]}` : ''}
-            </div>
-            
-            <div className="flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded text-xs font-bold shrink-0">
-              <span>{film.tmdb_rating || film.rating}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              </svg>
-            </div>
+          <div className="flex items-center gap-2 text-[10px] font-medium text-white/70">
+            <span className="text-brand/90 font-bold">{film.year || film.release_date?.split('-')[0] || 'N/A'}</span>
+            {film.genres && film.genres.length > 0 && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+                <span className="truncate">{film.genres[0]}</span>
+              </>
+            )}
           </div>
         </div>
       </Link>
@@ -87,16 +81,14 @@ export default function FilmCard({
       {showWatchedToggle && (
         <button 
           onClick={() => onToggleWatched && onToggleWatched(film)}
-          className="flex items-center gap-2 mt-1 text-sm font-medium text-text-muted hover:text-text-primary transition-colors group w-fit"
+          className="flex items-center gap-2 mt-1 text-[10px] font-bold text-text-muted hover:text-brand transition-colors group w-fit pl-1"
         >
-          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isWatched ? 'bg-gold border-gold' : 'border-border bg-surface group-hover:border-gold/50'}`}>
+          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isWatched ? 'bg-brand border-brand' : 'border-border bg-surface-2/30'}`}>
             {isWatched && (
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
+              <Icon icon="solar:check-read-linear" className="text-white text-[9px]" />
             )}
           </div>
-          Watched
+          <span className={isWatched ? 'text-brand' : ''}>Watched</span>
         </button>
       )}
     </div>

@@ -29,26 +29,26 @@ function StatusBadge({ video }) {
     <div className="flex flex-col gap-1.5 items-center">
       <div className="flex items-center gap-2">
         {isUnmatched && (
-          <span className="px-2 py-0.5 rounded-lg bg-surface-2 text-text-muted border border-border text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
+          <span className="px-2 py-0.5 rounded-lg bg-surface-2 text-text-muted border border-border text-[9px] font-bold flex items-center gap-1.5">
             <span className="w-1 h-1 rounded-full bg-slate-500" />
-            Private (Needs Link)
+            Needs Link
           </span>
         )}
         {isPending && (
-          <span className="px-2 py-0.5 rounded-lg bg-brand/10 text-brand border border-brand/20 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
+          <span className="px-2 py-0.5 rounded-lg bg-brand/10 text-brand border border-brand/20 text-[9px] font-bold tracking-wider flex items-center gap-1.5">
             <span className="w-1 h-1 rounded-full bg-brand animate-pulse" />
-            Needs Check
+            Pending
           </span>
         )}
         {isVerified && (
-          <span className="px-2 py-0.5 rounded-lg bg-green-500/10 text-green-500 border border-green-500/20 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
+          <span className="px-2 py-0.5 rounded-lg bg-green-500/10 text-green-500 border border-green-500/20 text-[9px] font-bold tracking-wider flex items-center gap-1.5">
             <span className="w-1 h-1 rounded-full bg-green-500" />
-            Live & Certified
+            Verified
           </span>
         )}
       </div>
       {video.is_hidden && (
-         <span className="px-2 py-0.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-black uppercase tracking-widest">
+         <span className="px-2 py-0.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-bold">
             Hidden
          </span>
       )}
@@ -90,28 +90,28 @@ function EditFilmModal({ film, onSave, onClose }) {
       <div className="bg-surface border border-border rounded-md w-full max-w-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-400">
         <div className="border-b border-border px-10 py-8 flex items-center justify-between bg-surface-2/30">
           <div>
-            <p className="text-brand text-[10px] font-black uppercase tracking-[0.3em] mb-1 italic">Film Details</p>
-            <h2 className="text-text-primary text-2xl font-black tracking-tight">Edit Information</h2>
+            <p className="text-brand text-[10px] font-bold tracking-wider mb-1">Movie Details</p>
+            <h2 className="text-text-primary text-2xl font-bold tracking-tight">Edit Information</h2>
           </div>
           <button onClick={onClose} className="w-12 h-12 flex items-center justify-center rounded-lg hover:bg-surface-2 text-text-muted transition-all">✕</button>
         </div>
         
         <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
           <div>
-            <label className="block text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-3 px-1">Film Title</label>
+            <label className="block text-text-muted text-[10px] font-bold tracking-wider mb-3 px-1">Movie Title</label>
             <input name="title" value={form.title} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-5 h-14 text-text-primary text-sm font-bold focus:border-brand/50 focus:ring-4 focus:ring-brand/5 transition-all outline-none" />
           </div>
 
           <div className="grid grid-cols-2 gap-8">
             <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-3 px-1">Release Year</label>
+              <label className="block text-text-muted text-[10px] font-bold mb-3 px-1">Release Year</label>
               <input name="year" type="number" value={form.year} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-5 h-14 text-text-primary text-sm font-bold focus:border-brand/50 focus:ring-4 focus:ring-brand/5 transition-all outline-none" />
             </div>
             <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-3 px-1">Category</label>
+              <label className="block text-text-muted text-[10px] font-bold mb-3 px-1">Category</label>
               <div className="relative">
-                <select name="release_type" value={form.release_type} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-5 h-14 text-text-primary text-[11px] font-black uppercase tracking-widest focus:border-brand/50 outline-none appearance-none cursor-pointer">
-                  {['youtube','cinema','netflix','amazon','showmax','iroko'].map(v => <option key={v} value={v}>{v.toUpperCase()}</option>)}
+                <select name="release_type" value={form.release_type} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-5 h-14 text-text-primary text-[11px] font-bold focus:border-brand/50 outline-none appearance-none cursor-pointer">
+                  {['youtube','cinema','netflix','amazon','showmax','iroko','kava'].map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
                 <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">↓</span>
               </div>
@@ -119,7 +119,7 @@ function EditFilmModal({ film, onSave, onClose }) {
           </div>
 
           <div>
-            <label className="block text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-3 px-1">Film Synopsis</label>
+            <label className="block text-text-muted text-[10px] font-bold tracking-wider mb-3 px-1">Movie Synopsis</label>
             <textarea name="synopsis" value={form.synopsis} onChange={handleChange} rows={5} className="w-full bg-surface-2 border border-border rounded-lg px-5 py-4 text-text-primary text-sm font-medium focus:border-brand/50 outline-none resize-none custom-scrollbar" />
           </div>
 
@@ -129,16 +129,16 @@ function EditFilmModal({ film, onSave, onClose }) {
               {form.needs_review && <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>}
             </div>
             <div>
-                <span className="text-text-primary text-sm font-black uppercase tracking-widest">Mark as Verified</span>
+                <span className="text-text-primary text-sm font-bold tracking-wider">Mark as Verified</span>
                 <p className="text-text-muted text-[10px] mt-1 font-bold">Uncheck to mark as production-ready.</p>
             </div>
           </label>
         </form>
 
         <div className="px-10 py-8 border-t border-border bg-surface-2/30 flex gap-4">
-          <button type="button" onClick={onClose} className="flex-1 h-14 rounded-lg border border-border text-text-muted font-black text-[10px] uppercase tracking-[0.2em] hover:bg-surface-2 transition-all">Cancel</button>
-          <button onClick={handleSubmit} disabled={saving} className="flex-[2] h-14 rounded-lg bg-brand text-white font-black text-[10px] uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-brand/20 disabled:opacity-50">
-            {saving ? 'Saving...' : 'Save Meta-Sync'}
+          <button type="button" onClick={onClose} className="flex-1 h-14 rounded-lg border border-border text-text-muted font-bold text-[10px] tracking-wider hover:bg-surface-2 transition-all">Cancel</button>
+          <button onClick={handleSubmit} disabled={saving} className="flex-[2] h-14 rounded-lg bg-brand text-white font-bold text-[10px] tracking-wider hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-brand/20 disabled:opacity-50">
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>
@@ -169,15 +169,15 @@ function CreditsModal({ film, onClose }) {
       <div className="bg-surface border border-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
         <div className="p-8 border-b border-border flex items-center justify-between">
            <div>
-             <p className="text-brand text-[10px] font-black uppercase tracking-widest mb-1">Production Hub</p>
-             <h2 className="text-text-primary text-xl font-black">Credits Manager: {film.title}</h2>
+             <p className="text-brand text-xs font-bold mb-1">Credits Manager</p>
+             <h2 className="text-text-primary text-xl font-bold">{film.title}</h2>
            </div>
            <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors text-2xl font-light">✕</button>
         </div>
         
         <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
           {loading ? (
-             <div className="h-40 flex items-center justify-center text-text-muted text-[10px] font-black uppercase tracking-widest animate-pulse">Accessing payload...</div>
+             <div className="h-40 flex items-center justify-center text-text-muted text-xs font-bold">Loading credits...</div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
               {credits.map(c => (
@@ -185,8 +185,8 @@ function CreditsModal({ film, onClose }) {
                   <div className="flex items-center gap-4">
                     <img src={c.people?.profile_path || 'https://via.placeholder.com/100x150'} className="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" alt="" />
                     <div>
-                      <p className="text-text-primary text-sm font-black tracking-tight">{c.people?.name}</p>
-                      <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest">
+                      <p className="text-text-primary text-sm font-bold tracking-tight">{c.people?.name}</p>
+                      <p className="text-text-muted text-xs font-medium">
                         {c.character_name && ` · ${c.character_name}`}
                       </p>
                     </div>
@@ -477,76 +477,76 @@ export default function AdminYouTubeVideos() {
       {selectedIds.size > 0 && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[110] bg-surface-2 border border-brand/20 rounded-2xl shadow-2xl px-8 py-4 flex items-center gap-8 animate-in slide-in-from-bottom-10">
           <div className="border-r border-border pr-8">
-             <p className="text-[10px] font-black text-brand uppercase tracking-widest leading-none mb-1">Batch Active</p>
-             <p className="text-sm font-black text-text-primary whitespace-nowrap">{selectedIds.size} Items Selected</p>
+             <p className="text-xs font-bold text-brand leading-none mb-1">Batch Actions</p>
+             <p className="text-sm font-bold text-text-primary whitespace-nowrap">{selectedIds.size} items selected</p>
           </div>
           
           <div className="flex items-center gap-3">
              <button 
                disabled={isBulkAction} 
                onClick={() => handleBulkAction('create_films')} 
-               className="h-10 px-6 rounded-lg bg-brand text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-brand/20 disabled:opacity-50 disabled:cursor-wait"
+               className="h-10 px-6 rounded-lg bg-brand text-white text-[10px] font-bold tracking-wider hover:scale-105 transition-all shadow-lg shadow-brand/20 disabled:opacity-50 disabled:cursor-wait"
              >
-               {isBulkAction ? 'Processing...' : 'Create Films'}
+               {isBulkAction ? 'Processing...' : 'Create Movies'}
              </button>
              <button 
                disabled={isBulkAction} 
                onClick={() => handleBulkAction('certify')} 
-               className="h-10 px-6 rounded-lg bg-green-500 text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:cursor-wait"
+               className="h-10 px-6 rounded-lg bg-green-500 text-white text-[10px] font-bold tracking-wider hover:scale-105 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:cursor-wait"
              >
-               {isBulkAction ? 'Processing...' : 'Bulk Certify'}
+               {isBulkAction ? 'Processing...' : 'Bulk Verify'}
              </button>
              <button 
                disabled={isBulkAction} 
                onClick={() => handleBulkAction('hide')} 
-               className="h-10 px-6 rounded-lg bg-surface border border-border text-text-muted text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 hover:text-red-500 transition-all disabled:opacity-50 disabled:cursor-wait"
+               className="h-10 px-6 rounded-lg bg-surface border border-border text-text-muted text-xs font-bold hover:bg-red-500/10 hover:text-red-500 transition-all disabled:opacity-50 disabled:cursor-wait"
              >
                Bulk Hide
              </button>
           </div>
 
-          <button onClick={() => setSelectedIds(new Set())} className="text-[10px] font-black text-text-muted hover:text-text-primary uppercase tracking-widest ml-4">Cancel</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-xs font-bold text-text-muted hover:text-text-primary ml-4">Cancel</button>
         </div>
       )}
 
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div>
-          <p className="text-brand text-[10px] font-black uppercase tracking-[0.3em] mb-1 italic">Library Management</p>
-          <h1 className="text-3xl font-black text-text-primary tracking-tight">YouTube Imports</h1>
+          <p className="text-brand text-xs font-bold mb-1">Queue Management</p>
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Imported Videos</h1>
           <p className="text-text-muted text-sm mt-1 max-w-xl font-medium leading-relaxed opacity-80">
-            Review and manage films imported from YouTube channels. Verified production streams.
+            Review and link videos imported from external sources to database records.
           </p>
         </div>
         <button 
           onClick={handleManualSync} 
           disabled={syncing} 
-          className="bg-brand text-white font-black px-10 py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 flex items-center gap-3"
+          className="bg-brand text-white font-bold px-10 py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 flex items-center gap-3"
         >
           {syncing ? (
             <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
-            <span className="text-lg leading-none">🔄</span>
+            <Icon icon="solar:refresh-linear" className="text-lg" />
           )}
-          {syncing ? 'Scanning Channels...' : 'Initialize Video Sync'}
+          {syncing ? 'Scanning...' : 'Sync videos'}
         </button>
       </header>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
         {[
-          { label: 'Total Videos', val: stats.total,      icon: '🎞️', color: 'text-text-primary' },
-          { label: 'Needs Review',   val: stats.pending,    icon: '⏳', color: 'text-brand' },
-          { label: 'Certified Films', val: stats.verified,   icon: '✅', color: 'text-green-500' },
-          { label: 'Unmatched', val: stats.unmatched,  icon: '❓', color: 'text-text-muted' },
-          { label: 'Hidden',    val: stats.hidden,     icon: '🔒', color: 'text-red-500' },
+          { label: 'Total items', val: stats.total,      icon: 'solar:videocamera-record-linear', color: 'text-text-primary' },
+          { label: 'Pending review',   val: stats.pending,    icon: 'solar:clock-circle-linear', color: 'text-brand' },
+          { label: 'Verified movies', val: stats.verified,   icon: 'solar:check-read-linear', color: 'text-green-500' },
+          { label: 'Unlinked', val: stats.unmatched,  icon: 'solar:link-broken-linear', color: 'text-text-muted' },
+          { label: 'Hidden',    val: stats.hidden,     icon: 'solar:eye-closed-linear', color: 'text-red-500' },
         ].map(s => (
           <div key={s.label} className="card-cal p-6 group hover:border-brand/20 transition-all">
             <div className="flex items-center gap-3 mb-4 opacity-60">
-              <span className="text-xl">{s.icon}</span>
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.15em] leading-none">{s.label}</p>
+              <Icon icon={s.icon} className="text-xl" />
+              <p className="text-[10px] font-bold text-text-muted tracking-wider leading-none">{s.label}</p>
             </div>
-            <p className={`text-3xl font-black tracking-tighter ${s.color}`}>{s.val}</p>
+            <p className={`text-3xl font-bold tracking-tighter ${s.color}`}>{s.val}</p>
           </div>
         ))}
       </div>
@@ -554,33 +554,33 @@ export default function AdminYouTubeVideos() {
       {/* Modernized Filter Bar */}
       <div className="card-cal p-2 overflow-hidden flex flex-col md:flex-row items-center divide-y md:divide-y-0 md:divide-x divide-border">
         <div className="flex-[1.5] relative w-full">
-          <span className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+          <Icon icon="solar:magnifer-linear" className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted" />
           <input 
             type="text" 
             value={searchQuery} 
             onChange={e => setSearchQuery(e.target.value)} 
-            placeholder="Search video titles..." 
+            placeholder="Search imported videos..." 
             className="w-full bg-transparent border-none py-5 pl-14 pr-6 text-text-primary text-sm font-bold focus:ring-0 placeholder:text-text-muted/50" 
           />
         </div>
         
         <div className="w-full md:w-72 relative bg-surface-2/30">
-          <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} className="w-full bg-transparent border-none py-5 px-8 text-text-primary text-sm font-black uppercase tracking-widest focus:ring-0 cursor-pointer appearance-none">
-            <option value="all">Every Source</option>
+          <select value={channelFilter} onChange={e => setChannelFilter(e.target.value)} className="w-full bg-transparent border-none py-5 px-8 text-text-primary text-sm font-bold focus:ring-0 cursor-pointer appearance-none">
+            <option value="all">All sources</option>
             {channels.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <span className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">↓</span>
+          <Icon icon="solar:alt-arrow-down-linear" className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted" />
         </div>
 
         <div className="w-full md:w-72 relative bg-surface-2/50">
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full bg-transparent border-none py-5 px-8 text-text-primary text-sm font-black uppercase tracking-widest focus:ring-0 cursor-pointer appearance-none">
-            <option value="all">Filter by State</option>
-            <option value="needs_review">Matched (Needs Check)</option>
-            <option value="matched">Certified Films</option>
-            <option value="unmatched">Unmatched</option>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="w-full bg-transparent border-none py-5 px-8 text-text-primary text-sm font-bold focus:ring-0 cursor-pointer appearance-none">
+            <option value="all">All statuses</option>
+            <option value="needs_review">Pending review</option>
+            <option value="matched">Verified movies</option>
+            <option value="unmatched">Unlinked</option>
             <option value="hidden">Hidden</option>
           </select>
-          <span className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">↓</span>
+          <Icon icon="solar:alt-arrow-down-linear" className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted" />
         </div>
       </div>
 
@@ -590,19 +590,19 @@ export default function AdminYouTubeVideos() {
           {loading ? (
             <div className="h-96 flex flex-col items-center justify-center gap-4">
               <div className="w-12 h-12 border-4 border-brand/20 border-t-brand rounded-full animate-spin" />
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em]">Establishing Uplink...</p>
+              <p className="text-xs font-bold text-text-muted">Loading records...</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="h-96 flex flex-col items-center justify-center text-center p-10">
-              <p className="text-4xl mb-4">🛰️</p>
-              <h3 className="text-xl font-black text-text-primary tracking-tight">No match found</h3>
-              <p className="text-text-muted text-sm mt-1 max-w-xs font-medium">Verify your filters or reset the protocol to resume search.</p>
-              <button onClick={() => { setSearchQuery(''); setChannelFilter('all'); setStatusFilter('all'); }} className="mt-6 text-brand font-black text-[10px] uppercase tracking-widest hover:underline">Reset Protocols</button>
+              <Icon icon="solar:video-library-linear" className="text-5xl text-text-muted mb-4 opacity-20" />
+              <h3 className="text-xl font-bold text-text-primary tracking-tight">No results found</h3>
+              <p className="text-text-muted text-sm mt-1 max-w-xs font-medium">Try adjusting your filters or search terms.</p>
+              <button onClick={() => { setSearchQuery(''); setChannelFilter('all'); setStatusFilter('all'); }} className="mt-6 text-brand font-bold text-xs hover:underline">Clear all filters</button>
             </div>
           ) : (
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-surface-2/30 border-b border-border text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">
+                <tr className="bg-surface-2/30 border-b border-border text-xs font-bold text-text-muted">
                   <th className="px-6 py-5 text-center w-12">
                      <input 
                        type="checkbox" 
@@ -611,8 +611,8 @@ export default function AdminYouTubeVideos() {
                        onChange={() => toggleSelectAll(filtered)}
                      />
                   </th>
-                  <th className="px-10 py-5 text-left">Video Details</th>
-                  <th className="px-6 py-5 text-center">Review Status</th>
+                  <th className="px-10 py-5 text-left">Record details</th>
+                  <th className="px-6 py-5 text-center">Status</th>
                   <th className="px-6 py-5 text-center w-32">Duration</th>
                   <th className="px-10 py-5 text-right">Actions</th>
                 </tr>
@@ -635,9 +635,9 @@ export default function AdminYouTubeVideos() {
                           <div className="absolute inset-0 rounded-md ring-1 ring-inset ring-black/5" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-text-primary text-sm font-black truncate leading-tight group-hover:text-brand transition-colors tracking-tight">{v.film_id ? v.films?.title : v.title}</p>
-                          <div className="flex items-center gap-2 mt-1.5 font-bold uppercase tracking-widest">
-                            <span className="text-[10px] text-text-muted">{v.channels?.name || 'External Stream'}</span>
+                          <p className="text-text-primary text-sm font-bold truncate leading-tight group-hover:text-brand transition-colors tracking-tight">{v.film_id ? v.films?.title : v.title}</p>
+                          <div className="flex items-center gap-2 mt-1.5 font-bold tracking-wide">
+                            <span className="text-[10px] text-text-muted">{v.channels?.name || 'YouTube'}</span>
                             <span className="w-1 h-1 rounded-full bg-border" />
                             <span className="text-[10px] text-text-muted/60">{new Date(v.published_at).toLocaleDateString()}</span>
                           </div>
@@ -648,36 +648,34 @@ export default function AdminYouTubeVideos() {
                       <StatusBadge video={v} />
                     </td>
                     <td className="px-6 py-6 text-center">
-                      <span className="text-[11px] font-black text-text-muted font-mono tracking-tighter bg-surface-2 px-2 py-1 rounded-lg border border-border/50">
-                        {fmtDuration(v.duration_seconds)}
-                      </span>
+                      <span className="text-xs font-bold text-text-muted font-mono tracking-tighter">{fmtDuration(v.duration_seconds)}</span>
                     </td>
                     <td className="px-10 py-6 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-3">
                         {v.film_id ? (
                           <>
                             {v.films?.needs_review && (
-                               <button onClick={() => certifyFilm(v.film_id)} className="h-10 px-5 rounded-md bg-green-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg shadow-green-500/20">Certify Now</button>
+                               <button onClick={() => certifyFilm(v.film_id)} className="h-10 px-5 rounded-md bg-green-500 text-white text-[10px] font-bold hover:bg-green-600 transition-all shadow-lg shadow-green-500/20">Verify now</button>
                             )}
-                            <button onClick={() => setEditFilm(v.films)} className="h-10 px-5 rounded-md border border-border bg-surface-2 text-text-primary text-[10px] font-black uppercase tracking-widest hover:border-brand/30 hover:text-brand transition-all">Info</button>
-                            <button onClick={() => setCreditsFilm(v.films)} className="h-10 px-5 rounded-md border border-border bg-surface-2 text-text-primary text-[10px] font-black uppercase tracking-widest hover:border-brand/30 hover:text-brand transition-all">Credits</button>
+                            <button onClick={() => setEditFilm(v.films)} className="h-10 px-5 rounded-md border border-border bg-surface-2 text-text-primary text-[10px] font-bold hover:border-brand/30 hover:text-brand transition-all">Info</button>
+                            <button onClick={() => setCreditsFilm(v.films)} className="h-10 px-5 rounded-md border border-border bg-surface-2 text-text-primary text-[10px] font-bold hover:border-brand/30 hover:text-brand transition-all">Credits</button>
                           </>
                         ) : (
                           <div className="flex items-center gap-2">
                              <button 
                                onClick={() => createFilmFromVideo(v)} 
-                               className="h-10 px-5 rounded-md bg-brand text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-brand/20"
+                               className="h-10 px-5 rounded-md bg-brand text-white text-[10px] font-bold hover:scale-105 transition-all shadow-lg shadow-brand/20"
                              >
-                               Create Film Record
+                               Create record
                              </button>
-                             <div className="text-[10px] font-black text-text-muted/30 uppercase mr-4 tracking-widest font-mono">INTERNAL</div>
+                             <div className="text-[10px] font-bold text-text-muted/30 mr-4 tracking-wider font-mono">ID: {v.video_id}</div>
                           </div>
                         )}
                         <button onClick={() => toggleHidden(v)} disabled={togglingId === v.id} className={`h-10 w-10 flex items-center justify-center rounded-md border border-border transition-all ${v.is_hidden ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-surface-2 hover:border-text-muted text-text-muted'}`}>
                           {togglingId === v.id ? (
                              <div className="w-3.5 h-3.5 border-2 border-text-muted/30 border-t-text-muted rounded-full animate-spin" />
                           ) : (
-                            <span className="text-lg leading-none">{v.is_hidden ? '👁️' : '🚫'}</span>
+                            <Icon icon={v.is_hidden ? 'solar:eye-linear' : 'solar:eye-closed-linear'} className="text-lg" />
                           )}
                         </button>
                       </div>
@@ -693,22 +691,22 @@ export default function AdminYouTubeVideos() {
       {/* Pagination Controls */}
       <div className="flex items-center justify-between pt-10 border-t border-border/50">
         <div className="space-y-1">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">
-            Showing {page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)} of {totalCount} Records
+          <p className="text-xs font-bold text-text-muted">
+            Showing {page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)} of {totalCount} records
           </p>
         </div>
         <div className="flex items-center gap-4">
           <button 
             disabled={page === 0 || loading}
             onClick={() => setPage(p => p - 1)}
-            className="h-12 px-8 rounded-xl border border-border bg-surface-2 text-text-primary text-[10px] font-black uppercase tracking-widest hover:border-brand/30 transition-all disabled:opacity-30"
+            className="h-12 px-8 rounded-xl border border-border bg-surface-2 text-text-primary text-[10px] font-bold hover:border-brand/30 transition-all disabled:opacity-30"
           >
             Previous
           </button>
           <button 
             disabled={(page + 1) * pageSize >= totalCount || loading}
             onClick={() => setPage(p => p + 1)}
-            className="h-12 px-8 rounded-xl bg-brand text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-brand/20 disabled:opacity-30"
+            className="h-12 px-8 rounded-xl bg-brand text-white text-[10px] font-bold hover:scale-105 transition-all shadow-lg shadow-brand/20 disabled:opacity-30"
           >
             Next
           </button>

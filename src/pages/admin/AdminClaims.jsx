@@ -132,23 +132,28 @@ export default function AdminClaims() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-text-primary">Pending Claims</h1>
-          <span className="bg-surface-2 text-text-muted px-3 py-1 rounded-full text-sm font-medium">
-            {claims.length}
-          </span>
+    <div className="space-y-8">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <p className="text-brand text-xs font-bold mb-1">Review Queue</p>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-text-primary tracking-tight">Identity Claims</h1>
+            <span className="bg-brand/10 text-brand px-3 py-1 rounded-full text-xs font-bold border border-brand/20">
+              {claims.length} pending
+            </span>
+          </div>
         </div>
-      </div>
+      </header>
 
       {claims.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <svg className="w-24 h-24 text-green-500 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 className="text-2xl font-bold text-text-primary mb-2">All claims reviewed.</h3>
-          <p className="text-text-muted">You're up to date.</p>
+        <div className="card-cal flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 mb-6">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-text-primary mb-2">Queue empty</h3>
+          <p className="text-text-muted text-sm max-w-xs mx-auto">There are no pending identity claims requiring review at this time.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -159,43 +164,44 @@ export default function AdminClaims() {
                 initial={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0, overflow: 'hidden', marginTop: 0, marginBottom: 0 }}
                 transition={{ duration: 0.3 }}
-                className="bg-surface rounded-lg p-6 border border-border flex flex-col lg:flex-row gap-6"
+                className="card-cal p-8 flex flex-col lg:flex-row gap-8 hover:border-brand/20 transition-all group"
               >
                 {/* LEFT SECTION */}
                 <div className="flex flex-col items-center text-center lg:w-48 shrink-0">
                   {claim.people?.photo_url ? (
-                    <img src={claim.people.photo_url} alt={claim.people.name} className="w-20 h-20 rounded-full object-cover bg-surface-2 mb-3" />
+                    <img src={claim.people.photo_url} alt="" className="w-24 h-24 rounded-full object-cover bg-surface-2 border border-border mb-4 grayscale group-hover:grayscale-0 transition-all" />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-surface-2 flex items-center justify-center text-2xl font-bold text-text-primary mb-3">
+                    <div className="w-24 h-24 rounded-full bg-surface-2 flex items-center justify-center text-2xl font-bold text-text-muted border border-border mb-4">
                       {getInitials(claim.people?.name)}
                     </div>
                   )}
-                  <div className="font-bold text-text-primary text-lg leading-tight mb-1">
-                    {claim.people?.name || 'Unknown Person'}
+                  <div className="font-bold text-text-primary text-base leading-tight mb-2">
+                    {claim.people?.name || 'Unknown record'}
                   </div>
-                  <div className="text-text-muted text-xs mb-3">Profile being claimed</div>
-                  <Link to={`/people/${claim.person_id}`} className="text-gold text-sm hover:underline" target="_blank" rel="noopener noreferrer">
-                    View Profile →
+                  <div className="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-4 opacity-60">Database record</div>
+                  <Link to={`/people/${claim.person_id}`} className="text-brand text-xs font-bold hover:underline" target="_blank" rel="noopener noreferrer">
+                    View profile
                   </Link>
                 </div>
 
                 {/* MIDDLE SECTION */}
-                <div className="flex-1 flex flex-col justify-center border-t border-border lg:border-t-0 lg:border-l lg:pl-6 pt-6 lg:pt-0">
-                  <div className="mb-4">
-                    <div className="font-bold text-text-primary text-lg">
-                      {claim.users?.name || 'Unknown User'}
+                <div className="flex-1 flex flex-col justify-center border-t lg:border-t-0 lg:border-l border-border lg:pl-8 pt-8 lg:pt-0">
+                  <div className="mb-6">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-sm font-bold text-text-primary">{claim.users?.name || 'Anonymous user'}</span>
+                      <span className="text-xs text-text-muted font-medium px-2 py-0.5 bg-surface-2 rounded-md border border-border">Claimant</span>
                     </div>
-                    <div className="text-text-muted text-sm">
+                    <div className="text-text-muted text-xs font-medium">
                       {claim.users?.email}
                     </div>
-                    <div className="text-text-muted text-xs mt-1">
-                      Submitted {new Date(claim.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    <div className="text-text-muted text-[10px] font-bold mt-2 opacity-60">
+                      Requested on {new Date(claim.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                     </div>
                   </div>
                   
                   {claim.note && (
-                    <div className="bg-surface-2/50 border-l-4 border-gold p-4 rounded-r-lg">
-                      <p className="text-text-primary italic whitespace-pre-wrap text-sm">
+                    <div className="bg-surface-2 border-l-2 border-brand p-5 rounded-r-lg">
+                      <p className="text-text-primary text-sm font-medium italic leading-relaxed">
                         "{claim.note}"
                       </p>
                     </div>
@@ -203,21 +209,21 @@ export default function AdminClaims() {
                 </div>
 
                 {/* RIGHT SECTION */}
-                <div className="flex flex-col justify-center gap-3 lg:w-64 shrink-0 border-t border-border lg:border-t-0 lg:border-l lg:pl-6 pt-6 lg:pt-0">
+                <div className="flex flex-col justify-center gap-3 lg:w-64 shrink-0 border-t lg:border-t-0 lg:border-l border-border lg:pl-8 pt-8 lg:pt-0">
                   {rejectingId === claim.id ? (
                     <div className="flex flex-col gap-3">
                       <textarea
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
                         placeholder="Reason for rejection (optional)"
-                        className="w-full bg-bg border border-border text-text-primary rounded-md px-3 py-2 text-sm focus:border-red-500 focus:outline-none resize-none h-24"
+                        className="w-full bg-surface-2 border border-border text-text-primary rounded-lg px-4 py-3 text-xs focus:border-red-500 outline-none resize-none h-24"
                       />
                       <button
                         onClick={() => handleReject(claim)}
                         disabled={isProcessing}
-                        className="w-full bg-red-500 text-white font-semibold py-2 rounded-md hover:bg-red-600 transition-colors disabled:opacity-50"
+                        className="w-full bg-red-500 text-white font-bold py-3 rounded-lg text-xs hover:bg-red-600 transition-all disabled:opacity-50"
                       >
-                        {isProcessing ? 'Processing...' : 'Confirm Rejection'}
+                        {isProcessing ? 'Rejecting...' : 'Reject request'}
                       </button>
                       <button
                         onClick={() => {
@@ -225,7 +231,7 @@ export default function AdminClaims() {
                           setRejectReason('');
                         }}
                         disabled={isProcessing}
-                        className="w-full text-text-muted hover:text-text-primary font-medium py-1 transition-colors text-sm"
+                        className="w-full text-text-muted hover:text-text-primary font-bold py-1 text-[10px] transition-colors"
                       >
                         Cancel
                       </button>
@@ -235,16 +241,16 @@ export default function AdminClaims() {
                       <button
                         onClick={() => handleApprove(claim)}
                         disabled={isProcessing}
-                        className="w-full bg-green-600 text-white font-semibold py-3 rounded-md hover:bg-green-500 transition-colors disabled:opacity-50"
+                        className="w-full bg-brand text-white font-bold py-4 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-brand/20 disabled:opacity-50"
                       >
-                        Approve
+                        Approve claim
                       </button>
                       <button
                         onClick={() => setRejectingId(claim.id)}
                         disabled={isProcessing}
-                        className="w-full border border-red-500/50 text-red-400 font-semibold py-3 rounded-md hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                        className="w-full border border-border bg-surface-2 text-text-muted font-bold py-4 rounded-xl text-xs hover:border-red-500/30 hover:text-red-500 transition-all disabled:opacity-50"
                       >
-                        Reject
+                        Decline request
                       </button>
                     </>
                   )}

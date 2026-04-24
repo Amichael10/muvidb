@@ -5,6 +5,7 @@ import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
 import { formatViewCount } from '../utils/youtube'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Icon } from '@iconify/react'
 
 const PersonCard = ({ person, currentUser }) => {
   const navigate = useNavigate()
@@ -88,9 +89,10 @@ const PersonCard = ({ person, currentUser }) => {
         </p>
 
         <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Icon icon="solar:clapperboard-play-linear" className="text-text-muted" width="14" />
             <span className="text-text-muted text-[9px] font-black uppercase tracking-widest">
-              🎬 {creditCount} FILMS
+              {creditCount} FILMS
             </span>
           </div>
         </div>
@@ -269,7 +271,7 @@ const PeopleList = () => {
             </div>
           ) : people.length === 0 ? (
             <div className="text-center py-32 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-              <p className="text-4xl mb-4">👤</p>
+              <Icon icon="solar:user-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
               <h3 className="text-text-muted font-black uppercase tracking-widest text-xs">No talent discovered in this search</h3>
             </div>
           ) : (

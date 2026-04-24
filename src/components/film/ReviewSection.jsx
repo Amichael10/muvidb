@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useReviews } from '../../hooks/useReviews'
+import { Icon } from '@iconify/react'
 
 const StarRating = ({ value, onChange, readonly = false }) => {
     const [hover, setHover] = useState(0)
@@ -15,12 +16,12 @@ const StarRating = ({ value, onChange, readonly = false }) => {
                     onClick={() => !readonly && onChange?.(num)}
                     onMouseEnter={() => !readonly && setHover(num)}
                     onMouseLeave={() => !readonly && setHover(0)}
-                    className={`text-xl transition-all duration-200 ${num <= (hover || value)
+                    className={`transition-all duration-200 ${num <= (hover || value)
                             ? 'text-brand scale-110'
                             : 'text-surface-3'
                         } ${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-125'}`}
                 >
-                    ★
+                    <Icon icon={num <= (hover || value) ? "solar:star-bold" : "solar:star-linear"} className="text-xl" />
                 </button>
             ))}
             <span className="text-xs font-black text-brand ml-3 bg-brand/5 px-2 py-0.5 rounded-full border border-brand/10">
@@ -81,7 +82,7 @@ const ReviewCard = ({
                         )}
                         {isOwner && isEditable && (
                             <div className="absolute -top-1 -right-1 w-4 h-4 bg-brand rounded-full border-2 border-surface flex items-center justify-center animate-pulse">
-                                <span className="text-[7px] text-white font-black">!</span>
+                                <Icon icon="solar:info-circle-bold" className="text-[10px] text-white" />
                             </div>
                         )}
                     </div>
@@ -101,7 +102,8 @@ const ReviewCard = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="text-brand font-black text-lg tracking-tighter">
+                    <div className="text-brand font-black text-lg tracking-tighter flex items-center gap-1">
+                        <Icon icon="solar:star-bold" className="text-sm" />
                         {review.rating}<span className="text-[10px] text-text-muted">/10</span>
                     </div>
                     {isOwner && isEditable && (
@@ -111,14 +113,14 @@ const ReviewCard = ({
                                 className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-brand hover:text-white transition-all shadow-sm"
                                 title="Edit (2 min limit)"
                             >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                <Icon icon="solar:pen-linear" width="14" />
                             </button>
                             <button
                                 onClick={() => onDelete(review.id)}
                                 className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-red-500 hover:text-white transition-all shadow-sm"
                                 title="Delete (2 min limit)"
                             >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                <Icon icon="solar:trash-bin-trash-linear" width="14" />
                             </button>
                         </div>
                     )}
@@ -173,40 +175,40 @@ const ReviewForm = ({
             
             <div className="relative z-10">
                 <h4 className="text-text-primary text-lg font-bold tracking-tight">
-                    {isEditing ? 'Refining Your Review' : 'Share Your Experience'}
+                    {isEditing ? 'Edit Your Review' : 'Write a Review'}
                 </h4>
-                <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-1">
-                    {isEditing ? 'Pulse Edit window active' : 'Contribute to the Nollywood Archive'}
+                <p className="text-text-muted text-[10px] font-bold tracking-wider mt-1">
+                    {isEditing ? 'Update your feedback' : 'Share your thoughts with the community'}
                 </p>
             </div>
 
             <div className="space-y-2">
-                <label className="text-text-secondary text-xs font-bold block uppercase tracking-wider">How was the production?</label>
+                <label className="text-text-secondary text-xs font-bold block tracking-wider">What did you think?</label>
                 <div className="p-4 bg-surface-2 rounded-xl border border-border">
                     <StarRating value={rating} onChange={setRating} />
                 </div>
             </div>
 
             <div className="space-y-2">
-                <label className="text-text-secondary text-xs font-bold block uppercase tracking-wider">Your Critical Thoughts</label>
+                <label className="text-text-secondary text-xs font-bold block tracking-wider">Your Review</label>
                 <textarea
                     value={body}
                     onChange={e => setBody(e.target.value)}
-                    placeholder="This production was..."
+                    placeholder="Write your review here..."
                     rows={4}
                     className="w-full bg-surface-2 border border-border text-text-primary rounded-xl px-5 py-4 text-sm focus:border-brand focus:ring-4 focus:ring-brand/10 focus:outline-none resize-none placeholder-text-muted transition-all leading-relaxed"
                 />
                 <div className="flex justify-between items-center px-1">
-                    <p className={`text-[9px] font-bold uppercase tracking-widest ${body.length < 20 ? 'text-amber-500' : 'text-text-muted'}`}>
-                        {body.length < 20 ? `${20 - body.length} MORE TO GO` : 'REVIEW READY'}
+                    <p className={`text-[9px] font-bold tracking-widest ${body.length < 20 ? 'text-amber-500' : 'text-text-muted'}`}>
+                        {body.length < 20 ? `${20 - body.length} characters to go` : 'Ready to post'}
                     </p>
-                    <p className="text-[9px] text-text-muted font-bold">{body.length} CHARS</p>
+                    <p className="text-[9px] text-text-muted font-bold">{body.length} characters</p>
                 </div>
             </div>
 
             {error && (
                 <div className="bg-red-500/5 border border-red-500/20 text-red-500 text-xs px-4 py-3 rounded-xl font-bold flex items-center gap-2">
-                    <span className="text-lg">⚠️</span> {error}
+                    <Icon icon="solar:danger-triangle-linear" className="text-lg" /> {error}
                 </div>
             )}
 
@@ -219,10 +221,10 @@ const ReviewForm = ({
                     {submitting ? (
                         <>
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Archiving...</span>
+                            <span>Posting...</span>
                         </>
                     ) : (
-                        <span>{isEditing ? 'Commit Changes' : 'Post Archive'}</span>
+                        <span>{isEditing ? 'Save Changes' : 'Post Review'}</span>
                     )}
                 </button>
                 {onCancel && (
@@ -231,7 +233,7 @@ const ReviewForm = ({
                         onClick={onCancel}
                         className="flex-1 bg-surface-2 text-text-secondary font-bold py-4 rounded-xl text-sm transition-all hover:bg-surface-3"
                     >
-                        Dismiss
+                        Cancel
                     </button>
                 )}
             </div>
@@ -281,15 +283,18 @@ const ReviewSection = ({ filmId, currentUser }) => {
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-border pb-8">
                 <div>
-                    <h3 className="text-text-primary text-2xl font-black tracking-tight">
-                        Critic & Community Feedback
+                    <h3 className="text-text-primary text-2xl font-bold tracking-tight">
+                        User Reviews
                     </h3>
-                    <p className="text-text-muted text-xs font-bold uppercase tracking-widest mt-1.5 flex items-center gap-2">
-                        {reviews.length} Production Review{reviews.length !== 1 ? 's' : ''} 
+                    <p className="text-text-muted text-xs font-bold tracking-wide mt-1.5 flex items-center gap-2">
+                        {reviews.length} User Review{reviews.length !== 1 ? 's' : ''} 
                         {averageRating && (
                             <>
                                 <span className="w-1 h-1 rounded-full bg-border" />
-                                <span className="text-brand flex items-center gap-1">★ {averageRating} AVG</span>
+                                <span className="text-brand flex items-center gap-1">
+                                    <Icon icon="solar:star-bold" className="text-sm" />
+                                    {averageRating} Average
+                                </span>
                             </>
                         )}
                     </p>
@@ -300,7 +305,8 @@ const ReviewSection = ({ filmId, currentUser }) => {
                         onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
                         className="bg-brand text-white font-bold px-8 py-3.5 rounded-xl text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
                     >
-                        <span>★</span> {currentUser ? 'Contribute Review' : 'Sign in to Review'}
+                        <Icon icon="solar:pen-new-square-linear" width="16" />
+                        <span>{currentUser ? 'Write a Review' : 'Sign in to review'}</span>
                     </button>
                 )}
             </div>
@@ -343,15 +349,16 @@ const ReviewSection = ({ filmId, currentUser }) => {
                     </div>
                 ) : (
                     <div className="bg-surface-2/50 border-2 border-dashed border-border rounded-3xl py-16 text-center">
-                        <div className="text-5xl mb-4 grayscale opacity-40">🎬</div>
-                        <h4 className="text-text-primary text-xl font-bold tracking-tight">The archive is empty.</h4>
-                        <p className="text-text-muted text-sm mt-1 max-w-xs mx-auto">Be the first to analyze this production and share your insights with the community.</p>
+                        <Icon icon="solar:clapperboard-play-linear" className="text-5xl mx-auto mb-4 opacity-20 text-brand" />
+                        <h4 className="text-text-primary text-xl font-bold tracking-tight">No reviews yet.</h4>
+                        <p className="text-text-muted text-sm mt-1 max-w-xs mx-auto">Be the first to review this movie and share your thoughts with the community.</p>
                         {!showForm && (
                             <button
                                 onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
-                                className="mt-8 text-brand font-black text-xs uppercase tracking-widest hover:scale-105 transition-all"
+                                className="mt-8 text-brand font-bold text-xs tracking-widest hover:scale-105 transition-all flex items-center justify-center gap-2 mx-auto"
                             >
-                                + ANALYZE NOW
+                                <Icon icon="solar:add-circle-linear" width="16" />
+                                Write a Review
                             </button>
                         )}
                     </div>
