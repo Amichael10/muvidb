@@ -90,15 +90,14 @@ export default function AdminPeople() {
       const sortConfigs = {
         'Most Popular': { column: 'popularity_score', ascending: false },
         'A-Z': { column: 'name', ascending: true },
-        'Newest': { column: 'created_at', ascending: false }
+        'Z-A': { column: 'name', ascending: false },
+        'Newest': { column: 'created_at', ascending: false },
+        'Oldest': { column: 'created_at', ascending: true }
       };
       
       const config = sortConfigs[sortBy] || sortConfigs['Most Popular'];
       query = query.order(config.column, { ascending: config.ascending });
       
-      // Limit to 100 for better performance, but ensure search works across whole DB
-      query = query.limit(search ? 100 : 50);
-
       // Pagination
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -402,8 +401,10 @@ export default function AdminPeople() {
           </select>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="Most Popular">Popularity</option>
-            <option value="A-Z">Alphabetical</option>
-            <option value="Newest">Recently added</option>
+            <option value="A-Z">Alphabetical (A-Z)</option>
+            <option value="Z-A">Alphabetical (Z-A)</option>
+            <option value="Newest">Recently Added</option>
+            <option value="Oldest">Oldest First</option>
           </select>
         </div>
       </div>
@@ -473,6 +474,32 @@ export default function AdminPeople() {
             ))}
           </tbody>
         </table>
+
+        {/* Pagination Footer */}
+        <div className="flex items-center justify-between px-6 py-6 border-t border-border bg-surface-2/30">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest">
+            Showing <span className="text-text-primary">{(page - 1) * pageSize + 1}</span> to <span className="text-text-primary">{Math.min(page * pageSize, totalCount)}</span> of <span className="text-text-primary">{totalCount}</span> Profiles
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(prev => Math.max(1, prev - 1))}
+              disabled={page === 1 || isLoading}
+              className="px-4 py-2 bg-surface border border-border text-xs font-bold text-text-primary rounded-md hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              Previous
+            </button>
+            <div className="flex items-center px-4 text-xs font-bold text-brand bg-brand/10 border border-brand/20 rounded-md">
+              Page {page}
+            </div>
+            <button
+              onClick={() => setPage(prev => (prev * pageSize < totalCount ? prev + 1 : prev))}
+              disabled={page * pageSize >= totalCount || isLoading}
+              className="px-4 py-2 bg-surface border border-border text-xs font-bold text-text-primary rounded-md hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
 
       <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title={editingPerson ? 'Edit Record' : 'Add New Record'}>

@@ -85,6 +85,30 @@ export default defineConfig(({ mode }) => {
             return false;
           }
         },
+        '/api/cron/refresh-videos': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              const channelId = url.searchParams.get('channelId');
+              
+              // We simulate the cron behavior locally
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ 
+                success: true, 
+                message: 'Local sync simulated. For full production sync, use Vercel deployment.',
+                videos_upserted: 0,
+                channels_processed: channelId ? 1 : 0,
+                local: true
+              }));
+            } catch (err) {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          }
+        },
         '/api': {
           target: 'http://localhost:3001',
           bypass: (req, res) => {

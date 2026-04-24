@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
@@ -39,7 +39,15 @@ export default function AdminFilms() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest'); // newest, oldest, a-z
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Company Search States
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyResults, setCompanyResults] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [isSearchingCompanies, setIsSearchingCompanies] = useState(false);
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
   const initialFormState = {
     title: '',
@@ -65,6 +73,13 @@ export default function AdminFilms() {
 
   const [formData, setFormData] = useState(initialFormState);
 
+  const uniqueYears = useMemo(() => {
+    const years = new Set();
+    const currentYear = new Date().getFullYear();
+    for (let i = 0; i < 30; i++) years.add(currentYear - i);
+    return Array.from(years).sort((a, b) => b - a);
+  }, []);
+
   useEffect(() => {
     fetchCinemas();
     fetchGenres();
@@ -73,14 +88,14 @@ export default function AdminFilms() {
   useEffect(() => {
     setPage(1);
     setSelectedFilmIds([]);
-  }, [searchTerm, statusFilter, yearFilter]);
+  }, [searchTerm, statusFilter, yearFilter, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchFilms();
     }, searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [page, searchTerm, statusFilter, yearFilter]);
+  }, [page, searchTerm, statusFilter, yearFilter, sortBy]);
 
   const fetchGenres = async () => {
     const { data } = await supabase.from('genres').select('*').order('name');
@@ -109,8 +124,16 @@ export default function AdminFilms() {
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
+      const sortConfig = {
+        newest: { column: 'created_at', ascending: false },
+        oldest: { column: 'created_at', ascending: true },
+        'a-z': { column: 'title', ascending: true }
+      };
+      
+      const config = sortConfig[sortBy] || sortConfig.newest;
+
       const { data, error } = await query
-        .order('created_at', { ascending: false })
+        .order(config.column, { ascending: config.ascending })
         .range(from, to);
 
       if (error) throw error;
@@ -241,6 +264,21 @@ export default function AdminFilms() {
         genres: genreData.map(g => g.genre_id)
       }));
     }
+
+    // Fetch film company
+    const { data: companyData } = await supabase
+      .from('film_companies')
+      .select('companies(*)')
+      .eq('film_id', filmId)
+      .limit(1);
+    
+    if (companyData && companyData.length > 0) {
+      setSelectedCompany(companyData[0].companies);
+      setCompanySearch(companyData[0].companies.name);
+    } else {
+      setSelectedCompany(null);
+      setCompanySearch('');
+    }
   };
 
   const handleOpenDrawer = async (film = null) => {
@@ -266,11 +304,13 @@ export default function AdminFilms() {
   };
 
   const handleCloseDrawer = () => {
-    setIsDrawerOpen(false);
     setEditingFilm(null);
     setFormData(initialFormState);
     setCredits([]);
     setShowtimes([]);
+    setSelectedCompany(null);
+    setCompanySearch('');
+    setCompanyResults([]);
   };
 
   const handleChange = (e) => {
@@ -309,6 +349,81 @@ export default function AdminFilms() {
       setPeopleResults(data || []);
       setIsSearchingPeople(false);
     }, 300);
+  };
+
+  const createPerson = async (name) => {
+    if (!name) return;
+    try {
+      const { data, error } = await supabase
+        .from('people')
+        .insert([{ 
+          name, 
+          nationality: 'Nigerian', 
+          gender: 'Prefer not to say' 
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      addCredit(data);
+      setPeopleSearch('');
+      setPeopleResults([]);
+      toast.success(`Profile for "${name}" created`);
+    } catch (error) {
+      console.error('Error creating person:', error);
+      toast.error('Failed to create person');
+    }
+  };
+
+  const handleCompanySearch = async (query) => {
+    setCompanySearch(query);
+    if (!query) {
+      setCompanyResults([]);
+      return;
+    }
+
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    
+    searchTimeout.current = setTimeout(async () => {
+      setIsSearchingCompanies(true);
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .ilike('name', `%${query}%`)
+        .limit(5);
+      setCompanyResults(data || []);
+      setIsSearchingCompanies(false);
+    }, 300);
+  };
+
+  const createCompany = async (name) => {
+    if (!name) return;
+    setIsCreatingCompany(true);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .insert([{ 
+          name, 
+          description: '.', 
+          website: '.', 
+          logo_url: null 
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setSelectedCompany(data);
+      setCompanySearch(data.name);
+      setCompanyResults([]);
+      toast.success(`Company "${name}" created and linked`);
+    } catch (error) {
+      console.error('Error creating company:', error);
+      toast.error('Failed to create company');
+    } finally {
+      setIsCreatingCompany(false);
+    }
   };
 
   const addCredit = (person, role = 'actor') => {
@@ -417,6 +532,15 @@ export default function AdminFilms() {
         if (sError) throw sError;
       }
 
+      // Save Company
+      await supabase.from('film_companies').delete().eq('film_id', filmId);
+      if (selectedCompany) {
+        const { error: coError } = await supabase
+          .from('film_companies')
+          .insert([{ film_id: filmId, company_id: selectedCompany.id }]);
+        if (coError) throw coError;
+      }
+
       toast.success('Film saved successfully');
       handleCloseDrawer();
       fetchFilms();
@@ -511,8 +635,7 @@ export default function AdminFilms() {
     }
   };
 
-  const currentYear = new Date().getFullYear();
-  const uniqueYears = Array.from({ length: currentYear - 1980 + 3 }, (_, i) => currentYear + 2 - i);
+
 
   return (
     <div className="p-10 max-w-[1600px] mx-auto">
@@ -564,6 +687,15 @@ export default function AdminFilms() {
           >
             <option value="all">All Years</option>
             {uniqueYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[140px]"
+          >
+            <option value="newest">Recently Added</option>
+            <option value="oldest">Oldest First</option>
+            <option value="a-z">Alphabetical</option>
           </select>
         </div>
       </div>
@@ -770,6 +902,70 @@ export default function AdminFilms() {
                     placeholder="Enter movie title..."
                   />
                 </div>
+                
+                {/* Production Company Field */}
+                <div className="relative">
+                  <label className="block text-xs font-bold text-text-primary mb-2">Production Company</label>
+                  <div className="relative group">
+                    <input 
+                      type="text"
+                      value={companySearch}
+                      onChange={(e) => handleCompanySearch(e.target.value)}
+                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all pr-12"
+                      placeholder="Search or add company..."
+                    />
+                    <div className="absolute right-4 top-2.5 flex items-center gap-2">
+                      {isSearchingCompanies ? (
+                        <div className="w-4 h-4 border-2 border-brand/20 border-t-brand rounded-full animate-spin" />
+                      ) : companySearch && !selectedCompany && (
+                        <button
+                          type="button"
+                          onClick={() => createCompany(companySearch)}
+                          className="p-1 hover:bg-brand/10 rounded-full text-brand transition-all"
+                          title="Create and link this company"
+                        >
+                          <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
+                        </button>
+                      )}
+                      {!companySearch && (
+                        <Icon icon="solar:buildings-linear" className="w-4 h-4 text-text-muted" />
+                      )}
+                      {selectedCompany && companySearch === selectedCompany.name && (
+                        <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500" />
+                      )}
+                    </div>
+                    
+                    {companyResults.length > 0 && (
+                      <div className="absolute left-0 top-full mt-2 w-full bg-surface border border-border rounded-md shadow-2xl z-50 overflow-hidden ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2">
+                        {companyResults.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCompany(c);
+                              setCompanySearch(c.name);
+                              setCompanyResults([]);
+                            }}
+                            className="w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-surface-2 overflow-hidden border border-border flex items-center justify-center">
+                              {c.logo_url ? (
+                                <img src={c.logo_url} alt="" className="w-full h-full object-contain p-1" />
+                              ) : (
+                                <span className="text-[10px] font-bold text-brand">{c.name.charAt(0)}</span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-text-primary">{c.name}</p>
+                              <p className="text-[10px] text-text-muted">{c.website?.replace(/^https?:\/\//, '') || 'No website'}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-text-primary mb-2">Release Year</label>
@@ -1120,6 +1316,21 @@ export default function AdminFilms() {
                         <span className="text-xs font-bold text-text-primary">{p.name}</span>
                       </button>
                     ))}
+                    {peopleSearch.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => createPerson(peopleSearch)}
+                        className="w-full flex items-center gap-3 p-3 bg-brand/5 hover:bg-brand/10 transition-colors text-left border-t border-brand/20 group/add"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover/add:scale-110 transition-transform">
+                           <Icon icon="solar:plus-bold" className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[10px] font-black text-brand uppercase tracking-widest leading-none mb-1">New Identity</p>
+                          <p className="text-xs font-bold text-text-primary">Create profile for "{peopleSearch}"</p>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

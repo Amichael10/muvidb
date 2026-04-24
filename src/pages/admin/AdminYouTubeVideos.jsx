@@ -67,6 +67,57 @@ function EditFilmModal({ film, onSave, onClose }) {
   });
   const [saving, setSaving] = useState(false);
 
+  // Company selection state
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyResults, setCompanyResults] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    // Fetch current company
+    supabase
+      .from('film_companies')
+      .select('companies(*)')
+      .eq('film_id', film.id)
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setSelectedCompany(data[0].companies);
+          setCompanySearch(data[0].companies.name);
+        }
+      });
+  }, [film.id]);
+
+  const handleCompanySearch = async (query) => {
+    setCompanySearch(query);
+    if (!query) {
+      setCompanyResults([]);
+      return;
+    }
+    setIsSearching(true);
+    const { data } = await supabase
+      .from('companies')
+      .select('*')
+      .ilike('name', `%${query}%`)
+      .limit(5);
+    setCompanyResults(data || []);
+    setIsSearching(false);
+  };
+
+  const createCompany = async (name) => {
+    const { data, error } = await supabase
+      .from('companies')
+      .insert([{ name, description: '.', website: '.', logo_url: null }])
+      .select()
+      .single();
+    if (!error) {
+      setSelectedCompany(data);
+      setCompanySearch(data.name);
+      setCompanyResults([]);
+      toast.success(`Created company: ${name}`);
+    }
+  };
+
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
@@ -81,6 +132,17 @@ function EditFilmModal({ film, onSave, onClose }) {
       .eq('id', film.id);
     setSaving(false);
     if (err) { toast.error(err.message); return; }
+
+    // Save Company Relationship
+    try {
+      await supabase.from('film_companies').delete().eq('film_id', film.id);
+      if (selectedCompany) {
+        await supabase.from('film_companies').insert([{ film_id: film.id, company_id: selectedCompany.id }]);
+      }
+    } catch (e) {
+      console.error('Error saving company link:', e);
+    }
+
     toast.success('Metadata updated');
     onSave();
   };
@@ -133,6 +195,65 @@ function EditFilmModal({ film, onSave, onClose }) {
                 <p className="text-text-muted text-[10px] mt-1 font-bold">Uncheck to mark as production-ready.</p>
             </div>
           </label>
+
+          <div className="pt-4 border-t border-border">
+            <label className="block text-text-muted text-[10px] font-bold tracking-wider mb-3 px-1 uppercase">Production Company</label>
+            <div className="relative group">
+              <input 
+                type="text" 
+                value={companySearch} 
+                onChange={(e) => handleCompanySearch(e.target.value)} 
+                placeholder="Search or add company..."
+                className="w-full bg-surface-2 border border-border rounded-lg px-5 h-14 text-text-primary text-sm font-bold focus:border-brand/50 outline-none pr-12" 
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                {isSearching ? (
+                  <div className="w-4 h-4 border-2 border-brand/20 border-t-brand rounded-full animate-spin" />
+                ) : companySearch && !selectedCompany && (
+                  <button
+                    type="button"
+                    onClick={() => createCompany(companySearch)}
+                    className="p-1 hover:bg-brand/10 rounded-full text-brand transition-all"
+                    title="Create and link this company"
+                  >
+                    <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
+                  </button>
+                )}
+                {selectedCompany && companySearch === selectedCompany.name && (
+                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500" />
+                )}
+              </div>
+
+              {companyResults.length > 0 && (
+                <div className="absolute left-0 top-full mt-2 w-full bg-surface border border-border rounded-md shadow-2xl z-50 overflow-hidden ring-1 ring-black/5">
+                  {companyResults.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCompany(c);
+                        setCompanySearch(c.name);
+                        setCompanyResults([]);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-surface-2 overflow-hidden border border-border flex items-center justify-center">
+                        {c.logo_url ? (
+                          <img src={c.logo_url} alt="" className="w-full h-full object-contain p-1" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-brand">{c.name.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold text-text-primary">{c.name}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-[9px] text-text-muted mt-2 px-1">Linking a production company helps organize the library.</p>
+          </div>
         </form>
 
         <div className="px-10 py-8 border-t border-border bg-surface-2/30 flex gap-4">
@@ -399,8 +520,42 @@ export default function AdminYouTubeVideos() {
       .update({ film_id: newFilm.id })
       .eq('id', video.id);
 
-    if (vErr) toast.error(`Linking failed: ${vErr.message}`);
-    else {
+    if (vErr) {
+      toast.error(`Linking failed: ${vErr.message}`);
+    } else {
+      // 3. Attempt to link Production Company (Producer Name)
+      if (video.channels?.name) {
+        try {
+          const channelName = video.channels.name;
+          // Check if company exists
+          let { data: existingCo } = await supabase
+            .from('companies')
+            .select('id')
+            .ilike('name', channelName)
+            .single();
+          
+          let companyId = existingCo?.id;
+
+          if (!companyId) {
+            // Create company
+            const { data: newCo, error: coErr } = await supabase
+              .from('companies')
+              .insert([{ name: channelName, description: '.', website: '.', logo_url: null }])
+              .select()
+              .single();
+            if (!coErr) companyId = newCo.id;
+          }
+
+          if (companyId) {
+            await supabase
+              .from('film_companies')
+              .insert([{ film_id: newFilm.id, company_id: companyId }]);
+          }
+        } catch (e) {
+          console.error('Auto-company link failed:', e);
+        }
+      }
+
       toast.success(`'${video.title}' is now a Film record!`);
       fetchVideos();
     }

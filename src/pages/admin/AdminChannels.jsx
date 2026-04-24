@@ -173,7 +173,14 @@ function ChannelModal({ channel, onSave, onClose }) {
 
     setSaving(false);
     if (err) { setError(err.message); return; }
-    onSave();
+    
+    // Fetch the full channel object if it was a new insert to get the ID
+    if (!channel) {
+      const { data: newCh } = await supabase.from('channels').select('*').eq('channel_handle', form.channel_handle).single();
+      onSave(newCh);
+    } else {
+      onSave(channel);
+    }
   };
 
   return (
@@ -270,6 +277,15 @@ function ChannelModal({ channel, onSave, onClose }) {
           >
             Cancel
           </button>
+          {channel && (
+            <button
+              type="button"
+              onClick={() => onSync(channel)}
+              className="flex-1 py-4 rounded-lg bg-green-500/10 text-green-500 font-bold text-xs border border-green-500/20 hover:bg-green-500 hover:text-white transition-all"
+            >
+              Sync Videos
+            </button>
+          )}
           <button
             onClick={handleSubmit}
             disabled={saving}
@@ -400,35 +416,27 @@ export default function AdminChannels() {
   };
 
   const handleSync = async (e, channel) => {
-    e.stopPropagation();
-    setSyncingId(channel.id);
+    if (e) e.stopPropagation();
+    const isAll = !channel.id;
+    setSyncingId(isAll ? 'all' : channel.id);
     setSyncResult('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`/api/cron/refresh-videos?channelId=${channel.id}`, {
+      const query = isAll ? '' : `?channelId=${channel.id}`;
+      const res = await fetch(`/api/cron/refresh-videos${query}`, {
+        method: 'GET', // or POST if supported
         headers: {
           'Authorization': `Bearer ${session?.access_token || ''}`
         }
       });
       
-      const text = await res.text();
-      if (text.includes('import ') || text.includes('export ')) {
-        throw new Error('Local dev detected: Vite cannot execute .ts scripts. Use vercel dev.');
-      }
-
-      let json;
-      try {
-        json = JSON.parse(text);
-      } catch (e) {
-        throw new Error('Invalid server response');
-      }
-
+      const json = await res.json();
       if (!res.ok) throw new Error(json.error || `Status ${res.status}`);
 
       const processedCount = json.videos_upserted || 0;
-      const filmsCreated = json.films_created || 0;
+      const chCount = json.channels_processed || 0;
       
-      setSyncResult(`Sync complete: ${processedCount} assets ingested. ${filmsCreated} films created.`);
+      setSyncResult(`Sync complete: ${processedCount} videos ingested across ${chCount} channels.`);
       toast.success(`Ingested ${processedCount} videos`);
       fetchChannels();
     } catch (e) {
@@ -472,6 +480,14 @@ export default function AdminChannels() {
              <span className="text-lg">⊕</span> Add New Source
           </span>
           <div className="absolute inset-0 bg-white/10 rounded-md opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+        <button
+          onClick={() => handleSync(null, { id: '' })} // null for all
+          disabled={syncingId === 'all'}
+          className="group relative px-8 py-5 bg-surface border border-border text-text-primary rounded-md text-xs font-bold hover:bg-surface-2 transition-all flex items-center gap-3"
+        >
+          <span className={syncingId === 'all' ? 'animate-spin' : ''}>🔄</span>
+          {syncingId === 'all' ? 'Syncing All...' : 'Sync All Sources'}
         </button>
       </div>
 
@@ -662,7 +678,16 @@ export default function AdminChannels() {
       {editingChannel !== null && (
         <ChannelModal
           channel={editingChannel || null}
-          onSave={() => { setEditingChannel(null); fetchChannels(); toast.success('Frequency recalibrated.'); }}
+          onSync={(ch) => { setEditingChannel(null); handleSync({ stopPropagation: () => {} }, ch); }}
+          onSave={(newCh) => { 
+            setEditingChannel(null); 
+            fetchChannels(); 
+            toast.success('Channel profile established.');
+            if (newCh) {
+              const doSync = window.confirm(`Channel "${newCh.name}" added. Would you like to sync the first 50 videos now?`);
+              if (doSync) handleSync(null, newCh);
+            }
+          }}
           onClose={() => setEditingChannel(null)}
         />
       )}
