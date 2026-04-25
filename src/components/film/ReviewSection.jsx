@@ -61,7 +61,7 @@ const ReviewCard = ({
         }
     }, [review.created_at, currentUser?.id]);
 
-    const userName = review.users?.name || 'Lumi Member';
+    const userName = review.users?.name || 'Anonymous';
     const avatarUrl = review.users?.avatar_url || null;
     const initials = userName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     

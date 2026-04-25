@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { formatViewCount } from '../../utils/youtube';
+import { toast } from 'react-hot-toast';
+import SyncStatusOverlay from '../../components/admin/SyncStatusOverlay';
 
 export default function AdminChannelDetail() {
   const { id } = useParams();
@@ -9,43 +11,75 @@ export default function AdminChannelDetail() {
   const [channel, setChannel] = useState(null);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(null);
+  const [syncReport, setSyncReport] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      
-      const { data: ch, error: chErr } = await supabase
-        .from('channels')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (chErr) {
-        console.error('Error fetching channel:', chErr);
-        setLoading(false);
-        return;
-      }
-      setChannel(ch);
-
-      const { data: vids, error: vidsErr } = await supabase
-        .from('channel_videos')
-        .select(`
-          id, video_id, title, thumbnail_url, published_at, 
-          duration_seconds, is_hidden, film_id,
-          films(id, title, poster_url, release_type, year, rating, synopsis, needs_review)
-        `)
-        .eq('channel_id', id)
-        .not('film_id', 'is', null)
-        .order('published_at', { ascending: false });
-
-      if (vidsErr) console.error('Error fetching videos:', vidsErr);
-      setVideos(vids || []);
-      setLoading(false);
-    }
     fetchData();
   }, [id]);
+
+  async function fetchData() {
+    setLoading(true);
+    
+    const { data: ch, error: chErr } = await supabase
+      .from('channels')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (chErr) {
+      console.error('Error fetching channel:', chErr);
+      setLoading(false);
+      return;
+    }
+    setChannel(ch);
+
+    const { data: vids, error: vidsErr } = await supabase
+      .from('channel_videos')
+      .select(`
+        id, video_id, title, thumbnail_url, published_at, 
+        duration_seconds, is_hidden, film_id,
+        films(id, title, poster_url, release_type, year, synopsis, needs_review)
+      `)
+      .eq('channel_id', id)
+      .order('published_at', { ascending: false });
+
+    if (vidsErr) {
+      console.error('Error fetching videos:', vidsErr);
+      toast.error(`Database Error: ${vidsErr.message}`);
+    }
+    setVideos(vids || []);
+    setLoading(false);
+  }
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncProgress({ current: 0, total: 1, status: 'Opening Data Link...' });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSyncProgress({ current: 0.5, total: 1, status: `Fetching ${channel?.name || 'Signals'}...` });
+      
+      const res = await fetch(`/api/cron/refresh-videos?channelId=${id}`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        }
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Sync failed');
+      
+      setSyncProgress(null);
+      setSyncReport([{ name: channel?.name || 'Channel', success: true, count: json.videos_upserted || 0 }]);
+      fetchData();
+    } catch (err) {
+      setSyncProgress(null);
+      setSyncReport([{ name: channel?.name || 'Channel', success: false, error: err.message }]);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const stats = useMemo(() => {
     const total = videos.length;
@@ -54,14 +88,49 @@ export default function AdminChannelDetail() {
     return { total, pending, approved };
   }, [videos]);
 
+  const handleHide = async (videoId, currentStatus) => {
+    try {
+      const { error } = await supabase
+        .from('channel_videos')
+        .update({ is_hidden: !currentStatus })
+        .eq('id', videoId);
+      if (error) throw error;
+      setVideos(videos.map(v => v.id === videoId ? { ...v, is_hidden: !currentStatus } : v));
+      toast.success(!currentStatus ? 'Video hidden' : 'Video unhidden');
+    } catch (err) {
+      toast.error('Failed to update visibility');
+    }
+  };
+
+  const handleDeleteVideo = async (videoId) => {
+    if (!window.confirm('Are you sure you want to delete this video record? This will remove the mapping as well.')) return;
+    try {
+      const { error } = await supabase.from('channel_videos').delete().eq('id', videoId);
+      if (error) throw error;
+      setVideos(videos.filter(v => v.id !== videoId));
+      toast.success('Record deleted');
+    } catch (err) {
+      toast.error('Deletion failed');
+    }
+  };
+
   const filteredFilms = useMemo(() => {
     return videos.filter(v => {
-      const matchesSearch = v.films?.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          v.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || 
-                          (statusFilter === 'pending' && v.films?.needs_review) ||
-                          (statusFilter === 'approved' && !v.films?.needs_review);
-      return matchesSearch && matchesStatus;
+      const filmTitle = v.films?.title || '';
+      const videoTitle = v.title || '';
+      const titleMatches = filmTitle.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          videoTitle.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const isPending = !v.films || v.films.needs_review;
+      const isApproved = v.films && !v.films.needs_review;
+      const isHidden = v.is_hidden;
+
+      if (statusFilter === 'hidden') return titleMatches && isHidden;
+      if (isHidden) return false;
+
+      if (statusFilter === 'pending') return titleMatches && isPending;
+      if (statusFilter === 'approved') return titleMatches && isApproved;
+      return titleMatches;
     });
   }, [videos, searchQuery, statusFilter]);
 
@@ -97,10 +166,24 @@ export default function AdminChannelDetail() {
             <h1 className="text-lg font-black text-text-primary tracking-tight truncate max-w-sm">{channel.name}</h1>
           </div>
         </div>
-        <div className="hidden md:flex items-center gap-6">
-           <div className="text-right">
+        <div className="flex items-center gap-6">
+           <button
+             onClick={handleSync}
+             disabled={syncing}
+             className="group relative px-6 py-3 bg-brand/10 border border-brand/20 text-brand rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+           >
+             {syncing ? (
+               <span className="flex items-center gap-2">
+                 <span className="w-3 h-3 border-2 border-brand/20 border-t-white rounded-full animate-spin" />
+                 Syncing...
+               </span>
+             ) : (
+               'Sync Signal'
+             )}
+           </button>
+           <div className="hidden lg:block text-right">
               <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1">Network Capacity</p>
-              <p className="text-text-primary font-black text-sm italic">{formatViewCount(channel.subscriber_count || 0)} Verified Signals</p>
+              <p className="text-text-primary font-black text-xs italic">{formatViewCount(channel.subscriber_count || 0)} Signals</p>
            </div>
            {channel.thumbnail_url && (
              <img src={channel.thumbnail_url} alt="" className="w-10 h-10 rounded-md border border-border shadow-md" />
@@ -142,7 +225,7 @@ export default function AdminChannelDetail() {
                </div>
             </div>
             <div className="flex gap-4">
-               {['all', 'pending', 'approved'].map(tab => (
+               {['all', 'pending', 'approved', 'hidden'].map(tab => (
                  <button
                   key={tab}
                   onClick={() => setStatusFilter(tab)}
@@ -218,10 +301,22 @@ export default function AdminChannelDetail() {
                       <td className="px-10 py-8 text-right">
                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Link 
-                               to={`/admin/films?edit=${vid.film_id}`} 
+                               to={vid.film_id ? `/admin/films?edit=${vid.film_id}` : `/admin/films?map_video=${vid.id}`} 
                                className="w-10 h-10 rounded-md bg-surface border border-border flex items-center justify-center text-text-muted hover:text-brand hover:border-brand/30 transition-all shadow-md"
-                               title="Edit Mapping"
+                               title={vid.film_id ? "Edit Film" : "Map to Film"}
                             >✏️</Link>
+                            <button 
+                               onClick={() => handleHide(vid.id, vid.is_hidden)} 
+                               className={`w-10 h-10 rounded-md bg-surface border border-border flex items-center justify-center transition-all shadow-md ${vid.is_hidden ? 'text-brand border-brand/30' : 'text-text-muted hover:text-brand hover:border-brand/30'}`}
+                               title={vid.is_hidden ? "Unhide Video" : "Hide Video"}
+                            >
+                              {vid.is_hidden ? '👁️' : '🕶️'}
+                            </button>
+                            <button 
+                               onClick={() => handleDeleteVideo(vid.id)} 
+                               className="w-10 h-10 rounded-md bg-surface border border-border flex items-center justify-center text-text-muted hover:text-red-500 hover:border-red-500/30 transition-all shadow-md"
+                               title="Delete Record"
+                            >🗑️</button>
                             <a 
                                href={`https://youtube.com/watch?v=${vid.video_id}`} 
                                target="_blank" 
@@ -238,6 +333,12 @@ export default function AdminChannelDetail() {
            </div>
         </div>
       </div>
+      {/* Progress & Report Overlay */}
+      <SyncStatusOverlay 
+        progress={syncProgress} 
+        report={syncReport} 
+        onClose={() => setSyncReport(null)} 
+      />
     </div>
   );
 }

@@ -16,17 +16,21 @@ export default function AdminPeople() {
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 25;
   const [search, setSearch] = useState('');
-  const [verifiedFilter, setVerifiedFilter] = useState('All'); // All, Verified, Unverified
-  const [sortBy, setSortBy] = useState('Most Popular'); // Most Popular, Most Credits, A-Z, Newest
+  const [verifiedFilter, setVerifiedFilter] = useState('All'); 
+  const [spotlightFilter, setSpotlightFilter] = useState('All'); 
+  const [profileStatus, setProfileStatus] = useState('All'); 
+  const [sortBy, setSortBy] = useState('Recently Added'); 
 
   // Modals/Drawers state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState(null);
   const [deletingPerson, setDeletingPerson] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedPersonIds, setSelectedPersonIds] = useState([]);
   const [personBatchDeleteIds, setPersonBatchDeleteIds] = useState(null);
   const [isBatchDeletingPeople, setIsBatchDeletingPeople] = useState(false);
   const [personCredits, setPersonCredits] = useState([]);
+  const [youtubeFilmography, setYoutubeFilmography] = useState([]);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
 
@@ -41,6 +45,7 @@ export default function AdminPeople() {
     is_verified: false,
     is_spotlight: false,
     popularity_score: 0,
+    known_for_department: 'Actor', // Actor, Skit Maker, Producer, etc.
     youtube_channel_id: '',
     youtube_handle: '',
     youtube_stats: { subscribers: '0', videos: '0', thumbnail: null, banner: null }
@@ -62,48 +67,45 @@ export default function AdminPeople() {
       if (search.trim()) {
         countQuery = countQuery.ilike('name', `%${search}%`);
       }
-      if (verifiedFilter !== 'all') {
-        countQuery = countQuery.eq('is_verified', verifiedFilter === 'verified');
+      if (profileStatus === 'Incomplete') {
+        // OR logic for incomplete profiles (missing bio OR missing photo)
+        countQuery = countQuery.or('bio.is.null,photo_url.is.null,bio.eq.,photo_url.eq.');
+      } else if (profileStatus === 'Complete') {
+        // Implicit AND logic for complete profiles (must have both bio AND photo)
+        countQuery = countQuery
+          .not('bio', 'is', null)
+          .not('photo_url', 'is', null)
+          .neq('bio', '')
+          .neq('photo_url', '');
       }
 
-      const { count } = await countQuery;
+      const { count, error: countError } = await countQuery;
+      if (countError) throw countError;
       setTotalCount(count || 0);
 
-      // 2. Fetch the current page of data
-      let query = supabase
-        .from('people')
-        .select('*');
-
-      // 1. Server-side Search
-      if (search.trim()) {
-        query = query.ilike('name', `%${search.trim()}%`);
-      }
-
-      // 2. Server-side Verification Filter
-      if (verifiedFilter === 'Verified') {
-        query = query.eq('is_verified', true);
-      } else if (verifiedFilter === 'Unverified') {
-        query = query.eq('is_verified', false);
-      }
-
-      // 3. Server-side Sorting
+      // 2. Fetch data using RPC
       const sortConfigs = {
-        'Most Popular': { column: 'popularity_score', ascending: false },
-        'A-Z': { column: 'name', ascending: true },
-        'Z-A': { column: 'name', ascending: false },
-        'Newest': { column: 'created_at', ascending: false },
-        'Oldest': { column: 'created_at', ascending: true }
+        'Most Popular': { col: 'popularity_score', asc: false },
+        'Recently Added': { col: 'created_at', asc: false },
+        'Newest': { col: 'created_at', asc: false },
+        'A-Z': { col: 'name', asc: true },
+        'Z-A': { col: 'name', asc: false },
+        'Oldest': { col: 'created_at', asc: true }
       };
       
-      const config = sortConfigs[sortBy] || sortConfigs['Most Popular'];
-      query = query.order(config.column, { ascending: config.ascending });
+      const sort = sortConfigs[sortBy] || sortConfigs['Most Popular'];
       
-      // Pagination
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      query = query.range(from, to);
+      const { data, error } = await supabase.rpc('get_people_with_counts', {
+        p_search: search.trim(),
+        p_verified: verifiedFilter.toLowerCase(),
+        p_spotlight: spotlightFilter.toLowerCase(),
+        p_sort_col: sort.col,
+        p_sort_asc: sort.asc,
+        p_offset: (page - 1) * pageSize,
+        p_limit: pageSize,
+        p_status: profileStatus.toLowerCase()
+      });
 
-      const { data, error } = await query;
       if (error) throw error;
       setPeople(data || []);
     } catch (error) {
@@ -117,7 +119,7 @@ export default function AdminPeople() {
   useEffect(() => {
     setPage(1);
     setSelectedPersonIds([]);
-  }, [search, verifiedFilter, sortBy]);
+  }, [search, verifiedFilter, spotlightFilter, profileStatus, sortBy]);
 
   useEffect(() => {
     // Debounced search to avoid spamming the DB
@@ -126,7 +128,7 @@ export default function AdminPeople() {
     }, search ? 400 : 0);
 
     return () => clearTimeout(timer);
-  }, [page, search, verifiedFilter, sortBy]);
+  }, [page, search, verifiedFilter, spotlightFilter, profileStatus, sortBy]);
 
   const handleToggleVerify = async (person) => {
     try {
@@ -146,9 +148,35 @@ export default function AdminPeople() {
     }
   };
 
+  const handleToggleSpotlight = async (person) => {
+    try {
+      const newStatus = !person.is_spotlight;
+      const { error } = await supabase
+        .from('people')
+        .update({ is_spotlight: newStatus })
+        .eq('id', person.id);
+
+      if (error) throw error;
+      
+      setPeople(people.map(p => p.id === person.id ? { ...p, is_spotlight: newStatus } : p));
+      toast.success(newStatus ? 'Added to Spotlight ★' : 'Removed from Spotlight');
+    } catch (error) {
+      console.error('Error toggling spotlight:', error);
+      toast.error('Failed to update spotlight status');
+    }
+  };
+
   const handleDelete = async () => {
     if (!deletingPerson) return;
+    setIsDeleting(true);
     try {
+      // 1. Delete credits first to avoid FK constraints
+      await supabase.from('credits').delete().eq('person_id', deletingPerson.id);
+      
+      // 2. Unlink any channels owned by this person
+      await supabase.from('channels').update({ owner_person_id: null }).eq('owner_person_id', deletingPerson.id);
+
+      // 3. Delete from people
       const { error } = await supabase
         .from('people')
         .delete()
@@ -158,11 +186,13 @@ export default function AdminPeople() {
 
       setPeople(people.filter(p => p.id !== deletingPerson.id));
       setSelectedPersonIds((prev) => prev.filter((id) => id !== deletingPerson.id));
-      toast.success('Person deleted');
+      toast.success('Person deleted successfully');
       setDeletingPerson(null);
     } catch (error) {
       console.error('Error deleting person:', error);
-      toast.error('Failed to delete person');
+      toast.error(`Deletion Failed: ${error.message || 'Check for related records'}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -217,6 +247,21 @@ export default function AdminPeople() {
       .order('billing_order');
       
     setPersonCredits(credits || []);
+
+    // Fetch qualifying YT videos
+    if (person.youtube_channel_id) {
+       const minDuration = person.primary_role === 'Actor' ? 2100 : 900; // 35m or 15m
+       const { data: ytVideos } = await supabase
+         .from('channel_videos')
+         .select('*')
+         .eq('channel_id', person.youtube_channel_id)
+         .gte('duration_seconds', minDuration)
+         .order('published_at', { ascending: false });
+       setYoutubeFilmography(ytVideos || []);
+    } else {
+       setYoutubeFilmography([]);
+    }
+
     setIsDrawerOpen(true);
   };
 
@@ -342,10 +387,21 @@ export default function AdminPeople() {
     }
   };
 
-  const handleMergePeople = async (primaryId, secondaryIds) => {
+  const handleMerge = async (primaryId, secondaryIds, enrichedData = null) => {
+    const t = toast.loading('Executing intelligent merge...');
     setIsMerging(true);
-    const t = toast.loading('Merging records...');
     try {
+      // 1. If we have enriched data, update the primary record first
+      if (enrichedData) {
+        const { error: updateError } = await supabase
+          .from('people')
+          .update(enrichedData)
+          .eq('id', primaryId);
+        
+        if (updateError) throw updateError;
+      }
+
+      // 2. Perform relational merge for each secondary
       for (const secId of secondaryIds) {
         const { error } = await supabase.rpc('merge_people', { 
           primary_id: primaryId, 
@@ -353,7 +409,8 @@ export default function AdminPeople() {
         });
         if (error) throw error;
       }
-      toast.success('Merge successful', { id: t });
+      
+      toast.success('Merge successful: Data enriched & relations moved', { id: t });
       setIsMergeModalOpen(false);
       setSelectedPersonIds([]);
       fetchPeople();
@@ -394,16 +451,16 @@ export default function AdminPeople() {
               className="w-full bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
             />
           </div>
-          <select value={verifiedFilter} onChange={(e) => setVerifiedFilter(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
-            <option value="All">All statuses</option>
-            <option value="Verified">Verified</option>
-            <option value="Unverified">Unverified</option>
+          <select value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+            <option value="All">All Profiles</option>
+            <option value="Incomplete">Incomplete (No Bio/Photo)</option>
+            <option value="Complete">Complete Profiles</option>
           </select>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
-            <option value="Most Popular">Popularity</option>
+            <option value="Recently Added">Recently Added</option>
+            <option value="Most Popular">Most Popular</option>
             <option value="A-Z">Alphabetical (A-Z)</option>
             <option value="Z-A">Alphabetical (Z-A)</option>
-            <option value="Newest">Recently Added</option>
             <option value="Oldest">Oldest First</option>
           </select>
         </div>
@@ -448,15 +505,30 @@ export default function AdminPeople() {
                   <div className="flex items-center gap-3">
                     {p.photo_url ? <img src={p.photo_url} className="w-10 h-10 rounded object-cover shadow-sm grayscale group-hover:grayscale-0 transition-all" /> : <div className="w-10 h-10 rounded bg-surface-2 flex items-center justify-center text-[10px] font-bold text-text-muted">?</div>}
                     <div>
-                      <span className="font-bold text-text-primary block leading-tight">{p.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-text-primary block leading-tight">{p.name}</span>
+                        {p.is_spotlight && (
+                          <Icon icon="solar:star-bold" className="w-3 h-3 text-brand" />
+                        )}
+                      </div>
                       <span className="text-[10px] text-text-muted font-mono">{p.id.slice(0, 8)}</span>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex gap-4 text-xs font-bold text-text-primary">
-                    <span title="Total Credits">🎬 {p.credits?.[0]?.count || 0}</span>
-                    <span title="Popularity Score">👁 {formatNumber(p.popularity_score)}</span>
+                  <div className="flex flex-col gap-1 text-xs font-bold">
+                    <div className="flex items-center gap-2">
+                      <span className="text-brand">🎬</span>
+                      <span className="text-text-primary">{p.total_filmography_count || 0}</span>
+                      <span className="text-[10px] text-text-muted font-medium">
+                        ({p.traditional_credits_count || 0} films + {p.youtube_filmography_count || 0} YT)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-brand">👁</span>
+                      <span className="text-text-primary">{formatNumber(p.popularity_score)}</span>
+                      <span className="text-[10px] text-text-muted font-medium uppercase tracking-widest">{p.known_for_department}</span>
+                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-center">
@@ -464,12 +536,19 @@ export default function AdminPeople() {
                     {p.is_verified ? 'Verified' : 'Member'}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => openEditDrawer(p)} className="p-2 bg-surface-2 rounded-lg hover:bg-brand hover:text-white transition-all">✎</button>
-                    <button onClick={() => setDeletingPerson(p)} className="p-2 bg-surface-2 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all">✖</button>
-                  </div>
-                </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button 
+                        onClick={() => handleToggleSpotlight(p)} 
+                        className={`p-2 rounded-lg transition-all border border-transparent hover:border-border hover:shadow-sm ${p.is_spotlight ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted hover:text-brand'}`}
+                        title={p.is_spotlight ? 'Remove from Spotlight' : 'Add to Spotlight'}
+                      >
+                        <Icon icon={p.is_spotlight ? "solar:star-bold" : "solar:star-linear"} className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => openEditDrawer(p)} className="p-2 bg-surface-2 rounded-lg hover:bg-brand hover:text-white transition-all text-sm">✎</button>
+                      <button onClick={() => setDeletingPerson(p)} className="p-2 bg-surface-2 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all text-sm">✖</button>
+                    </div>
+                  </td>
               </tr>
             ))}
           </tbody>
@@ -502,6 +581,14 @@ export default function AdminPeople() {
         </div>
       </div>
 
+      <MergeModal
+        isOpen={isMergeModalOpen}
+        onClose={() => setIsMergeModalOpen(false)}
+        items={people.filter(p => selectedPersonIds.includes(p.id))}
+        onConfirm={handleMerge}
+        type="person"
+      />
+
       <Drawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} title={editingPerson ? 'Edit Record' : 'Add New Record'}>
         <form onSubmit={handleSave} className="p-8 space-y-10">
           <section className="space-y-6">
@@ -532,6 +619,22 @@ export default function AdminPeople() {
                     <option>Male</option>
                     <option>Non-binary</option>
                     <option>Prefer not to say</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-2">Primary Role</label>
+                  <select 
+                    value={formData.known_for_department} 
+                    onChange={e => setFormData({...formData, known_for_department: e.target.value})} 
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none appearance-none cursor-pointer"
+                  >
+                    <option>Actor</option>
+                    <option>Skit Maker</option>
+                    <option>Producer</option>
+                    <option>Director</option>
+                    <option>Cinematographer</option>
+                    <option>Editor</option>
+                    <option>Other</option>
                   </select>
                 </div>
                 <div>
@@ -617,7 +720,7 @@ export default function AdminPeople() {
             <section className="space-y-6">
               <div className="flex items-center gap-2 pb-2 border-b border-border">
                 <span className="text-xl">🎞️</span>
-                <h4 className="text-xs font-bold text-text-muted">Credits</h4>
+                <h4 className="text-xs font-bold text-text-muted">Film Credits</h4>
               </div>
               <div className="space-y-3">
                 {personCredits.map(credit => (
@@ -635,6 +738,34 @@ export default function AdminPeople() {
                         <span className="capitalize">{credit.role}</span>
                         {credit.character_name && ` as ${credit.character_name}`}
                         {credit.films?.year && ` (${credit.films.year})`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {editingPerson && youtubeFilmography.length > 0 && (
+            <section className="space-y-6">
+              <div className="flex items-center gap-2 pb-2 border-b border-border">
+                <span className="text-xl">📺</span>
+                <h4 className="text-xs font-bold text-text-muted">YouTube Filmography</h4>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {youtubeFilmography.map(video => (
+                  <div key={video.video_id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
+                    <div className="w-20 aspect-video bg-surface rounded border border-border overflow-hidden flex-shrink-0">
+                      {video.thumbnail_url ? (
+                        <img src={video.thumbnail_url} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[8px] bg-surface-3 text-text-muted">NO THUMB</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-text-primary truncate">{video.title}</div>
+                      <div className="text-[10px] text-text-muted mt-0.5 font-medium">
+                        {Math.floor(video.duration_seconds / 60)}m {video.duration_seconds % 60}s • {new Date(video.published_at).toLocaleDateString()}
                       </div>
                     </div>
                   </div>
@@ -718,6 +849,16 @@ export default function AdminPeople() {
           </div>
         </form>
       </Drawer>
+      {deletingPerson && (
+        <ConfirmModal
+          onCancel={() => !isDeleting && setDeletingPerson(null)}
+          onConfirm={handleDelete}
+          title="Delete Person"
+          message={`Are you sure you want to delete "${deletingPerson.name}"? This will permanently remove them from the database.`}
+          confirmLabel="Delete Person"
+          isProcessing={isDeleting}
+        />
+      )}
     </div>
   );
 }

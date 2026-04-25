@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { Icon } from '@iconify/react';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
 
@@ -27,7 +28,7 @@ export default function AdminUsers() {
         .from('users')
         .select(`
           *,
-          people!fk_users_linked_profile(name)
+          people:linked_profile_id(name)
         `)
         .order('created_at', { ascending: false });
 

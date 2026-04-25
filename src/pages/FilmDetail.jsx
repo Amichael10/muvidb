@@ -317,7 +317,7 @@ export default function FilmDetail() {
                     {film.film_companies[0].companies?.logo_url ? (
                       <img src={film.film_companies[0].companies.logo_url} className="w-full h-full object-contain p-1" />
                     ) : (
-                      film.film_companies[0].companies?.name?.charAt(0) || 'L'
+                      film.film_companies[0].companies?.name?.charAt(0) || '?'
                     )}
                   </div>
                   <div>
@@ -328,11 +328,11 @@ export default function FilmDetail() {
               ) : (
                 <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4">
                   <div className="w-12 h-12 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-bold text-xl shrink-0">
-                    {film.director?.charAt(0) || 'L'}
+                    {film.director?.charAt(0) || '?'}
                   </div>
                   <div>
                     <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Director</div>
-                    <div className="font-bold text-text-primary text-sm tracking-tight">{film.director || 'Lumi Originals'}</div>
+                    <div className="font-bold text-text-primary text-sm tracking-tight">{film.director || 'Not Specified'}</div>
                   </div>
                 </div>
               )}

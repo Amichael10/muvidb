@@ -8,6 +8,7 @@ import {
   tmdbProfileUrl,
   mapTmdbGenre,
 } from '../../utils/tmdb'
+import SyncStatusOverlay from './SyncStatusOverlay'
 
 const TMDBSyncPanel = () => {
   // Search state
@@ -27,6 +28,8 @@ const TMDBSyncPanel = () => {
   const [importProgress, setImportProgress] = useState('')
   const [importedTmdbIds, setImportedTmdbIds] = useState(new Set())
   const [importLog, setImportLog] = useState([])
+  const [syncProgress, setSyncProgress] = useState(null)
+  const [syncReport, setSyncReport] = useState(null)
 
   // Tab state
   const [activeTab, setActiveTab] = useState('search') // 'search' | 'discover'
@@ -330,15 +333,26 @@ const TMDBSyncPanel = () => {
       return
     }
 
-    addLog(`🚀 Starting bulk import of ${toImport.length} films...`)
+    setSyncProgress({ current: 0, total: toImport.length, status: 'Initializing Bulk Import...' })
+    const results = []
 
-    for (const movie of toImport) {
-      await handleImport(movie.tmdbId, movie.title)
+    for (let i = 0; i < toImport.length; i++) {
+      const movie = toImport[i]
+      setSyncProgress({ current: i + 1, total: toImport.length, status: `Importing ${movie.title}...` })
+      
+      try {
+        await handleImport(movie.tmdbId, movie.title)
+        results.push({ name: movie.title, success: true, count: 1 })
+      } catch (err) {
+        results.push({ name: movie.title, success: false, error: err.message })
+      }
+      
       // Small delay to avoid overwhelming Supabase
       await new Promise(r => setTimeout(r, 300))
     }
 
-    addLog(`✅ Bulk import complete!`)
+    setSyncProgress(null)
+    setSyncReport(results)
   }
 
   return (
@@ -510,6 +524,12 @@ const TMDBSyncPanel = () => {
           </div>
         </div>
       )}
+      {/* Progress & Report Overlay */}
+      <SyncStatusOverlay 
+        progress={syncProgress} 
+        report={syncReport} 
+        onClose={() => setSyncReport(null)} 
+      />
     </div>
   )
 }

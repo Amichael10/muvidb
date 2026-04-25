@@ -169,8 +169,6 @@ export default function App() {
                   <Route path="channels/:id" element={<AdminChannelDetail />} />
                   <Route path="cinema-films" element={<AdminCinemaFilms />} />
                   <Route path="cinema-scraping" element={<AdminCinemaScraping />} />
-                  <Route path="youtube-videos" element={<AdminYouTubeVideos />} />
-                  <Route path="youtube" element={<AdminYouTube />} />
                   <Route path="ai" element={<AdminAI />} />
                   <Route path="import" element={<AdminImport />} />
                 </Route>

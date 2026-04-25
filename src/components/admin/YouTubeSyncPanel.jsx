@@ -4,6 +4,7 @@ import { syncAllFilmStats, syncSingleFilmStats } from '../../utils/syncService'
 import { formatViewCount } from '../../utils/youtube'
 import AddChannel from './AddChannel'
 import Drawer from './Drawer'
+import SyncStatusOverlay from './SyncStatusOverlay'
 
 const YouTubeSyncPanel = ({ currentUserId }) => {
   const [films, setFilms] = useState([])
@@ -11,6 +12,7 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
   const [syncing, setSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState(null)
   const [syncResult, setSyncResult] = useState(null)
+  const [syncReport, setSyncReport] = useState(null)
   const [showAddChannel, setShowAddChannel] = useState(false)
   const [lastSynced, setLastSynced] = useState(null)
   
@@ -50,16 +52,33 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
   const handleSyncAll = async () => {
     setSyncing(true)
     setSyncResult(null)
-    setSyncProgress({ stage: 'fetching', total: 0, done: 0 })
+    setSyncReport(null)
+    setSyncProgress({ stage: 'fetching', total: filmsWithYouTube.length, current: 0, status: 'Initializing YouTube Handshake...' })
 
     const result = await syncAllFilmStats((progress) => {
-      setSyncProgress(progress)
+      setSyncProgress({
+        ...progress,
+        current: progress.done,
+        status: progress.stage === 'fetching' ? 'Requesting Signal Data...' : `Syncing ${progress.currentFilm || 'Assets'}...`
+      })
     })
 
-    setSyncResult(result)
     setSyncing(false)
+    setSyncProgress(null)
+    
     if (result.success) {
+      setSyncReport(filmsWithYouTube.map(f => {
+        const error = result.errors?.find(e => e.film === f.title);
+        return {
+          name: f.title,
+          success: !error,
+          count: error ? 0 : 1, // Stats sync is 1 film at a time
+          error: error?.error
+        };
+      }));
       loadData()
+    } else {
+      setSyncReport([{ name: 'Bulk Sync', success: false, error: result.error || 'Connection Timeout' }]);
     }
   }
 
@@ -529,6 +548,12 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
         )}
       </Drawer>
 
+      {/* Progress & Report Overlay */}
+      <SyncStatusOverlay 
+        progress={syncProgress} 
+        report={syncReport} 
+        onClose={() => setSyncReport(null)} 
+      />
     </div>
   )
 }

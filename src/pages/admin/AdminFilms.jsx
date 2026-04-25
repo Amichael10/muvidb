@@ -39,8 +39,11 @@ export default function AdminFilms() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
+  const [featuredFilter, setFeaturedFilter] = useState('all'); // all, featured, regular
   const [sortBy, setSortBy] = useState('newest'); // newest, oldest, a-z
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState('library'); // library, youtube_buffer
+  const [youtubeVideos, setYoutubeVideos] = useState([]);
 
   // Company Search States
   const [companySearch, setCompanySearch] = useState('');
@@ -68,6 +71,7 @@ export default function AdminFilms() {
     is_featured: false,
     release_type: 'cinema',
     youtube_watch_url: '',
+    source_video_id: '',
     streaming_links: {}
   };
 
@@ -88,14 +92,62 @@ export default function AdminFilms() {
   useEffect(() => {
     setPage(1);
     setSelectedFilmIds([]);
-  }, [searchTerm, statusFilter, yearFilter, sortBy]);
+  }, [searchTerm, statusFilter, yearFilter, featuredFilter, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchFilms();
+      if (viewMode === 'library') {
+        fetchFilms();
+      } else {
+        fetchYoutubeBuffer();
+      }
     }, searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [page, searchTerm, statusFilter, yearFilter, sortBy]);
+  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, sortBy, viewMode]);
+
+  useEffect(() => {
+    const handleDeepLink = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const editId = params.get('edit');
+      const mapVideoId = params.get('map_video');
+
+      if (editId) {
+        // Attempt to find in existing list or fetch directly
+        let film = films.find(f => f.id === editId);
+        if (!film) {
+          const { data } = await supabase.from('films').select('*').eq('id', editId).single();
+          film = data;
+        }
+
+        if (film) {
+          setEditingFilm(film);
+          setFormData({ ...initialFormState, ...film });
+          setIsDrawerOpen(true);
+        }
+        // Clear param after handling
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (mapVideoId) {
+        // Handle mapping a new video
+        const { data: video } = await supabase.from('channel_videos').select('*, channels(name)').eq('id', mapVideoId).single();
+        if (video) {
+          setEditingFilm(null); // It's a new film record
+          setFormData({
+            ...initialFormState,
+            title: video.title,
+            synopsis: video.description || '',
+            poster_url: video.thumbnail_url || '',
+            source_video_id: video.video_id,
+            youtube_watch_url: `https://www.youtube.com/watch?v=${video.video_id}`
+          });
+          setIsDrawerOpen(true);
+          toast.success(`Mapping video: ${video.title}`);
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+
+    handleDeepLink();
+  }, [films.length > 0]); // Run when films list is populated
 
   const fetchGenres = async () => {
     const { data } = await supabase.from('genres').select('*').order('name');
@@ -110,6 +162,8 @@ export default function AdminFilms() {
       if (searchTerm) countQuery = countQuery.ilike('title', `%${searchTerm}%`);
       if (statusFilter !== 'all') countQuery = countQuery.eq('status', statusFilter);
       if (yearFilter !== 'all') countQuery = countQuery.eq('year', parseInt(yearFilter));
+      if (featuredFilter === 'featured') countQuery = countQuery.eq('is_featured', true);
+      if (featuredFilter === 'regular') countQuery = countQuery.eq('is_featured', false);
       
       const { count } = await countQuery;
       setTotalCount(count || 0);
@@ -120,6 +174,8 @@ export default function AdminFilms() {
       if (searchTerm) query = query.ilike('title', `%${searchTerm}%`);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
       if (yearFilter !== 'all') query = query.eq('year', parseInt(yearFilter));
+      if (featuredFilter === 'featured') query = query.eq('is_featured', true);
+      if (featuredFilter === 'regular') query = query.eq('is_featured', false);
 
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -143,6 +199,60 @@ export default function AdminFilms() {
       toast.error('Failed to load films');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return '00:00';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const fetchYoutubeBuffer = async () => {
+    setLoading(true);
+    try {
+      // Fetch videos that are NOT hidden and do NOT have a film_id
+      let query = supabase
+        .from('channel_videos')
+        .select('*, channels(name)', { count: 'exact' })
+        .is('film_id', null)
+        .eq('is_hidden', false);
+
+      if (searchTerm) query = query.ilike('title', `%${searchTerm}%`);
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, count, error } = await query
+        .order('published_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+      setYoutubeVideos(data || []);
+      setTotalCount(count || 0);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load YouTube buffer');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleIgnoreVideo = async (videoId) => {
+    try {
+      const { error } = await supabase
+        .from('channel_videos')
+        .update({ is_hidden: true })
+        .eq('id', videoId);
+      
+      if (error) throw error;
+      setYoutubeVideos(prev => prev.filter(v => v.id !== videoId));
+      toast.success('Signal dismissed');
+    } catch (err) {
+      toast.error('Failed to hide signal');
     }
   };
 
@@ -304,6 +414,7 @@ export default function AdminFilms() {
   };
 
   const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
     setEditingFilm(null);
     setFormData(initialFormState);
     setCredits([]);
@@ -311,6 +422,8 @@ export default function AdminFilms() {
     setSelectedCompany(null);
     setCompanySearch('');
     setCompanyResults([]);
+    setPeopleSearch('');
+    setPeopleResults([]);
   };
 
   const handleChange = (e) => {
@@ -566,8 +679,25 @@ export default function AdminFilms() {
     }
   };
 
+  const toggleFeatured = async (film) => {
+    const newStatus = !film.is_featured;
+    try {
+      const { error } = await supabase
+        .from('films')
+        .update({ is_featured: newStatus })
+        .eq('id', film.id);
+
+      if (error) throw error;
+      
+      setFilms(prev => prev.map(f => f.id === film.id ? { ...f, is_featured: newStatus } : f));
+      toast.success(newStatus ? 'Production Featured' : 'Removed from Featured');
+    } catch (err) {
+      toast.error('Feature toggle failed');
+    }
+  };
+
   const filteredFilms = films.filter(film => {
-    const matchesSearch = film.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (film.title || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || film.status === statusFilter;
     const matchesYear = yearFilter === 'all' || film.year?.toString() === yearFilter;
     return matchesSearch && matchesStatus && matchesYear;
@@ -611,10 +741,20 @@ export default function AdminFilms() {
     }
   };
 
-  const handleMergeFilms = async (primaryId, secondaryIds) => {
+  const handleMergeFilms = async (primaryId, secondaryIds, enrichedData = null) => {
+    const t = toast.loading('Executing production merge...');
     setIsMerging(true);
-    const t = toast.loading('Consolidating production records...');
     try {
+      // 1. Update primary with enriched data
+      if (enrichedData) {
+        const { error: updateError } = await supabase
+          .from('films')
+          .update(enrichedData)
+          .eq('id', primaryId);
+        if (updateError) throw updateError;
+      }
+
+      // 2. Relational merge
       for (const secId of secondaryIds) {
         const { error } = await supabase.rpc('merge_films', { 
           primary_id: primaryId, 
@@ -623,7 +763,7 @@ export default function AdminFilms() {
         if (error) throw error;
       }
       
-      toast.success('Productions merged successfully!', { id: t });
+      toast.success('Productions merged and metadata synchronized', { id: t });
       setIsMergeModalOpen(false);
       setSelectedFilmIds([]);
       fetchFilms();
@@ -645,14 +785,32 @@ export default function AdminFilms() {
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Movies</h1>
           <p className="text-text-muted text-sm mt-1 font-medium">Manage and monitor the digital film library.</p>
         </div>
-        <button
-          onClick={() => handleOpenDrawer()}
-          className="bg-brand text-white font-bold px-8 py-3.5 rounded-md text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-brand/20 flex items-center gap-2"
-        >
+
+        <div className="flex items-center gap-4">
+          <div className="flex gap-1 p-1 bg-surface-2 rounded-xl border border-border">
+            <button
+              onClick={() => setViewMode('library')}
+              className={`px-6 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'library' ? 'bg-surface border border-border shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            >
+              📂 Library
+            </button>
+            <button
+              onClick={() => setViewMode('youtube_buffer')}
+              className={`px-6 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'youtube_buffer' ? 'bg-surface border border-border shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
+            >
+              📺 Buffer
+            </button>
+          </div>
+          
+          <button
+            onClick={() => handleOpenDrawer()}
+            className="bg-brand text-white font-bold px-8 py-3.5 rounded-md text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-brand/20 flex items-center gap-2"
+          >
           <Icon icon="solar:add-circle-linear" className="w-5 h-5" />
           Add movie record
         </button>
       </div>
+    </div>
 
       {/* Library Controls */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
@@ -687,6 +845,15 @@ export default function AdminFilms() {
           >
             <option value="all">All Years</option>
             {uniqueYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+          </select>
+          <select
+            value={featuredFilter}
+            onChange={(e) => setFeaturedFilter(e.target.value)}
+            className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[120px]"
+          >
+            <option value="all">Any Spotlight</option>
+            <option value="featured">Featured Only</option>
+            <option value="regular">Regular Only</option>
           </select>
           <select
             value={sortBy}
@@ -749,79 +916,143 @@ export default function AdminFilms() {
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
-                <tr><td colSpan="5" className="p-20 text-center text-text-muted">Loading database records...</td></tr>
-              ) : filteredFilms.length === 0 ? (
-                <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">No productions found.</td></tr>
-              ) : filteredFilms.map((film, i) => (
-                <tr 
-                  key={film.id} 
-                  className="group hover:bg-surface-2/50 transition-colors"
-                >
-                  <td className="pl-6 py-4">
-                    <input
-                      type="checkbox"
-                      checked={selectedFilmIds.includes(film.id)}
-                      onChange={() => toggleFilmSelect(film.id)}
-                      className="w-4 h-4 rounded border-border bg-surface accent-brand cursor-pointer"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-14 bg-surface-2 rounded-lg border border-border overflow-hidden flex-shrink-0 shadow-sm transition-transform group-hover:scale-105">
-                        {film.poster_url ? (
-                          <img src={film.poster_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-text-muted">Empty</div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-text-primary text-sm truncate group-hover:text-brand transition-colors">{film.title}</div>
-                        <div className="text-[11px] text-text-muted font-medium mt-0.5">
-                          {film.year || 'TBD'} • {film.language || 'English'}
+                <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">Loading records...</td></tr>
+              ) : viewMode === 'library' ? (
+                films.length === 0 ? (
+                  <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">No productions found in library.</td></tr>
+                ) : films.map((film) => (
+                  <tr key={film.id} className="group hover:bg-surface-2/50 transition-colors">
+                    <td className="pl-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedFilmIds.includes(film.id)}
+                        onChange={() => toggleFilmSelect(film.id)}
+                        className="w-4 h-4 rounded border-border bg-surface accent-brand cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-14 bg-surface-2 rounded-lg border border-border overflow-hidden flex-shrink-0 shadow-sm transition-transform group-hover:scale-105">
+                          {film.poster_url ? <img src={film.poster_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-text-muted">Empty</div>}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="font-bold text-text-primary text-sm truncate group-hover:text-brand transition-colors">{film.title}</div>
+                            {film.is_featured && <Icon icon="solar:star-bold" className="w-3 h-3 text-brand" />}
+                          </div>
+                          <div className="text-[10px] text-text-muted font-medium mt-0.5 uppercase tracking-widest">
+                             {film.year || 'TBD'} • {film.language || 'Not Specified'} • {film.runtime_minutes ? `${film.runtime_minutes}m` : 'No Runtime'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                      film.status === 'released' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                      film.status === 'post-production' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
-                      film.status === 'filming' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
-                      'bg-slate-500/10 text-slate-500 border-slate-500/20'
-                    }`}>
-                      {film.status.replace('-', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-text-primary font-bold text-xs">{(film.view_count || 0).toLocaleString()}</span>
-                      <span className="text-[10px] text-text-muted font-medium">Views</span>
-                    </div>
-                  </td>
-                  <td className="pr-6 py-4 text-right">
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleOpenDrawer(film)}
-                        className="p-2 hover:bg-surface rounded-lg text-text-muted hover:text-brand transition-all border border-transparent hover:border-border hover:shadow-sm"
-                        title="Edit Production"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => setDeletingFilm(film)}
-                        className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-text-muted hover:text-red-600 transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900 shadow-sm"
-                        title="Delete Production"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        film.status === 'released' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                        film.status === 'post-production' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                        film.status === 'filming' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
+                        'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                      }`}>
+                        {(film.status || 'unknown').replace('-', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-text-primary font-bold text-xs">{(film.view_count || 0).toLocaleString()}</span>
+                        <span className="text-[10px] text-text-muted font-medium">Views</span>
+                      </div>
+                    </td>
+                    <td className="pr-6 py-4 text-right">
+                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => toggleFeatured(film)}
+                          className={`p-2 hover:bg-surface rounded-lg transition-all border border-transparent hover:border-border hover:shadow-sm ${film.is_featured ? 'text-brand' : 'text-text-muted hover:text-brand'}`}
+                          title="Toggle Spotlight"
+                        >
+                          <Icon icon={film.is_featured ? "solar:star-bold" : "solar:star-linear"} className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenDrawer(film)}
+                          className="p-2 hover:bg-surface rounded-lg text-text-muted hover:text-brand transition-all border border-transparent hover:border-border hover:shadow-sm"
+                          title="Edit Production"
+                        >
+                          <Icon icon="solar:pen-linear" className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingFilm(film)}
+                          className="p-2 hover:bg-red-50 rounded-lg text-text-muted hover:text-red-600 transition-all border border-transparent hover:border-red-100 shadow-sm"
+                          title="Delete Production"
+                        >
+                          <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                youtubeVideos.length === 0 ? (
+                  <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">No unmapped YouTube signals found.</td></tr>
+                ) : youtubeVideos.map((vid) => (
+                  <tr key={vid.id} className="group hover:bg-surface-2/50 transition-colors">
+                    <td className="pl-6 py-4">
+                       <Icon icon="solar:play-circle-bold" className="w-4 h-4 text-text-muted opacity-20" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-10 bg-surface-2 rounded-md border border-border overflow-hidden flex-shrink-0 shadow-sm">
+                          {vid.thumbnail_url && <img src={vid.thumbnail_url} alt="" className="w-full h-full object-cover" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-text-primary text-sm truncate group-hover:text-brand transition-colors">{vid.title}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{vid.channels?.name || 'YouTube'}</p>
+                            <span className="w-1 h-1 rounded-full bg-border"></span>
+                            <p className="text-[10px] text-brand font-black tracking-widest">{formatDuration(vid.duration_seconds)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-brand/5 text-brand border-brand/20 uppercase tracking-tighter">
+                        Unmapped Signal
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="text-[10px] text-text-muted font-bold uppercase">{new Date(vid.published_at).toLocaleDateString()}</div>
+                    </td>
+                    <td className="pr-6 py-4 text-right">
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button
+                             onClick={() => {
+                               setEditingFilm(null);
+                               setFormData({
+                                 ...initialFormState,
+                                 title: vid.title,
+                                 synopsis: vid.description || '',
+                                 poster_url: vid.thumbnail_url || '',
+                                 source_video_id: vid.video_id,
+                                 youtube_watch_url: `https://www.youtube.com/watch?v=${vid.video_id}`,
+                                 runtime_minutes: vid.duration_seconds ? Math.floor(vid.duration_seconds / 60) : ''
+                               });
+                               setIsDrawerOpen(true);
+                             }}
+                             className="p-2 bg-brand/10 text-brand rounded-lg hover:bg-brand hover:text-white transition-all border border-brand/20 shadow-sm"
+                             title="Create Film from Signal"
+                           >
+                              <Icon icon="solar:add-circle-linear" width="18" />
+                           </button>
+                           <button
+                             onClick={() => handleIgnoreVideo(vid.id)}
+                             className="p-2 bg-surface-2 text-text-muted hover:text-red-500 rounded-lg transition-all border border-border hover:border-red-200"
+                             title="Dismiss Signal"
+                           >
+                              <Icon icon="solar:eye-closed-linear" width="18" />
+                           </button>
+                        </div>
+                     </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -1301,35 +1532,48 @@ export default function AdminFilms() {
                 <svg className="absolute right-4 top-2.5 w-4 h-4 text-text-muted group-focus-within:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                {peopleResults.length > 0 && (
+                {(isSearchingPeople || peopleResults.length > 0 || peopleSearch.trim()) && (
                   <div className="absolute right-0 top-full mt-2 w-full bg-surface border border-border rounded-md shadow-2xl z-20 overflow-hidden ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2">
-                    {peopleResults.map(p => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => addCredit(p)}
-                        className="w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden border border-border">
-                          {p.photo_url && <img src={p.photo_url} alt="" className="w-full h-full object-cover" />}
-                        </div>
-                        <span className="text-xs font-bold text-text-primary">{p.name}</span>
-                      </button>
-                    ))}
-                    {peopleSearch.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => createPerson(peopleSearch)}
-                        className="w-full flex items-center gap-3 p-3 bg-brand/5 hover:bg-brand/10 transition-colors text-left border-t border-brand/20 group/add"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover/add:scale-110 transition-transform">
-                           <Icon icon="solar:plus-bold" className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-[10px] font-black text-brand uppercase tracking-widest leading-none mb-1">New Identity</p>
-                          <p className="text-xs font-bold text-text-primary">Create profile for "{peopleSearch}"</p>
-                        </div>
-                      </button>
+                    {isSearchingPeople ? (
+                      <div className="p-8 text-center">
+                        <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                        <p className="text-[10px] font-black text-text-muted uppercase tracking-widest">Searching Directory...</p>
+                      </div>
+                    ) : (
+                      <>
+                        {peopleResults.map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => addCredit(p)}
+                            className="w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden border border-border flex-shrink-0">
+                              {p.photo_url && <img src={p.photo_url} alt="" className="w-full h-full object-cover" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-text-primary truncate">{p.name}</p>
+                              <p className="text-[9px] text-text-muted font-bold uppercase tracking-tighter">Existing Record</p>
+                            </div>
+                          </button>
+                        ))}
+                        
+                        {peopleSearch.trim() && !peopleResults.some(p => p.name.toLowerCase() === peopleSearch.trim().toLowerCase()) && (
+                          <button
+                            type="button"
+                            onClick={() => createPerson(peopleSearch)}
+                            className="w-full flex items-center gap-3 p-4 bg-brand/5 hover:bg-brand/10 transition-colors text-left border-t border-brand/20 group/add"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center group-hover/add:scale-110 transition-transform shadow-lg shadow-brand/20">
+                               <Icon icon="solar:plus-bold" className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[10px] font-black text-brand uppercase tracking-widest leading-none mb-1">New Identity</p>
+                              <p className="text-xs font-bold text-text-primary">Create profile for "{peopleSearch}"</p>
+                            </div>
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
