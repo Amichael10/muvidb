@@ -44,7 +44,9 @@ export default function AdminAI() {
       setResults(data.results);
       
       if (data.results?.length > 0) {
-        addLog(`Found ${data.results.length} relevant items.`, 'success');
+        addLog(`Found ${data.results.length} relevant items.${data.filtered_out > 0 ? ` (Auto-filtered ${data.filtered_out} duplicates)` : ''}`, 'success');
+      } else if (data.filtered_out > 0) {
+        addLog(`All ${data.filtered_out} suggested items were already in your database.`, 'warning');
       } else {
         addLog("No items required action in this batch.", "info");
       }
@@ -145,8 +147,9 @@ export default function AdminAI() {
           addLog(`CRITICAL: Merge interrupted. Aborting deletion to protect data. Error: ${err.message}`, 'error');
           throw err;
         }
-      } else if (action === 'DELETE' && activeTask === 'cleanup_films') {
-        const { error } = await supabase.from('films').delete().eq('id', item.id);
+      } else if (action === 'DELETE' && (activeTask === 'cleanup_films' || activeTask === 'cleanup_people')) {
+        const table = activeTask === 'cleanup_films' ? 'films' : 'people';
+        const { error } = await supabase.from(table).delete().eq('id', item.id);
         dbError = error;
       }
 
@@ -205,9 +208,17 @@ export default function AdminAI() {
             <div className="space-y-3">
               <OperationButton 
                 icon="🧹" 
-                title="Cleanup International Films" 
-                desc="Remove Hollywood/Foreign leaks"
+                title="Cleanup Hollywood Films" 
+                desc="Remove international leaks"
                 onClick={() => runTask('cleanup_films')}
+                disabled={isProcessing}
+                variant="danger"
+              />
+              <OperationButton 
+                icon="🚫" 
+                title="Cleanup Hollywood People" 
+                desc="Remove non-Nollywood talent"
+                onClick={() => runTask('cleanup_people')}
                 disabled={isProcessing}
                 variant="danger"
               />
