@@ -148,6 +148,84 @@ async function handleTMDB(req: VercelRequest, res: VercelResponse) {
 async function handleKava(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) throw new Error('FIRECRAWL_API_KEY missing');
-  // Kava logic...
-  return res.status(200).json({ task: 'kava', status: 'ready' });
+
+  // 1. Ensure a "Kava Data" channel exists to act as the source
+  let { data: channel } = await supabase.from('channels').select('id').eq('name', 'Kava Data').single();
+  if (!channel) {
+    const { data: newChannel, error } = await supabase.from('channels').insert([{ 
+      name: 'Kava Data', 
+      channel_handle: 'kava.tv',
+      is_active: true 
+    }]).select().single();
+    if (error) throw error;
+    channel = newChannel;
+  }
+
+  // 2. Scrape the primary category page (Nollywood/Recent)
+  const scrapeRes = await fetch('https://api.firecrawl.dev/v1/extract', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      urls: ['https://kava.tv/category/p1'],
+      prompt: 'Extract all movie titles and their short synopses from this movie listing page.',
+      schema: {
+        type: 'object',
+        properties: {
+          movies: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                synopsis: { type: 'string' },
+                slug: { type: 'string', description: 'The URL path or slug for the movie, e.g. /content/movie-name' },
+                poster_url: { type: ['string', 'null'], description: 'Absolute URL to the poster image' }
+              },
+              required: ['title', 'synopsis']
+            }
+          }
+        },
+        required: ['movies']
+      }
+    })
+  });
+
+  if (!scrapeRes.ok) {
+    const errorBody = await scrapeRes.text();
+    throw new Error(`Firecrawl extract failed (${scrapeRes.status}): ${errorBody}`);
+  }
+
+  const json = await scrapeRes.json();
+  const movies = json.data?.movies || [];
+
+  if (movies.length === 0) {
+    return res.status(200).json({ task: 'kava', status: 'no_data_found' });
+  }
+
+  // 3. Upsert into channel_videos (the admin buffer)
+  const videoRows = movies.map((m: any) => ({
+    channel_id: channel!.id,
+    video_id: `kava-${(m.slug || m.title).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    title: m.title,
+    description: m.synopsis,
+    thumbnail_url: m.poster_url || null,
+    published_at: new Date().toISOString(),
+    match_status: 'unmatched'
+  }));
+
+  const { error: upsertError } = await supabase.from('channel_videos').upsert(videoRows, { 
+    onConflict: 'channel_id,video_id' 
+  });
+
+  if (upsertError) throw upsertError;
+
+  return res.status(200).json({ 
+    task: 'kava', 
+    status: 'completed', 
+    found: movies.length,
+    upserted: videoRows.length 
+  });
 }
