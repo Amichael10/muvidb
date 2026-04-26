@@ -28,16 +28,20 @@ jobs:
     env:
       BASE_URL: 'https://lumi-rho-seven.vercel.app/'
       CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fix Git Permissions
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20' # Standardizing on v20
 
       - name: Install Dependencies
         run: npm install @supabase/supabase-js node-fetch
@@ -48,6 +52,7 @@ jobs:
           echo "Syncing Cinemas..."
           curl -f -X GET "$BASE_URL/api/cron/sync?task=showtimes" \
           -H "x-cron-secret: $CRON_SECRET"
+        continue-on-error: true
 
       - name: Sync YouTube Videos (8 AM Local)
         if: github.event.schedule == '0 7 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
@@ -55,13 +60,14 @@ jobs:
           echo "Syncing YouTube Videos..."
           curl -f -X GET "$BASE_URL/api/cron/sync?task=videos" \
           -H "x-cron-secret: $CRON_SECRET"
+        continue-on-error: true
 
       - name: Sync TMDB & Kava (10 AM Local)
         if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'tmdb' || github.event.inputs.task == 'kava'))
         run: |
           echo "Syncing TMDB..."
           curl -f -X GET "$BASE_URL/api/cron/sync?task=tmdb" \
-          -H "x-cron-secret: $CRON_SECRET"
+          -H "x-cron-secret: $CRON_SECRET" || echo "TMDB Sync failed but continuing..."
           
           echo "Syncing Kava (Local Script)..."
           node scripts/sync-kava.mjs

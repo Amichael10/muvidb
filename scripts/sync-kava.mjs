@@ -66,7 +66,12 @@ async function run() {
 
     if (!scrapeRes.ok) {
       const err = await scrapeRes.text();
-      throw new Error(`Firecrawl Error: ${err}`);
+      if (scrapeRes.status === 402) {
+        console.error('⚠️ Firecrawl Error: Insufficient credits. Please check your Firecrawl account or wait for credit reset.');
+        // Don't exit with error, just return so the rest of the workflow can finish if needed
+        return;
+      }
+      throw new Error(`Firecrawl Error [${scrapeRes.status}]: ${err}`);
     }
 
     const json = await scrapeRes.json();
