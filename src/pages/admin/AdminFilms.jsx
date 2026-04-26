@@ -748,20 +748,12 @@ export default function AdminFilms() {
     const t = toast.loading('Executing production merge...');
     setIsMerging(true);
     try {
-      // 1. Update primary with enriched data
-      if (enrichedData) {
-        const { error: updateError } = await supabase
-          .from('films')
-          .update(enrichedData)
-          .eq('id', primaryId);
-        if (updateError) throw updateError;
-      }
-
-      // 2. Relational merge
+      // 1. Relational merge
       for (const secId of secondaryIds) {
         const { error } = await supabase.rpc('merge_films', { 
-          primary_id: primaryId, 
-          secondary_id: secId 
+          p_primary_id: primaryId, 
+          p_secondary_id: secId,
+          p_metadata: enrichedData
         });
         if (error) throw error;
       }

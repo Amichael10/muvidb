@@ -413,21 +413,12 @@ export default function AdminPeople() {
     const t = toast.loading('Executing intelligent merge...');
     setIsMerging(true);
     try {
-      // 1. If we have enriched data, update the primary record first
-      if (enrichedData) {
-        const { error: updateError } = await supabase
-          .from('people')
-          .update(enrichedData)
-          .eq('id', primaryId);
-        
-        if (updateError) throw updateError;
-      }
-
-      // 2. Perform relational merge for each secondary
+      // 1. Perform relational merge for each secondary
       for (const secId of secondaryIds) {
         const { error } = await supabase.rpc('merge_people', { 
-          primary_id: primaryId, 
-          secondary_id: secId 
+          p_primary_id: primaryId, 
+          p_secondary_id: secId,
+          p_metadata: enrichedData // Pass metadata directly to the RPC
         });
         if (error) throw error;
       }

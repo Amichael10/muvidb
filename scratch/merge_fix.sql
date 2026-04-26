@@ -1,4 +1,6 @@
--- 1. Create the function with prefixed parameters to prevent naming collisions
+-- 1. Drop existing function to change parameter names, then recreate
+DROP FUNCTION IF EXISTS merge_people(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION merge_people(p_primary_id UUID, p_secondary_id UUID)
 RETURNS void AS $$
 BEGIN
@@ -28,4 +30,4 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 2. Force PostgREST to reload its schema cache
-NOTIFY pgrst, reload_schema;
+NOTIFY pgrst, 'reload schema';

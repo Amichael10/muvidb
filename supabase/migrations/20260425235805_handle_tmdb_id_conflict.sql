@@ -1,12 +1,13 @@
--- Canonical Source for Merge Functions
--- Use these to update the database via SQL Editor or Migrations
+-- Handle Unique Constraint Conflicts during Merge
+-- This migration updates the merge functions to handle tmdb_id conflicts by:
+-- 1. Accepting a metadata JSONB object for custom user selections.
+-- 2. Clearing conflicting unique keys before updating the primary record.
 
--- 1. Robust Merge People Function
--- Handles moving credits, profile claims, channels, and linked users.
--- Prevents duplicate credit conflicts and unique constraint violations on tmdb_id.
-DROP FUNCTION IF EXISTS public.merge_people(uuid, uuid, jsonb);
+-- Drop existing functions to allow for signature changes
 DROP FUNCTION IF EXISTS public.merge_people(uuid, uuid);
+DROP FUNCTION IF EXISTS public.merge_films(uuid, uuid);
 
+-- 1. Robust Merge People Function with Metadata Support
 CREATE OR REPLACE FUNCTION public.merge_people(
   p_primary_id uuid, 
   p_secondary_id uuid,
@@ -25,7 +26,6 @@ BEGIN
     END IF;
 
     -- B. Handle Credits (Move from secondary to primary)
-    -- 1. Delete credits on the secondary person that would cause duplicate conflicts on the primary person.
     DELETE FROM public.credits c_sec
     WHERE c_sec.person_id = p_secondary_id
     AND EXISTS (
@@ -34,17 +34,15 @@ BEGIN
         AND c_pri.film_id = c_sec.film_id 
         AND c_pri.role = c_sec.role
     );
-
-    -- 2. Update remaining credits to point to the primary person
     UPDATE public.credits SET person_id = p_primary_id WHERE person_id = p_secondary_id;
 
-    -- C. Move Relations (Claims, Channels, Users)
+    -- C. Move Relations
     UPDATE public.profile_claims SET person_id = p_primary_id WHERE person_id = p_secondary_id;
     UPDATE public.channels SET owner_person_id = p_primary_id WHERE owner_person_id = p_secondary_id;
     UPDATE public.users SET linked_profile_id = p_primary_id WHERE linked_profile_id = p_secondary_id;
 
     -- D. Apply Enriched Metadata
-    -- Apply selections from the UI.
+    -- Apply selections from the UI. We use NULLIF to handle empty strings.
     UPDATE public.people
     SET 
         name = COALESCE(NULLIF(p_metadata->>'name', ''), name),
@@ -62,12 +60,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-
--- 2. Robust Merge Films Function
--- Handles moving credits and enriching film metadata.
-DROP FUNCTION IF EXISTS public.merge_films(uuid, uuid, jsonb);
-DROP FUNCTION IF EXISTS public.merge_films(uuid, uuid);
-
+-- 2. Robust Merge Films Function with Metadata Support
 CREATE OR REPLACE FUNCTION public.merge_films(
   p_primary_id uuid, 
   p_secondary_id uuid,
@@ -84,7 +77,6 @@ BEGIN
     END IF;
 
     -- B. Handle Credits (Move from secondary film to primary film)
-    -- 1. Delete credits on the secondary film that would cause duplicate conflicts on the primary film.
     DELETE FROM public.credits c_sec
     WHERE c_sec.film_id = p_secondary_id
     AND EXISTS (
@@ -93,8 +85,6 @@ BEGIN
         AND c_pri.person_id = c_sec.person_id 
         AND c_pri.role = c_sec.role
     );
-
-    -- 2. Update remaining credits to point to the primary film
     UPDATE public.credits SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
     -- C. Apply Enriched Metadata
