@@ -30,13 +30,20 @@ jobs:
       CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
     
     steps:
+      - name: Fix Git Permissions
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Fix Git Permissions
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Verify Environment
+        run: |
+          echo "Checking Secrets Presence..."
+          if [ -z "$CRON_SECRET" ]; then echo "❌ CRON_SECRET is MISSING"; else echo "✅ CRON_SECRET is set"; fi
+          if [ -z "${{ secrets.FIRECRAWL_API_KEY }}" ]; then echo "❌ FIRECRAWL_API_KEY is MISSING"; else echo "✅ FIRECRAWL_API_KEY is set"; fi
+          echo "Base URL: $BASE_URL"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,7 +57,7 @@ jobs:
         if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'showtimes'))
         run: |
           echo "Syncing Cinemas..."
-          curl -v -f -X GET "$BASE_URL/api/cron/sync?task=showtimes" \
+          curl -v -X GET "$BASE_URL/api/cron/sync?task=showtimes" \
           -H "x-cron-secret: $CRON_SECRET"
         continue-on-error: true
 
@@ -58,7 +65,7 @@ jobs:
         if: github.event.schedule == '0 7 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
         run: |
           echo "Syncing YouTube Videos..."
-          curl -v -f -X GET "$BASE_URL/api/cron/sync?task=videos" \
+          curl -v -X GET "$BASE_URL/api/cron/sync?task=videos" \
           -H "x-cron-secret: $CRON_SECRET"
         continue-on-error: true
 
@@ -66,8 +73,8 @@ jobs:
         if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'tmdb' || github.event.inputs.task == 'kava'))
         run: |
           echo "Syncing TMDB..."
-          curl -v -f -X GET "$BASE_URL/api/cron/sync?task=tmdb" \
-          -H "x-cron-secret: $CRON_SECRET" || echo "TMDB Sync returned an error but continuing..."
+          curl -v -X GET "$BASE_URL/api/cron/sync?task=tmdb" \
+          -H "x-cron-secret: $CRON_SECRET"
           
           echo "Syncing Kava (Local Script)..."
           node scripts/sync-kava.mjs
