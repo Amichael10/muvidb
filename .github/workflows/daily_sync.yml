@@ -41,7 +41,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Standardizing on v20
+          node-version: '22'
 
       - name: Install Dependencies
         run: npm install @supabase/supabase-js node-fetch
@@ -50,7 +50,7 @@ jobs:
         if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'showtimes'))
         run: |
           echo "Syncing Cinemas..."
-          curl -f -X GET "$BASE_URL/api/cron/sync?task=showtimes" \
+          curl -v -f -X GET "$BASE_URL/api/cron/sync?task=showtimes" \
           -H "x-cron-secret: $CRON_SECRET"
         continue-on-error: true
 
@@ -58,7 +58,7 @@ jobs:
         if: github.event.schedule == '0 7 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
         run: |
           echo "Syncing YouTube Videos..."
-          curl -f -X GET "$BASE_URL/api/cron/sync?task=videos" \
+          curl -v -f -X GET "$BASE_URL/api/cron/sync?task=videos" \
           -H "x-cron-secret: $CRON_SECRET"
         continue-on-error: true
 
@@ -66,11 +66,12 @@ jobs:
         if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'tmdb' || github.event.inputs.task == 'kava'))
         run: |
           echo "Syncing TMDB..."
-          curl -f -X GET "$BASE_URL/api/cron/sync?task=tmdb" \
-          -H "x-cron-secret: $CRON_SECRET" || echo "TMDB Sync failed but continuing..."
+          curl -v -f -X GET "$BASE_URL/api/cron/sync?task=tmdb" \
+          -H "x-cron-secret: $CRON_SECRET" || echo "TMDB Sync returned an error but continuing..."
           
           echo "Syncing Kava (Local Script)..."
           node scripts/sync-kava.mjs
+        continue-on-error: true
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
