@@ -28,10 +28,11 @@ jobs:
     env:
       BASE_URL: 'https://lumi-rho-seven.vercel.app/'
       CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
     steps:
       - name: Fix Git Permissions
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        run: git config --global --add safe.directory "*"
 
       - name: Checkout Repository
         uses: actions/checkout@v4
