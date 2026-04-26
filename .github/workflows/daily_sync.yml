@@ -28,19 +28,19 @@ jobs:
     env:
       BASE_URL: 'https://lumi-rho-seven.vercel.app/'
       CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install Dependencies
         run: npm install @supabase/supabase-js node-fetch
-
-      - name: Download Sync Script (Gitless)
-        run: |
-          curl -sSL https://raw.githubusercontent.com/Amichael10/lumi/main/scripts/sync-kava.mjs -o sync-kava.mjs
 
       - name: Sync Cinemas (6 AM Local)
         if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'showtimes'))
@@ -64,7 +64,7 @@ jobs:
           -H "x-cron-secret: $CRON_SECRET"
           
           echo "Syncing Kava (Local Script)..."
-          node sync-kava.mjs
+          node scripts/sync-kava.mjs
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
