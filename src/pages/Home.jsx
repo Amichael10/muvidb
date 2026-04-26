@@ -17,6 +17,8 @@ export default function Home() {
   const [otherPeople, setOtherPeople] = useState([]);
   const [creators, setCreators] = useState([]);
 
+  const [featuredFilms, setFeaturedFilms] = useState([]);
+
   useEffect(() => {
     document.title = "Lumi | Home";
     fetchAllData();
@@ -26,6 +28,7 @@ export default function Home() {
     setIsLoading(true);
     try {
       await Promise.all([
+        fetchFeaturedFilms(),
         fetchFilms(),
         fetchInCinemasData(),
         fetchYoutubeFeed(),
@@ -36,6 +39,24 @@ export default function Home() {
       console.error('Error fetching data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchFeaturedFilms = async () => {
+    const { data } = await supabase
+      .from('films')
+      .select(`
+        *,
+        film_genres(genres(name))
+      `)
+      .eq('is_featured', true)
+      .order('view_count', { ascending: false });
+    
+    if (data) {
+      setFeaturedFilms(data.map(f => ({
+        ...f,
+        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+      })));
     }
   };
 
@@ -51,25 +72,24 @@ export default function Home() {
       .order('view_count', { ascending: false });
 
     if (!error) {
-      const uniqueFilms = [];
-      const titles = new Set();
+      // Deduplicate regular films list
+      const filmMap = new Map();
       (data || []).forEach(f => {
-        if (!titles.has(f.title?.toLowerCase())) {
-          uniqueFilms.push({
+        const titleKey = f.title?.toLowerCase().trim();
+        if (!titleKey) return;
+        if (!filmMap.has(titleKey)) {
+          filmMap.set(titleKey, {
             ...f,
             genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
           });
-          titles.add(f.title?.toLowerCase());
         }
       });
-      setFilms(uniqueFilms);
+      setFilms(Array.from(filmMap.values()));
     }
   };
 
   const fetchInCinemasData = async () => {
     const today = new Date().toISOString().split('T')[0];
-    
-    // First try: Today only
     const { data, error } = await supabase
       .from('showtimes')
       .select(`
@@ -98,18 +118,14 @@ export default function Home() {
   };
 
   const fetchYoutubeFeed = async () => {
-    // Fetch films added in the last 24 hours OR just the latest 20 for reliability
-    const yesterday = new Date(Date.now() - 86400000).toISOString();
-    
     const { data, error } = await supabase
       .from('films')
       .select(`
         *,
         film_genres(genres(name))
       `)
-      .eq('source', 'youtube')
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(30);
 
     if (!error) {
       setYoutubeFeed((data || []).map(f => ({
@@ -137,7 +153,8 @@ export default function Home() {
     const { data } = await supabase
       .from('people')
       .select('*')
-      .not('youtube_handle', 'is', null)
+      .eq('is_spotlight', true)
+      .or('youtube_handle.neq.null,youtube_handle.neq."",youtube_channel_id.neq.null,youtube_channel_id.neq.""')
       .order('popularity_score', { ascending: false })
       .limit(6);
     if (data) setCreators(data);
@@ -151,7 +168,6 @@ export default function Home() {
     return true;
   });
 
-  const featuredFilms = films.filter(f => f.is_featured);
   const trendingFilms = films.filter(f => f.is_trending || f.view_count > 500);
   
   // New Releases: Combination of latest additions (synced today/recently) 
@@ -170,7 +186,7 @@ export default function Home() {
   return (
     <div className="w-full pb-20 bg-bg min-h-screen">
       <HeroSection 
-        featuredFilms={featuredFilms.length > 0 ? featuredFilms : films.slice(0, 5)} 
+        featuredFilms={featuredFilms} 
       />
 
       <div className="max-w-7xl mx-auto border-x border-border">
@@ -225,7 +241,7 @@ export default function Home() {
                   <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
                     Recently Added
                   </h2>
-                  <p className="text-text-muted text-sm font-medium opacity-80">Latest videos from the last 24 hours</p>
+                  <p className="text-text-muted text-sm font-medium opacity-80">Latest additions to our library</p>
                 </div>
                 <div className="flex bg-surface p-1 rounded-lg border border-border shadow-sm">
                   {['All', 'Movies', 'Skits'].map(filter => (
@@ -334,11 +350,18 @@ export default function Home() {
                               {creator.name}
                             </h3>
                             <div className="mt-2 flex items-center gap-4">
-                              <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers || 0).toLocaleString()} subscribers</span>
-                              <span className="text-[9px] font-bold text-text-muted flex items-center gap-1.5">
-                                {parseInt(stats.videos || 0).toLocaleString()} videos
-                                <Icon icon="solar:clapperboard-linear" className="text-xs" />
-                              </span>
+                              {(parseInt(stats.subscribers) > 0) && (
+                                <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers).toLocaleString()} subscribers</span>
+                              )}
+                              {(parseInt(stats.videos) > 0) && (
+                                <span className="text-[9px] font-bold text-text-muted flex items-center gap-1.5">
+                                  {parseInt(stats.videos).toLocaleString()} videos
+                                  <Icon icon="solar:clapperboard-linear" className="text-xs" />
+                                </span>
+                              )}
+                              {(!stats.subscribers && !stats.videos) && (
+                                <span className="text-[9px] font-bold text-text-muted italic opacity-60 tracking-wider">Spotlight Creator</span>
+                              )}
                             </div>
                           </div>
                         </div>
