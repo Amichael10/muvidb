@@ -262,13 +262,6 @@ export default function Home() {
     return true;
   });
 
-  const trendingFilms = films.filter(f => f.is_trending || f.view_count > 500);
-  
-  // Fallback for New Releases if the 2026 fetch is empty
-  const displayNewReleases = newReleases.length > 0 
-    ? newReleases 
-    : films.filter(f => f.year >= 2025).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
   const formatViews = (count) => {
     if (!count) return '0';
     if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
@@ -286,14 +279,16 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto border-x border-border">
         {/* 2. IN CINEMAS NOW */}
-        <div className="border-b border-border py-12">
-          <FilmRow
-            title="In Cinemas Now"
-            subtitle="Catch the latest Nollywood magic on the big screen"
-            films={inCinemas.length > 0 ? inCinemas : films.slice(0, 10)}
-            isLoading={isLoading}
-          />
-        </div>
+        {(isLoading || inCinemas.length > 0) && (
+          <div className="border-b border-border py-12">
+            <FilmRow
+              title="In Cinemas Now"
+              subtitle="Catch the latest Nollywood magic on the big screen"
+              films={inCinemas}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
 
         {/* 3. GENRE MOOD RAIL */}
         <div className="border-b border-border">
@@ -301,14 +296,16 @@ export default function Home() {
         </div>
 
         {/* 4. NEW RELEASES */}
-        <div className="border-b border-border py-12">
-          <FilmRow
-            title="New Releases"
-            subtitle="The freshest stories from this quarter"
-            films={newReleases.length > 0 ? newReleases : films.filter(f => f.year >= 2025).slice(0, 10)}
-            isLoading={isLoading}
-          />
-        </div>
+        {(isLoading || newReleases.length > 0) && (
+          <div className="border-b border-border py-12">
+            <FilmRow
+              title="New Releases"
+              subtitle="The freshest stories from this quarter"
+              films={newReleases}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
 
         {/* 5. RECENTLY ADDED */}
         <div className="border-b border-border py-12 bg-surface-2/5">
@@ -347,79 +344,6 @@ export default function Home() {
                     <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The storytellers of YouTube</p>
                   </div>
                   <Link to="/channels" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline">View all</Link>
-                </div>
-
-              <FilmRow
-                title=""
-                films={filteredYoutube}
-                isLoading={isLoading}
-                noHeader
-              />
-            </div>
-          </section>
-        </div>
-
-        {/* Filmmaker Spotlight */}
-        {(isLoading || spotlightPerson) && (
-          <div className="border-b border-border">
-            <section className="py-16">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-end justify-between mb-10">
-                  <div className="space-y-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                      People
-                    </h2>
-                    <p className="text-brand text-[10px] font-bold tracking-[0.1em]">Industry Professionals</p>
-                  </div>
-                  <Link
-                    to="/people"
-                    className="bg-surface border border-border text-text-primary font-bold text-[10px] px-6 py-3 rounded-lg hover:border-brand hover:text-brand transition-all duration-300 active:scale-95 flex items-center gap-2"
-                  >
-                    View all
-                    <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
-                  </Link>
-                </div>
-
-                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-border shadow-sm">
-                  <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-                  <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none"></div>
-                  <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
-                    <div className="xl:flex-1">
-                      <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
-                    </div>
-                    <div className="h-px xl:w-px xl:h-64 bg-border"></div>
-                    <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
-                      {isLoading ? (
-                        [...Array(4)].map((_, i) => (
-                          <PersonCard key={i} variant="compact" isLoading={true} />
-                        ))
-                      ) : (
-                        otherPeople.map(person => (
-                          <PersonCard key={person.id} person={person} variant="compact" />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {/* Creator Hub Section */}
-        {(isLoading || creators.length > 0) && (
-          <div className="border-b border-border bg-surface-2/5 relative overflow-hidden">
-             <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-            <section className="py-20 relative z-10">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-16">
-                  <h2 className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter">
-                    Featured Channels
-                  </h2>
-                  <div className="h-px w-20 bg-brand mx-auto mt-4" />
-                  <p className="text-text-muted mt-6 max-w-lg mx-auto text-sm leading-relaxed">
-                    Official channels from top storytellers.
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-border rounded-xl overflow-hidden shadow-sm">
@@ -523,7 +447,7 @@ export default function Home() {
         )}
 
         {/* 9. COMING SOON */}
-        {comingSoon.length > 0 && (
+        {(isLoading || comingSoon.length > 0) && (
           <div className="py-16">
             <FilmRow
               title="Coming Soon"
