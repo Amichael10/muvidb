@@ -132,22 +132,36 @@ const CompanyDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0F1E] pt-20">
-        <div className="max-w-5xl mx-auto px-4 py-8 animate-pulse">
-          <div className="flex gap-6 mb-8">
-            <div className="w-24 h-24 bg-[#13192B] rounded-2xl" />
-            <div className="flex-1 space-y-3">
-              <div className="h-8 bg-[#13192B] rounded w-64" />
-              <div className="h-4 bg-[#13192B] rounded w-48" />
+      <div className="w-full bg-bg min-h-screen">
+        <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
+          <div className="absolute inset-0 bg-surface-2 animate-shimmer opacity-20" />
+          <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border flex flex-col md:flex-row gap-10 items-center md:items-start">
+            <div className="w-32 h-32 rounded-xl bg-surface-2 animate-shimmer shrink-0 shadow-2xl border border-border" />
+            <div className="flex-1 space-y-6 w-full">
+              <div className="space-y-3">
+                <div className="h-10 w-64 bg-surface-2 rounded-lg animate-shimmer" />
+                <div className="h-4 w-32 bg-surface-2 rounded-md animate-shimmer opacity-60" />
+              </div>
+              <div className="h-16 w-full max-w-2xl bg-surface-2 rounded-lg animate-shimmer opacity-40" />
+              <div className="h-20 w-64 bg-surface-2 rounded-xl animate-shimmer border border-border" />
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div
-                key={i}
-                className="aspect-[2/3] bg-[#13192B] rounded-xl"
-              />
-            ))}
+        </div>
+
+        <div className="max-w-7xl mx-auto border-x border-border min-h-[400px]">
+          <div className="p-8 md:p-12 border-b border-border bg-surface-2/5">
+            <div className="h-8 w-32 bg-surface-2 rounded-md animate-shimmer" />
+          </div>
+          <div className="p-8 md:p-12">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="space-y-3">
+                  <div className="aspect-[2/3] bg-surface-2 rounded-xl animate-shimmer border border-border" />
+                  <div className="h-3 w-3/4 bg-surface-2 rounded animate-shimmer" />
+                  <div className="h-2 w-1/4 bg-surface-2 rounded animate-shimmer opacity-60" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

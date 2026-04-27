@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import { Skeleton } from '../components/ui/Skeleton';
 
 export default function Browse() {
@@ -201,8 +202,8 @@ export default function Browse() {
             {loading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="aspect-[2/3] bg-surface rounded-xl overflow-hidden border border-border animate-pulse">
-                     <Skeleton className="h-full w-full" />
+                  <div key={i} className="flex justify-center">
+                    <SkeletonCard size="md" />
                   </div>
                 ))}
               </div>

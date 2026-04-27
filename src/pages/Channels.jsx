@@ -109,17 +109,20 @@ function ChannelCard({ channel }) {
 function ChannelSkeleton() {
   return (
     <div className="bg-surface rounded-lg overflow-hidden border border-border">
-      <div className="h-20 bg-surface-2/20" />
-      <div className="px-4 pb-5 pt-10 space-y-3">
+      <div className="h-20 bg-surface-2 animate-shimmer" />
+      <div className="px-4 pb-5 pt-10 space-y-4 relative">
         <div className="absolute -top-8 left-4">
-           <Skeleton className="w-16 h-16 rounded-xl border-4 border-surface" />
+           <div className="w-16 h-16 rounded-xl border-4 border-surface bg-surface-2 animate-shimmer shadow-lg" />
         </div>
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-3 w-1/2" />
+        <div className="space-y-2">
+          <div className="h-4 w-3/4 bg-surface-2 rounded-md animate-shimmer" />
+          <div className="h-3 w-1/2 bg-surface-2 rounded-md animate-shimmer opacity-60" />
+        </div>
         <div className="pt-2 space-y-2">
-          <Skeleton className="h-2 w-full" />
-          <Skeleton className="h-2 w-5/6" />
+          <div className="h-2 w-full bg-surface-2 rounded-full animate-shimmer opacity-40" />
+          <div className="h-2 w-5/6 bg-surface-2 rounded-full animate-shimmer opacity-40" />
         </div>
+        <div className="h-4 w-20 bg-surface-2 rounded animate-shimmer" />
       </div>
     </div>
   );

@@ -151,27 +151,42 @@ function VideoCard({ video }) {
 
 const ChannelDetailSkeleton = () => (
     <div className="min-h-screen bg-bg">
-        <div className="relative h-52 md:h-72 bg-surface-2/10 border-b border-border animate-pulse" />
-        <div className="max-w-7xl mx-auto border-x border-border -mt-12 px-4 sm:px-6 lg:px-8 pb-12">
-            <div className="flex flex-col md:flex-row gap-8 items-end md:items-start animate-pulse">
-                <Skeleton className="w-32 h-32 md:w-40 md:h-40 rounded-xl border-4 border-bg" />
-                <div className="flex-1 pt-4 md:pt-16 space-y-4">
-                    <Skeleton className="h-10 w-1/3" />
-                    <Skeleton className="h-4 w-1/4" />
+        <div className="relative h-52 md:h-72 bg-surface-2/10 border-b border-border overflow-hidden">
+            <div className="absolute inset-0 bg-surface-2 animate-shimmer opacity-20" />
+        </div>
+        <div className="max-w-7xl mx-auto border-x border-border -mt-12 px-4 sm:px-6 lg:px-8 pb-12 relative z-10">
+            <div className="flex flex-col md:flex-row gap-8 items-end md:items-start">
+                <div className="w-32 h-32 md:w-40 md:h-40 rounded-xl border-4 border-bg bg-surface-2 animate-shimmer shrink-0" />
+                <div className="flex-1 pt-4 md:pt-16 space-y-4 w-full">
+                    <div className="h-10 w-1/3 bg-surface-2 rounded-lg animate-shimmer" />
+                    <div className="h-4 w-1/4 bg-surface-2 rounded-md animate-shimmer" />
                 </div>
             </div>
         </div>
         <div className="max-w-7xl mx-auto border-x border-border border-t border-border">
             <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-border">
                 <div className="lg:col-span-3 p-8 md:p-12 space-y-8">
-                    <Skeleton className="h-8 w-1/4" />
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {[1,2,3,4].map(i => <div key={i} className="aspect-video bg-surface-2/10 rounded-lg border border-border animate-pulse" />)}
+                    <div className="h-8 w-48 bg-surface-2 rounded-md animate-shimmer" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                            <div key={i} className="space-y-3">
+                                <div className="aspect-video bg-surface-2 rounded-lg border border-border animate-shimmer" />
+                                <div className="h-3 w-full bg-surface-2 rounded animate-shimmer" />
+                                <div className="h-2 w-1/2 bg-surface-2 rounded animate-shimmer opacity-60" />
+                            </div>
+                        ))}
                     </div>
                 </div>
-                <div className="lg:col-span-1 p-8 space-y-4">
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-32 w-full rounded-xl" />
+                <div className="lg:col-span-1 p-8 space-y-8">
+                    <div className="space-y-4">
+                        <div className="h-4 w-24 bg-surface-2 rounded animate-shimmer" />
+                        <div className="h-48 w-full bg-surface-2 rounded-xl border border-border animate-shimmer" />
+                    </div>
+                    <div className="space-y-4">
+                        <div className="h-4 w-32 bg-surface-2 rounded animate-shimmer" />
+                        <div className="h-12 w-full bg-surface-2 rounded-lg border border-border animate-shimmer" />
+                        <div className="h-12 w-full bg-surface-2 rounded-lg border border-border animate-shimmer" />
+                    </div>
                 </div>
             </div>
         </div>

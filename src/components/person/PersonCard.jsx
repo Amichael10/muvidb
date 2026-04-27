@@ -1,6 +1,33 @@
 import { Link } from 'react-router-dom';
 
-export default function PersonCard({ person, variant = 'compact' }) {
+export default function PersonCard({ person, variant = 'compact', isLoading }) {
+  if (isLoading) {
+    if (variant === 'compact') {
+      return (
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-surface-2 animate-shimmer mb-3 border border-border"></div>
+          <div className="w-16 h-4 bg-surface-2 animate-shimmer rounded-md mb-1"></div>
+          <div className="w-12 h-3 bg-surface-2 animate-shimmer rounded-md opacity-50"></div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center w-full">
+        <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg bg-surface-2 animate-shimmer shrink-0 border border-border shadow-sm"></div>
+        <div className="flex-1 w-full space-y-4">
+          <div className="w-1/3 h-8 bg-surface-2 animate-shimmer rounded-lg"></div>
+          <div className="w-1/4 h-4 bg-surface-2 animate-shimmer rounded-md"></div>
+          <div className="w-full h-12 bg-surface-2 animate-shimmer rounded-md"></div>
+          <div className="flex gap-6">
+            <div className="w-16 h-8 bg-surface-2 animate-shimmer rounded-md"></div>
+            <div className="w-16 h-8 bg-surface-2 animate-shimmer rounded-md"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!person) return null;
 
   // Format popularity (e.g., 12400000 -> 12.4M)

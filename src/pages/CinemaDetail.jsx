@@ -41,16 +41,19 @@ const chainColors = {
 const CinemaDetailSkeleton = () => (
     <div className="min-h-screen bg-bg">
         <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
+            <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
             <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
-                <div className="flex flex-col md:flex-row gap-8 items-center md:items-start animate-pulse">
-                    <Skeleton className="w-32 h-32 rounded-xl" />
-                    <div className="flex-1 space-y-4">
-                        <Skeleton className="h-10 w-1/3" />
-                        <Skeleton className="h-4 w-1/4" />
-                        <div className="grid grid-cols-3 gap-0 border border-border rounded-lg max-w-md">
-                            <div className="p-4 border-r border-border"><Skeleton className="h-8 w-full" /></div>
-                            <div className="p-4 border-r border-border"><Skeleton className="h-8 w-full" /></div>
-                            <div className="p-4"><Skeleton className="h-8 w-full" /></div>
+                <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+                    <div className="w-32 h-32 rounded-xl bg-surface-2 animate-shimmer shadow-2xl shrink-0" />
+                    <div className="flex-1 space-y-6 w-full">
+                        <div className="space-y-3">
+                            <div className="h-10 w-1/3 bg-surface-2 rounded-lg animate-shimmer mx-auto md:mx-0" />
+                            <div className="h-4 w-1/4 bg-surface-2 rounded-md animate-shimmer mx-auto md:mx-0" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-0 border border-border rounded-lg max-w-md mx-auto md:mx-0 bg-surface overflow-hidden">
+                            <div className="p-4 border-r border-border"><div className="h-8 w-full bg-surface-2 rounded-md animate-shimmer" /></div>
+                            <div className="p-4 border-r border-border"><div className="h-8 w-full bg-surface-2 rounded-md animate-shimmer" /></div>
+                            <div className="p-4"><div className="h-8 w-full bg-surface-2 rounded-md animate-shimmer" /></div>
                         </div>
                     </div>
                 </div>
@@ -58,16 +61,35 @@ const CinemaDetailSkeleton = () => (
         </div>
         <div className="max-w-7xl mx-auto border-x border-border">
             <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-border">
-                <div className="lg:col-span-1 p-8 space-y-4">
-                    <Skeleton className="h-4 w-1/2" />
-                    <div className="space-y-2">
-                        {[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                <div className="lg:col-span-1 p-8 md:p-12 space-y-8">
+                    <div className="h-4 w-24 bg-surface-2 rounded animate-shimmer" />
+                    <div className="space-y-3">
+                        {[1, 2, 3, 4, 5].map(i => (
+                            <div key={i} className="h-12 w-full bg-surface-2 rounded-lg border border-border animate-shimmer" />
+                        ))}
                     </div>
                 </div>
-                <div className="lg:col-span-3 p-8 space-y-8">
-                    <Skeleton className="h-8 w-1/4" />
-                    {[1,2].map(i => (
-                        <div key={i} className="bg-surface rounded-xl border border-border h-48 animate-pulse" />
+                <div className="lg:col-span-3 p-8 md:p-12 space-y-8">
+                    <div className="h-12 w-full bg-surface-2/10 rounded-xl border border-border animate-shimmer" />
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="bg-surface rounded-xl border border-border overflow-hidden animate-shimmer">
+                            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
+                                <div className="sm:w-32 lg:w-40 h-48 sm:h-auto bg-surface-2 animate-shimmer" />
+                                <div className="flex-1 p-8 space-y-4">
+                                    <div className="h-6 w-1/2 bg-surface-2 rounded animate-shimmer" />
+                                    <div className="h-4 w-1/3 bg-surface-2 rounded animate-shimmer opacity-60" />
+                                    <div className="flex gap-2">
+                                        <div className="h-6 w-16 bg-surface-2 rounded border border-border animate-shimmer" />
+                                        <div className="h-6 w-16 bg-surface-2 rounded border border-border animate-shimmer" />
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-3 pt-4">
+                                        {[1, 2, 3, 4].map(j => (
+                                            <div key={j} className="h-10 bg-surface-2 rounded-lg border border-border animate-shimmer" />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     ))}
                 </div>
             </div>

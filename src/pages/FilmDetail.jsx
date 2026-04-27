@@ -12,17 +12,75 @@ import { Skeleton } from '../components/ui/Skeleton';
 
 const FilmDetailSkeleton = () => (
     <div className="w-full bg-bg min-h-screen">
-        <div className="relative w-full h-[60vh] min-h-[500px] bg-surface-2/20 animate-pulse border-b border-border" />
+        <div className="relative w-full h-[60vh] min-h-[500px] bg-surface-2/10 border-b border-border overflow-hidden">
+            <div className="absolute inset-0 bg-surface-2 animate-shimmer opacity-20" />
+            <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/40 to-transparent"></div>
+            <div className="absolute bottom-0 left-0 w-full">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-end gap-8 pb-8">
+                    <div className="hidden md:block w-64 h-96 bg-surface-2 rounded-xl animate-shimmer shrink-0 shadow-2xl border border-white/10"></div>
+                    <div className="flex-1 space-y-6 w-full pb-4">
+                        <div className="space-y-4">
+                            <div className="h-12 w-2/3 bg-surface-2 rounded-lg animate-shimmer"></div>
+                            <div className="h-4 w-1/3 bg-surface-2 rounded-md animate-shimmer opacity-60"></div>
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="h-6 w-20 bg-surface-2 rounded-md animate-shimmer"></div>
+                            <div className="h-6 w-20 bg-surface-2 rounded-md animate-shimmer"></div>
+                            <div className="h-6 w-20 bg-surface-2 rounded-md animate-shimmer"></div>
+                        </div>
+                        <div className="h-10 w-48 bg-surface-2 rounded-lg animate-shimmer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div className="max-w-7xl mx-auto border-x border-border min-h-[600px]">
             <div className="grid grid-cols-1 lg:grid-cols-3 divide-x divide-border">
-                <div className="lg:col-span-2 p-8 md:p-12 space-y-8">
-                    <Skeleton className="h-10 w-1/3" />
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-[400px] w-full rounded-xl" />
+                <div className="lg:col-span-2">
+                    <div className="p-8 md:p-12 border-b border-border space-y-6">
+                        <div className="h-8 w-48 bg-surface-2 rounded-md animate-shimmer" />
+                        <div className="space-y-3">
+                            <div className="h-4 w-full bg-surface-2 rounded animate-shimmer" />
+                            <div className="h-4 w-full bg-surface-2 rounded animate-shimmer" />
+                            <div className="h-4 w-4/5 bg-surface-2 rounded animate-shimmer" />
+                        </div>
+                    </div>
+                    <div className="p-8 md:p-12 border-b border-border space-y-6 bg-surface-2/5">
+                        <div className="h-8 w-56 bg-surface-2 rounded-md animate-shimmer" />
+                        <div className="aspect-video w-full bg-surface-2 rounded-xl border border-border animate-shimmer" />
+                    </div>
+                    <div className="p-8 md:p-12 border-b border-border space-y-8">
+                        <div className="h-8 w-32 bg-surface-2 rounded-md animate-shimmer" />
+                        <div className="flex gap-8 overflow-hidden">
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <div key={i} className="shrink-0 w-32 space-y-3">
+                                    <div className="w-32 h-32 bg-surface-2 rounded-xl border border-border animate-shimmer" />
+                                    <div className="h-3 w-full bg-surface-2 rounded animate-shimmer" />
+                                    <div className="h-2 w-1/2 bg-surface-2 rounded animate-shimmer opacity-60" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
-                <div className="lg:col-span-1 p-8 space-y-8">
-                    <Skeleton className="h-32 w-full rounded-xl" />
-                    <Skeleton className="h-64 w-full rounded-xl" />
+                <div className="lg:col-span-1 divide-y divide-border">
+                    <div className="p-8">
+                        <div className="h-24 w-full bg-surface-2 rounded-xl border border-border animate-shimmer" />
+                    </div>
+                    <div className="p-8 space-y-6 bg-surface-2/5">
+                        <div className="h-4 w-24 bg-surface-2 rounded animate-shimmer" />
+                        <div className="space-y-4">
+                            {[1, 2, 3, 4].map(i => (
+                                <div key={i} className="flex justify-between items-center pb-3 border-b border-border last:border-0 last:pb-0">
+                                    <div className="h-3 w-16 bg-surface-2 rounded animate-shimmer" />
+                                    <div className="h-3 w-20 bg-surface-2 rounded animate-shimmer" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="p-8 space-y-4">
+                        <div className="h-12 w-full bg-surface-2 rounded-lg animate-shimmer" />
+                        <div className="h-12 w-full bg-surface-2 rounded-lg animate-shimmer" />
+                    </div>
                 </div>
             </div>
         </div>

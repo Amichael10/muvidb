@@ -50,30 +50,48 @@ function fmtDuration(secs) {
 }
 
 const PersonDetailSkeleton = () => (
-    <div className="min-h-screen bg-bg">
-        <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-            <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
-                <div className="flex flex-col md:flex-row gap-10 items-center md:items-start animate-pulse">
-                    <Skeleton className="w-48 h-48 md:w-56 md:h-56 rounded-xl" />
-                    <div className="flex-1 space-y-4">
-                        <Skeleton className="h-12 w-1/3" />
-                        <Skeleton className="h-4 w-1/4" />
-                        <div className="grid grid-cols-3 gap-0 border border-border rounded-lg max-w-sm">
-                            <div className="p-4 border-r border-border"><Skeleton className="h-8 w-full" /></div>
-                            <div className="p-4 border-r border-border"><Skeleton className="h-8 w-full" /></div>
-                            <div className="p-4"><Skeleton className="h-8 w-full" /></div>
-                        </div>
-                    </div>
-                </div>
+  <div className="min-h-screen bg-bg">
+    <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
+      <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
+      <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
+        <div className="flex flex-col md:flex-row gap-10 items-center md:items-start">
+          <div className="w-48 h-48 md:w-56 md:h-56 rounded-xl bg-surface-2 animate-shimmer shrink-0 shadow-2xl"></div>
+          <div className="flex-1 space-y-6 w-full">
+            <div className="space-y-3">
+              <div className="h-12 w-2/3 bg-surface-2 rounded-lg animate-shimmer mx-auto md:mx-0"></div>
+              <div className="h-4 w-1/3 bg-surface-2 rounded-md animate-shimmer mx-auto md:mx-0"></div>
             </div>
-        </div>
-        <div className="max-w-7xl mx-auto border-x border-border p-8 md:p-12 space-y-8">
-            <Skeleton className="h-10 w-1/4" />
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                {[1,2,3,4,5].map(i => <div key={i} className="aspect-[2/3] bg-surface rounded-lg border border-border animate-pulse" />)}
+            <div className="grid grid-cols-3 gap-0 border border-border rounded-lg max-w-sm mx-auto md:mx-0 bg-surface overflow-hidden">
+              <div className="p-4 border-r border-border"><div className="h-8 w-full bg-surface-2 rounded-md animate-shimmer"></div></div>
+              <div className="p-4 border-r border-border"><div className="h-8 w-full bg-surface-2 rounded-md animate-shimmer"></div></div>
+              <div className="p-4"><div className="h-8 w-full bg-surface-2 rounded-md animate-shimmer"></div></div>
             </div>
+            <div className="space-y-2 max-w-2xl mx-auto md:mx-0">
+              <div className="h-4 w-full bg-surface-2 rounded-md animate-shimmer"></div>
+              <div className="h-4 w-5/6 bg-surface-2 rounded-md animate-shimmer"></div>
+              <div className="h-4 w-4/6 bg-surface-2 rounded-md animate-shimmer"></div>
+            </div>
+            <div className="flex gap-4 justify-center md:justify-start">
+              <div className="h-12 w-32 bg-surface-2 rounded-lg animate-shimmer"></div>
+              <div className="h-12 w-40 bg-surface-2 rounded-lg animate-shimmer"></div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
+    <div className="max-w-7xl mx-auto border-x border-border p-8 md:p-12 space-y-12">
+      <div className="h-10 w-48 bg-surface-2 rounded-md animate-shimmer"></div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} className="space-y-3">
+            <div className="aspect-[2/3] bg-surface-2 rounded-lg border border-border animate-shimmer overflow-hidden"></div>
+            <div className="h-3 w-3/4 bg-surface-2 rounded animate-shimmer"></div>
+            <div className="h-2 w-1/2 bg-surface-2 rounded animate-shimmer opacity-60"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
 )
 
 const Biography = ({ text }) => {

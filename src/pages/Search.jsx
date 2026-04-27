@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
-import { Skeleton } from '../components/ui/Skeleton';
+import SkeletonCard from '../components/ui/SkeletonCard';
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -166,13 +166,31 @@ export default function Search() {
         {/* Results Body */}
         <div className="p-8 md:p-12">
           {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
-              {[...Array(10)].map((_, i) => (
-                <div key={i} className="aspect-[2/3] bg-surface rounded-xl overflow-hidden border border-border animate-pulse">
-                    <Skeleton className="h-full w-full" />
-                </div>
-              ))}
-            </div>
+            activeTab === 'films' ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
+                {[...Array(10)].map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            ) : activeTab === 'people' ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8">
+                {[...Array(12)].map((_, i) => (
+                  <PersonCard key={i} isLoading variant="compact" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 animate-shimmer shadow-sm">
+                    <div className="w-14 h-14 bg-surface-2 rounded-lg shrink-0 border border-border/50"></div>
+                    <div className="flex-1 space-y-2">
+                        <div className="h-4 w-2/3 bg-surface-2 rounded"></div>
+                        <div className="h-3 w-1/3 bg-surface-2 rounded opacity-60"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
             <>
               {activeTab === 'films' && (

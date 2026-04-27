@@ -197,8 +197,38 @@ export default function ProDashboard() {
 
         <main className="flex-1 p-8 md:p-16 relative">
           {loading ? (
-             <div className="space-y-12 animate-pulse">
-                <Skeleton className="h-10 w-1/3" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">{[1,2,3,4].map(i => <div key={i} className="h-32 bg-surface rounded-xl border border-border" />)}</div>
+             <div className="space-y-12">
+                {/* Profile Header Skeleton */}
+                <div className="flex items-end justify-between border-b border-border pb-6 animate-shimmer">
+                    <div className="h-10 w-64 bg-surface-2 rounded-lg"></div>
+                    <div className="h-4 w-24 bg-surface-2 rounded-md"></div>
+                </div>
+
+                {/* Profile Card Skeleton */}
+                <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col md:flex-row gap-10 animate-shimmer">
+                    <div className="w-40 h-40 rounded-2xl bg-surface-2 shrink-0"></div>
+                    <div className="space-y-6 flex-1">
+                        <div className="space-y-2">
+                            <div className="h-10 w-1/2 bg-surface-2 rounded-lg"></div>
+                            <div className="h-4 w-24 bg-surface-2 rounded-md"></div>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="h-4 w-full bg-surface-2 rounded-md"></div>
+                            <div className="h-4 w-full bg-surface-2 rounded-md"></div>
+                            <div className="h-4 w-2/3 bg-surface-2 rounded-md"></div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Stats Grid Skeleton */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-shimmer">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="bg-surface border border-border p-8 rounded-2xl space-y-4">
+                            <div className="h-3 w-20 bg-surface-2 rounded-md"></div>
+                            <div className="h-10 w-16 bg-surface-2 rounded-lg"></div>
+                        </div>
+                    ))}
+                </div>
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">

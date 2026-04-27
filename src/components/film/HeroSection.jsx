@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import WatchOptions from './WatchOptions';
 import { Icon } from '@iconify/react';
 
-export default function HeroSection({ featuredFilms: featuredFilmsProp, featuredFilm: singleFilmProp }) {
+export default function HeroSection({ featuredFilms: featuredFilmsProp, featuredFilm: singleFilmProp, isLoading }) {
   // Handle both array and single object props for backward compatibility
   const featuredFilms = featuredFilmsProp || (singleFilmProp ? [singleFilmProp] : []);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -18,6 +18,36 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
     return () => clearInterval(interval);
   }, [featuredFilms.length]);
+
+  if (isLoading) {
+    return (
+      <section className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg">
+        <div className="absolute inset-0 z-0 bg-surface animate-shimmer"></div>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-32 pt-32">
+          <div className="flex justify-between items-end w-full">
+            <div className="max-w-2xl space-y-6">
+              <div className="flex gap-2">
+                <div className="w-16 h-6 bg-white/10 rounded-lg animate-pulse"></div>
+                <div className="w-16 h-6 bg-white/10 rounded-lg animate-pulse"></div>
+              </div>
+              <div className="w-full h-16 md:h-24 bg-white/10 rounded-xl animate-pulse"></div>
+              <div className="flex gap-4">
+                <div className="w-20 h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className="w-20 h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className="w-20 h-4 bg-white/10 rounded animate-pulse"></div>
+              </div>
+              <div className="w-full h-20 bg-white/10 rounded-xl animate-pulse"></div>
+              <div className="flex gap-4">
+                <div className="w-32 h-12 bg-white/10 rounded-xl animate-pulse"></div>
+                <div className="w-32 h-12 bg-white/10 rounded-xl animate-pulse"></div>
+              </div>
+            </div>
+            <div className="hidden lg:block w-64 h-96 bg-white/10 rounded-2xl animate-pulse"></div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (!featuredFilms || featuredFilms.length === 0) return null;
 

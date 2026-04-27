@@ -91,16 +91,17 @@ export default function Home() {
   };
 
   const fetchNewReleases = async () => {
-    // Fetch latest 2026 releases specifically from recent fetches
+    // Fetch latest 2026 releases specifically from recent fetches (Cinema & YouTube)
     const { data, error } = await supabase
       .from('films')
       .select(`
         id, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating, 
-        is_featured, is_trending, release_type, created_at,
+        is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
       `)
       .eq('year', 2026)
+      .order('release_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -210,6 +211,7 @@ export default function Home() {
     <div className="w-full pb-20 bg-bg min-h-screen">
       <HeroSection 
         featuredFilms={featuredFilms} 
+        isLoading={isLoading}
       />
 
       <div className="max-w-7xl mx-auto border-x border-border">
@@ -294,7 +296,7 @@ export default function Home() {
         </div>
 
         {/* Filmmaker Spotlight */}
-        {spotlightPerson && (
+        {(isLoading || spotlightPerson) && (
           <div className="border-b border-border">
             <section className="py-16">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -319,13 +321,19 @@ export default function Home() {
                   <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none"></div>
                   <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
                     <div className="xl:flex-1">
-                      <PersonCard person={spotlightPerson} variant="full" />
+                      <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
                     </div>
                     <div className="h-px xl:w-px xl:h-64 bg-border"></div>
                     <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
-                      {otherPeople.map(person => (
-                        <PersonCard key={person.id} person={person} variant="compact" />
-                      ))}
+                      {isLoading ? (
+                        [...Array(4)].map((_, i) => (
+                          <PersonCard key={i} variant="compact" isLoading={true} />
+                        ))
+                      ) : (
+                        otherPeople.map(person => (
+                          <PersonCard key={person.id} person={person} variant="compact" />
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -335,7 +343,7 @@ export default function Home() {
         )}
 
         {/* Creator Hub Section */}
-        {creators.length > 0 && (
+        {(isLoading || creators.length > 0) && (
           <div className="border-b border-border bg-surface-2/5 relative overflow-hidden">
              <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
             <section className="py-20 relative z-10">
@@ -351,46 +359,58 @@ export default function Home() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-border rounded-xl overflow-hidden shadow-sm">
-                  {creators.map((creator) => {
-                    const stats = creator.youtube_stats || {};
-                    return (
-                      <a 
-                        key={creator.id}
-                        href={getPersonYoutubeChannelUrl(creator) || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group bg-surface p-8 hover:bg-surface-2/50 transition-all duration-500 flex flex-col gap-6 border-r border-b border-border"
-                      >
-                        <div className="flex items-center gap-5">
-                          <img 
-                            src={stats.thumbnail || creator.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
-                            alt={creator.name} 
-                            className="w-16 h-16 rounded-lg object-cover shadow-sm border border-border group-hover:scale-105 transition-transform" 
-                            onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
-                          />
-                          <div>
-                            <h3 className="text-lg font-black text-text-primary group-hover:text-brand transition-colors tracking-tight">
-                              {creator.name}
-                            </h3>
-                            <div className="mt-2 flex items-center gap-4">
-                              {(parseInt(stats.subscribers) > 0) && (
-                                <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers).toLocaleString()} subscribers</span>
-                              )}
-                              {(parseInt(stats.videos) > 0) && (
-                                <span className="text-[9px] font-bold text-text-muted flex items-center gap-1.5">
-                                  {parseInt(stats.videos).toLocaleString()} videos
-                                  <Icon icon="solar:clapperboard-linear" className="text-xs" />
-                                </span>
-                              )}
-                              {(!stats.subscribers && !stats.videos) && (
-                                <span className="text-[9px] font-bold text-text-muted italic opacity-60 tracking-wider">Spotlight Creator</span>
-                              )}
+                  {isLoading ? (
+                    [...Array(6)].map((_, i) => (
+                      <div key={i} className="bg-surface p-8 border-r border-b border-border flex items-center gap-5">
+                        <div className="w-16 h-16 rounded-lg bg-surface-2 animate-shimmer shrink-0"></div>
+                        <div className="flex-1 space-y-3">
+                          <div className="w-2/3 h-5 bg-surface-2 animate-shimmer rounded"></div>
+                          <div className="w-1/2 h-3 bg-surface-2 animate-shimmer rounded opacity-60"></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    creators.map((creator) => {
+                      const stats = creator.youtube_stats || {};
+                      return (
+                        <a 
+                          key={creator.id}
+                          href={getPersonYoutubeChannelUrl(creator) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group bg-surface p-8 hover:bg-surface-2/50 transition-all duration-500 flex flex-col gap-6 border-r border-b border-border"
+                        >
+                          <div className="flex items-center gap-5">
+                            <img 
+                              src={stats.thumbnail || creator.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
+                              alt={creator.name} 
+                              className="w-16 h-16 rounded-lg object-cover shadow-sm border border-border group-hover:scale-105 transition-transform" 
+                              onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
+                            />
+                            <div>
+                              <h3 className="text-lg font-black text-text-primary group-hover:text-brand transition-colors tracking-tight">
+                                {creator.name}
+                              </h3>
+                              <div className="mt-2 flex items-center gap-4">
+                                {(parseInt(stats.subscribers) > 0) && (
+                                  <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers).toLocaleString()} subscribers</span>
+                                )}
+                                {(parseInt(stats.videos) > 0) && (
+                                  <span className="text-[9px] font-bold text-text-muted flex items-center gap-1.5">
+                                    {parseInt(stats.videos).toLocaleString()} videos
+                                    <Icon icon="solar:clapperboard-linear" className="text-xs" />
+                                  </span>
+                                )}
+                                {(!stats.subscribers && !stats.videos) && (
+                                  <span className="text-[9px] font-bold text-text-muted italic opacity-60 tracking-wider">Spotlight Creator</span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </a>
-                    );
-                  })}
+                        </a>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </section>

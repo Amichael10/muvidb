@@ -23,7 +23,12 @@ BEGIN
   VALUES (
     new.id, 
     new.email, 
-    COALESCE(new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'full_name'), 
+    COALESCE(
+      new.raw_user_meta_data->>'name', 
+      new.raw_user_meta_data->>'full_name', 
+      split_part(new.email, '@', 1),
+      'User'
+    ), 
     COALESCE(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture'),
     COALESCE(new.raw_user_meta_data->>'role', 'fan')
   )
@@ -35,7 +40,7 @@ BEGIN
     
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 4. Set up the trigger on auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;

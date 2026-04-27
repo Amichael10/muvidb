@@ -119,12 +119,13 @@ const PersonCard = ({ person, currentUser }) => {
 }
 
 const PersonSkeleton = () => (
-    <div className="bg-surface rounded-xl overflow-hidden border border-border animate-pulse">
-        <div className="aspect-[4/5] bg-surface-2/20" />
-        <div className="p-4 space-y-3">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
-            <Skeleton className="h-10 w-full rounded-lg mt-2" />
+    <div className="bg-surface rounded-xl overflow-hidden border border-border">
+        <div className="aspect-[4/5] bg-surface-2 animate-shimmer" />
+        <div className="p-4 space-y-4">
+            <div className="h-4 w-3/4 bg-surface-2 rounded-md animate-shimmer" />
+            <div className="h-3 w-1/2 bg-surface-2 rounded-md animate-shimmer opacity-60" />
+            <div className="h-3 w-1/3 bg-surface-2 rounded-md animate-shimmer pt-2" />
+            <div className="h-10 w-full bg-surface-2 rounded-lg mt-2 animate-shimmer" />
         </div>
     </div>
 )

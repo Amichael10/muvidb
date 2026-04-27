@@ -69,19 +69,22 @@ const CompanyCard = ({ company, filmCount }) => {
 }
 
 const CompanySkeleton = () => (
-    <div className="bg-surface rounded-xl overflow-hidden border border-border animate-pulse">
-        <div className="p-6 space-y-4">
+    <div className="bg-surface rounded-xl overflow-hidden border border-border">
+        <div className="p-6 space-y-6">
             <div className="flex gap-5">
-                <Skeleton className="w-16 h-16 rounded-xl" />
-                <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/4" />
+                <div className="w-16 h-16 rounded-xl bg-surface-2 animate-shimmer shrink-0" />
+                <div className="flex-1 space-y-3">
+                    <div className="h-4 w-3/4 bg-surface-2 rounded-md animate-shimmer" />
+                    <div className="h-3 w-1/4 bg-surface-2 rounded-md animate-shimmer opacity-60" />
                 </div>
             </div>
-            <Skeleton className="h-10 w-full" />
+            <div className="space-y-3">
+                <div className="h-3 w-full bg-surface-2 rounded-md animate-shimmer opacity-40" />
+                <div className="h-3 w-5/6 bg-surface-2 rounded-md animate-shimmer opacity-40" />
+            </div>
         </div>
         <div className="px-6 py-4 bg-surface-2/30 border-t border-border">
-            <Skeleton className="h-3 w-1/3" />
+            <div className="h-3 w-1/3 bg-surface-2 rounded-md animate-shimmer" />
         </div>
     </div>
 )

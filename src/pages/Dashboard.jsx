@@ -182,10 +182,18 @@ export default function Dashboard() {
         {/* Content */}
         <main className="flex-1 p-8 md:p-16">
           {loading ? (
-            <div className="space-y-8 animate-pulse">
-                <Skeleton className="h-10 w-1/3" />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    {[1,2,3,4].map(i => <div key={i} className="aspect-[2/3] bg-surface rounded-xl border border-border" />)}
+            <div className="space-y-12">
+                <div className="flex items-end justify-between border-b border-border pb-6 animate-shimmer">
+                    <div className="space-y-2">
+                        <div className="h-10 w-48 bg-surface-2 rounded-lg"></div>
+                        <div className="h-4 w-32 bg-surface-2 rounded-md"></div>
+                    </div>
+                    <div className="h-8 w-24 bg-surface-2 rounded-full"></div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                    {[1, 2, 3, 4].map(i => (
+                        <SkeletonCard key={i} />
+                    ))}
                 </div>
             </div>
           ) : (
