@@ -25,6 +25,8 @@ import PeopleList from './pages/PeopleList';
 import Channels from './pages/Channels';
 import ChannelDetail from './pages/ChannelDetail';
 
+import Waitlist from './pages/Waitlist';
+
 // Admin Pages
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminOverview from './pages/admin/AdminOverview';
@@ -97,16 +99,19 @@ function Layout({ children }) {
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith('/admin');
   const isOnboardingPath = location.pathname === '/onboarding';
+  const isWaitlistPath = location.pathname === '/waitlist';
+  
+  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath;
   
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text-primary">
-      {!isAdminPath && !isOnboardingPath && <Navbar />}
-      <main className={`flex-grow ${!isAdminPath && !isOnboardingPath ? 'pt-24 pb-20 lg:pb-0' : ''}`}>
+      {!hideLayout && <Navbar />}
+      <main className={`flex-grow ${!hideLayout ? 'pt-24 pb-20 lg:pb-0' : ''}`}>
         {children}
       </main>
-      {!isAdminPath && !isOnboardingPath && <Footer />}
-      {!isAdminPath && !isOnboardingPath && <MobileNav />}
-      {!isAdminPath && !isOnboardingPath && <BackToTop />}
+      {!hideLayout && <Footer />}
+      {!hideLayout && <MobileNav />}
+      {!hideLayout && <BackToTop />}
     </div>
   );
 }
@@ -148,6 +153,7 @@ export default function App() {
                 <Route path="/companies/:id" element={<CompanyDetail />} />
 
                 {/* Onboarding */}
+                <Route path="/waitlist" element={<Waitlist />} />
                 <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
 
                 {/* Protected Routes */}
