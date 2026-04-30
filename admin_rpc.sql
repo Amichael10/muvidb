@@ -53,20 +53,37 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, auth
 AS $$
+DECLARE
+  v_normalized_role TEXT;
 BEGIN
     -- Security Check: Ensure caller is an admin
     IF (SELECT role FROM public.users WHERE id = auth.uid()) != 'admin' THEN
         RAISE EXCEPTION 'Unauthorized';
     END IF;
 
-    -- Update public.users table 
+    -- Normalize role values to valid enum members
+    v_normalized_role := CASE new_role
+      WHEN 'admin'        THEN 'admin'
+      WHEN 'professional' THEN 'professional'
+      WHEN 'pro'          THEN 'professional'
+      WHEN 'fan'          THEN 'fan'
+      WHEN 'user'         THEN 'fan'
+      ELSE new_role -- Allow direct enum values if they match
+    END;
+
+    -- 1. Update public.users table (cast TEXT -> user_role enum explicitly)
     UPDATE public.users 
-    SET role = new_role 
+    SET role = v_normalized_role::user_role
     WHERE id = target_user_id;
 
-    -- Update auth.users app_metadata for RLS constraints & JWT claims
+    -- 2. Update auth.users raw_app_meta_data for RLS constraints & JWT claims
+    -- Note: The column is named raw_app_meta_data in the auth.users table
     UPDATE auth.users 
-    SET app_metadata = jsonb_set(COALESCE(app_metadata, '{}'::jsonb), '{role}', to_jsonb(new_role)) 
+    SET raw_app_meta_data = jsonb_set(
+      COALESCE(raw_app_meta_data, '{}'::jsonb), 
+      '{role}', 
+      to_jsonb(v_normalized_role)
+    ) 
     WHERE id = target_user_id;
 END;
 $$;

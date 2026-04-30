@@ -16,7 +16,7 @@ BEGIN
       split_part(new.email, '@', 1),
       'User'
     ),
-    COALESCE(new.raw_user_meta_data->>'role', 'user')
+    COALESCE(new.raw_user_meta_data->>'role', 'fan')
   )
   ON CONFLICT (id) DO UPDATE
   SET 

@@ -151,10 +151,10 @@ export default function ClaimProfile() {
                 </div>
                 <input 
                   type="text" 
-                  placeholder="LEGAL NAME..." 
+                  placeholder="legal name..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-bg border border-border text-text-primary rounded-xl pl-16 pr-6 py-5 focus:outline-none focus:border-brand transition-all text-sm font-bold uppercase tracking-widest"
+                  className="w-full bg-bg border border-border text-text-primary rounded-xl pl-16 pr-6 py-5 focus:outline-none focus:border-brand transition-all text-sm font-bold tracking-widest"
                   autoFocus
                 />
               </div>
@@ -248,7 +248,7 @@ export default function ClaimProfile() {
                     required
                     value={claimReason}
                     onChange={(e) => setClaimReason(e.target.value)}
-                    placeholder="PROVIDE LINKS TO SOCIALS, AGENCY CONTACTS, OR OFFICIAL DOCUMENTATION FOR VERIFICATION..."
+                    placeholder="provide links to socials, agency contacts, or official documentation for verification..."
                     className="w-full bg-bg border border-border text-text-primary rounded-xl px-6 py-4 focus:outline-none focus:border-brand transition-all min-h-[150px] text-[11px] font-bold tracking-widest"
                   ></textarea>
                 </div>

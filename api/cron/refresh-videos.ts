@@ -38,6 +38,7 @@ function parseDuration(iso: string): number {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const startTime = Date.now();
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end();
   
   console.log(`[refresh-videos] Triggered. Method: ${req.method}, Query:`, req.query);
@@ -55,6 +56,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { channelId } = req.query;
+  let totalProcessed = 0;
+  let totalCreated = 0;
+  let totalUpdated = 0;
+  let totalFailed = 0;
+
+  // 1. Create a "pending" log entry immediately so the user sees it started
+  const { data: logEntry, error: logErr } = await supabase.from('sync_logs').insert({
+    source: 'youtube',
+    status: 'running',
+    message: `Started sync for ${channelId ? 'channel ' + channelId : 'all channels'}...`,
+    details: { channelId, started_at: new Date().toISOString() }
+  }).select().single();
+
+  const logId = logEntry?.id;
 
   try {
     let channelsToProcess = [];
@@ -73,11 +88,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`[refresh-videos] Processing ${channelsToProcess.length} channels`);
 
-    let totalVideosUpserted = 0;
     const processResults = [];
 
     for (const ch of channelsToProcess) {
       try {
+        // Fetch hidden videos for this channel to avoid re-promoting them
+        const { data: hiddenVids } = await supabase
+          .from('channel_videos')
+          .select('video_id')
+          .eq('channel_id', ch.id)
+          .eq('is_hidden', true);
+        
+        const hiddenSet = new Set(hiddenVids?.map(v => v.video_id) || []);
+
         const handle = ch.channel_handle?.replace(/^@/, '');
         let uploadsId = '';
         let discoveredChannelId = ch.channel_id;
@@ -160,7 +183,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             let filmId = null;
             let matchStatus = 'unmatched';
 
-            if (isPromotable) {
+            // BUG FIX: Check if video was previously marked as hidden
+            if (isPromotable && !hiddenSet.has(v.id)) {
               // 1. Check if film exists
               const { data: existingFilm } = await supabase
                 .from('films')
@@ -191,6 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!filmErr && newFilm) {
                   filmId = newFilm.id;
                   matchStatus = 'matched';
+                  totalCreated++;
                   console.log(`[refresh-videos] Auto-Promoted: ${newFilm.title}`);
 
                   // 3. Auto-Credit Channel Owner
@@ -204,9 +229,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     console.log(`[refresh-videos] Auto-Credited Owner for: ${newFilm.title}`);
                   }
                 } else if (filmErr) {
+                  totalFailed++;
                   console.error(`[refresh-videos] Failed auto-promote ${v.id}:`, filmErr.message);
                 }
               }
+            } else if (isPromotable && hiddenSet.has(v.id)) {
+              console.log(`[refresh-videos] Skipping hidden video: ${v.snippet.title}`);
             }
 
             const videoRow: any = {
@@ -245,14 +273,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         if (upsertErr) {
+          totalFailed++;
           console.error(`[refresh-videos] Upsert error for ${ch.name}:`, upsertErr.message);
           processResults.push({ name: ch.name, status: 'error', reason: upsertErr.message });
         } else {
-          totalVideosUpserted += allVideoRows.length;
+          totalUpdated += allVideoRows.length;
+          totalProcessed += allVideoRows.length;
           await supabase.from('channels').update({ videos_last_fetched_at: new Date().toISOString() }).eq('id', ch.id);
           processResults.push({ name: ch.name, status: 'success', count: allVideoRows.length });
         }
       } catch (err: any) {
+        totalFailed++;
         console.error(`[refresh-videos] Error processing channel ${ch.name}:`, err.message);
         processResults.push({ name: ch.name, status: 'error', reason: err.message });
       }
@@ -282,20 +313,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             await supabase.from('channel_videos').upsert(tmdbRows, { onConflict: 'video_id' });
             await supabase.from('channels').update({ videos_last_fetched_at: new Date().toISOString() }).eq('id', tmdbCh.id);
             tmdbResult = { imported: movies.length };
+            totalUpdated += movies.length;
           }
         }
       }
     }
 
+    const duration = Date.now() - startTime;
+    if (logId) {
+      await supabase.from('sync_logs').update({
+        status: totalFailed === 0 ? 'success' : (totalProcessed > 0 ? 'partial' : 'error'),
+        message: `Processed ${channelsToProcess.length} channels. Created ${totalCreated} films.`,
+        details: { processResults, tmdbResult, completed_at: new Date().toISOString() },
+        duration_ms: duration,
+        items_processed: totalProcessed,
+        items_created: totalCreated,
+        items_updated: totalUpdated,
+        items_failed: totalFailed
+      }).eq('id', logId);
+    }
+
     return res.status(200).json({ 
       success: true, 
-      videos_upserted: totalVideosUpserted,
+      videos_upserted: totalUpdated,
       channels_processed: channelsToProcess.length,
       tmdb_discovery: tmdbResult,
       results: processResults
     });
 
   } catch (err: any) {
+    const duration = Date.now() - startTime;
+    if (logId) {
+      await supabase.from('sync_logs').update({
+        status: 'error',
+        message: err.message,
+        duration_ms: duration,
+        items_failed: 1,
+        details: { error: err.stack, last_processed: totalProcessed }
+      }).eq('id', logId);
+    }
     console.error('[refresh-videos] fatal error:', err.message);
     return res.status(500).json({ error: err.message });
   }

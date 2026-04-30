@@ -233,7 +233,8 @@ export default function AdminUsers() {
               <tr className="bg-surface-2/30 border-b border-border text-text-muted text-[10px] font-bold uppercase tracking-wider">
                 <th className="px-6 py-5 w-24 text-center">ID</th>
                 <th className="px-6 py-5">Profile</th>
-                <th className="px-6 py-5 text-center">Status</th>
+                <th className="px-6 py-5">Status</th>
+                <th className="px-6 py-5">Last Active</th>
                 <th className="px-6 py-5">Registered</th>
                 <th className="px-6 py-5">Linked record</th>
                 <th className="px-8 py-5 text-right">Actions</th>
@@ -241,7 +242,7 @@ export default function AdminUsers() {
             </thead>
             <tbody className="divide-y divide-border/50">
               {isLoading ? (
-                Array(5).fill(0).map((_, i) => <SkeletonRow key={i} columns={6} />)
+                Array(5).fill(0).map((_, i) => <SkeletonRow key={i} columns={7} />)
               ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-20 text-center text-text-muted italic font-medium">
@@ -279,13 +280,29 @@ export default function AdminUsers() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-6 text-center">
+                    <td className="px-6 py-6">
                       <div className="flex flex-col items-center gap-1.5">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${getRoleBadge(u.role)}`}>
                           {u.role}
                         </span>
                         {u.is_banned && (
                           <span className="bg-red-500/10 text-red-500 text-[8px] font-bold uppercase px-2 py-0.5 rounded border border-red-500/20">Banned</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-6">
+                      <div className="text-left">
+                        {u.last_sign_in_at ? (
+                          <>
+                            <p className="text-text-primary font-bold text-xs tracking-tight">
+                              {new Date(u.last_sign_in_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                            <p className="text-[10px] text-text-muted font-bold opacity-60 mt-0.5 uppercase tracking-wider">
+                              {new Date(u.last_sign_in_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-text-muted italic text-[10px] font-bold opacity-40 uppercase tracking-wider">Never logged in</p>
                         )}
                       </div>
                     </td>

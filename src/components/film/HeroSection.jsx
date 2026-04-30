@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import WatchOptions from './WatchOptions';
 import { Icon } from '@iconify/react';
 
@@ -8,6 +8,15 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
   // Handle both array and single object props for backward compatibility
   const featuredFilms = featuredFilmsProp || (singleFilmProp ? [singleFilmProp] : []);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   useEffect(() => {
     if (featuredFilms.length <= 1) return;
@@ -105,10 +114,22 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
                 className="max-w-2xl"
               >
+                {/* Tagline */}
+                <motion.p 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
+                  className="text-brand text-xs font-bold tracking-[0.3em] uppercase mb-4 drop-shadow-md"
+                >
+                  The home of Nollywood — discover, explore, obsess.
+                </motion.p>
+
+
+
                 {/* Genre Pills */}
                 <div className="flex flex-wrap gap-2 mb-6">
                   {(featuredFilm.genres || []).map((genre) => (
-                    <span key={genre} className="px-3 py-1 text-[10px] font-bold bg-black/40 backdrop-blur-md text-white rounded-lg border border-white/10">
+                    <span key={genre} className="px-3 py-1 text-[10px] font-bold bg-white/5 backdrop-blur-md text-white/80 rounded-lg border border-white/10 hover:border-brand/40 transition-colors cursor-default">
                       {genre}
                     </span>
                   ))}

@@ -1,0 +1,246 @@
+{
+  "film": {
+    "id": 364280,
+    "slug": "mami-wata",
+    "title": "Mami Wata",
+    "title_locale": "en-US",
+    "title_upcase": "MAMI WATA",
+    "original_title": "Mami Wata",
+    "year": 2023,
+    "duration": 108,
+    "stills": {
+      "small": "https://assets.mubicdn.net/images/film/364280/image-w256.jpg?1745500731",
+      "medium": "https://assets.mubicdn.net/images/film/364280/image-w448.jpg?1745500731",
+      "standard": "https://assets.mubicdn.net/images/film/364280/image-w856.jpg?1745500731",
+      "retina": "https://assets.mubicdn.net/images/film/364280/image-w1280.jpg?1745500731",
+      "small_overlaid": "https://assets.mubicdn.net/images/film/364280/image-w512_overlaid.jpg?1745500731",
+      "large_overlaid": "https://assets.mubicdn.net/images/film/364280/image-w1504_overlaid.jpg?1745500731",
+      "standard_push": "https://assets.mubicdn.net/images/film/364280/image-w856_two_one.jpg?1745500731"
+    },
+    "still_focal_point": {
+      "x": 0.608547,
+      "y": 0.325228
+    },
+    "hd": true,
+    "average_colour_hex": "0E0E0E",
+    "trailer_url": "https://trailers.mubicdn.net/364280/optimised/1080p-t-mami-wata_en_us_1710948808.mp4",
+    "trailer_id": 104113,
+    "popularity": 159,
+    "web_url": "https://mubi.com/films/mami-wata",
+    "genres": [
+      "Drama",
+      "Fantasy",
+      "Thriller"
+    ],
+    "average_rating": 4.2,
+    "average_rating_out_of_ten": 8.5,
+    "number_of_ratings": 452,
+    "mubi_release": false,
+    "should_use_safe_still": false,
+    "still_url": "https://images.mubicdn.net/images/film/364280/cache-836667-1745500731/image-w1280.jpg",
+    "critic_review_rating": 4,
+    "content_rating": {
+      "label": "mature",
+      "rating_code": "MATURE",
+      "description": "Contains material and themes suitable only for mature audiences.",
+      "icon_url": null,
+      "label_hex_color": "dd2323"
+    },
+    "episode": null,
+    "short_synopsis": "When the harmony in a village is threatened by outside elements, two sisters must fight to save their people and restore the glory of a mermaid goddess to the land.",
+    "short_synopsis_html": "<p>When the harmony in a village is threatened by outside elements, two sisters must fight to save their people and restore the glory of a mermaid goddess to the land.</p>",
+    "historic_countries": [
+      "Nigeria",
+      "France"
+    ],
+    "portrait_image": null,
+    "title_treatment_url": "https://images.mubicdn.net/images/artworks/674305/cache-674305-1710937041/images-original.png",
+    "experiment_stills": null,
+    "experiment_stills_multi": null,
+    "default_editorial": "Drawing from West African folklore, C.J. Obasi’s transfixing fable heeds the siren call of the sea, a space of both rebirth and destruction. Winner of a Special Jury prize at Sundance, Lílis Soares’s high-contrast black-and-white cinematography conjures a spellbinding vision of aquatic spiritualism.",
+    "default_editorial_html": "<p>Drawing from West African folklore, C.J. Obasi&#8217;s transfixing fable heeds the siren call of the sea, a space of both rebirth and destruction. Winner of a Special Jury prize at Sundance, Lílis Soares&#8217;s high-contrast black-and-white cinematography conjures a spellbinding vision of aquatic spiritualism.</p>",
+    "cast_members_count": 20,
+    "industry_events_count": 26,
+    "comments_count": 19,
+    "mubi_go_highlighted": false,
+    "optimised_trailers": [
+      {
+        "url": "https://trailers.mubicdn.net/364280/optimised/240p-t-mami-wata_en_us_1710948808.mp4",
+        "profile": "240p"
+      },
+      {
+        "url": "https://trailers.mubicdn.net/364280/optimised/720p-t-mami-wata_en_us_1710948808.mp4",
+        "profile": "720p"
+      },
+      {
+        "url": "https://trailers.mubicdn.net/364280/optimised/1080p-t-mami-wata_en_us_1710948808.mp4",
+        "profile": "1080p"
+      }
+    ],
+    "directors": [
+      {
+        "name": "C.J. 'Fiery' Obasi",
+        "name_upcase": "C.J. 'FIERY' OBASI",
+        "slug": "c-j-fiery-obasi"
+      }
+    ],
+    "consumable": null,
+    "press_quote": null,
+    "star_rating": null,
+    "award": null,
+    "series": null,
+    "content_warnings": [
+      {
+        "id": 2,
+        "name": "domestic violence",
+        "key": "domestic_violence"
+      },
+      {
+        "id": 17,
+        "name": "injury detail",
+        "key": "injury_detail"
+      }
+    ],
+    "artworks": [
+      {
+        "format": "tile_artwork",
+        "locale": null,
+        "image_url": "https://images.mubicdn.net/images/artworks/673152/cache-673152-1710505813/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "cover_artwork_box_episode",
+        "locale": null,
+        "image_url": "https://images.mubicdn.net/images/artworks/673153/cache-673153-1710505816/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "centered_background",
+        "locale": null,
+        "image_url": "https://images.mubicdn.net/images/artworks/673154/cache-673154-1710505821/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "centered_background_small",
+        "locale": null,
+        "image_url": "https://images.mubicdn.net/images/artworks/673155/cache-673155-1710505824/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "cover_artwork_horizontal",
+        "locale": "en-US",
+        "image_url": "https://images.mubicdn.net/images/artworks/673156/cache-673156-1710505828/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "cover_artwork_box",
+        "locale": "en-US",
+        "image_url": "https://images.mubicdn.net/images/artworks/673158/cache-673158-1710505839/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "tvos_cover_artwork",
+        "locale": "en-US",
+        "image_url": "https://images.mubicdn.net/images/artworks/673159/cache-673159-1710505841/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "content_logo_monochromatic",
+        "locale": "en-US",
+        "image_url": "https://images.mubicdn.net/images/artworks/674305/cache-674305-1710937041/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "cover_artwork_vertical",
+        "locale": "en-US",
+        "image_url": "https://images.mubicdn.net/images/artworks/819113/cache-819113-1752009534/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      },
+      {
+        "format": "cover_artwork_box_series",
+        "locale": "en-US",
+        "image_url": "https://images.mubicdn.net/images/artworks/849203/cache-849203-1754928040/images-original.png",
+        "focal_point": {
+          "x": 0.5,
+          "y": 0
+        }
+      }
+    ],
+    "highlighted_industry_event_entry": null
+  },
+  "filterOptions": [
+    {
+      "label": "All titles",
+      "value": ""
+    },
+    {
+      "label": "Director",
+      "value": "director"
+    },
+    {
+      "label": "Screenplay",
+      "value": "screenplay"
+    },
+    {
+      "label": "Cast",
+      "value": "cast"
+    },
+    {
+      "label": "Cinematography",
+      "value": "cinematography"
+    },
+    {
+      "label": "Music",
+      "value": "music"
+    },
+    {
+      "label": "Producer",
+      "value": "producer"
+    },
+    {
+      "label": "Executive Producer",
+      "value": "executive_producer"
+    },
+    {
+      "label": "Editing",
+      "value": "editing"
+    }
+  ],
+  "initialSelectedSortOptions": {
+    "sort": "relevance",
+    "sort_period": ""
+  },
+  "initialSelectedFilterOptions": {
+    "type": ""
+  },
+  "initialPageNum": 1,
+  "_sentryTraceData": "bf7e2d3657316dc3e616c81c6c02dbba-2de5043f09ff85e7-0",
+  "_sentryBaggage": "sentry-environment=production,sentry-release=2026.04.28.1202-4b35916,sentry-public_key=3b8c3e6654eafb37822681af4549d1bd,sentry-trace_id=bf7e2d3657316dc3e616c81c6c02dbba,sentry-org_id=535082,sentry-sampled=false,sentry-sample_rand=0.6026302652056512,sentry-sample_rate=0"
+}

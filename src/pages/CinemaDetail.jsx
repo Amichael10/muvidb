@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
+import ShareAction from '../components/ui/ShareAction'
 
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
@@ -367,6 +368,11 @@ const CinemaDetail = () => {
                     Official Site
                   </a>
                 )}
+                <ShareAction 
+                  title={cinema.name}
+                  text={`Check out ${cinema.name} on Lumi`}
+                  className="!w-auto"
+                />
               </div>
             </div>
           </div>

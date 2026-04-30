@@ -323,6 +323,90 @@ function CreditsModal({ film, onClose }) {
   );
 }
 
+// ── Sync Logs Modal ──────────────────────────────────────────────────────────
+function SyncLogsModal({ onClose }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('sync_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        setLogs(data || []);
+        setLoading(false);
+      });
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-background/90 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+      <div className="bg-surface border border-border rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+        <div className="p-8 border-b border-border flex items-center justify-between">
+           <div>
+             <p className="text-brand text-xs font-bold mb-1">System Logs</p>
+             <h2 className="text-text-primary text-xl font-bold">Sync History</h2>
+           </div>
+           <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors text-2xl font-light">✕</button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
+          {loading ? (
+             <div className="h-60 flex items-center justify-center text-text-muted text-xs font-bold uppercase tracking-widest animate-pulse">Fetching logs...</div>
+          ) : logs.length === 0 ? (
+             <div className="h-60 flex flex-col items-center justify-center text-text-muted text-xs font-bold uppercase tracking-widest gap-4">
+               <Icon icon="solar:history-linear" className="text-4xl opacity-20" />
+               No logs found yet
+             </div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-surface-2 border-b border-border">
+                <tr className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                  <th className="px-6 py-4">Time</th>
+                  <th className="px-6 py-4">Source</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Result</th>
+                  <th className="px-6 py-4 text-right">Duration</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {logs.map(log => (
+                  <tr key={log.id} className="hover:bg-surface-2/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <p className="text-[11px] font-bold text-text-primary">{new Date(log.created_at).toLocaleDateString()}</p>
+                      <p className="text-[9px] text-text-muted">{new Date(log.created_at).toLocaleTimeString()}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-0.5 rounded bg-surface-3 text-[10px] font-bold text-text-muted border border-border uppercase tracking-wider">{log.source}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
+                        log.status === 'success' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                        log.status === 'partial' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                        'bg-red-500/10 text-red-500 border-red-500/20'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-[11px] font-medium text-text-muted leading-relaxed line-clamp-2">{log.message}</p>
+                      {log.items_created > 0 && <span className="text-[9px] text-brand font-bold mt-1 block">+{log.items_created} new films</span>}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-[10px] font-mono font-bold text-text-muted">{log.duration_ms}ms</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function AdminYouTubeVideos() {
   const [videos,       setVideos]       = useState([]);
@@ -333,6 +417,7 @@ export default function AdminYouTubeVideos() {
   const [searchQuery,  setSearchQuery]  = useState('');
   const [editFilm,     setEditFilm]     = useState(null);
   const [creditsFilm,  setCreditsFilm]  = useState(null);
+  const [showLogs,     setShowLogs]     = useState(false);
   const [togglingId,   setTogglingId]   = useState(null);
   const [syncing,      setSyncing]      = useState(false);
   const [selectedIds,   setSelectedIds]   = useState(new Set());
@@ -524,6 +609,8 @@ export default function AdminYouTubeVideos() {
         needs_review: true,
         synopsis: video.description || 'Imported. Please update description.',
         youtube_watch_url: video.watch_url || null,
+        source_video_id: video.video_id,
+        source: 'youtube',
         poster_url: video.poster_url || video.thumbnail_url || null,
         year: video.published_at ? new Date(video.published_at).getFullYear() : 2024
       })
@@ -708,18 +795,27 @@ export default function AdminYouTubeVideos() {
             )}
           </div>
         </div>
-        <button 
-          onClick={handleManualSync} 
-          disabled={syncing} 
-          className="bg-brand text-white font-bold px-10 py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 flex items-center gap-3"
-        >
-          {syncing ? (
-            <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Icon icon="solar:refresh-linear" className="text-lg" />
-          )}
-          {syncing ? 'Scanning...' : 'Sync videos'}
-        </button>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setShowLogs(true)}
+            className="bg-surface border border-border text-text-muted font-bold px-6 py-3.5 rounded-lg text-sm hover:bg-surface-2 transition-all flex items-center gap-3"
+          >
+            <Icon icon="solar:history-linear" className="text-lg" />
+            History
+          </button>
+          <button 
+            onClick={handleManualSync} 
+            disabled={syncing} 
+            className="bg-brand text-white font-bold px-10 py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 flex items-center gap-3"
+          >
+            {syncing ? (
+              <div className="w-4 h-4 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Icon icon="solar:refresh-linear" className="text-lg" />
+            )}
+            {syncing ? 'Scanning...' : 'Sync videos'}
+          </button>
+        </div>
       </header>
 
       {/* Stats Grid */}
@@ -908,6 +1004,9 @@ export default function AdminYouTubeVideos() {
       )}
       {creditsFilm && (
         <CreditsModal film={creditsFilm} onClose={() => setCreditsFilm(null)} />
+      )}
+      {showLogs && (
+        <SyncLogsModal onClose={() => setShowLogs(false)} />
       )}
     </div>
   );

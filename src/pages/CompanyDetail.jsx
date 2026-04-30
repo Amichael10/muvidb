@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatViewCount } from '../utils/youtube'
 import { Icon } from '@iconify/react'
+import ShareAction from '../components/ui/ShareAction'
 
 const FilmCard = ({ film }) => (
   <Link
@@ -260,6 +261,11 @@ const CompanyDetail = () => {
                   >
                     Visit Website
                   </a>
+                  <ShareAction 
+                    title={company.name}
+                    text={`Check out ${company.name} on Lumi`}
+                    className="!w-auto"
+                  />
                 </div>
               )}
             </div>

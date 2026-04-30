@@ -87,8 +87,8 @@ export default function Signup() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="FULL NAME"
-            className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:border-brand focus:outline-none transition-all"
+            placeholder="Your full name"
+            className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:border-brand focus:outline-none transition-all"
           />
         </div>
 
@@ -100,8 +100,8 @@ export default function Signup() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="NAME@PROTOCOL.COM"
-            className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:border-brand focus:outline-none transition-all"
+            placeholder="name@email.com"
+            className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:border-brand focus:outline-none transition-all"
           />
         </div>
 

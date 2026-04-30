@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
+import GenreRail from '../components/film/GenreRail';
+import CountryRail from '../components/film/CountryRail';
 import PersonCard from '../components/person/PersonCard';
 import { Icon } from '@iconify/react';
 
@@ -19,6 +21,10 @@ export default function Home() {
   const [newReleases, setNewReleases] = useState([]);
 
   const [featuredFilms, setFeaturedFilms] = useState([]);
+  const [comingSoon, setComingSoon] = useState([]);
+  const [curatedCollection, setCuratedCollection] = useState(null);
+  const [recentlyAdded, setRecentlyAdded] = useState([]);
+  const [spotlightContent, setSpotlightContent] = useState(null);
 
   useEffect(() => {
     document.title = "Lumi | Home";
@@ -32,10 +38,13 @@ export default function Home() {
         fetchFeaturedFilms(),
         fetchFilms(),
         fetchNewReleases(),
+        fetchComingSoon(),
         fetchInCinemasData(),
         fetchYoutubeFeed(),
         fetchPeople(),
-        fetchCreators()
+        fetchCreators(),
+        fetchCuratedCollection(),
+        fetchSpotlightContent()
       ]);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -114,12 +123,20 @@ export default function Home() {
   };
 
   const fetchInCinemasData = async () => {
+    // 1. Fetch by explicit is_in_cinemas flag
+    const { data: cinemaMovies } = await supabase
+      .from('films')
+      .select(`*, film_genres(genres(name))`)
+      .eq('is_in_cinemas', true)
+      .order('release_date', { ascending: false })
+      .limit(20);
+
+    // 2. Fetch from showtimes (movies currently showing)
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
+    const { data: showtimesData } = await supabase
       .from('showtimes')
       .select(`
         film_id, 
-        show_date,
         films(*, film_genres(genres(name)))
       `)
       .gte('show_date', today)
@@ -127,23 +144,97 @@ export default function Home() {
       .order('show_date', { ascending: true })
       .limit(20);
 
-    if (!error && data) {
-      const filmMap = {};
-      data.forEach(s => {
-        if (s.films) {
-          filmMap[s.films.id] = {
+    const filmMap = new Map();
+
+    // Prioritize explicit flag
+    if (cinemaMovies) {
+      cinemaMovies.forEach(f => {
+        filmMap.set(f.id, {
+          ...f,
+          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        });
+      });
+    }
+
+    // Add movies with active showtimes
+    if (showtimesData) {
+      showtimesData.forEach(s => {
+        if (s.films && !filmMap.has(s.films.id)) {
+          filmMap.set(s.films.id, {
             ...s.films,
-            genres: s.films.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [],
-            is_today: s.show_date === today
-          };
+            genres: s.films.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+          });
         }
       });
-      setInCinemas(Object.values(filmMap));
+    }
+
+    setInCinemas(Array.from(filmMap.values()));
+  };
+
+  const fetchComingSoon = async () => {
+    const { data } = await supabase
+      .from('films')
+      .select(`*, film_genres(genres(name))`)
+      .or('coming_soon.eq.true,status.ilike.announced')
+      .order('release_date', { ascending: true })
+      .limit(20);
+    
+    if (data) {
+      setComingSoon(data.map(f => ({
+        ...f,
+        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+      })));
+    }
+  };
+
+  const fetchCuratedCollection = async () => {
+    const { data: collection } = await supabase
+      .from('collections')
+      .select(`
+        *,
+        collection_films(
+          display_order,
+          films(*, film_genres(genres(name)))
+        )
+      `)
+      .eq('is_featured', true)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (collection) {
+      const films = (collection.collection_films || [])
+        .sort((a, b) => a.display_order - b.display_order)
+        .map(cf => ({
+          ...cf.films,
+          genres: cf.films?.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        }))
+        .filter(f => f.id);
+      
+      setCuratedCollection({ ...collection, films });
+    }
+  };
+
+  const fetchSpotlightContent = async () => {
+    const { data } = await supabase
+      .from('spotlights')
+      .select(`
+        *,
+        people (*)
+      `)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (data) {
+      setSpotlightContent(data);
     }
   };
 
   const fetchYoutubeFeed = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('films')
       .select(`
         *,
@@ -152,11 +243,13 @@ export default function Home() {
       .order('created_at', { ascending: false })
       .limit(30);
 
-    if (!error) {
-      setYoutubeFeed((data || []).map(f => ({
+    if (data) {
+      const mapped = data.map(f => ({
         ...f,
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
+      }));
+      setYoutubeFeed(mapped);
+      setRecentlyAdded(mapped.slice(0, 20));
     }
   };
 
@@ -193,13 +286,6 @@ export default function Home() {
     return true;
   });
 
-  const trendingFilms = films.filter(f => f.is_trending || f.view_count > 500);
-  
-  // Fallback for New Releases if the 2026 fetch is empty
-  const displayNewReleases = newReleases.length > 0 
-    ? newReleases 
-    : films.filter(f => f.year >= 2025).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
   const formatViews = (count) => {
     if (!count) return '0';
     if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
@@ -209,153 +295,97 @@ export default function Home() {
 
   return (
     <div className="w-full pb-20 bg-bg min-h-screen">
+      {/* 1. HERO */}
       <HeroSection 
         featuredFilms={featuredFilms} 
         isLoading={isLoading}
       />
 
       <div className="max-w-7xl mx-auto border-x border-border">
-        {/* In Cinemas Section */}
-        <div className="border-b border-border py-12">
-          {inCinemas.length > 0 ? (
-            <FilmRow
-              title="In Cinemas"
-              subtitle="Movies playing in theaters near you"
-              films={inCinemas}
-              isLoading={isLoading}
-            />
-          ) : (
-            <FilmRow
-              title="In Cinemas"
-              subtitle="Latest releases in theaters"
-              films={films.slice(0, 4)}
-              isLoading={isLoading}
-            />
-          )}
-        </div>
-
-        {/* New Releases (Dynamic 2026 Sync) */}
-        {displayNewReleases.length > 0 && (
+        {/* 2. IN CINEMAS NOW */}
+        {(isLoading || inCinemas.length > 0) && (
           <div className="border-b border-border py-12">
             <FilmRow
-              title="New Releases"
-              subtitle="2026's latest from cinema and digital fetches"
-              films={displayNewReleases}
+              title="In Cinemas Now"
+              subtitle="Catch the latest Nollywood magic on the big screen"
+              films={inCinemas}
               isLoading={isLoading}
             />
           </div>
         )}
 
-        {/* Trending This Week */}
-        <div className="border-b border-border py-12">
+        {/* 3. GENRE MOOD RAIL */}
+        <div className="border-b border-border">
+          <GenreRail />
+        </div>
+
+        {/* 3.5. COUNTRY RAIL */}
+        <div className="border-b border-border">
+          <CountryRail />
+        </div>
+
+        {/* 4. COMING SOON */}
+        {(isLoading || comingSoon.length > 0) && (
+          <div className="border-b border-border py-16 bg-brand/5">
+            <FilmRow
+              title="Coming Soon"
+              subtitle="Confirmed upcoming Nigerian releases"
+              films={comingSoon}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
+
+        {/* 5. NEW RELEASES */}
+        {(isLoading || newReleases.length > 0) && (
+          <div className="border-b border-border py-12">
+            <FilmRow
+              title="New Releases"
+              subtitle="The freshest stories from this quarter"
+              films={newReleases}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
+
+        {/* 5. RECENTLY ADDED */}
+        <div className="border-b border-border py-12 bg-surface-2/5">
           <FilmRow
-            title="Popular"
-            subtitle="What everyone is watching this week"
-            films={trendingFilms}
+            title="Recently Added"
+            subtitle="Latest additions to the Lumi library"
+            films={recentlyAdded}
             isLoading={isLoading}
           />
         </div>
 
-        {/* New on YouTube with Filters */}
-        <div className="border-b border-border bg-surface-2/10 relative overflow-hidden">
-          <div className="absolute inset-0 grid-bg opacity-30 pointer-events-none"></div>
-          <section className="py-16 relative z-10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-                <div className="space-y-1">
-                  <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                    Recently Added
-                  </h2>
-                  <p className="text-text-muted text-sm font-medium opacity-80">Latest additions to our library</p>
-                </div>
-                <div className="flex bg-surface p-1 rounded-lg border border-border shadow-sm">
-                  {['All', 'Movies', 'Skits'].map(filter => (
-                    <button
-                      key={filter}
-                      onClick={() => setYoutubeFilter(filter)}
-                      className={`px-6 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all ${
-                        youtubeFilter === filter 
-                          ? 'bg-brand text-white shadow-md' 
-                          : 'text-text-muted hover:text-text-primary'
-                      }`}
-                    >
-                      {filter}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              <FilmRow
-                title=""
-                films={filteredYoutube}
-                isLoading={isLoading}
-                noHeader
-              />
-            </div>
-          </section>
-        </div>
-
-        {/* Filmmaker Spotlight */}
-        {(isLoading || spotlightPerson) && (
-          <div className="border-b border-border">
-            <section className="py-16">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-end justify-between mb-10">
-                  <div className="space-y-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                      People
-                    </h2>
-                    <p className="text-brand text-[10px] font-bold tracking-[0.1em]">Industry Professionals</p>
-                  </div>
-                  <Link
-                    to="/people"
-                    className="bg-surface border border-border text-text-primary font-bold text-[10px] px-6 py-3 rounded-lg hover:border-brand hover:text-brand transition-all duration-300 active:scale-95 flex items-center gap-2"
-                  >
-                    View all
-                    <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
-                  </Link>
-                </div>
-
-                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-border shadow-sm">
-                  <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-                  <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none"></div>
-                  <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
-                    <div className="xl:flex-1">
-                      <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
-                    </div>
-                    <div className="h-px xl:w-px xl:h-64 bg-border"></div>
-                    <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
-                      {isLoading ? (
-                        [...Array(4)].map((_, i) => (
-                          <PersonCard key={i} variant="compact" isLoading={true} />
-                        ))
-                      ) : (
-                        otherPeople.map(person => (
-                          <PersonCard key={person.id} person={person} variant="compact" />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
+        {/* 7. CURATED PICK (Editorial Row) */}
+        {curatedCollection && curatedCollection.films.length > 0 && (
+          <div className="border-b border-border py-16 bg-brand/5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
+            <FilmRow
+              title={curatedCollection.name}
+              subtitle={curatedCollection.description}
+              films={curatedCollection.films}
+              isLoading={isLoading}
+            />
           </div>
         )}
 
-        {/* Creator Hub Section */}
+        {/* 8. FEATURED CHANNELS */}
         {(isLoading || creators.length > 0) && (
-          <div className="border-b border-border bg-surface-2/5 relative overflow-hidden">
-             <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-            <section className="py-20 relative z-10">
+          <div className="border-b border-border bg-surface-2/10 relative overflow-hidden">
+             <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
+            <section className="py-16 relative z-10">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-16">
-                  <h2 className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter">
-                    Featured Channels
-                  </h2>
-                  <div className="h-px w-20 bg-brand mx-auto mt-4" />
-                  <p className="text-text-muted mt-6 max-w-lg mx-auto text-sm leading-relaxed">
-                    Official channels from top storytellers.
-                  </p>
+                <div className="flex items-end justify-between mb-12">
+                  <div className="space-y-1">
+                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                      Featured Channels
+                    </h2>
+                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The storytellers of YouTube</p>
+                  </div>
+                  <Link to="/channels" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline">View all</Link>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-border rounded-xl overflow-hidden shadow-sm">
@@ -393,16 +423,12 @@ export default function Home() {
                               </h3>
                               <div className="mt-2 flex items-center gap-4">
                                 {(parseInt(stats.subscribers) > 0) && (
-                                  <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers).toLocaleString()} subscribers</span>
+                                  <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers).toLocaleString()} subs</span>
                                 )}
                                 {(parseInt(stats.videos) > 0) && (
                                   <span className="text-[9px] font-bold text-text-muted flex items-center gap-1.5">
                                     {parseInt(stats.videos).toLocaleString()} videos
-                                    <Icon icon="solar:clapperboard-linear" className="text-xs" />
                                   </span>
-                                )}
-                                {(!stats.subscribers && !stats.videos) && (
-                                  <span className="text-[9px] font-bold text-text-muted italic opacity-60 tracking-wider">Spotlight Creator</span>
                                 )}
                               </div>
                             </div>
@@ -417,19 +443,102 @@ export default function Home() {
           </div>
         )}
 
-        {/* Top Rated hidden for now */}
-        {/* 
-        <div className="py-16 relative overflow-hidden">
-          <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-          <FilmRow
-            title="Top Rated"
-            subtitle="Highly rated by the community"
-            films={films}
-            sortKey="rating"
-            isLoading={isLoading}
-          />
-        </div>
-        */}
+        {/* 9. SPOTLIGHT (Editorial) */}
+        {(isLoading || spotlightContent) && (
+          <div className="border-b border-border">
+            <section className="py-16">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-end justify-between mb-10">
+                  <div className="space-y-1">
+                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                      Spotlight
+                    </h2>
+                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">
+                      In focus this week
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative bg-surface rounded-xl overflow-hidden border border-border shadow-sm">
+                  {isLoading ? (
+                    <div className="h-96 animate-pulse bg-surface-2" />
+                  ) : spotlightContent && spotlightContent.people && (
+                    <div className="flex flex-col md:flex-row">
+                      <div className="md:w-1/2 relative h-64 md:h-auto">
+                        <img 
+                          src={spotlightContent.photo_url || spotlightContent.people.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
+                          alt={spotlightContent.people.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="md:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+                        <h3 className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter mb-4">
+                          {spotlightContent.people.name}
+                        </h3>
+                        <p className="text-text-secondary text-base md:text-lg mb-8 leading-relaxed whitespace-pre-wrap">
+                          {spotlightContent.story}
+                        </p>
+                        <Link 
+                          to={`/person/${spotlightContent.people.id}`}
+                          className="inline-flex items-center gap-2 text-brand font-bold uppercase tracking-widest text-xs hover:gap-4 transition-all"
+                        >
+                          View Profile
+                          <Icon icon="lucide:arrow-right" className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* 10. FEATURED ARTIST */}
+        {(isLoading || spotlightPerson) && (
+          <div className="border-b border-border">
+            <section className="py-16">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-end justify-between mb-10">
+                  <div className="space-y-1">
+                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                      Featured Artist
+                    </h2>
+                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The talent behind the camera</p>
+                  </div>
+                  <Link
+                    to="/people"
+                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline"
+                  >
+                    View all
+                  </Link>
+                </div>
+
+                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-border shadow-sm">
+                  <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
+                  <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
+                    <div className="xl:flex-1">
+                      <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
+                    </div>
+                    <div className="h-px xl:w-px xl:h-64 bg-border"></div>
+                    <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
+                      {isLoading ? (
+                        [...Array(4)].map((_, i) => (
+                          <PersonCard key={i} variant="compact" isLoading={true} />
+                        ))
+                      ) : (
+                        otherPeople.map(person => (
+                          <PersonCard key={person.id} person={person} variant="compact" />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
       </div>
     </div>
   );

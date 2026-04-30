@@ -78,8 +78,8 @@ export default function Login() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="NAME@PROTOCOL.COM"
-            className={`w-full bg-surface-2/50 border ${error ? 'border-red-500' : 'border-border'} text-text-primary placeholder-text-muted/30 rounded-xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:outline-none focus:border-brand transition-all`}
+            placeholder="name@email.com"
+            className={`w-full bg-surface-2/50 border ${error ? 'border-red-500' : 'border-border'} text-text-primary placeholder-text-muted/30 rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:outline-none focus:border-brand transition-all`}
           />
         </div>
 

@@ -1,0 +1,57 @@
+name: Mubi Scraper Sync
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run daily at midnight
+  workflow_dispatch:
+    inputs:
+      country:
+        description: 'Country name'
+        required: true
+        default: 'Nigeria'
+      max_pages:
+        description: 'Max pages to scrape'
+        required: true
+        default: '17'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+        
+      - name: Restore State
+        uses: actions/cache/restore@v4
+        with:
+          path: mubi_playwright_state.json
+          key: mubi-state-${{ github.run_id }}
+          restore-keys: |
+            mubi-state-
+
+      - name: Run Scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          COUNTRY: ${{ github.event.inputs.country || 'Nigeria' }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages || '17' }}
+        run: node scripts/mubi_playwright.js
+
+      - name: Save State
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: mubi_playwright_state.json
+          key: mubi-state-${{ github.run_id }}
+

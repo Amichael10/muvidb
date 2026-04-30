@@ -136,8 +136,8 @@ export default function Onboarding() {
                 <div className="relative group">
                     <input 
                       type="text" 
-                      placeholder="SEARCH YOUR STAGE NAME..."
-                      className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:border-brand transition-all"
+                      placeholder="search your stage name..."
+                      className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:border-brand transition-all"
                     />
                 </div>
                 <div className="pt-6 border-t border-border/50 text-center">
@@ -163,8 +163,8 @@ export default function Onboarding() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="YOUR NAME"
-                className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest focus:border-brand focus:outline-none transition-all"
+                placeholder="your name"
+                className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:border-brand focus:outline-none transition-all"
               />
             </div>
           </div>
