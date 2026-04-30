@@ -42,8 +42,8 @@ jobs:
 
       - name: Run Scraper
         env:
-          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           COUNTRY: ${{ github.event.inputs.country || 'Nigeria' }}
           MAX_PAGES: ${{ github.event.inputs.max_pages || '17' }}
