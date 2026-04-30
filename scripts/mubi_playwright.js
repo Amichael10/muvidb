@@ -180,7 +180,8 @@ async function scrapeFilmDetails(browser, slug) {
   try {
     const url = `https://mubi.com/en/films/${slug}`;
     console.log(`  📡 Visiting: ${url}`);
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(2000); // Small delay for hydration
     
     const nextDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
     if (!nextDataStr) throw new Error('No __NEXT_DATA__ found');
@@ -190,7 +191,8 @@ async function scrapeFilmDetails(browser, slug) {
     
     // Visit cast page
     const castUrl = `${url}/cast`;
-    await page.goto(castUrl, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.goto(castUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(2000);
     const castDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
     const credits = [];
     
@@ -249,24 +251,28 @@ async function main() {
   try {
     for (let p = state.current_page; p <= MAX_PAGES; p++) {
       console.log(`\n📄 Page ${p}/${MAX_PAGES}`);
-      const browsePage = await context.newPage();
-      const browseUrl = `https://mubi.com/en/browse/films/historic_countries/${getCountryCode(country)}?page=${p}`;
+      // USE FAST API FOR DISCOVERY
+      const browseUrl = `https://api.mubi.com/v4/browse/films?historic_countries[]=${getCountryCode(country)}&page=${p}&per_page=24`;
+      console.log(`  📡 Fetching API: ${browseUrl}`);
       
-      await browsePage.goto(browseUrl, { waitUntil: 'networkidle', timeout: 60000 });
+      const response = await context.request.get(browseUrl, {
+        headers: {
+          'Client-Country': 'NG',
+          'client': 'web',
+          'Accept': 'application/json'
+        }
+      });
       
-      const nextDataStr = await browsePage.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
-      if (!nextDataStr) {
-        console.log('  ⚠️ No __NEXT_DATA__ on browse page. Possibly end of list.');
-        await browsePage.close();
-        break;
+      if (!response.ok()) {
+         console.error(`  ⚠️ API Error ${response.status()}: ${await response.text()}`);
+         break;
       }
       
-      const nextData = JSON.parse(nextDataStr);
-      const films = nextData.props.pageProps.films || [];
+      const nextData = await response.json();
+      const films = nextData.films || [];
       
       if (films.length === 0) {
-        console.log('  Empty film list. Finishing.');
-        await browsePage.close();
+        console.log('  Empty film list from API. Finishing country.');
         break;
       }
       
@@ -293,7 +299,6 @@ async function main() {
       
       state.current_page = p + 1;
       saveState(state);
-      await browsePage.close();
     }
     
     // Check if we should rotate to another country
