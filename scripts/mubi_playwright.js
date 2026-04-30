@@ -23,7 +23,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const STATE_FILE = 'mubi_playwright_state.json';
 const COUNTRY = process.env.COUNTRY || 'Nigeria';
-const MAX_PAGES = parseInt(process.env.MAX_PAGES || '17');
+const MAX_PAGES = parseInt(process.env.MAX_PAGES || '100');
 
 const ROLE_MAP = {
   'Cast': 'actor',
@@ -184,9 +184,15 @@ async function scrapeFilmDetails(browser, slug) {
     await page.waitForTimeout(2000); // Small delay for hydration
     
     const nextDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
-    if (!nextDataStr) throw new Error('No __NEXT_DATA__ found');
+    if (!nextDataStr) {
+       // Fallback: try to find a different script tag or wait longer
+       console.log(`  ⚠️ __NEXT_DATA__ not found for ${slug}, retrying with wait...`);
+       await page.waitForTimeout(5000);
+    }
+    const finalDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
+    if (!finalDataStr) throw new Error('No __NEXT_DATA__ found');
     
-    const nextData = JSON.parse(nextDataStr);
+    const nextData = JSON.parse(finalDataStr);
     const film = nextData.props.pageProps.initFilm;
     
     // Visit cast page
