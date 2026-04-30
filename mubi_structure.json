@@ -1613,6 +1613,6 @@
   },
   "initialPageNum": 1,
   "initialShowAllFilms": true,
-  "_sentryTraceData": "3c291a2af6c6c07927d0d1daef7f8c7c-df18816bf623f6b7-0",
-  "_sentryBaggage": "sentry-environment=production,sentry-release=2026.04.29.1630-1c4d22d,sentry-public_key=3b8c3e6654eafb37822681af4549d1bd,sentry-trace_id=3c291a2af6c6c07927d0d1daef7f8c7c,sentry-org_id=535082,sentry-sampled=false,sentry-sample_rand=0.4725933896058383,sentry-sample_rate=0"
+  "_sentryTraceData": "a9308c27e0c84b8589045b81bbe6a5a4-31836ff68b1a1475-0",
+  "_sentryBaggage": "sentry-environment=production,sentry-release=2026.04.30.0910-00d79e6,sentry-public_key=3b8c3e6654eafb37822681af4549d1bd,sentry-trace_id=a9308c27e0c84b8589045b81bbe6a5a4,sentry-org_id=535082,sentry-sampled=false,sentry-sample_rand=0.3162091235025437,sentry-sample_rate=0"
 }
