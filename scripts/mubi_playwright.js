@@ -102,13 +102,19 @@ async function syncFilm(filmData, credits) {
     .maybeSingle();
     
   const payload = {
-    ...filmData,
+    mubi_id: String(filmData.mubi_id),
+    mubi_slug: filmData.mubi_slug,
+    title: filmData.title,
+    year: filmData.year,
+    synopsis: filmData.synopsis,
+    runtime_minutes: filmData.runtime_minutes,
+    poster_url: filmData.poster_url,
+    backdrop_url: filmData.backdrop_url,
+    is_nollywood: filmData.is_nollywood,
     source: 'mubi',
     status: 'released',
     needs_review: true
   };
-  delete payload.countries;
-  delete payload.genres;
   
   let filmId;
   if (existing) {
