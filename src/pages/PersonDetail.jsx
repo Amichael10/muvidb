@@ -11,6 +11,7 @@ import {
 } from '../utils/youtube'
 import { getPersonYoutubeChannelUrl } from '../lib/youtube'
 import { Skeleton } from '../components/ui/Skeleton'
+import ShareAction from '../components/ui/ShareAction'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -508,6 +509,12 @@ const PersonDetail = () => {
                     Official Channel
                   </a>
                 )}
+                
+                <ShareAction 
+                  title={person.name}
+                  text={`Check out ${person.name}'s profile on Lumi`}
+                  className="!w-auto"
+                />
               </div>
             </div>
           </div>

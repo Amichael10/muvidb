@@ -609,6 +609,8 @@ export default function AdminYouTubeVideos() {
         needs_review: true,
         synopsis: video.description || 'Imported. Please update description.',
         youtube_watch_url: video.watch_url || null,
+        source_video_id: video.video_id,
+        source: 'youtube',
         poster_url: video.poster_url || video.thumbnail_url || null,
         year: video.published_at ? new Date(video.published_at).getFullYear() : 2024
       })

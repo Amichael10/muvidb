@@ -9,6 +9,7 @@ import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 import WatchOptions from '../components/film/WatchOptions';
 import { Skeleton } from '../components/ui/Skeleton';
+import ShareAction from '../components/ui/ShareAction';
 
 const FilmDetailSkeleton = () => (
     <div className="w-full bg-bg min-h-screen">
@@ -138,6 +139,12 @@ export default function FilmDetail() {
 
       setCast(castMembers);
       setCrew(crewMembers);
+      
+      // Extract director if available
+      const dir = crewMembers.find(m => m.role.toLowerCase().includes('director'));
+      if (dir) {
+        setFilm(prev => prev ? { ...prev, director: dir.name } : null);
+      }
     } catch (error) {
       console.error('Error fetching credits:', error);
     }
@@ -150,6 +157,7 @@ export default function FilmDetail() {
         .from('films')
         .select(`
           *,
+          film_genres(genres(name)),
           film_companies(
             companies(id, name, logo_url)
           )
@@ -158,16 +166,29 @@ export default function FilmDetail() {
         .single();
 
       if (error) throw error;
-      setFilm(data);
+      
+      const mappedFilm = {
+        ...data,
+        genres: data.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+      };
+      
+      setFilm(mappedFilm);
 
       if (data) {
         document.title = `Lumi | ${data.title}`;
         const { data: related } = await supabase
           .from('films')
-          .select('*')
+          .select(`
+            *,
+            film_genres(genres(name))
+          `)
           .neq('id', id)
           .limit(3);
-        setRelatedFilms(related || []);
+          
+        setRelatedFilms((related || []).map(f => ({
+          ...f,
+          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        })));
       }
     } catch (error) {
       console.error('Error fetching film:', error);
@@ -186,19 +207,7 @@ export default function FilmDetail() {
     await toggleWatchlist();
   };
 
-  const handleShare = async () => {
-    const shareData = {
-      title: film.title,
-      text: `Check out ${film.title} on Lumi`,
-      url: window.location.href
-    };
-    if (navigator.share) {
-      await navigator.share(shareData);
-    } else {
-      await navigator.clipboard.writeText(window.location.href);
-      alert('Link copied to clipboard');
-    }
-  };
+
 
   if (loading) return <FilmDetailSkeleton />;
 
@@ -311,19 +320,21 @@ export default function FilmDetail() {
             </section>
 
             {/* Trailer */}
-            <section id="trailer-section" className="p-8 md:p-12 border-b border-border bg-surface-2/10 relative overflow-hidden">
-               <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-              <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter relative z-10">Official Trailer</h2>
-              <div className="relative z-10 aspect-video rounded-xl overflow-hidden border border-border bg-surface-2 shadow-sm">
-                <iframe
-                  className="w-full h-full"
-                  src={`https://www.youtube.com/embed/${film.trailer_youtube_id || 'dQw4w9WgXcQ'}?autoplay=0&rel=0&modestbranding=1`}
-                  title={`${film.title} Trailer`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
-              </div>
-            </section>
+            {film.trailer_youtube_id && (
+              <section id="trailer-section" className="p-8 md:p-12 border-b border-border bg-surface-2/10 relative overflow-hidden">
+                <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
+                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter relative z-10">Official Trailer</h2>
+                <div className="relative z-10 aspect-video rounded-xl overflow-hidden border border-border bg-surface-2 shadow-sm">
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${film.trailer_youtube_id}?autoplay=0&rel=0&modestbranding=1`}
+                    title={`${film.title} Trailer`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+              </section>
+            )}
 
             {/* Cast */}
             {cast.length > 0 && (
@@ -403,6 +414,12 @@ export default function FilmDetail() {
                   <span className="text-text-muted tracking-wider">Status</span>
                   <span className="text-text-primary">{film.status}</span>
                 </div>
+                {film.countries && film.countries.length > 0 && (
+                  <div className="flex justify-between items-center border-b border-border pb-3">
+                    <span className="text-text-muted tracking-wider">Country</span>
+                    <span className="text-text-primary text-right">{film.countries.join(', ')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center border-b border-border pb-3">
                   <span className="text-text-muted tracking-wider">Language</span>
                   <span className="text-text-primary">{film.language}</span>
@@ -432,12 +449,10 @@ export default function FilmDetail() {
               >
                 {inWatchlist ? 'Added' : 'Add to Watchlist'}
               </button>
-              <button
-                onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 border border-border text-text-primary hover:border-brand hover:text-brand px-6 py-4 rounded-lg font-bold text-[10px] tracking-widest transition-all duration-300 active:scale-95 min-h-[44px]"
-              >
-                Share
-              </button>
+              <ShareAction 
+                title={film.title}
+                text={`Check out ${film.title} on Lumi`}
+              />
             </div>
 
             <div className="p-8">

@@ -45,6 +45,7 @@ import AdminCinemaScraping from './pages/admin/AdminCinemaScraping';
 import AdminChannelDetail from './pages/admin/AdminChannelDetail';
 import AdminImport from './pages/admin/AdminImport';
 import AdminAI from './pages/admin/AdminAI';
+import AdminSpotlight from './pages/admin/AdminSpotlight';
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -177,6 +178,7 @@ export default function App() {
                   <Route path="cinema-scraping" element={<AdminCinemaScraping />} />
                   <Route path="ai" element={<AdminAI />} />
                   <Route path="import" element={<AdminImport />} />
+                  <Route path="spotlight" element={<AdminSpotlight />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

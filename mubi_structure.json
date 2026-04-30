@@ -1,0 +1,1618 @@
+{
+  "sortOptionsForBrowseType": {
+    "sort": [
+      {
+        "label": "Trending",
+        "value": "trending"
+      },
+      {
+        "label": "Most Popular",
+        "value": "popularity_quality_score"
+      },
+      {
+        "label": "Most Wanted",
+        "value": "wanted_sort"
+      },
+      {
+        "label": "Most Recent",
+        "value": "year"
+      },
+      {
+        "label": "Title (A-Z)",
+        "value": "title"
+      }
+    ],
+    "sort_period": [
+      {
+        "label": "All Time",
+        "value": ""
+      },
+      {
+        "label": "This Week",
+        "value": 7
+      },
+      {
+        "label": "This Month",
+        "value": 30
+      },
+      {
+        "label": "This Year",
+        "value": 365
+      }
+    ]
+  },
+  "filterOptionsForBrowseType": {
+    "genre": [
+      {
+        "label": "All genres",
+        "value": ""
+      },
+      {
+        "label": "Action",
+        "value": "Action"
+      },
+      {
+        "label": "Animation",
+        "value": "Animation"
+      },
+      {
+        "label": "Comedy",
+        "value": "Comedy"
+      },
+      {
+        "label": "Documentary",
+        "value": "Documentary"
+      },
+      {
+        "label": "Drama",
+        "value": "Drama"
+      },
+      {
+        "label": "Fantasy",
+        "value": "Fantasy"
+      },
+      {
+        "label": "Biography",
+        "value": "Biography"
+      },
+      {
+        "label": "Horror",
+        "value": "Horror"
+      },
+      {
+        "label": "Musical",
+        "value": "Musical"
+      },
+      {
+        "label": "Sci-Fi",
+        "value": "Sci-Fi"
+      },
+      {
+        "label": "Short",
+        "value": "Short"
+      },
+      {
+        "label": "Silent",
+        "value": "Silent"
+      },
+      {
+        "label": "Sport",
+        "value": "Sport"
+      },
+      {
+        "label": "Thriller",
+        "value": "Thriller"
+      },
+      {
+        "label": "Western",
+        "value": "Western"
+      },
+      {
+        "label": "Avant-Garde",
+        "value": "Avant-Garde"
+      },
+      {
+        "label": "Crime",
+        "value": "Crime"
+      },
+      {
+        "label": "Romance",
+        "value": "Romance"
+      },
+      {
+        "label": "LGBTQ+",
+        "value": "LGBTQ+"
+      },
+      {
+        "label": "TV Movie",
+        "value": "TV Movie"
+      },
+      {
+        "label": "Adventure",
+        "value": "Adventure"
+      },
+      {
+        "label": "Cult",
+        "value": "Cult"
+      },
+      {
+        "label": "Family",
+        "value": "Family"
+      },
+      {
+        "label": "History",
+        "value": "History"
+      },
+      {
+        "label": "War",
+        "value": "War"
+      },
+      {
+        "label": "Mystery",
+        "value": "Mystery"
+      },
+      {
+        "label": "Erotica",
+        "value": "Erotica"
+      },
+      {
+        "label": "Music Video",
+        "value": "Music Video"
+      },
+      {
+        "label": "Film noir",
+        "value": "Film noir"
+      },
+      {
+        "label": "TV Mini-series",
+        "value": "TV Mini-series"
+      },
+      {
+        "label": "Commercial",
+        "value": "Commercial"
+      },
+      {
+        "label": "Music",
+        "value": "Music"
+      },
+      {
+        "label": "Anthology",
+        "value": "Anthology"
+      },
+      {
+        "label": "TV Series",
+        "value": "TV Series"
+      }
+    ],
+    "country": [
+      {
+        "options": [
+          {
+            "label": "All countries",
+            "value": ""
+          }
+        ]
+      },
+      {
+        "label": "Top Matches",
+        "options": [
+          {
+            "label": "United States",
+            "value": "United States"
+          },
+          {
+            "label": "France",
+            "value": "France"
+          },
+          {
+            "label": "United Kingdom",
+            "value": "United Kingdom"
+          },
+          {
+            "label": "Italy",
+            "value": "Italy"
+          },
+          {
+            "label": "Japan",
+            "value": "Japan"
+          },
+          {
+            "label": "Canada",
+            "value": "Canada"
+          },
+          {
+            "label": "Germany",
+            "value": "Germany"
+          },
+          {
+            "label": "India",
+            "value": "India"
+          },
+          {
+            "label": "Spain",
+            "value": "Spain"
+          },
+          {
+            "label": "South Korea",
+            "value": "South Korea"
+          },
+          {
+            "label": "Hong Kong",
+            "value": "Hong Kong"
+          },
+          {
+            "label": "Turkey",
+            "value": "Turkey"
+          },
+          {
+            "label": "Brazil",
+            "value": "Brazil"
+          },
+          {
+            "label": "Poland",
+            "value": "Poland"
+          },
+          {
+            "label": "Sweden",
+            "value": "Sweden"
+          },
+          {
+            "label": "Portugal",
+            "value": "Portugal"
+          },
+          {
+            "label": "Mexico",
+            "value": "Mexico"
+          },
+          {
+            "label": "China",
+            "value": "China"
+          },
+          {
+            "label": "Soviet Union",
+            "value": "Soviet Union"
+          },
+          {
+            "label": "Australia",
+            "value": "Australia"
+          },
+          {
+            "label": "West Germany",
+            "value": "West Germany"
+          },
+          {
+            "label": "Argentina",
+            "value": "Argentina"
+          },
+          {
+            "label": "Netherlands",
+            "value": "Netherlands"
+          },
+          {
+            "label": "Denmark",
+            "value": "Denmark"
+          },
+          {
+            "label": "Austria",
+            "value": "Austria"
+          },
+          {
+            "label": "Philippines",
+            "value": "Philippines"
+          },
+          {
+            "label": "Russia",
+            "value": "Russia"
+          },
+          {
+            "label": "Belgium",
+            "value": "Belgium"
+          },
+          {
+            "label": "Indonesia",
+            "value": "Indonesia"
+          },
+          {
+            "label": "Iran",
+            "value": "Iran"
+          },
+          {
+            "label": "Romania",
+            "value": "Romania"
+          },
+          {
+            "label": "Switzerland",
+            "value": "Switzerland"
+          },
+          {
+            "label": "Hungary",
+            "value": "Hungary"
+          },
+          {
+            "label": "Finland",
+            "value": "Finland"
+          },
+          {
+            "label": "Yugoslavia",
+            "value": "Yugoslavia"
+          },
+          {
+            "label": "Czechoslovakia",
+            "value": "Czechoslovakia"
+          },
+          {
+            "label": "Norway",
+            "value": "Norway"
+          },
+          {
+            "label": "Greece",
+            "value": "Greece"
+          },
+          {
+            "label": "Taiwan",
+            "value": "Taiwan"
+          },
+          {
+            "label": "Lithuania",
+            "value": "Lithuania"
+          }
+        ]
+      },
+      {
+        "label": "Other Countries",
+        "options": [
+          {
+            "label": "Israel",
+            "value": "Israel"
+          },
+          {
+            "label": "Chile",
+            "value": "Chile"
+          },
+          {
+            "label": "Egypt",
+            "value": "Egypt"
+          },
+          {
+            "label": "Ireland",
+            "value": "Ireland"
+          },
+          {
+            "label": "Thailand",
+            "value": "Thailand"
+          },
+          {
+            "label": "Czechia",
+            "value": "Czechia"
+          },
+          {
+            "label": "South Africa",
+            "value": "South Africa"
+          },
+          {
+            "label": "Malaysia",
+            "value": "Malaysia"
+          },
+          {
+            "label": "Serbia",
+            "value": "Serbia"
+          },
+          {
+            "label": "New Zealand",
+            "value": "New Zealand"
+          },
+          {
+            "label": "Iceland",
+            "value": "Iceland"
+          },
+          {
+            "label": "Colombia",
+            "value": "Colombia"
+          },
+          {
+            "label": "Bulgaria",
+            "value": "Bulgaria"
+          },
+          {
+            "label": "Croatia",
+            "value": "Croatia"
+          },
+          {
+            "label": "Estonia",
+            "value": "Estonia"
+          },
+          {
+            "label": "Morocco",
+            "value": "Morocco"
+          },
+          {
+            "label": "Cuba",
+            "value": "Cuba"
+          },
+          {
+            "label": "Tunisia",
+            "value": "Tunisia"
+          },
+          {
+            "label": "East Germany",
+            "value": "East Germany"
+          },
+          {
+            "label": "Peru",
+            "value": "Peru"
+          },
+          {
+            "label": "Latvia",
+            "value": "Latvia"
+          },
+          {
+            "label": "Vietnam",
+            "value": "Vietnam"
+          },
+          {
+            "label": "Ukraine",
+            "value": "Ukraine"
+          },
+          {
+            "label": "Nigeria",
+            "value": "Nigeria"
+          },
+          {
+            "label": "Lebanon",
+            "value": "Lebanon"
+          },
+          {
+            "label": "Singapore",
+            "value": "Singapore"
+          },
+          {
+            "label": "Algeria",
+            "value": "Algeria"
+          },
+          {
+            "label": "Venezuela",
+            "value": "Venezuela"
+          },
+          {
+            "label": "Pakistan",
+            "value": "Pakistan"
+          },
+          {
+            "label": "Senegal",
+            "value": "Senegal"
+          },
+          {
+            "label": "Bangladesh",
+            "value": "Bangladesh"
+          },
+          {
+            "label": "Burkina Faso",
+            "value": "Burkina Faso"
+          },
+          {
+            "label": "Slovenia",
+            "value": "Slovenia"
+          },
+          {
+            "label": "Uruguay",
+            "value": "Uruguay"
+          },
+          {
+            "label": "Kazakhstan",
+            "value": "Kazakhstan"
+          },
+          {
+            "label": "Slovakia",
+            "value": "Slovakia"
+          },
+          {
+            "label": "Sri Lanka",
+            "value": "Sri Lanka"
+          },
+          {
+            "label": "Syrian Arab Republic",
+            "value": "Syrian Arab Republic"
+          },
+          {
+            "label": "Puerto Rico",
+            "value": "Puerto Rico"
+          },
+          {
+            "label": "Georgia",
+            "value": "Georgia"
+          },
+          {
+            "label": "Bosnia and Herzegovina",
+            "value": "Bosnia and Herzegovina"
+          },
+          {
+            "label": "Palestine",
+            "value": "Palestine"
+          },
+          {
+            "label": "Luxembourg",
+            "value": "Luxembourg"
+          },
+          {
+            "label": "Cameroon",
+            "value": "Cameroon"
+          },
+          {
+            "label": "Cambodia",
+            "value": "Cambodia"
+          },
+          {
+            "label": "United Arab Emirates",
+            "value": "United Arab Emirates"
+          },
+          {
+            "label": "Cote d'Ivoire",
+            "value": "Cote d'Ivoire"
+          },
+          {
+            "label": "Mali",
+            "value": "Mali"
+          },
+          {
+            "label": "Bolivia",
+            "value": "Bolivia"
+          },
+          {
+            "label": "Macedonia",
+            "value": "Macedonia"
+          },
+          {
+            "label": "North Korea",
+            "value": "North Korea"
+          },
+          {
+            "label": "Dominican Republic",
+            "value": "Dominican Republic"
+          },
+          {
+            "label": "Kenya",
+            "value": "Kenya"
+          },
+          {
+            "label": "Afghanistan",
+            "value": "Afghanistan"
+          },
+          {
+            "label": "Ghana",
+            "value": "Ghana"
+          },
+          {
+            "label": "Nepal",
+            "value": "Nepal"
+          },
+          {
+            "label": "Ethiopia",
+            "value": "Ethiopia"
+          },
+          {
+            "label": "Mozambique",
+            "value": "Mozambique"
+          },
+          {
+            "label": "Guinea",
+            "value": "Guinea"
+          },
+          {
+            "label": "Ecuador",
+            "value": "Ecuador"
+          },
+          {
+            "label": "Niger",
+            "value": "Niger"
+          },
+          {
+            "label": "Iraq",
+            "value": "Iraq"
+          },
+          {
+            "label": "Armenia",
+            "value": "Armenia"
+          },
+          {
+            "label": "Sudan",
+            "value": "Sudan"
+          },
+          {
+            "label": "Kyrgyzstan",
+            "value": "Kyrgyzstan"
+          },
+          {
+            "label": "Democratic Republic of the Congo",
+            "value": "Democratic Republic of the Congo"
+          },
+          {
+            "label": "Angola",
+            "value": "Angola"
+          },
+          {
+            "label": "Albania",
+            "value": "Albania"
+          },
+          {
+            "label": "Zimbabwe",
+            "value": "Zimbabwe"
+          },
+          {
+            "label": "Azerbaijan",
+            "value": "Azerbaijan"
+          },
+          {
+            "label": "Tanzania, United Republic of",
+            "value": "Tanzania, United Republic of"
+          },
+          {
+            "label": "Costa Rica",
+            "value": "Costa Rica"
+          },
+          {
+            "label": "Belarus",
+            "value": "Belarus"
+          },
+          {
+            "label": "Uganda",
+            "value": "Uganda"
+          },
+          {
+            "label": "Paraguay",
+            "value": "Paraguay"
+          },
+          {
+            "label": "Malta",
+            "value": "Malta"
+          },
+          {
+            "label": "Haiti",
+            "value": "Haiti"
+          },
+          {
+            "label": "Rwanda",
+            "value": "Rwanda"
+          },
+          {
+            "label": "Scotland",
+            "value": "Scotland"
+          },
+          {
+            "label": "Uzbekistan",
+            "value": "Uzbekistan"
+          },
+          {
+            "label": "Madagascar",
+            "value": "Madagascar"
+          },
+          {
+            "label": "Mongolia",
+            "value": "Mongolia"
+          },
+          {
+            "label": "Jamaica",
+            "value": "Jamaica"
+          },
+          {
+            "label": "Mauritius",
+            "value": "Mauritius"
+          },
+          {
+            "label": "Moldova, Republic of",
+            "value": "Moldova, Republic of"
+          },
+          {
+            "label": "Jordan",
+            "value": "Jordan"
+          },
+          {
+            "label": "Cyprus",
+            "value": "Cyprus"
+          },
+          {
+            "label": "Chad",
+            "value": "Chad"
+          },
+          {
+            "label": "Saudi Arabia",
+            "value": "Saudi Arabia"
+          },
+          {
+            "label": "Guatemala",
+            "value": "Guatemala"
+          },
+          {
+            "label": "Faroe Islands",
+            "value": "Faroe Islands"
+          },
+          {
+            "label": "Republic of Kosovo",
+            "value": "Republic of Kosovo"
+          },
+          {
+            "label": "Togo",
+            "value": "Togo"
+          },
+          {
+            "label": "Gabon",
+            "value": "Gabon"
+          },
+          {
+            "label": "Congo",
+            "value": "Congo"
+          },
+          {
+            "label": "Myanmar",
+            "value": "Myanmar"
+          },
+          {
+            "label": "Guinea-Bissau",
+            "value": "Guinea-Bissau"
+          },
+          {
+            "label": "Benin",
+            "value": "Benin"
+          },
+          {
+            "label": "El Salvador",
+            "value": "El Salvador"
+          },
+          {
+            "label": "Montenegro",
+            "value": "Montenegro"
+          },
+          {
+            "label": "Bhutan",
+            "value": "Bhutan"
+          },
+          {
+            "label": "Aruba",
+            "value": "Aruba"
+          },
+          {
+            "label": "Zambia",
+            "value": "Zambia"
+          },
+          {
+            "label": "Tajikistan",
+            "value": "Tajikistan"
+          },
+          {
+            "label": "Qatar",
+            "value": "Qatar"
+          },
+          {
+            "label": "Panama",
+            "value": "Panama"
+          },
+          {
+            "label": "Namibia",
+            "value": "Namibia"
+          },
+          {
+            "label": "Mauritania",
+            "value": "Mauritania"
+          },
+          {
+            "label": "Lao People's Democratic Republic",
+            "value": "Lao People's Democratic Republic"
+          },
+          {
+            "label": "Cape Verde",
+            "value": "Cape Verde"
+          },
+          {
+            "label": "Bahrain",
+            "value": "Bahrain"
+          },
+          {
+            "label": "Trinidad and Tobago",
+            "value": "Trinidad and Tobago"
+          },
+          {
+            "label": "Sierra Leone",
+            "value": "Sierra Leone"
+          },
+          {
+            "label": "Libyan Arab Jamahiriya",
+            "value": "Libyan Arab Jamahiriya"
+          },
+          {
+            "label": "Lesotho",
+            "value": "Lesotho"
+          },
+          {
+            "label": "Equatorial Guinea",
+            "value": "Equatorial Guinea"
+          },
+          {
+            "label": "Greenland",
+            "value": "Greenland"
+          },
+          {
+            "label": "Barbados",
+            "value": "Barbados"
+          },
+          {
+            "label": "Antigua and Barbuda",
+            "value": "Antigua and Barbuda"
+          },
+          {
+            "label": "Yemen",
+            "value": "Yemen"
+          },
+          {
+            "label": "Swaziland",
+            "value": "Swaziland"
+          },
+          {
+            "label": "Suriname",
+            "value": "Suriname"
+          },
+          {
+            "label": "Oman",
+            "value": "Oman"
+          },
+          {
+            "label": "Nicaragua",
+            "value": "Nicaragua"
+          },
+          {
+            "label": "Malawi",
+            "value": "Malawi"
+          },
+          {
+            "label": "Martinique",
+            "value": "Martinique"
+          },
+          {
+            "label": "Monaco",
+            "value": "Monaco"
+          },
+          {
+            "label": "Liberia",
+            "value": "Liberia"
+          },
+          {
+            "label": "Saint Lucia",
+            "value": "Saint Lucia"
+          },
+          {
+            "label": "Kuwait",
+            "value": "Kuwait"
+          },
+          {
+            "label": "Honduras",
+            "value": "Honduras"
+          },
+          {
+            "label": "Gambia",
+            "value": "Gambia"
+          },
+          {
+            "label": "Eritrea",
+            "value": "Eritrea"
+          },
+          {
+            "label": "Dominica",
+            "value": "Dominica"
+          },
+          {
+            "label": "Botswana",
+            "value": "Botswana"
+          },
+          {
+            "label": "Bahamas",
+            "value": "Bahamas"
+          },
+          {
+            "label": "Vanuatu",
+            "value": "Vanuatu"
+          },
+          {
+            "label": "Holy See (Vatican City State)",
+            "value": "Holy See (Vatican City State)"
+          },
+          {
+            "label": "Turkmenistan",
+            "value": "Turkmenistan"
+          },
+          {
+            "label": "Sao Tome and Principe",
+            "value": "Sao Tome and Principe"
+          },
+          {
+            "label": "San Marino",
+            "value": "San Marino"
+          },
+          {
+            "label": "Macao",
+            "value": "Macao"
+          },
+          {
+            "label": "Marshall Islands",
+            "value": "Marshall Islands"
+          },
+          {
+            "label": "Liechtenstein",
+            "value": "Liechtenstein"
+          },
+          {
+            "label": "Djibouti",
+            "value": "Djibouti"
+          },
+          {
+            "label": "Brunei Darussalam",
+            "value": "Brunei Darussalam"
+          },
+          {
+            "label": "Netherlands Antilles",
+            "value": "Netherlands Antilles"
+          },
+          {
+            "label": "Libya",
+            "value": "Libya"
+          },
+          {
+            "label": "Tonga",
+            "value": "Tonga"
+          },
+          {
+            "label": "Timor-Leste",
+            "value": "Timor-Leste"
+          },
+          {
+            "label": "Tokelau",
+            "value": "Tokelau"
+          },
+          {
+            "label": "Somalia",
+            "value": "Somalia"
+          },
+          {
+            "label": "Seychelles",
+            "value": "Seychelles"
+          },
+          {
+            "label": "Solomon Islands",
+            "value": "Solomon Islands"
+          },
+          {
+            "label": "Reunion",
+            "value": "Reunion"
+          },
+          {
+            "label": "Papua New Guinea",
+            "value": "Papua New Guinea"
+          },
+          {
+            "label": "Maldives",
+            "value": "Maldives"
+          },
+          {
+            "label": "Northern Mariana Islands",
+            "value": "Northern Mariana Islands"
+          },
+          {
+            "label": "Cayman Islands",
+            "value": "Cayman Islands"
+          },
+          {
+            "label": "Saint Kitts and Nevis",
+            "value": "Saint Kitts and Nevis"
+          },
+          {
+            "label": "Comoros",
+            "value": "Comoros"
+          },
+          {
+            "label": "Kiribati",
+            "value": "Kiribati"
+          },
+          {
+            "label": "Jersey",
+            "value": "Jersey"
+          },
+          {
+            "label": "Isle of Man",
+            "value": "Isle of Man"
+          },
+          {
+            "label": "Guyana",
+            "value": "Guyana"
+          },
+          {
+            "label": "Guam",
+            "value": "Guam"
+          },
+          {
+            "label": "Guadeloupe",
+            "value": "Guadeloupe"
+          },
+          {
+            "label": "Gibraltar",
+            "value": "Gibraltar"
+          },
+          {
+            "label": "Guernsey",
+            "value": "Guernsey"
+          },
+          {
+            "label": "French Guiana",
+            "value": "French Guiana"
+          },
+          {
+            "label": "Fiji",
+            "value": "Fiji"
+          },
+          {
+            "label": "Central African Republic",
+            "value": "Central African Republic"
+          },
+          {
+            "label": "Belize",
+            "value": "Belize"
+          },
+          {
+            "label": "American Samoa",
+            "value": "American Samoa"
+          },
+          {
+            "label": "Anguilla",
+            "value": "Anguilla"
+          },
+          {
+            "label": "Andorra",
+            "value": "Andorra"
+          },
+          {
+            "label": "Mayotte",
+            "value": "Mayotte"
+          },
+          {
+            "label": "Samoa",
+            "value": "Samoa"
+          },
+          {
+            "label": "Wallis and Futuna",
+            "value": "Wallis and Futuna"
+          },
+          {
+            "label": "Virgin Islands, U.S.",
+            "value": "Virgin Islands, U.S."
+          },
+          {
+            "label": "Virgin Islands, British",
+            "value": "Virgin Islands, British"
+          },
+          {
+            "label": "Saint Vincent and the Grenadines",
+            "value": "Saint Vincent and the Grenadines"
+          },
+          {
+            "label": "United States Minor Outlying Islands",
+            "value": "United States Minor Outlying Islands"
+          },
+          {
+            "label": "Tuvalu",
+            "value": "Tuvalu"
+          },
+          {
+            "label": "French Southern Territories",
+            "value": "French Southern Territories"
+          },
+          {
+            "label": "Turks and Caicos Islands",
+            "value": "Turks and Caicos Islands"
+          },
+          {
+            "label": "Svalbard and Jan Mayen",
+            "value": "Svalbard and Jan Mayen"
+          },
+          {
+            "label": "Saint Helena",
+            "value": "Saint Helena"
+          },
+          {
+            "label": "Palau",
+            "value": "Palau"
+          },
+          {
+            "label": "Pitcairn",
+            "value": "Pitcairn"
+          },
+          {
+            "label": "Saint Pierre and Miquelon",
+            "value": "Saint Pierre and Miquelon"
+          },
+          {
+            "label": "French Polynesia",
+            "value": "French Polynesia"
+          },
+          {
+            "label": "Niue",
+            "value": "Niue"
+          },
+          {
+            "label": "Nauru",
+            "value": "Nauru"
+          },
+          {
+            "label": "Norfolk Island",
+            "value": "Norfolk Island"
+          },
+          {
+            "label": "New Caledonia",
+            "value": "New Caledonia"
+          },
+          {
+            "label": "Montserrat",
+            "value": "Montserrat"
+          },
+          {
+            "label": "British Indian Ocean Territory",
+            "value": "British Indian Ocean Territory"
+          },
+          {
+            "label": "Heard Island and McDonald Islands",
+            "value": "Heard Island and McDonald Islands"
+          },
+          {
+            "label": "South Georgia and the South Sandwich Islands",
+            "value": "South Georgia and the South Sandwich Islands"
+          },
+          {
+            "label": "Grenada",
+            "value": "Grenada"
+          },
+          {
+            "label": "Micronesia, Federated States of",
+            "value": "Micronesia, Federated States of"
+          },
+          {
+            "label": "Falkland Islands (Malvinas)",
+            "value": "Falkland Islands (Malvinas)"
+          },
+          {
+            "label": "Europe",
+            "value": "Europe"
+          },
+          {
+            "label": "Western Sahara",
+            "value": "Western Sahara"
+          },
+          {
+            "label": "Christmas Island",
+            "value": "Christmas Island"
+          },
+          {
+            "label": "Cook Islands",
+            "value": "Cook Islands"
+          },
+          {
+            "label": "Cocos (Keeling) Islands",
+            "value": "Cocos (Keeling) Islands"
+          },
+          {
+            "label": "Bouvet Island",
+            "value": "Bouvet Island"
+          },
+          {
+            "label": "Bermuda",
+            "value": "Bermuda"
+          },
+          {
+            "label": "Burundi",
+            "value": "Burundi"
+          },
+          {
+            "label": "Aland Islands",
+            "value": "Aland Islands"
+          },
+          {
+            "label": "Antarctica",
+            "value": "Antarctica"
+          },
+          {
+            "label": "Asia/Pacific Region",
+            "value": "Asia/Pacific Region"
+          }
+        ]
+      }
+    ],
+    "year": [
+      {
+        "label": "All years",
+        "value": ""
+      },
+      {
+        "label": "2020+",
+        "value": "2020"
+      },
+      {
+        "label": "2010-19",
+        "value": "2010"
+      },
+      {
+        "label": "2000-2009",
+        "value": "2000"
+      },
+      {
+        "label": "1990-1999",
+        "value": "1990"
+      },
+      {
+        "label": "1980-1989",
+        "value": "1980"
+      },
+      {
+        "label": "1970-1979",
+        "value": "1970"
+      },
+      {
+        "label": "1960-1969",
+        "value": "1960"
+      },
+      {
+        "label": "1950-1959",
+        "value": "1950"
+      },
+      {
+        "label": "1940-1949",
+        "value": "1940"
+      },
+      {
+        "label": "1930-1939",
+        "value": "1930"
+      },
+      {
+        "label": "1920-1929",
+        "value": "1920"
+      },
+      {
+        "label": "1910-1919",
+        "value": "1910"
+      },
+      {
+        "label": "1900-1909",
+        "value": "1900"
+      },
+      {
+        "label": "1890-1899",
+        "value": "1890"
+      },
+      {
+        "label": "1880-1889",
+        "value": "1880"
+      },
+      {
+        "label": "1870-1879",
+        "value": "1870"
+      }
+    ]
+  },
+  "filterDescriptivesForBrowseType": {
+    "genre": {
+      "Action": "Action Films",
+      "Animation": "Animation Films",
+      "Comedy": "Comedy Films",
+      "Documentary": "Documentaries",
+      "Drama": "Drama Films",
+      "Fantasy": "Fantasy Films",
+      "Biography": "Biographical Films",
+      "Horror": "Horror Films",
+      "Musical": "Musicals",
+      "Sci-Fi": "Sci-Fi Films",
+      "Short": "Short Films",
+      "Silent": "Silent Films",
+      "Sport": "Sport Films",
+      "Thriller": "Thrillers",
+      "Western": "Westerns",
+      "Avant-Garde": "Avant-Garde Films",
+      "Crime": "Crime Films",
+      "Romance": "Romance Films",
+      "LGBTQ+": "LGBT+ Films",
+      "TV Movie": "TV Movies",
+      "Adventure": "Adventure Films",
+      "Cult": "Cult Films",
+      "Family": "Family Films",
+      "History": "History Films",
+      "War": "War Films",
+      "Mystery": "Mystery Films",
+      "Erotica": "Erotic Films",
+      "Music Video": "Music Videos",
+      "Film noir": "Film noir",
+      "TV Mini-series": "TV Mini-series",
+      "Commercial": "Commercials",
+      "Music": "Music Films",
+      "Anthology": "Anthology Films",
+      "TV Series": "TV Series"
+    },
+    "country": {
+      "United States": "United States",
+      "France": "France",
+      "United Kingdom": "United Kingdom",
+      "Italy": "Italy",
+      "Japan": "Japan",
+      "Canada": "Canada",
+      "Germany": "Germany",
+      "India": "India",
+      "Spain": "Spain",
+      "South Korea": "South Korea",
+      "Hong Kong": "Hong Kong",
+      "Turkey": "Turkey",
+      "Brazil": "Brazil",
+      "Poland": "Poland",
+      "Sweden": "Sweden",
+      "Portugal": "Portugal",
+      "Mexico": "Mexico",
+      "China": "China",
+      "Soviet Union": "Soviet Union",
+      "Australia": "Australia",
+      "West Germany": "West Germany",
+      "Argentina": "Argentina",
+      "Netherlands": "Netherlands",
+      "Denmark": "Denmark",
+      "Austria": "Austria",
+      "Philippines": "Philippines",
+      "Russia": "Russia",
+      "Belgium": "Belgium",
+      "Indonesia": "Indonesia",
+      "Iran": "Iran",
+      "Romania": "Romania",
+      "Switzerland": "Switzerland",
+      "Hungary": "Hungary",
+      "Finland": "Finland",
+      "Yugoslavia": "Yugoslavia",
+      "Czechoslovakia": "Czechoslovakia",
+      "Norway": "Norway",
+      "Greece": "Greece",
+      "Taiwan": "Taiwan",
+      "Lithuania": "Lithuania",
+      "Israel": "Israel",
+      "Chile": "Chile",
+      "Egypt": "Egypt",
+      "Ireland": "Ireland",
+      "Thailand": "Thailand",
+      "Czechia": "Czechia",
+      "South Africa": "South Africa",
+      "Malaysia": "Malaysia",
+      "Serbia": "Serbia",
+      "New Zealand": "New Zealand",
+      "Iceland": "Iceland",
+      "Colombia": "Colombia",
+      "Bulgaria": "Bulgaria",
+      "Croatia": "Croatia",
+      "Estonia": "Estonia",
+      "Morocco": "Morocco",
+      "Cuba": "Cuba",
+      "Tunisia": "Tunisia",
+      "East Germany": "East Germany",
+      "Peru": "Peru",
+      "Latvia": "Latvia",
+      "Vietnam": "Vietnam",
+      "Ukraine": "Ukraine",
+      "Nigeria": "Nigeria",
+      "Lebanon": "Lebanon",
+      "Singapore": "Singapore",
+      "Algeria": "Algeria",
+      "Venezuela": "Venezuela",
+      "Pakistan": "Pakistan",
+      "Senegal": "Senegal",
+      "Bangladesh": "Bangladesh",
+      "Burkina Faso": "Burkina Faso",
+      "Slovenia": "Slovenia",
+      "Uruguay": "Uruguay",
+      "Kazakhstan": "Kazakhstan",
+      "Slovakia": "Slovakia",
+      "Sri Lanka": "Sri Lanka",
+      "Syrian Arab Republic": "Syrian Arab Republic",
+      "Puerto Rico": "Puerto Rico",
+      "Georgia": "Georgia",
+      "Bosnia and Herzegovina": "Bosnia and Herzegovina",
+      "Palestine": "Palestine",
+      "Luxembourg": "Luxembourg",
+      "Cameroon": "Cameroon",
+      "Cambodia": "Cambodia",
+      "United Arab Emirates": "United Arab Emirates",
+      "Cote d'Ivoire": "Cote d'Ivoire",
+      "Mali": "Mali",
+      "Bolivia": "Bolivia",
+      "Macedonia": "Macedonia",
+      "North Korea": "North Korea",
+      "Dominican Republic": "Dominican Republic",
+      "Kenya": "Kenya",
+      "Afghanistan": "Afghanistan",
+      "Ghana": "Ghana",
+      "Nepal": "Nepal",
+      "Ethiopia": "Ethiopia",
+      "Mozambique": "Mozambique",
+      "Guinea": "Guinea",
+      "Ecuador": "Ecuador",
+      "Niger": "Niger",
+      "Iraq": "Iraq",
+      "Armenia": "Armenia",
+      "Sudan": "Sudan",
+      "Kyrgyzstan": "Kyrgyzstan",
+      "Democratic Republic of the Congo": "Democratic Republic of the Congo",
+      "Angola": "Angola",
+      "Albania": "Albania",
+      "Zimbabwe": "Zimbabwe",
+      "Azerbaijan": "Azerbaijan",
+      "Tanzania, United Republic of": "Tanzania, United Republic of",
+      "Costa Rica": "Costa Rica",
+      "Belarus": "Belarus",
+      "Uganda": "Uganda",
+      "Paraguay": "Paraguay",
+      "Malta": "Malta",
+      "Haiti": "Haiti",
+      "Rwanda": "Rwanda",
+      "Scotland": "Scotland",
+      "Uzbekistan": "Uzbekistan",
+      "Madagascar": "Madagascar",
+      "Mongolia": "Mongolia",
+      "Jamaica": "Jamaica",
+      "Mauritius": "Mauritius",
+      "Moldova, Republic of": "Moldova, Republic of",
+      "Jordan": "Jordan",
+      "Cyprus": "Cyprus",
+      "Chad": "Chad",
+      "Saudi Arabia": "Saudi Arabia",
+      "Guatemala": "Guatemala",
+      "Faroe Islands": "Faroe Islands",
+      "Republic of Kosovo": "Republic of Kosovo",
+      "Togo": "Togo",
+      "Gabon": "Gabon",
+      "Congo": "Congo",
+      "Myanmar": "Myanmar",
+      "Guinea-Bissau": "Guinea-Bissau",
+      "Benin": "Benin",
+      "El Salvador": "El Salvador",
+      "Montenegro": "Montenegro",
+      "Bhutan": "Bhutan",
+      "Aruba": "Aruba",
+      "Zambia": "Zambia",
+      "Tajikistan": "Tajikistan",
+      "Qatar": "Qatar",
+      "Panama": "Panama",
+      "Namibia": "Namibia",
+      "Mauritania": "Mauritania",
+      "Lao People's Democratic Republic": "Lao People's Democratic Republic",
+      "Cape Verde": "Cape Verde",
+      "Bahrain": "Bahrain",
+      "Trinidad and Tobago": "Trinidad and Tobago",
+      "Sierra Leone": "Sierra Leone",
+      "Libyan Arab Jamahiriya": "Libyan Arab Jamahiriya",
+      "Lesotho": "Lesotho",
+      "Equatorial Guinea": "Equatorial Guinea",
+      "Greenland": "Greenland",
+      "Barbados": "Barbados",
+      "Antigua and Barbuda": "Antigua and Barbuda",
+      "Yemen": "Yemen",
+      "Swaziland": "Swaziland",
+      "Suriname": "Suriname",
+      "Oman": "Oman",
+      "Nicaragua": "Nicaragua",
+      "Malawi": "Malawi",
+      "Martinique": "Martinique",
+      "Monaco": "Monaco",
+      "Liberia": "Liberia",
+      "Saint Lucia": "Saint Lucia",
+      "Kuwait": "Kuwait",
+      "Honduras": "Honduras",
+      "Gambia": "Gambia",
+      "Eritrea": "Eritrea",
+      "Dominica": "Dominica",
+      "Botswana": "Botswana",
+      "Bahamas": "Bahamas",
+      "Vanuatu": "Vanuatu",
+      "Holy See (Vatican City State)": "Holy See (Vatican City State)",
+      "Turkmenistan": "Turkmenistan",
+      "Sao Tome and Principe": "Sao Tome and Principe",
+      "San Marino": "San Marino",
+      "Macao": "Macao",
+      "Marshall Islands": "Marshall Islands",
+      "Liechtenstein": "Liechtenstein",
+      "Djibouti": "Djibouti",
+      "Brunei Darussalam": "Brunei Darussalam",
+      "Netherlands Antilles": "Netherlands Antilles",
+      "Libya": "Libya",
+      "Tonga": "Tonga",
+      "Timor-Leste": "Timor-Leste",
+      "Tokelau": "Tokelau",
+      "Somalia": "Somalia",
+      "Seychelles": "Seychelles",
+      "Solomon Islands": "Solomon Islands",
+      "Reunion": "Reunion",
+      "Papua New Guinea": "Papua New Guinea",
+      "Maldives": "Maldives",
+      "Northern Mariana Islands": "Northern Mariana Islands",
+      "Cayman Islands": "Cayman Islands",
+      "Saint Kitts and Nevis": "Saint Kitts and Nevis",
+      "Comoros": "Comoros",
+      "Kiribati": "Kiribati",
+      "Jersey": "Jersey",
+      "Isle of Man": "Isle of Man",
+      "Guyana": "Guyana",
+      "Guam": "Guam",
+      "Guadeloupe": "Guadeloupe",
+      "Gibraltar": "Gibraltar",
+      "Guernsey": "Guernsey",
+      "French Guiana": "French Guiana",
+      "Fiji": "Fiji",
+      "Central African Republic": "Central African Republic",
+      "Belize": "Belize",
+      "American Samoa": "American Samoa",
+      "Anguilla": "Anguilla",
+      "Andorra": "Andorra",
+      "Mayotte": "Mayotte",
+      "Samoa": "Samoa",
+      "Wallis and Futuna": "Wallis and Futuna",
+      "Virgin Islands, U.S.": "Virgin Islands, U.S.",
+      "Virgin Islands, British": "Virgin Islands, British",
+      "Saint Vincent and the Grenadines": "Saint Vincent and the Grenadines",
+      "United States Minor Outlying Islands": "United States Minor Outlying Islands",
+      "Tuvalu": "Tuvalu",
+      "French Southern Territories": "French Southern Territories",
+      "Turks and Caicos Islands": "Turks and Caicos Islands",
+      "Svalbard and Jan Mayen": "Svalbard and Jan Mayen",
+      "Saint Helena": "Saint Helena",
+      "Palau": "Palau",
+      "Pitcairn": "Pitcairn",
+      "Saint Pierre and Miquelon": "Saint Pierre and Miquelon",
+      "French Polynesia": "French Polynesia",
+      "Niue": "Niue",
+      "Nauru": "Nauru",
+      "Norfolk Island": "Norfolk Island",
+      "New Caledonia": "New Caledonia",
+      "Montserrat": "Montserrat",
+      "British Indian Ocean Territory": "British Indian Ocean Territory",
+      "Heard Island and McDonald Islands": "Heard Island and McDonald Islands",
+      "South Georgia and the South Sandwich Islands": "South Georgia and the South Sandwich Islands",
+      "Grenada": "Grenada",
+      "Micronesia, Federated States of": "Micronesia, Federated States of",
+      "Falkland Islands (Malvinas)": "Falkland Islands (Malvinas)",
+      "Europe": "Europe",
+      "Western Sahara": "Western Sahara",
+      "Christmas Island": "Christmas Island",
+      "Cook Islands": "Cook Islands",
+      "Cocos (Keeling) Islands": "Cocos (Keeling) Islands",
+      "Bouvet Island": "Bouvet Island",
+      "Bermuda": "Bermuda",
+      "Burundi": "Burundi",
+      "Aland Islands": "Aland Islands",
+      "Antarctica": "Antarctica",
+      "Asia/Pacific Region": "Asia/Pacific Region"
+    },
+    "year": {
+      "1870": "1870-79",
+      "1880": "1880-89",
+      "1890": "1890-99",
+      "1900": "1900-09",
+      "1910": "1910-19",
+      "1920": "1920-29",
+      "1930": "1930-39",
+      "1940": "1940-49",
+      "1950": "1950-59",
+      "1960": "1960-69",
+      "1970": "1970-79",
+      "1980": "1980-89",
+      "1990": "1990-99",
+      "2000": "2000-09",
+      "2010": "2010-2019",
+      "2020": "2020-2029"
+    }
+  },
+  "initialSelectedSortOptions": {
+    "sort": "popularity_quality_score",
+    "sort_period": ""
+  },
+  "initialSelectedFilterOptions": {
+    "country": "",
+    "year": ""
+  },
+  "initialPageNum": 1,
+  "initialShowAllFilms": true,
+  "_sentryTraceData": "3c291a2af6c6c07927d0d1daef7f8c7c-df18816bf623f6b7-0",
+  "_sentryBaggage": "sentry-environment=production,sentry-release=2026.04.29.1630-1c4d22d,sentry-public_key=3b8c3e6654eafb37822681af4549d1bd,sentry-trace_id=3c291a2af6c6c07927d0d1daef7f8c7c,sentry-org_id=535082,sentry-sampled=false,sentry-sample_rand=0.4725933896058383,sentry-sample_rate=0"
+}

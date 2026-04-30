@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatViewCount, parseDuration } from '../utils/youtube';
 import { Skeleton } from '../components/ui/Skeleton';
+import ShareAction from '../components/ui/ShareAction';
 import { Icon } from '@iconify/react';
 
 const CATEGORY_LABELS = {
@@ -364,6 +365,11 @@ export default function ChannelDetail() {
                     className="flex items-center gap-2 border border-border bg-surface text-text-muted hover:text-red-400 hover:border-red-400/50 font-bold text-xs px-6 py-4 rounded-lg transition-all">
                     Report
                   </button>
+                  <ShareAction 
+                    title={channel.name}
+                    text={`Check out ${channel.name} on Lumi`}
+                    className="!w-auto"
+                  />
                 </div>
               </div>
 

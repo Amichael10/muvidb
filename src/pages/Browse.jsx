@@ -8,16 +8,19 @@ import { Skeleton } from '../components/ui/Skeleton';
 export default function Browse() {
   const [searchParams] = useSearchParams();
   const initialGenre = searchParams.get('genre') || '';
+  const initialCountry = searchParams.get('country') || '';
   const initialSort = searchParams.get('sort') || 'views';
 
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [films, setFilms] = useState([]);
   const [dbGenres, setDbGenres] = useState([]);
+  const [dbCountries, setDbCountries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
   // Filters state
   const [selectedGenres, setSelectedGenres] = useState(initialGenre ? [initialGenre] : []);
+  const [selectedCountries, setSelectedCountries] = useState(initialCountry ? [initialCountry] : []);
   const [yearRange, setYearRange] = useState(2000);
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [language, setLanguage] = useState('');
@@ -31,18 +34,21 @@ export default function Browse() {
   useEffect(() => {
     setError(null);
     fetchFilms();
-  }, [selectedGenres, yearRange, selectedRatings, language, sortBy]);
+  }, [selectedGenres, selectedCountries, yearRange, selectedRatings, language, sortBy]);
 
   const fetchGenres = async () => {
     try {
-      const { data, error } = await supabase
-        .from('genres')
-        .select('name')
-        .order('name');
-      if (error) throw error;
-      setDbGenres((data || []).map(g => g.name));
+      const [genresRes, countriesRes] = await Promise.all([
+        supabase.from('genres').select('name').order('name'),
+        supabase.from('countries').select('name').order('name')
+      ]);
+      if (genresRes.error) throw genresRes.error;
+      if (countriesRes.error) throw countriesRes.error;
+      
+      setDbGenres((genresRes.data || []).map(g => g.name));
+      setDbCountries((countriesRes.data || []).map(c => c.name));
     } catch (err) {
-      console.error('Error fetching genres:', err);
+      console.error('Error fetching filters:', err);
     }
   };
   
@@ -52,16 +58,35 @@ export default function Browse() {
       let query = supabase.from('films').select(`
         id, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating,
-        film_genres!left(genres(name))
+        film_genres!left(genres(name)),
+        film_countries!left(countries(name))
       `);
 
-      if (selectedGenres.length > 0) {
+      if (selectedGenres.length > 0 && selectedCountries.length > 0) {
+         query = supabase.from('films').select(`
+          id, title, poster_url, backdrop_url, year, language, 
+          runtime_minutes, view_count, average_rating, nfvcb_rating,
+          film_genres!inner(genres!inner(name)),
+          film_countries!inner(countries!inner(name))
+        `);
+        query = query.in('film_genres.genres.name', selectedGenres);
+        query = query.in('film_countries.countries.name', selectedCountries);
+      } else if (selectedGenres.length > 0) {
         query = supabase.from('films').select(`
           id, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
-          film_genres!inner(genres!inner(name))
+          film_genres!inner(genres!inner(name)),
+          film_countries!left(countries(name))
         `);
         query = query.in('film_genres.genres.name', selectedGenres);
+      } else if (selectedCountries.length > 0) {
+        query = supabase.from('films').select(`
+          id, title, poster_url, backdrop_url, year, language, 
+          runtime_minutes, view_count, average_rating, nfvcb_rating,
+          film_genres!left(genres(name)),
+          film_countries!inner(countries!inner(name))
+        `);
+        query = query.in('film_countries.countries.name', selectedCountries);
       }
 
       if (yearRange > 1990) query = query.gte('year', yearRange);
@@ -85,7 +110,8 @@ export default function Browse() {
 
       const transformed = (data || []).map(f => ({
         ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [],
+        countries: f.film_countries?.map(fc => fc.countries?.name).filter(Boolean) || []
       }));
 
       setFilms(transformed);
@@ -105,6 +131,12 @@ export default function Browse() {
     );
   };
 
+  const toggleCountry = (country) => {
+    setSelectedCountries(prev => 
+      prev.includes(country) ? prev.filter(c => c !== country) : [...prev, country]
+    );
+  };
+
   const toggleRating = (rating) => {
     setSelectedRatings(prev => 
       prev.includes(rating) ? prev.filter(r => r !== rating) : [...prev, rating]
@@ -113,6 +145,7 @@ export default function Browse() {
 
   const clearAll = () => {
     setSelectedGenres([]);
+    setSelectedCountries([]);
     setYearRange(2000);
     setSelectedRatings([]);
     setLanguage('');
@@ -165,13 +198,27 @@ export default function Browse() {
 
             <div className="space-y-6">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Genres</h4>
-              <div className="space-y-3 max-h-96 overflow-y-auto pr-4 custom-scrollbar">
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-4 custom-scrollbar">
                 {dbGenres.map(genre => (
                   <label key={genre} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleGenre(genre)}>
                     <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedGenres.includes(genre) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
                       {selectedGenres.includes(genre) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </div>
                     <span className={`text-[11px] font-bold tracking-wider transition-colors ${selectedGenres.includes(genre) ? 'text-brand' : 'text-text-primary group-hover:text-brand'}`}>{genre}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Countries</h4>
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-4 custom-scrollbar">
+                {dbCountries.map(country => (
+                  <label key={country} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleCountry(country)}>
+                    <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedCountries.includes(country) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
+                      {selectedCountries.includes(country) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className={`text-[11px] font-bold tracking-wider transition-colors ${selectedCountries.includes(country) ? 'text-brand' : 'text-text-primary group-hover:text-brand'}`}>{country}</span>
                   </label>
                 ))}
               </div>

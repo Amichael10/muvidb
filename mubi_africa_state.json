@@ -1,0 +1,3388 @@
+{
+  "discovered_countries": [
+    "Algeria",
+    "Angola",
+    "Benin",
+    "Botswana",
+    "Burkina Faso",
+    "Burundi",
+    "Cabo Verde",
+    "Cameroon",
+    "Central African Republic",
+    "Chad",
+    "Comoros",
+    "Congo",
+    "Congo (DRC)",
+    "Djibouti",
+    "Egypt",
+    "Equatorial Guinea",
+    "Eritrea",
+    "Eswatini",
+    "Ethiopia",
+    "Gabon",
+    "Gambia",
+    "Ghana",
+    "Guinea",
+    "Guinea-Bissau",
+    "Ivory Coast",
+    "Kenya",
+    "Lesotho",
+    "Liberia",
+    "Libya",
+    "Madagascar",
+    "Malawi",
+    "Mali",
+    "Mauritania",
+    "Mauritius",
+    "Morocco",
+    "Mozambique",
+    "Namibia",
+    "Niger",
+    "Nigeria"
+  ],
+  "pending_films": [
+    {
+      "mubi_id": 462427,
+      "slug": "what-happens-at-night-2026",
+      "title": "What Happens at Night",
+      "year": 2027,
+      "duration": null,
+      "synopsis": "An American couple travels to a snowy European town to adopt a baby, checking into a hotel populated by enigmatic figures: a flamboyant singer, a corrupt businessman, and a magnetic faith healer. As they fight to bring their child home, the strange world around them begins to unravel.",
+      "genres": [
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/462427/image-w856.jpg?1774336222",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/462427/image-w1280.jpg?1774336222",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Martin Scorsese",
+          "slug": "martin-scorsese"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 465582,
+      "slug": "discipline-2026",
+      "title": "Discipline",
+      "year": 2026,
+      "duration": 14,
+      "synopsis": "Northern Italy. In an otherwise uninhabited boarding school, two figures—a masked puppeteer, a life-size doll—awake in the same bed. Along with other identical pairings, they dress for the day and start their routine: from inspection, to playtime, to lunch. But order gradually gives way to ecstasy.",
+      "genres": [
+        "Short",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/465582/image-w856.jpg?1772538660",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/465582/image-w1280.jpg?1772538660",
+      "trailer_url": "https://trailers.mubicdn.net/465582/optimised/1080p-t-_en_us_1772718839.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Mona Fastvold",
+          "slug": "mona-fastvold"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 420475,
+      "slug": "the-drama",
+      "title": "The Drama",
+      "year": 2026,
+      "duration": 106,
+      "synopsis": "Charlie and Emma are engaged to be wed. But just one week away from the ceremony, the happy couple share their most intimate secrets at dinner with friends—and their relationship is put to the test by one shock revelation.",
+      "genres": [
+        "Romance"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/420475/image-w856.jpg?1772453980",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/420475/image-w1280.jpg?1772453980",
+      "trailer_url": "https://trailers.mubicdn.net/420475/optimised/1080p-t-the-drama_en_us_841.951_1920_1080_1770149542.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Kristoffer Borgli",
+          "slug": "kristoffer-borgli"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 391721,
+      "slug": "rosebush-pruning",
+      "title": "Rosebush Pruning",
+      "year": 2026,
+      "duration": 95,
+      "synopsis": "Underneath the Catalonian sun, a rich white American family lives in hedonistic isolation, seeking love and validation through one another, their designer wardrobes and pop music. When an outsider infiltrates the family, buried tensions surface and blood ties are severed.",
+      "genres": [
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/391721/image-w856.jpg?1772705599",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/391721/image-w1280.jpg?1772705599",
+      "trailer_url": "https://trailers.mubicdn.net/391721/optimised/1080p-t-rosebush-pruning_en_us_1774617115.mp4",
+      "mubi_rating": 3.8,
+      "historic_countries": [
+        "Italy",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Karim Aïnouz",
+          "slug": "karim-ainouz"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440751,
+      "slug": "yellow-letters",
+      "title": "Yellow Letters",
+      "year": 2026,
+      "duration": 128,
+      "synopsis": "Life is good for Derya and Aziz, a celebrated artist couple from Turkey, until an incident at their play’s premiere. Suddenly targeted by the state and struggling to balance their ideals with life’s necessities, their marriage is pushed to a breaking point.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440751/image-w856.jpg?1770027287",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440751/image-w1280.jpg?1770027287",
+      "trailer_url": "https://trailers.mubicdn.net/440751/optimised/1080p-t-yellow-letters_en_us_2029.7930000000001_1920_1080_1769373255.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "Germany",
+        "Turkey"
+      ],
+      "directors": [
+        {
+          "name": "İlker Çatak",
+          "slug": "ilker-catak"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 463992,
+      "slug": "my-undesirable-friends-part-ii-exile",
+      "title": "My Undesirable Friends: Part II - Exile",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "",
+      "genres": [
+        "Documentary"
+      ],
+      "poster_url": null,
+      "backdrop_url": null,
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Julia Loktev",
+          "slug": "julia-loktev"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 418273,
+      "slug": "project-hail-mary",
+      "title": "Project Hail Mary",
+      "year": 2026,
+      "duration": 166,
+      "synopsis": "An astronaut tries to save Earth while alone in outer space. Upon waking up in space, he will, thanks to a surprise encounter, find solutions to the threat of star destruction that could endanger Earth.",
+      "genres": [
+        "Sci-Fi",
+        "Adventure"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/418273/image-w856.jpg?1773055274",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/418273/image-w1280.jpg?1773055274",
+      "trailer_url": "https://trailers.mubicdn.net/418273/optimised/1080p-t-project-hail-mary_en_us_765.7349999999999_1920_1080_1751305226.mp4",
+      "mubi_rating": 3.5,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Phil Lord",
+          "slug": "phil-lord"
+        },
+        {
+          "name": "Christopher Miller",
+          "slug": "christopher-miller"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 423142,
+      "slug": "bitter-christmas",
+      "title": "Bitter Christmas",
+      "year": 2026,
+      "duration": 111,
+      "synopsis": "During a long December holiday weekend, a woman, whose mother dies recently, throws herself into work as a form of escape. Her relentless pace is interrupted when a panic attack forces her to take a break.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/423142/image-w856.jpg?1769504143",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/423142/image-w1280.jpg?1769504143",
+      "trailer_url": "https://trailers.mubicdn.net/423142/optimised/1080p-t-bitter-christmas_en_us_2261.553_1920_1080_1766063257.mp4",
+      "mubi_rating": 3.3,
+      "historic_countries": [
+        "Spain"
+      ],
+      "directors": [
+        {
+          "name": "Pedro Almodóvar",
+          "slug": "pedro-almodovar"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 368829,
+      "slug": "teenage-sex-and-death-at-camp-miasma",
+      "title": "Teenage Sex and Death at Camp Miasma",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "After years of slapdash sequels, the Camp Miasma franchise is handed over to an enthusiastic young director for resurrection. But when she visits the original’s star, a now-reclusive actress shrouded in mystery, the two women fall into a blood-soaked world of desire, fear, and delirium.",
+      "genres": [
+        "LGBTQ+",
+        "Comedy",
+        "Horror"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/368829/image-w856.jpg?1771019329",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/368829/image-w1280.jpg?1771019329",
+      "trailer_url": "https://trailers.mubicdn.net/368829/optimised/1080p-t-teenage-sex-and-death-at-camp-miasma_en_us_1772037214.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States",
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Jane Schoenbrun",
+          "slug": "jane-schoenbrun"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 442304,
+      "slug": "her-private-hell-2026",
+      "title": "Her Private Hell",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "An edgy, hypnotic and unhinged thriller based on an original story that promises “lots of glitter, sex, and violence.”",
+      "genres": [
+        "Thriller",
+        "Drama",
+        "Avant-Garde"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/442304/image-w856.jpg?1774599456",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/442304/image-w1280.jpg?1774599456",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Nicolas Winding Refn",
+          "slug": "nicolas-winding-refn"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 434018,
+      "slug": "fjord",
+      "title": "Fjord",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "An immigrant Romanian family living in Norway is subject to an investigation and faces the scrutiny of the local judicial system.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/434018/image-w856.jpg?1776021023",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/434018/image-w1280.jpg?1776021023",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "Romania",
+        "Norway"
+      ],
+      "directors": [
+        {
+          "name": "Cristian Mungiu",
+          "slug": "cristian-mungiu"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 456346,
+      "slug": "minotaur-2026",
+      "title": "Minotaur",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": null,
+      "backdrop_url": null,
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "France",
+        "Latvia"
+      ],
+      "directors": [
+        {
+          "name": "Andrey Zvyagintsev",
+          "slug": "andrey-zvyagintsev"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 466008,
+      "slug": "histoires-paralleles-2026",
+      "title": "Parallel Tales",
+      "year": 2026,
+      "duration": 139,
+      "synopsis": "Seeking inspiration for her new novel, Sylvie spies on her neighbors across the street. When she hires Adam to help her with her daily life, she ignores how he will turn her life upside down, until the fiction she imagined surpasses everyone’s reality.",
+      "genres": [
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/466008/image-w856.jpg?1775793780",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/466008/image-w1280.jpg?1775793780",
+      "trailer_url": "https://trailers.mubicdn.net/466008/optimised/1080p-t-histoires-paralleles-2026_en_us_673.081_1920_1080_1777017605.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "France",
+        "Italy"
+      ],
+      "directors": [
+        {
+          "name": "Asghar Farhadi",
+          "slug": "asghar-farhadi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 443608,
+      "slug": "all-of-a-sudden-2026",
+      "title": "All of a Sudden",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "Two scholars exchange letters about chance and risk. As the philosopher falls ill, their academic correspondence evolves into intimate discussions about mortality and a deeper connection forms between them.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/443608/image-w856.jpg?1771060224",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/443608/image-w1280.jpg?1771060224",
+      "trailer_url": "https://trailers.mubicdn.net/443608/optimised/1080p-t-all-of-a-sudden-2026_en_us_669.355_1920_1080_1775785677.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "Japan",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Ryusuke Hamaguchi",
+          "slug": "ryusuke-hamaguchi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 373996,
+      "slug": "mother-mary-2023",
+      "title": "Mother Mary",
+      "year": 2026,
+      "duration": 112,
+      "synopsis": "Long-buried wounds rise to the surface when iconic pop star Mother Mary reunites with her estranged best friend and former costume designer, Sam Anselm, on the eve of her comeback performance.",
+      "genres": [
+        "Music",
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/373996/image-w856.jpg?1776669026",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/373996/image-w1280.jpg?1776669026",
+      "trailer_url": "https://trailers.mubicdn.net/373996/optimised/1080p-t-mother-mary-2023_en_us_569.568_1920_1080_1764719605.mp4",
+      "mubi_rating": 3,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "David Lowery",
+          "slug": "david-lowery"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 432035,
+      "slug": "the-odyssey-2025",
+      "title": "The Odyssey",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "After the Trojan War, Odysseus faces a dangerous voyage back to Ithaca, meeting creatures like the Cyclops Polyphemus, Sirens, and Circe along the way.",
+      "genres": [
+        "Action"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/432035/image-w856.jpg?1766500310",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/432035/image-w1280.jpg?1766500310",
+      "trailer_url": "https://trailers.mubicdn.net/432035/optimised/1080p-t-the-odyssey-2025_en_us_617.3530000000001_1920_1080_1766474927.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Christopher Nolan",
+          "slug": "christopher-nolan"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 442112,
+      "slug": "bucking-fastard",
+      "title": "Bucking Fastard",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "Follows two inseparable sisters who live on the fringes of society.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/442112/image-w856.jpg?1769694635",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/442112/image-w1280.jpg?1769694635",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Werner Herzog",
+          "slug": "werner-herzog"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440826,
+      "slug": "salvation-2025",
+      "title": "Salvation",
+      "year": 2026,
+      "duration": 120,
+      "synopsis": "In a remote village, an exiled clan returns, reviving a decades-old land feud. Seized by divine visions, Mesut challenges his brother’s leadership to save his people. Will this new path bring salvation or tragedy?",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440826/image-w856.jpg?1770239639",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440826/image-w1280.jpg?1770239639",
+      "trailer_url": "https://trailers.mubicdn.net/440826/optimised/1080p-t-salvation-2025_en_us_662.498_1920_1080_1771526713.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "Turkey",
+        "Netherlands"
+      ],
+      "directors": [
+        {
+          "name": "Emin Alper",
+          "slug": "emin-alper"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440735,
+      "slug": "rose-2025",
+      "title": "Rose",
+      "year": 2026,
+      "duration": 94,
+      "synopsis": "In the early 17th century, a soldier arrives at an isolated Protestant village in Germany claiming to be the heir to an abandoned farmstead. Even though he proves to be a good man, the villagers’ suspicions about his identity grow and they force a reckoning.",
+      "genres": [
+        "Drama",
+        "History"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440735/image-w856.jpg?1768908267",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440735/image-w1280.jpg?1768908267",
+      "trailer_url": "https://trailers.mubicdn.net/440735/optimised/1080p-t-rose-2025_en_us_733.0550000000001_1920_1080_1771218430.mp4",
+      "mubi_rating": 3.6,
+      "historic_countries": [
+        "Austria",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Markus Schleinzer",
+          "slug": "markus-schleinzer"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 436878,
+      "slug": "el-ser-querido",
+      "title": "The Beloved",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "An acclaimed director reunites with estranged daughter, an unsuccessful actress, to shoot a film together, confronting their strained relationship and unresolved past issues that neither wants to address directly.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/436878/image-w856.jpg?1775791614",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/436878/image-w1280.jpg?1775791614",
+      "trailer_url": "https://trailers.mubicdn.net/436878/optimised/1080p-t-el-ser-querido_en_us_1775891431.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "Spain",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Rodrigo Sorogoyen",
+          "slug": "rodrigo-sorogoyen"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 371101,
+      "slug": "backrooms",
+      "title": "Backrooms",
+      "year": 2026,
+      "duration": 105,
+      "synopsis": "A strange doorway appears in the basement of a furniture showroom.",
+      "genres": [
+        "Horror"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/371101/image-w856.jpg?1772073400",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/371101/image-w1280.jpg?1772073400",
+      "trailer_url": "https://trailers.mubicdn.net/371101/optimised/1080p-t-backrooms_en_us_642.545_1920_1080_1775018522.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Kane Parsons",
+          "slug": "kane-parsons"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 436816,
+      "slug": "wuthering-heights-2026",
+      "title": "\"Wuthering Heights\"",
+      "year": 2026,
+      "duration": 136,
+      "synopsis": "Tragedy strikes when Heathcliff falls in love with Catherine Earnshaw, a woman from a wealthy family in 18th-century England, kickstarting an intense and destructive relationship set against the backdrop of the Yorkshire moors.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/436816/image-w856.jpg?1769981262",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/436816/image-w1280.jpg?1769981262",
+      "trailer_url": "https://trailers.mubicdn.net/436816/optimised/1080p-t-wuthering-heights-2026_en_us_4696.299_1920_1080_1763059630.mp4",
+      "mubi_rating": 2.7,
+      "historic_countries": [
+        "United States",
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Emerald Fennell",
+          "slug": "emerald-fennell"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 412419,
+      "slug": "i-want-your-sex-2025",
+      "title": "I Want Your Sex",
+      "year": 2026,
+      "duration": 91,
+      "synopsis": "When a fresh-faced newcomer lands an exciting job for renowned icon and provocateur, his fantasies come true as she taps him to become her sexual muse. Soon he finds himself out of his depth as she takes him on a journey more profound than he ever could have imagined.",
+      "genres": [
+        "Thriller",
+        "Comedy",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/412419/image-w856.jpg?1774532009",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/412419/image-w1280.jpg?1774532009",
+      "trailer_url": null,
+      "mubi_rating": 3.6,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Gregg Araki",
+          "slug": "gregg-araki"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 408292,
+      "slug": "dune-part-three",
+      "title": "Dune: Part Three",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "Based on the novel.",
+      "genres": [
+        "Sci-Fi",
+        "Action",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/408292/image-w856.jpg?1773814310",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/408292/image-w1280.jpg?1773814310",
+      "trailer_url": "https://trailers.mubicdn.net/408292/optimised/1080p-t-dune-messiah_en_us_2153.0660000000003_3840_2160_1773814232.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Denis Villeneuve",
+          "slug": "denis-villeneuve"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 435277,
+      "slug": "the-man-i-love-2026",
+      "title": "The Man I Love",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "A film set in the late ’80s in New York City.",
+      "genres": [
+        "Drama",
+        "Musical",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/435277/image-w856.jpg?1775791032",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/435277/image-w1280.jpg?1775791032",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Ira Sachs",
+          "slug": "ira-sachs"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 374905,
+      "slug": "hope-2023",
+      "title": "Hope",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "When a tiger is suspected to have appeared and local police chief Bum-seok is alerted, it throws the community into chaos. What begins as a local emergency soon spirals into a deeper, more terrifying mystery, one that forces the town’s residents to confront the unknown.",
+      "genres": [
+        "Sci-Fi",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/374905/image-w856.jpg?1758074740",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/374905/image-w1280.jpg?1758074740",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "South Korea"
+      ],
+      "directors": [
+        {
+          "name": "Na Hong-jin",
+          "slug": "na-hong-jin"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 461295,
+      "slug": "gentle-monster",
+      "title": "Gentle Monster",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "Renowned pianist relocates with her family to the countryside, where she uncovers a life-shattering truth that forces her to confront the complexities of love, trust, and deception.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/461295/image-w856.jpg?1775794253",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/461295/image-w1280.jpg?1775794253",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "France",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Marie Kreutzer",
+          "slug": "marie-kreutzer"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 466012,
+      "slug": "full-phil",
+      "title": "Full Phil",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "Wealthy businessman Philip Doom (Woody Harrelson) travels to Paris in an effort to get closer to his daughter Madeline (Kristen Stewart).",
+      "genres": [
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/466012/image-w856.jpg?1775791777",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/466012/image-w1280.jpg?1775791777",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "Luxembourg",
+        "Belgium"
+      ],
+      "directors": [
+        {
+          "name": "Quentin Dupieux",
+          "slug": "quentin-dupieux"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 466009,
+      "slug": "coward-2026",
+      "title": "Coward",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "1916. During the First World War, the soldiers try to keep up their morale behind the trenches. Stirred by wartime rhetoric, each of them seeks their own path.",
+      "genres": [
+        "Drama",
+        "War",
+        "History"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/466009/image-w856.jpg?1775795415",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/466009/image-w1280.jpg?1775795415",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "Netherlands",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Lukas Dhont",
+          "slug": "lukas-dhont"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 470035,
+      "slug": "la-bola-negra",
+      "title": "La bola negra",
+      "year": 2026,
+      "duration": null,
+      "synopsis": "The story of three men whose lives are intimately connected through sexuality and desire, pain and inheritance, across three different eras – 1932, 1937, and 2017.",
+      "genres": [
+        "Drama",
+        "Musical",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/470035/image-w856.jpg?1775301024",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/470035/image-w1280.jpg?1775301024",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "Spain",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Javier Ambrossi",
+          "slug": "javier-ambrossi"
+        },
+        {
+          "name": "Javier Calvo",
+          "slug": "javier-calvo"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 411498,
+      "slug": "the-secret-agent-2025",
+      "title": "The Secret Agent",
+      "year": 2025,
+      "duration": 161,
+      "synopsis": "Marcelo is a father on the run from a mysterious past. Arriving in Recife during Carnival, Marcelo is swept into a dizzying world of colour, noise, and unforgettable characters. As the city’s sights and sounds intensify, Marcelo’s true place within Recife’s intricate web of secrets begins to emerge.",
+      "genres": [
+        "Thriller",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/411498/image-w856.jpg?1771581654",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/411498/image-w1280.jpg?1771581654",
+      "trailer_url": "https://trailers.mubicdn.net/411498/optimised/1080p-t-the-secret-agent-2025_en_us_1772102884.mp4",
+      "mubi_rating": 4.4,
+      "historic_countries": [
+        "France",
+        "Brazil"
+      ],
+      "directors": [
+        {
+          "name": "Kleber Mendonça Filho",
+          "slug": "kleber-mendonca-filho"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 410994,
+      "slug": "my-father-s-shadow",
+      "title": "My Father's Shadow",
+      "year": 2025,
+      "duration": 93,
+      "synopsis": "Over the course of a single day’s journey into and around Lagos, Folarin and his young sons, Akin and Remi, reckon with their relationship while navigating a city on the precipice of democratic crisis. As details of Folarin’s life emerge, the strain in their connection becomes increasingly clear.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/410994/image-w856.jpg?1745503807",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/410994/image-w1280.jpg?1745503807",
+      "trailer_url": "https://trailers.mubicdn.net/410994/optimised/1080p-t-my-father-s-shadow_en_us_1764777758.mp4",
+      "mubi_rating": 4.5,
+      "historic_countries": [
+        "United Kingdom",
+        "Nigeria"
+      ],
+      "directors": [
+        {
+          "name": "Akinola Davies Jr.",
+          "slug": "akinola-davies-jr"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 442350,
+      "slug": "arco",
+      "title": "Arco",
+      "year": 2025,
+      "duration": 95,
+      "synopsis": "In 2075, Iris, a 10-year-old girl, sees a mysterious boy in a rainbow suit fall from the sky. It’s Arco. Iris will take him in and help him by any means possible to get home.",
+      "genres": [
+        "Animation",
+        "Adventure",
+        "Sci-Fi"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/442350/image-w856.jpg?1765576972",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/442350/image-w1280.jpg?1765576972",
+      "trailer_url": "https://trailers.mubicdn.net/442350/optimised/1080p-t-arco_en_us_1765575703.mp4",
+      "mubi_rating": 4.7,
+      "historic_countries": [
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Ugo Bienvenu",
+          "slug": "ugo-bienvenu"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 436826,
+      "slug": "sound-of-falling",
+      "title": "Sound of Falling",
+      "year": 2025,
+      "duration": 155,
+      "synopsis": "Four adolescent girls (Alma, Erika, Angelika, Lenka) each spend their youth in the same farmhouse over the last century. Though separated by decades, resonances between their lives emerge: their desires and distress, secrets and truths, encounters with another’s gaze and defiant gaze in return.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/436826/image-w856.jpg?1747926473",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/436826/image-w1280.jpg?1747926473",
+      "trailer_url": "https://trailers.mubicdn.net/436826/optimised/1080p-t-sound-of-falling_en_us_1765291744.mp4",
+      "mubi_rating": 4,
+      "historic_countries": [
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Mascha Schilinski",
+          "slug": "mascha-schilinski"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440441,
+      "slug": "pompei-below-the-clouds",
+      "title": "Pompei: Below the Clouds",
+      "year": 2025,
+      "duration": 114,
+      "synopsis": "Naples is a city forever marked by the looming presence of Mount Vesuvius. Beneath the quiet threat of eruption, people go about their days: archaeologists unearth the past, children learn as the earth hums, firefighters wait for the next call.",
+      "genres": [
+        "Documentary"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440441/image-w856.jpg?1753700563",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440441/image-w1280.jpg?1753700563",
+      "trailer_url": "https://trailers.mubicdn.net/440441/optimised/1080p-t-pompei-below-the-clouds_en_us_1769696189.mp4",
+      "mubi_rating": 4.3,
+      "historic_countries": [
+        "Italy"
+      ],
+      "directors": [
+        {
+          "name": "Gianfranco Rosi",
+          "slug": "gianfranco-rosi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 255497,
+      "slug": "no-other-choice",
+      "title": "No Other Choice",
+      "year": 2025,
+      "duration": 139,
+      "synopsis": "Looking for a job? When a happy family man is dismissed after twenty-five years of loyal service at a paper company, he finds the perfect solution to land his next role: truly eliminate the competition.",
+      "genres": [
+        "Comedy",
+        "Crime",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/255497/image-w856.jpg?1753801050",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/255497/image-w1280.jpg?1753801050",
+      "trailer_url": "https://trailers.mubicdn.net/255497/optimised/1080p-t-no-other-choice_en_us_1764282418.mp4",
+      "mubi_rating": 4.4,
+      "historic_countries": [
+        "South Korea"
+      ],
+      "directors": [
+        {
+          "name": "Park Chan-wook",
+          "slug": "park-chan-wook"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 448851,
+      "slug": "agon-2025",
+      "title": "Agon",
+      "year": 2025,
+      "duration": 100,
+      "synopsis": "Three elite athletes train for the Summer Games, Ludoj, 2024. Facing press attention, injury, and exhaustion, they practice their respective disciplines of rifle shooting, fencing, and judo. The women work with coaches to optimize their performance before competing under acute pressure at the Games.",
+      "genres": [
+        "Drama",
+        "Sport"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/448851/image-w856.jpg?1767698068",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/448851/image-w1280.jpg?1767698068",
+      "trailer_url": "https://trailers.mubicdn.net/448851/optimised/1080p-t-agon-2025_en_us_1777017883.mp4",
+      "mubi_rating": 4.1,
+      "historic_countries": [
+        "Italy",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Giulio Bertelli",
+          "slug": "giulio-bertelli"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 437598,
+      "slug": "la-grazia",
+      "title": "La grazia",
+      "year": 2025,
+      "duration": 133,
+      "synopsis": "As his tenure as President of Italy nears its end, Mariano De Santis faces wrenching decisions—both political and deeply personal. Amid these moral quandaries, he must confront his own conscience and seek guidance from those closest to him, including his confidante and daughter, Dorotea.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/437598/image-w856.jpg?1751620976",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/437598/image-w1280.jpg?1751620976",
+      "trailer_url": "https://trailers.mubicdn.net/437598/optimised/1080p-t-la-grazia_en_us_1763647985.mp4",
+      "mubi_rating": 4.3,
+      "historic_countries": [
+        "Italy"
+      ],
+      "directors": [
+        {
+          "name": "Paolo Sorrentino",
+          "slug": "paolo-sorrentino"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 441162,
+      "slug": "it-was-just-an-accident",
+      "title": "It Was Just an Accident",
+      "year": 2025,
+      "duration": 104,
+      "synopsis": "When an auto mechanic encounters the man who may have been his torturer in prison, he kidnaps him to exact vengeance. But since the sole clue to Eghbal’s identity is the squeak of his prosthetic leg, Vahid turns to other now-freed victims for confirmation. And the danger only escalates.",
+      "genres": [
+        "Crime",
+        "Thriller",
+        "Drama",
+        "Mystery"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/441162/image-w856.jpg?1747995632",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/441162/image-w1280.jpg?1747995632",
+      "trailer_url": "https://trailers.mubicdn.net/441162/optimised/1080p-t-it-was-just-an-accident_en_us_1761269943.mp4",
+      "mubi_rating": 4.4,
+      "historic_countries": [
+        "Iran",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Jafar Panahi",
+          "slug": "jafar-panahi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431210,
+      "slug": "endless-cookie",
+      "title": "Endless Cookie",
+      "year": 2025,
+      "duration": 97,
+      "synopsis": "Two half-brothers, one Indigenous and one white, embark on a journey through time and place. They travel from their remote home in Shamattawa to the vibrant urban landscape of the 1980s.",
+      "genres": [
+        "Documentary",
+        "Animation",
+        "Avant-Garde",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431210/image-w856.jpg?1776250272",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431210/image-w1280.jpg?1776250272",
+      "trailer_url": "https://trailers.mubicdn.net/431210/optimised/1080p-t-endless-cookie_en_us_1290.2559999999999_1920_1080_1746609358.mp4",
+      "mubi_rating": 4.2,
+      "historic_countries": [
+        "Canada"
+      ],
+      "directors": [
+        {
+          "name": "Seth Scriver",
+          "slug": "seth-scriver"
+        },
+        {
+          "name": "Peter Scriver",
+          "slug": "peter-scriver"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 400360,
+      "slug": "sentimental-value",
+      "title": "Sentimental Value",
+      "year": 2025,
+      "duration": 135,
+      "synopsis": "Nora, a successful stage actress, reunites with her estranged father, Gustav Borg—a once-renowned film director planning a comeback with a script based on their family. When Gustav offers Nora the lead role, which she promptly declines, he turns his attention to a rising Hollywood starlet instead.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/400360/image-w856.jpg?1757575671",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/400360/image-w1280.jpg?1757575671",
+      "trailer_url": "https://trailers.mubicdn.net/400360/optimised/1080p-t-sentimental-value_en_us_1770128174.mp4",
+      "mubi_rating": 4.6,
+      "historic_countries": [
+        "Norway",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Joachim Trier",
+          "slug": "joachim-trier"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 360569,
+      "slug": "die-my-love",
+      "title": "Die My Love",
+      "year": 2025,
+      "duration": 119,
+      "synopsis": "Grace and her partner Jackson move into an old country house. She pursues her dream of writing, and the couple welcome a baby soon after. However, with Jackson frequently absent, and the pressures of domestic life weighing on her, Grace begins to unravel, leaving a path of destruction in her wake.",
+      "genres": [
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/360569/image-w856.jpg?1761916729",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/360569/image-w1280.jpg?1761916729",
+      "trailer_url": "https://trailers.mubicdn.net/360569/optimised/1080p-t-die-my-love_en_us_1765794274.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United States",
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Lynne Ramsay",
+          "slug": "lynne-ramsay"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 422583,
+      "slug": "the-mastermind",
+      "title": "The Mastermind",
+      "year": 2025,
+      "duration": 111,
+      "synopsis": "In a sedate Massachusetts suburb circa 1970, unemployed family man and amateur art thief J.B. Mooney sets out on his first heist. With the museum cased and accomplices recruited, he has an airtight plan. Or so he thinks.",
+      "genres": [
+        "Crime"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/422583/image-w856.jpg?1765544027",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/422583/image-w1280.jpg?1765544027",
+      "trailer_url": "https://trailers.mubicdn.net/422583/optimised/1080p-t-the-mastermind_en_us_1765549437.mp4",
+      "mubi_rating": 3.4,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Kelly Reichardt",
+          "slug": "kelly-reichardt"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 408020,
+      "slug": "atropia",
+      "title": "Atropia",
+      "year": 2025,
+      "duration": 103,
+      "synopsis": "When an aspiring actress in a military role-playing facility falls in love with a soldier cast as an insurgent, their unsimulated emotions threaten to derail the performance.",
+      "genres": [
+        "Drama",
+        "Comedy",
+        "War"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/408020/image-w856.jpg?1745503378",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/408020/image-w1280.jpg?1745503378",
+      "trailer_url": "https://trailers.mubicdn.net/408020/optimised/1080p-t-atropia_en_us_5119.758_1920_1080_1762502604.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "United States",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Hailey Gates",
+          "slug": "hailey-gates"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 398054,
+      "slug": "father-mother-sister-brother",
+      "title": "Father Mother Sister Brother",
+      "year": 2025,
+      "duration": 110,
+      "synopsis": "A feature film in the form of a triptych. The three stories all concern the relationships between adult children, their somewhat distant parent (or parents), and each other.",
+      "genres": [
+        "Drama",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/398054/image-w856.jpg?1770218943",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/398054/image-w1280.jpg?1770218943",
+      "trailer_url": "https://trailers.mubicdn.net/398054/optimised/1080p-t-father-mother-sister-brother_en_us_1762521654.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Jim Jarmusch",
+          "slug": "jim-jarmusch"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431131,
+      "slug": "the-ugly-stepsister",
+      "title": "The Ugly Stepsister",
+      "year": 2025,
+      "duration": 110,
+      "synopsis": "Seemingly plain but ambitious Elvira is pushed by her mother to win over a vain prince and save their family. But when her stunning stepsister Agnes becomes a rival, Elvira is driven to extremes. As the royal ball nears, she must face the harsh truths of the world she longs to belong to.",
+      "genres": [
+        "Comedy",
+        "Horror"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431131/image-w856.jpg?1758284892",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431131/image-w1280.jpg?1758284892",
+      "trailer_url": "https://trailers.mubicdn.net/431131/optimised/1080p-t-the-ugly-stepsister_en_us_1798.7620000000002_1920_1080_1742349242.mp4",
+      "mubi_rating": 4.3,
+      "historic_countries": [
+        "Norway",
+        "Poland"
+      ],
+      "directors": [
+        {
+          "name": "Emilie Blichfeldt",
+          "slug": "emilie-blichfeldt"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 301059,
+      "slug": "sirat",
+      "title": "Sirât",
+      "year": 2025,
+      "duration": 115,
+      "synopsis": "A man and his son arrive at a rave lost in the mountains of Morocco. They are looking for Marina, their daughter and sister, who disappeared months ago at another rave. Driven by fate, they decide to follow a group of ravers in search of one last party, in the hope that Marina will be there.",
+      "genres": [
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/301059/image-w856.jpg?1769615497",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/301059/image-w1280.jpg?1769615497",
+      "trailer_url": "https://trailers.mubicdn.net/301059/optimised/1080p-t-sirat_en_us_1770992437.mp4",
+      "mubi_rating": 4.1,
+      "historic_countries": [
+        "France",
+        "Morocco"
+      ],
+      "directors": [
+        {
+          "name": "Oliver Laxe",
+          "slug": "oliver-laxe"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 447318,
+      "slug": "l-accident-de-piano",
+      "title": "The Piano Accident",
+      "year": 2025,
+      "duration": 88,
+      "synopsis": "Magalie, a social media sensation famous for posting shocking content online, takes a break after suffering a serious accident while filming one of her videos. Isolated in a mountain chalet with her personal assistant, her retreat is interrupted by a journalist who begins to blackmail her.",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/447318/image-w856.jpg?1764695248",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/447318/image-w1280.jpg?1764695248",
+      "trailer_url": "https://trailers.mubicdn.net/447318/optimised/1080p-t-l-accident-de-piano_en_us_2526.937_1920_1080_1752391086.mp4",
+      "mubi_rating": 3.8,
+      "historic_countries": [
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Quentin Dupieux",
+          "slug": "quentin-dupieux"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 418722,
+      "slug": "magic-farm",
+      "title": "Magic Farm",
+      "year": 2025,
+      "duration": 93,
+      "synopsis": "When a misguided American documentary crew in search of their next viral segment ends up in the wrong town in rural Argentina, chaos ensues. As they collaborate with locals to fake a new music trend, unexpected relationships form and an unfolding health crisis becomes apparent.",
+      "genres": [
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/418722/image-w856.jpg?1745503382",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/418722/image-w1280.jpg?1745503382",
+      "trailer_url": "https://trailers.mubicdn.net/418722/optimised/1080p-t-magic-farm_en_us_1749218333.mp4",
+      "mubi_rating": 3.8,
+      "historic_countries": [
+        "Argentina",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Amalia Ulman",
+          "slug": "amalia-ulman"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 332978,
+      "slug": "hot-milk-2023",
+      "title": "Hot Milk",
+      "year": 2025,
+      "duration": 93,
+      "synopsis": "Sofia and her ailing mother, Rose, travel to the Spanish seaside town of Almería to seek the help of Dr. Gómez, an enigmatic healer who may hold the key to Rose’s mysterious illness. As long-buried tensions simmer between them, Sofia finds herself drawn to the magnetic and free-spirited Ingrid.",
+      "genres": [
+        "Drama",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/332978/image-w856.jpg?1746718753",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/332978/image-w1280.jpg?1746718753",
+      "trailer_url": "https://trailers.mubicdn.net/332978/optimised/1080p-t-hot-milk-2023_en_us_1755853544.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Rebecca Lenkiewicz",
+          "slug": "rebecca-lenkiewicz"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 411499,
+      "slug": "miroirs-no-3",
+      "title": "Miroirs No. 3",
+      "year": 2025,
+      "duration": 86,
+      "synopsis": "A young piano student is involved in a car accident in which her boyfriend is killed. Miraculously, she survives the accident unharmed and is taken in by a family. She finds comfort and support in order to get her life back on track, but over time she notices that something is wrong with the family.",
+      "genres": [
+        "Drama",
+        "Music"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/411499/image-w856.jpg?1758546736",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/411499/image-w1280.jpg?1758546736",
+      "trailer_url": "https://trailers.mubicdn.net/411499/optimised/1080p-t-miroirs-no-3_en_us_5449.65_1920_1038_1763506117.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Christian Petzold",
+          "slug": "christian-petzold"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440746,
+      "slug": "the-mysterious-gaze-of-the-flamingo",
+      "title": "The Mysterious Gaze of the Flamingo",
+      "year": 2025,
+      "duration": 108,
+      "synopsis": "1982. As an unknown disease begins to spread in a small mining town in the Chilean desert, gay men are accused of transmitting it through their eyes. Eleven-year-old Lidia, the only girl in the community, sets out in search of the truth.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440746/image-w856.jpg?1747464641",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440746/image-w1280.jpg?1747464641",
+      "trailer_url": "https://trailers.mubicdn.net/440746/optimised/1080p-t-the-mysterious-gaze-of-the-flamingo_en_us_1776844804.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "Chile",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Diego Céspedes",
+          "slug": "diego-cespedes"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 444140,
+      "slug": "m-son-of-the-century-chapter-1",
+      "title": "Chapter 1",
+      "year": 2025,
+      "duration": 60,
+      "synopsis": "Mussolini has just founded the Fasces of Combat when D’Annunzio takes Fiume. Mussolini hopes to exploit the feat of his poet on the field.",
+      "genres": [
+        "Drama",
+        "Biography",
+        "TV Mini-series"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/444140/image-w856.jpg?1752852159",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/444140/image-w1280.jpg?1752852159",
+      "trailer_url": null,
+      "mubi_rating": 4.7,
+      "historic_countries": [
+        "United States",
+        "Italy"
+      ],
+      "directors": [
+        {
+          "name": "Joe Wright",
+          "slug": "joe-wright"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 448206,
+      "slug": "pilot-2025",
+      "title": "Pilot",
+      "year": 2025,
+      "duration": 26,
+      "synopsis": "Hal and Harper’s childhood house is on the market, and Dad’s got even bigger news that’s about to send all three on a journey through time.",
+      "genres": [
+        "Comedy",
+        "Drama",
+        "TV Mini-series"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/448206/image-w856.jpg?1757432851",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/448206/image-w1280.jpg?1757432851",
+      "trailer_url": null,
+      "mubi_rating": 4.7,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Cooper Raiff",
+          "slug": "cooper-raiff"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 323321,
+      "slug": "the-history-of-sound",
+      "title": "The History of Sound",
+      "year": 2025,
+      "duration": 129,
+      "synopsis": "Two young music students, Lionel and David, attending the Boston Conservatory in 1917, bond over their shared love of folk music. They reconnect a few years later, embarking on a song collecting trip in the backwaters of Maine.",
+      "genres": [
+        "LGBTQ+",
+        "Romance",
+        "History",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/323321/image-w856.jpg?1746192262",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/323321/image-w1280.jpg?1746192262",
+      "trailer_url": "https://trailers.mubicdn.net/323321/optimised/1080p-t-the-history-of-sound_en_us_1762175024.mp4",
+      "mubi_rating": 4.4,
+      "historic_countries": [
+        "United States",
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Oliver Hermanus",
+          "slug": "oliver-hermanus"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431237,
+      "slug": "serious-people",
+      "title": "Serious People",
+      "year": 2025,
+      "duration": 84,
+      "synopsis": "Married and expecting a child, music video director Pasqual is struggling to balance the needs of his business and his pregnant wife. When a famous rapper hires him, Pasqual finds a look-alike to impersonate him at work while he focuses on his new family. But his replacement has ideas of his own.",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431237/image-w856.jpg?1771424179",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431237/image-w1280.jpg?1771424179",
+      "trailer_url": "https://trailers.mubicdn.net/431237/optimised/1080p-t-serious-people_en_us_1598.308_1920_1080_1770915746.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Pasqual Gutierrez",
+          "slug": "pasqual-gutierrez"
+        },
+        {
+          "name": "Benjamin Mullinkosson",
+          "slug": "benjamin-mullinkosson"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 453108,
+      "slug": "fragments-for-venus",
+      "title": "Fragments for Venus",
+      "year": 2025,
+      "duration": 21,
+      "synopsis": "A Black woman wanders alone through the galleries of a museum, carefully examining each painting, searching for something. Across Brooklyn, another Black woman wanders the streets, her gaze full of wonder at the Black women she encounters.",
+      "genres": [
+        "Short",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/453108/image-w856.jpg?1762770049",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/453108/image-w1280.jpg?1762770049",
+      "trailer_url": null,
+      "mubi_rating": 4.1,
+      "historic_countries": [
+        "France",
+        "Italy"
+      ],
+      "directors": [
+        {
+          "name": "Alice Diop",
+          "slug": "alice-diop"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431122,
+      "slug": "sorry-baby-2025",
+      "title": "Sorry, Baby",
+      "year": 2025,
+      "duration": 103,
+      "synopsis": "Something bad happened to Agnes, but life goes on for everyone else. When a beloved friend on the brink of a major milestone visits, Agnes starts to realize just how stuck she’s been, and begins to work through how to move forward.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431122/image-w856.jpg?1758281044",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431122/image-w1280.jpg?1758281044",
+      "trailer_url": "https://trailers.mubicdn.net/431122/optimised/1080p-t-sorry-baby-2025_en_us_1762191022.mp4",
+      "mubi_rating": 4.2,
+      "historic_countries": [
+        "United States",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Eva Victor",
+          "slug": "eva-victor"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 433332,
+      "slug": "dracula-2025",
+      "title": "Dracula",
+      "year": 2025,
+      "duration": 170,
+      "synopsis": "A frustrated filmmaker, facing creative paralysis, turns to an AI chatbot to make his latest movie a hit. The result is a series of increasingly outrageous vignettes exploring the legend of Dracula, from a wild chase through the streets of modern Transylvania to eerie hauntings in rural Romania.",
+      "genres": [
+        "Comedy",
+        "Horror"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/433332/image-w856.jpg?1771419170",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/433332/image-w1280.jpg?1771419170",
+      "trailer_url": "https://trailers.mubicdn.net/433332/optimised/1080p-t-dracula-2025_en_us_3629.985_1920_1080_1772759097.mp4",
+      "mubi_rating": 3.2,
+      "historic_countries": [
+        "Romania",
+        "Austria"
+      ],
+      "directors": [
+        {
+          "name": "Radu Jude",
+          "slug": "radu-jude"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 441168,
+      "slug": "the-last-one-for-the-road",
+      "title": "The Last One for the Road",
+      "year": 2025,
+      "duration": 101,
+      "synopsis": "Two broke, bar-hopping fiftysomethings meet a shy and aimless architecture student. Together, the three men embark on a chaotic road trip through the Venetian plains where bad advice, hangovers, and unexpected friendship shake up the young man’s future plans for life and love.",
+      "genres": [
+        "Drama",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/441168/image-w856.jpg?1767880192",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/441168/image-w1280.jpg?1767880192",
+      "trailer_url": "https://trailers.mubicdn.net/441168/optimised/1080p-t-the-last-one-for-the-road_en_us_1767880502.mp4",
+      "mubi_rating": 4.3,
+      "historic_countries": [
+        "Italy"
+      ],
+      "directors": [
+        {
+          "name": "Francesco Sossai",
+          "slug": "francesco-sossai"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431077,
+      "slug": "lurker",
+      "title": "Lurker",
+      "year": 2025,
+      "duration": 100,
+      "synopsis": "When a twenty-something retail clerk encounters a rising pop star, he takes the opportunity to edge his way into the in-crowd. But as the line between friend and fan blurs beyond recognition, access and proximity become a matter of life and death.",
+      "genres": [
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431077/image-w856.jpg?1749138946",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431077/image-w1280.jpg?1749138946",
+      "trailer_url": "https://trailers.mubicdn.net/431077/optimised/1080p-t-lurker_en_us_1753454757.mp4",
+      "mubi_rating": 4.1,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Alex Russell",
+          "slug": "alex-russell-2"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431120,
+      "slug": "plainclothes",
+      "title": "Plainclothes",
+      "year": 2025,
+      "duration": 96,
+      "synopsis": "In 1990s New York, police officer Lucas’s daily assignment is casing a shopping mall, looking to lure gay men into intimate situations in the public bathroom so they can be arrested for indecency. During a routine shift Lucas encounters Andrew and struggles to complete his usual mission.",
+      "genres": [
+        "Drama",
+        "Romance",
+        "Thriller",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431120/image-w856.jpg?1768501568",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431120/image-w1280.jpg?1768501568",
+      "trailer_url": "https://trailers.mubicdn.net/431120/optimised/1080p-t-plainclothes_en_us_2978.607_1920_1080_1755197131.mp4",
+      "mubi_rating": 4.4,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Carmen Emmi",
+          "slug": "carmen-emmi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 451805,
+      "slug": "the-stranger-2025-francois-ozon",
+      "title": "The Stranger",
+      "year": 2025,
+      "duration": 122,
+      "synopsis": "In 1930s Algeria, apathetic Frenchman Meursault shows total indifference to life. His emotional detachment leads to a murder, followed by a trial that scrutinizes both the crime and his character.",
+      "genres": [
+        "Drama",
+        "Crime"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/451805/image-w856.jpg?1775827506",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/451805/image-w1280.jpg?1775827506",
+      "trailer_url": "https://trailers.mubicdn.net/451805/optimised/1080p-t-the-stranger-2025-francois-ozon_en_us_848.733_1920_1080_1768116628.mp4",
+      "mubi_rating": 3.6,
+      "historic_countries": [
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "François Ozon",
+          "slug": "francois-ozon"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 455764,
+      "slug": "eve-the-killer-momentary-documentary",
+      "title": "Eve the Killer Momentary Documentary",
+      "year": 2025,
+      "duration": 16,
+      "synopsis": "Unable to release her song “Evdekiler,” multidisciplinary artist Selût sets out on a project with her photographer friend Barry. By sending the song to thirteen artists, she initiates a collaborative process that leads her to reflect on her evolving audio-visual practice.",
+      "genres": [
+        "Documentary",
+        "Short"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/455764/image-w856.jpg?1764243399",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/455764/image-w1280.jpg?1764243399",
+      "trailer_url": "https://trailers.mubicdn.net/455764/optimised/1080p-t-eve-the-killer-momentary-documentary_en_us_1764247381.mp4",
+      "mubi_rating": 3.5,
+      "historic_countries": [
+        "Turkey"
+      ],
+      "directors": [
+        {
+          "name": "Duygu Yasa",
+          "slug": "duygu-yasa"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 414484,
+      "slug": "orphan-2025",
+      "title": "Orphan",
+      "year": 2025,
+      "duration": 133,
+      "synopsis": "Hungary, 1957. A young Jewish boy, raised by his mother with idealized tales of his dead father, has his world turned upside down when a brutish man appears, claiming to be his true parent.",
+      "genres": [
+        "Drama",
+        "History"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/414484/image-w856.jpg?1745503622",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/414484/image-w1280.jpg?1745503622",
+      "trailer_url": "https://trailers.mubicdn.net/414484/optimised/1080p-t-orphan-2025_en_us_1775153240.mp4",
+      "mubi_rating": 3.4,
+      "historic_countries": [
+        "Hungary",
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "László Nemes",
+          "slug": "laszlo-nemes"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 442272,
+      "slug": "a-poet-2025",
+      "title": "A Poet",
+      "year": 2025,
+      "duration": 123,
+      "synopsis": "Oscar Restrepo’s obsession with poetry brought him no glory. Aging and erratic, he has succumbed to the cliché of the poet in the shadows. Meeting Yurlady, a humble teenager, brings some light to his days, but dragging her into the world of poets may not be the way.",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/442272/image-w856.jpg?1775034077",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/442272/image-w1280.jpg?1775034077",
+      "trailer_url": "https://trailers.mubicdn.net/442272/optimised/1080p-t-a-poet-2025_en_us_3041.322_1920_1080_1747470818.mp4",
+      "mubi_rating": 4.4,
+      "historic_countries": [
+        "Colombia",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Simón Mesa Soto",
+          "slug": "simon-mesa-soto"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 375425,
+      "slug": "hamnet",
+      "title": "Hamnet",
+      "year": 2025,
+      "duration": 125,
+      "synopsis": "In 16th-century England, Agnes, deeply attuned to the natural world, and Will defy expectations to build a life together. When the loss of their child shatters the family, sorrow strains their bond, as Will retreats into his work, transforming mourning into the tragedy Hamlet.",
+      "genres": [
+        "Drama",
+        "Romance",
+        "Fantasy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/375425/image-w856.jpg?1766499826",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/375425/image-w1280.jpg?1766499826",
+      "trailer_url": "https://trailers.mubicdn.net/375425/optimised/1080p-t-hamnet_en_us_856.736_1920_1080_1760259853.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "United Kingdom",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Chloé Zhao",
+          "slug": "chloe-zhao"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 400216,
+      "slug": "resurrection-2024",
+      "title": "Resurrection",
+      "year": 2025,
+      "duration": 160,
+      "synopsis": "In a future where humanity has surrendered its ability to dream in exchange for immortality, an outcast finds illusion, nightmarish visions, and beauty in an intoxicating world of his own making.",
+      "genres": [
+        "Sci-Fi",
+        "Crime",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/400216/image-w856.jpg?1746716521",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/400216/image-w1280.jpg?1746716521",
+      "trailer_url": "https://trailers.mubicdn.net/400216/optimised/1080p-t-resurrection-2024_en_us_5118.847_1920_1080_1763021020.mp4",
+      "mubi_rating": 3.8,
+      "historic_countries": [
+        "China",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Bi Gan",
+          "slug": "bi-gan"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 392686,
+      "slug": "peter-hujar-s-day",
+      "title": "Peter Hujar’s Day",
+      "year": 2025,
+      "duration": 76,
+      "synopsis": "East Village, 1974. At his Second Avenue apartment, photographer Peter Hujar talks with his friend, the writer Linda Rosenkrantz. She tape-records Hujar as he recounts the previous 24 hours, detailing the ins and outs of his work and his interactions with personalities from New York’s art scene.",
+      "genres": [
+        "Drama",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/392686/image-w856.jpg?1745503383",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/392686/image-w1280.jpg?1745503383",
+      "trailer_url": "https://trailers.mubicdn.net/392686/optimised/1080p-t-peter-hujar-s-day_en_us_351.664_1920_1038_1755197334.mp4",
+      "mubi_rating": 3.5,
+      "historic_countries": [
+        "United States",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Ira Sachs",
+          "slug": "ira-sachs"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 434103,
+      "slug": "hysteria-2025",
+      "title": "Hysteria",
+      "year": 2025,
+      "duration": 104,
+      "synopsis": "A film shoot takes a dark turn when the burning of a Quran throws the crew into turmoil. Caught in the crossfire of accusations, intern Elif is drawn into a dangerous game of secrets and lies and finds herself at the heart of an all-absorbing conspiracy.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/434103/image-w856.jpg?1745503501",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/434103/image-w1280.jpg?1745503501",
+      "trailer_url": "https://trailers.mubicdn.net/434103/optimised/720p-t-hysteria-2025_en_us_1739701459.mp4",
+      "mubi_rating": 4,
+      "historic_countries": [
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Mehmet Akif Büyükatalay",
+          "slug": "mehmet-akif-buyukatalay"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 461540,
+      "slug": "eunice-gutman-tem-historias",
+      "title": "Eunice Gutman Has Stories",
+      "year": 2025,
+      "duration": 19,
+      "synopsis": "Clips from the feminist documentaries of the Brazilian filmmaker Eunice Gutman, selected and edited to mark 50 years of her cinematic legacy.",
+      "genres": [
+        "Short",
+        "Documentary"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/461540/image-w856.jpg?1766260991",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/461540/image-w1280.jpg?1766260991",
+      "trailer_url": null,
+      "mubi_rating": 4.5,
+      "historic_countries": [
+        "Brazil"
+      ],
+      "directors": [
+        {
+          "name": "Lucas Vasconcellos",
+          "slug": "lucas-vasconcellos-1"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 436829,
+      "slug": "pillion-2025",
+      "title": "Pillion",
+      "year": 2025,
+      "duration": 103,
+      "synopsis": "Colin, a timid man, meets Ray, a confident biker gang leader, who initiates him into a submissive relationship, challenging Colin’s mundane existence and prompting personal growth through their unconventional dynamic.",
+      "genres": [
+        "Drama",
+        "LGBTQ+",
+        "Romance"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/436829/image-w856.jpg?1768905104",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/436829/image-w1280.jpg?1768905104",
+      "trailer_url": "https://trailers.mubicdn.net/436829/optimised/1080p-t-pillion-2025_en_us_660.048_1920_1080_1768461288.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United Kingdom",
+        "Ireland"
+      ],
+      "directors": [
+        {
+          "name": "Harry Lighton",
+          "slug": "harry-lighton"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 453965,
+      "slug": "los-domingos",
+      "title": "Sundays",
+      "year": 2025,
+      "duration": 115,
+      "synopsis": "When Ainara announces that she wants to become a nun, chaos arises in her family. Is this a genuine desire or has she been influenced by the religious staff at her school? Or is this life-changing decision due to her father’s inattention and her mother’s absence?",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/453965/image-w856.jpg?1766692011",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/453965/image-w1280.jpg?1766692011",
+      "trailer_url": "https://trailers.mubicdn.net/453965/optimised/1080p-t-los-domingos_en_us_1203.0739999999998_1920_1080_1766074752.mp4",
+      "mubi_rating": 3.8,
+      "historic_countries": [
+        "Spain",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Alauda Ruiz de Azúa",
+          "slug": "alauda-ruiz-de-azua"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 264995,
+      "slug": "save-the-green-planet-2021",
+      "title": "Bugonia",
+      "year": 2025,
+      "duration": 117,
+      "synopsis": "Two conspiracy-obsessed friends kidnap the CEO of a powerful pharmaceutical company, convinced she is an alien plotting Earth’s destruction. As paranoia mounts, their clash spirals into a dangerous game where reality, ideology, and control violently collide.",
+      "genres": [
+        "Sci-Fi",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/264995/image-w856.jpg?1763372067",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/264995/image-w1280.jpg?1763372067",
+      "trailer_url": "https://trailers.mubicdn.net/264995/optimised/1080p-t-save-the-green-planet-2021_en_us_2495.11_1920_1080_1756488253.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United Kingdom",
+        "Ireland"
+      ],
+      "directors": [
+        {
+          "name": "Yorgos Lanthimos",
+          "slug": "yorgos-lanthimos"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 362153,
+      "slug": "the-chronology-of-water",
+      "title": "The Chronology of Water",
+      "year": 2025,
+      "duration": 128,
+      "synopsis": "A young woman finds her voice through the written word and her salvation as a swimmer—ultimately becoming a triumphant teacher, mother and a singular modern writer.",
+      "genres": [
+        "Biography",
+        "Drama",
+        "Romance"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/362153/image-w856.jpg?1772567578",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/362153/image-w1280.jpg?1772567578",
+      "trailer_url": "https://trailers.mubicdn.net/362153/optimised/1080p-t-the-chronology-of-water_en_us_5030.069_1920_1080_1763506338.mp4",
+      "mubi_rating": 3.3,
+      "historic_countries": [
+        "United States",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Kristen Stewart",
+          "slug": "kristen-stewart"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 453561,
+      "slug": "fatherland-2025",
+      "title": "Fatherland",
+      "year": 2025,
+      "duration": null,
+      "synopsis": "Set at the height of the Cold War, 1949 centres on the relationship between the writer Thomas Mann & his daughter Erika; actress, journalist and rally driver, as they embark on a road trip in a black Buick cruiser across a Germany in ruins – from U.S. dominated Frankfurt to Soviet controlled Weimar.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/453561/image-w856.jpg?1775834114",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/453561/image-w1280.jpg?1775834114",
+      "trailer_url": null,
+      "mubi_rating": null,
+      "historic_countries": [
+        "Italy",
+        "Poland"
+      ],
+      "directors": [
+        {
+          "name": "Paweł Pawlikowski",
+          "slug": "pawel-pawlikowski"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 422094,
+      "slug": "mile-end-kicks",
+      "title": "Mile End Kicks",
+      "year": 2025,
+      "duration": 105,
+      "synopsis": "A 24-year-old music critic moves to Montreal intending to write a book about Alanis Morissette’s “Jagged Little Pill.” Her plans take an unexpected turn when she becomes romantically involved with two members of the same struggling indie rock band and decides to become their publicist.",
+      "genres": [
+        "Comedy",
+        "Romance"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/422094/image-w856.jpg?1754978989",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/422094/image-w1280.jpg?1754978989",
+      "trailer_url": "https://trailers.mubicdn.net/422094/optimised/1080p-t-mile-end-kicks_en_us_1991.98_1920_1080_1773196075.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "Canada"
+      ],
+      "directors": [
+        {
+          "name": "Chandler Levack",
+          "slug": "chandler-levack"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 408026,
+      "slug": "silent-friend",
+      "title": "Silent Friend",
+      "year": 2025,
+      "duration": 147,
+      "synopsis": "In Marburg’s Old Botanical Garden, an ancient ginkgo tree anchors three lives across a century. In 1908, Grete, the university’s first biology student, turns to plant photography. In 1972, Hannes is changed by close observation. In 2020, a visiting neuroscientist experiments with the tree.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/408026/image-w856.jpg?1766492427",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/408026/image-w1280.jpg?1766492427",
+      "trailer_url": "https://trailers.mubicdn.net/408026/optimised/1080p-t-silent-friend_en_us_751.815_1920_1080_1757494078.mp4",
+      "mubi_rating": 4,
+      "historic_countries": [
+        "Germany",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Ildikó Enyedi",
+          "slug": "ildiko-enyedi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 363407,
+      "slug": "one-battle-after-another",
+      "title": "One Battle After Another",
+      "year": 2025,
+      "duration": 162,
+      "synopsis": "Washed-up revolutionary Bob exists in a state of paranoia, surviving off-grid with his self-reliant daughter, Willa. When his evil nemesis resurfaces after 16 years and she goes missing, the former radical scrambles to find her, father and daughter both battling the consequences of his past.",
+      "genres": [
+        "Crime",
+        "Thriller",
+        "Action",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/363407/image-w856.jpg?1758536394",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/363407/image-w1280.jpg?1758536394",
+      "trailer_url": "https://trailers.mubicdn.net/363407/optimised/1080p-t-one-battle-after-another_en_us_3488.996_1920_1080_1743094427.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Paul Thomas Anderson",
+          "slug": "paul-thomas-anderson"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 432041,
+      "slug": "kokuho",
+      "title": "Kokuho",
+      "year": 2025,
+      "duration": 174,
+      "synopsis": "After the death of his yakuza father, 14-year-old Kikuo is taken in by a famous kabuki actor. Alongside Shunsuke, the actor’s only son, he wholly dedicates himself to theater. For decades, the two young men grow and evolve together, but only one will become the greatest Japanese master of kabuki.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/432041/image-w856.jpg?1770388838",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/432041/image-w1280.jpg?1770388838",
+      "trailer_url": "https://trailers.mubicdn.net/432041/optimised/720p-t-kokuho_en_us_1559.873_1920_804_1757630798.mp4",
+      "mubi_rating": 4,
+      "historic_countries": [
+        "Japan"
+      ],
+      "directors": [
+        {
+          "name": "Lee Sang-il",
+          "slug": "lee-sang-il"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 450015,
+      "slug": "blue-heron",
+      "title": "Blue Heron",
+      "year": 2025,
+      "duration": 90,
+      "synopsis": "A family of six settles into their new home on Vancouver Island as internal dynamics are slowly revealed through the eyes of the youngest child.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/450015/image-w856.jpg?1751972542",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/450015/image-w1280.jpg?1751972542",
+      "trailer_url": "https://trailers.mubicdn.net/450015/optimised/1080p-t-blue-heron_en_us_943.481_1920_1080_1773833018.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "Canada",
+        "Hungary"
+      ],
+      "directors": [
+        {
+          "name": "Sophy Romvari",
+          "slug": "sophy-romvari"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 411747,
+      "slug": "alpha",
+      "title": "Alpha",
+      "year": 2025,
+      "duration": 128,
+      "synopsis": "Alpha, a troubled 13-year-old lives with her single mom. Their world collapses the day she returns from school with a tattoo on her arm.",
+      "genres": [
+        "Drama",
+        "Horror"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/411747/image-w856.jpg?1747833599",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/411747/image-w1280.jpg?1747833599",
+      "trailer_url": "https://trailers.mubicdn.net/411747/optimised/1080p-t-alpha_en_us_853.688_1920_1080_1765786038.mp4",
+      "mubi_rating": 3.2,
+      "historic_countries": [
+        "France",
+        "Belgium"
+      ],
+      "directors": [
+        {
+          "name": "Julia Ducournau",
+          "slug": "julia-ducournau"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 451233,
+      "slug": "the-testament-of-ann-lee",
+      "title": "The Testament of Ann Lee",
+      "year": 2025,
+      "duration": 137,
+      "synopsis": "Ann Lee, the founding leader of the Shaker Movement, proclaimed as the female Christ by her followers. Depicts her establishment of a utopian society and the Shakers’ worship through song and dance, based on real events.",
+      "genres": [
+        "Drama",
+        "History",
+        "Musical"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/451233/image-w856.jpg?1772011115",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/451233/image-w1280.jpg?1772011115",
+      "trailer_url": "https://trailers.mubicdn.net/451233/optimised/1080p-t-the-testament-of-ann-lee_en_us_965.652_1920_1080_1767878768.mp4",
+      "mubi_rating": 3.4,
+      "historic_countries": [
+        "United Kingdom",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Mona Fastvold",
+          "slug": "mona-fastvold"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 418411,
+      "slug": "marty-supreme",
+      "title": "Marty Supreme",
+      "year": 2025,
+      "duration": 149,
+      "synopsis": "In Manhattan’s backstreets, shoe clerk Marty dreams beyond his uncle’s shop, chasing a table tennis career after hours in smoky competition halls. Short on money, he turns to lies, stolen cash, and reckless alliances, betting relationships and morals on a fragile chance at fame.",
+      "genres": [
+        "Biography",
+        "Drama",
+        "Sport",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/418411/image-w856.jpg?1768902460",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/418411/image-w1280.jpg?1768902460",
+      "trailer_url": "https://trailers.mubicdn.net/418411/optimised/1080p-t-marty-supreme_en_us_542.28_1920_1080_1755094619.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Josh Safdie",
+          "slug": "josh-safdie"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 451719,
+      "slug": "or-something",
+      "title": "Or Something",
+      "year": 2025,
+      "duration": 82,
+      "synopsis": "Two strangers show up at the same Brooklyn apartment to collect cash they’re both owed. Forced to spend the day together on a journey through New York City to find the promised money, the pair begin to open up to one another and reveal intimate details about their lives.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/451719/image-w856.jpg?1766588681",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/451719/image-w1280.jpg?1766588681",
+      "trailer_url": "https://trailers.mubicdn.net/451719/optimised/1080p-t-or-something_en_us_1568.52_1920_1080_1753613059.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Jeffrey Scotti Schroeder",
+          "slug": "jeffrey-scotti-schroeder"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 414706,
+      "slug": "nouvelle-vague-2024",
+      "title": "Nouvelle Vague",
+      "year": 2025,
+      "duration": 105,
+      "synopsis": "Paris, 1959. A young Jean-Luc Godard is determined to make his debut film. Battling conventions, budgetary chaos and sceptical producers, he and his collaborators launch a quiet revolution in cinema, capturing the raw energy of the era.",
+      "genres": [
+        "Drama",
+        "Biography",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/414706/image-w856.jpg?1764256257",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/414706/image-w1280.jpg?1764256257",
+      "trailer_url": "https://trailers.mubicdn.net/414706/optimised/1080p-t-nouvelle-vague-2024_en_us_3003.674_1920_1080_1747558957.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "France",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Richard Linklater",
+          "slug": "richard-linklater"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 382733,
+      "slug": "if-i-had-legs-i-d-kick-you",
+      "title": "If I Had Legs I’d Kick You",
+      "year": 2025,
+      "duration": 113,
+      "synopsis": "With her life crashing down around her, Linda attempts to navigate her child’s mysterious illness, her absent husband, a missing person, and an increasingly hostile relationship with her therapist.",
+      "genres": [
+        "Drama",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/382733/image-w856.jpg?1745503382",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/382733/image-w1280.jpg?1745503382",
+      "trailer_url": "https://trailers.mubicdn.net/382733/optimised/1080p-t-if-i-had-legs-i-d-kick-you_en_us_565.5699999999999_1920_1080_1754730542.mp4",
+      "mubi_rating": 3.4,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Mary Bronstein",
+          "slug": "mary-bronstein"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 450204,
+      "slug": "i-swear",
+      "title": "I Swear",
+      "year": 2025,
+      "duration": 120,
+      "synopsis": "True life story of John Davidson. Diagnosed with Tourette’s at 15, targeted as insane by his peers, he struggled with a condition few had witnessed. Campaigning for Tourette’s as an adult, he accepted his MBE from the Queen in 2019.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/450204/image-w856.jpg?1752539735",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/450204/image-w1280.jpg?1752539735",
+      "trailer_url": "https://trailers.mubicdn.net/450204/optimised/1080p-t-i-swear_en_us_877.812_1920_1080_1752466472.mp4",
+      "mubi_rating": 4,
+      "historic_countries": [
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Kirk Jones",
+          "slug": "kirk-jones"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 435880,
+      "slug": "rose-of-nevada",
+      "title": "Rose of Nevada",
+      "year": 2025,
+      "duration": 114,
+      "synopsis": "A mysterious boat returns to a village 30 years after vanishing. Two men join its crew hoping for better fortune. After one voyage, they find themselves transported back in time, mistaken for the original crew.",
+      "genres": [
+        "Mystery",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/435880/image-w856.jpg?1756024690",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/435880/image-w1280.jpg?1756024690",
+      "trailer_url": "https://trailers.mubicdn.net/435880/optimised/1080p-t-rose-of-nevada_en_us_1432.9099999999999_1920_1080_1770854678.mp4",
+      "mubi_rating": 3.6,
+      "historic_countries": [
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Mark Jenkin",
+          "slug": "mark-jenkin"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 421811,
+      "slug": "romeria",
+      "title": "Romería",
+      "year": 2025,
+      "duration": 114,
+      "synopsis": "A woman travels to the Galician city of Vigo to meet her biological father’s family. Like her mother, he died of AIDS when she was very young. Through her encounters with the family, she attempts to piece together the story of her father and the love he shared with her mother.",
+      "genres": [
+        "Drama",
+        "Biography",
+        "Romance"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/421811/image-w856.jpg?1755972643",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/421811/image-w1280.jpg?1755972643",
+      "trailer_url": "https://trailers.mubicdn.net/421811/optimised/1080p-t-romeria_en_us_4197.761_1920_1080_1769115921.mp4",
+      "mubi_rating": 3.3,
+      "historic_countries": [
+        "Spain",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Carla Simón",
+          "slug": "carla-simon"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440484,
+      "slug": "the-exit-8",
+      "title": "The Exit 8",
+      "year": 2025,
+      "duration": 95,
+      "synopsis": "A man gets lost in an underground passage. He follows the “guide” through the passage, but one after another, strange things happen to him. Is this space real? Or an illusion? Will the man be able to escape the passage?",
+      "genres": [
+        "Horror",
+        "Mystery",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440484/image-w856.jpg?1745503762",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440484/image-w1280.jpg?1745503762",
+      "trailer_url": "https://trailers.mubicdn.net/440484/optimised/1080p-t-the-exit-8_en_us_1961.377_1920_1080_1752400346.mp4",
+      "mubi_rating": 3.2,
+      "historic_countries": [
+        "Japan"
+      ],
+      "directors": [
+        {
+          "name": "Genki Kawamura",
+          "slug": "genki-kawamura"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440824,
+      "slug": "little-amelie",
+      "title": "Little Amélie or the Character of Rain",
+      "year": 2025,
+      "duration": 75,
+      "synopsis": "Amélie, a Belgian child in Japan, explores life with her companion Nishio-san. Her third birthday becomes a turning point, marking the beginning of life-altering events that shape her understanding of the world.",
+      "genres": [
+        "Animation",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440824/image-w856.jpg?1746549101",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440824/image-w1280.jpg?1746549101",
+      "trailer_url": "https://trailers.mubicdn.net/440824/optimised/1080p-t-little-amelie_en_us_2231.314_1920_1080_1757061601.mp4",
+      "mubi_rating": 4.1,
+      "historic_countries": [
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Maïlys Vallade",
+          "slug": "mailys-vallade"
+        },
+        {
+          "name": "Liane-Cho Han Jin Kuang",
+          "slug": "liane-cho-han-jin-kuang"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 451145,
+      "slug": "the-voice-of-hind-rajab",
+      "title": "The Voice of Hind Rajab",
+      "year": 2025,
+      "duration": 89,
+      "synopsis": "Red Crescent volunteers receive an emergency call. A 6-year old girl is trapped in a car under IDF fire in Gaza, pleading for rescue. While trying to keep her on the line, they do everything they can to get an ambulance to her.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/451145/image-w856.jpg?1753196733",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/451145/image-w1280.jpg?1753196733",
+      "trailer_url": "https://trailers.mubicdn.net/451145/optimised/1080p-t-the-voice-of-hind-rajab_en_us_610.362_1920_1080_1764144496.mp4",
+      "mubi_rating": 4,
+      "historic_countries": [
+        "Tunisia",
+        "France"
+      ],
+      "directors": [
+        {
+          "name": "Kaouther Ben Hania",
+          "slug": "kaouther-ben-hania"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 413113,
+      "slug": "the-wizard-of-the-kremlin",
+      "title": "The Wizard of the Kremlin",
+      "year": 2025,
+      "duration": 156,
+      "synopsis": "Russia, early 1990s. Amid post-Soviet chaos,  Vadim Baranov, a resourceful TV producer, unexpectedly becomes the spin doctor of a rising politician, Vladimir Putin. Years later, after retreating into silence, Baranov finally opens up, revealing the dark secrets of the regime he helps build.",
+      "genres": [
+        "Thriller",
+        "History",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/413113/image-w856.jpg?1753699722",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/413113/image-w1280.jpg?1753699722",
+      "trailer_url": "https://trailers.mubicdn.net/413113/optimised/1080p-t-the-wizard-of-the-kremlin_en_us_3126.503_1920_1080_1763020918.mp4",
+      "mubi_rating": 3,
+      "historic_countries": [
+        "France",
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Olivier Assayas",
+          "slug": "olivier-assayas"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 442384,
+      "slug": "magellan-2025",
+      "title": "Magellan",
+      "year": 2025,
+      "duration": 156,
+      "synopsis": "A navigator rebells against the power of the King, due to his humanism and belief in justice. But once he is finally in command of the Spice Fleet, in which he will make the first circumnavigation of the Earth, what will his journey unravel about himself?",
+      "genres": [
+        "Drama",
+        "History"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/442384/image-w856.jpg?1762248970",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/442384/image-w1280.jpg?1762248970",
+      "trailer_url": "https://trailers.mubicdn.net/442384/optimised/1080p-t-magellan-2025_en_us_3335.971_1350_1080_1761199072.mp4",
+      "mubi_rating": 3.8,
+      "historic_countries": [
+        "Portugal",
+        "Spain"
+      ],
+      "directors": [
+        {
+          "name": "Lav Diaz",
+          "slug": "lav-diaz"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 458206,
+      "slug": "mitski-the-land",
+      "title": "Mitski: The Land",
+      "year": 2025,
+      "duration": 77,
+      "synopsis": "Indie singer-songwriter Mitski takes the stage at Atlanta’s Fox Theater with a seven-piece band. Over the course of three nights in September 2024, they perform music from Mitski’s acclaimed seventh album, The Land Is Inhospitable and So Are We, alongside reimaginings of her earlier work.",
+      "genres": [
+        "Music",
+        "Documentary"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/458206/image-w856.jpg?1777028350",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/458206/image-w1280.jpg?1777028350",
+      "trailer_url": "https://trailers.mubicdn.net/458206/optimised/1080p-t-mitski-the-land_en_us_2895.092_1440_1080_1761551706.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Grant James",
+          "slug": "grant-james-2"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 444324,
+      "slug": "the-president-s-cake",
+      "title": "The President's Cake",
+      "year": 2025,
+      "duration": 102,
+      "synopsis": "While people struggle daily to survive under sanctions in Saddam’s Iraq, nine-year-old Lamia must use her wits to gather ingredients for the mandatory cake to celebrate President Saddam Hussein’s birthday or face the consequences—prison or death.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/444324/image-w856.jpg?1747132476",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/444324/image-w1280.jpg?1747132476",
+      "trailer_url": "https://trailers.mubicdn.net/444324/optimised/1080p-t-the-president-s-cake_en_us_1058.241_1920_1080_1764863581.mp4",
+      "mubi_rating": 4,
+      "historic_countries": [
+        "Iraq",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Hasan Hadi",
+          "slug": "hasan-hadi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 436879,
+      "slug": "two-prosecutors",
+      "title": "Two Prosecutors",
+      "year": 2025,
+      "duration": 117,
+      "synopsis": "1937. USSR. Law school graduate Kornev is an idealist ready to fight for Soviet justice, but on his very first assignment he is confronted with the diabolical reality of Stalinism. Based on G.Demidov’s novel.",
+      "genres": [
+        "History",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/436879/image-w856.jpg?1745503829",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/436879/image-w1280.jpg?1745503829",
+      "trailer_url": "https://trailers.mubicdn.net/436879/optimised/1080p-t-two-prosecutors_en_us_1419.718_1920_1080_1763655768.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "France",
+        "Netherlands"
+      ],
+      "directors": [
+        {
+          "name": "Sergei Loznitsa",
+          "slug": "sergei-loznitsa"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440944,
+      "slug": "love-me-tender-2025",
+      "title": "Love Me Tender",
+      "year": 2025,
+      "duration": 134,
+      "synopsis": "Clémence, a lawyer, leaves her marriage to embrace her true self. Her ex-husband fights for custody of their son Paul, manipulating him. As their relationship deteriorates, Clémence struggles to maintain her maternal bond.",
+      "genres": [
+        "Drama",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440944/image-w856.jpg?1762272152",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440944/image-w1280.jpg?1762272152",
+      "trailer_url": "https://trailers.mubicdn.net/440944/optimised/1080p-t-love-me-tender-2025_en_us_2310.0860000000002_1920_1080_1765479178.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "France",
+        "Luxembourg"
+      ],
+      "directors": [
+        {
+          "name": "Anna Cazenave Cambet",
+          "slug": "anna-cazenave-cambet"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 406102,
+      "slug": "the-love-that-remains",
+      "title": "The Love That Remains",
+      "year": 2025,
+      "duration": 109,
+      "synopsis": "The film tenderly captures a year in the life of a family as the parents navigate their separation. Through both playful and heartfelt moments, the film portrays the bittersweet essence of faded love and shared memories amidst the changing seasons.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/406102/image-w856.jpg?1745503515",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/406102/image-w1280.jpg?1745503515",
+      "trailer_url": "https://trailers.mubicdn.net/406102/optimised/1080p-t-on-land-and-sea_en_us_2766.011_1920_1080_1764265789.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "Iceland",
+        "Denmark"
+      ],
+      "directors": [
+        {
+          "name": "Hlynur Pálmason",
+          "slug": "hlynur-palmason"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 449320,
+      "slug": "two-seasons-two-strangers",
+      "title": "Two Seasons, Two Strangers",
+      "year": 2025,
+      "duration": 89,
+      "synopsis": "The story follows a scriptwriter named Lee who is processing what is happening in her life. She meets an innkeeper, who goes by the name Ben-zō, while traveling.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/449320/image-w856.jpg?1751984584",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/449320/image-w1280.jpg?1751984584",
+      "trailer_url": "https://trailers.mubicdn.net/449320/optimised/1080p-t-two-seasons-two-strangers_en_us_3237.904_1920_1080_1763529369.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "Japan"
+      ],
+      "directors": [
+        {
+          "name": "Sho Miyake",
+          "slug": "sho-miyake"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 400814,
+      "slug": "the-phoenician-scheme",
+      "title": "The Phoenician Scheme",
+      "year": 2025,
+      "duration": 101,
+      "synopsis": "The story of a family and a family business.",
+      "genres": [
+        "Comedy",
+        "Crime",
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/400814/image-w856.jpg?1752489614",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/400814/image-w1280.jpg?1752489614",
+      "trailer_url": "https://trailers.mubicdn.net/400814/optimised/1080p-t-the-phoenician-scheme_en_us_850.789_1920_1080_1744152171.mp4",
+      "mubi_rating": 3.3,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Wes Anderson",
+          "slug": "wes-anderson"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 442113,
+      "slug": "ghost-elephants",
+      "title": "Ghost Elephants",
+      "year": 2025,
+      "duration": 98,
+      "synopsis": "Follows a mysterious herd of ghost elephants in the jungles of Angola.",
+      "genres": [
+        "Documentary"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/442113/image-w856.jpg?1772190067",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/442113/image-w1280.jpg?1772190067",
+      "trailer_url": null,
+      "mubi_rating": 3.8,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Werner Herzog",
+          "slug": "werner-herzog"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 417809,
+      "slug": "la-petite-derniere",
+      "title": "The Little Sister",
+      "year": 2025,
+      "duration": 106,
+      "synopsis": "Fatima, 17, the youngest daughter of a French-Algerian family in a Paris suburb, leaves school for a prestigious prep class. She plays football, has a secret boyfriend, but hides that she loves women. In Paris, new freedoms clash with family tradition and faith, forcing her to find her own path.",
+      "genres": [
+        "Drama",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/417809/image-w856.jpg?1777364457",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/417809/image-w1280.jpg?1777364457",
+      "trailer_url": "https://trailers.mubicdn.net/417809/optimised/1080p-t-la-petite-derniere_en_us_1661.691_1920_1080_1760867860.mp4",
+      "mubi_rating": 3.3,
+      "historic_countries": [
+        "France",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Hafsia Herzi",
+          "slug": "hafsia-herzi"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 418789,
+      "slug": "dracula-a-love-tale",
+      "title": "Dracula",
+      "year": 2025,
+      "duration": 129,
+      "synopsis": "After his wife dies, a 15th-century prince renounces God and becomes a vampire. Centuries later in 19th-century London, he sees a woman resembling his late wife and pursues her, sealing his own fate.",
+      "genres": [
+        "Horror",
+        "Fantasy",
+        "Romance"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/418789/image-w856.jpg?1763654729",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/418789/image-w1280.jpg?1763654729",
+      "trailer_url": "https://trailers.mubicdn.net/418789/optimised/1080p-t-dracula-a-love-tale_en_us_971.573_1920_1080_1766084812.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "France",
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Luc Besson",
+          "slug": "luc-besson"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 451065,
+      "slug": "three-goodbyes",
+      "title": "Three Goodbyes",
+      "year": 2025,
+      "duration": 120,
+      "synopsis": "After what seemed like a trivial argument, Marta and Antonio split up. Marta reacts to the breakup by withdrawing into herself. The only symptom she cannot ignore is her sudden lack of appetite. Antonio, a rising chef, immers himself in his work.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/451065/image-w856.jpg?1753131943",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/451065/image-w1280.jpg?1753131943",
+      "trailer_url": "https://trailers.mubicdn.net/451065/optimised/1080p-t-three-goodbyes_en_us_1753173606.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "Italy",
+        "Spain"
+      ],
+      "directors": [
+        {
+          "name": "Isabel Coixet",
+          "slug": "isabel-coixet"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 433226,
+      "slug": "all-before-you",
+      "title": "Palestine 36",
+      "year": 2025,
+      "duration": 115,
+      "synopsis": "A dramatic retelling of the beginnings and failings of the 1936 farmer-led revolt against British colonial rule in Palestine. Deploying over 20,000 troops to suppress the uprising, the British established a brutal legacy that stretches forward in time to today.",
+      "genres": [
+        "Drama",
+        "History",
+        "War"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/433226/image-w856.jpg?1745503777",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/433226/image-w1280.jpg?1745503777",
+      "trailer_url": "https://trailers.mubicdn.net/433226/optimised/1080p-t-all-before-you_en_us_3324.138_1920_1080_1762073863.mp4",
+      "mubi_rating": 3.9,
+      "historic_countries": [
+        "Palestine",
+        "Qatar"
+      ],
+      "directors": [
+        {
+          "name": "Annemarie Jacir",
+          "slug": "annemarie-jacir"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 451803,
+      "slug": "how-to-shoot-a-ghost",
+      "title": "How to Shoot a Ghost",
+      "year": 2025,
+      "duration": 27,
+      "synopsis": "Two newly dead young people meet in the streets of Athens, amid the pulsing cityscape and the ghosts of history. One a translator, the other a photographer, they were outsiders in life; in death they struggle with the residue of their longings and mistakes.",
+      "genres": [
+        "Short",
+        "Drama",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/451803/image-w856.jpg?1772637025",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/451803/image-w1280.jpg?1772637025",
+      "trailer_url": "https://trailers.mubicdn.net/451803/optimised/1080p-t-how-to-shoot-a-ghost_en_us_2151.544_1920_1080_1756597122.mp4",
+      "mubi_rating": 2.8,
+      "historic_countries": [
+        "United States",
+        "Greece"
+      ],
+      "directors": [
+        {
+          "name": "Charlie Kaufman",
+          "slug": "charlie-kaufman"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 329809,
+      "slug": "chungking-express-2020-2024",
+      "title": "Chungking Express 2020",
+      "year": 2025,
+      "duration": null,
+      "synopsis": "In ‘90s Hong Kong, broken-hearted Policeman 223 encounters a blonde female assassin, and they spend a short time together overnight. Policeman 663, who also is getting over heartbreak, sees his life gradually changed by the intrusions of the ’person of his dreams.’",
+      "genres": [
+        "Romance"
+      ],
+      "poster_url": null,
+      "backdrop_url": null,
+      "trailer_url": null,
+      "mubi_rating": 4.7,
+      "historic_countries": [
+        "Hong Kong"
+      ],
+      "directors": [
+        {
+          "name": "Wong Kar Wai",
+          "slug": "wong-kar-wai"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 441519,
+      "slug": "the-diary-of-an-exile",
+      "title": "The Diary of an Exile",
+      "year": 2025,
+      "duration": 73,
+      "synopsis": "The film unfolds around the memories and daily life of revolutionary musician Fuat Saka, who had to leave Türkiye just before the military coup d’etat in 1980 because of his political views and a fascist attack against him on the eve of 1979.",
+      "genres": [
+        "Documentary"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/441519/image-w856.jpg?1764671802",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/441519/image-w1280.jpg?1764671802",
+      "trailer_url": "https://trailers.mubicdn.net/441519/optimised/720p-t-the-diary-of-an-exile_en_us_1750969980.mp4",
+      "mubi_rating": 4.7,
+      "historic_countries": [
+        "Turkey"
+      ],
+      "directors": [
+        {
+          "name": "Mert Güncüer",
+          "slug": "mert-guncuer"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 456535,
+      "slug": "montreal-my-beautiful",
+      "title": "Montréal, My Beautiful",
+      "year": 2025,
+      "duration": 118,
+      "synopsis": "Feng Xia, a 53-year-old Chinese immigrant and mother living in Montreal, has spent her life shaped by duty — to her family, her culture, and a loveless marriage. But when she meets Camille, a spirited young Québécoise, a long-buried desire is awakened.",
+      "genres": [
+        "Drama",
+        "Romance",
+        "LGBTQ+"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/456535/image-w856.jpg?1759442769",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/456535/image-w1280.jpg?1759442769",
+      "trailer_url": "https://trailers.mubicdn.net/456535/optimised/1080p-t-montreal-my-beautiful_en_us_1748.961_1920_1080_1759742614.mp4",
+      "mubi_rating": 4.3,
+      "historic_countries": [
+        "Canada"
+      ],
+      "directors": [
+        {
+          "name": "He Xiaodan",
+          "slug": "he-xiaodan"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431072,
+      "slug": "all-that-s-left-of-you",
+      "title": "All That's Left of You",
+      "year": 2025,
+      "duration": 145,
+      "synopsis": "Palestinian family’s life across generations, starting from grandfather’s displacement, leading to teen confronting Israeli soldiers at West Bank protest, told from mother’s perspective.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431072/image-w856.jpg?1745503381",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431072/image-w1280.jpg?1745503381",
+      "trailer_url": "https://trailers.mubicdn.net/431072/optimised/1080p-t-all-that-s-left-of-you_en_us_812.605_1920_1080_1759388082.mp4",
+      "mubi_rating": 4.1,
+      "historic_countries": [
+        "Germany",
+        "Cyprus"
+      ],
+      "directors": [
+        {
+          "name": "Cherien Dabis",
+          "slug": "cherien-dabis"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 417883,
+      "slug": "chocobar",
+      "title": "Landmarks",
+      "year": 2025,
+      "duration": 119,
+      "synopsis": "Javier Chocobar was shot dead fighting the removal of his indigenous community from their ancestral land in Argentina. His death appeared in a video on YouTube. This feature documentary unravels the 500 years of “reason” that led to this shooting, both with a gun and a camera.",
+      "genres": [
+        "Documentary"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/417883/image-w856.jpg?1765473052",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/417883/image-w1280.jpg?1765473052",
+      "trailer_url": "https://trailers.mubicdn.net/417883/optimised/1080p-t-chocobar_en_us_2975.5330000000004_1920_1080_1757317654.mp4",
+      "mubi_rating": 4.1,
+      "historic_countries": [
+        "Argentina",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Lucrecia Martel",
+          "slug": "lucrecia-martel"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 450009,
+      "slug": "phantoms-of-july",
+      "title": "Phantoms of July",
+      "year": 2025,
+      "duration": 90,
+      "synopsis": "An East German waitress with a broken heart and an Iranian YouTuber with a broken arm seek solace from loneliness on a ghost hunt in the mountains.",
+      "genres": [
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/450009/image-w856.jpg?1751981001",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/450009/image-w1280.jpg?1751981001",
+      "trailer_url": "https://trailers.mubicdn.net/450009/optimised/1080p-t-phantoms-of-july_en_us_3525.335_1920_1080_1764264946.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Julian Radlmaier",
+          "slug": "julian-radlmaier"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 450889,
+      "slug": "the-undertone",
+      "title": "Undertone",
+      "year": 2025,
+      "duration": 85,
+      "synopsis": "Podcaster Evy prepares for her mother’s death and becomes intrigued with a mysterious set of recordings that spirals into unexpected terrors.",
+      "genres": [
+        "Horror",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/450889/image-w856.jpg?1752955667",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/450889/image-w1280.jpg?1752955667",
+      "trailer_url": "https://trailers.mubicdn.net/450889/optimised/1080p-t-the-undertone_en_us_417.554_1920_1080_1768116492.mp4",
+      "mubi_rating": 3.2,
+      "historic_countries": [
+        "Canada"
+      ],
+      "directors": [
+        {
+          "name": "Ian Tuason",
+          "slug": "ian-tuason"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 440909,
+      "slug": "urchin-2025",
+      "title": "Urchin",
+      "year": 2025,
+      "duration": 98,
+      "synopsis": "Mike, a homeless person in London, is struggling to break free from a cycle of self-destruction while trying to turn his life around.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/440909/image-w856.jpg?1747263251",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/440909/image-w1280.jpg?1747263251",
+      "trailer_url": "https://trailers.mubicdn.net/440909/optimised/1080p-t-urchin-2025_en_us_688.076_1920_1080_1756853406.mp4",
+      "mubi_rating": 3.4,
+      "historic_countries": [
+        "United Kingdom"
+      ],
+      "directors": [
+        {
+          "name": "Harris Dickinson",
+          "slug": "harris-dickinson"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 452496,
+      "slug": "rental-family",
+      "title": "Rental Family",
+      "year": 2025,
+      "duration": 103,
+      "synopsis": "A lonely American actor living in Tokyo starts working for a Japanese “rental family” company to play stand-in roles in other people’s lives. Along the way, he finds surprising connections and unexpected joys within his built-in family.",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/452496/image-w856.jpg?1754462455",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/452496/image-w1280.jpg?1754462455",
+      "trailer_url": "https://trailers.mubicdn.net/452496/optimised/1080p-t-rental-family_en_us_3061.2200000000003_1920_1080_1754462538.mp4",
+      "mubi_rating": 3.4,
+      "historic_countries": [
+        "Japan",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "HIKARI",
+          "slug": "hikari"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 391571,
+      "slug": "mickey-17",
+      "title": "Mickey 17",
+      "year": 2025,
+      "duration": 137,
+      "synopsis": "A disposable employee is sent on a human expedition to colonize the ice world Niflheim. After one iteration dies, a new body is regenerated with most of his memories intact.",
+      "genres": [
+        "Sci-Fi",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/391571/image-w856.jpg?1745503629",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/391571/image-w1280.jpg?1745503629",
+      "trailer_url": "https://trailers.mubicdn.net/391571/optimised/1080p-t-mickey-17_en_us_1726624654.mp4",
+      "mubi_rating": 3.1,
+      "historic_countries": [
+        "United States",
+        "South Korea"
+      ],
+      "directors": [
+        {
+          "name": "Bong Joon Ho",
+          "slug": "bong-joon-ho"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 434853,
+      "slug": "nirvanna-the-band-the-show-the-movie",
+      "title": "Nirvanna the Band the Show the Movie",
+      "year": 2025,
+      "duration": 95,
+      "synopsis": "When their plan to book a show at the Rivoli goes horribly wrong, Matt and Jay accidentally travel back to the year 2008. Blah blah blah blah blah.",
+      "genres": [
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/434853/image-w856.jpg?1745503530",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/434853/image-w1280.jpg?1745503530",
+      "trailer_url": "https://trailers.mubicdn.net/434853/optimised/1080p-t-nirvanna-the-band-the-show-the-movie_en_us_5243.918_3840_2160_1768724680.mp4",
+      "mubi_rating": 4.2,
+      "historic_countries": [
+        "Canada"
+      ],
+      "directors": [
+        {
+          "name": "Matt Johnson",
+          "slug": "matt-johnson"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 441527,
+      "slug": "athlete",
+      "title": "Athlete",
+      "year": 2025,
+      "duration": 80,
+      "synopsis": "Hatice, a young and ambitious weightlifter living with her unemployed mother, aims to win the lifetime allowance provided to athletes who win medals in international competitions. In her pursuit of success, she decides to use an unconventional doping technique at the world championships.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/441527/image-w856.jpg?1766406937",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/441527/image-w1280.jpg?1766406937",
+      "trailer_url": "https://trailers.mubicdn.net/441527/optimised/1080p-t-athlete_en_us_1744791353.mp4",
+      "mubi_rating": 3.4,
+      "historic_countries": [
+        "Turkey",
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Semih Gülen",
+          "slug": "semih-gulen"
+        },
+        {
+          "name": "Mustafa Emin Büyükcoşkun",
+          "slug": "mustafa-emin-buyukcoskun"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 443676,
+      "slug": "our-hero-balthazar",
+      "title": "Our Hero, Balthazar",
+      "year": 2025,
+      "duration": 91,
+      "synopsis": "Follows a wealthy New York City teenager who, eager to impress his activist crush, follows an online connection to Texas where he believes he can stop an act of extreme violence.",
+      "genres": [
+        "Comedy",
+        "Drama",
+        "Thriller"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/443676/image-w856.jpg?1773728776",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/443676/image-w1280.jpg?1773728776",
+      "trailer_url": "https://trailers.mubicdn.net/443676/optimised/1080p-t-our-hero-balthazar_en_us_2623.604_1920_1080_1773614912.mp4",
+      "mubi_rating": null,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Oscar Boyson",
+          "slug": "oscar-boyson"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 430956,
+      "slug": "the-other-side-of-the-sky",
+      "title": "The Blue Trail",
+      "year": 2025,
+      "duration": 85,
+      "synopsis": "In the near future, the elderly must relocate to remote retirement colonies so that the younger generations can go about their work undisturbed. 77-year-old Tereza refuses to comply, embarking instead on a life-changing journey through the Amazon.",
+      "genres": [
+        "Drama",
+        "Sci-Fi"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/430956/image-w856.jpg?1760296868",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/430956/image-w1280.jpg?1760296868",
+      "trailer_url": "https://trailers.mubicdn.net/430956/optimised/1080p-t-the-other-side-of-the-sky_en_us_1746609665.mp4",
+      "mubi_rating": 3.7,
+      "historic_countries": [
+        "Brazil",
+        "Mexico"
+      ],
+      "directors": [
+        {
+          "name": "Gabriel Mascaro",
+          "slug": "gabriel-mascaro"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 404010,
+      "slug": "good-luck-have-fun-don-t-die",
+      "title": "Good Luck, Have Fun, Don't Die",
+      "year": 2025,
+      "duration": 134,
+      "synopsis": "A “man from the future” arrives at a diner in Los Angeles where he must recruit the precise combination of disgruntled patrons to join him on a one-night-six-block quest to save the world from the terminal threat of a rogue artificial intelligence.",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Sci-Fi",
+        "Comedy"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/404010/image-w856.jpg?1768124539",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/404010/image-w1280.jpg?1768124539",
+      "trailer_url": "https://trailers.mubicdn.net/404010/optimised/1080p-t-good-luck-have-fun-don-t-die_en_us_2364.254_1920_1080_1768117098.mp4",
+      "mubi_rating": 3.2,
+      "historic_countries": [
+        "Germany",
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Gore Verbinski",
+          "slug": "gore-verbinski"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 431173,
+      "slug": "train-dreams",
+      "title": "Train Dreams",
+      "year": 2025,
+      "duration": 102,
+      "synopsis": "Robert Grainier is a day laborer building America’s railroads at the start of the 20th century as he experiences profound love, shocking defeat, and a world irrevocably transforming before his very eyes.",
+      "genres": [
+        "Drama"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/431173/image-w856.jpg?1745503383",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/431173/image-w1280.jpg?1745503383",
+      "trailer_url": "https://trailers.mubicdn.net/431173/optimised/1080p-t-train-dreams_en_us_875.795_1920_1080_1760260272.mp4",
+      "mubi_rating": 3.6,
+      "historic_countries": [
+        "United States"
+      ],
+      "directors": [
+        {
+          "name": "Clint Bentley",
+          "slug": "clint-bentley"
+        }
+      ],
+      "browsed_country": "Algeria"
+    },
+    {
+      "mubi_id": 433233,
+      "slug": "amrum",
+      "title": "Amrum",
+      "year": 2025,
+      "duration": 93,
+      "synopsis": "On Amrum Island in spring 1945, twelve-year-old Nanning hunts seals, fishes at night, and works the fields to help feed his family. When the war ends, his mother sinks into depression, and he must navigate new conflicts while struggling to find his own path.",
+      "genres": [
+        "Drama",
+        "History"
+      ],
+      "poster_url": "https://assets.mubicdn.net/images/film/433233/image-w856.jpg?1758536702",
+      "backdrop_url": "https://assets.mubicdn.net/images/film/433233/image-w1280.jpg?1758536702",
+      "trailer_url": "https://trailers.mubicdn.net/433233/optimised/1080p-t-amrum_en_us_2735.051_1920_1080_1767331646.mp4",
+      "mubi_rating": 3.5,
+      "historic_countries": [
+        "Germany"
+      ],
+      "directors": [
+        {
+          "name": "Fatih Akın",
+          "slug": "fatih-akin"
+        }
+      ],
+      "browsed_country": "Angola"
+    }
+  ],
+  "processed_mubi_ids": [],
+  "stats": {
+    "inserted": 0,
+    "updated": 0,
+    "skipped": 0,
+    "errors": 0
+  },
+  "last_saved": "2026-04-30T07:00:47.668Z"
+}

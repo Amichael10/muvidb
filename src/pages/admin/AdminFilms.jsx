@@ -608,6 +608,12 @@ export default function AdminFilms() {
         tmdb_rating: formData.tmdb_rating && !isNaN(parseFloat(formData.tmdb_rating)) ? parseFloat(formData.tmdb_rating) : null,
         is_trending: Boolean(formData.is_trending),
         is_featured: Boolean(formData.is_featured),
+        source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
+        trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
+        poster_url: (formData.poster_url || '').trim() || null,
+        backdrop_url: (formData.backdrop_url || '').trim() || null,
+        youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
+        release_type: formData.release_type || null,
       };
 
       const { genres: selectedGenreIds, ...cleanFilmPayload } = filmPayload;
@@ -618,9 +624,33 @@ export default function AdminFilms() {
         const { error } = await supabase.from('films').update(cleanFilmPayload).eq('id', filmId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from('films').insert([cleanFilmPayload]).select();
-        if (error) throw error;
-        filmId = data[0].id;
+        // If we have a source_video_id, check if it already exists to avoid unique constraint error
+        if (cleanFilmPayload.source_video_id) {
+          const { data: existing } = await supabase
+            .from('films')
+            .select('id, title')
+            .eq('source_video_id', cleanFilmPayload.source_video_id)
+            .maybeSingle();
+          
+          if (existing) {
+            // It already exists! Let's update it instead of creating a new one
+            filmId = existing.id;
+            const { error: updateErr } = await supabase
+              .from('films')
+              .update(cleanFilmPayload)
+              .eq('id', filmId);
+            if (updateErr) throw updateErr;
+            toast.success(`Updated existing film: ${existing.title}`);
+          } else {
+            const { data, error } = await supabase.from('films').insert([cleanFilmPayload]).select();
+            if (error) throw error;
+            filmId = data[0].id;
+          }
+        } else {
+          const { data, error } = await supabase.from('films').insert([cleanFilmPayload]).select();
+          if (error) throw error;
+          filmId = data[0].id;
+        }
       }
 
       // Sync Genres

@@ -124,32 +124,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                   The home of Nollywood — discover, explore, obsess.
                 </motion.p>
 
-                {/* Search Bar - Search First Design */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.4 }}
-                  className="mb-12 relative max-w-xl group"
-                >
-                  <form onSubmit={handleSearch} className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
-                      <Icon icon="solar:magnifer-linear" className="text-xl text-white/40 group-focus-within:text-brand transition-colors" />
-                    </div>
-                    <input 
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search movies, people, studios..."
-                      className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl py-6 pl-16 pr-32 text-xs font-bold tracking-widest text-white placeholder-white/30 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 transition-all shadow-2xl"
-                    />
-                    <button 
-                      type="submit"
-                      className="absolute inset-y-2 right-2 bg-brand text-white px-8 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20"
-                    >
-                      Search
-                    </button>
-                  </form>
-                </motion.div>
+
 
                 {/* Genre Pills */}
                 <div className="flex flex-wrap gap-2 mb-6">

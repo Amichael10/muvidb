@@ -5,6 +5,7 @@ import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
 import GenreRail from '../components/film/GenreRail';
+import CountryRail from '../components/film/CountryRail';
 import PersonCard from '../components/person/PersonCard';
 import { Icon } from '@iconify/react';
 
@@ -23,6 +24,7 @@ export default function Home() {
   const [comingSoon, setComingSoon] = useState([]);
   const [curatedCollection, setCuratedCollection] = useState(null);
   const [recentlyAdded, setRecentlyAdded] = useState([]);
+  const [spotlightContent, setSpotlightContent] = useState(null);
 
   useEffect(() => {
     document.title = "Lumi | Home";
@@ -41,7 +43,8 @@ export default function Home() {
         fetchYoutubeFeed(),
         fetchPeople(),
         fetchCreators(),
-        fetchCuratedCollection()
+        fetchCuratedCollection(),
+        fetchSpotlightContent()
       ]);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -120,29 +123,20 @@ export default function Home() {
   };
 
   const fetchInCinemasData = async () => {
-    // 1. Fetch by is_in_cinemas flag first
-    const { data: flagged } = await supabase
+    // 1. Fetch by explicit is_in_cinemas flag
+    const { data: cinemaMovies } = await supabase
       .from('films')
       .select(`*, film_genres(genres(name))`)
       .eq('is_in_cinemas', true)
       .order('release_date', { ascending: false })
       .limit(20);
 
-    if (flagged && flagged.length > 0) {
-      setInCinemas(flagged.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
-      return;
-    }
-
-    // 2. Fallback to showtimes if no flags set
+    // 2. Fetch from showtimes (movies currently showing)
     const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
+    const { data: showtimesData } = await supabase
       .from('showtimes')
       .select(`
         film_id, 
-        show_date,
         films(*, film_genres(genres(name)))
       `)
       .gte('show_date', today)
@@ -150,25 +144,38 @@ export default function Home() {
       .order('show_date', { ascending: true })
       .limit(20);
 
-    if (data) {
-      const filmMap = {};
-      data.forEach(s => {
-        if (s.films) {
-          filmMap[s.films.id] = {
+    const filmMap = new Map();
+
+    // Prioritize explicit flag
+    if (cinemaMovies) {
+      cinemaMovies.forEach(f => {
+        filmMap.set(f.id, {
+          ...f,
+          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        });
+      });
+    }
+
+    // Add movies with active showtimes
+    if (showtimesData) {
+      showtimesData.forEach(s => {
+        if (s.films && !filmMap.has(s.films.id)) {
+          filmMap.set(s.films.id, {
             ...s.films,
             genres: s.films.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-          };
+          });
         }
       });
-      setInCinemas(Object.values(filmMap));
     }
+
+    setInCinemas(Array.from(filmMap.values()));
   };
 
   const fetchComingSoon = async () => {
     const { data } = await supabase
       .from('films')
       .select(`*, film_genres(genres(name))`)
-      .eq('coming_soon', true)
+      .or('coming_soon.eq.true,status.ilike.announced')
       .order('release_date', { ascending: true })
       .limit(20);
     
@@ -206,6 +213,23 @@ export default function Home() {
         .filter(f => f.id);
       
       setCuratedCollection({ ...collection, films });
+    }
+  };
+
+  const fetchSpotlightContent = async () => {
+    const { data } = await supabase
+      .from('spotlights')
+      .select(`
+        *,
+        people (*)
+      `)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (data) {
+      setSpotlightContent(data);
     }
   };
 
@@ -295,7 +319,24 @@ export default function Home() {
           <GenreRail />
         </div>
 
-        {/* 4. NEW RELEASES */}
+        {/* 3.5. COUNTRY RAIL */}
+        <div className="border-b border-border">
+          <CountryRail />
+        </div>
+
+        {/* 4. COMING SOON */}
+        {(isLoading || comingSoon.length > 0) && (
+          <div className="border-b border-border py-16 bg-brand/5">
+            <FilmRow
+              title="Coming Soon"
+              subtitle="Confirmed upcoming Nigerian releases"
+              films={comingSoon}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
+
+        {/* 5. NEW RELEASES */}
         {(isLoading || newReleases.length > 0) && (
           <div className="border-b border-border py-12">
             <FilmRow
@@ -317,7 +358,8 @@ export default function Home() {
           />
         </div>
 
-        {/* 6. CURATED PICK (Editorial Row) */}
+
+        {/* 7. CURATED PICK (Editorial Row) */}
         {curatedCollection && curatedCollection.films.length > 0 && (
           <div className="border-b border-border py-16 bg-brand/5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
@@ -330,7 +372,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 7. FEATURED CHANNELS */}
+        {/* 8. FEATURED CHANNELS */}
         {(isLoading || creators.length > 0) && (
           <div className="border-b border-border bg-surface-2/10 relative overflow-hidden">
              <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
@@ -401,7 +443,58 @@ export default function Home() {
           </div>
         )}
 
-        {/* 8. SPOTLIGHT: PEOPLE */}
+        {/* 9. SPOTLIGHT (Editorial) */}
+        {(isLoading || spotlightContent) && (
+          <div className="border-b border-border">
+            <section className="py-16">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-end justify-between mb-10">
+                  <div className="space-y-1">
+                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                      Spotlight
+                    </h2>
+                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">
+                      In focus this week
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative bg-surface rounded-xl overflow-hidden border border-border shadow-sm">
+                  {isLoading ? (
+                    <div className="h-96 animate-pulse bg-surface-2" />
+                  ) : spotlightContent && spotlightContent.people && (
+                    <div className="flex flex-col md:flex-row">
+                      <div className="md:w-1/2 relative h-64 md:h-auto">
+                        <img 
+                          src={spotlightContent.photo_url || spotlightContent.people.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
+                          alt={spotlightContent.people.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="md:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center">
+                        <h3 className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter mb-4">
+                          {spotlightContent.people.name}
+                        </h3>
+                        <p className="text-text-secondary text-base md:text-lg mb-8 leading-relaxed whitespace-pre-wrap">
+                          {spotlightContent.story}
+                        </p>
+                        <Link 
+                          to={`/person/${spotlightContent.people.id}`}
+                          className="inline-flex items-center gap-2 text-brand font-bold uppercase tracking-widest text-xs hover:gap-4 transition-all"
+                        >
+                          View Profile
+                          <Icon icon="lucide:arrow-right" className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* 10. FEATURED ARTIST */}
         {(isLoading || spotlightPerson) && (
           <div className="border-b border-border">
             <section className="py-16">
@@ -409,7 +502,7 @@ export default function Home() {
                 <div className="flex items-end justify-between mb-10">
                   <div className="space-y-1">
                     <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                      Spotlight: People
+                      Featured Artist
                     </h2>
                     <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The talent behind the camera</p>
                   </div>
@@ -446,17 +539,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* 9. COMING SOON */}
-        {(isLoading || comingSoon.length > 0) && (
-          <div className="py-16">
-            <FilmRow
-              title="Coming Soon"
-              subtitle="Confirmed upcoming Nigerian releases"
-              films={comingSoon}
-              isLoading={isLoading}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
