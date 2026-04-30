@@ -50,7 +50,11 @@ const AFRICAN_COUNTRIES = [
 
 function loadState() {
   if (fs.existsSync(STATE_FILE)) {
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    try {
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    } catch (e) {
+      console.warn('⚠️ State file corrupted, resetting.');
+    }
   }
   return {
     current_country: COUNTRY,
@@ -67,7 +71,6 @@ function saveState(state) {
 async function upsertPerson(name, mubiSlug) {
   if (!name) return null;
   
-  // Try to find person by name (case-insensitive)
   const { data: existing } = await supabase
     .from('people')
     .select('id')
@@ -76,7 +79,6 @@ async function upsertPerson(name, mubiSlug) {
     
   if (existing) return existing.id;
   
-  // Create new person
   const { data: newPerson, error } = await supabase
     .from('people')
     .insert({ name, mubi_slug: mubiSlug, source: 'mubi' })
@@ -93,11 +95,10 @@ async function upsertPerson(name, mubiSlug) {
 async function syncFilm(filmData, credits) {
   const { mubi_id, title, year, slug } = filmData;
   
-  // 1. Upsert Film
   const { data: existing } = await supabase
     .from('films')
     .select('id')
-    .or(`mubi_id.eq.${mubi_id},and(title.eq."${title}",year.eq.${year})`)
+    .or(`mubi_id.eq.${mubi_id},and(title.eq."${title}",year.eq.${year}),mubi_slug.eq."${slug}"`)
     .maybeSingle();
     
   const payload = {
@@ -106,6 +107,8 @@ async function syncFilm(filmData, credits) {
     status: 'released',
     needs_review: true
   };
+  delete payload.countries;
+  delete payload.genres;
   
   let filmId;
   if (existing) {
@@ -126,7 +129,6 @@ async function syncFilm(filmData, credits) {
     console.log(`  ✅ Inserted: ${title} (${year})`);
   }
   
-  // 2. Link Countries
   if (filmData.countries?.length > 0) {
     for (const cName of filmData.countries) {
       const { data: countryRow } = await supabase
@@ -143,7 +145,6 @@ async function syncFilm(filmData, credits) {
     }
   }
   
-  // 3. Link Genres
   if (filmData.genres?.length > 0) {
     for (const gName of filmData.genres) {
       const { data: genreRow } = await supabase
@@ -159,46 +160,35 @@ async function syncFilm(filmData, credits) {
       }
     }
   }
-  
-  // 4. Credits
-  for (const credit of credits) {
-    const personId = await upsertPerson(credit.name, credit.mubi_slug);
+
+  for (const c of credits) {
+    const personId = await upsertPerson(c.name, c.mubi_slug);
     if (personId) {
       await supabase.from('credits').upsert({
         film_id: filmId,
         person_id: personId,
-        role: ROLE_MAP[credit.original_role] || credit.role || 'crew',
-        character_name: credit.character_name || null,
-        billing_order: 0
-      }, { onConflict: 'film_id,person_id,role' });
+        role: ROLE_MAP[c.role] || 'crew',
+        original_role: c.original_role || c.role,
+        character_name: c.character_name
+      }, { onConflict: 'film_id,person_id,role,character_name' });
     }
   }
 }
 
-async function scrapeFilmDetails(browser, slug, currentCountry) {
-  const page = await browser.newPage();
+async function scrapeFilmDetails(context, slug, currentCountry) {
+  const filmUrl = `https://mubi.com/films/${slug}`;
+  const castUrl = `https://mubi.com/films/${slug}/cast`;
+  
+  const page = await context.newPage();
   try {
-    const url = `https://mubi.com/en/films/${slug}`;
-    console.log(`  📡 Visiting: ${url}`);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(2000); // Small delay for hydration
+    await page.goto(filmUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    const dataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
+    if (!dataStr) return null;
     
-    const nextDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
-    if (!nextDataStr) {
-       // Fallback: try to find a different script tag or wait longer
-       console.log(`  ⚠️ __NEXT_DATA__ not found for ${slug}, retrying with wait...`);
-       await page.waitForTimeout(5000);
-    }
-    const finalDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
-    if (!finalDataStr) throw new Error('No __NEXT_DATA__ found');
+    const film = JSON.parse(dataStr).props.pageProps.film;
     
-    const nextData = JSON.parse(finalDataStr);
-    const film = nextData.props.pageProps.initFilm;
-    
-    // Visit cast page
-    const castUrl = `${url}/cast`;
     await page.goto(castUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
     const castDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
     const credits = [];
     
@@ -207,7 +197,7 @@ async function scrapeFilmDetails(browser, slug, currentCountry) {
       if (castData.cast) {
         castData.cast.forEach(c => credits.push({
           name: c.name,
-          role: 'actor',
+          role: 'Cast',
           character_name: c.role,
           mubi_slug: c.slug
         }));
@@ -215,7 +205,7 @@ async function scrapeFilmDetails(browser, slug, currentCountry) {
       if (castData.crew) {
         castData.crew.forEach(c => credits.push({
           name: c.name,
-          role: 'crew',
+          role: 'Crew',
           original_role: c.job,
           mubi_slug: c.slug
         }));
@@ -232,8 +222,8 @@ async function scrapeFilmDetails(browser, slug, currentCountry) {
         year: film.year,
         synopsis: film.short_synopsis || film.default_editorial || '',
         runtime_minutes: film.duration,
-        poster_url: film.still_url || film.stills?.retina,
-        backdrop_url: film.stills?.retina,
+        poster_url: film.still_url || (film.stills ? film.stills.retina : null),
+        backdrop_url: (film.stills ? film.stills.retina : null),
         genres: film.genres || [],
         countries: countries.length > 0 ? countries : [currentCountry],
         is_nollywood: countries.includes('Nigeria') || currentCountry === 'Nigeria'
@@ -247,80 +237,106 @@ async function scrapeFilmDetails(browser, slug, currentCountry) {
 
 async function main() {
   const state = loadState();
-  const country = state.current_country;
-  
-  console.log(`🚀 Starting Playwright Scraper for ${country} from page ${state.current_page}`);
   
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   
   try {
-    for (let p = state.current_page; p <= MAX_PAGES; p++) {
-      console.log(`\n📄 Page ${p}/${MAX_PAGES}`);
-      // USE FAST API FOR DISCOVERY
-      const browseUrl = `https://api.mubi.com/v4/browse/films?historic_countries[]=${getCountryCode(country)}&page=${p}&per_page=24`;
-      console.log(`  📡 Fetching API: ${browseUrl}`);
-      
-      const response = await context.request.get(browseUrl, {
-        headers: {
-          'Client-Country': 'NG',
-          'client': 'web',
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok()) {
-         console.error(`  ⚠️ API Error ${response.status()}: ${await response.text()}`);
-         break;
-      }
-      
-      const nextData = await response.json();
-      const films = nextData.films || [];
-      
-      if (films.length === 0) {
-        console.log('  Empty film list from API. Finishing country.');
-        break;
-      }
-      
-      console.log(`  Found ${films.length} films.`);
-      
-      for (const f of films) {
-        if (state.processed_slugs.includes(f.slug)) {
-          console.log(`  ⏭️ Already processed: ${f.slug}`);
-          continue;
+    let country = state.current_country;
+    let finishedAll = false;
+
+    while (!finishedAll) {
+      console.log(`\n🌍 Processing ${country} (Starting from page ${state.current_page})`);
+      let pagesRemaining = true;
+
+      for (let p = state.current_page; p <= MAX_PAGES; p++) {
+        console.log(`\n📄 Page ${p}/${MAX_PAGES} for ${country}`);
+        const browseUrl = `https://api.mubi.com/v4/browse/films?historic_countries[]=${getCountryCode(country)}&page=${p}&per_page=24`;
+        
+        const response = await context.request.get(browseUrl, {
+          headers: {
+            'Client-Country': 'NG',
+            'client': 'web',
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+        
+        if (!response.ok()) {
+           console.error(`  ⚠️ API Error ${response.status()}`);
+           pagesRemaining = false;
+           break;
         }
         
-        try {
-          const { metadata, credits } = await scrapeFilmDetails(context, f.slug, country);
-          await syncFilm(metadata, credits);
-          state.processed_slugs.push(f.slug);
-          saveState(state);
-          
-          // Random delay to avoid detection
-          await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
-        } catch (err) {
-          console.error(`  ❌ Failed to process ${f.slug}:`, err.message);
+        const nextData = await response.json();
+        const films = nextData.films || [];
+        
+        if (films.length === 0) {
+          console.log(`  🏁 No more films found for ${country}.`);
+          pagesRemaining = false;
+          break;
         }
+        
+        for (const f of films) {
+          if (state.processed_slugs.includes(f.slug)) continue;
+
+          const { data: dbExisting } = await supabase
+            .from('films')
+            .select('id')
+            .eq('mubi_slug', f.slug)
+            .maybeSingle();
+
+          if (dbExisting) {
+            state.processed_slugs.push(f.slug);
+            continue;
+          }
+          
+          try {
+            console.log(`  🎬 Processing: ${f.title} (${f.slug})`);
+            const result = await Promise.race([
+              scrapeFilmDetails(context, f.slug, country),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 120000))
+            ]);
+            
+            if (result) {
+              await syncFilm(result.metadata, result.credits);
+              state.processed_slugs.push(f.slug);
+              saveState(state);
+            }
+            await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+          } catch (err) {
+            console.error(`  ❌ Failed ${f.slug}: ${err.message}`);
+          }
+        }
+        
+        state.current_page = p + 1;
+        saveState(state);
       }
       
-      state.current_page = p + 1;
-      saveState(state);
-    }
-    
-    // Check if we should rotate to another country
-    if (state.current_page > MAX_PAGES) {
-      console.log(`\n🎉 Finished ${country}!`);
-      state.countries_done.push(country);
-      const nextCountry = AFRICAN_COUNTRIES.find(c => !state.countries_done.includes(c));
-      if (nextCountry) {
-        console.log(`🌍 Next up: ${nextCountry}`);
-        state.current_country = nextCountry;
-        state.current_page = 1;
-        state.processed_slugs = []; // Reset or keep? Let's reset for the new country context
+      // ROTATION LOGIC
+      if (!pagesRemaining || state.current_page > MAX_PAGES) {
+        console.log(`🎉 Finished ${country}!`);
+        if (!state.countries_done.includes(country)) {
+          state.countries_done.push(country);
+        }
+        
+        const nextCountry = AFRICAN_COUNTRIES.find(c => !state.countries_done.includes(c));
+        if (nextCountry) {
+          console.log(`🌍 Moving to: ${nextCountry}`);
+          country = nextCountry;
+          state.current_country = nextCountry;
+          state.current_page = 1;
+          state.processed_slugs = [];
+          saveState(state);
+        } else {
+          console.log('🏁 ALL AFRICAN COUNTRIES DONE!');
+          finishedAll = true;
+          break;
+        }
       } else {
-        console.log('🏁 All African countries processed!');
+        // If we finished the MAX_PAGES loop but pages were still remaining, stop for now
+        break;
       }
-      saveState(state);
     }
     
   } finally {

@@ -41,9 +41,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: mubi_playwright_state.json
-          key: mubi-state-v2-${{ github.run_id }}
+          key: mubi-state-v3-${{ github.run_id }}
           restore-keys: |
-            mubi-state-v2-
+            mubi-state-v3-
 
       - name: Run Scraper
         env:
@@ -51,7 +51,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           COUNTRY: ${{ github.event.inputs.country || 'Nigeria' }}
-          MAX_PAGES: ${{ github.event.inputs.max_pages || '17' }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages || '100' }}
         run: node scripts/mubi_playwright.js
 
       - name: Save State
@@ -59,5 +59,5 @@ jobs:
         if: always()
         with:
           path: mubi_playwright_state.json
-          key: mubi-state-${{ github.run_id }}
+          key: mubi-state-v3-${{ github.run_id }}
 
