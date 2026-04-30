@@ -95,11 +95,30 @@ async function upsertPerson(name, mubiSlug) {
 async function syncFilm(filmData, credits) {
   const { mubi_id, title, year, slug } = filmData;
   
-  const { data: existing } = await supabase
+  let { data: existing } = await supabase
     .from('films')
     .select('id')
-    .or(`mubi_id.eq.${mubi_id},and(title.eq."${title}",year.eq.${year}),mubi_slug.eq."${slug}"`)
+    .eq('mubi_id', String(mubi_id))
     .maybeSingle();
+    
+  if (!existing && slug) {
+    const { data: bySlug } = await supabase
+      .from('films')
+      .select('id')
+      .eq('mubi_slug', slug)
+      .maybeSingle();
+    existing = bySlug;
+  }
+  
+  if (!existing) {
+    const { data: byTitle } = await supabase
+      .from('films')
+      .select('id')
+      .eq('title', title)
+      .eq('year', year)
+      .maybeSingle();
+    existing = byTitle;
+  }
     
   const payload = {
     mubi_id: String(filmData.mubi_id),
@@ -130,6 +149,10 @@ async function syncFilm(filmData, credits) {
       .single();
     if (error) {
       console.error(`  ❌ Error inserting ${title}:`, error.message);
+      return;
+    }
+    if (!inserted) {
+      console.error(`  ❌ Insert failed for ${title}: No data returned`);
       return;
     }
     filmId = inserted.id;
@@ -287,13 +310,29 @@ async function main() {
         for (const f of films) {
           if (state.processed_slugs.includes(f.slug)) continue;
 
-          const { data: dbExisting } = await supabase
+          let dbExisting = null;
+          
+          // 1. Try slug
+          const { data: bySlug } = await supabase
             .from('films')
             .select('id')
             .eq('mubi_slug', f.slug)
             .maybeSingle();
+          dbExisting = bySlug;
+
+          // 2. Try title/year if slug not found
+          if (!dbExisting) {
+            const { data: byTitle } = await supabase
+              .from('films')
+              .select('id')
+              .eq('title', f.title)
+              .eq('year', f.year)
+              .maybeSingle();
+            dbExisting = byTitle;
+          }
 
           if (dbExisting) {
+            console.log(`  🔗 Linking existing: ${f.title} (${f.year})`);
             // Ensure country link exists for this country
             const { data: countryRow } = await supabase
               .from('countries')
