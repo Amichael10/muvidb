@@ -41,9 +41,9 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: mubi_playwright_state.json
-          key: mubi-state-v4-${{ github.run_id }}
+          key: mubi-state-v5-${{ github.run_id }}
           restore-keys: |
-            mubi-state-v4-
+            mubi-state-v5-
 
       - name: Run Scraper
         env:
@@ -59,5 +59,5 @@ jobs:
         if: always()
         with:
           path: mubi_playwright_state.json
-          key: mubi-state-v4-${{ github.run_id }}
+          key: mubi-state-v5-${{ github.run_id }}
 
