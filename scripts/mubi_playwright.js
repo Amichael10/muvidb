@@ -215,46 +215,61 @@ async function scrapeFilmDetails(context, slug, currentCountry) {
     const dataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
     if (!dataStr) return null;
     
-    const film = JSON.parse(dataStr).props.pageProps.film;
+    const pageProps = JSON.parse(dataStr).props?.pageProps;
+    const film = pageProps?.film;
     
-    await page.goto(castUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    if (!film || typeof film !== 'object') {
+      console.warn(`  ⚠️ Missing or invalid film metadata for ${slug}`);
+      return null;
+    }
+    
+    await page.goto(castUrl, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await page.waitForTimeout(1000);
     const castDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
     const credits = [];
     
     if (castDataStr) {
-      const castData = JSON.parse(castDataStr).props.pageProps;
-      if (castData.cast) {
-        castData.cast.forEach(c => credits.push({
-          name: c.name,
-          role: 'Cast',
-          character_name: c.role,
-          mubi_slug: c.slug
-        }));
-      }
-      if (castData.crew) {
-        castData.crew.forEach(c => credits.push({
-          name: c.name,
-          role: 'Crew',
-          original_role: c.job,
-          mubi_slug: c.slug
-        }));
+      try {
+        const castData = JSON.parse(castDataStr).props?.pageProps;
+        if (castData?.cast && Array.isArray(castData.cast)) {
+          castData.cast.forEach(c => {
+            if (c?.name) credits.push({
+              name: c.name,
+              role: 'Cast',
+              character_name: c.role,
+              mubi_slug: c.slug
+            });
+          });
+        }
+        if (castData?.crew && Array.isArray(castData.crew)) {
+          castData.crew.forEach(c => {
+            if (c?.name) credits.push({
+              name: c.name,
+              role: 'Crew',
+              original_role: c.job,
+              mubi_slug: c.slug
+            });
+          });
+        }
+      } catch (e) {
+        console.warn(`  ⚠️ Could not parse cast data for ${slug}`);
       }
     }
     
-    const countries = (film.historic_countries || []).filter(c => AFRICAN_COUNTRIES.includes(c));
+    const historicCountries = Array.isArray(film.historic_countries) ? film.historic_countries : [];
+    const countries = historicCountries.filter(c => AFRICAN_COUNTRIES.includes(c));
     
     return {
       metadata: {
         mubi_id: String(film.id),
         mubi_slug: slug,
-        title: film.title,
-        year: film.year,
+        title: film.title || 'Unknown Title',
+        year: film.year || null,
         synopsis: film.short_synopsis || film.default_editorial || '',
-        runtime_minutes: film.duration,
+        runtime_minutes: film.duration || 0,
         poster_url: film.still_url || (film.stills ? film.stills.retina : null),
         backdrop_url: (film.stills ? film.stills.retina : null),
-        genres: film.genres || [],
+        genres: Array.isArray(film.genres) ? film.genres : [],
         countries: countries.length > 0 ? countries : [currentCountry],
         is_nollywood: countries.includes('Nigeria') || currentCountry === 'Nigeria'
       },
