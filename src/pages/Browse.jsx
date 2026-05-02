@@ -40,7 +40,7 @@ export default function Browse() {
     try {
       const [genresRes, countriesRes] = await Promise.all([
         supabase.from('genres').select('name').order('name'),
-        supabase.from('countries').select('name').order('name')
+        supabase.from('countries').select('name').eq('name', 'Nigeria').order('name')
       ]);
       if (genresRes.error) throw genresRes.error;
       if (countriesRes.error) throw countriesRes.error;
@@ -92,6 +92,9 @@ export default function Browse() {
       if (yearRange > 1990) query = query.gte('year', yearRange);
       if (language) query = query.eq('language', language);
       if (selectedRatings.length > 0) query = query.in('nfvcb_rating', selectedRatings);
+      
+      // Filter: Only show non-mubi films OR mubi films from Nigeria
+      query = query.or('source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}');
 
       const sortMap = {
         'views': { column: 'view_count', ascending: false },

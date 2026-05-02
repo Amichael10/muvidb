@@ -152,15 +152,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const allVideoRows = [];
 
         // Helper to clean YouTube titles
-        const cleanTitle = (t: string) => {
-          return t
-            .replace(/\|?\s*Nigerian Movie\s*\|?/gi, '')
-            .replace(/\|?\s*Full Movie\s*\|?/gi, '')
-            .replace(/\|?\s*Nollywood\s*\|?/gi, '')
-            .replace(/\|?\s*\d{4}\s*\|?/g, '')
-            .replace(/【.*?】/g, '')
-            .replace(/\[.*?\]/g, '')
-            .trim();
+        const cleanTitle = (raw: string) => {
+          if (!raw) return raw;
+          let title = raw.trim();
+          title = title.replace(/\s*\/\s*[A-Z]{2,5}\.?\s*\/?\s*$/i, '');
+          title = title.replace(/\s+[-–—]\s*Watch\s+.*/i, '');
+          title = title.replace(/\s+[-–—]\s*LATEST\s*.*/i, '');
+          title = title.replace(/\s+[-–—]s\s*NEW\s*$/i, '');
+          title = title.replace(/\s*#\w+/g, '');
+          title = title.replace(/\s+[-–—]\s+Nigerian\s*.*/i, '');
+          title = title.replace(/\s+[-–—]\s+Nollywood\s*.*/i, '');
+          title = title.replace(/\s+[-–—]\s+African\s*.*/i, '');
+          title = title.replace(/\s+[-–—]Nigerian\s*.*/i, '');
+          title = title.replace(/\s+[-–—]Nollywood\s*.*/i, '');
+          title = title.replace(/\s+[-–—]African\s*.*/i, '');
+          title = title.replace(/\s*Latest\s*(Nigerian|Nollywood|Yoruba|Igbo)?\s*(Epic\s*)?(New\s*)?(Drama\s*)?(Movie|Film|Movies|Films)s?\s*$/i, '');
+          title = title.replace(/\s+[-–—]\s+[A-Z][a-z]+\s+[A-Z][a-z]+\s*[\/,]\s*[A-Z].*$/i, '');
+          title = title.replace(/\s*(Full|Complete)\s*(Movie|Film|Season)\s*$/i, '');
+          title = title.replace(/\s*\|\s*(Moments with Mo|MWM)\s*$/i, '');
+          title = title.replace(/\s*\(Latest\s*(Comedy\s*)?(Drama\s*)?(Action\s*)?(Movie|Film|Movies|Films)\s*\)\s*$/i, '');
+          if (title.length > 80) {
+            const dashParts = title.split(/\s+[-–—]\s+/);
+            if (dashParts[0].length >= 3 && dashParts[0].length <= 70) {
+              title = dashParts[0];
+            }
+          }
+          title = title.replace(/\s{2,}/g, ' ').trim();
+          title = title.replace(/\s*[,|]\s*$/, '').trim();
+          title = title.replace(/\s+[-–—]\s*$/, '').trim();
+          return title;
         };
 
         while (!stopFetching && fetchedCount < 200) {

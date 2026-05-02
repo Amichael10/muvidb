@@ -1,0 +1,748 @@
+{
+  "id": "3105",
+  "primary_id": "3105",
+  "created": "1680201602",
+  "modified": "1765795050",
+  "published_on": "1711497600",
+  "unpublished_on": "",
+  "type": "video",
+  "name": "Kukro",
+  "admin_name": "Kukro (video/Drama:AL,KA,XX) (id: 3105)",
+  "short_description": "A story of a hunter's encounter with gods, fate, and the consequences of his actions.",
+  "long_description": "A tale of a hunter, Ubadu, who met the gods and changed his fate. Yet, his wrongdoing led to a curse that spanned generations.",
+  "extended_description": "",
+  "promotional_text": "",
+  "reg_users_only": "false",
+  "meta": {
+    "langcode": "en",
+    "language": "English",
+    "categories": [
+      {
+        "id": "3",
+        "name": "Drama"
+      },
+      {
+        "id": "1135",
+        "name": "Epic"
+      }
+    ],
+    "actors": [
+      {
+        "id": "281",
+        "name": "Andy Tetteh"
+      },
+      {
+        "id": "2918",
+        "name": "Gifty Arthur"
+      },
+      {
+        "id": "2919",
+        "name": "Lydia Ayiku"
+      }
+    ],
+    "directors": [
+      {
+        "id": "2920",
+        "name": "Clement Kofi Amoah"
+      }
+    ],
+    "writers": [],
+    "tags": [
+      {
+        "id": "2916",
+        "name": "Hunter"
+      },
+      {
+        "id": "2917",
+        "name": "Land"
+      },
+      {
+        "id": "116",
+        "name": "Tradition"
+      }
+    ]
+  },
+  "user_generated": "false",
+  "detail_disabled": "false",
+  "url": "/feature/kukro",
+  "unpublished_date": "",
+  "rh_uid": "29237",
+  "rightsholder": "Rushlake Media",
+  "category": "3",
+  "origin_country": [
+    {
+      "code": "GH",
+      "name": "Ghana"
+    }
+  ],
+  "allowed_countries": [],
+  "has_geo_restrictions": "false",
+  "age_restricted": "false",
+  "screencap_widescreen": "https://cdnapisec.kaltura.com/p/513551/sp/51355100/thumbnail/entry_id/1_c41nk2ux/version/0/vid_sec/1890/width/WIDTH_PH/height/HEIGHT_PH/type/3",
+  "thumb_poster_alt": "",
+  "thumb_widescreen_alt": "https://img.static-ottera.com/prod/alt/video/thumbnails/widescreen-alt/kukro_poster_art_0.jpg",
+  "thumb_square_gif": "",
+  "thumb_standard_gif": "",
+  "thumb_poster_gif": "",
+  "thumb_widescreen_gif": "",
+  "thumb_vertical_standard_gif": "",
+  "thumb_univisium_gif": "",
+  "thumb_poster_gn": "",
+  "img_info": {
+    "thumb_standard": {
+      "aspect_ratio": "4x3",
+      "orig_size": "2048x1536"
+    },
+    "thumb_poster": {
+      "aspect_ratio": "7x10",
+      "orig_size": "1400x2000"
+    },
+    "thumb_widescreen": {
+      "aspect_ratio": "16x9",
+      "orig_size": "1920x1080"
+    },
+    "thumb_vertical_standard": {
+      "aspect_ratio": "7x10",
+      "orig_size": "1536x2048"
+    },
+    "thumb_univisium": {
+      "aspect_ratio": "16x9",
+      "orig_size": "1920x1080"
+    },
+    "thumb_widescreen_alt": {
+      "aspect_ratio": "16x9",
+      "orig_size": "1920x1080"
+    },
+    "banner_kukro_poster_art_0": {
+      "aspect_ratio": "16x9",
+      "orig_size": "1920x1080"
+    }
+  },
+  "is_4k_content": "false",
+  "aspect_ratio": "16x9",
+  "year": "2024",
+  "mpaa_rating": "",
+  "tv_rating": "TV-14",
+  "bbfc_rating": "",
+  "content_ratings": {
+    "TVPG": {
+      "rating": "TV-14",
+      "system": "TVPG",
+      "notes": null,
+      "inferred": false,
+      "rec_age_low": 14,
+      "type": "tv",
+      "country_codes": [
+        "US"
+      ]
+    },
+    "BBFC": {
+      "rating": 15,
+      "system": "BBFC",
+      "inferred": true,
+      "rec_age_low": 15,
+      "country_codes": [
+        "GB"
+      ]
+    },
+    "CHVRS": {
+      "rating": "14A",
+      "system": "CHVRS",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "CA"
+      ]
+    },
+    "IMDA": {
+      "rating": "M18",
+      "system": "IMDA",
+      "inferred": true,
+      "rec_age_low": 18,
+      "country_codes": [
+        "SG"
+      ]
+    },
+    "OFLC": {
+      "rating": "M",
+      "system": "OFLC",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "NZ"
+      ]
+    },
+    "RCQ": {
+      "rating": "16+",
+      "system": "RCQ",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "CA"
+      ]
+    },
+    "RTC": {
+      "rating": "B15",
+      "system": "RTC",
+      "inferred": true,
+      "rec_age_low": 15,
+      "country_codes": [
+        "MX"
+      ]
+    },
+    "DJCTQ": {
+      "rating": 14,
+      "system": "DJCTQ",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "BR"
+      ]
+    },
+    "DJCTQAC": {
+      "rating": "A14",
+      "system": "DJCTQAC",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "BR"
+      ]
+    },
+    "ICAA": {
+      "rating": 16,
+      "system": "ICAA",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "ES"
+      ]
+    },
+    "MKRF": {
+      "rating": "14+",
+      "system": "MKRF",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "RU"
+      ]
+    },
+    "UKRAINE": {
+      "rating": 14,
+      "system": "UKRAINE",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "UA"
+      ]
+    },
+    "CBFC": {
+      "rating": "U/A-16+",
+      "system": "CBFC",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "IN"
+      ]
+    },
+    "CBSC": {
+      "rating": 14,
+      "system": "CBSC",
+      "inferred": true,
+      "rec_age_low": 18,
+      "country_codes": [
+        "CA"
+      ]
+    },
+    "CBSC-F": {
+      "rating": "16+",
+      "system": "CBSC-F",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "CA"
+      ]
+    },
+    "FPB": {
+      "rating": 16,
+      "system": "FPB",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "ZA"
+      ]
+    },
+    "FSK": {
+      "rating": 16,
+      "system": "FSK",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "DE"
+      ]
+    },
+    "FSF": {
+      "rating": 16,
+      "system": "FSF",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "DE"
+      ]
+    },
+    "EIRIN": {
+      "rating": "R15+",
+      "system": "EIRIN",
+      "inferred": true,
+      "rec_age_low": 15,
+      "country_codes": [
+        "JP"
+      ]
+    },
+    "ACMA": {
+      "rating": "M",
+      "system": "ACMA",
+      "inferred": true,
+      "rec_age_low": 15,
+      "country_codes": [
+        "AU"
+      ]
+    },
+    "NCS": {
+      "rating": "M",
+      "system": "NCS",
+      "inferred": true,
+      "rec_age_low": 15,
+      "country_codes": [
+        "AU"
+      ]
+    },
+    "EU-LG": {
+      "rating": "14+",
+      "system": "EU-LG",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "GB",
+        "FR",
+        "DE",
+        "IT",
+        "ES",
+        "IE",
+        "PT",
+        "FI",
+        "CH",
+        "AT",
+        "NO",
+        "SE",
+        "NL",
+        "FI",
+        "DK"
+      ]
+    },
+    "CCC": {
+      "rating": 14,
+      "system": "CCC",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "CL"
+      ]
+    },
+    "AGCOM": {
+      "rating": "VM14",
+      "system": "AGCOM",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "IT"
+      ]
+    },
+    "MBACT": {
+      "rating": "VM14",
+      "system": "MBACT",
+      "inferred": true,
+      "rec_age_low": 14,
+      "country_codes": [
+        "IT"
+      ]
+    },
+    "CSA": {
+      "rating": 16,
+      "system": "CSA",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "FR"
+      ]
+    },
+    "CNC": {
+      "rating": 16,
+      "system": "CNC",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "FR"
+      ]
+    },
+    "NBC-PL": {
+      "rating": 16,
+      "system": "NBC-PL",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "PL"
+      ]
+    },
+    "NMC": {
+      "rating": "PG-15",
+      "system": "NMC",
+      "inferred": true,
+      "rec_age_low": 15,
+      "country_codes": [
+        "AE"
+      ]
+    },
+    "NBC-NG": {
+      "rating": 18,
+      "system": "NBC-NG",
+      "inferred": true,
+      "rec_age_low": 18,
+      "country_codes": [
+        "NG"
+      ]
+    },
+    "CCE": {
+      "rating": "M/16",
+      "system": "CCE",
+      "inferred": true,
+      "rec_age_low": 16,
+      "country_codes": [
+        "PT"
+      ]
+    }
+  },
+  "captions": [],
+  "drm": "false",
+  "res_flags": "HD,FHD",
+  "duration": "5669",
+  "video_type": "feature",
+  "audio": "https://cfvod.kaltura.com/p/513551/sp/51355100/playManifest/entryId/1_c41nk2ux/flavorParamIds/408411/format/download/protocol/https/rename/1_c41nk2ux_audio/relocate/1_c41nk2ux_audio.mp4",
+  "format": "standard",
+  "has_skip_cues": false,
+  "ad_break_duration_preroll": "60",
+  "total_ad_break_duration_preroll": "60",
+  "ads_num_preroll": "1",
+  "ad_break_duration_postroll": "120",
+  "total_ad_break_duration_postroll": "120",
+  "ads_num_postroll": "1",
+  "ads_num_midroll_per_break": "4",
+  "ads_num_midroll": "36",
+  "ad_breaks": [
+    "487.22",
+    "990.16",
+    "1441.38",
+    "1912.92",
+    "2550.08",
+    "3134.20",
+    "4223.80",
+    "4661.20",
+    "5256.40"
+  ],
+  "ad_break_duration_midroll": "120",
+  "total_ad_break_duration_midroll": "1080",
+  "total_duration": 6749,
+  "has_ads": "true",
+  "premium_content": "false",
+  "is_premium": "false",
+  "associations": [
+    {
+      "id": "3102",
+      "primary_id": "3102",
+      "created": "1680070201",
+      "modified": "1753379961",
+      "published_on": "1730764800",
+      "unpublished_on": "",
+      "type": "video",
+      "name": "Kukro Trailer",
+      "admin_name": "Kukro Trailer (video:AL,KA,XX) (id: 3102)",
+      "short_description": "A story of a hunter's encounter with gods, fate, and the consequences of his actions.",
+      "long_description": "A tale of a hunter, Ubadu, who met the gods and changed his fate. Yet, his wrongdoing led to a curse that spanned generations.",
+      "extended_description": "",
+      "promotional_text": "",
+      "reg_users_only": "false",
+      "meta": {
+        "langcode": "en",
+        "language": "English",
+        "categories": [],
+        "actors": [],
+        "directors": [],
+        "writers": [],
+        "tags": []
+      },
+      "user_generated": "false",
+      "detail_disabled": "false",
+      "url": "/trailer/kukro-trailer",
+      "unpublished_date": "",
+      "rh_uid": "29237",
+      "rightsholder": "Rushlake Media",
+      "category": "3",
+      "origin_country": [
+        {
+          "code": "GH",
+          "name": "Ghana"
+        }
+      ],
+      "allowed_countries": [],
+      "has_geo_restrictions": "false",
+      "age_restricted": "false",
+      "screencap_widescreen": "https://cdnapisec.kaltura.com/p/513551/sp/51355100/thumbnail/entry_id/1_nvqldrja/version/0/vid_sec/31/width/WIDTH_PH/height/HEIGHT_PH/type/3",
+      "thumb_poster_alt": "",
+      "thumb_widescreen_alt": "https://img.static-ottera.com/prod/alt/video/thumbnails/widescreen-alt/kukro_poster_art_0.jpg",
+      "thumb_square_gif": "",
+      "thumb_standard_gif": "",
+      "thumb_poster_gif": "",
+      "thumb_widescreen_gif": "",
+      "thumb_vertical_standard_gif": "",
+      "thumb_univisium_gif": "",
+      "thumb_poster_gn": "",
+      "img_info": {
+        "thumb_standard": {
+          "aspect_ratio": "4x3",
+          "orig_size": "2048x1536"
+        },
+        "thumb_poster": {
+          "aspect_ratio": "7x10",
+          "orig_size": "1400x2000"
+        },
+        "thumb_widescreen": {
+          "aspect_ratio": "16x9",
+          "orig_size": "1920x1080"
+        },
+        "thumb_vertical_standard": {
+          "aspect_ratio": "7x10",
+          "orig_size": "1536x2048"
+        },
+        "thumb_univisium": {
+          "aspect_ratio": "16x9",
+          "orig_size": "1920x1080"
+        },
+        "thumb_widescreen_alt": {
+          "aspect_ratio": "16x9",
+          "orig_size": "1920x1080"
+        }
+      },
+      "is_4k_content": "false",
+      "aspect_ratio": "16x9",
+      "year": "2024",
+      "mpaa_rating": "",
+      "tv_rating": "TV-14",
+      "bbfc_rating": "",
+      "captions": [],
+      "drm": "false",
+      "res_flags": "HD,FHD",
+      "duration": "92",
+      "video_type": "trailer",
+      "audio": "https://cfvod.kaltura.com/p/513551/sp/51355100/playManifest/entryId/1_nvqldrja/flavorParamIds/408411/format/download/protocol/https/rename/1_nvqldrja_audio/relocate/1_nvqldrja_audio.mp4",
+      "format": "standard",
+      "has_skip_cues": false,
+      "has_ads": "false",
+      "premium_content": "false",
+      "is_premium": "false",
+      "share_url": "https://www.afrolandtv.com/trailer/kukro-trailer",
+      "allow_linear_rights": false,
+      "allow_linear_rights_global": false,
+      "allow_linear_rights_countries": [],
+      "total_views": "128",
+      "prevday_views": "0",
+      "association_type": "trailer",
+      "association_parent_id": "3105",
+      "association_parent_type": "video",
+      "thumbnail_format": "widescreen",
+      "widescreen_thumbnail_url": "https://cfvod.kaltura.com/p/513551/sp/51355100/thumbnail/entry_id/1_nvqldrja/version/0/vid_sec/31/width/366/height/206/type/3/a.jpg",
+      "univisium_thumbnail_url": "https://img.static-ottera.com/prod/alt/video/thumbnails/univisium/366x206/kukro_poster_art_0.jpg",
+      "vertical_standard_thumbnail_url": "https://img.static-ottera.com/prod/alt/video/thumbnails/vertical-standard/366x523/kukro_3_4_0.jpg",
+      "thumbnail_url": "https://cfvod.kaltura.com/p/513551/sp/51355100/thumbnail/entry_id/1_nvqldrja/version/0/vid_sec/31/width/366/height/206/type/3/a.jpg",
+      "parent_id": "895",
+      "parent_type": "collection",
+      "last_watched": "0",
+      "watched": {
+        "state": "new"
+      },
+      "video_url": "https://cdnapisec.kaltura.com/p/513551/sp/51355100/playManifest/entryId/1_nvqldrja/format/applehttp/protocol/https/flavorIds/1_zybk821i,1_7ihjoa73,1_bfnq16aq,1_anfrof16,1_9i0n4qdp/preferredBitrate/1500/maxBitrate/2500/a.m3u8",
+      "progressive_url": "https://cdnapisec.kaltura.com/p/513551/sp/51355100/playManifest/entryId/1_nvqldrja/format/url/protocol/https/flavorIds/1_9i0n4qdp/preferredBitrate/1500/maxBitrate/2500/a.mp4",
+      "download_url": "https://cdnapisec.kaltura.com/p/513551/sp/51355100/playManifest/entryId/1_nvqldrja/format/url/protocol/https/flavorIds/1_9i0n4qdp/preferredBitrate/1500/maxBitrate/2500/a.mp4",
+      "bif_url_sd": "https://cdnsecakmi.kaltura.com/api_v3/index.php/service/thumbAsset/action/serve/thumbAssetId/1_2j1cjov7/v/11?a.bif",
+      "bif_url_hd": "https://cdnsecakmi.kaltura.com/api_v3/index.php/service/thumbAsset/action/serve/thumbAssetId/1_3wm1yo90/v/11?a.bif",
+      "bif_url_fhd": "https://cdnsecakmi.kaltura.com/api_v3/index.php/service/thumbAsset/action/serve/thumbAssetId/1_bgw1ycb9/v/11?a.bif"
+    }
+  ],
+  "share_url": "https://www.afrolandtv.com/feature/kukro",
+  "allow_linear_rights": false,
+  "allow_linear_rights_global": false,
+  "allow_linear_rights_countries": [],
+  "has_cues": "true",
+  "total_views": "1333",
+  "prevday_views": "0",
+  "parent_type": "collection",
+  "parent_id": "895",
+  "parent_name": "Drama",
+  "node_metadata": {
+    "schema_video_object_type": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "@type",
+        "content": "VideoObject",
+        "group": "schema_video_object",
+        "schema_metatag": true
+      }
+    },
+    "title": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "title",
+        "content": "Kukro | AfroLandTV"
+      }
+    },
+    "schema_video_object_thumbnail_url_0": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "thumbnailUrl",
+        "content": "https://img.static-ottera.com/prod/alt/video/thumbnails/widescreen/kukro_poster_art_1.jpg",
+        "group": "schema_video_object",
+        "schema_metatag": true
+      }
+    },
+    "schema_video_object_description": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "description",
+        "content": "A story of a hunter's encounter with gods, fate, and the consequences of his actions.",
+        "group": "schema_video_object",
+        "schema_metatag": true
+      }
+    },
+    "schema_video_object_name": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "name",
+        "content": "Kukro",
+        "group": "schema_video_object",
+        "schema_metatag": true
+      }
+    },
+    "schema_video_object_upload_date": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "uploadDate",
+        "content": "2023-03-30T18:40:02+0000",
+        "group": "schema_video_object",
+        "schema_metatag": true
+      }
+    },
+    "schema_video_object_id": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "@id",
+        "content": "http://default/feature/kukro",
+        "group": "schema_video_object",
+        "schema_metatag": true
+      }
+    },
+    "og_site_name": {
+      "#tag": "meta",
+      "#attributes": {
+        "property": "og:site_name",
+        "content": "AfroLandTV"
+      }
+    },
+    "canonical_url": {
+      "#tag": "link",
+      "#attributes": {
+        "rel": "canonical",
+        "href": "http://default/feature/kukro"
+      }
+    },
+    "twitter_cards_type": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "twitter:card",
+        "content": "summary_large_image"
+      }
+    },
+    "twitter_cards_site": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "twitter:site",
+        "content": "@"
+      }
+    },
+    "twitter_cards_title": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "twitter:title",
+        "content": "Kukro"
+      }
+    },
+    "description": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "description",
+        "content": "A story of a hunter's encounter with gods, fate, and the consequences of his actions."
+      }
+    },
+    "og_url": {
+      "#tag": "meta",
+      "#attributes": {
+        "property": "og:url",
+        "content": "http://default/feature/kukro"
+      }
+    },
+    "og_title": {
+      "#tag": "meta",
+      "#attributes": {
+        "property": "og:title",
+        "content": "Kukro"
+      }
+    },
+    "image_src": {
+      "#tag": "link",
+      "#attributes": {
+        "rel": "image_src",
+        "href": "https://img.static-ottera.com/prod/alt/video/thumbnails/widescreen/kukro_poster_art_1.jpg"
+      }
+    },
+    "twitter_cards_page_url": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "twitter:url",
+        "content": "http://default/feature/kukro"
+      }
+    },
+    "twitter_cards_image": {
+      "#tag": "meta",
+      "#attributes": {
+        "name": "twitter:image",
+        "content": "https://img.static-ottera.com/prod/alt/video/thumbnails/widescreen/kukro_poster_art_1.jpg"
+      }
+    },
+    "og_image_0": {
+      "#tag": "meta",
+      "#attributes": {
+        "property": "og:image",
+        "content": "https://img.static-ottera.com/prod/alt/video/thumbnails/widescreen/kukro_poster_art_1.jpg"
+      }
+    }
+  },
+  "thumbnail_format": "widescreen",
+  "widescreen_thumbnail_url": "https://img2.static-ottera.com/prod/alt/video/thumbnails/widescreen/366x206/kukro_poster_art_1.jpg",
+  "univisium_thumbnail_url": "https://img.static-ottera.com/prod/alt/video/thumbnails/univisium/366x206/kukro_poster_art_0.jpg",
+  "vertical_standard_thumbnail_url": "https://img.static-ottera.com/prod/alt/video/thumbnails/vertical-standard/366x523/kukro_3_4_0.jpg",
+  "thumbnail_url": "https://img2.static-ottera.com/prod/alt/video/thumbnails/widescreen/366x206/kukro_poster_art_1.jpg",
+  "last_watched": "0",
+  "watched": {
+    "state": "new"
+  },
+  "bif_url_sd": "https://cdnsecakmi.kaltura.com/api_v3/index.php/service/thumbAsset/action/serve/thumbAssetId/1_o8ki0o27/v/11?a.bif",
+  "bif_url_hd": "https://cdnsecakmi.kaltura.com/api_v3/index.php/service/thumbAsset/action/serve/thumbAssetId/1_pw26x571/v/11?a.bif",
+  "bif_url_fhd": "https://cdnsecakmi.kaltura.com/api_v3/index.php/service/thumbAsset/action/serve/thumbAssetId/1_cq1ffgeo/v/11?a.bif"
+}

@@ -61,6 +61,7 @@ export default function Home() {
         film_genres(genres(name))
       `)
       .eq('is_featured', true)
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('view_count', { ascending: false });
     
     if (data) {
@@ -80,6 +81,7 @@ export default function Home() {
         is_featured, is_trending, release_type,
         film_genres(genres(name))
       `)
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('view_count', { ascending: false });
 
     if (!error) {
@@ -110,6 +112,7 @@ export default function Home() {
         film_genres(genres(name))
       `)
       .eq('year', 2026)
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('release_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(20);
@@ -128,6 +131,9 @@ export default function Home() {
       .from('films')
       .select(`*, film_genres(genres(name))`)
       .eq('is_in_cinemas', true)
+      .neq('source', 'youtube')
+      .or('youtube_watch_url.is.null,youtube_watch_url.eq.""')
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('release_date', { ascending: false })
       .limit(20);
 
@@ -137,22 +143,29 @@ export default function Home() {
       .from('showtimes')
       .select(`
         film_id, 
-        films(*, film_genres(genres(name)))
+        films!inner(*, film_genres(genres(name)))
       `)
       .gte('show_date', today)
       .eq('is_available', true)
+      .neq('films.source', 'youtube')
+      .or('youtube_watch_url.is.null,youtube_watch_url.eq.""', { foreignTable: 'films' })
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}', { foreignTable: 'films' })
       .order('show_date', { ascending: true })
-      .limit(20);
+      .limit(60);
 
     const filmMap = new Map();
 
     // Prioritize explicit flag
     if (cinemaMovies) {
       cinemaMovies.forEach(f => {
-        filmMap.set(f.id, {
-          ...f,
-          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-        });
+        // Double check to ensure no youtube movies sneak in
+        const isYoutube = f.source === 'youtube' || (f.youtube_watch_url && f.youtube_watch_url.length > 5);
+        if (!isYoutube) {
+          filmMap.set(f.id, {
+            ...f,
+            genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+          });
+        }
       });
     }
 
@@ -160,10 +173,15 @@ export default function Home() {
     if (showtimesData) {
       showtimesData.forEach(s => {
         if (s.films && !filmMap.has(s.films.id)) {
-          filmMap.set(s.films.id, {
-            ...s.films,
-            genres: s.films.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-          });
+          // Double check to ensure no youtube movies sneak in
+          const f = s.films;
+          const isYoutube = f.source === 'youtube' || (f.youtube_watch_url && String(f.youtube_watch_url).length > 5);
+          if (!isYoutube) {
+            filmMap.set(f.id, {
+              ...f,
+              genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+            });
+          }
         }
       });
     }
@@ -176,6 +194,7 @@ export default function Home() {
       .from('films')
       .select(`*, film_genres(genres(name))`)
       .or('coming_soon.eq.true,status.ilike.announced')
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('release_date', { ascending: true })
       .limit(20);
     
@@ -210,7 +229,7 @@ export default function Home() {
           ...cf.films,
           genres: cf.films?.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
         }))
-        .filter(f => f.id);
+        .filter(f => f.id && (f.source !== 'mubi' || (f.countries && Array.isArray(f.countries) && f.countries.includes('Nigeria'))));
       
       setCuratedCollection({ ...collection, films });
     }
@@ -240,6 +259,7 @@ export default function Home() {
         *,
         film_genres(genres(name))
       `)
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('created_at', { ascending: false })
       .limit(30);
 
@@ -297,7 +317,7 @@ export default function Home() {
     <div className="w-full pb-20 bg-bg min-h-screen">
       {/* 1. HERO */}
       <HeroSection 
-        featuredFilms={featuredFilms} 
+        featuredFilms={[...inCinemas, ...featuredFilms].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i)} 
         isLoading={isLoading}
       />
 
@@ -319,10 +339,10 @@ export default function Home() {
           <GenreRail />
         </div>
 
-        {/* 3.5. COUNTRY RAIL */}
-        <div className="border-b border-border">
-          <CountryRail />
-        </div>
+{/* 3.5. COUNTRY RAIL - DISABLED AS REQUESTED */}
+{/* <div className="border-b border-border">
+  <CountryRail />
+</div> */}
 
         {/* 4. COMING SOON */}
         {(isLoading || comingSoon.length > 0) && (

@@ -148,11 +148,18 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     <span>{Number(featuredFilm.tmdb_rating || featuredFilm.rating || 0).toFixed(1)}</span>
                   </div>
                   
-                  {/* Popularity Icon */}
-                  <div className="flex items-center gap-2">
-                    <Icon icon="solar:fire-bold" className="text-base text-orange-500" />
-                    <span>Trending</span>
-                  </div>
+                  {/* Status / Popularity Icon */}
+                  {featuredFilm.is_in_cinemas ? (
+                    <div className="flex items-center gap-2 bg-brand/20 text-brand px-2.5 py-0.5 rounded border border-brand/30">
+                      <Icon icon="solar:ticket-bold" className="text-base" />
+                      <span className="uppercase tracking-widest text-[9px]">In Cinemas Now</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Icon icon="solar:fire-bold" className="text-base text-orange-500" />
+                      <span>Trending</span>
+                    </div>
+                  )}
                   
                   {/* Year */}
                   <div className="flex items-center gap-2">

@@ -52,6 +52,7 @@ export default function Search() {
           film_genres!left(genres(name))
         `)
         .ilike('title', `%${initialQuery}%`)
+        .or('source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}')
         .limit(40);
 
       if (filmError) throw filmError;
