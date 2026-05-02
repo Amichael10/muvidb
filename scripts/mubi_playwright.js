@@ -412,6 +412,11 @@ async function main() {
            // Continue while loop
         } else {
            console.log(`🎊 All African countries have been processed!`);
+           console.log(`🔄 Resetting cycle to begin again on the next run.`);
+           state.countries_done = [];
+           state.current_country = AFRICAN_COUNTRIES[0];
+           state.current_page = 1;
+           saveState(state);
            finishedAll = true;
            break;
         }
