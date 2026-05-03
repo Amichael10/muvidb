@@ -195,7 +195,25 @@ Important: include ALL films and ALL their time slots. Do not omit any.`,
       };
     }
 
-    const json = await res.json() as { success?: boolean; data?: ExtractedSchedule; error?: string };
+    let json = await res.json() as { success?: boolean; id?: string; data?: ExtractedSchedule; error?: string; status?: string };
+    
+    // If it's an async job (Firecrawl v1), poll for result
+    if (json.success && json.id && !json.data) {
+      let status = 'scraping';
+      while (status !== 'completed' && status !== 'failed' && status !== 'cancelled') {
+        await new Promise(r => setTimeout(r, 3000));
+        const pollRes = await fetch(`https://api.firecrawl.dev/v1/extract/${json.id}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!pollRes.ok) {
+          const body = await pollRes.text().catch(() => '');
+          return { cinemaId: cinema.id, showtimes: [], error: `Firecrawl poll HTTP ${pollRes.status}: ${body.slice(0, 300)}` };
+        }
+        json = await pollRes.json();
+        status = json.status || (json.error ? 'failed' : 'scraping');
+      }
+    }
+
     if (!json.success || !json.data) {
       return {
         cinemaId: cinema.id,

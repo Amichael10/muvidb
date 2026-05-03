@@ -266,6 +266,11 @@ async function scrapeFilmDetails(context, slug, currentCountry) {
     const historicCountries = Array.isArray(film.historic_countries) ? film.historic_countries : [];
     const countries = historicCountries.filter(c => AFRICAN_COUNTRIES.includes(c));
     
+    if (countries.length === 0) {
+      console.warn(`  ⚠️ Skipping non-African or unverified film: ${film.title} (${historicCountries.join(', ')})`);
+      return null;
+    }
+    
     return {
       metadata: {
         mubi_id: String(film.id),
@@ -277,8 +282,8 @@ async function scrapeFilmDetails(context, slug, currentCountry) {
         poster_url: film.still_url || (film.stills ? film.stills.retina : null),
         backdrop_url: (film.stills ? film.stills.retina : null),
         genres: Array.isArray(film.genres) ? film.genres : [],
-        countries: countries.length > 0 ? countries : [currentCountry],
-        is_nollywood: countries.includes('Nigeria') || currentCountry === 'Nigeria'
+        countries: countries,
+        is_nollywood: countries.includes('Nigeria')
       },
       credits
     };
