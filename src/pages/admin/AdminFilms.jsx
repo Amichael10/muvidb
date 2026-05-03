@@ -46,6 +46,58 @@ export default function AdminFilms() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState('library'); // library, youtube_buffer
   const [youtubeVideos, setYoutubeVideos] = useState([]);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+
+  const handleAISummarize = async () => {
+    if (!formData.title) {
+      toast.error('Title is required for summarization');
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          task: 'summarize_film', 
+          data: { title: formData.title, description: formData.synopsis } 
+        })
+      });
+
+      const data = await response.json();
+      if (data.synopsis) {
+        setFormData(prev => ({ ...prev, synopsis: data.synopsis }));
+        toast.success('Synopsis generated!');
+      }
+    } catch (err) {
+      console.error('AI Error:', err);
+      toast.error('AI Summarization failed');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const handleAIPolishTitle = async () => {
+    if (!formData.title) return;
+    setIsSummarizing(true);
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: 'polish_title', data: { title: formData.title } })
+      });
+      const data = await res.json();
+      if (data.title) {
+        setFormData(prev => ({ ...prev, title: data.title }));
+        toast.success('Title polished!');
+      }
+    } catch (err) {
+      toast.error('Failed to polish title');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
 
   // Company Search States
   const [companySearch, setCompanySearch] = useState('');
@@ -1173,13 +1225,24 @@ export default function AdminFilms() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-text-primary mb-2">Movie Title *</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-text-primary">Movie Title *</label>
+                    <button
+                      type="button"
+                      onClick={handleAIPolishTitle}
+                      disabled={isSummarizing}
+                      className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-full hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
+                    >
+                      <Icon icon="solar:magic-stick-bold" />
+                      AI Polish
+                    </button>
+                  </div>
                   <input 
                     required 
                     name="title" 
                     value={formData.title} 
                     onChange={handleChange} 
-                    className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" 
+                    className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" 
                     placeholder="Enter movie title..."
                   />
                 </div>
@@ -1192,7 +1255,7 @@ export default function AdminFilms() {
                       type="text"
                       value={companySearch}
                       onChange={(e) => handleCompanySearch(e.target.value)}
-                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all pr-12"
+                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all pr-12"
                       placeholder="Search or add company..."
                     />
                     <div className="absolute right-4 top-2.5 flex items-center gap-2">
@@ -1255,7 +1318,7 @@ export default function AdminFilms() {
                       name="year" 
                       value={formData.year} 
                       onChange={handleChange} 
-                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" 
+                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" 
                     />
                   </div>
                   <div>
@@ -1264,7 +1327,7 @@ export default function AdminFilms() {
                       name="status" 
                       value={formData.status} 
                       onChange={handleChange} 
-                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all appearance-none cursor-pointer"
+                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all appearance-none cursor-pointer"
                     >
                       <option value="announced">Announced</option>
                       <option value="filming">Filming</option>
@@ -1274,13 +1337,28 @@ export default function AdminFilms() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-text-primary mb-2">Story Synopsis</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-bold text-text-primary">Story Synopsis</label>
+                    <button
+                      type="button"
+                      onClick={handleAISummarize}
+                      disabled={isSummarizing}
+                      className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-full hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
+                    >
+                      {isSummarizing ? 'Generating...' : (
+                        <>
+                          <Icon icon="solar:stars-minimalistic-bold" />
+                          AI Summarize
+                        </>
+                      )}
+                    </button>
+                  </div>
                   <textarea 
                     name="synopsis" 
                     rows="5" 
                     value={formData.synopsis} 
                     onChange={handleChange} 
-                    className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all resize-none leading-relaxed" 
+                    className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all resize-none leading-relaxed" 
                     placeholder="Tell the story..."
                   />
                 </div>
@@ -1295,16 +1373,16 @@ export default function AdminFilms() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">TMDB ID</label>
-                      <input name="tmdb_id" value={formData.tmdb_id || ''} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs focus:border-brand outline-none" />
+                      <input name="tmdb_id" value={formData.tmdb_id || ''} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">Rating</label>
-                      <input step="0.1" type="number" name="tmdb_rating" value={formData.tmdb_rating || ''} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs focus:border-brand outline-none" />
+                      <input step="0.1" type="number" name="tmdb_rating" value={formData.tmdb_rating || ''} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5">Marketing Tagline</label>
-                    <input name="tagline" value={formData.tagline || ''} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs focus:border-brand outline-none" placeholder="Catchy phrase..." />
+                    <input name="tagline" value={formData.tagline || ''} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" placeholder="Catchy phrase..." />
                   </div>
                 </div>
 
@@ -1354,11 +1432,11 @@ export default function AdminFilms() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-text-primary mb-2">Poster Asset URL</label>
-                  <input name="poster_url" value={formData.poster_url} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" placeholder="https://" />
+                  <input name="poster_url" value={formData.poster_url} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" placeholder="https://" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-text-primary mb-2">Landscape Backdrop URL</label>
-                  <input name="backdrop_url" value={formData.backdrop_url} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" placeholder="https://" />
+                  <input name="backdrop_url" value={formData.backdrop_url} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" placeholder="https://" />
                 </div>
               </div>
 
@@ -1427,7 +1505,7 @@ export default function AdminFilms() {
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Duration (Mins)</label>
-                    <input type="number" name="runtime_minutes" value={formData.runtime_minutes} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs focus:border-brand outline-none" />
+                    <input type="number" name="runtime_minutes" value={formData.runtime_minutes} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Content Rating</label>
@@ -1435,7 +1513,7 @@ export default function AdminFilms() {
                       name="nfvcb_rating" 
                       value={formData.nfvcb_rating} 
                       onChange={handleChange} 
-                      className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs focus:border-brand outline-none"
+                      className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
                     >
                       {['G', 'PG', 'PG-13', '15', '18'].map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
@@ -1522,7 +1600,7 @@ export default function AdminFilms() {
                       name="youtube_watch_url" 
                       value={formData.youtube_watch_url || ''} 
                       onChange={handleChange} 
-                      className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs focus:border-brand outline-none" 
+                      className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" 
                       placeholder="https://..." 
                     />
                   </div>
@@ -1573,7 +1651,7 @@ export default function AdminFilms() {
                               }
                             }}
                             placeholder={platform.placeholder}
-                            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[10px] focus:border-brand outline-none"
+                            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[10px] text-text-primary focus:border-brand outline-none"
                           />
                         </div>
                       );
@@ -1589,7 +1667,7 @@ export default function AdminFilms() {
                     name="trailer_youtube_id" 
                     value={formData.trailer_youtube_id || ''} 
                     onChange={handleChange} 
-                    className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs focus:border-brand outline-none" 
+                    className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" 
                     placeholder="URL or ID..." 
                   />
                 </div>
@@ -1609,7 +1687,7 @@ export default function AdminFilms() {
                   placeholder="Search directory..."
                   value={peopleSearch}
                   onChange={(e) => handlePeopleSearch(e.target.value)}
-                  className="bg-surface-2 border border-border rounded-md px-4 py-2 text-xs w-full md:w-64 focus:border-brand outline-none transition-all pr-12"
+                  className="bg-surface-2 border border-border rounded-md px-4 py-2 text-xs w-full md:w-64 text-text-primary focus:border-brand outline-none transition-all pr-12"
                 />
                 <svg className="absolute right-4 top-2.5 w-4 h-4 text-text-muted group-focus-within:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1680,7 +1758,7 @@ export default function AdminFilms() {
                           <select
                             value={credit.role}
                             onChange={(e) => setCredits(prev => prev.map((c, i) => i === idx ? { ...c, role: e.target.value } : c))}
-                            className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-[10px] font-bold focus:border-brand outline-none uppercase"
+                            className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-[10px] text-text-primary font-bold focus:border-brand outline-none uppercase"
                           >
                             <option value="actor">Actor</option>
                             <option value="director">Director</option>
@@ -1692,7 +1770,7 @@ export default function AdminFilms() {
                               placeholder="Role name..."
                               value={credit.character_name || ''}
                               onChange={(e) => setCredits(prev => prev.map((c, i) => i === idx ? { ...c, character_name: e.target.value } : c))}
-                              className="bg-transparent border-b border-border text-[10px] font-medium px-2 py-1 outline-none focus:border-brand flex-1"
+                              className="bg-transparent border-b border-border text-[10px] text-text-primary font-medium px-2 py-1 outline-none focus:border-brand flex-1"
                             />
                           )}
                         </div>

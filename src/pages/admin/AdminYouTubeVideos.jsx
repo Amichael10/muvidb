@@ -67,6 +67,61 @@ function EditFilmModal({ film, onSave, onClose }) {
     needs_review: film.needs_review ?? true,
   });
   const [saving, setSaving] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+
+  const handleAISummarize = async () => {
+    if (!form.title) {
+      toast.error('Need at least a title to summarize');
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'summarize_film',
+          title: form.title,
+          description: form.synopsis || film.description || ''
+        })
+      });
+
+      const result = await response.json();
+      if (result.success && result.content) {
+        setForm(prev => ({ ...prev, synopsis: result.content }));
+        toast.success('Synopsis generated!');
+      } else {
+        toast.error(result.error || 'Failed to generate synopsis');
+      }
+    } catch (error) {
+      console.error('AI Summarize Error:', error);
+      toast.error('Network error during AI summarization');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const handleAIPolishTitle = async () => {
+    if (!form.title) return;
+    setIsSummarizing(true);
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: 'polish_title', data: { title: form.title } })
+      });
+      const data = await res.json();
+      if (data.title) {
+        setForm(prev => ({ ...prev, title: data.title }));
+        toast.success('Title polished!');
+      }
+    } catch (err) {
+      toast.error('Failed to polish title');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
 
   // Company selection state
   const [companySearch, setCompanySearch] = useState('');
@@ -161,7 +216,18 @@ function EditFilmModal({ film, onSave, onClose }) {
         
         <form onSubmit={handleSubmit} className="p-10 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
           <div>
-            <label className="block text-text-muted text-[10px] font-bold tracking-wider mb-3 px-1">Movie Title</label>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <label className="block text-text-muted text-[10px] font-bold tracking-wider uppercase">Movie Title</label>
+              <button
+                type="button"
+                onClick={handleAIPolishTitle}
+                disabled={isSummarizing}
+                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-full hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Icon icon="solar:magic-stick-bold" />
+                AI Polish
+              </button>
+            </div>
             <input name="title" value={form.title} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-5 h-14 text-text-primary text-sm font-bold focus:border-brand/50 focus:ring-4 focus:ring-brand/5 transition-all outline-none" />
           </div>
 
@@ -182,7 +248,22 @@ function EditFilmModal({ film, onSave, onClose }) {
           </div>
 
           <div>
-            <label className="block text-text-muted text-[10px] font-bold tracking-wider mb-3 px-1">Movie Synopsis</label>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <label className="block text-text-muted text-[10px] font-bold tracking-wider uppercase">Movie Synopsis</label>
+              <button
+                type="button"
+                onClick={handleAISummarize}
+                disabled={isSummarizing}
+                className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-full hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
+              >
+                {isSummarizing ? 'Generating...' : (
+                  <>
+                    <Icon icon="solar:stars-minimalistic-bold" />
+                    AI Summarize
+                  </>
+                )}
+              </button>
+            </div>
             <textarea name="synopsis" value={form.synopsis} onChange={handleChange} rows={5} className="w-full bg-surface-2 border border-border rounded-lg px-5 py-4 text-text-primary text-sm font-medium focus:border-brand/50 outline-none resize-none custom-scrollbar" />
           </div>
 

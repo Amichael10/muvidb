@@ -3,59 +3,72 @@ import { Link } from 'react-router-dom';
 export default function Footer() {
   return (
     <footer className="bg-bg border-t border-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-x border-white/5">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-          {/* Brand */}
-          <div className="space-y-6">
-            <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 bg-brand text-white flex items-center justify-center rounded-lg shadow-lg shadow-brand/20 group-hover:scale-110 transition-transform">
-                <span className="text-xl">L</span>
+      <div className="relative mt-auto pt-24 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 relative z-10 border-x border-white/5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+            {/* Brand */}
+            <div className="space-y-6">
+              <Link to="/" className="flex items-center gap-3 group">
+                <div className="w-10 h-10 bg-brand text-white flex items-center justify-center rounded-lg shadow-lg shadow-brand/20 group-hover:scale-110 transition-transform">
+                  <span className="text-xl">L</span>
+                </div>
+                <span className="font-heading font-bold text-white text-3xl tracking-tighter">Lumi</span>
+              </Link>
+              <p className="text-text-muted text-sm leading-relaxed max-w-xs font-medium">
+                The premier film database for Nollywood. Preserving the legacy, celebrating the future.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-bold text-text-primary mb-6 uppercase tracking-widest">Discover</h3>
+              <ul className="space-y-4">
+                <li><Link to="/" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Home</Link></li>
+                <li><Link to="/browse" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Browse Movies</Link></li>
+                <li><Link to="/browse?sort=rating" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Top Rated</Link></li>
+                <li><Link to="/browse?sort=new" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">New Releases</Link></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="text-xs font-bold text-text-primary mb-6 uppercase tracking-widest">People</h3>
+              <ul className="space-y-4">
+                <li><Link to="/browse?type=actors" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Actors</Link></li>
+                <li><Link to="/browse?type=directors" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Directors</Link></li>
+                <li><Link to="/browse?type=producers" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Producers</Link></li>
+                <li><Link to="/browse?type=writers" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Writers</Link></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-bold text-text-primary mb-6 uppercase tracking-widest">Platform</h3>
+              <ul className="space-y-4">
+                <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
+                <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join Lumi</Link></li>
+                <li><Link to="/dashboard" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Dashboard</Link></li>
+                <li><Link to="/pro/claim" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Claim Profile</Link></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-16 pt-8 border-t border-white/5 relative">
+            {/* African Culture Image (Clean & Sharp) */}
+            <div className="w-full h-auto mb-8 overflow-hidden flex justify-center items-end relative">
+              <img 
+                src="/assets/footer-people.png" 
+                alt="African Culture" 
+                className="w-full max-w-7xl object-contain object-bottom transition-all duration-700"
+              />
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
+              <p className="text-[10px] font-bold text-text-muted opacity-40 uppercase tracking-widest">
+                © 2025 Lumi Database. All rights reserved.
+              </p>
+              <div className="flex gap-8">
+                <Link to="#" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Terms</Link>
+                <Link to="#" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Privacy</Link>
               </div>
-              <span className="font-heading font-bold text-white text-3xl tracking-tighter">Lumi</span>
-            </Link>
-            <p className="text-text-muted text-sm leading-relaxed max-w-xs">
-              The premier film database for Nollywood. Preserving the legacy, celebrating the future.
-            </p>
-          </div>
-
-          <div>
-            <h3 className="text-xs font-bold text-text-primary mb-6">Discover</h3>
-            <ul className="space-y-4">
-              <li><Link to="/" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Home</Link></li>
-              <li><Link to="/browse" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Browse Movies</Link></li>
-              <li><Link to="/browse?sort=rating" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Top Rated</Link></li>
-              <li><Link to="/browse?sort=new" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">New Releases</Link></li>
-            </ul>
-          </div>
-          
-          <div>
-            <h3 className="text-xs font-bold text-text-primary mb-6">People</h3>
-            <ul className="space-y-4">
-              <li><Link to="/browse?type=actors" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Actors</Link></li>
-              <li><Link to="/browse?type=directors" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Directors</Link></li>
-              <li><Link to="/browse?type=producers" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Producers</Link></li>
-              <li><Link to="/browse?type=writers" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Writers</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-xs font-bold text-text-primary mb-6">Platform</h3>
-            <ul className="space-y-4">
-              <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
-              <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join Lumi</Link></li>
-              <li><Link to="/dashboard" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Dashboard</Link></li>
-              <li><Link to="/pro/claim" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Claim Profile</Link></li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="mt-16 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs font-bold text-text-muted opacity-40">
-            © 2025 Lumi Database. All rights reserved.
-          </p>
-          <div className="flex gap-8">
-            <Link to="#" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Terms</Link>
-            <Link to="#" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Privacy</Link>
+            </div>
           </div>
         </div>
       </div>

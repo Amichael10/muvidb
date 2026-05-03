@@ -11,6 +11,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'cleanup_films': return await cleanupFilms(res);
       case 'cleanup_people': return await cleanupPeople(res);
       case 'enrich_metadata': return await enrichMetadata(res);
+      case 'cleanup_titles': return await cleanupTitles(res);
+      case 'polish_title': return await polishTitle(data, res);
+      case 'summarize_film': return await summarizeFilm(data, res);
       case 'discover_actors': return await discoverActors(data, res);
       case 'deduplicate': return await mergeDuplicates(data, res);
       default: return res.status(400).json({ error: 'Invalid task' });
@@ -186,4 +189,83 @@ async function mergeDuplicates(data: any, res: VercelResponse) {
   }).filter((r: any) => r.master_id && r.duplicate_ids.length > 0);
 
   return res.json({ results: mappedResults, telemetry });
+}
+
+async function summarizeFilm(data: any, res: VercelResponse) {
+  const { title, description } = data;
+  
+  if (!title) return res.status(400).json({ error: 'Title is required for summarization' });
+
+  const prompt = `
+    Write a professional and compelling movie synopsis for an African film titled "${title}".
+    
+    Context from YouTube description:
+    ${description || 'No description provided.'}
+    
+    Rules:
+    1. Keep it to exactly 3 sentences.
+    2. Focus on the plot and drama/emotions.
+    3. Remove any YouTube marketing jargon (links, "subscribe", "produced by", etc.).
+    4. Ensure it sounds like a high-end cinematic description.
+    5. Do NOT include spoilers unless they are part of the basic premise.
+    
+    Return ONLY the synopsis text.
+  `;
+
+  const { text, telemetry } = await generateAIContent(prompt);
+  return res.json({ synopsis: text.trim(), telemetry });
+}
+
+async function cleanupTitles(res: VercelResponse) {
+  // Focus on films with potentially noisy titles (long ones or containing keywords)
+  const { data: films } = await supabase
+    .from('films')
+    .select('id, title')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (!films) return res.json({ results: [] });
+
+  const prompt = `
+    You are a Nollywood database editor. 
+    Clean up these movie titles by removing common YouTube marketing noise, years, and category labels.
+    
+    Rules:
+    1. Remove prefix like "LATEST YORUBA MOVIE", "OLD NIGERIAN MOVIE", etc.
+    2. Remove suffix like "PART 1", "(Full Movie)", "2024", etc.
+    3. Proper Case: Ensure titles are not ALL CAPS unless it's an acronym.
+    4. If a title is ONLY marketing noise (e.g., "LATEST YORUBA MOVIE 2024"), try to extract the real name or flag it.
+    
+    Examples:
+    - "LATEST YORUBA MOVIE 2024 - NKAN ASIRI" -> "Nkan Asiri"
+    - "NKAN ASIRI PART 1" -> "Nkan Asiri"
+    - "OLD YORUBA MOVIE: THE RETURN" -> "The Return"
+    
+    Return ONLY JSON: [{"id": "...", "old_title": "...", "new_title": "...", "type": "title_cleanup"}]
+    
+    Titles: ${JSON.stringify(films)}
+  `;
+
+  const { text, telemetry } = await generateAIContent(prompt);
+  const results = parseJSON(text).filter((f: any) => f.old_title && f.new_title && f.old_title.trim() !== f.new_title.trim());
+  return res.json({ results, telemetry });
+}
+
+async function polishTitle(data: any, res: VercelResponse) {
+  const { title } = data;
+  if (!title) return res.status(400).json({ error: 'Title is required' });
+
+  const prompt = `
+    Clean up this movie title by removing common YouTube marketing noise, years, and category labels.
+    Return ONLY the cleaned title.
+    
+    Examples:
+    - "LATEST YORUBA MOVIE 2024 - NKAN ASIRI" -> "Nkan Asiri"
+    - "NKAN ASIRI PART 1" -> "Nkan Asiri"
+    
+    Title: "${title}"
+  `;
+
+  const { text, telemetry } = await generateAIContent(prompt);
+  return res.json({ title: text.trim().replace(/^"|"$/g, ''), telemetry });
 }

@@ -107,6 +107,11 @@ export default function AdminAI() {
       } else if (action === 'DELETE') {
         const { error } = await supabase.from('films').delete().eq('id', item.id);
         dbError = error;
+      } else if (action === 'UPDATE_TITLE') {
+        const { error } = await supabase.from('films').update({
+          title: item.new_title
+        }).eq('id', item.id);
+        dbError = error;
       }
 
       if (dbError) throw dbError;
@@ -184,6 +189,13 @@ export default function AdminAI() {
                 onClick={() => runTask('find_duplicate_people')}
                 disabled={isProcessing}
                 variant="danger"
+              />
+              <OperationButton 
+                icon="✍️"
+                title="Title Polish"
+                desc="Clean YouTube noise from titles"
+                onClick={() => runTask('cleanup_titles')}
+                disabled={isProcessing}
               />
             </div>
 
@@ -350,6 +362,28 @@ function ResultItem({ item, task, onAction }) {
             DELETE
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (task === 'cleanup_titles') {
+    return (
+      <div className="p-6 flex items-center justify-between hover:bg-surface-2 group transition-colors border-b border-border/50">
+        <div className="space-y-1 min-w-0 flex-1 pr-10">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-black text-red-500/50 line-through truncate max-w-[200px] block">{item.old_title}</span>
+            <span className="text-xs text-text-muted">➜</span>
+          </div>
+          <p className="text-lg font-black text-text-primary truncate">
+            {item.new_title}
+          </p>
+        </div>
+        <button 
+          onClick={() => onAction(item, 'UPDATE_TITLE')}
+          className="flex-shrink-0 px-6 py-2.5 bg-brand text-on-brand rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all"
+        >
+          UPDATE TITLE
+        </button>
       </div>
     );
   }
