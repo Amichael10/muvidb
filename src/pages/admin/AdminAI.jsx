@@ -41,10 +41,25 @@ export default function AdminAI() {
         addLog(`Engine: ${data.telemetry.engine.toUpperCase()}${data.telemetry.reset > 0 ? ` (Reset in ${data.telemetry.reset}s)` : ''}`, data.telemetry.engine === 'groq' ? 'warning' : 'success');
       }
 
+      // Debug info for extract_cast diagnostics
+      if (data._debug) {
+        addLog(`[DEBUG] Parsed: ${data._debug.parsedCount} | Normalized: ${data._debug.normalizedCount} | Final: ${data._debug.filteredCount}`, 'warning');
+        if (data._debug.sampleKeys?.length > 0) {
+          addLog(`[DEBUG] AI returned keys: ${data._debug.sampleKeys.join(', ')}`, 'warning');
+        }
+        if (data._debug.rawPreview) {
+          addLog(`[DEBUG] Raw AI: ${data._debug.rawPreview.substring(0, 150)}...`, 'warning');
+        }
+      }
+
       setResults(data.results);
       
       if (data.results?.length > 0) {
-        addLog(`Found ${data.results.length} relevant items.${data.filtered_out > 0 ? ` (Auto-filtered ${data.filtered_out} duplicates)` : ''}`, 'success');
+        addLog(`Found ${data.results.length} items requiring action.`, 'success');
+      } else if (data.analyzedCount !== undefined) {
+        addLog(data.analyzedCount > 0 
+          ? `Analyzed ${data.analyzedCount} items. AI determined no action needed.`
+          : 'No relevant items found in database scan.', 'info');
       } else if (data.filtered_out > 0) {
         addLog(`All ${data.filtered_out} suggested items were already in your database.`, 'warning');
       } else {
@@ -75,8 +90,12 @@ export default function AdminAI() {
       addLog(`Applying ${action} to ${item.name || item.title || item.id}...`, 'info');
       
       let dbError = null;
+      let count = 0;
 
-      if (item.type === 'person' || activeTask === 'discover_actors') {
+      // Logic refinement: Discover Cast (new) vs Enrich (existing)
+      const isNewPerson = activeTask === 'discover_actors';
+
+      if (isNewPerson) {
         const { error } = await supabase.from('people').insert({
           name: item.name,
           bio: item.bio || item.biography,
@@ -85,43 +104,150 @@ export default function AdminAI() {
           created_at: new Date().toISOString()
         });
         dbError = error;
+        count = error ? 0 : 1;
+      } else if (item.type === 'person') {
+        const { data, error } = await supabase.from('people').update({
+          biography: item.bio || item.biography,
+          photo_url: item.image_url
+        }).eq('id', item.id).select();
+        dbError = error;
+        count = data?.length || 0;
       } else if (item.type === 'film') {
-        const { error } = await supabase.from('films').update({
+        const { data, error } = await supabase.from('films').update({
           synopsis: item.synopsis,
           poster_url: item.image_url
-        }).eq('id', item.id);
+        }).eq('id', item.id).select();
         dbError = error;
+        count = data?.length || 0;
       } else if (item.type === 'company') {
-        const { error } = await supabase.from('companies').update({
+        const { data, error } = await supabase.from('companies').update({
           logo_url: item.image_url,
           description: item.bio || item.description
-        }).eq('id', item.id);
+        }).eq('id', item.id).select();
         dbError = error;
+        count = data?.length || 0;
       } else if (action === 'MERGE') {
-        // Handle merge logic from results
         const { error } = await supabase.rpc('merge_people', {
           p_master_id: item.master_id,
           p_duplicate_ids: item.duplicate_ids
         });
         dbError = error;
+        count = error ? 0 : 1;
       } else if (action === 'DELETE') {
         const { error } = await supabase.from('films').delete().eq('id', item.id);
         dbError = error;
+        count = error ? 0 : 1;
       } else if (action === 'UPDATE_TITLE') {
-        const { error } = await supabase.from('films').update({
+        const { data, error } = await supabase.from('films').update({
+          title: item.new_title
+        }).eq('id', item.id).select();
+        dbError = error;
+        count = data?.length || 0;
+      } else if (action === 'APPLY_CAST') {
+        // 1. Update the film title
+        const { error: titleErr } = await supabase.from('films').update({
           title: item.new_title
         }).eq('id', item.id);
-        dbError = error;
+        if (titleErr) throw titleErr;
+        addLog(`Title updated: "${item.old_title}" → "${item.new_title}"`, 'success');
+
+        // 2. Upsert each cast member → people table → credits table
+        let castLinked = 0;
+        for (const actorName of (item.cast || [])) {
+          try {
+            // Tier 1: Exact name match (case-insensitive)
+            let { data: existingPerson } = await supabase
+              .from('people')
+              .select('id, name')
+              .ilike('name', actorName)
+              .maybeSingle();
+
+            // Tier 2: Partial match — name appears WITHIN a longer name
+            // e.g. "Lalude" matches "Fatai Adekunle Adetayo (Lalude)"
+            if (!existingPerson) {
+              const { data: partialMatch } = await supabase
+                .from('people')
+                .select('id, name')
+                .ilike('name', `%${actorName}%`)
+                .limit(1)
+                .maybeSingle();
+              if (partialMatch) {
+                existingPerson = partialMatch;
+                addLog(`Matched "${actorName}" → existing "${partialMatch.name}"`, 'info');
+              }
+            }
+
+            let personId = existingPerson?.id;
+
+            if (!personId) {
+              // Create new person
+              const { data: newPerson, error: pErr } = await supabase
+                .from('people')
+                .insert({
+                  name: actorName,
+                  nationality: 'Nigerian',
+                  created_at: new Date().toISOString()
+                })
+                .select('id')
+                .single();
+
+              if (pErr) {
+                addLog(`⚠ Could not create person "${actorName}": ${pErr.message}`, 'warning');
+                continue;
+              }
+              personId = newPerson.id;
+              addLog(`Created new person: ${actorName}`, 'info');
+            }
+
+            // Link credit (ignore duplicates)
+            const { error: creditErr } = await supabase
+              .from('credits')
+              .insert({
+                film_id: item.id,
+                person_id: personId,
+                role: 'actor',
+                billing_order: castLinked
+              });
+
+            if (creditErr && !creditErr.message.includes('duplicate')) {
+              addLog(`⚠ Credit link error for ${actorName}: ${creditErr.message}`, 'warning');
+            } else {
+              castLinked++;
+            }
+          } catch (castErr) {
+            addLog(`⚠ Error processing ${actorName}: ${castErr.message}`, 'warning');
+          }
+        }
+        addLog(`Linked ${castLinked}/${item.cast.length} cast members to "${item.new_title}"`, 'success');
+        count = castLinked;
+        dbError = null;
       }
 
       if (dbError) throw dbError;
-
-      addLog(`Successfully applied action to ${item.name || item.title || item.id}`, 'success');
-      setResults(prev => prev.filter(i => i.id !== item.id && i !== item));
-      toast.success('Action applied');
+      
+      if (count === 0 && !isNewPerson) {
+        addLog(`Warning: No database rows were affected. Check if ID ${item.id || item.master_id} is valid.`, 'warning');
+      } else {
+        addLog(`Successfully applied changes to ${item.name || item.title || item.id || 'record'}.`, 'success');
+        
+        // Robust filtering to remove ONLY the processed item
+        setResults(prev => {
+          if (!prev) return null;
+          return prev.filter(i => {
+            // Match by ID
+            if (item.id && i.id === item.id) return false;
+            // Match by Master ID (for deduplication)
+            if (item.master_id && i.master_id === item.master_id) return false;
+            // Match by object reference fallback
+            if (i === item) return false;
+            return true;
+          });
+        });
+        toast.success('Database updated');
+      }
     } catch (err) {
-      addLog(`Failed to apply action: ${err.message}`, 'error');
-      toast.error('Database Error');
+      addLog(`Database Write Error: ${err.message}`, 'error');
+      toast.error('Failed to save changes');
     }
   };
 
@@ -186,7 +312,7 @@ export default function AdminAI() {
                 icon="🧬"
                 title="Merge Duplicates"
                 desc="Consolidate duplicate people"
-                onClick={() => runTask('find_duplicate_people')}
+                onClick={() => runTask('deduplicate')}
                 disabled={isProcessing}
                 variant="danger"
               />
@@ -195,6 +321,13 @@ export default function AdminAI() {
                 title="Title Polish"
                 desc="Clean YouTube noise from titles"
                 onClick={() => runTask('cleanup_titles')}
+                disabled={isProcessing}
+              />
+              <OperationButton 
+                icon="🎭"
+                title="Extract Cast"
+                desc="Parse actors from video titles"
+                onClick={() => runTask('extract_cast')}
                 disabled={isProcessing}
               />
             </div>
@@ -267,7 +400,7 @@ export default function AdminAI() {
             <div className="bg-surface border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="p-6 border-b border-border bg-brand/5 flex items-center justify-between">
                 <h3 className="font-black flex items-center gap-2 text-brand">
-                  <span className="text-2xl">{activeTask === 'cleanup_films' ? '🧹' : activeTask === 'discover_actors' ? '🌟' : '🪄'}</span>
+                  <span className="text-2xl">{activeTask === 'cleanup_films' ? '🧹' : activeTask === 'discover_actors' ? '🌟' : activeTask === 'extract_cast' ? '🎭' : '🪄'}</span>
                   <span className="tracking-tight">{activeTask?.replace('_', ' ').toUpperCase()} RESULTS</span>
                 </h3>
                 <div className="flex items-center gap-4">
@@ -384,6 +517,40 @@ function ResultItem({ item, task, onAction }) {
         >
           UPDATE TITLE
         </button>
+      </div>
+    );
+  }
+
+  if (task === 'extract_cast') {
+    return (
+      <div className="p-6 hover:bg-surface-2 group transition-colors border-b border-border/50">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2 min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-black text-red-500/50 line-through truncate max-w-[250px] block">{item.old_title}</span>
+              <span className="text-xs text-text-muted">➜</span>
+            </div>
+            <p className="text-lg font-black text-text-primary truncate">
+              {item.new_title}
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {(item.cast || []).map((name, i) => (
+                <span key={i} className="px-2 py-1 bg-brand/10 text-brand text-[10px] font-black rounded-lg">
+                  🎭 {name}
+                </span>
+              ))}
+            </div>
+            <p className="text-[10px] text-text-muted mt-1">
+              {item.cast?.length || 0} cast member{(item.cast?.length || 0) !== 1 ? 's' : ''} detected
+            </p>
+          </div>
+          <button 
+            onClick={() => onAction(item, 'APPLY_CAST')}
+            className="flex-shrink-0 px-5 py-2.5 bg-brand text-on-brand rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all whitespace-nowrap"
+          >
+            APPLY CAST
+          </button>
+        </div>
       </div>
     );
   }

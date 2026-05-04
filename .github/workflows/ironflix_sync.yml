@@ -1,0 +1,44 @@
+name: Ironflix Scraper Sync
+
+on:
+  schedule:
+    - cron: '0 2 * * 0' # Run weekly on Sunday at 2 AM
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: 'Max pages to scrape'
+        required: true
+        default: '10'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Fix Git Permissions
+        run: git config --global --add safe.directory "*"
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages || '10' }}
+        run: node scripts/ironflix_sync.js

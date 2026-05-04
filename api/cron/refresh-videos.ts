@@ -3,7 +3,7 @@ import { supabase } from '../_lib/supabase';
 import { isValidAuth } from '../_lib/auth';
 
 export const config = {
-  maxDuration: 60, // 60 seconds
+  maxDuration: 300, // Increased for 225 channels
 };
 
 const YT_KEY = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
@@ -105,29 +105,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let uploadsId = '';
         let discoveredChannelId = ch.channel_id;
 
-        // 1. Resolve uploads playlist ID & fetch subscriber count
+        // 1. Resolve uploads playlist ID & fetch subscriber count + metadata
+        let ytChannelData = null;
         if (discoveredChannelId) {
-           const d = await ytGet('channels', { part: 'contentDetails,statistics', id: discoveredChannelId });
-           if (d.items?.[0]) {
-             uploadsId = d.items[0].contentDetails?.relatedPlaylists?.uploads;
-             const subCount = parseInt(d.items[0].statistics?.subscriberCount || '0');
-             if (subCount > 0) {
-               await supabase.from('channels').update({ subscriber_count: subCount }).eq('id', ch.id);
-             }
-           }
+          ytChannelData = await ytGet('channels', { part: 'snippet,contentDetails,statistics,brandingSettings', id: discoveredChannelId });
         } else if (handle) {
-           const d = await ytGet('channels', { part: 'contentDetails,statistics', forHandle: handle });
-           if (d.items?.[0]) {
-             discoveredChannelId = d.items[0].id;
-             uploadsId = d.items[0].contentDetails?.relatedPlaylists?.uploads;
-             const subCount = parseInt(d.items[0].statistics?.subscriberCount || '0');
-             
-             // Backfill the real YouTube channel ID & subscriber count
-             await supabase.from('channels').update({ 
-               channel_id: discoveredChannelId,
-               subscriber_count: subCount 
-             }).eq('id', ch.id);
-           }
+          ytChannelData = await ytGet('channels', { part: 'snippet,contentDetails,statistics,brandingSettings', forHandle: handle });
+        }
+
+        if (ytChannelData?.items?.[0]) {
+          const item = ytChannelData.items[0];
+          discoveredChannelId = item.id;
+          uploadsId = item.contentDetails?.relatedPlaylists?.uploads;
+          const subCount = parseInt(item.statistics?.subscriberCount || '0');
+          
+          // Update Channel Metadata (Logo, Banner, Subs)
+          const updateData: any = {
+            channel_id: discoveredChannelId,
+            subscriber_count: subCount,
+            thumbnail_url: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url,
+            banner_url: item.brandingSettings?.image?.bannerExternalUrl || ch.banner_url
+          };
+          
+          await supabase.from('channels').update(updateData).eq('id', ch.id);
         }
 
         if (!uploadsId) {

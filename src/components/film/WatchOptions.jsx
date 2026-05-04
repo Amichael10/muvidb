@@ -11,12 +11,14 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
     kava: 'https://kava.tv',
     youtube: 'https://youtube.com',
     showmax: 'https://showmax.com',
+    ironflix: 'https://ironflix.com',
   };
 
   const platforms = [
     { id: 'netflix', label: 'Netflix', color: 'bg-[#E50914]', icon: 'simple-icons:netflix' },
     { id: 'prime_video', label: 'Prime Video', color: 'bg-[#00A8E1]', icon: 'simple-icons:primevideo' },
     { id: 'kava', label: 'Kava', color: 'bg-[#FF5C00]', icon: 'solar:play-circle-bold' },
+    { id: 'ironflix', label: 'Ironflix', color: 'bg-[#D32F2F]', icon: 'solar:play-bold' },
     { id: 'youtube', label: 'YouTube', color: 'bg-[#FF0000]', icon: 'simple-icons:youtube' },
     { id: 'showmax', label: 'Showmax', color: 'bg-[#E10098]', icon: 'solar:tv-linear' },
   ];

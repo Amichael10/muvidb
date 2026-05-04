@@ -242,12 +242,9 @@ Important: include ALL films and ALL their time slots. Do not omit any.`,
       }
 
       const showDate = normalizeDate(st.date, today);
-      const format   = inferFormat(st.screen ?? st.format ?? null) !== 'Standard'
-                         ? inferFormat(st.screen ?? null)
-                         : (SCREEN_FORMAT_LABELS[st.format?.toUpperCase() ?? ''] ?? 'Standard');
+      const format = inferFormat(st.screen ?? st.format ?? null);
+      const ticketUrl = st.ticket_url || (ticketBaseUrl ? ticketBaseUrl : null);
 
-      const ticketUrl = st.ticket_url
-        || (ticketBaseUrl ? ticketBaseUrl : null);
 
       showtimes.push({
         externalFilmId: `fc-${film.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
