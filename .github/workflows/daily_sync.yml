@@ -2,12 +2,14 @@ name: Lumi Data Sync
 
 on:
   schedule:
-    # 6:00 AM WAT (UTC+1) = 5:00 AM UTC
+    # 6:00 AM WAT (UTC+1) = 5:00 AM UTC (Cinemas)
     - cron: '0 5 * * *'
-    # 8:00 AM WAT (UTC+1) = 7:00 AM UTC
-    - cron: '0 7 * * *'
-    # 10:00 AM WAT (UTC+1) = 9:00 AM UTC
+    # YouTube Sync: Every 4 hours starting at 8:00 AM WAT / 7:00 AM UTC
+    - cron: '0 3,7,11,15,19,23 * * *'
+    # 10:00 AM WAT (UTC+1) = 9:00 AM UTC (TMDB/Kava)
     - cron: '0 9 * * *'
+    # AI Maintenance: 2:00 AM & 2:00 PM WAT = 1:00 AM & 1:00 PM UTC
+    - cron: '0 1,13 * * *'
   workflow_dispatch:
     inputs:
       task:
@@ -21,6 +23,7 @@ on:
           - videos
           - tmdb
           - kava
+          - ai_maintenance
 
 jobs:
   sync:
@@ -64,8 +67,8 @@ jobs:
           -H "x-cron-secret: $CRON_SECRET"
         continue-on-error: true
 
-      - name: Sync YouTube Videos (8 AM Local)
-        if: github.event.schedule == '0 7 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
+      - name: Sync YouTube Videos (Every 4 Hours)
+        if: github.event.schedule == '0 3,7,11,15,19,23 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
         run: |
           echo "Syncing YouTube Videos (Vercel API)..."
           curl -v -X GET "$BASE_URL/api/cron/sync?task=videos" \
@@ -86,3 +89,15 @@ jobs:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: AI Maintenance (Extract Cast + Title Cleanup)
+        if: github.event.schedule == '0 1,13 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'ai_maintenance'))
+        run: |
+          echo "Running AI Maintenance (Extract Cast → Title Cleanup)..."
+          curl -v -X GET "$BASE_URL/api/cron/sync?task=ai_maintenance" \
+          -H "x-cron-secret: $CRON_SECRET"
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
