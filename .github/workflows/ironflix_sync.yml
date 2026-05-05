@@ -41,4 +41,4 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           MAX_PAGES: ${{ github.event.inputs.max_pages || '10' }}
-        run: node scripts/ironflix_sync.js
+        run: npx tsx scripts/ironflix_sync.ts
