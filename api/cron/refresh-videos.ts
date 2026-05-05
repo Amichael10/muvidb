@@ -1,58 +1,23 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../_lib/supabase';
-import { isValidAuth } from '../_lib/auth';
+import { supabase } from '../_lib/supabase.js';
+import { isValidAuth } from '../_lib/auth.js';
+import { ytGet, parseDuration, cleanTitle } from '../_lib/yt_service.js';
 
-export const config = {
-  maxDuration: 300, // Increased for 225 channels
-};
+/**
+ * Manual/Targeted Video Refresh
+ * Used by the Admin UI to sync a specific channel or all channels.
+ * Includes auto-promotion logic for long videos.
+ */
 
-const YT_KEY = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
-const YT_BASE = 'https://www.googleapis.com/youtube/v3';
-
-async function ytGet(endpoint: string, params: Record<string, string>) {
-  if (!YT_KEY) throw new Error('YOUTUBE_API_KEY is missing in environment');
-  
-  const url = new URL(`${YT_BASE}/${endpoint}`);
-  Object.entries({ ...params, key: YT_KEY }).forEach(([k, v]) => url.searchParams.set(k, v));
-  
-  console.log(`[YouTube API] Fetching: ${endpoint} with params:`, { ...params, key: '***' });
-  
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    const errorBody = await res.text();
-    let detail = errorBody;
-    try {
-      const json = JSON.parse(errorBody);
-      detail = json.error?.message || errorBody;
-    } catch (e) {}
-    throw new Error(`YouTube /${endpoint} ${res.status}: ${detail}`);
-  }
-  return res.json();
-}
-
-function parseDuration(iso: string): number {
-  const h = parseInt(iso.match(/(\d+)H/)?.[1] ?? '0');
-  const m = parseInt(iso.match(/(\d+)M/)?.[1] ?? '0');
-  const s = parseInt(iso.match(/(\d+)S/)?.[1] ?? '0');
-  return h * 3600 + m * 60 + s;
-}
+export const config = { maxDuration: 300 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = Date.now();
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end();
   
-  console.log(`[refresh-videos] Triggered. Method: ${req.method}, Query:`, req.query);
-
-  // Basic auth check
-  try {
-    const authOk = await isValidAuth(req);
-    if (!authOk) {
-      console.warn('[refresh-videos] Auth check failed');
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  } catch (authErr: any) {
-    console.error('[refresh-videos] Auth exception:', authErr.message);
-    return res.status(401).json({ error: `Auth Error: ${authErr.message}` });
+  // Auth check
+  if (!(await isValidAuth(req))) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const { channelId } = req.query;
@@ -61,9 +26,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let totalUpdated = 0;
   let totalFailed = 0;
 
-  // 1. Create a "pending" log entry immediately so the user sees it started
-  const { data: logEntry, error: logErr } = await supabase.from('sync_logs').insert({
-    source: 'youtube',
+  // 1. Create a "running" log entry
+  const { data: logEntry } = await supabase.from('sync_logs').insert({
+    source: 'youtube_manual',
     status: 'running',
     message: `Started sync for ${channelId ? 'channel ' + channelId : 'all channels'}...`,
     details: { channelId, started_at: new Date().toISOString() }
@@ -75,10 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let channelsToProcess = [];
     if (channelId) {
       const { data: channel, error: chFetchErr } = await supabase.from('channels').select('*').eq('id', channelId).single();
-      if (chFetchErr || !channel) {
-        console.error(`[refresh-videos] Channel ${channelId} not found in DB:`, chFetchErr?.message);
-        return res.status(404).json({ error: 'Channel not found' });
-      }
+      if (chFetchErr || !channel) return res.status(404).json({ error: 'Channel not found' });
       channelsToProcess = [channel];
     } else {
       const { data: channels, error: listErr } = await supabase.from('channels').select('*');
@@ -86,26 +48,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       channelsToProcess = channels || [];
     }
 
-    console.log(`[refresh-videos] Processing ${channelsToProcess.length} channels`);
-
     const processResults = [];
 
     for (const ch of channelsToProcess) {
       try {
-        // Fetch hidden videos for this channel to avoid re-promoting them
-        const { data: hiddenVids } = await supabase
-          .from('channel_videos')
-          .select('video_id')
-          .eq('channel_id', ch.id)
-          .eq('is_hidden', true);
-        
+        const { data: hiddenVids } = await supabase.from('channel_videos').select('video_id').eq('channel_id', ch.id).eq('is_hidden', true);
         const hiddenSet = new Set(hiddenVids?.map(v => v.video_id) || []);
 
         const handle = ch.channel_handle?.replace(/^@/, '');
         let uploadsId = '';
         let discoveredChannelId = ch.channel_id;
 
-        // 1. Resolve uploads playlist ID & fetch subscriber count + metadata
+        // 1. Resolve uploads playlist ID & update metadata
         let ytChannelData = null;
         if (discoveredChannelId) {
           ytChannelData = await ytGet('channels', { part: 'snippet,contentDetails,statistics,brandingSettings', id: discoveredChannelId });
@@ -117,237 +71,120 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const item = ytChannelData.items[0];
           discoveredChannelId = item.id;
           uploadsId = item.contentDetails?.relatedPlaylists?.uploads;
-          const subCount = parseInt(item.statistics?.subscriberCount || '0');
           
-          // Update Channel Metadata (Logo, Banner, Subs)
-          const updateData: any = {
+          await supabase.from('channels').update({
             channel_id: discoveredChannelId,
-            subscriber_count: subCount,
+            subscriber_count: parseInt(item.statistics?.subscriberCount || '0'),
             thumbnail_url: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url,
             banner_url: item.brandingSettings?.image?.bannerExternalUrl || ch.banner_url
-          };
-          
-          await supabase.from('channels').update(updateData).eq('id', ch.id);
+          }).eq('id', ch.id);
         }
 
         if (!uploadsId) {
-          console.warn(`[refresh-videos] Skip: No uploads playlist for ${ch.name}`);
           processResults.push({ name: ch.name, status: 'skipped', reason: 'No uploads playlist' });
           continue;
         }
 
         // 2. Fetch latest videos incrementally
-        const { data: latestVid } = await supabase
-          .from('channel_videos')
-          .select('published_at')
-          .eq('channel_id', ch.id)
-          .order('published_at', { ascending: false })
-          .limit(1)
-          .single();
-        
+        const { data: latestVid } = await supabase.from('channel_videos').select('published_at').eq('channel_id', ch.id).order('published_at', { ascending: false }).limit(1).single();
         const latestDate = latestVid ? new Date(latestVid.published_at) : new Date(0);
+        
         let nextPageToken = '';
         let fetchedCount = 0;
         let stopFetching = false;
         const allVideoRows = [];
 
-        // Helper to clean YouTube titles
-        const cleanTitle = (raw: string) => {
-          if (!raw) return raw;
-          let title = raw.trim();
-          title = title.replace(/\s*\/\s*[A-Z]{2,5}\.?\s*\/?\s*$/i, '');
-          title = title.replace(/\s+[-–—]\s*Watch\s+.*/i, '');
-          title = title.replace(/\s+[-–—]\s*LATEST\s*.*/i, '');
-          title = title.replace(/\s+[-–—]s\s*NEW\s*$/i, '');
-          title = title.replace(/\s*#\w+/g, '');
-          title = title.replace(/\s+[-–—]\s+Nigerian\s*.*/i, '');
-          title = title.replace(/\s+[-–—]\s+Nollywood\s*.*/i, '');
-          title = title.replace(/\s+[-–—]\s+African\s*.*/i, '');
-          title = title.replace(/\s+[-–—]Nigerian\s*.*/i, '');
-          title = title.replace(/\s+[-–—]Nollywood\s*.*/i, '');
-          title = title.replace(/\s+[-–—]African\s*.*/i, '');
-          title = title.replace(/\s*Latest\s*(Nigerian|Nollywood|Yoruba|Igbo)?\s*(Epic\s*)?(New\s*)?(Drama\s*)?(Movie|Film|Movies|Films)s?\s*$/i, '');
-          title = title.replace(/\s+[-–—]\s+[A-Z][a-z]+\s+[A-Z][a-z]+\s*[\/,]\s*[A-Z].*$/i, '');
-          title = title.replace(/\s*(Full|Complete)\s*(Movie|Film|Season)\s*$/i, '');
-          title = title.replace(/\s*\|\s*(Moments with Mo|MWM)\s*$/i, '');
-          title = title.replace(/\s*\(Latest\s*(Comedy\s*)?(Drama\s*)?(Action\s*)?(Movie|Film|Movies|Films)\s*\)\s*$/i, '');
-          if (title.length > 80) {
-            const dashParts = title.split(/\s+[-–—]\s+/);
-            if (dashParts[0].length >= 3 && dashParts[0].length <= 70) {
-              title = dashParts[0];
-            }
-          }
-          title = title.replace(/\s{2,}/g, ' ').trim();
-          title = title.replace(/\s*[,|]\s*$/, '').trim();
-          title = title.replace(/\s+[-–—]\s*$/, '').trim();
-          return title;
-        };
-
         while (!stopFetching && fetchedCount < 200) {
           const plData = await ytGet('playlistItems', { 
-            part: 'snippet', 
-            playlistId: uploadsId, 
-            maxResults: '50',
-            pageToken: nextPageToken
+            part: 'snippet', playlistId: uploadsId, maxResults: '50', pageToken: nextPageToken
           });
-
           if (!plData.items?.length) break;
 
-          const pageItems = plData.items;
-          const videoIds = pageItems.map((i: any) => i.snippet.resourceId.videoId).join(',');
+          const videoIds = plData.items.map((i: any) => i.snippet.resourceId.videoId).join(',');
           const vData = await ytGet('videos', { part: 'contentDetails,snippet', id: videoIds });
 
-          for (const v of vData.items) {
-            const duration = parseDuration(v.contentDetails.duration);
-            const isPromotable = duration >= 900; // 15 mins
-            let filmId = null;
-            let matchStatus = 'unmatched';
+          const promotableVids = vData.items.filter((v: any) => parseDuration(v.contentDetails.duration) >= 900 && !hiddenSet.has(v.id));
 
-            // BUG FIX: Check if video was previously marked as hidden
-            if (isPromotable && !hiddenSet.has(v.id)) {
-              // 1. Check if film exists
-              const { data: existingFilm } = await supabase
-                .from('films')
-                .select('id')
-                .eq('source_video_id', v.id)
-                .maybeSingle();
+          // 1. Bulk check existing films
+          const existingFilmsMap = new Map();
+          if (promotableVids.length > 0) {
+            const vIds = promotableVids.map((v: any) => v.id);
+            const { data: existingFilms } = await supabase.from('films').select('id, source_video_id').in('source_video_id', vIds);
+            if (existingFilms) existingFilms.forEach((f: any) => existingFilmsMap.set(f.source_video_id, f.id));
+          }
 
-              if (existingFilm) {
-                filmId = existingFilm.id;
-                matchStatus = 'matched';
-              } else {
-                // 2. Create Film
-                const { data: newFilm, error: filmErr } = await supabase
-                  .from('films')
-                  .insert([{
-                    title: cleanTitle(v.snippet.title),
-                    synopsis: v.snippet.description || '',
-                    poster_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
-                    release_type: 'youtube',
-                    youtube_watch_url: `https://www.youtube.com/watch?v=${v.id}`,
-                    source_video_id: v.id,
-                    year: new Date(v.snippet.publishedAt).getFullYear(),
-                    runtime_minutes: Math.round(duration / 60)
-                  }])
-                  .select()
-                  .single();
+          // 2. Auto-promote
+          const filmsToInsert = promotableVids.filter((v: any) => !existingFilmsMap.has(v.id)).map((v: any) => ({
+            title: cleanTitle(v.snippet.title),
+            synopsis: v.snippet.description || '',
+            poster_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
+            release_type: 'youtube',
+            youtube_watch_url: `https://www.youtube.com/watch?v=${v.id}`,
+            source_video_id: v.id,
+            year: new Date(v.snippet.publishedAt).getFullYear(),
+            runtime_minutes: Math.round(parseDuration(v.contentDetails.duration) / 60)
+          }));
 
-                if (!filmErr && newFilm) {
-                  filmId = newFilm.id;
-                  matchStatus = 'matched';
-                  totalCreated++;
-                  console.log(`[refresh-videos] Auto-Promoted: ${newFilm.title}`);
-
-                  // 3. Auto-Credit Channel Owner
-                  if (ch.owner_person_id) {
-                    await supabase.from('credits').insert([{
-                      film_id: filmId,
-                      person_id: ch.owner_person_id,
-                      role: 'Actor', // Default to Actor for now
-                      billing_order: 1
-                    }]);
-                    console.log(`[refresh-videos] Auto-Credited Owner for: ${newFilm.title}`);
-                  }
-                } else if (filmErr) {
-                  totalFailed++;
-                  console.error(`[refresh-videos] Failed auto-promote ${v.id}:`, filmErr.message);
-                }
-              }
-            } else if (isPromotable && hiddenSet.has(v.id)) {
-              console.log(`[refresh-videos] Skipping hidden video: ${v.snippet.title}`);
+          let insertedFilms: any[] = [];
+          if (filmsToInsert.length > 0) {
+            const { data: newFilms } = await supabase.from('films').insert(filmsToInsert).select();
+            if (newFilms) {
+              insertedFilms = newFilms;
+              insertedFilms.forEach((f: any) => {
+                existingFilmsMap.set(f.source_video_id, f.id);
+                totalCreated++;
+              });
             }
+          }
 
-            const videoRow: any = {
+          // 3. Auto-credit owner
+          if (ch.owner_person_id && insertedFilms.length > 0) {
+            await supabase.from('credits').insert(insertedFilms.map(f => ({
+              film_id: f.id, person_id: ch.owner_person_id, role: 'Actor', billing_order: 1
+            })));
+          }
+
+          // 4. Construct video rows
+          for (const v of vData.items) {
+            if (hiddenSet.has(v.id)) continue;
+            const duration = parseDuration(v.contentDetails.duration);
+            const row: any = {
               channel_id: ch.id,
               video_id: v.id,
               title: v.snippet.title,
               thumbnail_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
               published_at: v.snippet.publishedAt,
-              duration_seconds: duration
+              duration_seconds: duration,
+              match_status: (duration >= 900 && existingFilmsMap.has(v.id)) ? 'matched' : 'unmatched',
+              film_id: (duration >= 900) ? existingFilmsMap.get(v.id) : null
             };
-
-            // Only set these if we found a new match or created a film
-            if (matchStatus === 'matched') {
-              videoRow.match_status = 'matched';
-              videoRow.film_id = filmId;
-            }
-
-            if (!hiddenSet.has(v.id)) {
-              allVideoRows.push(videoRow);
-            }
+            allVideoRows.push(row);
           }
 
           fetchedCount += vData.items.length;
           const oldestInPage = new Date(vData.items[vData.items.length - 1].snippet.publishedAt);
           if (oldestInPage <= latestDate) stopFetching = true;
-
           nextPageToken = plData.nextPageToken;
           if (!nextPageToken) stopFetching = true;
         }
 
-        if (allVideoRows.length === 0) {
-          processResults.push({ name: ch.name, status: 'skipped', reason: 'No new videos found' });
-          continue;
-        }
-
-        const { error: upsertErr } = await supabase.from('channel_videos').upsert(allVideoRows, { 
-          onConflict: 'channel_id,video_id' 
-        });
-
-        if (upsertErr) {
-          totalFailed++;
-          console.error(`[refresh-videos] Upsert error for ${ch.name}:`, upsertErr.message);
-          processResults.push({ name: ch.name, status: 'error', reason: upsertErr.message });
+        if (allVideoRows.length > 0) {
+          const { error: upsertErr } = await supabase.from('channel_videos').upsert(allVideoRows, { onConflict: 'channel_id,video_id' });
+          if (upsertErr) {
+            totalFailed++;
+            processResults.push({ name: ch.name, status: 'error', reason: upsertErr.message });
+          } else {
+            totalUpdated += allVideoRows.length;
+            totalProcessed += allVideoRows.length;
+            await supabase.from('channels').update({ videos_last_fetched_at: new Date().toISOString() }).eq('id', ch.id);
+            processResults.push({ name: ch.name, status: 'success', count: allVideoRows.length });
+          }
         } else {
-          totalUpdated += allVideoRows.length;
-          totalProcessed += allVideoRows.length;
-          await supabase.from('channels').update({ videos_last_fetched_at: new Date().toISOString() }).eq('id', ch.id);
-          processResults.push({ name: ch.name, status: 'success', count: allVideoRows.length });
+          processResults.push({ name: ch.name, status: 'skipped', reason: 'No new videos' });
         }
       } catch (err: any) {
         totalFailed++;
-        console.error(`[refresh-videos] Error processing channel ${ch.name}:`, err.message);
         processResults.push({ name: ch.name, status: 'error', reason: err.message });
-      }
-    }
-
-    // 3. Optional: Trigger TMDB Discovery as well if no specific channel requested
-    let tmdbResult = null;
-    if (!channelId) {
-      console.log('[refresh-videos] Triggering TMDB discovery');
-      const TMDB_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
-      if (TMDB_KEY) {
-        const url = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_origin_country=NG&sort_by=popularity.desc`;
-        const resData = await fetch(url).then(r => r.json());
-        const movies = resData.results || [];
-        
-        if (movies.length > 0) {
-          let { data: tmdbCh } = await supabase.from('channels').select('id').eq('name', 'TMDB Discover').maybeSingle();
-          if (tmdbCh) {
-            const { data: hiddenVids } = await supabase
-              .from('channel_videos')
-              .select('video_id')
-              .eq('channel_id', tmdbCh.id)
-              .eq('is_hidden', true);
-            const hiddenSet = new Set(hiddenVids?.map(v => v.video_id) || []);
-
-            const tmdbRows = movies.map((m: any) => ({
-              channel_id: tmdbCh.id,
-              video_id: `TMDB_${m.id}`,
-              title: m.title,
-              description: m.overview,
-              thumbnail_url: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : null,
-              published_at: m.release_date ? new Date(m.release_date).toISOString() : new Date().toISOString()
-            })).filter(row => !hiddenSet.has(row.video_id));
-
-            if (tmdbRows.length > 0) {
-              await supabase.from('channel_videos').upsert(tmdbRows, { onConflict: 'video_id' });
-              tmdbResult = { imported: movies.length };
-              totalUpdated += movies.length;
-            }
-            await supabase.from('channels').update({ videos_last_fetched_at: new Date().toISOString() }).eq('id', tmdbCh.id);
-          }
-        }
       }
     }
 
@@ -356,7 +193,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await supabase.from('sync_logs').update({
         status: totalFailed === 0 ? 'success' : (totalProcessed > 0 ? 'partial' : 'error'),
         message: `Processed ${channelsToProcess.length} channels. Created ${totalCreated} films.`,
-        details: { processResults, tmdbResult, completed_at: new Date().toISOString() },
+        details: { processResults, completed_at: new Date().toISOString() },
         duration_ms: duration,
         items_processed: totalProcessed,
         items_created: totalCreated,
@@ -365,26 +202,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }).eq('id', logId);
     }
 
-    return res.status(200).json({ 
-      success: true, 
-      videos_upserted: totalUpdated,
-      channels_processed: channelsToProcess.length,
-      tmdb_discovery: tmdbResult,
-      results: processResults
-    });
+    return res.status(200).json({ success: true, videos_upserted: totalUpdated, channels_processed: channelsToProcess.length, results: processResults });
 
   } catch (err: any) {
-    const duration = Date.now() - startTime;
     if (logId) {
-      await supabase.from('sync_logs').update({
-        status: 'error',
-        message: err.message,
-        duration_ms: duration,
-        items_failed: 1,
-        details: { error: err.stack, last_processed: totalProcessed }
-      }).eq('id', logId);
+      await supabase.from('sync_logs').update({ status: 'error', message: err.message, duration_ms: Date.now() - startTime, items_failed: 1, details: { error: err.stack } }).eq('id', logId);
     }
-    console.error('[refresh-videos] fatal error:', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

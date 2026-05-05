@@ -24,15 +24,8 @@ export function AuthProvider({ children }) {
         .eq('id', authUser.id)
         .single();
       
-      const defaultAdminEmail = 'amichaelwale@gmail.com';
-      const isDefaultAdmin = authUser.email === defaultAdminEmail;
-      
       // Prioritize DB role, fallback to metadata
       let finalRole = (profile?.role) || authUser.user_metadata?.role || null;
-      
-      if (isDefaultAdmin) {
-        finalRole = 'admin';
-      }
 
       setAuthState({
         user: authUser,

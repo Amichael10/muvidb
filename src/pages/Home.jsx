@@ -306,12 +306,7 @@ export default function Home() {
     return true;
   });
 
-  const formatViews = (count) => {
-    if (!count) return '0';
-    if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
-    if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
-    return count.toString();
-  };
+
 
   return (
     <div className="w-full pb-20 bg-bg min-h-screen">

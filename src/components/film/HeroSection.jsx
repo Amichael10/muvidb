@@ -62,17 +62,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
   const featuredFilm = featuredFilms[currentIndex];
 
-  // Format views (e.g., 4200000 -> 4.2M)
-  const formatViews = (views) => {
-    if (!views) return '0';
-    if (views >= 1000000) {
-      return (views / 1000000).toFixed(1) + 'M';
-    }
-    if (views >= 1000) {
-      return (views / 1000).toFixed(1) + 'K';
-    }
-    return views;
-  };
+
 
   return (
     <section className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg">

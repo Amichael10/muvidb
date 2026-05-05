@@ -715,7 +715,7 @@ export default function AdminYouTubeVideos() {
     // 2. Link the video to the new film
     const { error: vErr } = await supabase
       .from('channel_videos')
-      .update({ film_id: newFilm.id })
+      .update({ film_id: newFilm.id, match_status: 'manual' })
       .eq('id', video.id);
 
     if (vErr) {

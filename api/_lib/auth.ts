@@ -41,12 +41,11 @@ export async function isValidAuth(req: VercelRequest): Promise<boolean> {
       }
 
       if (user) {
-        const defaultAdminEmail = 'amichaelwale@gmail.com';
         const role = user.user_metadata?.role || 'fan';
         
         console.log(`Auth check: [SUCCESS] User: ${user.email} | Role: ${role}`);
 
-        if (user.email === defaultAdminEmail || role === 'admin' || role === 'pro') {
+        if (role === 'admin' || role === 'pro') {
           return true;
         } else {
           console.warn(`Auth check: [FORBIDDEN] ${user.email} lacks admin/pro role.`);

@@ -393,15 +393,33 @@ export default function AdminFilms() {
   };
 
   const fetchFilmDetails = async (filmId) => {
-    // Fetch credits
-    const { data: creditData } = await supabase
-      .from('credits')
-      .select(`
-        id, role, character_name, billing_order, person_id,
-        people(id, name, photo_url)
-      `)
-      .eq('film_id', filmId)
-      .order('billing_order', { ascending: true });
+    const [
+      { data: creditData },
+      { data: showtimeData },
+      { data: genreData },
+      { data: companyData }
+    ] = await Promise.all([
+      supabase
+        .from('credits')
+        .select(`id, role, character_name, billing_order, person_id, people(id, name, photo_url)`)
+        .eq('film_id', filmId)
+        .order('billing_order', { ascending: true }),
+      supabase
+        .from('showtimes')
+        .select('*')
+        .eq('film_id', filmId)
+        .order('show_date', { ascending: true })
+        .order('show_time', { ascending: true }),
+      supabase
+        .from('film_genres')
+        .select('genre_id')
+        .eq('film_id', filmId),
+      supabase
+        .from('film_companies')
+        .select('companies(*)')
+        .eq('film_id', filmId)
+        .limit(1)
+    ]);
     
     if (creditData) {
       setCredits(creditData.map(c => ({
@@ -413,14 +431,6 @@ export default function AdminFilms() {
       })));
     }
 
-    // Fetch showtimes (future only by default or all for admin)
-    const { data: showtimeData } = await supabase
-      .from('showtimes')
-      .select('*')
-      .eq('film_id', filmId)
-      .order('show_date', { ascending: true })
-      .order('show_time', { ascending: true });
-    
     if (showtimeData) {
       setShowtimes(showtimeData.map(s => ({
         cinema_id: s.cinema_id,
@@ -431,27 +441,14 @@ export default function AdminFilms() {
       })));
     }
 
-    // Fetch film genres
-    const { data: genreData } = await supabase
-      .from('film_genres')
-      .select('genre_id')
-      .eq('film_id', filmId);
-    
     if (genreData) {
       setFormData(prev => ({
         ...prev,
         genres: genreData.map(g => g.genre_id)
       }));
     }
-
-    // Fetch film company
-    const { data: companyData } = await supabase
-      .from('film_companies')
-      .select('companies(*)')
-      .eq('film_id', filmId)
-      .limit(1);
     
-    if (companyData && companyData.length > 0) {
+    if (companyData && companyData.length > 0 && companyData[0].companies) {
       setSelectedCompany(companyData[0].companies);
       setCompanySearch(companyData[0].companies.name);
     } else {
@@ -705,19 +702,24 @@ export default function AdminFilms() {
         }
       }
 
-      // Sync Genres
-      await supabase.from('film_genres').delete().eq('film_id', filmId);
+      // Delete old associations in parallel
+      await Promise.all([
+        supabase.from('film_genres').delete().eq('film_id', filmId),
+        supabase.from('credits').delete().eq('film_id', filmId),
+        supabase.from('showtimes').delete().eq('film_id', filmId),
+        supabase.from('film_companies').delete().eq('film_id', filmId)
+      ]);
+
+      const insertPromises = [];
+
       if (selectedGenreIds.length > 0) {
         const genrePayload = selectedGenreIds.map(gid => ({
           film_id: filmId,
           genre_id: gid
         }));
-        const { error: gError } = await supabase.from('film_genres').insert(genrePayload);
-        if (gError) throw gError;
+        insertPromises.push(supabase.from('film_genres').insert(genrePayload));
       }
 
-      // Save Credits
-      await supabase.from('credits').delete().eq('film_id', filmId);
       if (credits.length > 0) {
         const creditPayload = credits.map(c => ({
           film_id: filmId,
@@ -726,12 +728,9 @@ export default function AdminFilms() {
           character_name: c.character_name,
           billing_order: c.billing_order
         }));
-        const { error: cError } = await supabase.from('credits').insert(creditPayload);
-        if (cError) throw cError;
+        insertPromises.push(supabase.from('credits').insert(creditPayload));
       }
 
-      // Save Showtimes
-      await supabase.from('showtimes').delete().eq('film_id', filmId);
       if (showtimes.length > 0) {
         const showtimePayload = showtimes.map(s => ({
           film_id: filmId,
@@ -742,17 +741,18 @@ export default function AdminFilms() {
           ticket_url: s.ticket_url,
           is_available: true
         }));
-        const { error: sError } = await supabase.from('showtimes').insert(showtimePayload);
-        if (sError) throw sError;
+        insertPromises.push(supabase.from('showtimes').insert(showtimePayload));
       }
 
-      // Save Company
-      await supabase.from('film_companies').delete().eq('film_id', filmId);
       if (selectedCompany) {
-        const { error: coError } = await supabase
-          .from('film_companies')
-          .insert([{ film_id: filmId, company_id: selectedCompany.id }]);
-        if (coError) throw coError;
+        insertPromises.push(supabase.from('film_companies').insert([{ film_id: filmId, company_id: selectedCompany.id }]));
+      }
+
+      if (insertPromises.length > 0) {
+        const results = await Promise.all(insertPromises);
+        results.forEach(res => {
+          if (res.error) throw res.error;
+        });
       }
 
       toast.success('Film saved successfully');

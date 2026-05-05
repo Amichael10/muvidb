@@ -1,8 +1,9 @@
-const { chromium } = require('playwright');
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const dotenv = require('dotenv');
+import { chromium } from 'playwright';
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import dotenv from 'dotenv';
 
+// Support .env and .env.local
 const envLocal = fs.existsSync('.env.local') ? dotenv.parse(fs.readFileSync('.env.local')) : {};
 const envDefault = fs.existsSync('.env') ? dotenv.parse(fs.readFileSync('.env')) : {};
 const env = { ...envDefault, ...envLocal, ...process.env };
@@ -33,7 +34,7 @@ async function scrapeIronflix() {
   const page = await context.newPage();
   
   const allMovies = [];
-  const maxPages = process.env.MAX_PAGES ? parseInt(process.env.MAX_PAGES) : 10;
+  const maxPages = env.MAX_PAGES ? parseInt(env.MAX_PAGES) : 10;
   
   // Scrape pages
   for (let p = 1; p <= maxPages; p++) {
