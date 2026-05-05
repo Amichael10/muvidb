@@ -48,15 +48,19 @@ export function cleanTitle(raw: string): string {
   let title = raw.trim();
 
   // 0. Pre-capture and temporarily remove EP info to prevent it from "protecting" noise
-  const epMatch = title.match(/\bEP\s*\d+/i);
+  // Handles EP 1, EPISODE 1, EP. 1, E1, E01, SEASON 1, etc.
+  // We use a more permissive regex for episode numbers to catch "EP 205" etc.
+  const epMatch = title.match(/\b(EP|EPISODE|EP\.|E|SEASON|PART)\s*(\d+)/i);
   const epInfo = epMatch ? epMatch[0] : null;
+  
   if (epInfo) {
-    // Replace with a placeholder or just remove for now
-    title = title.replace(epMatch[0], '').replace(/\s{2,}/g, ' ').trim();
+    // Temporarily replace with a placeholder that won't be caught by noise filters
+    title = title.replace(epMatch[0], ' __EP_PLACEHOLDER__ ').replace(/\s{2,}/g, ' ').trim();
   }
 
   // 1. Prefix noise removal (e.g., "LATEST NIGERIAN MOVIE 2024 - ")
-  title = title.replace(/^(LATEST|NEW|HOT|TRENDING)\s+(NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(EPIC\s*)?(DRAMA\s*)?(MOVIE|FILM|MOVIES|FILMS)\s*(\d{4})?\s*[-–—]\s*/i, '');
+  // Updated to handle multiple descriptors like "HOT TRENDING"
+  title = title.replace(/^(LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA)\s+(LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA|NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(MOVIE|FILM|MOVIES|FILMS|NOLLYWOOD|NIGERIAN|AFRICAN)?\s*(\d{4})?\s*[-–—:]\s*/i, '');
 
   // 2. Specific Nollywood/YouTube noise patterns
   title = title.replace(/\s*\/\s*[A-Z]{2,5}\.?\s*\/?\s*$/i, '');
@@ -95,15 +99,29 @@ export function cleanTitle(raw: string): string {
 
   // 6. Re-inject EP info
   if (epInfo) {
-    title = `${title} ${epInfo}`;
+    title = title.replace('__EP_PLACEHOLDER__', epInfo);
+    // If for some reason the placeholder was lost (unlikely), append it
+    if (!title.includes(epInfo)) {
+      title = `${title} ${epInfo}`;
+    }
   }
 
   // 7. Title Case conversion (except for short acronyms)
-  const minorWords = ['A', 'AN', 'THE', 'AND', 'BUT', 'OR', 'FOR', 'NOR', 'ON', 'AT', 'TO', 'BY', 'OF'];
+  const minorWords = ['A', 'AN', 'THE', 'AND', 'BUT', 'OR', 'FOR', 'NOR', 'ON', 'AT', 'TO', 'BY', 'OF', 'IN', 'WITH', 'FROM', 'AS'];
+  const preservedAcronyms = ['EP', 'EPISODE', 'SEASON', 'PART'];
+  
   return title.split(/\s+/).map((w, i) => {
     const upper = w.toUpperCase();
-    if (upper === 'EP') return 'EP';
     
+    // Check if it's a series marker like EP or SEASON
+    if (preservedAcronyms.includes(upper)) return upper;
+    
+    // Check if it's an episode number (e.g. "1" or "205") following a series marker
+    if (/^\d+$/.test(w) && i > 0) {
+      const prev = title.split(/\s+/)[i-1].toUpperCase();
+      if (preservedAcronyms.includes(prev)) return w;
+    }
+
     if (w.length <= 3 && w === w.toUpperCase() && /^[A-Z]+$/.test(w) && !minorWords.includes(upper)) {
       return w;
     }
@@ -113,5 +131,5 @@ export function cleanTitle(raw: string): string {
     }
     
     return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-  }).join(' ');
+  }).join(' ').replace(/\s{2,}/g, ' ').trim();
 }
