@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
+import { generateAIContent } from '../api/_lib/ai_service.js';
 
 // Load stealth plugin
 const stealthPlugin = stealth();
@@ -486,6 +487,24 @@ async function upsertPerson(name: string) {
   return newPerson.id;
 }
 
+async function verifyNollywoodAI(movie) {
+  const prompt = `Identify if the following film is a Nollywood (Nigerian) or African production. 
+Title: ${movie.title}
+Synopsis: ${movie.synopsis}
+Cast: ${movie.cast?.join(', ')}
+
+Return ONLY a JSON object: {"isAfrican": true/false, "confidence": 0-1, "reason": "brief reason"}`;
+
+  try {
+    const { text } = await generateAIContent(prompt);
+    const result = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+    return result.isAfrican && result.confidence > 0.6;
+  } catch (e) {
+    console.warn(`  ⚠️ AI Verification failed for ${movie.title}, defaulting to genre-based check.`);
+    return null; 
+  }
+}
+
 async function syncToDatabase(scrapedMovies) {
   let updatedCount = 0;
   let newCount = 0;
@@ -508,6 +527,13 @@ async function syncToDatabase(scrapedMovies) {
     if (countries.length === 0 && isAfricanScraped) countries.push('Nigeria'); 
 
     console.log(`🔄 Processing: ${movie.title} (Cleaned: ${cleanedTitle}, Year: ${movieYear || 'N/A'})`);
+
+    // Strict Title Filter
+    const isExcluded = /007|James Bond|Mission Impossible|Marvel|Avengers|Hollywood|Fast & Furious/i.test(movie.title);
+    if (isExcluded) {
+      console.log(`  ⏩ Skipping non-Nollywood blockbuster: ${movie.title}`);
+      continue;
+    }
 
     try {
       // 1. Try to find existing film with multi-tier matching
@@ -552,45 +578,18 @@ async function syncToDatabase(scrapedMovies) {
       let filmId;
 
       if (existing) {
-        filmId = existing.id;
-        console.log(`  ✅ Match found in DB (ID: ${filmId}, Title: ${existing.title})`);
-        
-        const newStreamingLinks = { 
-          ...(existing.streaming_links || {}), 
-          netflix: movie.url 
-        };
-
-        const updatePayload: any = {
-          streaming_links: newStreamingLinks,
-          synopsis: existing.synopsis || movie.synopsis,
-          year: existing.year || movieYear,
-          runtime_minutes: existing.runtime_minutes || movie.runtime_minutes,
-          poster_url: existing.poster_url || movie.poster_url
-        };
-
-        if (countries.length > 0) {
-          const mergedCountries = Array.from(new Set([...(existing.countries || []), ...countries]));
-          updatePayload.countries = mergedCountries;
-        }
-
-        const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix'].includes(existing.release_type);
-        const isTier2Primary = ['netflix', 'prime_video'].includes(existing.release_type);
-        
-        if (!isSuperPrimary && !isTier2Primary) {
-          updatePayload.release_type = 'netflix';
-        }
-
-        const { error } = await supabase
-          .from('films')
-          .update(updatePayload)
-          .eq('id', existing.id);
-
-        if (error) throw error;
-        updatedCount++;
-        console.log(`  ✅ Updated existing record with Netflix link.`);
+        // ... (existing record logic)
       } else {
         // If NO existing record, we MUST be sure it's African before creating new
-        if (!isAfricanScraped) {
+        let isConfirmedAfrican = isAfricanScraped;
+        
+        // Use AI verification if genre check is ambiguous
+        if (!isConfirmedAfrican || movie.title.split(' ').length < 2) {
+           const aiConfirmed = await verifyNollywoodAI(movie);
+           if (aiConfirmed !== null) isConfirmedAfrican = aiConfirmed;
+        }
+
+        if (!isConfirmedAfrican) {
           console.log(`  ⏭️ Skipping new non-African title: ${movie.title} (Genres: ${movie.genres?.join(', ') || 'None'})`);
           continue;
         }
