@@ -3,6 +3,40 @@ import { supabase } from './supabase.js';
 import { ADAPTERS, upsertShowtimes } from './cinema-adapters/index.js';
 import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 
+/** Try to find a TMDB movie match and return enriched metadata */
+async function enrichFromTMDB(title: string, year?: number | null): Promise<{
+  synopsis?: string;
+  poster_url?: string;
+  backdrop_url?: string;
+  tmdb_id?: number;
+  tmdb_rating?: number;
+} | null> {
+  const TMDB_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
+  if (!TMDB_KEY) return null;
+  try {
+    const query = encodeURIComponent(title);
+    const yearParam = year ? `&year=${year}` : '';
+    const res = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${query}${yearParam}&with_origin_country=NG`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Try Nigerian result first, then any result
+    let result = data.results?.find((r: any) => r.origin_country?.includes('NG'));
+    if (!result) result = data.results?.[0];
+    if (!result) return null;
+    return {
+      synopsis: result.overview?.trim() || undefined,
+      poster_url: result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : undefined,
+      backdrop_url: result.backdrop_path ? `https://image.tmdb.org/t/p/w780${result.backdrop_path}` : undefined,
+      tmdb_id: result.id,
+      tmdb_rating: result.vote_average || undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Syncs cinema showtimes from various adapters
  */
@@ -165,17 +199,26 @@ export async function runVideosSync() {
             const filmsToInsert = [];
             for (const v of videosToProcess) {
               if (!existingFilmsMap.has(v.video_id)) {
+                const cleanedTitle = cleanTitle(v.title);
+                const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
+                // Try TMDB enrichment first
+                const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
                 filmsToInsert.push({
-                  title: cleanTitle(v.title), 
-                  year: v.published_at ? new Date(v.published_at).getFullYear() : null,
+                  title: cleanedTitle, 
+                  year: vidYear,
                   release_type: 'youtube', 
                   source: 'youtube', 
                   source_video_id: v.video_id,
                   youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
                   trailer_youtube_id: v.video_id, 
-                  poster_url: v.thumbnail_url,
-                  backdrop_url: v.thumbnail_url,
-                  needs_review: true, 
+                  // Use TMDB poster if available, else fall back to YouTube thumbnail
+                  poster_url: tmdb?.poster_url || v.thumbnail_url,
+                  backdrop_url: tmdb?.backdrop_url || v.thumbnail_url,
+                  synopsis: tmdb?.synopsis || null,
+                  tmdb_id: tmdb?.tmdb_id || null,
+                  tmdb_rating: tmdb?.tmdb_rating || null,
+                  // Only mark needs_review if we couldn't enrich from TMDB
+                  needs_review: !tmdb?.synopsis, 
                   status: 'released',
                   runtime_minutes: Math.round(v.duration_seconds / 60)
                 });

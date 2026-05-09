@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -306,7 +306,7 @@ export type Database = {
           film_id: string
           id: string
           person_id: string
-          role: Database["public"]["Enums"]["credit_role"]
+          role: string
         }
         Insert: {
           billing_order?: number | null
@@ -315,7 +315,7 @@ export type Database = {
           film_id: string
           id?: string
           person_id: string
-          role: Database["public"]["Enums"]["credit_role"]
+          role: string
         }
         Update: {
           billing_order?: number | null
@@ -324,7 +324,7 @@ export type Database = {
           film_id?: string
           id?: string
           person_id?: string
-          role?: Database["public"]["Enums"]["credit_role"]
+          role?: string
         }
         Relationships: [
           {

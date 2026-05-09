@@ -23,6 +23,8 @@ on:
           - videos
           - tmdb
           - kava
+          - iroko
+          - filmflux
           - ai_maintenance
 
 jobs:
@@ -87,6 +89,26 @@ jobs:
         continue-on-error: true
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Sync IrokoTV (10 AM Local)
+        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'iroko'))
+        run: |
+          echo "Syncing IrokoTV (Local Playwright Script)..."
+          npx tsx scripts/iroko_sync.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Harvest Filmflux (Daily)
+        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'filmflux'))
+        run: |
+          echo "Harvesting Filmflux (Competitor Data)..."
+          npx tsx scripts/filmflux_harvester.ts
+        continue-on-error: true
+        env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
