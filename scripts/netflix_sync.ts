@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { generateAIContent } from '../api/_lib/ai_service.js';
+import { detectAndNormalizeSeries } from '../api/_lib/series_utils.js';
 
 // Load stealth plugin
 const stealthPlugin = stealth();
@@ -143,36 +144,38 @@ async function handleProfileSelection(page) {
       '.profile-icon',
       'li.profile a',
       '.choose-profile a',
-      '.profile-name'
+      '.profile-name',
+      '.profile'
     ];
     
     console.log('👀 Checking for profile selection screen...');
     
-    // Wait for the page to be stable
-    await page.waitForTimeout(2000);
-    
-    let profileEl = null;
-    for (const selector of profileSelectors) {
-      profileEl = await page.$(selector).catch(() => null);
+    // Wait for any of the profile selectors to appear
+    const foundSelector = await Promise.any(
+      profileSelectors.map(selector => 
+        page.waitForSelector(selector, { timeout: 10000 }).then(() => selector)
+      )
+    ).catch(() => null);
+
+    if (foundSelector) {
+      console.log(`✅ Found profile with selector: ${foundSelector}`);
+      const profileEl = await page.$(foundSelector);
       if (profileEl) {
-        console.log(`✅ Found profile with selector: ${selector}`);
-        break;
+        console.log(`🖱️ Clicking profile...`);
+        await profileEl.click({ force: true });
+        
+        // Wait for navigation or the browse page to load
+        console.log('⌛ Waiting for redirect to /browse...');
+        await page.waitForURL(url => url.includes('/browse'), { timeout: 45000 }).catch(() => {
+          console.log('⚠️ Navigation to /browse timed out after profile selection. Checking if we are already there.');
+        });
+        
+        await page.waitForTimeout(5000); 
+        await page.screenshot({ path: 'netflix-post-profile.png' });
+        return true;
       }
-    }
-    
-    if (profileEl) {
-      console.log(`🖱️ Clicking profile...`);
-      await profileEl.click({ force: true });
-      
-      // Wait for navigation or the browse page to load
-      await page.waitForURL(url => url.includes('/browse'), { timeout: 30000 }).catch(() => {
-        console.log('⚠️ Navigation to /browse timed out after profile selection.');
-      });
-      await page.waitForTimeout(3000); 
-      await page.screenshot({ path: 'netflix-post-profile.png' });
-      return true;
     } else {
-      console.log('ℹ️ No profile selection detected.');
+      console.log('ℹ️ No profile selection detected or timed out.');
       if (page.url().includes('/ProfilesGate') || page.url().includes('/profiles')) {
         console.log('⚠️ On profile gate but no clickable elements found.');
         await page.screenshot({ path: 'netflix-profile-gate-stuck.png' });
@@ -310,6 +313,7 @@ async function scrapeNetflix() {
             title: titleText,
             netflix_id: watchId,
             url: `https://www.netflix.com/title/${watchId}`,
+            watch_url: `https://www.netflix.com/watch/${watchId}`,
             poster_url: linkEl.querySelector('img')?.src || null,
             isAfricanDiscovery: isAfricanRow
           });
@@ -372,19 +376,37 @@ async function scrapeNetflix() {
 
         // 1. Direct DOM Selectors
         let synopsis = document.querySelector('[data-uia="video-metadata--synopsis"], [data-uia="video-description"], .description-text')?.textContent?.trim() || '';
-        let cast = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-cast"] .about-item-content, .item-cast'))
+        
+        // Broaden cast selectors
+        let cast = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-cast"] .about-item-content, .item-cast, .more-details-item-cast, .ptrack-content[data-uia="about-item-cast"]'))
                         .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
-        let genres = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-genre"] .about-item-content, .item-genres'))
+        
+        let directors = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-director"] .about-item-content, .item-directors, .more-details-item-director'))
+                        .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
+
+        let writers = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-writer"] .about-item-content, .item-writers, .more-details-item-writer'))
+                        .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
+
+        let genres = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-genre"] .about-item-content, .item-genres, .more-details-item-genre'))
                           .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
         
         // 2. Label-based fallbacks
         if (cast.length === 0) cast = getFromLabels('Cast') || [];
+        if (directors.length === 0) directors = getFromLabels('Director') || getFromLabels('Directors') || [];
         if (genres.length === 0) genres = getFromLabels('Genres') || getFromLabels('Genre') || [];
 
-        // 3. Falcor Cache Fallback (Targeted to THIS video)
+        // 3. Falcor Cache Fallback (Targeted to THIS video) - Much more robust
         if (videoData) {
           if (!synopsis) synopsis = videoData.synopsis?.value || videoData.synopsis || '';
           
+          // Try to extract cast from cache if DOM failed
+          if (cast.length === 0 && videoData.cast) {
+            const cacheCast = videoData.cast.value || videoData.cast;
+            if (Array.isArray(cacheCast)) {
+              cast = cacheCast.map(c => c.name || c).filter(Boolean);
+            }
+          }
+
           if (genres.length === 0) {
             const videoCacheStr = JSON.stringify(videoData);
             const genreKeywords = ['Nollywood', 'Nigerian', 'African', 'South African', 'Ghanaian', 'Kenyan', 'Senegalese', 'Egyptian', 'Cameroonian'];
@@ -393,7 +415,7 @@ async function scrapeNetflix() {
         }
 
         // Strict African check: Must have African keywords in genres, synopsis, or cache
-        const africanPattern = /Nollywood|Nigerian|African|South African|Ghanaian|Kenyan|Senegalese|Egyptian|Cameroonian|Yoruba|Hausa|Igbo/i;
+        const africanPattern = /Nollywood|Nigerian|African|South African|Ghanaian|Kenyan|Senegalese|Egyptian|Cameroonian|Yoruba|Hausa|Igbo|Naija/i;
         const isAfrican = genres.some(g => africanPattern.test(g)) || 
                          africanPattern.test(synopsis) || 
                          africanPattern.test(JSON.stringify(videoData));
@@ -402,14 +424,33 @@ async function scrapeNetflix() {
         const runtimeEl = document.querySelector('[data-uia="duration"], [data-uia="video-runtime"], .duration');
         const detailTitleEl = document.querySelector('[data-uia="video-title"], .title-title, h1');
         
+        // Detect if it's a series
+        const titleText = (detailTitleEl?.textContent || '').toLowerCase();
+        const synopsisText = (synopsis || '').toLowerCase();
+        const durationText = (runtimeEl?.textContent || '').toLowerCase();
+        
+        // Check for common series markers in title, synopsis, or metadata
+        // Added more markers like Ep, Season, Series
+        const seriesRegex = /\b(ep|episode|vol|volume|part|pt|season|series|anthology)\b\s*\d*|seasons|episodes/i;
+        const hasSeriesKeywords = seriesRegex.test(titleText) || 
+                                 seriesRegex.test(durationText) ||
+                                 seriesRegex.test(synopsisText);
+        
+        const hasSeriesSelectors = !!document.querySelector('.duration-badge, [data-uia="duration-badge"], .season-count, [data-uia="season-selector"], .episode-list, [data-uia="episode-list"], .series-title');
+        
+        const isSeries = hasSeriesSelectors || hasSeriesKeywords;
+
         return {
           title: detailTitleEl?.textContent?.trim() || null,
           synopsis: synopsis || '',
           year: yearEl?.textContent?.trim() || videoData.releaseYear?.value || videoData.releaseYear || null,
           runtimeStr: runtimeEl?.textContent?.trim() || (videoData.runtime?.value ? (Math.floor(videoData.runtime.value / 60) + 'm') : null),
-          cast: Array.from(new Set(cast)).slice(0, 15),
+          cast: Array.from(new Set(cast)).slice(0, 50), 
+          directors: Array.from(new Set(directors)),
+          writers: Array.from(new Set(writers)),
           genres: Array.from(new Set(genres)),
-          isAfrican
+          isAfrican,
+          isSeries
         };
       });
 
@@ -428,15 +469,19 @@ async function scrapeNetflix() {
         ...rawData,
         title: movie.title === 'Unknown' ? (rawData.title || movie.title) : movie.title,
         runtime_minutes: parseRuntime(rawData.runtimeStr),
-        // Don't trust discovery rows alone if we have detail-page data
-        isAfrican: rawData.isAfrican 
+        isAfrican: rawData.isAfrican,
+        type: rawData.isSeries ? 'series' : 'movie',
+        streaming_links: { 
+          netflix: movie.url,
+          netflix_watch: movie.watch_url
+        }
       });
     } catch (e) {
       console.warn(`  ❌ Failed to get details for ${movie.title}: ${e.message}`);
-      // Fallback to discovery only if detail page totally failed
       detailedMovies.push({
         ...movie,
-        isAfrican: movie.isAfricanDiscovery
+        isAfrican: movie.isAfricanDiscovery,
+        type: movie.title.toLowerCase().match(/\b(ep|episode|season)\b/) ? 'series' : 'movie'
       });
     }
     await page.waitForTimeout(1000 + Math.random() * 1000);
@@ -509,7 +554,8 @@ async function syncToDatabase(scrapedMovies) {
   let errorCount = 0;
 
   for (const movie of scrapedMovies) {
-    const cleanedTitle = cleanTitle(movie.title);
+    const { isSeries, baseTitle, episodeNum } = detectAndNormalizeSeries(movie.title);
+    const cleanedTitle = cleanTitle(baseTitle);
     const movieYear = movie.year ? parseInt(movie.year.toString().match(/\d{4}/)?.[0] || '0') : null;
     
     // Check for African identity
@@ -576,7 +622,37 @@ async function syncToDatabase(scrapedMovies) {
       let filmId;
 
       if (existing) {
-        // ... (existing record logic)
+        filmId = existing.id;
+        const currentLinks = existing.streaming_links || {};
+        
+        const updatePayload: any = {
+          streaming_links: { 
+            ...currentLinks, 
+            netflix: movie.url,
+            netflix_watch: movie.watch_url || currentLinks.netflix_watch
+          },
+          synopsis: existing.synopsis || movie.synopsis,
+          runtime_minutes: existing.runtime_minutes || movie.runtime_minutes,
+          poster_url: existing.poster_url || movie.poster_url,
+          backdrop_url: existing.backdrop_url || movie.poster_url,
+          type: movie.type || existing.type || 'movie'
+        };
+
+        if (['announced', 'coming_soon'].includes(existing.status)) {
+          updatePayload.status = 'released';
+        }
+
+        const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix'].includes(existing.release_type);
+        if (!isSuperPrimary && existing.release_type !== 'netflix') {
+          updatePayload.release_type = 'netflix';
+        }
+
+        const { error: updateError } = await supabase.from('films').update(updatePayload).eq('id', existing.id);
+        if (updateError) throw updateError;
+        
+        updatedCount++;
+        console.log(`  🆙 Updated existing film record.`);
+
       } else {
         // If NO existing record, we MUST be sure it's African before creating new
         let isConfirmedAfrican = isAfricanScraped;
@@ -600,11 +676,15 @@ async function syncToDatabase(scrapedMovies) {
           poster_url: movie.poster_url,
           backdrop_url: movie.poster_url,
           release_type: 'netflix',
-          streaming_links: { netflix: movie.url },
+          streaming_links: { 
+            netflix: movie.url,
+            netflix_watch: movie.watch_url
+          },
           source: 'netflix',
           status: 'released',
           countries: countries.length > 0 ? countries : ['Nigeria'],
-          needs_review: true
+          needs_review: true,
+          type: movie.type || 'movie'
         }).select('id').single();
 
         if (error) throw error;

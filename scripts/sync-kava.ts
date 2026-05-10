@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
+import { detectAndNormalizeSeries } from '../api/_lib/series_utils.js';
 
 // Support .env and .env.local
 const envLocal = fs.existsSync('.env.local') ? dotenv.parse(fs.readFileSync('.env.local')) : {};
@@ -67,16 +68,26 @@ async function syncKava() {
         const titleEl = card.querySelector('.dataContents span');
         const descEl = card.querySelector('.dataContents div');
         const linkEl = card.querySelector('a.dataContents');
-        const imgEl = card.querySelector('.content_img img');
+        const posterDiv = card.querySelector('.content_img');
         
         if (!titleEl || !linkEl) return null;
+
+        let posterUrl = null;
+        if (posterDiv) {
+          const style = window.getComputedStyle(posterDiv);
+          const bgImage = style.backgroundImage;
+          if (bgImage && bgImage !== 'none') {
+            const match = bgImage.match(/url\("?(.+?)"?\)/);
+            if (match) posterUrl = match[1];
+          }
+        }
 
         return {
           title: titleEl.textContent?.trim(),
           synopsis: descEl?.textContent?.trim() || '',
           slug: linkEl.getAttribute('href')?.split('/').pop() || '',
           url: (linkEl as HTMLAnchorElement).href,
-          poster_url: imgEl?.getAttribute('src') || null
+          poster_url: posterUrl
         };
       }).filter(m => m !== null && m.title);
     });
@@ -104,7 +115,8 @@ async function syncKava() {
     const filmsToUpsert = movies.map(m => {
       const source_video_id = `kava-${m!.slug || m!.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
       const watchUrl = m!.url || `https://kava.tv/watch/${m!.slug}`;
-      const cleanedTitle = cleanTitle(m!.title!);
+      const { isSeries, baseTitle, episodeNum } = detectAndNormalizeSeries(m!.title!);
+      const cleanedTitle = cleanTitle(baseTitle);
       
       return {
         title: cleanedTitle,
@@ -114,10 +126,12 @@ async function syncKava() {
         source: 'kava',
         source_video_id,
         youtube_watch_url: watchUrl,
+        streaming_links: { kava: watchUrl },
         release_type: 'kava',
         countries: ['Nigeria'],
-        needs_review: false,
-        status: 'released'
+        needs_review: true,
+        status: 'released',
+        type: isSeries ? 'series' : 'movie'
       };
     }).filter(row => !existingSet.has(row.source_video_id));
 

@@ -30,19 +30,26 @@ async function main() {
   let allFilms: any[] = []
 
   while (true) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('films')
       .select('id, title, year, synopsis, poster_url, backdrop_url, tmdb_id')
-      .is('synopsis', null)
+      .or('synopsis.is.null,synopsis.eq."",poster_url.is.null,poster_url.ilike.%ytimg%')
       .order('created_at', { ascending: false })
       .range(offset, offset + PAGE - 1)
+      .limit(100)
+    
+    if (error) {
+      console.error('Error fetching films:', error)
+      break
+    }
     if (!data || data.length === 0) break
     allFilms.push(...data)
     offset += data.length
     if (data.length < PAGE) break
+    if (allFilms.length >= 500) break // Don't try to do 5000 at once
   }
 
-  console.log(`Found ${allFilms.length} films with null synopsis\n`)
+  console.log(`Found ${allFilms.length} films needing metadata enrichment\n`)
 
   let enriched = 0
   let notFound = 0
@@ -94,8 +101,9 @@ async function main() {
 
     await supabase.from('films').update(updates).eq('id', film.id)
     enriched++
+    console.log(`  ✅ Enriched: ${film.title}`)
 
-    if ((i + 1) % 20 === 0 || i === allFilms.length - 1) {
+    if ((i + 1) % 5 === 0 || i === allFilms.length - 1) {
       process.stdout.write(`\r  Progress: ${i + 1}/${allFilms.length} — enriched: ${enriched}, not found: ${notFound}`)
     }
   }

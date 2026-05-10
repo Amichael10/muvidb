@@ -156,27 +156,71 @@ async function harvestFilmflux() {
         }
 
         const data = await page.evaluate(() => {
-          const titleEl = document.querySelector('h1.font-bold.text-white, h1.text-4xl, h1');
-          const title = titleEl?.textContent?.trim() || '';
-          
-          const synopsisEl = document.querySelector('div.mt-4.text-gray-400.leading-relaxed, .browse-description p, .browse-description, .movie-details p');
-          const synopsis = synopsisEl?.textContent?.trim() || '';
-          
-          const bannerEl = document.querySelector('img.absolute.inset-0.object-cover, .browse-item-poster img') as HTMLImageElement;
-          const backdrop = bannerEl?.src || '';
-          
+          // Use og:title meta tag — this is always the actual movie title, never the brand name
+          const ogTitle = (document.querySelector('meta[property="og:title"]') as HTMLMetaElement)?.content?.trim() || '';
+          // Strip " - Filmflux" suffix if present
+          const title = ogTitle.replace(/\s*[-|]\s*Filmflux.*$/i, '').trim() ||
+            document.querySelector('h1.text-3xl, h1.text-4xl, h2.font-bold, [class*="movie-title"], [class*="film-title"]')?.textContent?.trim() || '';
+
+          // Synopsis: try og:description first, then DOM
+          const ogDesc = (document.querySelector('meta[property="og:description"], meta[name="description"]') as HTMLMetaElement)?.content?.trim() || '';
+          const synopsisEl = document.querySelector(
+            'div.mt-4.text-gray-400.leading-relaxed, .browse-description p, .browse-description, .movie-details p, [class*="synopsis"], [class*="description"] p'
+          );
+          const synopsis = synopsisEl?.textContent?.trim() || (ogDesc.length > 40 ? ogDesc : '');
+
+          // Poster: og:image is most reliable
+          const ogImage = (document.querySelector('meta[property="og:image"]') as HTMLMetaElement)?.content?.trim() || '';
+          const bannerEl = document.querySelector('img.absolute.inset-0.object-cover, .browse-item-poster img, [class*="poster"] img, [class*="banner"] img') as HTMLImageElement;
+          const backdrop = ogImage || bannerEl?.src || '';
+
           const slug = window.location.pathname.split('/').pop();
-          
+
           const ytEl = document.querySelector('a[href*="youtube.com/watch"], a[href*="youtu.be/"]');
           const youtubeLink = (ytEl as HTMLAnchorElement)?.href || null;
 
-          const castItems = Array.from(document.querySelectorAll('.cast-member, .person-card, .cast-details a')).map(item => {
-            const name = item.querySelector('.name, h3, span')?.textContent?.trim() || item.textContent?.trim() || '';
-            const photoUrl = (item.querySelector('img') as HTMLImageElement)?.src || '';
-            return { name, photoUrl };
-          });
+          const cast = Array.from(document.querySelectorAll('a[href^="/actor/"], div.flex-none')).map(item => {
+            const nameEl = item.querySelector('h3, .font-semibold, .text-white');
+            const charEl = item.querySelector('p, .text-gray-400, .text-xs');
+            const imgEl = item.querySelector('img') as HTMLImageElement;
+            
+            const name = nameEl?.textContent?.trim() || '';
+            const character = charEl?.textContent?.trim() || '';
+            const photoUrl = imgEl?.src || '';
+            
+            return { name, role: 'actor', character, photoUrl };
+          }).filter(c => c.name && c.name.toLowerCase() !== 'cast');
 
-          return { title, synopsis, backdrop, slug, youtubeLink, cast: castItems };
+          const normalizeRole = (role: string) => {
+            const r = role.toLowerCase().trim();
+            if (r.includes('director of photography') || r === 'dop' || r === 'cinematographer') return 'cinematographer';
+            if (r.includes('executive producer')) return 'executive producer';
+            if (r.includes('associate producer')) return 'associate producer';
+            if (r.includes('producer')) return 'producer';
+            if (r.includes('director')) return 'director';
+            if (r.includes('writer') || r.includes('screenplay')) return 'writer';
+            if (r.includes('editor')) return 'editor';
+            if (r.includes('composer') || r.includes('music')) return 'composer';
+            if (r.includes('sound')) return 'sound recordist';
+            if (r.includes('production design')) return 'production designer';
+            if (r.includes('costume')) return 'costume designer';
+            if (r.includes('makeup')) return 'makeup artist';
+            return r;
+          };
+
+          const crew = Array.from(document.querySelectorAll('a[href^="/crew/"], section h2 + div > div, .grid-cols-2 > div')).map(item => {
+            const nameEl = item.querySelector('span.font-medium, h3.font-semibold, span.text-white, h3');
+            const roleEl = item.querySelector('span.text-sm, p.text-gray-400, span.text-xs, p');
+            
+            const name = nameEl?.textContent?.trim() || '';
+            const rawRole = roleEl?.textContent?.trim() || 'crew';
+            const role = normalizeRole(rawRole);
+            const photoUrl = (item.querySelector('img') as HTMLImageElement)?.src || '';
+            
+            return { name, role, character: '', photoUrl };
+          }).filter(c => c.name && c.name.toLowerCase() !== 'crew');
+
+          return { title, synopsis, backdrop, slug, youtubeLink, cast, crew };
         });
 
         // Skip if title is obviously the site name or placeholder
@@ -244,14 +288,18 @@ async function harvestFilmflux() {
           console.log(`  ✨ New Film: ${cleanedTitle}`);
         }
 
-        if (filmId && data.cast.length > 0) {
-          for (const personData of data.cast) {
+        // 3. Personnel Enrichment
+        const allPersonnel = [...data.cast, ...data.crew];
+        if (filmId && allPersonnel.length > 0) {
+          for (const personData of allPersonnel) {
+            if (!personData.name) continue;
             const personId = await upsertPerson(personData.name, personData.photoUrl);
             if (personId) {
               await supabase.from('credits').upsert({
                 film_id: filmId,
                 person_id: personId,
-                role: 'actor'
+                role: personData.role.toLowerCase(),
+                character_name: personData.character || null
               }, { onConflict: 'film_id,person_id,role' });
             }
           }

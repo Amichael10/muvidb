@@ -43,6 +43,10 @@ export default function AdminFilms() {
   const [featuredFilter, setFeaturedFilter] = useState('all'); // all, featured, regular
   const [trendingFilter, setTrendingFilter] = useState('all'); // all, trending, regular
   const [sortBy, setSortBy] = useState('newest'); // newest, oldest, a-z
+  const [duplicateFilter, setDuplicateFilter] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState('library'); // library, youtube_buffer
   const [youtubeVideos, setYoutubeVideos] = useState([]);
@@ -147,7 +151,7 @@ export default function AdminFilms() {
   useEffect(() => {
     setPage(1);
     setSelectedFilmIds([]);
-  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sortBy]);
+  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -158,7 +162,7 @@ export default function AdminFilms() {
       }
     }, searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, sortBy, viewMode]);
+  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, sortBy, viewMode]);
 
   useEffect(() => {
     const handleDeepLink = async () => {
@@ -193,7 +197,9 @@ export default function AdminFilms() {
             poster_url: video.thumbnail_url || '',
             source_video_id: video.video_id,
             youtube_watch_url: `https://www.youtube.com/watch?v=${video.video_id}`,
-            release_type: 'youtube'
+            release_type: 'youtube',
+            status: 'released',
+            channel_video_id: video.id
           });
           setIsDrawerOpen(true);
           toast.success(`Mapping video: ${video.title}`);
@@ -215,11 +221,17 @@ export default function AdminFilms() {
     try {
       // 1. Get total count
       let countQuery = supabase.from('films').select('*', { count: 'exact', head: true });
-      if (searchTerm) countQuery = countQuery.ilike('title', `%${searchTerm}%`);
+      if (searchTerm) countQuery = countQuery.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') countQuery = countQuery.eq('status', statusFilter);
       if (yearFilter !== 'all') countQuery = countQuery.eq('year', parseInt(yearFilter));
       if (featuredFilter === 'featured') countQuery = countQuery.eq('is_featured', true);
       if (featuredFilter === 'regular') countQuery = countQuery.eq('is_featured', false);
+      if (sourceFilter !== 'all') countQuery = countQuery.eq('source', sourceFilter);
+      if (typeFilter !== 'all') countQuery = countQuery.eq('type', typeFilter);
+      if (platformFilter !== 'all') {
+        if (platformFilter === 'youtube') countQuery = countQuery.not('youtube_watch_url', 'is', null);
+        else countQuery = countQuery.not(`streaming_links->${platformFilter}`, 'is', null);
+      }
       
       const { count } = await countQuery;
       setTotalCount(count || 0);
@@ -227,13 +239,19 @@ export default function AdminFilms() {
       // 2. Get paginated data
       let query = supabase.from('films').select('*');
       
-      if (searchTerm) query = query.ilike('title', `%${searchTerm}%`);
+      if (searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
       if (yearFilter !== 'all') query = query.eq('year', parseInt(yearFilter));
       if (featuredFilter === 'featured') query = query.eq('is_featured', true);
       if (featuredFilter === 'regular') query = query.eq('is_featured', false);
       if (trendingFilter === 'trending') query = query.eq('is_trending', true);
       if (trendingFilter === 'regular') query = query.eq('is_trending', false);
+      if (sourceFilter !== 'all') query = query.eq('source', sourceFilter);
+      if (typeFilter !== 'all') query = query.eq('type', typeFilter);
+      if (platformFilter !== 'all') {
+        if (platformFilter === 'youtube') query = query.not('youtube_watch_url', 'is', null);
+        else query = query.not(`streaming_links->${platformFilter}`, 'is', null);
+      }
 
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -251,7 +269,19 @@ export default function AdminFilms() {
         .range(from, to);
 
       if (error) throw error;
-      setFilms(data || []);
+      let finalData = data || [];
+
+      // 3. Handle Duplicate Name Filter (Local filtering for now as it's complex for RPC)
+      if (duplicateFilter) {
+        const titleCounts = {};
+        finalData.forEach(f => {
+          const t = f.title.toLowerCase().trim();
+          titleCounts[t] = (titleCounts[t] || 0) + 1;
+        });
+        finalData = finalData.filter(f => titleCounts[f.title.toLowerCase().trim()] > 1);
+      }
+
+      setFilms(finalData);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load films');
@@ -279,7 +309,7 @@ export default function AdminFilms() {
         .is('film_id', null)
         .eq('is_hidden', false);
 
-      if (searchTerm) query = query.ilike('title', `%${searchTerm}%`);
+      if (searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
 
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -665,7 +695,7 @@ export default function AdminFilms() {
         release_type: formData.release_type || null,
       };
 
-      const { genres: selectedGenreIds, ...cleanFilmPayload } = filmPayload;
+      const { genres: selectedGenreIds, channel_video_id, ...cleanFilmPayload } = filmPayload;
 
       let filmId = editingFilm?.id;
 
@@ -700,6 +730,14 @@ export default function AdminFilms() {
           if (error) throw error;
           filmId = data[0].id;
         }
+
+      }
+
+      // Always try to link the channel_videos record to this film (new or existing)
+      if (channel_video_id) {
+        await supabase.from('channel_videos').update({ film_id: filmId }).eq('id', channel_video_id);
+      } else if (cleanFilmPayload.source_video_id) {
+        await supabase.from('channel_videos').update({ film_id: filmId }).eq('video_id', cleanFilmPayload.source_video_id);
       }
 
       // Delete old associations in parallel
@@ -758,6 +796,7 @@ export default function AdminFilms() {
       toast.success('Film saved successfully');
       handleCloseDrawer();
       fetchFilms();
+      fetchYoutubeBuffer();
     } catch (error) {
       console.error('Error saving:', error);
       toast.error(error.message || 'Failed to save film');
@@ -871,7 +910,7 @@ export default function AdminFilms() {
 
 
   return (
-    <div className="p-10 max-w-[1600px] mx-auto">
+    <div className="p-4 md:p-8 lg:p-10 w-full max-w-full mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
         <div>
           <p className="text-brand text-xs font-bold mb-1">Database</p>
@@ -906,65 +945,118 @@ export default function AdminFilms() {
     </div>
 
       {/* Library Controls */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="flex-1 relative group">
-          <input
-            type="text"
-            placeholder="Search by production title..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-surface border border-border rounded-md px-4 py-3 pl-12 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all"
-          />
-          <svg className="absolute left-4 top-3.5 w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col lg:flex-row gap-4 w-full">
+          <div className="flex-1 relative group">
+            <input
+              type="text"
+              placeholder="Search by production title..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-surface border border-border rounded-md px-4 py-3 pl-12 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all"
+            />
+            <svg className="absolute left-4 top-3.5 w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[140px]"
+            >
+              <option value="all">Any Status</option>
+              <option value="announced">Announced</option>
+              <option value="filming">Filming</option>
+              <option value="post-production">Post-Prod</option>
+              <option value="released">Released</option>
+            </select>
+            <select
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+              className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[120px]"
+            >
+              <option value="all">All Years</option>
+              {uniqueYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[140px]"
+            >
+              <option value="newest">Recently Added</option>
+              <option value="oldest">Oldest First</option>
+              <option value="a-z">Alphabetical</option>
+            </select>
+            <button
+              onClick={() => setDuplicateFilter(!duplicateFilter)}
+              className={`px-4 py-3 rounded-md text-xs font-bold transition-all border flex items-center gap-2 ${duplicateFilter ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-surface border-border text-text-muted hover:text-text-primary'}`}
+              title="Show potential duplicates by name"
+            >
+              <Icon icon="solar:copy-bold" className="w-4 h-4" />
+              {duplicateFilter ? 'Showing Duplicates' : 'Filter Duplicates'}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-4">
+        
+        {/* Advanced Filters */}
+        <div className="flex flex-wrap items-center gap-3 p-4 bg-surface-2/50 rounded-lg border border-border">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-widest mr-2">Filters:</div>
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[160px]"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
           >
-            <option value="all">Any Status</option>
-            <option value="announced">Announced</option>
-            <option value="filming">Filming</option>
-            <option value="post-production">Post-Prod</option>
-            <option value="released">Released</option>
+            <option value="all">All Types</option>
+            <option value="movie">Movies</option>
+            <option value="series">Series</option>
           </select>
+
           <select
-            value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-            className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[120px]"
+            value={platformFilter}
+            onChange={(e) => setPlatformFilter(e.target.value)}
+            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
           >
-            <option value="all">All Years</option>
-            {uniqueYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+            <option value="all">All Platforms</option>
+            <option value="youtube">YouTube</option>
+            <option value="netflix">Netflix</option>
+            <option value="prime_video">Prime Video</option>
+            <option value="kava">Kava</option>
+            <option value="iroko_tv">IrokoTV</option>
           </select>
+
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
+          >
+            <option value="all">All Sources</option>
+            <option value="manual">Manual</option>
+            <option value="netflix_sync">Netflix Sync</option>
+            <option value="prime_sync">Prime Sync</option>
+            <option value="kava">Kava Sync</option>
+            <option value="irokotv">IrokoTV Sync</option>
+            <option value="youtube">YouTube Sync</option>
+          </select>
+          
           <select
             value={featuredFilter}
             onChange={(e) => setFeaturedFilter(e.target.value)}
-            className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer"
+            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
           >
             <option value="all">Any Placement</option>
             <option value="featured">Featured Hero</option>
             <option value="regular">Regular Only</option>
           </select>
+          
           <select
             value={trendingFilter}
             onChange={(e) => setTrendingFilter(e.target.value)}
-            className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer"
+            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
           >
             <option value="all">Any Trend</option>
             <option value="trending">Trending Now</option>
             <option value="regular">Normal Feed</option>
-          </select>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-surface border border-border rounded-md px-4 py-3 text-text-primary text-sm focus:border-brand focus:ring-4 focus:ring-brand/5 shadow-sm transition-all appearance-none cursor-pointer min-w-[140px]"
-          >
-            <option value="newest">Recently Added</option>
-            <option value="oldest">Oldest First</option>
-            <option value="a-z">Alphabetical</option>
           </select>
         </div>
       </div>
@@ -1011,8 +1103,10 @@ export default function AdminFilms() {
                   />
                 </th>
                 <th className="px-6 py-4 font-bold">Production</th>
-                <th className="px-6 py-4 font-bold">Status</th>
-                <th className="px-6 py-4 font-bold">Engagement</th>
+                <th className="px-6 py-4 font-bold">Year</th>
+                <th className="px-6 py-4 font-bold">Platforms</th>
+                <th className="px-6 py-4 font-bold">Source</th>
+                <th className="px-6 py-4 font-bold text-center">Status</th>
                 <th className="pr-6 py-4 text-right font-bold w-[120px]">Actions</th>
               </tr>
             </thead>
@@ -1041,27 +1135,85 @@ export default function AdminFilms() {
                           <div className="flex items-center gap-2">
                             <div className="font-bold text-text-primary text-sm truncate group-hover:text-brand transition-colors">{film.title}</div>
                             {film.is_featured && <Icon icon="solar:star-bold" className="w-3 h-3 text-brand" />}
+                            {film.is_trending && <Icon icon="solar:fire-bold" className="w-3 h-3 text-amber-500" />}
                           </div>
-                          <div className="text-[10px] text-text-muted font-medium mt-0.5 uppercase tracking-widest">
-                             {film.year || 'TBD'} • {film.language || 'Not Specified'} • {film.runtime_minutes ? `${film.runtime_minutes}m` : 'No Runtime'}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border ${film.type === 'series' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-surface-3 text-text-muted border-border'}`}>
+                              {film.type || 'movie'}
+                            </span>
+                            {film.needs_review && (
+                              <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 text-[8px] font-black uppercase tracking-tighter border border-red-500/20">
+                                Review Required
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        film.status === 'released' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                        film.status === 'post-production' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
-                        film.status === 'filming' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
-                        'bg-slate-500/10 text-slate-500 border-slate-500/20'
-                      }`}>
-                        {(film.status || 'unknown').replace('-', ' ')}
-                      </span>
+                      <span className="text-text-primary font-mono text-xs">{film.year || 'TBD'}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-text-primary font-bold text-xs">{(film.view_count || 0).toLocaleString()}</span>
-                        <span className="text-[10px] text-text-muted font-medium">Views</span>
+                      <div className="flex items-center gap-2">
+                        {film.youtube_watch_url && (
+                          <a href={film.youtube_watch_url} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white transition-all shadow-sm" title="YouTube Play Link">
+                            <Icon icon="solar:play-circle-bold" className="w-5 h-5" />
+                          </a>
+                        )}
+                        {film.streaming_links?.netflix && (
+                          <>
+                            <a href={film.streaming_links.netflix} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-black transition-all shadow-sm" title="Netflix Title Link">
+                              <Icon icon="simple-icons:netflix" className="w-4 h-4" />
+                            </a>
+                            {film.streaming_links.netflix_watch && (
+                              <a href={film.streaming_links.netflix_watch} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-600/10 text-red-600 hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Netflix Watch Link">
+                                <Icon icon="solar:play-circle-bold" className="w-5 h-5" />
+                              </a>
+                            )}
+                          </>
+                        )}
+                        {film.streaming_links?.prime_video && (
+                          <a href={film.streaming_links.prime_video} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Prime Video Link">
+                            <Icon icon="simple-icons:primevideo" className="w-5 h-5" />
+                          </a>
+                        )}
+                        {film.streaming_links?.kava && (
+                          <a href={film.streaming_links.kava} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Kava.tv Link">
+                            <Icon icon="solar:video-library-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {film.streaming_links?.iroko_tv && (
+                          <a href={film.streaming_links.iroko_tv} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm" title="IrokoTV Link">
+                            <Icon icon="solar:play-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && (
+                          <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                       <div className="flex flex-col">
+                         <span className="text-[10px] text-text-muted font-black uppercase tracking-widest leading-none mb-1">{(film.source || 'Manual').replace('_', ' ')}</span>
+                         <span className="text-[10px] text-brand/60 font-bold">{film.release_type || 'Film'}</span>
+                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                          film.status === 'released' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                          film.status === 'post-production' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
+                          film.status === 'filming' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
+                          'bg-slate-500/10 text-slate-500 border-slate-500/20'
+                        }`}>
+                          {(film.status || 'unknown').replace('-', ' ')}
+                        </span>
+                        {(film.is_featured || film.is_trending) && (
+                          <div className="flex gap-1">
+                             {film.is_featured && <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" title="Featured"></span>}
+                             {film.is_trending && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" title="Trending"></span>}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="pr-6 py-4 text-right">
@@ -1134,7 +1286,9 @@ export default function AdminFilms() {
                                  poster_url: vid.thumbnail_url || '',
                                  source_video_id: vid.video_id,
                                  youtube_watch_url: `https://www.youtube.com/watch?v=${vid.video_id}`,
-                                 runtime_minutes: vid.duration_seconds ? Math.floor(vid.duration_seconds / 60) : ''
+                                 runtime_minutes: vid.duration_seconds ? Math.floor(vid.duration_seconds / 60) : '',
+                                 status: 'released',
+                                 channel_video_id: vid.id
                                });
                                setIsDrawerOpen(true);
                              }}
@@ -1621,38 +1775,63 @@ export default function AdminFilms() {
                       if (!isActive) return null;
 
                       return (
-                        <div key={platform.id} className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-left-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider">
-                              {platform.label} {formData.release_type === platform.id && <span className="text-gold ml-1">(PRIMARY)</span>}
-                            </label>
+                        <div key={platform.id} className="flex flex-col gap-3 animate-in fade-in slide-in-from-left-2">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider">
+                                {platform.label} {formData.release_type === platform.id && <span className="text-gold ml-1">(PRIMARY)</span>}
+                              </label>
+                            </div>
+                            <input
+                              type="text"
+                              value={platform.id === formData.release_type ? (formData.youtube_watch_url || formData.streaming_links?.[platform.id] || '') : (formData.streaming_links?.[platform.id] || '')}
+                              onChange={(e) => {
+                                if (platform.id === formData.release_type) {
+                                  setFormData({
+                                    ...formData,
+                                    youtube_watch_url: e.target.value,
+                                    streaming_links: {
+                                      ...formData.streaming_links,
+                                      [platform.id]: e.target.value
+                                    }
+                                  });
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    streaming_links: {
+                                      ...formData.streaming_links,
+                                      [platform.id]: e.target.value
+                                    }
+                                  });
+                                }
+                              }}
+                              placeholder={platform.placeholder}
+                              className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[10px] text-text-primary focus:border-brand outline-none"
+                            />
                           </div>
-                          <input
-                            type="text"
-                            value={platform.id === formData.release_type ? (formData.youtube_watch_url || formData.streaming_links?.[platform.id] || '') : (formData.streaming_links?.[platform.id] || '')}
-                            onChange={(e) => {
-                              if (platform.id === formData.release_type) {
-                                setFormData({
-                                  ...formData,
-                                  youtube_watch_url: e.target.value,
-                                  streaming_links: {
-                                    ...formData.streaming_links,
-                                    [platform.id]: e.target.value
-                                  }
-                                });
-                              } else {
-                                setFormData({
-                                  ...formData,
-                                  streaming_links: {
-                                    ...formData.streaming_links,
-                                    [platform.id]: e.target.value
-                                  }
-                                });
-                              }
-                            }}
-                            placeholder={platform.placeholder}
-                            className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[10px] text-text-primary focus:border-brand outline-none"
-                          />
+                          
+                          {platform.id === 'netflix' && (
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider">
+                                Netflix Watch URL
+                              </label>
+                              <input
+                                type="text"
+                                value={formData.streaming_links?.netflix_watch || ''}
+                                onChange={(e) => {
+                                  setFormData({
+                                    ...formData,
+                                    streaming_links: {
+                                      ...formData.streaming_links,
+                                      netflix_watch: e.target.value
+                                    }
+                                  });
+                                }}
+                                placeholder="https://www.netflix.com/watch/..."
+                                className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-[10px] text-text-primary focus:border-brand outline-none"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1763,7 +1942,25 @@ export default function AdminFilms() {
                             <option value="actor">Actor</option>
                             <option value="director">Director</option>
                             <option value="producer">Producer</option>
+                            <option value="executive producer">Executive Producer</option>
                             <option value="writer">Writer</option>
+                            <option value="cinematographer">Cinematographer (DOP)</option>
+                            <option value="editor">Editor</option>
+                            <option value="composer">Composer (Music)</option>
+                            <option value="sound recordist">Sound Recordist</option>
+                            <option value="production designer">Production Designer</option>
+                            <option value="art director">Art Director</option>
+                            <option value="makeup artist">Makeup Artist</option>
+                            <option value="costume designer">Costume Designer</option>
+                            <option value="gaffer">Gaffer</option>
+                            <option value="continuity">Continuity</option>
+                            <option value="production manager">Production Manager</option>
+                            <option value="assistant director">Assistant Director</option>
+                            <option value="colorist">Colorist</option>
+                            <option value="vfx">VFX</option>
+                            <option value="stunts">Stunts</option>
+                            <option value="casting director">Casting Director</option>
+                            <option value="location manager">Location Manager</option>
                           </select>
                           {credit.role === 'actor' && (
                             <input

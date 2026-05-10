@@ -1,20 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 dotenv.config();
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(supabaseUrl!, supabaseKey!);
 
-async function checkSchema() {
-  const { data, error } = await supabase.rpc('inspect_table_columns', { table_name: 'people' });
-  if (error) {
-    // Fallback: use a simple query
-    console.log('RPC failed, trying information_schema');
-    const { data: cols, error: colError } = await supabase.from('people').select('*').limit(1);
-    if (colError) console.error(colError);
-    else console.log('Columns:', Object.keys(cols[0]));
-  } else {
-    console.log(data);
-  }
+async function check() {
+  const { data, error } = await supabase.from('channel_videos').select('*').limit(1);
+  if (error) console.error(error);
+  else console.log(Object.keys(data[0] || {}));
 }
-
-checkSchema();
+check();

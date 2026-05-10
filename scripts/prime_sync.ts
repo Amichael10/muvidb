@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { generateAIContent } from '../api/_lib/ai_service.js';
+import { detectAndNormalizeSeries } from '../api/_lib/series_utils.js';
 
 // Load stealth plugin
 const stealthPlugin = stealth();
@@ -160,27 +161,47 @@ async function scrapePrime() {
       await page.waitForSelector('h1', { timeout: 8000 }).catch(() => null);
 
       const details = await page.evaluate(async () => {
+        // Scroll a bit to trigger lazy loads
+        window.scrollBy(0, 500);
+        await new Promise(r => setTimeout(r, 800));
+
         const titleEl = document.querySelector('h1[data-testid="title"], h1[data-automation-id="title"], h1, .dv-node-dp-title');
-        const synopsisEl = document.querySelector('.synopsis-FWBzLL span, span[data-testid="unclipped-text"], div[data-testid="synopsis"] span, [data-automation-id="description-text"]');
-        const yearEl = document.querySelector('span[data-testid="release-year"], [data-automation-id="release-year-badge"], .dv-node-dp-release-year');
-        const runtimeEl = document.querySelector('span[data-testid="runtime"], [data-automation-id="runtime-badge"]');
+        const synopsisEl = document.querySelector('.synopsis-FWBzLL span, span[data-testid="unclipped-text"], div[data-testid="synopsis"] span, [data-automation-id="description-text"], #pv-details-description, .pv-description');
+        const yearEl = document.querySelector('span[data-testid="release-year"], [data-automation-id="release-year-badge"], .dv-node-dp-release-year, [data-automation-id="release-year"]');
+        const runtimeEl = document.querySelector('span[data-testid="runtime"], [data-automation-id="runtime-badge"], [data-automation-id="runtime"]');
         
         // Horizontal Hero / Backdrop
         const backdropEl = document.querySelector('picture img, div[data-automation-id="hero-background"] img, .dv-node-dp-hero-image img');
         
-        // Vertical Poster (Try to find it in "Related" or "More to explore" if not on main)
+        // Vertical Poster
         const posterEl = document.querySelector('img[data-testid="poster-image"], img.dv-node-dp-image, a.contentCardLink-_UM9Xj img, a.detailLink-zyfcZQ img');
         
         // Click Details tab if it exists to get full cast/director
-        const detailsTab = document.querySelector('#tab-selector-details') as HTMLElement;
+        const detailsTab = document.querySelector('#tab-selector-details, [data-automation-id="details-tab"], button:has-text("Details"), a:has-text("Details")') as HTMLElement;
         if (detailsTab) {
           detailsTab.click();
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 1500));
         }
 
-        const castEls = Array.from(document.querySelectorAll('a[href*="atv_dp_pd_actors"], a[data-testid="cast"], a[href*="role=actor"], .dv-node-dp-cast a'));
-        const directorEls = Array.from(document.querySelectorAll('a[href*="atv_dp_pd_dir"], a[href*="role=director"], .dv-node-dp-director a'));
-        const genresEls = Array.from(document.querySelectorAll('a[data-testid="genre"], a[href*="genre="], .dv-node-dp-genres a'));
+        const castEls = Array.from(document.querySelectorAll('a[href*="atv_dp_pd_actors"], a[data-testid="cast"], a[href*="role=actor"], .dv-node-dp-cast a, [data-automation-id="cast-and-crew"] a, a[href*="atv_dp_md_pp"], .dv-node-dp-actors a, .atv-dp-cast-and-crew-item a'));
+        const directorEls = Array.from(document.querySelectorAll('a[href*="atv_dp_pd_dir"], a[href*="role=director"], .dv-node-dp-director a, [data-automation-id="director"] a, a[href*="role=director"], .dv-node-dp-directors a, .atv-dp-director-item a'));
+        const writerEls = Array.from(document.querySelectorAll('a[href*="atv_dp_pd_wr"], a[href*="role=writer"], .dv-node-dp-writer a, [data-automation-id="writer"] a, .dv-node-dp-writers a, .atv-dp-writer-item a'));
+        const genresEls = Array.from(document.querySelectorAll('a[data-testid="genre"], a[href*="genre="], .dv-node-dp-genres a, [data-automation-id="genre"] a'));
+
+        // Detect if it's a series
+        const titleText = titleEl?.textContent?.toLowerCase() || '';
+        const synopsisText = synopsisEl?.textContent?.toLowerCase() || '';
+        const durationText = runtimeEl?.textContent?.toLowerCase() || '';
+        const seasonSelector = !!document.querySelector('[data-automation-id="season-selector"], .dv-node-dp-season-selector, [data-testid="season-selector"], .season-selector');
+        const episodeList = !!document.querySelector('[data-automation-id="episodes-list"], .dv-node-dp-episodes, .episode-list, .episode-container');
+        
+        // Broaden series detection for "Ep 1", "Season 1", etc.
+        const seriesRegex = /\b(ep|episode|vol|volume|part|pt|season|series|anthology)\b\s*\d*|seasons|episodes/i;
+        const isSeries = seasonSelector || 
+                         episodeList ||
+                         seriesRegex.test(titleText) || 
+                         seriesRegex.test(durationText) ||
+                         seriesRegex.test(synopsisText);
 
         return {
           title: titleEl?.textContent?.trim() || 'Unknown',
@@ -189,16 +210,22 @@ async function scrapePrime() {
           runtime: runtimeEl?.textContent?.trim() || null,
           poster_url: (posterEl as HTMLImageElement)?.src || null,
           backdrop_url: (backdropEl as HTMLImageElement)?.src || null,
-          cast: [...new Set(castEls.map(el => el.textContent?.trim()).filter(Boolean))],
+          cast: [...new Set(castEls.map(el => el.textContent?.trim()).filter(Boolean))].slice(0, 50), // Increased limit
           directors: [...new Set(directorEls.map(el => el.textContent?.trim()).filter(Boolean))],
-          genres: [...new Set(genresEls.map(el => el.textContent?.trim()).filter(Boolean))]
+          writers: [...new Set(writerEls.map(el => el.textContent?.trim()).filter(Boolean))],
+          genres: [...new Set(genresEls.map(el => el.textContent?.trim()).filter(Boolean))],
+          isSeries
         };
       });
 
       if (details.title !== 'Unknown') {
-        const isExcluded = /007|James Bond|Mission Impossible|Marvel|Avengers|Hollywood/i.test(details.title);
+        const isExcluded = /007|James Bond|Mission Impossible|Marvel|Avengers|Hollywood|Fast & Furious/i.test(details.title);
         if (!isExcluded) {
-          allMovies.push({ ...details, url });
+          allMovies.push({ 
+            ...details, 
+            url,
+            watch_url: url // Prime Video usually has the same URL for title and watch
+          });
         } else {
           console.log(`  ⏩ Skipping non-Nollywood title: ${details.title}`);
         }
@@ -222,7 +249,8 @@ async function upsertPerson(name: string) {
     }
     return existing.id;
   }
-  const { data: newPerson, error } = await supabase.from('people').insert({ name, source: 'prime_video', nationality: 'Nigerian' }).select('id').single();
+  const { data: newPerson, error } = await supabase.from('people').insert({ name, source: 'prime_video', nationality: 'Nigerian' }).select('id')
+    .single();
   if (error) return null;
   return newPerson.id;
 }
@@ -231,11 +259,12 @@ async function syncToDatabase(scrapedMovies) {
   let updatedCount = 0; let newCount = 0; let errorCount = 0;
 
   for (const movie of scrapedMovies) {
-    const cleanedTitle = cleanTitle(movie.title);
+    const { isSeries, baseTitle, episodeNum } = detectAndNormalizeSeries(movie.title);
+    const cleanedTitle = cleanTitle(baseTitle);
     const movieYear = movie.year ? parseInt(movie.year.match(/\d{4}/)?.[0] || '0') : null;
     const runtimeMinutes = parsePrimeDuration(movie.runtime);
 
-    console.log(`🔄 Processing: ${cleanedTitle} (${movieYear || 'N/A'})`);
+    console.log(`🔄 Processing: ${cleanedTitle} ${episodeNum ? `(Episode ${episodeNum})` : ''} (${movieYear || 'N/A'})`);
 
     const isAfrican = await verifyNollywoodAI(movie);
     if (!isAfrican) {
@@ -258,7 +287,8 @@ async function syncToDatabase(scrapedMovies) {
           synopsis: existing.synopsis || movie.synopsis,
           runtime_minutes: existing.runtime_minutes || runtimeMinutes,
           poster_url: existing.poster_url || movie.poster_url,
-          backdrop_url: (existing as any).backdrop_url || movie.backdrop_url || movie.poster_url
+          backdrop_url: (existing as any).backdrop_url || movie.backdrop_url || movie.poster_url,
+          type: existing.type || (movie.isSeries ? 'series' : 'movie')
         };
         const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix'].includes(existing.release_type);
         if (!isSuperPrimary) updatePayload.release_type = 'prime_video';
@@ -270,7 +300,8 @@ async function syncToDatabase(scrapedMovies) {
           title: cleanedTitle, year: movieYear, synopsis: movie.synopsis, runtime_minutes: runtimeMinutes,
           poster_url: movie.poster_url, backdrop_url: movie.backdrop_url || movie.poster_url,
           release_type: 'prime_video', streaming_links: { prime_video: movie.url }, source: 'prime_video',
-          status: 'released', countries: ['Nigeria'], needs_review: true
+          status: 'released', countries: ['Nigeria'], needs_review: true,
+          type: movie.isSeries ? 'series' : 'movie'
         }).select('id').single();
         if (error) throw error;
         filmId = inserted.id;
@@ -284,12 +315,30 @@ async function syncToDatabase(scrapedMovies) {
         }
       }
 
+      // Sync Cast
       if (movie.cast) {
         for (const actorName of movie.cast) {
           const pId = await upsertPerson(actorName);
           if (pId) await supabase.from('credits').upsert({ film_id: filmId, person_id: pId, role: 'actor' }, { onConflict: 'film_id,person_id,role' });
         }
       }
+
+      // Sync Directors
+      if (movie.directors) {
+        for (const directorName of movie.directors) {
+          const pId = await upsertPerson(directorName);
+          if (pId) await supabase.from('credits').upsert({ film_id: filmId, person_id: pId, role: 'director' }, { onConflict: 'film_id,person_id,role' });
+        }
+      }
+
+      // Sync Writers
+      if (movie.writers) {
+        for (const writerName of movie.writers) {
+          const pId = await upsertPerson(writerName);
+          if (pId) await supabase.from('credits').upsert({ film_id: filmId, person_id: pId, role: 'writer' }, { onConflict: 'film_id,person_id,role' });
+        }
+      }
+
     } catch (e) {
       console.error(`  ❌ Error processing ${movie.title}:`, e.message);
       errorCount++;
