@@ -24,7 +24,7 @@ export default function Signup() {
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'admin') {
+      if (user.role === 'admin' || user.role === 'admin_limited') {
         navigate('/admin');
       } else if (!user.onboarded) {
         navigate('/onboarding');

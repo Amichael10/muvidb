@@ -149,6 +149,7 @@ export default function AdminUsers() {
   const getAvatarColor = (role) => {
     switch(role) {
       case 'admin': return 'bg-brand text-white';
+      case 'admin_limited': return 'bg-purple-500/20 text-purple-500';
       case 'professional': return 'bg-orange-500/20 text-brand';
       default: return 'bg-surface-2 text-text-primary';
     }
@@ -157,6 +158,7 @@ export default function AdminUsers() {
   const getRoleBadge = (role) => {
     switch(role) {
       case 'admin': return 'bg-brand text-white';
+      case 'admin_limited': return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
       case 'professional': return 'bg-orange-500/10 text-brand border-brand/20';
       default: return 'bg-surface-2 text-text-muted border-border/50';
     }
@@ -177,7 +179,7 @@ export default function AdminUsers() {
           { label: 'Total users', count: users.length, icon: 'solar:users-group-rounded-linear', color: 'from-brand/10 to-transparent' },
           { label: 'Standard users', count: users.filter(u => u.role === 'user').length, icon: 'solar:user-linear', color: 'from-blue-500/10 to-transparent' },
           { label: 'Professionals', count: users.filter(u => u.role === 'professional').length, icon: 'solar:star-linear', color: 'from-orange-500/10 to-transparent' },
-          { label: 'Administrators', count: users.filter(u => u.role === 'admin').length, icon: 'solar:shield-user-linear', color: 'from-brand/10 to-transparent' },
+          { label: 'Administrators', count: users.filter(u => u.role === 'admin' || u.role === 'admin_limited').length, icon: 'solar:shield-user-linear', color: 'from-brand/10 to-transparent' },
         ].map((stat, i) => (
           <div key={i} className="card-cal p-6 group transition-all hover:border-brand/30">
             <div className="flex items-center justify-between mb-4">
@@ -219,6 +221,7 @@ export default function AdminUsers() {
                 <option value="user">User</option>
                 <option value="professional">Professional</option>
                 <option value="admin">Admin</option>
+                <option value="admin_limited">Limited Admin</option>
               </select>
               <Icon icon="solar:alt-arrow-down-linear" className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted" />
             </div>
@@ -342,6 +345,7 @@ export default function AdminUsers() {
                           >
                             <option value="user">User</option>
                             <option value="professional">Pro</option>
+                            <option value="admin_limited">Limited Admin</option>
                             <option value="admin">Admin</option>
                           </select>
                           <Icon icon="solar:alt-arrow-down-linear" className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted" />

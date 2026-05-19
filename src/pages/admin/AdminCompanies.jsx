@@ -5,8 +5,11 @@ import { Icon } from '@iconify/react';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
+import { useAuth } from '../../context/AuthContext';
+import { logAdminAction } from '../../lib/adminLogger';
 
 export default function AdminCompanies() {
+  const { user } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -56,6 +59,8 @@ export default function AdminCompanies() {
         .eq('id', deletingCompany.id);
 
       if (error) throw error;
+
+      await logAdminAction(user, 'delete', 'company', deletingCompany.id, deletingCompany.name);
 
       setCompanies(companies.filter(c => c.id !== deletingCompany.id));
       toast.success('Company deleted');
@@ -108,12 +113,16 @@ export default function AdminCompanies() {
           .update(dataToSave)
           .eq('id', editingCompany.id);
         if (error) throw error;
+        await logAdminAction(user, 'update', 'company', editingCompany.id, dataToSave.name);
         toast.success('Company updated');
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('companies')
-          .insert([dataToSave]);
+          .insert([dataToSave])
+          .select();
         if (error) throw error;
+        const newCompanyId = data?.[0]?.id;
+        await logAdminAction(user, 'create', 'company', newCompanyId, dataToSave.name);
         toast.success('Company added');
       }
       setIsDrawerOpen(false);

@@ -8,8 +8,11 @@ import SkeletonRow from '../../components/admin/SkeletonRow';
 import { extractChannelIdentifier, fetchChannelData, getPersonYoutubeChannelUrl } from '../../lib/youtube';
 import MergeModal from '../../components/admin/MergeModal';
 import { Icon } from '@iconify/react';
+import { useAuth } from '../../context/AuthContext';
+import { logAdminAction } from '../../lib/adminLogger';
 
 export default function AdminPeople() {
+  const { user } = useAuth();
   const [people, setPeople] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -135,6 +138,8 @@ export default function AdminPeople() {
 
       if (error) throw error;
       
+      await logAdminAction(user, 'update', 'person', person.id, person.name, { is_verified: newStatus, field: 'verified' });
+      
       setPeople(people.map(p => p.id === person.id ? { ...p, is_verified: newStatus } : p));
       toast.success(newStatus ? 'Profile verified ✓' : 'Verification removed');
     } catch (error) {
@@ -152,6 +157,8 @@ export default function AdminPeople() {
         .eq('id', person.id);
 
       if (error) throw error;
+      
+      await logAdminAction(user, 'update', 'person', person.id, person.name, { is_spotlight: newStatus, field: 'spotlight' });
       
       setPeople(people.map(p => p.id === person.id ? { ...p, is_spotlight: newStatus } : p));
       toast.success(newStatus ? 'Added to Spotlight ★' : 'Removed from Spotlight');
@@ -181,6 +188,8 @@ export default function AdminPeople() {
         .eq('id', deletingPerson.id);
 
       if (error) throw error;
+
+      await logAdminAction(user, 'delete', 'person', deletingPerson.id, deletingPerson.name);
 
       setPeople(people.filter(p => p.id !== deletingPerson.id));
       setSelectedPersonIds((prev) => prev.filter((id) => id !== deletingPerson.id));
@@ -332,12 +341,16 @@ export default function AdminPeople() {
           .update(dataToSave)
           .eq('id', editingPerson.id);
         if (error) throw error;
+        await logAdminAction(user, 'update', 'person', editingPerson.id, dataToSave.name);
         toast.success('Profile updated');
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('people')
-          .insert([dataToSave]);
+          .insert([dataToSave])
+          .select();
         if (error) throw error;
+        const newPersonId = data?.[0]?.id;
+        await logAdminAction(user, 'create', 'person', newPersonId, dataToSave.name);
         toast.success('Person added');
       }
       setIsDrawerOpen(false);
@@ -389,6 +402,10 @@ export default function AdminPeople() {
       const { error } = await supabase.from('people').delete().in('id', personBatchDeleteIds);
       if (error) throw error;
       
+      for (const id of personBatchDeleteIds) {
+        await logAdminAction(user, 'delete', 'person', id, `Batch deleted person ID: ${id}`);
+      }
+      
       toast.success(`Deleted ${personBatchDeleteIds.length} profiles`, { id: t });
       setPeople(people.filter(p => !personBatchDeleteIds.includes(p.id)));
       setSelectedPersonIds([]);
@@ -423,6 +440,8 @@ export default function AdminPeople() {
         });
         if (error) throw error;
       }
+      
+      await logAdminAction(user, 'update', 'person', primaryId, `Merged secondary ID(s) into person profile`, { secondaryIds });
       
       toast.success('Merge successful: Data enriched & relations moved', { id: t });
       setIsMergeModalOpen(false);

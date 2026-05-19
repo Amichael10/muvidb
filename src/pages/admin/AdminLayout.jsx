@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, Link, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Icon } from '@iconify/react';
 
@@ -46,8 +46,28 @@ export default function AdminLayout() {
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
   ];
 
-  const currentPage = navItems.find(item => location.pathname === item.path) || 
-                      navItems.find(item => location.pathname.startsWith(item.path));
+  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies'];
+  
+  // Security guard for manual URL entry by admin_limited
+  const isPathAllowed = (path) => {
+    if (user?.role !== 'admin_limited') return true;
+    if (path === '/admin' || path === '/admin/') return true;
+    return allowedPathsForLimited.some(allowedPath => allowedPath !== '/admin' && path.startsWith(allowedPath));
+  };
+
+  if (user?.role === 'admin_limited' && !isPathAllowed(location.pathname)) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  const visibleNavItems = navItems.filter(item => {
+    if (user?.role === 'admin_limited') {
+      return allowedPathsForLimited.includes(item.path);
+    }
+    return true;
+  });
+
+  const currentPage = visibleNavItems.find(item => location.pathname === item.path) || 
+                      visibleNavItems.find(item => location.pathname.startsWith(item.path));
 
   return (
     <div className={`flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300`}>
@@ -77,7 +97,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 space-y-1 py-4 scrollbar-hide">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}

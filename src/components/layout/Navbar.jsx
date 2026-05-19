@@ -160,21 +160,21 @@ export default function Navbar() {
                     <div className="p-4 border-b border-border bg-surface-2/50">
                       <p className="text-sm font-bold text-text-primary line-clamp-1">{user.name}</p>
                       <p className="text-xs text-text-muted line-clamp-1">{user.email}</p>
-                      {user.role === 'admin' && (
+                      {(user.role === 'admin' || user.role === 'admin_limited') && (
                         <span className="mt-2 inline-block px-2 py-0.5 bg-brand/10 text-brand text-[10px] font-bold rounded tracking-wide">
-                          Admin
+                          {user.role === 'admin' ? 'Admin' : 'Sub-Admin'}
                         </span>
                       )}
                     </div>
                     <div className="p-2">
                       <Link 
-                        to={(user.role === 'professional' || user.role === 'admin') ? "/pro-dashboard" : "/dashboard"} 
+                        to={user.role === 'admin_limited' ? "/admin" : ((user.role === 'professional' || user.role === 'admin') ? "/pro-dashboard" : "/dashboard")} 
                         className="flex items-center gap-3 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors"
                       >
                         <Icon icon="solar:user-linear" width="18" height="18" />
                         Your Profile
                       </Link>
-                      {user.role === 'admin' && (
+                      {(user.role === 'admin' || user.role === 'admin_limited') && (
                         <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-sm text-brand hover:bg-brand/5 rounded-lg transition-colors">
                           <Icon icon="solar:clapperboard-play-linear" width="18" height="18" />
                           Admin Panel

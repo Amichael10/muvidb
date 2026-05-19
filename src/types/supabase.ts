@@ -1210,7 +1210,7 @@ export type Database = {
         | "costume_designer"
       film_status: "released" | "upcoming" | "in_production" | "post-production"
       nfvcb_rating: "G" | "PG" | "PG-13" | "15" | "18"
-      user_role: "fan" | "professional" | "admin"
+      user_role: "fan" | "professional" | "admin" | "admin_limited"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1352,7 +1352,7 @@ export const Constants = {
       ],
       film_status: ["released", "upcoming", "in_production", "post-production"],
       nfvcb_rating: ["G", "PG", "PG-13", "15", "18"],
-      user_role: ["fan", "professional", "admin"],
+      user_role: ["fan", "professional", "admin", "admin_limited"],
     },
   },
 } as const

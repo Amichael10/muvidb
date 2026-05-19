@@ -4,6 +4,8 @@ import { toast } from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
+import { useAuth } from '../../context/AuthContext';
+import { logAdminAction } from '../../lib/adminLogger';
 
 // Custom Searchable Dropdown Component
 function SearchableDropdown({ options, value, onChange, placeholder, type = 'person' }) {
@@ -102,6 +104,7 @@ function SearchableDropdown({ options, value, onChange, placeholder, type = 'per
 }
 
 export default function AdminCredits() {
+  const { user } = useAuth();
   const [credits, setCredits] = useState([]);
   const [allPeople, setAllPeople] = useState([]);
   const [allFilms, setAllFilms] = useState([]);
@@ -126,6 +129,7 @@ export default function AdminCredits() {
     character_name: '',
     billing_order: 99
   });
+  const [isCustomRole, setIsCustomRole] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchData = async () => {
@@ -195,6 +199,8 @@ export default function AdminCredits() {
 
       if (error) throw error;
 
+      await logAdminAction(user, 'delete', 'credit', deletingCredit.id, `${deletingCredit.people?.name} as ${deletingCredit.role} in ${deletingCredit.films?.title}`);
+
       setCredits(credits.filter(c => c.id !== deletingCredit.id));
       setSelectedCreditIds((prev) => prev.filter((id) => id !== deletingCredit.id));
       toast.success('Credit removed');
@@ -214,15 +220,21 @@ export default function AdminCredits() {
       character_name: '',
       billing_order: 99
     });
+    setIsCustomRole(false);
     setIsDrawerOpen(true);
   };
 
   const openEditDrawer = (credit) => {
     setEditingCredit(credit);
+    
+    const roleValue = credit.role || 'actor';
+    const standardRoles = ['actor', 'director', 'writer', 'producer', 'cinematographer', 'editor', 'composer', 'costume_designer'];
+    setIsCustomRole(!standardRoles.includes(roleValue.toLowerCase()));
+    
     setFormData({
       person_id: credit.person_id || '',
       film_id: credit.film_id || '',
-      role: credit.role || 'actor',
+      role: roleValue,
       character_name: credit.character_name || '',
       billing_order: credit.billing_order || 99
     });
@@ -262,10 +274,15 @@ export default function AdminCredits() {
           return;
         }
 
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('credits')
-          .insert([dataToSave]);
+          .insert([dataToSave])
+          .select();
         if (error) throw error;
+        const newCreditId = data?.[0]?.id;
+        const personName = allPeople.find(p => p.id === formData.person_id)?.name || formData.person_id;
+        const filmTitle = allFilms.find(f => f.id === formData.film_id)?.title || formData.film_id;
+        await logAdminAction(user, 'create', 'credit', newCreditId, `${personName} as ${formData.role} in ${filmTitle}`, { person_id: formData.person_id, film_id: formData.film_id, role: formData.role });
         toast.success('Credit added');
       } else {
         const { error } = await supabase
@@ -273,6 +290,9 @@ export default function AdminCredits() {
           .update(dataToSave)
           .eq('id', editingCredit.id);
         if (error) throw error;
+        const personName = allPeople.find(p => p.id === formData.person_id)?.name || formData.person_id;
+        const filmTitle = allFilms.find(f => f.id === formData.film_id)?.title || formData.film_id;
+        await logAdminAction(user, 'update', 'credit', editingCredit.id, `${personName} as ${formData.role} in ${filmTitle}`, { person_id: formData.person_id, film_id: formData.film_id, role: formData.role });
         toast.success('Credit updated');
       }
       setIsDrawerOpen(false);
@@ -331,6 +351,11 @@ export default function AdminCredits() {
     try {
       const { error } = await supabase.from('credits').delete().in('id', creditBatchDeleteIds);
       if (error) throw error;
+      
+      for (const id of creditBatchDeleteIds) {
+        await logAdminAction(user, 'delete', 'credit', id, `Batch deleted credit ID: ${id}`);
+      }
+      
       setCredits((prev) => prev.filter((c) => !creditBatchDeleteIds.includes(c.id)));
       setSelectedCreditIds((prev) => prev.filter((id) => !creditBatchDeleteIds.includes(id)));
       toast.success(`Removed ${creditBatchDeleteIds.length} credit${creditBatchDeleteIds.length === 1 ? '' : 's'}`);
@@ -577,20 +602,51 @@ export default function AdminCredits() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="col-span-2">
                   <label className="block text-[11px] font-black text-text-muted uppercase tracking-[0.1em] mb-2 pl-1">Department Head / Role *</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="w-full bg-surface-2 border border-border text-text-primary rounded-md px-4 py-3 text-sm font-bold focus:border-brand focus:outline-none transition-all appearance-none"
-                  >
-                    <option value="actor">Actor</option>
-                    <option value="director">Director</option>
-                    <option value="writer">Writer</option>
-                    <option value="producer">Producer</option>
-                    <option value="cinematographer">Cinematographer</option>
-                    <option value="editor">Editor</option>
-                    <option value="composer">Composer</option>
-                    <option value="costume_designer">Costume Designer</option>
-                  </select>
+                  {isCustomRole ? (
+                    <div className="flex gap-2">
+                      <input
+                        autoFocus
+                        value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        className="w-full bg-surface-2 border border-brand text-text-primary rounded-md px-4 py-3 text-sm font-bold focus:border-brand focus:outline-none transition-all"
+                        placeholder="Enter custom role..."
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setIsCustomRole(false);
+                          setFormData({ ...formData, role: 'actor' });
+                        }}
+                        className="px-4 bg-surface-2 border border-border text-text-muted rounded-md hover:text-red-500 transition-colors"
+                        title="Back to standard roles"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.role}
+                      onChange={(e) => {
+                        if (e.target.value === 'custom_role') {
+                          setIsCustomRole(true);
+                          setFormData({ ...formData, role: '' });
+                        } else {
+                          setFormData({ ...formData, role: e.target.value });
+                        }
+                      }}
+                      className="w-full bg-surface-2 border border-border text-text-primary rounded-md px-4 py-3 text-sm font-bold focus:border-brand focus:outline-none transition-all appearance-none"
+                    >
+                      <option value="actor">Actor</option>
+                      <option value="director">Director</option>
+                      <option value="writer">Writer</option>
+                      <option value="producer">Producer</option>
+                      <option value="cinematographer">Cinematographer</option>
+                      <option value="editor">Editor</option>
+                      <option value="composer">Composer</option>
+                      <option value="costume_designer">Costume Designer</option>
+                      <option value="custom_role" className="text-brand font-black">+ Add Custom Role...</option>
+                    </select>
+                  )}
                 </div>
 
                 {formData.role === 'actor' && (

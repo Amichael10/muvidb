@@ -22,7 +22,7 @@ export default function Login() {
     if (user) {
       if (user.role === 'professional') {
         navigate('/pro-dashboard');
-      } else if (user.role === 'admin') {
+      } else if (user.role === 'admin' || user.role === 'admin_limited') {
         navigate('/admin');
       } else {
         navigate('/dashboard');

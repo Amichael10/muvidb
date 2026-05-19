@@ -163,7 +163,7 @@ export default function App() {
                 <Route path="/claim" element={<ProtectedRoute><ClaimProfile /></ProtectedRoute>} />
 
                 {/* Admin Routes */}
-                <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminLayout /></ProtectedRoute>}>
+                <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'admin_limited']}><AdminLayout /></ProtectedRoute>}>
                   <Route index element={<AdminOverview />} />
                   <Route path="films" element={<AdminFilms />} />
                   <Route path="people" element={<AdminPeople />} />

@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
 import { Skeleton } from '../components/ui/Skeleton';
+import SkeletonCard from '../components/ui/SkeletonCard';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -25,7 +26,13 @@ export default function Dashboard() {
   useEffect(() => {
     document.title = "Lumi | Dashboard";
     
-    // Redirect professionals to the Pro Hub
+    // Redirect admin_limited to Admin Workspace
+    if (user?.role === 'admin_limited') {
+      navigate('/admin');
+      return;
+    }
+
+    // Redirect professionals/admins to the Pro Hub
     if (user?.role === 'professional' || user?.role === 'admin') {
       navigate('/pro-dashboard');
       return;

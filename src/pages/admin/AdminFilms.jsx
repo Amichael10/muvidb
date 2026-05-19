@@ -6,8 +6,11 @@ import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
 import { extractYoutubeId } from '../../lib/youtube';
+import { useAuth } from '../../context/AuthContext';
+import { logAdminAction } from '../../lib/adminLogger';
 
 export default function AdminFilms() {
+  const { user } = useAuth();
   const [films, setFilms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -26,6 +29,7 @@ export default function AdminFilms() {
   
   // Normalized Data State
   const [credits, setCredits] = useState([]);
+  const [customRoles, setCustomRoles] = useState([]);
   const [showtimes, setShowtimes] = useState([]);
   const [cinemas, setCinemas] = useState([]);
   const [allGenres, setAllGenres] = useState([]);
@@ -452,12 +456,20 @@ export default function AdminFilms() {
     ]);
     
     if (creditData) {
+      const standardRoles = ['actor', 'director', 'producer', 'executive producer', 'writer', 'cinematographer', 'editor', 'composer', 'sound recordist', 'production designer', 'art director', 'makeup artist', 'costume designer', 'gaffer', 'continuity', 'production manager', 'assistant director', 'colorist', 'vfx', 'stunts', 'casting director', 'location manager'];
+      
+      const existingCustomRoles = [...new Set(creditData
+        .map(c => c.role ? c.role.toLowerCase() : '')
+        .filter(role => role && !standardRoles.includes(role)))];
+      setCustomRoles(existingCustomRoles);
+
       setCredits(creditData.map(c => ({
         person_id: c.person_id,
         name: c.people?.name,
         role: c.role,
         character_name: c.character_name,
-        billing_order: c.billing_order
+        billing_order: c.billing_order,
+        isCustomRole: false
       })));
     }
 
@@ -520,6 +532,7 @@ export default function AdminFilms() {
     setCompanyResults([]);
     setPeopleSearch('');
     setPeopleResults([]);
+    setCustomRoles([]);
   };
 
   const handleChange = (e) => {
@@ -793,6 +806,9 @@ export default function AdminFilms() {
         });
       }
 
+      const actionType = editingFilm ? 'update' : 'create';
+      await logAdminAction(user, actionType, 'film', filmId, cleanFilmPayload.title, { year: cleanFilmPayload.year });
+
       toast.success('Film saved successfully');
       handleCloseDrawer();
       fetchFilms();
@@ -810,6 +826,7 @@ export default function AdminFilms() {
     try {
       const { error } = await supabase.from('films').delete().eq('id', deletingFilm.id);
       if (error) throw error;
+      await logAdminAction(user, 'delete', 'film', deletingFilm.id, deletingFilm.title);
       toast.success('Film deleted');
       setSelectedFilmIds((prev) => prev.filter((id) => id !== deletingFilm.id));
       fetchFilms();
@@ -828,6 +845,8 @@ export default function AdminFilms() {
         .eq('id', film.id);
 
       if (error) throw error;
+      
+      await logAdminAction(user, 'update', 'film', film.id, film.title, { is_featured: newStatus, field: 'featured' });
       
       setFilms(prev => prev.map(f => f.id === film.id ? { ...f, is_featured: newStatus } : f));
       toast.success(newStatus ? 'Production Featured' : 'Removed from Featured');
@@ -870,6 +889,11 @@ export default function AdminFilms() {
     try {
       const { error } = await supabase.from('films').delete().in('id', filmBatchDeleteIds);
       if (error) throw error;
+      
+      for (const id of filmBatchDeleteIds) {
+        await logAdminAction(user, 'delete', 'film', id, `Batch deleted film ID: ${id}`);
+      }
+      
       toast.success(`Deleted ${filmBatchDeleteIds.length} film${filmBatchDeleteIds.length === 1 ? '' : 's'}`);
       setSelectedFilmIds((prev) => prev.filter((id) => !filmBatchDeleteIds.includes(id)));
       setFilmBatchDeleteIds(null);
@@ -894,6 +918,8 @@ export default function AdminFilms() {
         });
         if (error) throw error;
       }
+      
+      await logAdminAction(user, 'update', 'film', primaryId, `Merged secondary ID(s) into film`, { secondaryIds });
       
       toast.success('Productions merged and metadata synchronized', { id: t });
       setIsMergeModalOpen(false);
@@ -1933,36 +1959,90 @@ export default function AdminFilms() {
                     <div key={idx} className="flex items-center gap-4 bg-surface p-4 rounded-md border border-border shadow-sm group animate-in slide-in-from-left-2">
                       <div className="flex-1 space-y-3">
                         <p className="text-xs font-bold text-text-primary">{credit.name}</p>
-                        <div className="flex items-center gap-3">
-                          <select
-                            value={credit.role}
-                            onChange={(e) => setCredits(prev => prev.map((c, i) => i === idx ? { ...c, role: e.target.value } : c))}
-                            className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-[10px] text-text-primary font-bold focus:border-brand outline-none uppercase"
-                          >
-                            <option value="actor">Actor</option>
-                            <option value="director">Director</option>
-                            <option value="producer">Producer</option>
-                            <option value="executive producer">Executive Producer</option>
-                            <option value="writer">Writer</option>
-                            <option value="cinematographer">Cinematographer (DOP)</option>
-                            <option value="editor">Editor</option>
-                            <option value="composer">Composer (Music)</option>
-                            <option value="sound recordist">Sound Recordist</option>
-                            <option value="production designer">Production Designer</option>
-                            <option value="art director">Art Director</option>
-                            <option value="makeup artist">Makeup Artist</option>
-                            <option value="costume designer">Costume Designer</option>
-                            <option value="gaffer">Gaffer</option>
-                            <option value="continuity">Continuity</option>
-                            <option value="production manager">Production Manager</option>
-                            <option value="assistant director">Assistant Director</option>
-                            <option value="colorist">Colorist</option>
-                            <option value="vfx">VFX</option>
-                            <option value="stunts">Stunts</option>
-                            <option value="casting director">Casting Director</option>
-                            <option value="location manager">Location Manager</option>
-                          </select>
-                          {credit.role === 'actor' && (
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {credit.isCustomRole ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                autoFocus
+                                placeholder="Enter custom role..."
+                                value={credit.tempRole || ''}
+                                onChange={(e) => setCredits(prev => prev.map((c, i) => i === idx ? { ...c, tempRole: e.target.value } : c))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (credit.tempRole?.trim()) {
+                                      const newRole = credit.tempRole.trim().toLowerCase();
+                                      if (!customRoles.includes(newRole)) setCustomRoles(prev => [...prev, newRole]);
+                                      setCredits(prev => prev.map((c, i) => i === idx ? { ...c, role: newRole, isCustomRole: false, tempRole: '' } : c));
+                                    }
+                                  }
+                                }}
+                                className="bg-surface-2 border border-brand rounded-lg px-2 py-1 text-[10px] text-text-primary font-bold focus:border-brand outline-none uppercase min-w-[120px]"
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  if (credit.tempRole?.trim()) {
+                                    const newRole = credit.tempRole.trim().toLowerCase();
+                                    if (!customRoles.includes(newRole)) setCustomRoles(prev => [...prev, newRole]);
+                                    setCredits(prev => prev.map((c, i) => i === idx ? { ...c, role: newRole, isCustomRole: false, tempRole: '' } : c));
+                                  }
+                                }}
+                                className="p-1 hover:bg-brand/10 rounded-full text-brand transition-all"
+                                title="Save Custom Role"
+                              >
+                                <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setCredits(prev => prev.map((c, i) => i === idx ? { ...c, isCustomRole: false, role: 'actor', tempRole: '' } : c))}
+                                className="text-text-muted hover:text-red-500 p-1"
+                                title="Back to standard roles"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <select
+                              value={credit.role}
+                              onChange={(e) => {
+                                if (e.target.value === 'custom_role') {
+                                  setCredits(prev => prev.map((c, i) => i === idx ? { ...c, role: '', isCustomRole: true } : c));
+                                } else {
+                                  setCredits(prev => prev.map((c, i) => i === idx ? { ...c, role: e.target.value } : c));
+                                }
+                              }}
+                              className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-[10px] text-text-primary font-bold focus:border-brand outline-none uppercase"
+                            >
+                              <option value="actor">Actor</option>
+                              <option value="director">Director</option>
+                              <option value="producer">Producer</option>
+                              <option value="executive producer">Executive Producer</option>
+                              <option value="writer">Writer</option>
+                              <option value="cinematographer">Cinematographer (DOP)</option>
+                              <option value="editor">Editor</option>
+                              <option value="composer">Composer (Music)</option>
+                              <option value="sound recordist">Sound Recordist</option>
+                              <option value="production designer">Production Designer</option>
+                              <option value="art director">Art Director</option>
+                              <option value="makeup artist">Makeup Artist</option>
+                              <option value="costume designer">Costume Designer</option>
+                              <option value="gaffer">Gaffer</option>
+                              <option value="continuity">Continuity</option>
+                              <option value="production manager">Production Manager</option>
+                              <option value="assistant director">Assistant Director</option>
+                              <option value="colorist">Colorist</option>
+                              <option value="vfx">VFX</option>
+                              <option value="stunts">Stunts</option>
+                              <option value="casting director">Casting Director</option>
+                              <option value="location manager">Location Manager</option>
+                              {customRoles.map(r => (
+                                <option key={r} value={r}>{r}</option>
+                              ))}
+                              <option value="custom_role" className="text-brand font-black">+ Add Custom Role...</option>
+                            </select>
+                          )}
+                          {(!credit.isCustomRole && credit.role === 'actor') && (
                             <input
                               placeholder="Role name..."
                               value={credit.character_name || ''}
