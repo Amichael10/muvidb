@@ -372,7 +372,10 @@ function DiscoveryHub({ onMonitor }) {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/search-channels?query=${encodeURIComponent(query)}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/admin/search-channels?query=${encodeURIComponent(query)}`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token || ''}` }
+      });
       const data = await res.json();
       setResults(data.items || []);
     } catch (err) {
