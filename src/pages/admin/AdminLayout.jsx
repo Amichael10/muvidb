@@ -41,6 +41,7 @@ export default function AdminLayout() {
     { path: '/admin/channels', label: 'Channels', icon: 'solar:videocamera-record-linear' },
     { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear' },
     { path: '/admin/cinema-scraping', label: 'Scraping', icon: 'solar:refresh-linear' },
+    { path: '/admin/logs', label: 'Activity Logs', icon: 'solar:history-linear' },
     { path: '/admin/ai', label: 'AI Agent', icon: 'solar:cpu-linear' },
     { path: '/admin/spotlight', label: 'Spotlight', icon: 'solar:star-fall-linear' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },

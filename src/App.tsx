@@ -46,6 +46,7 @@ import AdminChannelDetail from './pages/admin/AdminChannelDetail';
 import AdminImport from './pages/admin/AdminImport';
 import AdminAI from './pages/admin/AdminAI';
 import AdminSpotlight from './pages/admin/AdminSpotlight';
+import AdminLogs from './pages/admin/AdminLogs';
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -179,6 +180,7 @@ export default function App() {
                   <Route path="ai" element={<AdminAI />} />
                   <Route path="import" element={<AdminImport />} />
                   <Route path="spotlight" element={<AdminSpotlight />} />
+                  <Route path="logs" element={<ProtectedRoute allowedRoles={['admin']}><AdminLogs /></ProtectedRoute>} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />
