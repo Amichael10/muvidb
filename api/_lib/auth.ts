@@ -41,14 +41,30 @@ export async function isValidAuth(req: VercelRequest): Promise<boolean> {
       }
 
       if (user) {
-        const role = user.user_metadata?.role || 'fan';
+        // Fallback to user_metadata if DB check fails
+        let role = user.user_metadata?.role || 'fan';
+        
+        // Prioritize role from public.users table (matches AuthContext logic)
+        try {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+          
+          if (profile?.role) {
+            role = profile.role;
+          }
+        } catch (dbErr) {
+          console.warn('Auth check: Failed to fetch role from public.users', dbErr);
+        }
         
         console.log(`Auth check: [SUCCESS] User: ${user.email} | Role: ${role}`);
 
-        if (role === 'admin' || role === 'pro') {
+        if (role === 'admin' || role === 'admin_limited' || role === 'pro') {
           return true;
         } else {
-          console.warn(`Auth check: [FORBIDDEN] ${user.email} lacks admin/pro role.`);
+          console.warn(`Auth check: [FORBIDDEN] ${user.email} lacks admin/pro role. Evaluated role: ${role}`);
         }
       }
     } catch (e: any) {
