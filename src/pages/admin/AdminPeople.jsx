@@ -10,6 +10,7 @@ import MergeModal from '../../components/admin/MergeModal';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
+import { toTitleCase } from '../../utils/format';
 
 export default function AdminPeople() {
   const { user } = useAuth();
@@ -325,6 +326,7 @@ export default function AdminPeople() {
 
       const dataToSave = {
         ...formData,
+        name: toTitleCase(formData.name),
         biography: formData.biography || null,
         date_of_birth: formData.date_of_birth || null,
         photo_url: formData.photo_url || null,

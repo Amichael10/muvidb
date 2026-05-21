@@ -8,6 +8,7 @@ import MergeModal from '../../components/admin/MergeModal';
 import { extractYoutubeId } from '../../lib/youtube';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
+import { toTitleCase } from '../../utils/format';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -775,8 +776,8 @@ export default function AdminFilms() {
         const creditPayload = credits.map(c => ({
           film_id: filmId,
           person_id: c.person_id,
-          role: c.role,
-          character_name: c.character_name,
+          role: c.role ? toTitleCase(c.role) : '',
+          character_name: c.character_name ? toTitleCase(c.character_name) : '',
           billing_order: c.billing_order
         }));
         insertPromises.push(supabase.from('credits').insert(creditPayload));
