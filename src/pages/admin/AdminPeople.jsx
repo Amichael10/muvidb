@@ -806,6 +806,7 @@ export default function AdminPeople() {
                   required 
                   value={formData.name} 
                   onChange={e => setFormData({...formData, name: e.target.value})} 
+                  onBlur={e => setFormData({...formData, name: toTitleCase(e.target.value)})}
                   className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none transition-colors" 
                   placeholder="e.g. Funke Akindele" 
                 />
