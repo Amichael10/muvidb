@@ -41,7 +41,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
   if (variant === 'compact') {
     return (
       <Link 
-        to={`/people/${person.id}`}
+        to={`/people/${person.mubi_slug || person.id}`}
         className="flex flex-col items-center text-center group"
       >
         <div className="relative mb-3">
@@ -67,7 +67,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
   // Full variant
   return (
     <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-      <Link to={`/person/${person.id}`} className="shrink-0 group">
+      <Link to={`/people/${person.mubi_slug || person.id}`} className="shrink-0 group">
         <img 
           src={person.photo_url || person.photo} 
           alt={person.name} 
@@ -77,7 +77,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
       
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <Link to={`/person/${person.id}`}>
+          <Link to={`/people/${person.mubi_slug || person.id}`}>
             <h3 className="font-heading font-bold text-2xl text-text-primary hover:text-gold transition-colors">
               {person.name}
             </h3>

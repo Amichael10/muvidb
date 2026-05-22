@@ -117,7 +117,7 @@ export default function FilmDetail() {
         .from('credits')
         .select(`
           id, role, character_name, billing_order,
-          people(id, name, photo_url, popularity_score)
+          people(id, name, photo_url, popularity_score, mubi_slug)
         `)
         .eq('film_id', uuid)
         .order('billing_order', { ascending: true });
@@ -364,7 +364,7 @@ export default function FilmDetail() {
                   {crew.map((member, idx) => (
                     <Link 
                       key={idx} 
-                      to={`/people/${member.id}`}
+                      to={`/people/${member.mubi_slug || member.id}`}
                       className="flex items-center gap-4 bg-surface p-4 border-r border-b border-border last:border-r-0 last:border-b-0 hover:bg-surface-2 transition-colors group"
                     >
                       <img src={member.photo_url || `https://placehold.co/150x150/1A1A1A/FF5C00?text=${member.name.split(' ').map(n => n[0]).join('')}`} alt={member.name} className="w-10 h-10 rounded-lg object-cover border border-border group-hover:border-gold transition-colors" />
