@@ -23,7 +23,7 @@ export default function FilmCard({
   return (
     <div className="relative flex flex-col gap-3">
       <Link 
-        to={`/films/${film.id}`}
+        to={`/films/${film.mubi_slug || film.id}`}
         className={`relative block rounded-xl overflow-hidden group transition-all duration-500 hover:shadow-2xl z-0 hover:z-10 ${sizeClasses[size]}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}

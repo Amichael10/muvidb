@@ -311,13 +311,13 @@ export default function Dashboard() {
                           </div>
                           
                           <div className="flex gap-8 relative z-10">
-                            <Link to={`/films/${review.film.id}`} className="shrink-0 w-24 aspect-[2/3] rounded-lg overflow-hidden border border-border shadow-md">
+                            <Link to={`/films/${review.film.mubi_slug || review.film.id}`} className="shrink-0 w-24 aspect-[2/3] rounded-lg overflow-hidden border border-border shadow-md">
                               <img src={review.film.poster_url || review.film.poster} alt={review.film.title} className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" />
                             </Link>
                             <div className="flex-1 space-y-4">
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <Link to={`/films/${review.film.id}`} className="font-bold text-text-primary hover:text-brand transition-colors text-lg tracking-tight">
+                                  <Link to={`/films/${review.film.mubi_slug || review.film.id}`} className="font-bold text-text-primary hover:text-brand transition-colors text-lg tracking-tight">
                                     {review.film.title}
                                   </Link>
                                   <p className="text-[10px] font-bold text-text-muted mt-1 opacity-60">{review.film.year} Release</p>

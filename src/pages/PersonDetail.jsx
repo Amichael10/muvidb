@@ -624,7 +624,7 @@ const PersonDetail = () => {
             </h2>
 
             <Link
-              to={`/channels/${channel.id}`}
+              to={`/channels/${channel.mubi_slug || channel.id}`}
               className="relative z-10 group flex flex-col sm:flex-row items-center gap-8 bg-surface rounded-xl border border-border hover:border-brand transition-all duration-500 overflow-hidden shadow-sm p-8 max-w-3xl"
             >
               <div className="relative shrink-0">
