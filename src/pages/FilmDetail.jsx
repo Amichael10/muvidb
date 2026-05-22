@@ -117,7 +117,7 @@ export default function FilmDetail() {
         .from('credits')
         .select(`
           id, role, character_name, billing_order,
-          people(id, name, photo_url, popularity_score, slug)
+          people(id, name, photo_url, popularity_score)
         `)
         .eq('film_id', uuid)
         .order('billing_order', { ascending: true });
