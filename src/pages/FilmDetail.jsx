@@ -125,18 +125,26 @@ export default function FilmDetail() {
       if (error) throw error;
       
       const castMembers = data
-        .filter(c => (c.role || '').toLowerCase() === 'actor' || (c.role || '').toLowerCase() === 'cast')
-        .map(c => ({
-          ...c.people,
-          role: c.character_name || 'Cast'
-        }));
+        .filter(c => {
+          const role = (c.role || '').trim().toLowerCase();
+          return role === 'actor' || role === 'cast';
+        })
+        .map(c => {
+          const person = Array.isArray(c.people) ? c.people[0] : c.people;
+          return person ? { ...person, role: c.character_name || 'Cast' } : null;
+        })
+        .filter(Boolean);
         
       const crewMembers = data
-        .filter(c => (c.role || '').toLowerCase() !== 'actor' && (c.role || '').toLowerCase() !== 'cast')
-        .map(c => ({
-          ...c.people,
-          role: c.role || 'Crew'
-        }));
+        .filter(c => {
+          const role = (c.role || '').trim().toLowerCase();
+          return role !== 'actor' && role !== 'cast';
+        })
+        .map(c => {
+          const person = Array.isArray(c.people) ? c.people[0] : c.people;
+          return person ? { ...person, role: c.role || 'Crew' } : null;
+        })
+        .filter(Boolean);
 
       setCast(castMembers);
       setCrew(crewMembers);
