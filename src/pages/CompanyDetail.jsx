@@ -4,11 +4,11 @@ import { supabase } from '../lib/supabase'
 import { formatViewCount } from '../utils/youtube'
 import { Icon } from '@iconify/react'
 import ShareAction from '../components/ui/ShareAction'
-import { slugOrId } from '../utils/slug'
+
 
 const FilmCard = ({ film }) => (
   <Link
-    to={`/films/${film.slug || film.id}`}
+    to={`/films/${film.mubi_slug || film.id}`}
     className="group block"
   >
     <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[#13192B]">
@@ -86,7 +86,6 @@ const CompanyDetail = () => {
     setLoading(true)
     setError(null)
 
-    const { col, val } = slugOrId(slug);
     const { data, error } = await supabase
       .from('companies')
       .select(`
@@ -94,13 +93,13 @@ const CompanyDetail = () => {
         film_companies(
           role,
           films(
-            id, title, year, poster_url, slug,
+            id, title, year, poster_url, mubi_slug,
             view_count, average_rating,
             film_genres(genres(name))
           )
         )
       `)
-      .eq(col, val)
+      .eq('id', slug)
       .single()
 
     if (error) {

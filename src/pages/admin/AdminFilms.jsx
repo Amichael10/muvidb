@@ -728,6 +728,7 @@ export default function AdminFilms() {
         tmdb_rating: formData.tmdb_rating && !isNaN(parseFloat(formData.tmdb_rating)) ? parseFloat(formData.tmdb_rating) : null,
         is_trending: Boolean(formData.is_trending),
         is_featured: Boolean(formData.is_featured),
+        mubi_slug: formData.mubi_slug || (formData.title ? formData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '') + '-' + Math.random().toString(36).substring(2, 6) : null),
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
         poster_url: (formData.poster_url || '').trim() || null,

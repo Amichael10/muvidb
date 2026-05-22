@@ -191,7 +191,7 @@ export default function FilmDetail() {
         const { data: related } = await supabase
           .from('films')
           .select(`
-            id, title, year, poster_url, backdrop_url, slug,
+            id, title, year, poster_url, backdrop_url, mubi_slug,
             film_genres(genres(name))
           `)
           .neq('id', data.id)
@@ -212,7 +212,7 @@ export default function FilmDetail() {
   const handleWatchlist = async () => {
     if (!user) {
       navigate('/login', {
-        state: { from: `/films/${film?.slug || slug}`, message: 'Sign in to add films to your watchlist' }
+        state: { from: `/films/${film?.mubi_slug || film?.id || slug}`, message: 'Sign in to add films to your watchlist' }
       });
       return;
     }
@@ -471,7 +471,7 @@ export default function FilmDetail() {
                 {relatedFilms.map(relatedFilm => (
                   <Link
                     key={relatedFilm.id}
-                    to={`/films/${relatedFilm.slug || relatedFilm.id}`}
+                    to={`/films/${relatedFilm.mubi_slug || relatedFilm.id}`}
                     className="flex gap-4 bg-surface hover:bg-surface-2 p-4 border-b border-border last:border-b-0 group transition-all"
                   >
                     <img

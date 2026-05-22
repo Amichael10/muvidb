@@ -159,7 +159,7 @@ const PersonDetail = () => {
           id, role, character_name, billing_order,
           films(
             id, title, year, poster_url, trailer_youtube_id,
-            view_count, average_rating, slug,
+            view_count, average_rating, mubi_slug,
             release_type, trailer_youtube_id,
             film_genres(genres(name))
           )
@@ -180,7 +180,7 @@ const PersonDetail = () => {
     // Fetch linked YouTube channel
     const { data: ch } = await supabase
       .from('channels')
-      .select('id, name, channel_handle, channel_url, thumbnail_url, banner_url, subscriber_count, description, category, slug')
+      .select('id, name, channel_handle, channel_url, thumbnail_url, banner_url, subscriber_count, description, category')
       .eq('owner_person_id', data.id)
       .maybeSingle()
     setChannel(ch ?? null)
@@ -337,7 +337,7 @@ const PersonDetail = () => {
     if (!user) {
       navigate('/login', {
         state: {
-          from: `/people/${person?.slug || slug}`,
+          from: `/people/${person?.mubi_slug || person?.id || slug}`,
           message: 'Sign in to follow filmmakers'
         }
       })
@@ -559,7 +559,7 @@ const PersonDetail = () => {
                 const poster = film?.poster_url || video?.thumbnail_url
                 const link = video 
                   ? `https://www.youtube.com/watch?v=${video.video_id}` 
-                  : `/films/${film?.slug || film?.id}`
+                  : `/films/${film?.mubi_slug || film?.id}`
                 const isExternal = !!video
 
                 return (
@@ -624,7 +624,7 @@ const PersonDetail = () => {
             </h2>
 
             <Link
-              to={`/channels/${channel.slug || channel.id}`}
+              to={`/channels/${channel.id}`}
               className="relative z-10 group flex flex-col sm:flex-row items-center gap-8 bg-surface rounded-xl border border-border hover:border-brand transition-all duration-500 overflow-hidden shadow-sm p-8 max-w-3xl"
             >
               <div className="relative shrink-0">

@@ -358,6 +358,7 @@ export default function AdminPeople() {
         photo_url: formData.photo_url || null,
         popularity_score: parseInt(formData.popularity_score) || 0,
         tmdb_id: formData.tmdb_id || null,
+        mubi_slug: formData.mubi_slug || (formData.name ? formData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '') + '-' + Math.random().toString(36).substring(2, 6) : null),
         youtube_channel_id,
         youtube_handle,
         youtube_stats
