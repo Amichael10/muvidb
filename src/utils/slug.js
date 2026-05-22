@@ -23,5 +23,5 @@ export const slugOrId = (param) => {
   if (!param) return { col: 'id', val: null };
   return isUuid(param)
     ? { col: 'id', val: param }
-    : { col: 'slug', val: param };
+    : { col: 'mubi_slug', val: param };
 };
