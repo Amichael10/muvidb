@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
+import { findAndInsertMissingFilm } from './lib/tmdb_cinema.js';
 
 const stealthPlugin = stealth();
 chromium.use(stealthPlugin);
@@ -99,7 +100,8 @@ async function scrapeGenesis() {
         totalProcessed += films.length;
         
         for (const film of films) {
-          const cleanTitleStr = cleanTitle(film.title!.replace(/\s+VIP$/i, '').trim());
+          const rawTitle = film.title!.replace(/\s+VIP$/i, '').replace(/\(vip\)/i, '').replace(/\(ambition\)/i, '').trim();
+          const cleanTitleStr = cleanTitle(rawTitle);
           console.log(`    🔍 Syncing ${cleanTitleStr}...`);
           
           let { data: dbFilm } = await supabase
@@ -112,7 +114,7 @@ async function scrapeGenesis() {
             const { data: fuzzyFilms } = await supabase
               .from('films')
               .select('id, title')
-              .ilike('title', `%${cleanTitleStr}%`)
+              .ilike('title', `${cleanTitleStr}%`)
               .limit(5);
               
             if (fuzzyFilms && fuzzyFilms.length > 0) {
@@ -122,7 +124,12 @@ async function scrapeGenesis() {
           }
 
           if (!dbFilm) {
-            console.log(`      ⚠️ Film not found in DB: ${cleanTitleStr}`);
+            console.log(`      ⚠️ Film not found in DB: ${cleanTitleStr}. Attempting TMDB fetch...`);
+            dbFilm = await findAndInsertMissingFilm(supabase, rawTitle);
+          }
+
+          if (!dbFilm) {
+            console.log(`      ❌ Could not resolve film: ${cleanTitleStr}`);
             continue;
           }
 
@@ -146,7 +153,7 @@ async function scrapeGenesis() {
             cinema_id: loc.cinemaId,
             show_date: today,
             show_time: s.time + ':00',
-            format: s.format,
+            format: 'Standard', // Enforce 'Standard' to prevent check constraint violations
             ticket_url: s.ticketUrl,
             source: 'genesis_playwright',
             is_available: true,
