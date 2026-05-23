@@ -41,11 +41,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: `Invalid or missing endpoint. Allowed: ${[...ALLOWED_ENDPOINTS].join(', ')}` });
   }
 
-  // Get API key (prefer non-VITE_ version for server-side)
+  // Get API key — YOUTUBE_API_KEY must be set as a server-side env var in Vercel
+  // (NOT VITE_YOUTUBE_API_KEY — that is only available at build time, not in serverless functions)
   const apiKey = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
   if (!apiKey) {
-    console.error('[api/youtube] YOUTUBE_API_KEY is not set in environment variables');
-    return res.status(500).json({ error: 'YouTube API Key not configured. Set YOUTUBE_API_KEY in Vercel environment variables.' });
+    console.error('[api/youtube] YOUTUBE_API_KEY is missing. Go to Vercel → Settings → Environment Variables and add YOUTUBE_API_KEY');
+    return res.status(503).json({
+      error: 'YouTube API Key not configured on the server. Ask your admin to set YOUTUBE_API_KEY in Vercel environment variables.',
+      hint: 'YOUTUBE_API_KEY must be set in Vercel → Project Settings → Environment Variables'
+    });
   }
 
   // Build the YouTube API URL
