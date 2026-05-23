@@ -376,11 +376,15 @@ export default function AdminPeople() {
       };
 
       if (editingPerson) {
-        const { error } = await supabase
+        const { data: updateData, error } = await supabase
           .from('people')
           .update(dataToSave)
-          .eq('id', editingPerson.id);
+          .eq('id', editingPerson.id)
+          .select();
         if (error) throw error;
+        if (!updateData || updateData.length === 0) {
+          throw new Error('Save failed: No permissions or record not found.');
+        }
         await logAdminAction(user, 'update', 'person', editingPerson.id, dataToSave.name);
         toast.success('Profile updated');
       } else {
