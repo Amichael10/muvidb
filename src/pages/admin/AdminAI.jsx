@@ -104,7 +104,7 @@ export default function AdminAI() {
       if (isNewPerson) {
         const { error } = await supabase.from('people').insert({
           name: item.name,
-          biography: item.biography || item.bio,
+          bio: item.biography || item.bio,
           date_of_birth: item.date_of_birth || null,
           photo_url: item.image_url,
           nationality: item.nationality || 'Nigerian',
@@ -114,7 +114,7 @@ export default function AdminAI() {
         count = error ? 0 : 1;
       } else if (item.type === 'person') {
         const { data, error } = await supabase.from('people').update({
-          biography: item.biography || item.bio,
+          bio: item.biography || item.bio,
           date_of_birth: item.date_of_birth || null,
           photo_url: item.image_url
         }).eq('id', item.id).select();
