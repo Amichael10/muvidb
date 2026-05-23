@@ -253,22 +253,32 @@ export default function AdminPeople() {
     setDraftRestoredMessage(draft ? 'Unsaved changes restored from draft.' : '');
 
     setEditingPerson(person);
+
+    // Fetch full person details since get_people_with_counts omits heavy fields
+    const { data: fullPerson } = await supabase
+      .from('people')
+      .select('*')
+      .eq('id', person.id)
+      .single();
+    
+    const p = fullPerson || person;
+
     setFormData(draft || {
-      name: person.name || '',
-      biography: person.biography || person.bio || '',
-      photo_url: person.photo_url || '',
-      date_of_birth: person.date_of_birth || '',
-      gender: person.gender || 'Prefer not to say',
-      nationality: person.nationality || 'Nigerian',
-      is_verified: person.is_verified || false,
-      is_spotlight: person.is_spotlight || false,
-      popularity_score: person.popularity_score || 0,
-      tmdb_id: person.tmdb_id || '',
-      youtube_channel_id: person.youtube_channel_id || '',
-      youtube_handle: person.youtube_handle || '',
-      youtube_stats: person.youtube_stats || { subscribers: '0', videos: '0', thumbnail: null, banner: null }
+      name: p.name || '',
+      biography: p.biography || p.bio || '',
+      photo_url: p.photo_url || '',
+      date_of_birth: p.date_of_birth || '',
+      gender: p.gender || 'Prefer not to say',
+      nationality: p.nationality || 'Nigerian',
+      is_verified: p.is_verified || false,
+      is_spotlight: p.is_spotlight || false,
+      popularity_score: p.popularity_score || 0,
+      tmdb_id: p.tmdb_id || '',
+      youtube_channel_id: p.youtube_channel_id || '',
+      youtube_handle: p.youtube_handle || '',
+      youtube_stats: p.youtube_stats || { subscribers: '0', videos: '0', thumbnail: null, banner: null }
     });
-    setYoutubeChannelInput(draft?.youtube_channel_id || draft?.youtube_handle || getPersonYoutubeChannelUrl(person) || '');
+    setYoutubeChannelInput(draft?.youtube_channel_id || draft?.youtube_handle || getPersonYoutubeChannelUrl(p) || '');
     
     // Fetch credits for this person
     const { data: credits } = await supabase
