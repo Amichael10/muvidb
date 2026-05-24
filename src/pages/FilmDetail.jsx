@@ -106,6 +106,7 @@ export default function FilmDetail() {
 
   const [cast, setCast] = useState([]);
   const [crew, setCrew] = useState([]);
+  const [showAllCast, setShowAllCast] = useState(false);
 
   useEffect(() => {
     fetchFilm();
@@ -360,14 +361,50 @@ export default function FilmDetail() {
             {/* Cast */}
             {cast.length > 0 && (
               <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Cast</h2>
-                <div className="flex overflow-x-auto gap-8 pb-4 scrollbar-hide">
-                  {cast.map(person => (
-                    <div key={person.id} className="shrink-0 w-32">
-                      <PersonCard person={person} variant="compact" />
-                    </div>
+                <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted mb-6">Cast</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                  {(showAllCast ? cast : cast.slice(0, 6)).map(person => (
+                    <Link 
+                      key={person.id} 
+                      to={`/people/${person.mubi_slug || person.id}`}
+                      className="group flex flex-col"
+                    >
+                      <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden border border-border/50 shadow-md group-hover:shadow-xl group-hover:border-gold/50 transition-all duration-300 transform group-hover:scale-[1.03]">
+                        {person.photo_url ? (
+                          <img 
+                            src={person.photo_url} 
+                            alt={person.name} 
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-surface-2 flex items-center justify-center text-text-muted text-4xl font-extrabold uppercase select-none transition-colors group-hover:bg-surface-3">
+                            {person.name.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex flex-col text-left">
+                        <span className="font-bold text-text-primary text-sm tracking-tight leading-snug line-clamp-1 group-hover:text-gold transition-colors">
+                          {person.name}
+                        </span>
+                        <span className="text-xs text-text-muted font-medium mt-0.5 line-clamp-1">
+                          {person.role}
+                        </span>
+                      </div>
+                    </Link>
                   ))}
                 </div>
+                
+                {cast.length > 6 && (
+                  <div className="mt-8 flex justify-center">
+                    <button
+                      onClick={() => setShowAllCast(prev => !prev)}
+                      className="w-full py-4 bg-surface/50 border border-border text-text-primary text-xs font-black uppercase tracking-widest rounded-xl hover:bg-surface hover:border-border-hover transition-all duration-300 active:scale-[0.98]"
+                    >
+                      {showAllCast ? 'Show less' : `Show all ${cast.length} cast members`}
+                    </button>
+                  </div>
+                )}
               </section>
             )}
 
