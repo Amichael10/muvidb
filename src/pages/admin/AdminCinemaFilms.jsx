@@ -151,7 +151,7 @@ export default function AdminCinemaFilms() {
       query = query.not('admin_decision', 'is', null);
     }
 
-    const { data } = await query.order('created_at', { ascending: false });
+    const { data } = await query.order('first_seen_at', { ascending: false });
     setItems(data ?? []);
     setLoading(false);
   }, [viewMode]);
@@ -237,7 +237,7 @@ export default function AdminCinemaFilms() {
                   <td className="px-10 py-8">
                     <div className="flex flex-col">
                       <span className="text-text-primary text-base font-black tracking-tight group-hover:text-brand transition-colors">{item.title}</span>
-                      <span className="text-[9px] text-text-muted font-bold uppercase tracking-widest mt-1">Detected: {fmtDate(item.created_at)}</span>
+                      <span className="text-[9px] text-text-muted font-bold uppercase tracking-widest mt-1">Detected: {fmtDate(item.first_seen_at)}</span>
                     </div>
                   </td>
                   <td className="px-10 py-8">
