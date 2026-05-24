@@ -26,7 +26,7 @@ jobs:
       - name: Run Netflix Sync
         run: npm run scrape:netflix
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NETFLIX_EMAIL: ${{ secrets.NETFLIX_EMAIL }}
           NETFLIX_PASSWORD: ${{ secrets.NETFLIX_PASSWORD }}
@@ -34,7 +34,7 @@ jobs:
       - name: Run Prime Sync
         run: npm run scrape:prime
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PRIME_EMAIL: ${{ secrets.PRIME_EMAIL }}
           PRIME_PASSWORD: ${{ secrets.PRIME_PASSWORD }}

@@ -48,9 +48,7 @@ async function syncKava() {
       console.log('Creating Kava Data channel...');
       const { data: newChannel, error } = await supabase.from('channels').insert([{ 
         name: 'Kava Data', 
-        channel_handle: 'kava.tv',
-        adapter: 'kava',
-        is_active: true 
+        channel_handle: 'kava.tv'
       }]).select().single();
       
       if (error) throw error;
@@ -130,8 +128,7 @@ async function syncKava() {
         release_type: 'kava',
         countries: ['Nigeria'],
         needs_review: true,
-        status: 'released',
-        type: isSeries ? 'series' : 'movie'
+        status: 'released'
       };
     }).filter(row => !existingSet.has(row.source_video_id));
 

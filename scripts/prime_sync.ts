@@ -287,8 +287,7 @@ async function syncToDatabase(scrapedMovies) {
           synopsis: existing.synopsis || movie.synopsis,
           runtime_minutes: existing.runtime_minutes || runtimeMinutes,
           poster_url: existing.poster_url || movie.poster_url,
-          backdrop_url: (existing as any).backdrop_url || movie.backdrop_url || movie.poster_url,
-          type: existing.type || (movie.isSeries ? 'series' : 'movie')
+          backdrop_url: (existing as any).backdrop_url || movie.backdrop_url || movie.poster_url
         };
         const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix'].includes(existing.release_type);
         if (!isSuperPrimary) updatePayload.release_type = 'prime_video';
@@ -300,8 +299,7 @@ async function syncToDatabase(scrapedMovies) {
           title: cleanedTitle, year: movieYear, synopsis: movie.synopsis, runtime_minutes: runtimeMinutes,
           poster_url: movie.poster_url, backdrop_url: movie.backdrop_url || movie.poster_url,
           release_type: 'prime_video', streaming_links: { prime_video: movie.url }, source: 'prime_video',
-          status: 'released', countries: ['Nigeria'], needs_review: true,
-          type: movie.isSeries ? 'series' : 'movie'
+          status: 'released', countries: ['Nigeria'], needs_review: true
         }).select('id').single();
         if (error) throw error;
         filmId = inserted.id;

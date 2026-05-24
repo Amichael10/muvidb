@@ -634,8 +634,7 @@ async function syncToDatabase(scrapedMovies) {
           synopsis: existing.synopsis || movie.synopsis,
           runtime_minutes: existing.runtime_minutes || movie.runtime_minutes,
           poster_url: existing.poster_url || movie.poster_url,
-          backdrop_url: existing.backdrop_url || movie.poster_url,
-          type: movie.type || existing.type || 'movie'
+          backdrop_url: existing.backdrop_url || movie.poster_url
         };
 
         if (['announced', 'coming_soon'].includes(existing.status)) {
@@ -683,8 +682,7 @@ async function syncToDatabase(scrapedMovies) {
           source: 'netflix',
           status: 'released',
           countries: countries.length > 0 ? countries : ['Nigeria'],
-          needs_review: true,
-          type: movie.type || 'movie'
+          needs_review: true
         }).select('id').single();
 
         if (error) throw error;
