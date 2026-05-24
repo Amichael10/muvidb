@@ -37,13 +37,31 @@ async function matchNollywoodFilm(title: string): Promise<string | null> {
   const clean = title.trim().replace(/\s+/g, ' ');
   if (!clean) return null;
 
-  const { data } = await supabase
+  // 1. Direct case-insensitive exact match in films
+  const { data: directMatch } = await supabase
     .from('films')
     .select('id')
     .eq('is_nollywood', true)
     .ilike('title', clean)       // ilike with no %..% = case-insensitive exact
     .limit(1);
-  return data && data.length ? data[0].id : null;
+
+  if (directMatch && directMatch.length) {
+    return directMatch[0].id;
+  }
+
+  // 2. Resolve via pending triage mapping (admin-promoted alias)
+  const { data: aliasMatch } = await supabase
+    .from('pending_cinema_films')
+    .select('promoted_film_id')
+    .ilike('title', clean)
+    .eq('admin_decision', 'promoted')
+    .limit(1);
+
+  if (aliasMatch && aliasMatch.length && aliasMatch[0].promoted_film_id) {
+    return aliasMatch[0].promoted_film_id;
+  }
+
+  return null;
 }
 
 /** Upsert into pending_cinema_films (or update last_seen + count). */
