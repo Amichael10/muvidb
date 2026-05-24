@@ -517,7 +517,7 @@ const PersonDetail = () => {
                 
                 <ShareAction 
                   title={person.name}
-                  text={`Check out ${person.name}'s profile on Lumi`}
+                  text={`Check out ${person.name}'s profile on Ensembla`}
                   className="!w-auto"
                 />
               </div>

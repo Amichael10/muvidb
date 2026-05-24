@@ -8,7 +8,7 @@ const ShareAction = ({ title, text, url, variant = 'default', className = '' }) 
 
   const shareUrl = url || window.location.href;
   const shareTitle = title || document.title;
-  const shareText = text || `Check this out on Lumi`;
+  const shareText = text || `Check this out on Ensembla`;
 
   const socialPlatforms = [
     {

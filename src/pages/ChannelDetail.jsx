@@ -247,7 +247,7 @@ export default function ChannelDetail() {
       if (chErr || !ch) throw new Error('Channel not found');
       setChannel(ch);
       setChannelId(ch.id);
-      document.title = `Lumi | ${ch.name}`;
+      document.title = `Ensembla | ${ch.name}`;
 
       if (ch.owner_person_id) {
         const { data: p } = await supabase
@@ -369,7 +369,7 @@ export default function ChannelDetail() {
                   </button>
                   <ShareAction 
                     title={channel.name}
-                    text={`Check out ${channel.name} on Lumi`}
+                    text={`Check out ${channel.name} on Ensembla`}
                     className="!w-auto"
                   />
                 </div>

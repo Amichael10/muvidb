@@ -18,7 +18,7 @@ export default function ClaimProfile() {
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   useEffect(() => {
-    document.title = "Lumi | Claim Profile";
+    document.title = "Ensembla | Claim Profile";
     if (user?.id) {
        checkExistingClaim();
     }
@@ -142,7 +142,7 @@ export default function ClaimProfile() {
             <div className="animate-in fade-in slide-in-from-right-4 duration-500 relative z-10">
               <h2 className="font-heading font-bold text-4xl text-text-primary mb-2 text-center tracking-tighter uppercase italic">Find Your Profile</h2>
               <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em] text-center mb-12 opacity-60">
-                SEARCH FOR YOUR NAME TO ESTABLISH YOUR OFFICIAL LUMI RECORD
+                SEARCH FOR YOUR NAME TO ESTABLISH YOUR OFFICIAL ENSEMBLA RECORD
               </p>
               
               <div className="relative max-w-xl mx-auto mb-12">

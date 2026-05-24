@@ -370,7 +370,7 @@ const CinemaDetail = () => {
                 )}
                 <ShareAction 
                   title={cinema.name}
-                  text={`Check out ${cinema.name} on Lumi`}
+                  text={`Check out ${cinema.name} on Ensembla`}
                   className="!w-auto"
                 />
               </div>

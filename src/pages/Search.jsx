@@ -18,7 +18,7 @@ export default function Search() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    document.title = "Lumi | Search";
+    document.title = "Ensembla | Search";
     fetchGenres();
     if (initialQuery) {
       fetchAll();

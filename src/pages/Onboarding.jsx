@@ -14,7 +14,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Lumi | Complete Your Profile";
+    document.title = "Ensembla | Complete Your Profile";
     if (user?.onboarded) {
       navigate(user.role === 'professional' ? '/pro-dashboard' : '/dashboard');
     }
@@ -61,7 +61,7 @@ export default function Onboarding() {
           Complete <span className="text-brand">Profile</span>
         </h2>
         <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em] opacity-60">
-          Personalize your Lumi experience
+          Personalize your Ensembla experience
         </p>
       </div>
 

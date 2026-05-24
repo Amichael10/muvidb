@@ -27,7 +27,7 @@ export default function Home() {
   const [spotlightContent, setSpotlightContent] = useState(null);
 
   useEffect(() => {
-    document.title = "Lumi | Home";
+    document.title = "Ensembla | Home";
     fetchAllData();
   }, []);
 
@@ -372,7 +372,7 @@ export default function Home() {
         <div className="border-b border-border py-12 bg-surface-2/5">
           <FilmRow
             title="Recently Added"
-            subtitle="Latest additions to the Lumi library"
+            subtitle="Latest additions to the Ensembla library"
             films={recentlyAdded}
             isLoading={isLoading}
           />

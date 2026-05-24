@@ -36,12 +36,12 @@ export default function ImageWithFallback({
     setHasError(!src);
   }, [src]);
 
-  const hash = getHash(name || alt || 'Lumi');
+  const hash = getHash(name || alt || 'Ensembla');
   const gradient = PRESET_GRADIENTS[hash % PRESET_GRADIENTS.length];
 
   // Get initials for avatar (max 2 characters)
   const getInitials = (title) => {
-    if (!title) return 'LU';
+    if (!title) return 'EN';
     const cleaned = title.trim().replace(/[^a-zA-Z0-9\s]/g, '');
     const words = cleaned.split(/\s+/).filter(Boolean);
     if (words.length >= 2) {
@@ -74,7 +74,7 @@ export default function ImageWithFallback({
           
           {/* Subtle text label if it's large enough */}
           <span className="absolute bottom-3 right-4 text-[9px] font-black uppercase tracking-[0.25em] text-white/40 pointer-events-none select-none font-heading">
-            {name || alt || 'LUMI'}
+            {name || alt || 'ENSEMBLA'}
           </span>
         </div>
       );

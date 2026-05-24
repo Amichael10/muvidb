@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { films } from '../../data/mockData';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function AuthLayout({ children }) {
   const [currentFilmIndex, setCurrentFilmIndex] = useState(0);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -82,11 +84,17 @@ export default function AuthLayout({ children }) {
         
         {/* Mobile Logo */}
         <div className="absolute top-10 left-10 lg:hidden">
-          <Link to="/" className="flex items-center gap-3 text-brand font-heading font-bold text-2xl">
-            <div className="w-8 h-8 bg-brand text-white flex items-center justify-center rounded-lg shadow-lg shadow-brand/20">
-                <span className="text-lg">L</span>
-            </div>
-            <span className="uppercase tracking-tighter italic">Lumi</span>
+          <Link to="/" className="flex items-center gap-3 group shrink-0">
+            <img 
+              src="/images/Ensembla Brand/Logo.png" 
+              alt="Ensembla Logo" 
+              className="w-8 h-8 object-contain group-hover:scale-110 transition-all duration-500" 
+            />
+            <img 
+              src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.png" : "/images/Ensembla Brand/Wordmark Black.png"} 
+              alt="Ensembla" 
+              className="h-5 object-contain" 
+            />
           </Link>
         </div>
 

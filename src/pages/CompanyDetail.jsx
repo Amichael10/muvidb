@@ -264,7 +264,7 @@ const CompanyDetail = () => {
                   </a>
                   <ShareAction 
                     title={company.name}
-                    text={`Check out ${company.name} on Lumi`}
+                    text={`Check out ${company.name} on Ensembla`}
                     className="!w-auto"
                   />
                 </div>

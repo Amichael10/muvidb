@@ -302,7 +302,7 @@ async function runSeed() {
   await processCredits();
 
   // Write report
-  let report = `=== LUMI BATCH IMPORT REPORT ===\n\n`;
+  let report = `=== ENSEMBLA BATCH IMPORT REPORT ===\n\n`;
   report += `INSERTED: ${logs.inserted.length}\n`;
   report += `UPDATED (Merged more info): ${logs.updated.length}\n`;
   report += `SKIPPED (Already existed): ${logs.skipped.length}\n`;

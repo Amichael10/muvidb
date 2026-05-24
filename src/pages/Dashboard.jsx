@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [editingReviewId, setEditingReviewId] = useState(null);
 
   useEffect(() => {
-    document.title = "Lumi | Dashboard";
+    document.title = "Ensembla | Dashboard";
     
     // Redirect admin and admin_limited to Admin Workspace
     if (user?.role === 'admin' || user?.role === 'admin_limited') {

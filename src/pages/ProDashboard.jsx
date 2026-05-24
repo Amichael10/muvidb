@@ -35,7 +35,7 @@ export default function ProDashboard() {
   });
 
   useEffect(() => {
-    document.title = "Lumi Pro | Dashboard";
+    document.title = "Ensembla Pro | Dashboard";
     if (user?.role === 'admin' || user?.role === 'admin_limited') {
       navigate('/admin');
       return;
@@ -45,7 +45,7 @@ export default function ProDashboard() {
       checkClaimStatus();
     }
     
-    const hasSeenModal = localStorage.getItem('lumi_pro_welcome_seen');
+    const hasSeenModal = localStorage.getItem('ensembla_pro_welcome_seen');
     if (!hasSeenModal && user?.role === 'professional' && !user.linked_profile_id) {
       setShowWelcomeModal(true);
     }
@@ -446,8 +446,8 @@ export default function ProDashboard() {
           <div className="bg-surface border border-border rounded-3xl p-12 max-w-lg w-full relative z-10 text-center space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
              <div className="w-20 h-20 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-4 border border-brand/20"><span className="text-3xl">🎭</span></div>
              <h2 className="font-heading font-bold text-4xl text-text-primary tracking-tighter">Welcome to Pro</h2>
-             <p className="text-text-muted text-xs font-bold leading-relaxed opacity-60">Lumi Pro is the management portal for industry professionals. Connect your profile to manage your filmography and access insights.</p>
-             <button onClick={() => { setShowWelcomeModal(false); localStorage.setItem('lumi_pro_welcome_seen', 'true'); }} className="w-full bg-brand text-white py-5 rounded-xl text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20">Continue</button>
+             <p className="text-text-muted text-xs font-bold leading-relaxed opacity-60">Ensembla Pro is the management portal for industry professionals. Connect your profile to manage your filmography and access insights.</p>
+             <button onClick={() => { setShowWelcomeModal(false); localStorage.setItem('ensembla_pro_welcome_seen', 'true'); }} className="w-full bg-brand text-white py-5 rounded-xl text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20">Continue</button>
           </div>
         </div>
       )}

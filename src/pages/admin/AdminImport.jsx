@@ -91,7 +91,7 @@ export default function AdminImport() {
     const url = URL.createObjectURL(data);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Lumi_${config.label}_Template.xlsx`;
+    a.download = `Ensembla_${config.label}_Template.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -107,7 +107,7 @@ export default function AdminImport() {
     let finalHeaders = headers;
     if (type === 'movies') finalHeaders = headers.concat(['link_netflix', 'link_kava', 'link_prime']);
 
-    let md = `# Lumi ${config.label} Import Template\n\n`;
+    let md = `# Ensembla ${config.label} Import Template\n\n`;
     md += `| ${finalHeaders.join(' | ')} |\n`;
     md += `| ${finalHeaders.map(() => '---').join(' | ')} |\n`;
     md += `| ${finalHeaders.map(h => config.required.includes(h) ? 'REQUIRED' : 'optional').join(' | ')} |\n\n`;
@@ -115,13 +115,13 @@ export default function AdminImport() {
     md += `## Instructions\n`;
     md += `1. Do not rename the column headers.\n`;
     md += `2. Fill out all REQUIRED fields.\n`;
-    md += `3. Upload this file via the Lumi Admin Import Hub.\n`;
+    md += `3. Upload this file via the Ensembla Admin Import Hub.\n`;
 
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Lumi_${config.label}_Template.md`;
+    a.download = `Ensembla_${config.label}_Template.md`;
     a.click();
   };
 

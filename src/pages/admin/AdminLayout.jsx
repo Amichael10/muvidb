@@ -7,19 +7,19 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    return localStorage.getItem('lumi_admin_collapsed') === 'true';
+    return localStorage.getItem('ensembla_admin_collapsed') === 'true';
   });
   
   const [isDark, setIsDark] = useState(() => {
-    return localStorage.getItem('lumi_theme_mode') !== 'light';
+    return localStorage.getItem('ensembla_theme_mode') !== 'light';
   });
 
   useEffect(() => {
-    localStorage.setItem('lumi_admin_collapsed', isCollapsed);
+    localStorage.setItem('ensembla_admin_collapsed', isCollapsed);
   }, [isCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem('lumi_theme_mode', isDark ? 'dark' : 'light');
+    localStorage.setItem('ensembla_theme_mode', isDark ? 'dark' : 'light');
     if (isDark) {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
@@ -88,9 +88,11 @@ export default function AdminLayout() {
 
         <div className={`h-16 flex items-center px-6 mb-4 ${isCollapsed ? 'justify-center' : ''}`}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-hover flex items-center justify-center text-white font-black shadow-lg shadow-brand/20">
-              L
-            </div>
+            <img 
+              src="/images/Ensembla Brand/Logo.png" 
+              alt="Ensembla Logo" 
+              className="w-8 h-8 object-contain" 
+            />
             {!isCollapsed && (
               <span className="text-text-primary font-bold text-lg tracking-tight">Admin Panel</span>
             )}

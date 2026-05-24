@@ -11,7 +11,7 @@ export default function Waitlist() {
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    document.title = "Lumi | The Home of African Cinema";
+    document.title = "Ensembla | The Home of African Cinema";
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,7 +42,7 @@ export default function Waitlist() {
       }
 
       setIsSubmitted(true);
-      toast.success("Welcome to Lumi!");
+      toast.success("Welcome to Ensembla!");
     } catch (err: any) {
       console.error('Waitlist error:', err);
       toast.error(err.message || 'Something went wrong.');
@@ -83,8 +83,17 @@ export default function Waitlist() {
       </div>
 
       <header className="absolute top-0 left-0 w-full p-8 md:p-12 z-20 flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="text-2xl font-extrabold tracking-tight text-text-primary transition-colors">LUMI<span className="text-brand drop-shadow-[0_0_8px_var(--color-brand-muted)]">.</span></span>
+        <Link to="/" className="flex items-center gap-3 group shrink-0">
+          <img 
+            src="/images/Ensembla Brand/Logo.png" 
+            alt="Ensembla Logo" 
+            className="w-10 h-10 object-contain group-hover:scale-110 transition-all duration-500" 
+          />
+          <img 
+            src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.png" : "/images/Ensembla Brand/Wordmark Black.png"} 
+            alt="Ensembla" 
+            className="h-6 object-contain hidden sm:block" 
+          />
         </Link>
         
         <div className="flex items-center gap-6">
@@ -207,7 +216,7 @@ export default function Waitlist() {
 
       <footer className="mt-auto w-full p-8 border-t border-border/50 text-center relative z-10">
         <p className="text-[10px] font-bold uppercase tracking-[0.4em] transition-colors text-text-secondary">
-          Lumi Protocol © 2026 — Pioneering the African Archive
+          Ensembla Protocol © 2026 — Pioneering the African Archive
         </p>
       </footer>
     </div>

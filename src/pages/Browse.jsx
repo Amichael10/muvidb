@@ -27,7 +27,7 @@ export default function Browse() {
   const [sortBy, setSortBy] = useState(initialSort);
 
   useEffect(() => {
-    document.title = "Lumi | Browse";
+    document.title = "Ensembla | Browse";
     fetchGenres();
   }, []);
 

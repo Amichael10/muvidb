@@ -187,7 +187,7 @@ export default function FilmDetail() {
       fetchCredits(data.id);
 
       if (data) {
-        document.title = `Lumi | ${data.title}`;
+        document.title = `Ensembla | ${data.title}`;
         const { data: related } = await supabase
           .from('films')
           .select(`
@@ -476,7 +476,7 @@ export default function FilmDetail() {
               </button>
               <ShareAction 
                 title={film.title}
-                text={`Check out ${film.title} on Lumi`}
+                text={`Check out ${film.title} on Ensembla`}
               />
             </div>
 

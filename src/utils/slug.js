@@ -1,5 +1,5 @@
 /**
- * Slug utilities for Lumi URL routing.
+ * Slug utilities for Ensembla URL routing.
  * Allows detail pages to accept both slugs (new) and UUIDs (legacy backwards compat).
  */
 

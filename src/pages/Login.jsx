@@ -14,7 +14,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Lumi | Sign In";
+    document.title = "Ensembla | Sign In";
   }, []);
 
   // Redirect if already logged in
@@ -156,9 +156,9 @@ export default function Login() {
 
       {/* Sign Up Link */}
       <p className="text-center mt-10">
-        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">NEW TO LUMI? </span>
+        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">NEW TO ENSEMBLA? </span>
         <Link to="/signup" className="text-[10px] font-black text-brand uppercase tracking-widest hover:underline">
-          JOIN LUMI
+          JOIN ENSEMBLA
         </Link>
       </p>
     </AuthLayout>

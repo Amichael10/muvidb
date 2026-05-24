@@ -376,7 +376,7 @@ export default function AdminCredits() {
           <p className="text-brand text-[10px] font-black uppercase tracking-[0.3em] mb-1 italic">Production Index</p>
           <h1 className="text-3xl font-black text-text-primary tracking-tight">Credits Management</h1>
           <p className="text-text-muted text-sm mt-1 max-w-xl font-medium leading-relaxed opacity-80">
-            Global attribution engine for the Lumi ecosystem. Linking talent to production assets.
+            Global attribution engine for the Ensembla ecosystem. Linking talent to production assets.
           </p>
         </div>
         <button

@@ -124,7 +124,7 @@ const Cinemas = () => {
   const CHAINS = ['All', 'Filmhouse', 'Genesis', 'Silverbird', 'Ozone', 'Blu Star', 'Kada', 'Viva']
 
   useEffect(() => {
-    document.title = 'Lumi | Cinemas'
+    document.title = 'Ensembla | Cinemas'
     fetchCinemas()
   }, [])
 

@@ -19,7 +19,7 @@ export default function Signup() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Lumi | Join";
+    document.title = "Ensembla | Join";
   }, []);
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function Signup() {
     <AuthLayout>
       <div className="mb-10 space-y-2">
         <h2 className="font-heading font-bold text-4xl md:text-5xl text-text-primary tracking-tighter uppercase italic leading-none">
-          Join <span className="text-brand">Lumi</span>
+          Join <span className="text-brand">Ensembla</span>
         </h2>
         <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em] opacity-60">
           Create your archive profile

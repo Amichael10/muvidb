@@ -130,7 +130,7 @@ export default function Channels() {
   const [searchInput, setSearchInput] = useState('');
 
   useEffect(() => {
-    document.title = 'Lumi | YouTube Channels';
+    document.title = 'Ensembla | YouTube Channels';
     fetchChannels();
   }, [search, activeCategory]);
 
