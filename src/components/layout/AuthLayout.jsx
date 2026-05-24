@@ -84,16 +84,11 @@ export default function AuthLayout({ children }) {
         
         {/* Mobile Logo */}
         <div className="absolute top-10 left-10 lg:hidden">
-          <Link to="/" className="flex items-center gap-3 group shrink-0">
+          <Link to="/" className="flex items-center group shrink-0">
             <img 
-              src="/images/Ensembla Brand/Logo.png" 
-              alt="Ensembla Logo" 
-              className="w-8 h-8 object-contain group-hover:scale-110 transition-all duration-500" 
-            />
-            <img 
-              src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.png" : "/images/Ensembla Brand/Wordmark Black.png"} 
+              src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.svg" : "/images/Ensembla Brand/Wordmark.svg"} 
               alt="Ensembla" 
-              className="h-5 object-contain" 
+              className="h-6 object-contain group-hover:scale-105 transition-all duration-500" 
             />
           </Link>
         </div>

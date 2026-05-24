@@ -74,16 +74,11 @@ export default function Navbar() {
       >
         <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-x border-white/5">
         {/* Left: Logo */}
-        <Link to="/" className="flex items-center gap-3 group shrink-0">
+        <Link to="/" className="flex items-center group shrink-0">
           <img 
-            src="/images/Ensembla Brand/Logo.png" 
-            alt="Ensembla Logo" 
-            className="w-10 h-10 object-contain group-hover:scale-110 transition-all duration-500" 
-          />
-          <img 
-            src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.png" : "/images/Ensembla Brand/Wordmark Black.png"} 
+            src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.svg" : "/images/Ensembla Brand/Wordmark.svg"} 
             alt="Ensembla" 
-            className="h-6 object-contain hidden sm:block" 
+            className="h-7 object-contain group-hover:scale-105 transition-all duration-500" 
           />
         </Link>
 

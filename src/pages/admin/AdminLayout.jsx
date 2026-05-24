@@ -86,17 +86,20 @@ export default function AdminLayout() {
           <Icon icon={isCollapsed ? "solar:alt-arrow-right-linear" : "solar:alt-arrow-left-linear"} width="12" />
         </button>
 
-        <div className={`h-16 flex items-center px-6 mb-4 ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="flex items-center gap-3">
+        <div className={`h-16 flex items-center mb-4 ${isCollapsed ? 'justify-center px-6' : 'px-6'}`}>
+          {isCollapsed ? (
             <img 
               src="/images/Ensembla Brand/Logo.png" 
               alt="Ensembla Logo" 
               className="w-8 h-8 object-contain" 
             />
-            {!isCollapsed && (
-              <span className="text-text-primary font-bold text-lg tracking-tight">Admin Panel</span>
-            )}
-          </div>
+          ) : (
+            <img 
+              src="/images/Ensembla Brand/Wordmark White.svg" 
+              alt="Ensembla Admin" 
+              className="h-6 object-contain" 
+            />
+          )}
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 space-y-1 py-4 scrollbar-hide">
