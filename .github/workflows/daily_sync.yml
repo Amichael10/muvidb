@@ -2,14 +2,14 @@ name: Lumi Data Sync
 
 on:
   schedule:
-    # 6:00 AM WAT (UTC+1) = 5:00 AM UTC (Cinemas)
+    # 6:00 AM WAT (UTC+1) = 5:00 AM UTC (Cinemas - Daily)
     - cron: '0 5 * * *'
-    # YouTube Sync: Hourly
-    - cron: '0 * * * *'
-    # 10:00 AM WAT (UTC+1) = 9:00 AM UTC (TMDB/Kava)
+    # YouTube Sync: 3 times a day (every 8 hours)
+    - cron: '0 */8 * * *'
+    # 10:00 AM WAT (UTC+1) = 9:00 AM UTC (TMDB/Kava - Daily)
     - cron: '0 9 * * *'
-    # AI Maintenance: Every 4 hours
-    - cron: '0 1,5,9,13,17,21 * * *'
+    # AI Maintenance: Twice a day (every 12 hours)
+    - cron: '0 2,14 * * *'
   workflow_dispatch:
     inputs:
       task:

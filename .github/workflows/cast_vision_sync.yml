@@ -2,7 +2,7 @@ name: Cast Vision Sync
 
 on:
   schedule:
-    - cron: '30 * * * *' # Run at half-past every hour
+    - cron: '0 3,15 * * *' # Run twice a day (at 3:00 AM and 3:00 PM)
   workflow_dispatch:
 
 jobs:
