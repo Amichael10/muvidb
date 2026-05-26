@@ -101,7 +101,7 @@ function Layout({ children }) {
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith('/admin');
   const isOnboardingPath = location.pathname === '/onboarding';
-  const isWaitlistPath = location.pathname === '/waitlist';
+  const isWaitlistPath = location.pathname === '/waitlist' || location.pathname === '/';
   
   const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath;
   
@@ -133,11 +133,12 @@ export default function App() {
                   border: '1px solid #333333',
                 },
               }} 
+              
             />
             <Layout>
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<Home />} />
+                <Route path="/" element={<Waitlist />} />
                 <Route path="/films/:slug" element={<FilmDetail />} />
                 <Route path="/film/:slug" element={<FilmDetail />} />
                 <Route path="/search" element={<Search />} />
