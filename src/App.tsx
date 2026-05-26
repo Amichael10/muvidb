@@ -138,7 +138,7 @@ export default function App() {
             <Layout>
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<Waitlist />} />
+                <Route path="/" element={<Home />} />
                 <Route path="/films/:slug" element={<FilmDetail />} />
                 <Route path="/film/:slug" element={<FilmDetail />} />
                 <Route path="/search" element={<Search />} />
