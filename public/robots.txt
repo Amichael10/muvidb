@@ -1,4 +1,38 @@
 User-agent: *
 Allow: /
 
+# Block AI scrapers and training crawlers
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: OMgili
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: YouBot
+Disallow: /
+
 Sitemap: https://ensembla.xyz/sitemap.xml
