@@ -1,128 +1,173 @@
-# Lumi
+<p align="center">
+  <a href="https://ensembla.xyz" target="_blank">
+    <img src="./public/images/Ensembla%20Brand/Logo%20Red.png" alt="Ensembla Logo" width="100" />
+  </a>
+</p>
 
-**The Nollywood film discovery platform.**
-Browse films, explore cast and crew, find showtimes, and follow your favourite Nigerian filmmakers and creators.
+<h1 align="center">Ensembla</h1>
 
-</div>
+<p align="center">
+  <strong>The Ultimate Nollywood Film Discovery & Cinema Showtime Platform.</strong>
+</p>
+
+<p align="center">
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-20232a.svg?style=for-the-badge&logo=react" alt="React 19" /></a>
+  <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4.svg?style=for-the-badge&logo=tailwind-css" alt="Tailwind CSS v4" /></a>
+  <a href="https://supabase.com"><img src="https://img.shields.io/badge/Supabase-Database-3ECF8E.svg?style=for-the-badge&logo=supabase" alt="Supabase" /></a>
+  <a href="https://vercel.com"><img src="https://img.shields.io/badge/Vercel-Hosted-000000.svg?style=for-the-badge&logo=vercel" alt="Vercel" /></a>
+  <a href="https://vite.dev"><img src="https://img.shields.io/badge/Vite-Bundler-646CFF.svg?style=for-the-badge&logo=vite" alt="Vite" /></a>
+</p>
+
+<p align="center">
+  <a href="https://ensembla.xyz">🌐 Live Production Site</a> &bull;
+  <a href="https://staging.ensembla.xyz">🧪 Staging Environment</a> &bull;
+  <a href="https://waitlist.ensembla.xyz">🎟️ Standalone Waitlist</a>
+</p>
+
+<hr />
+
+<p align="center">
+  <img src="./public/images/Ensembla%20Brand/Ensembla%20Social%20Share.png" alt="Ensembla Social Share Banner" width="100%" style="border-radius: 8px;" />
+</p>
+
+## 🌟 Overview
+
+**Ensembla** is a premium, state-of-the-art web application dedicated to Nollywood cinema. It bridges the gap between Nollywood film lovers and theater showtimes across Nigeria.
+
+Ensembla features a robust, fully automated scheduling and scraping ecosystem that compiles film catalogs, maps theater schedules in real-time, displays crew/actor filmographies, syncs with major Nollywood YouTube creators, and protects resources using smart backend proxy structures and security honeypots.
 
 ---
 
-## Tech Stack
+## ✨ Core Features
 
-| Layer | Tech |
+* **🎬 Nollywood Showcase** — Browse a premium Nollywood catalog filtered by genre, release year, language, and NFVCB rating.
+* **📅 Live Cinema Showtimes** — Ingest and link theater showtimes dynamically from major chains (Silverbird, Filmhouse, Genesis) with fuzzy title matching.
+* **🌟 Cast & Crew Hub** — Comprehensive crew profiles, high-quality portraits, dynamic filmographies, and verified social media handles (Instagram, Facebook, X).
+* **📹 Creator & critic Sync** — Automated statistics, view metrics, and subscriber tracking for top Nollywood YouTube content creators.
+* **🔒 Admin Control Panel** — Rich administration dashboards featuring live TMDB imports, custom record curators, and a fuzzy movie-triage mapping queue.
+* **🛡️ Security Honeypots** — Active backend security endpoints that detect and log automated vulnerability scanning attempts.
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+| Layer | Technologies Used |
 |---|---|
-| Frontend | React 19, React Router, Tailwind CSS v4, Vite |
-| Backend | Vercel Serverless Functions (`/api`) |
-| Database | Supabase (PostgreSQL + Row Level Security) |
-| External APIs | TMDB, YouTube Data API v3 |
-| Deployment | Vercel |
+| **Frontend** | React 19, React Router, Tailwind CSS v4, Remix Icons, Vite |
+| **Backend** | Vercel Serverless Functions (`TypeScript`) |
+| **Database** | Supabase (PostgreSQL + RLS Security Policies) |
+| **Automations** | GitHub Actions Cron Pipelines (Scrapers & AI Maintenance Agents) |
+| **External APIs** | TMDB API, YouTube Data API v3, Playwright Headless Scraping |
 
----
-
-## Features
-
-- **Browse & Search** — Filter Nollywood films by genre, year, language, and NFVCB rating
-- **Film Pages** — Poster, backdrop, cast, crew, ratings, and streaming info
-- **People** — Profiles for actors, directors, and producers with filmographies
-- **Cinemas & Showtimes** — Find where films are playing near you
-- **YouTube Creators** — Follow Nollywood creators with live channel stats
-- **Admin Panel** — Manage films, people, and sync data from TMDB and YouTube
-
----
-
-## Project Structure
+### 📂 Directory Structure
 
 ```
-/
-├── api/                    # Vercel serverless API routes
-│   ├── _lib/               # Shared server utilities (Supabase client, rate limiter)
-│   ├── films.ts            # GET /api/films
-│   ├── film/[id].ts        # GET /api/film/:id
-│   ├── people.ts           # GET /api/people
-│   ├── tmdb.ts             # Authenticated TMDB proxy
-│   ├── youtube.ts          # Authenticated YouTube Data API proxy
-│   └── data/all.ts         # Honeypot endpoint
-├── src/
-│   ├── components/         # Reusable UI components
-│   ├── lib/                # Supabase and YouTube client helpers
-│   ├── pages/              # Route-level page components
-│   └── utils/              # TMDB and YouTube utility functions
-├── vercel.json             # Routing config — /api/* → serverless, * → index.html
-└── vite.config.ts
+ensembla/
+├── .github/workflows/       # Highly optimized Actions cron sync pipelines
+├── api/                     # Vercel serverless backend proxy API routes
+│   ├── _lib/                # Shared DB connections, rate limiters, & scraper adapters
+│   ├── films.ts             # GET /api/films (public catalog)
+│   ├── film/[id].ts         # GET /api/film/:id (rich profile and administration data)
+│   ├── people.ts            # GET /api/people (actor and filmmaker list)
+│   ├── tmdb.ts              # Secure, authenticated TMDB server-side proxy
+│   ├── youtube.ts           # Secure, authenticated YouTube stats proxy
+│   └── data/all.ts          # Backend honeypot endpoint (anti-reconnaissance)
+├── public/                  # Static assets, branding graphics, sitemap, robots.txt
+├── src/                     # Core React Frontend Application
+│   ├── components/          # Reusable design tokens, layouts, and input forms
+│   ├── lib/                 # Supabase & service API client linkages
+│   ├── pages/               # Route pages (Browsing, Showtimes, Cinemas, Waitlist, Admin)
+│   └── utils/               # Catalog, mapping, and text formatters
+├── supabase/                # PostgreSQL migrations, schema types, and RLS scripts
+├── vercel.json              # Serverless API routing and custom rewrite configurations
+└── vite.config.ts           # Bundler configurations
 ```
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
-### Prerequisites
+Follow these instructions to configure and run the Ensembla development server locally.
 
-- Node.js 18+
-- A [Supabase](https://supabase.com) project
-- A [TMDB](https://www.themoviedb.org/settings/api) API key
-- A [YouTube Data API v3](https://console.cloud.google.com) key
+### 📋 Prerequisites
+* Node.js v18+
+* A [Supabase](https://supabase.com) database instance
+* A [TMDB API Key](https://www.themoviedb.org/settings/api)
+* A [Google Cloud Console Developer Key](https://console.cloud.google.com) (with YouTube Data API v3 enabled)
 
-### Local Setup
+### 💻 Local Installation
 
-1. **Install dependencies**
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Amichael10/ensembla.git
+   cd ensembla
+   ```
+
+2. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. **Configure environment variables**
-
-   Copy `.env.example` to `.env` and fill in your values:
-
+3. **Configure Environment Variables:**
+   Copy the environment variables template and populate the values:
    ```bash
    cp .env.example .env
    ```
-
-   | Variable | Description |
+   
+   | Variable | Purpose / Description |
    |---|---|
-   | `VITE_SUPABASE_URL` | Your Supabase project URL |
-   | `VITE_SUPABASE_ANON_KEY` | Supabase anon/public key |
-   | `SUPABASE_URL` | Same as above — used by serverless functions |
-   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only, never expose) |
-   | `TMDB_API_KEY` | TMDB API key (server-only) |
-   | `YOUTUBE_API_KEY` | YouTube Data API v3 key (server-only) |
+   | `VITE_SUPABASE_URL` | Your Supabase project endpoint |
+   | `VITE_SUPABASE_ANON_KEY` | Public anon key for frontend DB reads |
+   | `SUPABASE_URL` | Same as above — used by backend Vercel functions |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase private role key (server-only, never expose) |
+   | `TMDB_API_KEY` | Private Movie Database key (server-only) |
+   | `YOUTUBE_API_KEY` | Private YouTube Data key (server-only) |
 
-3. **Start the dev server**
+4. **Launch the Development Server:**
    ```bash
    npm run dev
    ```
-   App runs at `http://localhost:3001`
+   The local environment is now live at `http://localhost:3001`!
 
 ---
 
-## Deployment (Vercel)
+## 🛡️ Security & API Proxying
 
-1. Connect the repo to a Vercel project
-2. Add all environment variables listed above in **Project → Settings → Environment Variables**
-3. If using the Vercel Supabase integration, `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set automatically — you still need to add `SUPABASE_SERVICE_ROLE_KEY`, `TMDB_API_KEY`, and `YOUTUBE_API_KEY` manually
-4. Deploy — Vercel auto-detects Vite and runs `vite build`
+To keep user accounts secure and protect credentials, Ensembla implements strict API proxy boundaries:
 
-> **Note:** `TMDB_API_KEY` and `YOUTUBE_API_KEY` are server-only variables. They are never included in the client bundle — all calls go through the `/api/tmdb` and `/api/youtube` proxy routes.
-
----
-
-## API Routes
-
-| Method | Route | Description |
-|---|---|---|
-| `GET` | `/api/films` | List films. Query params: `search`, `country`, `year`, `language`, `limit`, `offset` |
-| `GET` | `/api/film/:id` | Single film. Returns extra fields for authenticated requests |
-| `GET` | `/api/people` | List people. Query params: `search`, `sort`, `limit`, `offset` |
-| `GET` | `/api/tmdb` | Authenticated TMDB proxy (admin use) |
-| `GET` | `/api/youtube` | Authenticated YouTube proxy (admin use) |
-| `ANY` | `/api/data/all` | Honeypot — always 403, logs hit to `honeypot_hits` table |
+* **Token Isolation:** Key APIs (`TMDB_API_KEY` and `YOUTUBE_API_KEY`) are stored safely in backend environment variables and **never** exposed to the browser.
+* **Server-Side Proxies:** The frontend makes clean fetch queries to Vercel Serverless proxy routes (`/api/tmdb` and `/api/youtube`) which handle authenticating, formatting, and returning sanitized payloads.
+* **Active Honeypot Tracker:** Automated vulnerability crawlers targeting `/api/data/all` are caught by a security honeypot script. The request metrics (IP, User-Agent, origin, time) are logged directly to the Supabase `honeypot_hits` table, and the connection is aborted with an immediate HTTP `403 Forbidden` response.
 
 ---
 
-## Scripts
+## ⚙️ Automated Sync Workflows
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start local dev server on port 3001 |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview the production build locally |
-| `npm run lint` | TypeScript type check (`tsc --noEmit`) |
+Ensembla features automated data pipelines orchestrated via GitHub Actions. These schedules are heavily optimized to stay well within free limits and prevent account restrictions:
+
+* **📅 Daily Showtimes Scraping (`daily_sync.yml` @ `0 5 * * *`):** Ingests and processes active movie schedules from major cinema sites, pushing clean data to Supabase.
+* **📹 Youtube Channel Tracking (`daily_sync.yml` @ `0 */8 * * *`):** Runs three times a day to fetch and save metrics for featured Nollywood YouTube channels.
+* **🤖 AI Catalog Maintenance (`daily_sync.yml` @ `0 2,14 * * *`):** Triggers twice a day to clean duplicate fields and format names dynamically.
+* **👁️ Vision & Cast Sync (`cast_vision_sync.yml` @ `0 3,15 * * *`):** Runs twice a day to fetch casting details from Nollywood databases.
+
+---
+
+## 🤝 Contributing
+
+Contributions to Ensembla are welcome! Please follow these guidelines:
+1. Fork the repository.
+2. Create a clean feature branch: `git checkout -b feature/your-awesome-feature`
+3. Commit your changes: `git commit -m "feat(scope): add high-fidelity component"`
+4. Push to the branch: `git push origin feature/your-awesome-feature`
+5. Open a Pull Request pointing to `staging`.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+
+---
+
+<p align="center">
+  Made with 🍿 & 💖 by <a href="https://github.com/Amichael10">Amichael10</a>
+</p>
