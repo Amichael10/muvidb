@@ -3,10 +3,292 @@ import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 
+const estimateWorkDuration = (actions) => {
+  if (!actions || actions.length === 0) return '0 mins';
+  
+  // Sort actions chronologically (ascending)
+  const sorted = [...actions].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  
+  let totalMs = 0;
+  let sessionStart = new Date(sorted[0].created_at);
+  let prevActionTime = sessionStart;
+  
+  const SESSION_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes threshold
+  const DEFAULT_BUFFER_MS = 10 * 60 * 1000; // 10 minutes buffer
+  
+  for (let i = 1; i < sorted.length; i++) {
+    const currentTime = new Date(sorted[i].created_at);
+    const gap = currentTime - prevActionTime;
+    
+    if (gap > SESSION_THRESHOLD_MS) {
+      // Add duration + buffer for completed session
+      totalMs += (prevActionTime - sessionStart) + DEFAULT_BUFFER_MS;
+      sessionStart = currentTime;
+    }
+    
+    prevActionTime = currentTime;
+  }
+  
+  // Add the last session duration + buffer
+  totalMs += (prevActionTime - sessionStart) + DEFAULT_BUFFER_MS;
+  
+  const totalMinutes = Math.floor(totalMs / (60 * 1000));
+  const hrs = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  
+  if (hrs === 0) return `${mins} min${mins > 1 ? 's' : ''}`;
+  return `${hrs} hr${hrs > 1 ? 's' : ''} ${mins} min${mins > 1 ? 's' : ''}`;
+};
+
+const generatePDFWindow = (actions, selectedDate) => {
+  const sortedActions = [...actions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  
+  // Identify sub-admin profile details
+  const subAdmin = sortedActions[0]?.users || { name: 'Ensembla Admin', email: 'admin@ensembla.xyz' };
+  const adminName = subAdmin.name || 'Unknown Admin';
+  const adminEmail = subAdmin.email || 'N/A';
+  
+  const estWorkTime = estimateWorkDuration(sortedActions);
+  
+  const totalCount = sortedActions.length;
+  const creates = sortedActions.filter(a => a.action_type === 'create').length;
+  const updates = sortedActions.filter(a => a.action_type === 'update').length;
+  const deletes = sortedActions.filter(a => a.action_type === 'delete').length;
+  
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups to export the PDF report.');
+    return;
+  }
+  
+  const dateRangeStr = selectedDate 
+    ? new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : 'All Time';
+    
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Ensembla Audit Report - ${adminName}</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #1e293b;
+            margin: 0;
+            padding: 40px;
+            background: #ffffff;
+            -webkit-print-color-adjust: exact;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .brand-logo {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            color: #ff5c00;
+          }
+          .brand-subtitle {
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 800;
+            color: #94a3b8;
+            letter-spacing: 0.15em;
+            margin-top: 2px;
+          }
+          .report-meta {
+            text-align: right;
+            font-size: 12px;
+            color: #64748b;
+          }
+          .report-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-top: 0;
+            margin-bottom: 4px;
+          }
+          .summary-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 35px;
+          }
+          .summary-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 14px;
+          }
+          .summary-card h4 {
+            margin: 0 0 6px 0;
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 0.05em;
+          }
+          .summary-card p {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+          }
+          .summary-card .highlight {
+            color: #ff5c00;
+          }
+          .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 30px;
+          }
+          .logs-table th, .logs-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+          }
+          .logs-table th {
+            background: #f1f5f9;
+            color: #475569;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9px;
+            letter-spacing: 0.05em;
+          }
+          .badge {
+            display: inline-block;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+          .badge-create { background: #dcfce7; color: #15803d; }
+          .badge-update { background: #dbeafe; color: #1d4ed8; }
+          .badge-delete { background: #fee2e2; color: #b91c1c; }
+          
+          .footer {
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 15px;
+            margin-top: 50px;
+            text-align: center;
+            font-size: 9px;
+            color: #94a3b8;
+          }
+          
+          @media print {
+            body {
+              padding: 0;
+            }
+            .no-print {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="brand-logo">ENSEMBLA</div>
+            <div class="brand-subtitle">Database Audit System</div>
+          </div>
+          <div class="report-meta">
+            <div class="report-title">Admin Work Audit Report</div>
+            <div>Date Range: <strong>${dateRangeStr}</strong></div>
+            <div>Generated: <strong>${new Date().toLocaleString()}</strong></div>
+          </div>
+        </div>
+
+        <div class="summary-title">Work Session Summary</div>
+        <div class="summary-grid">
+          <div class="summary-card" style="grid-column: span 2;">
+            <h4>Audited Administrator</h4>
+            <p>${adminName}</p>
+            <span style="font-size: 11px; color: #64748b;">${adminEmail}</span>
+          </div>
+          <div class="summary-card">
+            <h4>Est. Active Duration</h4>
+            <p class="highlight">${estWorkTime}</p>
+            <span style="font-size: 9px; color: #94a3b8;">Gap-based active estimate</span>
+          </div>
+          <div class="summary-card">
+            <h4>Total Edits Logged</h4>
+            <p>${totalCount}</p>
+            <span style="font-size: 9px; color: #64748b;">C: ${creates} | U: ${updates} | D: ${deletes}</span>
+          </div>
+        </div>
+
+        <div class="summary-title">Chronological Log Trail (${totalCount} Entries)</div>
+        <table class="logs-table">
+          <thead>
+            <tr>
+              <th style="width: 15%;">Timestamp</th>
+              <th style="width: 10%;">Action</th>
+              <th style="width: 15%;">Entity</th>
+              <th style="width: 30%;">Title / Name</th>
+              <th style="width: 30%;">Audit Parameters</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedActions.map(a => `
+              <tr>
+                <td style="color: #64748b; font-size: 10px;">
+                  ${new Date(a.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </td>
+                <td>
+                  <span class="badge badge-${a.action_type}">
+                    ${a.action_type}
+                  </span>
+                </td>
+                <td style="text-transform: capitalize; font-weight: 600; color: #475569;">
+                  ${a.entity_type}
+                </td>
+                <td style="font-weight: 700; color: #0f172a;">
+                  ${a.entity_name || '<span style="font-style: italic; color: #94a3b8;">N/A</span>'}
+                </td>
+                <td style="color: #64748b; font-family: monospace; font-size: 9px; word-break: break-all;">
+                  ${a.details ? JSON.stringify(a.details) : '{}'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          This document represents verified cryptographic database logs tracked by Ensembla.
+          All working durations are scientifically estimated using chronological action-gap clustering.
+        </div>
+        
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 500);
+          }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+
 export default function AdminLogs() {
   const { user } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [pageInput, setPageInput] = useState('1');
@@ -67,6 +349,52 @@ export default function AdminLogs() {
     }
   };
 
+  const handleGenerateReport = async () => {
+    setExporting(true);
+    try {
+      const selectQuery = filterName ? '*, users!inner(name, email, role)' : '*, users(name, email, role)';
+      
+      let query = supabase
+        .from('admin_actions')
+        .select(selectQuery);
+
+      if (filterName) {
+        query = query.ilike('users.name', `%${filterName}%`);
+      }
+      if (filterAction !== 'all') {
+        query = query.eq('action_type', filterAction);
+      }
+      if (filterEntity !== 'all') {
+        query = query.eq('entity_type', filterEntity);
+      }
+      if (filterDate) {
+        const [year, month, day] = filterDate.split('-');
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+        query = query.gte('created_at', startOfDay.toISOString());
+        query = query.lte('created_at', endOfDay.toISOString());
+      }
+
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        alert('No activity logs found matching your filters to generate a report.');
+        return;
+      }
+
+      generatePDFWindow(data, filterDate);
+    } catch (err) {
+      console.error('Error generating report:', err);
+      alert('Failed to generate audit report.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   const handlePageSubmit = (e) => {
@@ -98,6 +426,23 @@ export default function AdminLogs() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={handleGenerateReport}
+            disabled={exporting || loading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white font-bold text-sm rounded-xl hover:scale-[1.02] shadow-lg shadow-brand/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {exporting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <Icon icon="solar:document-text-bold" width="18" />
+                <span>Export Audit PDF</span>
+              </>
+            )}
+          </button>
           <input
             type="text"
             placeholder="Search by name..."

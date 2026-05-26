@@ -50,13 +50,13 @@ except ImportError:
     pass
 
 # ── Config ────────────────────────────────────────────────────────────────────
-INTRO_DURATION  = 180   # first 3 minutes
-OUTRO_DURATION  = 300   # last 5 minutes
+INTRO_DURATION  = 300   # first 5 minutes (excellent for opening crew credits)
+OUTRO_DURATION  = 480   # last 8 minutes (captures full closing credit roll)
 FRAME_INTERVAL  = 3     # one frame every N seconds
-MAX_FRAMES      = 20    # max frames per section sent to AI
+MAX_FRAMES      = 25    # max frames per section sent to AI
 
 # Use local workspace for temp files to avoid path issues on Windows
-BASE_TEMP_DIR   = Path.cwd() / "temp_lumi"
+BASE_TEMP_DIR   = Path.cwd() / f"temp_lumi_{os.getpid()}"
 FRAMES_DIR      = BASE_TEMP_DIR / "frames"
 
 GROK_API_KEY    = os.getenv("GROK_API_KEY")
@@ -152,15 +152,24 @@ class AIOrchestrator:
 
         # Fallback to Gemini
         if "gemini" in self.available_providers:
-            try:
-                if tried_grok:
-                    print(f"  [Fallback] Falling back to Gemini for '{task_name}'...")
-                else:
-                    print(f"  [Attempting] Attempting '{task_name}' via Gemini...")
-                return fn_gemini(self.gemini_client, *args, **kwargs), "gemini"
-            except Exception as e:
-                print(f"  ❌ Gemini Error during '{task_name}': {e}")
-                raise
+            import time
+            for attempt in range(1, 4):
+                try:
+                    if tried_grok:
+                        print(f"  [Fallback] Falling back to Gemini for '{task_name}' (attempt {attempt}/3)...")
+                    else:
+                        print(f"  [Attempting] Attempting '{task_name}' via Gemini (attempt {attempt}/3)...")
+                    return fn_gemini(self.gemini_client, *args, **kwargs), "gemini"
+                except Exception as e:
+                    print(f"  ❌ Gemini Error during '{task_name}': {e}")
+                    if attempt < 3:
+                        # Sleep for 60 seconds if it's a 429 Rate Limit error, otherwise default retry
+                        is_429 = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+                        sleep_time = 60 if is_429 else (attempt * 15)
+                        print(f"  ⏳ Gemini rate limit or error encountered. Retrying in {sleep_time}s...")
+                        time.sleep(sleep_time)
+                    else:
+                        raise
 
         raise RuntimeError(f"All providers failed for task '{task_name}'")
 
@@ -277,14 +286,16 @@ def encode_image(path: Path) -> str:
 
 CREDITS_PROMPT = """These are frames from the {section} of a Nollywood movie.
 Look carefully at every frame for any visible cast or crew credit text:
-actor names, character names, director, producer, cinematographer,
-editor, music, costume, makeup, executive producer, etc.
+actor names, character names, director, producer, cinematographer (DOP), editor, music, 
+makeup artist, costumier (wardrobe), gaffer, lighting, camera operator, sound designer, 
+photographer (still photographer), production manager, continuity, executive producer, associate producer, 
+production company, etc.
 Extract ALL names and roles you can see.
 Ignore subtitles, dialogue text, and channel watermarks.
 Return only the raw extracted text, one entry per line.
 If no credits are visible in a frame, skip it silently."""
 
-STRUCTURE_PROMPT = """You are building a Nollywood film database called Lumi.
+STRUCTURE_PROMPT = """You are building a Nollywood film database called Ensembla.
 Below is raw text extracted from the credits of a movie called '{title}'.
 Some text may be garbled, duplicated, or noisy from OCR on video frames.
 Clean it up using your knowledge of Nollywood naming conventions to fix obvious errors.
@@ -292,19 +303,42 @@ Deduplicate entries. Separate cast from crew.
 
 Return ONLY a markdown document with these sections (skip any with no data):
 # Cast
-(Include character names if visible)
+Pair each actor strictly with their character name/role if visible on the screen.
+Format each actor line EXACTLY like this:
+- Actor Name - Character Name (e.g. - Maurice Sam - Prince Caleb)
+If NO character name or role is shown for an actor, write ONLY their name:
+- Actor Name (e.g. - Maurice Sam)
 
 # Director
+Format each director line EXACTLY like this:
+- Director Name - Director (e.g. - John Director - Director)
+
 # Producers
-(Including Executive Producers)
+(Including Executive Producers, Associate Producers, etc.)
+Format each line EXACTLY like this:
+- Producer Name - Specific Role (e.g. - Jane Producer - Executive Producer, Mary Producer - Producer)
 
 # Cinematography
-# Continuity
+Format each line EXACTLY like this:
+- Cinematographer Name - Cinematographer (e.g. - Dave Cam - Cinematographer)
+
 # Editor
+Format each line EXACTLY like this:
+- Editor Name - Editor (e.g. - Ed Editor - Editor)
+
 # Music
+Format each line EXACTLY like this:
+- Composer Name - Composer (e.g. - Mel Music - Composer)
+
 # Costume & Makeup
+(Makeup Artist, Costumier, Wardrobe)
+Format each line EXACTLY like this:
+- Crew Name - Specific Role (e.g. - Mary Makeup - Makeup Artist, Wardrobe Designer - Costumier)
+
 # Crew
-(Any other crew roles like Sound, Gaffer, etc.)
+(ALL other crew roles like Gaffer, Sound Designer, Production Manager, Continuity, Lighting, Photographer, Still Photographer, etc.)
+Format each line EXACTLY like this:
+- Crew Name - Specific Role (e.g. - John Gaf - Gaffer, Sam Sound - Sound Designer, Dan Lit - Lighting)
 
 # Notes
 (Anything unclear or ambiguous)
@@ -351,7 +385,7 @@ def extract_credits_gemini(client, frames: list[Path], section: str) -> str:
     images = [Image.open(f) for f in frames]
     prompt = CREDITS_PROMPT.format(section=section)
     response = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash",
         contents=[prompt, *images]
     )
     return response.text
@@ -360,7 +394,7 @@ def extract_credits_gemini(client, frames: list[Path], section: str) -> str:
 def structure_credits_gemini(client, intro_raw: str, outro_raw: str, title: str) -> str:
     combined = f"INTRO CREDITS:\n{intro_raw}\n\nOUTRO CREDITS:\n{outro_raw}"
     response = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.5-flash",
         contents=STRUCTURE_PROMPT.format(title=title, raw=combined)
     )
     return response.text
@@ -470,22 +504,52 @@ class SupabaseSync:
             entries = [l.strip('- ').strip() for l in lines[1:] if l.strip() and not l.startswith('(')]
             
             for idx, entry in enumerate(entries):
-                # Handle "Actor Name - Character Name" pattern
+                # Handle splitting name and character/role details
                 name = entry
                 char = ""
+                specific_role = role
+                
+                # Split by separators: ' - ', ' – ', ' as ', ' : '
+                parts = []
                 if " - " in entry:
-                    name, char = entry.split(" - ", 1)
+                    parts = entry.split(" - ", 1)
+                elif " – " in entry: # en-dash
+                    parts = entry.split(" – ", 1)
                 elif " as " in entry.lower():
-                    parts = re.split(r" as ", entry, flags=re.IGNORECASE)
+                    parts = re.split(r"\s+as\s+", entry, flags=re.IGNORECASE)
+                elif " : " in entry:
+                    parts = entry.split(" : ", 1)
+                
+                if parts:
                     name = parts[0].strip()
-                    char = parts[1].strip()
-
+                    extra = parts[1].strip()
+                    if role == "actor":
+                        char = extra
+                    else:
+                        specific_role = extra
+                else:
+                    # Fallbacks if no separator exists
+                    if role == "producer":
+                        specific_role = "Producer"
+                    elif role == "cinematographer":
+                        specific_role = "Cinematographer"
+                    elif role == "editor":
+                        specific_role = "Editor"
+                    elif role == "composer":
+                        specific_role = "Composer"
+                    elif header == "Costume & Makeup":
+                        specific_role = "Costume & Makeup"
+                    elif role == "crew":
+                        specific_role = "Crew"
+                    elif role == "director":
+                        specific_role = "Director"
+                
                 name = name.strip()
                 if not name: continue
 
                 person_id = self.upsert_person(name)
                 if person_id:
-                    self.link_credit(film_id, person_id, role, char, idx)
+                    self.link_credit(film_id, person_id, specific_role, char, idx)
                     linked_count += 1
 
         print(f"  OK: Successfully linked {linked_count} credits to the database.")
