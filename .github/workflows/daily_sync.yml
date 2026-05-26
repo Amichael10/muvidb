@@ -31,7 +31,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     env:
-      BASE_URL: 'https://lumi-rho-seven.vercel.app'
+      BASE_URL: 'https://ensembla.xyz'
       CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
     
     steps:
