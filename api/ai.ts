@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateAIContent, parseJSON, generateAIVisionContent } from './_lib/ai_service';
-import { supabase } from './_lib/supabase';
+import { generateAIContent, parseJSON, generateAIVisionContent } from './_lib/ai_service.js';
+import { supabase } from './_lib/supabase.js';
 
 export const maxDuration = 60;
 
