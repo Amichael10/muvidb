@@ -32,6 +32,7 @@ export default function AdminCreditsExtractor() {
   // Dropdown Film search
   const [filmSearch, setFilmSearch] = useState('');
   const [isFilmDropdownOpen, setIsFilmDropdownOpen] = useState(false);
+  const [isSearchingFilms, setIsSearchingFilms] = useState(false);
 
   // Load 50 recent films on mount (so newly created/updated films appear first)
   async function loadRecentFilms() {
@@ -54,26 +55,45 @@ export default function AdminCreditsExtractor() {
 
   // Debounced dynamic server-side live film search
   useEffect(() => {
-    if (!filmSearch.trim()) {
+    let active = true;
+    const cleanSearch = filmSearch.trim();
+
+    if (!cleanSearch) {
       loadRecentFilms();
+      setIsSearchingFilms(false);
       return;
     }
+
+    setIsSearchingFilms(true);
 
     const delayDebounceFn = setTimeout(async () => {
       try {
         const { data, error } = await supabase
           .from('films')
           .select('id, title, poster_url, release_type')
-          .ilike('title', `%${filmSearch}%`)
+          .ilike('title', `%${cleanSearch}%`)
           .limit(50);
         if (error) throw error;
-        setFilms(data || []);
+        
+        if (active) {
+          setFilms(data || []);
+        }
       } catch (err) {
         console.error('Dynamic film search failed:', err);
+        if (active) {
+          toast.error(`Search failed: ${err.message}`);
+        }
+      } finally {
+        if (active) {
+          setIsSearchingFilms(false);
+        }
       }
     }, 300);
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      active = false;
+      clearTimeout(delayDebounceFn);
+    };
   }, [filmSearch]);
 
 
@@ -473,7 +493,12 @@ export default function AdminCreditsExtractor() {
                     />
                   </div>
                   <div className="overflow-y-auto flex-1 p-1.5 custom-scrollbar">
-                    {filteredFilms.length === 0 ? (
+                    {isSearchingFilms ? (
+                      <div className="p-8 text-center text-sm text-text-muted font-medium flex items-center justify-center gap-2">
+                        <div className="w-4.5 h-4.5 border-2 border-brand/30 border-t-brand rounded-full animate-spin"></div>
+                        <span>🔍 Searching database...</span>
+                      </div>
+                    ) : filteredFilms.length === 0 ? (
                       <div className="p-8 text-center text-sm text-text-muted font-medium">No results found</div>
                     ) : (
                       filteredFilms.map(f => (
