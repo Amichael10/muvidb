@@ -1,26 +1,35 @@
 /**
- * Firecrawl adapter — fallback for cinemas whose websites block server-side
- * fetch (e.g. Genesis Cinemas, which ECONNREFUSED from non-Nigerian IPs).
+ * Local Stealth + Gemini adapter — drop-in replacement for the exhausted/deprecated
+ * Firecrawl API fallback.
  *
- * Uses Firecrawl's /extract endpoint with an LLM schema to pull structured
- * showtime data from any cinema's now-showing/movies page. One Firecrawl
- * "scrape + extract" call consumes ~5 credits on the free plan (500/mo).
- * At 7 locations × 1 scrape/day = ~210 credits/month — comfortably free.
+ * Uses local Playwright-Stealth to bypass anti-bot walls (like Cloudflare Turnstile)
+ * and fetch webpage text for $0. Then sends it to Gemini Flash via your existing
+ * rotation pipeline to extract structured showtime schedules.
  *
  * cinemas.scrape_config must include:
  *   { "url": "https://genesiscinemas.com.ng/movies" }
  *
  * Optional overrides:
  *   { "ticketBaseUrl": "https://genesiscinemas.com.ng/book" }
- *
- * Requires env var:
- *   FIRECRAWL_API_KEY=fc-...
  */
 
+import { chromium } from 'playwright-extra';
+import stealth from 'puppeteer-extra-plugin-stealth';
+import { generateAIContent, parseJSON } from '../ai_service.js';
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { inferFormat, todayLagos } from './types.js';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-/** The shape we ask Firecrawl to extract from each page. */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Activate the stealth plugin locally
+const stealthPlugin = stealth();
+chromium.use(stealthPlugin);
+
+/** The shape we ask Gemini to extract from each page. */
 interface ExtractedSchedule {
   films: Array<{
     /** Film title as displayed on the site */
@@ -105,6 +114,79 @@ function normalizeDate(raw: string | null | undefined, fallback: string): string
   return fallback;
 }
 
+async function runScraplingBridge(url: string, options: { wait?: number; solveCloudflare?: boolean; selector?: string } = {}): Promise<{ status: number; text: string; html: string; error?: string }> {
+  return new Promise((resolve) => {
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const bridgePath = path.resolve(__dirname, '../../../scripts/scrapling_bridge.py');
+    
+    const args = ['-u', bridgePath, '--url', url, '--timeout', '90000'];
+    if (options.wait !== undefined) {
+      args.push('--wait', String(options.wait));
+    }
+    if (options.solveCloudflare) {
+      args.push('--solve-cloudflare');
+    }
+    if (options.selector) {
+      args.push('--selector', options.selector);
+    }
+    
+    console.log(`[Scrapling Bridge] Spawning: ${pythonCmd} ${args.join(' ')}`);
+    
+    const child = spawn(pythonCmd, args, {
+      shell: true,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' }
+    });
+    
+    let stdoutData = '';
+    let stderrData = '';
+    
+    child.stdout.on('data', (data) => {
+      stdoutData += data.toString();
+    });
+    
+    child.stderr.on('data', (data) => {
+      stderrData += data.toString();
+    });
+    
+    const timeout = setTimeout(() => {
+      console.warn(`[Scrapling Bridge] Timeout reached (120s). Killing process...`);
+      child.kill('SIGTERM');
+      resolve({ status: 500, text: '', html: '', error: 'Scrapling bridge timed out' });
+    }, 120000);
+    
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        resolve({ status: 500, text: '', html: '', error: `Process failed with code ${code}: ${stderrData.trim() || 'No stderr'}` });
+        return;
+      }
+      
+      try {
+        const lines = stdoutData.split('\n');
+        let jsonStr = '';
+        for (const line of lines) {
+          if (line.trim().startsWith('{') && line.trim().endsWith('}')) {
+            jsonStr = line.trim();
+            break;
+          }
+        }
+        if (!jsonStr) {
+          throw new Error('Could not find JSON payload in Scrapling stdout');
+        }
+        const parsed = JSON.parse(jsonStr);
+        resolve(parsed);
+      } catch (err: any) {
+        resolve({ status: 500, text: '', html: '', error: `Failed to parse output: ${err.message}` });
+      }
+    });
+    
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      resolve({ status: 500, text: '', html: '', error: err.message });
+    });
+  });
+}
+
 export const firecrawlAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<AdapterResult> => {
   const cfg = cinema.scrape_config || {};
   const url: string | undefined = cfg.url;
@@ -116,115 +198,133 @@ export const firecrawlAdapter: CinemaAdapter = async (cinema: CinemaRow): Promis
     };
   }
 
-  const apiKey = process.env.FIRECRAWL_API_KEY;
-  if (!apiKey) {
+  const ticketBaseUrl: string = cfg.ticketBaseUrl || '';
+
+  // Use Scrapling directly for Filmhouse (requires 5s JavaScript render) or if explicitly set in config
+  const useScrapling = cfg.useScrapling === true || url.includes('filmhouseng.com');
+  let pageText = '';
+
+  if (useScrapling) {
+    console.log(`[Local Scraper] Route fetching via Python Scrapling Bridge for ${cinema.name}...`);
+    const bridgeRes = await runScraplingBridge(url, {
+      wait: cfg.wait ?? 5000,
+      selector: cfg.waitSelector,
+      solveCloudflare: cfg.solveCloudflare === true
+    });
+    if (bridgeRes.error) {
+      console.warn(`[Local Scraper] Scrapling Bridge failed: ${bridgeRes.error}. Falling back to plain Playwright...`);
+    } else {
+      pageText = bridgeRes.text;
+    }
+  }
+
+  if (!pageText) {
+    // 1. Launch a local stealth browser session to fetch the page HTML/Text safely for free
+    console.log(`[Local Scraper] Launching stealth browser for ${cinema.name} (${url})...`);
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const context = await browser.newContext({
+        ignoreHTTPSErrors: true,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      });
+      const page = await context.newPage();
+      
+      // Block heavy assets to increase performance
+      await page.route('**/*', (route) => {
+        const type = route.request().resourceType();
+        if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+          route.abort();
+        } else {
+          route.continue();
+        }
+      });
+
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      
+      // Retrieve page text content
+      pageText = await page.evaluate(() => document.body.innerText);
+    } catch (err: any) {
+      console.warn(`[Local Scraper] Playwright fetch failed for ${cinema.name}: ${err.message}. Trying Scrapling Bridge fallback...`);
+      const bridgeRes = await runScraplingBridge(url, {
+        wait: cfg.wait ?? 5000,
+        solveCloudflare: cfg.solveCloudflare === true
+      });
+      if (bridgeRes.error) {
+        return {
+          cinemaId: cinema.id,
+          showtimes: [],
+          error: `Both Playwright and Scrapling fetchers failed. Playwright: ${err.message}, Scrapling: ${bridgeRes.error}`,
+        };
+      }
+      pageText = bridgeRes.text;
+    } finally {
+      await browser.close();
+    }
+  }
+
+  if (!pageText.trim()) {
     return {
       cinemaId: cinema.id,
       showtimes: [],
-      error: 'FIRECRAWL_API_KEY env var is not set',
+      error: 'Scraped page returned empty content',
     };
   }
 
-  const ticketBaseUrl: string = cfg.ticketBaseUrl || '';
+  // 2. Call your existing AI Provider model rotation (Gemini/Grok/OpenAI) to extract structured JSON showtimes
+  console.log(`[Local Scraper] Calling AI Provider to extract schedule for ${cinema.name}...`);
+  const aiPrompt = `Analyze the following raw text content of a cinema's "now showing" webpage and extract all currently showing movies and their scheduled showtimes.
+  
+Webpage Raw Text:
+"""
+${pageText}
+"""
 
-  // Call Firecrawl extract endpoint
+Instructions:
+1. Extract ALL films listed.
+2. For each film, return the title exactly as shown.
+3. Extract all showtimes, including:
+   - date: represented as "Today", "Tomorrow", a day of the week (e.g. "Saturday"), or a specific date if shown. If no date is visible, default to "Today".
+   - time: represented in any format shown (e.g., "6:00pm", "18:00").
+   - screen: the screen/hall name or number (e.g., "Screen 1", "IMAX"), if visible.
+   - format: standard format details (e.g., "IMAX", "3D", "VIP", "Standard"), if visible.
+   - ticket_url: direct booking link for this showtime slot if available.
+
+Return ONLY a valid JSON object matching this schema (do not include any conversational text or formatting other than valid JSON):
+{
+  "films": [
+    {
+      "title": "Movie Title",
+      "poster_url": "Optional absolute URL to the poster if visible in text, else null",
+      "rating": "Optional rating like PG, 18, else null",
+      "showtimes": [
+        {
+          "date": "Today" or "YYYY-MM-DD" or day name,
+          "time": "Show time (e.g. 6:00pm or 18:00)",
+          "screen": "Screen name or null",
+          "format": "IMAX" or "3D" or "VIP" or "Standard" or null,
+          "ticket_url": "Optional slot ticket URL or null"
+        }
+      ]
+    }
+  ]
+}
+`;
+
   let extracted: ExtractedSchedule;
   try {
-    const res = await fetch('https://api.firecrawl.dev/v1/extract', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        urls: [url],
-        prompt: `Extract all currently showing films and their showtimes from this cinema website.
-For each film, return:
-- title (exact as shown)
-- poster_url (absolute URL if visible, else null)
-- rating (age/censor certificate if shown, e.g. "PG", "18", else null)
-- showtimes array, where each showtime has:
-  - date (the date this showtime occurs: "Today", a day name, or YYYY-MM-DD; null if not shown)
-  - time (the time in any format, e.g. "6:00pm", "18:00")
-  - screen (screen/hall name if shown, else null)
-  - format (e.g. "IMAX", "3D", "4DX", "Standard", null if not shown)
-  - ticket_url (direct booking link for this showtime if available, else null)
-
-Important: include ALL films and ALL their time slots. Do not omit any.`,
-        schema: {
-          type: 'object',
-          properties: {
-            films: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  title:      { type: 'string' },
-                  poster_url: { type: ['string', 'null'] },
-                  rating:     { type: ['string', 'null'] },
-                  showtimes:  {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        date:       { type: ['string', 'null'] },
-                        time:       { type: 'string' },
-                        screen:     { type: ['string', 'null'] },
-                        format:     { type: ['string', 'null'] },
-                        ticket_url: { type: ['string', 'null'] },
-                      },
-                      required: ['time'],
-                    },
-                  },
-                },
-                required: ['title', 'showtimes'],
-              },
-            },
-          },
-          required: ['films'],
-        },
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      return {
-        cinemaId: cinema.id,
-        showtimes: [],
-        error: `Firecrawl extract HTTP ${res.status}: ${body.slice(0, 300)}`,
-      };
+    const aiRes = await generateAIContent(aiPrompt);
+    const parsed = parseJSON(aiRes.text);
+    if (!parsed || !parsed.films) {
+      throw new Error('AI Response did not match the required films schema');
     }
-
-    let json = await res.json() as { success?: boolean; id?: string; data?: ExtractedSchedule; error?: string; status?: string };
-    
-    // If it's an async job (Firecrawl v1), poll for result
-    if (json.success && json.id && !json.data) {
-      let status = 'scraping';
-      while (status !== 'completed' && status !== 'failed' && status !== 'cancelled') {
-        await new Promise(r => setTimeout(r, 3000));
-        const pollRes = await fetch(`https://api.firecrawl.dev/v1/extract/${json.id}`, {
-          headers: { Authorization: `Bearer ${apiKey}` },
-        });
-        if (!pollRes.ok) {
-          const body = await pollRes.text().catch(() => '');
-          return { cinemaId: cinema.id, showtimes: [], error: `Firecrawl poll HTTP ${pollRes.status}: ${body.slice(0, 300)}` };
-        }
-        json = await pollRes.json();
-        status = json.status || (json.error ? 'failed' : 'scraping');
-      }
-    }
-
-    if (!json.success || !json.data) {
-      return {
-        cinemaId: cinema.id,
-        showtimes: [],
-        error: `Firecrawl extract returned no data: ${json.error ?? JSON.stringify(json).slice(0, 200)}`,
-      };
-    }
-
-    extracted = json.data;
+    extracted = parsed as ExtractedSchedule;
   } catch (err: any) {
-    return { cinemaId: cinema.id, showtimes: [], error: err.message };
+    console.error(`[Local Scraper] AI extraction failed for ${cinema.name}:`, err.message);
+    return {
+      cinemaId: cinema.id,
+      showtimes: [],
+      error: `AI extraction failed: ${err.message}`,
+    };
   }
 
   const today = todayLagos(0);
@@ -245,7 +345,6 @@ Important: include ALL films and ALL their time slots. Do not omit any.`,
       const format = inferFormat(st.screen ?? st.format ?? null);
       const ticketUrl = st.ticket_url || (ticketBaseUrl ? ticketBaseUrl : null);
 
-
       showtimes.push({
         externalFilmId: `fc-${film.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
         filmTitle: film.title.trim(),
@@ -262,6 +361,7 @@ Important: include ALL films and ALL their time slots. Do not omit any.`,
     }
   }
 
+  console.log(`[Local Scraper] Successfully extracted ${showtimes.length} showtimes for ${cinema.name}`);
   return {
     cinemaId: cinema.id,
     showtimes,
@@ -269,13 +369,3 @@ Important: include ALL films and ALL their time slots. Do not omit any.`,
   };
 };
 
-// Supplemental format labels from Firecrawl LLM output (when not in screen name)
-const SCREEN_FORMAT_LABELS: Record<string, string> = {
-  'IMAX': 'IMAX',
-  '4DX':  '4DX',
-  '3D':   '3D',
-  'VIP':  'VIP',
-  'RECLINER': 'Recliner',
-  'STANDARD': 'Standard',
-  'PREMIUM':  'VIP',
-};

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
@@ -105,6 +106,7 @@ function SearchableDropdown({ options, value, onChange, placeholder, type = 'per
 
 export default function AdminCredits() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [credits, setCredits] = useState([]);
   const [allPeople, setAllPeople] = useState([]);
   const [allFilms, setAllFilms] = useState([]);
@@ -379,12 +381,20 @@ export default function AdminCredits() {
             Global attribution engine for the Ensembla ecosystem. Linking talent to production assets.
           </p>
         </div>
-        <button
-          onClick={openAddDrawer}
-          className="bg-brand text-white font-black px-8 py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 flex items-center gap-2"
-        >
-          <span className="text-lg leading-none">＋</span> Create New Attribution
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => navigate('/admin/credits/extractor')}
+            className="bg-surface-2 border border-border hover:border-brand/30 text-text-muted hover:text-text-primary font-black px-6 py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm flex items-center gap-2"
+          >
+            📷 Launch Credits OCR Extractor
+          </button>
+          <button
+            onClick={openAddDrawer}
+            className="bg-brand text-white font-black px-8 py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 flex items-center gap-2"
+          >
+            <span className="text-lg leading-none">＋</span> Create New Attribution
+          </button>
+        </div>
       </header>
 
       {/* Filter Bar with SaaS Styling */}

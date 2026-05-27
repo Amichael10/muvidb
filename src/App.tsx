@@ -42,6 +42,7 @@ import AdminChannels from './pages/admin/AdminChannels';
 import AdminYouTubeVideos from './pages/admin/AdminYouTubeVideos';
 import AdminCinemaFilms from './pages/admin/AdminCinemaFilms';
 import AdminCinemaScraping from './pages/admin/AdminCinemaScraping';
+import AdminCreditsExtractor from './pages/admin/AdminCreditsExtractor';
 import AdminChannelDetail from './pages/admin/AdminChannelDetail';
 import AdminImport from './pages/admin/AdminImport';
 import AdminAI from './pages/admin/AdminAI';
@@ -170,6 +171,7 @@ export default function App() {
                   <Route path="films" element={<AdminFilms />} />
                   <Route path="people" element={<AdminPeople />} />
                   <Route path="credits" element={<AdminCredits />} />
+                  <Route path="credits/extractor" element={<AdminCreditsExtractor />} />
                   <Route path="companies" element={<AdminCompanies />} />
                   <Route path="claims" element={<AdminClaims />} />
                   <Route path="users" element={<AdminUsers />} />

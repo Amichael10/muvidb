@@ -7,7 +7,7 @@ dotenv.config();
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 // Initialize Groq (if key exists)
 const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
@@ -134,4 +134,27 @@ export async function generateAIContent(prompt: string) {
   }
 
   throw lastError || new Error('All AI providers failed');
+}
+
+/**
+ * Vision Content Generator (Gemini Flash Vision)
+ */
+export async function generateAIVisionContent(prompt: string, base64Data: string, mimeType: string) {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not set. Vision AI requires Gemini.');
+  }
+  
+  console.log(`[AI Service] Sending Vision request to Gemini (mimeType: ${mimeType})...`);
+  const imagePart = {
+    inlineData: {
+      data: base64Data,
+      mimeType: mimeType
+    }
+  };
+
+  const result = await geminiModel.generateContent([prompt, imagePart]);
+  return {
+    text: result.response.text(),
+    telemetry: { engine: 'gemini-vision', status: 'ok' }
+  };
 }

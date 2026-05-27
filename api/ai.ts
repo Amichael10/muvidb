@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateAIContent, parseJSON } from './_lib/ai_service';
+import { generateAIContent, parseJSON, generateAIVisionContent } from './_lib/ai_service';
 import { supabase } from './_lib/supabase';
 
 export const maxDuration = 60;
@@ -19,6 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'summarize_film': return await summarizeFilm(data, res);
       case 'discover_actors': return await discoverActors(data, res);
       case 'deduplicate': return await mergeDuplicates(data, res);
+      case 'extract_credits_from_image': return await extractCreditsFromImage(data, res);
       default: return res.status(400).json({ error: 'Invalid task' });
     }
   } catch (err: any) {
@@ -496,4 +497,70 @@ async function polishTitle(data: any, res: VercelResponse) {
 
   const { text, telemetry } = await generateAIContent(prompt);
   return res.json({ title: text.trim().replace(/^"|"$/g, ''), telemetry });
+}
+
+async function extractCreditsFromImage(data: any, res: VercelResponse) {
+  const { image, creditType = 'cast' } = data;
+
+  if (!image) {
+    return res.status(400).json({ error: 'Image base64 data is required' });
+  }
+
+  // Parse mimeType and clean base64 data
+  const matches = image.match(/^data:(image\/[a-zA-Z0-9.-]+);base64,(.+)$/);
+  if (!matches) {
+    return res.status(400).json({ error: 'Invalid image format. Must be a base64 data URL.' });
+  }
+
+  const mimeType = matches[1];
+  const base64Data = matches[2];
+
+  let prompt = '';
+  if (creditType === 'cast') {
+    prompt = `
+      You are an expert Nollywood credit extractor.
+      Perform high-accuracy OCR on the uploaded screenshot of opening or closing movie credits.
+      Extract all Cast Members (actors) and their matching character names.
+
+      Rules:
+      1. Extract ALL actor names and character names listed.
+      2. Ignore any headers like "Awon Osere", "Cast", "Starring", etc.
+      3. Clean up the actor names: Proper Case them (e.g. "Murphy Afolabi", "Taofeeq Adewale").
+      4. If dots or lines are used between names (e.g., "Murphy Afolabi.........Oba"), split them cleanly into Actor Name ("Murphy Afolabi") and Character Name ("Oba").
+      5. Return ONLY a valid JSON array matching this schema:
+      [
+        {
+          "name": "Actor Full Name",
+          "role_or_character": "Character Name"
+        }
+      ]
+    `;
+  } else {
+    prompt = `
+      You are an expert Nollywood credit extractor.
+      Perform high-accuracy OCR on the uploaded screenshot of opening or closing movie credits.
+      Extract all Crew Members and their specific functions/roles.
+
+      Rules:
+      1. Extract ALL crew names and their specific functions/roles listed (e.g., "Director", "Producer", "Makeup Artist", "Gaffer", "Lighting", "Editor", "Screenplay").
+      2. Clean up the names: Proper Case them (e.g. "Emem Inlobong Monday").
+      3. Clean up the roles: Standardize them to professional crew functions (e.g. "Makeup Artist", "Cinematographer", "Producer", "Director").
+      4. Return ONLY a valid JSON array matching this schema:
+      [
+        {
+          "name": "Crew Member Full Name",
+          "role_or_character": "Specific Role/Function"
+        }
+      ]
+    `;
+  }
+
+  try {
+    const { text, telemetry } = await generateAIVisionContent(prompt, base64Data, mimeType);
+    const parsed = parseJSON(text);
+    return res.json({ results: parsed, telemetry });
+  } catch (err: any) {
+    console.error('Vision API Error:', err);
+    return res.status(500).json({ error: err.message });
+  }
 }
