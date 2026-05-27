@@ -1,0 +1,27 @@
+# Ignore local test and temp folders
+temp_lumi_*
+temp_lumi/
+output/
+scratch/
+scripts/
+.git/
+node_modules/
+dist/
+
+# Ignore big media assets
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Ignore root-level scripts only (with leading slash)
+/*.js
+/*.cjs
+/*.sql
+/*.py
+/*.txt
+/*.json
+!package.json
+!tsconfig.json
+!vercel.json

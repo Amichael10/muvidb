@@ -12,6 +12,7 @@ export default function AdminCreditsExtractor() {
   // Core State
   const [films, setFilms] = useState([]);
   const [selectedFilmId, setSelectedFilmId] = useState('');
+  const [selectedFilm, setSelectedFilm] = useState(null); // Explicit selected film object
   const [activeTab, setActiveTab] = useState('cast'); // 'cast' or 'crew'
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [ocrLogs, setOcrLogs] = useState([]);
@@ -32,23 +33,49 @@ export default function AdminCreditsExtractor() {
   const [filmSearch, setFilmSearch] = useState('');
   const [isFilmDropdownOpen, setIsFilmDropdownOpen] = useState(false);
 
-  // Load films on mount
+  // Load 50 recent films on mount (so newly created/updated films appear first)
+  async function loadRecentFilms() {
+    try {
+      const { data, error } = await supabase
+        .from('films')
+        .select('id, title, poster_url, release_type')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setFilms(data || []);
+    } catch (err) {
+      console.error('Failed to load recent films:', err);
+    }
+  }
+
   useEffect(() => {
-    async function loadFilms() {
+    loadRecentFilms();
+  }, []);
+
+  // Debounced dynamic server-side live film search
+  useEffect(() => {
+    if (!filmSearch.trim()) {
+      loadRecentFilms();
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
       try {
         const { data, error } = await supabase
           .from('films')
           .select('id, title, poster_url, release_type')
-          .order('title');
+          .ilike('title', `%${filmSearch}%`)
+          .limit(50);
         if (error) throw error;
         setFilms(data || []);
       } catch (err) {
-        console.error('Failed to load films:', err);
-        toast.error('Could not load film index.');
+        console.error('Dynamic film search failed:', err);
       }
-    }
-    loadFilms();
-  }, []);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [filmSearch]);
+
 
   // Fetch live matches from database whenever the name list changes
   const runLiveProfileVerification = async (rows, setter) => {
@@ -341,11 +368,8 @@ export default function AdminCreditsExtractor() {
     }
   };
 
-  // Dropdown Filtering
-  const filteredFilms = films.filter(f =>
-    f.title.toLowerCase().includes(filmSearch.toLowerCase())
-  );
-  const selectedFilm = films.find(f => f.id === selectedFilmId);
+  // Server-side filtered films list
+  const filteredFilms = films;
 
   const activeRoster = activeTab === 'cast' ? castRows : crewRows;
 
@@ -421,9 +445,10 @@ export default function AdminCreditsExtractor() {
                       filteredFilms.map(f => (
                         <div
                           key={f.id}
-                          className={`p-2.5 rounded-md cursor-pointer flex items-center gap-3 hover:bg-surface-2 transition-all ${selectedFilmId === f.value ? 'bg-brand/5' : ''}`}
+                          className={`p-2.5 rounded-md cursor-pointer flex items-center gap-3 hover:bg-surface-2 transition-all ${selectedFilmId === f.id ? 'bg-brand/5' : ''}`}
                           onClick={() => {
                             setSelectedFilmId(f.id);
+                            setSelectedFilm(f);
                             setIsFilmDropdownOpen(false);
                             setFilmSearch('');
                           }}
