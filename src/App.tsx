@@ -102,7 +102,7 @@ function Layout({ children }) {
   const location = useLocation();
   const isAdminPath = location.pathname.startsWith('/admin');
   const isOnboardingPath = location.pathname === '/onboarding';
-  const isWaitlistPath = location.pathname === '/waitlist' || location.pathname === '/';
+  const isWaitlistPath = location.pathname === '/waitlist';
   
   const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath;
   
