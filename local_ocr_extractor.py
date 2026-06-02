@@ -110,6 +110,16 @@ YT_BASE_FLAGS   = [
     "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 ]
 
+# Configure SmartProxy if credentials exist
+PROXY_USER = os.getenv("SMARTPROXY_USER")
+PROXY_PASS = os.getenv("SMARTPROXY_PASS")
+PROXY_HOST = os.getenv("SMARTPROXY_HOST", "proxy.smartproxy.net")
+PROXY_PORT = os.getenv("SMARTPROXY_PORT", "3120")
+
+if PROXY_USER and PROXY_PASS:
+    proxy_url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
+    YT_BASE_FLAGS.extend(["--proxy", proxy_url])
+
 # ── Check Dependencies ────────────────────────────────────────────────────────
 def check_dependencies():
     missing_bins = []

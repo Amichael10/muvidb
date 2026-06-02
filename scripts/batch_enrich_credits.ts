@@ -405,8 +405,9 @@ async function main() {
       });
 
       if (i < toProcess.length - 1) {
-        console.log(`\n⏳ Cooling down for 45s...`);
-        await delay(45000);
+        const cooldown = process.env.SMARTPROXY_USER ? 3000 : 45000;
+        console.log(`\n⏳ Cooling down for ${cooldown / 1000}s...`);
+        await delay(cooldown);
       }
     }
 
