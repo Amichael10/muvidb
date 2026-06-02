@@ -26,6 +26,7 @@ on:
           - iroko
           - filmflux
           - ai_maintenance
+          - credits_enrichment
 
 jobs:
   sync:
@@ -57,7 +58,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          npm install @supabase/supabase-js node-fetch playwright
+          npm install
           npx playwright install chromium --with-deps
 
       - name: Sync Cinemas (6 AM Local)
@@ -71,8 +72,8 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
 
-      - name: Sync YouTube Videos (Hourly)
-        if: github.event.schedule == '0 * * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
+      - name: Sync YouTube Videos (Every 8 Hours)
+        if: github.event.schedule == '0 */8 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
         run: |
           echo "Syncing YouTube Videos (Vercel API)..."
           curl -v -X GET "$BASE_URL/api/cron/sync?task=videos" \
@@ -115,7 +116,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: AI Maintenance (Extract Cast + Title Cleanup)
-        if: github.event.schedule == '0 1,5,9,13,17,21 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'ai_maintenance'))
+        if: github.event.schedule == '0 2,14 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'ai_maintenance'))
         run: |
           echo "Running AI Maintenance (Extract Cast → Title Cleanup)..."
           curl -v -X GET "$BASE_URL/api/cron/sync?task=ai_maintenance" \
@@ -125,3 +126,26 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Install System and Python Dependencies for Local OCR
+        if: github.event.schedule == '0 2,14 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'credits_enrichment' || github.event.inputs.task == 'ai_maintenance'))
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+          python -m pip install --upgrade pip
+          pip install opencv-python-headless imagehash rapidfuzz google-genai requests yt-dlp pillow
+        continue-on-error: true
+
+      - name: Run Hybrid Credit Enrichment (TMDB + Local OCR Fallback)
+        if: github.event.schedule == '0 2,14 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'credits_enrichment' || github.event.inputs.task == 'ai_maintenance'))
+        run: |
+          echo "Running local OCR Cast & Crew Extraction on incomplete YouTube videos..."
+          npx tsx scripts/batch_enrich_credits.ts
+        continue-on-error: true
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

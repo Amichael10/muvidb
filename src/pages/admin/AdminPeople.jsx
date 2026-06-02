@@ -13,6 +13,7 @@ import { logAdminAction } from '../../lib/adminLogger';
 import { toTitleCase } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { useMemo } from 'react';
+import { getFriendlyErrorMessage } from '../../utils/errors';
 
 export default function AdminPeople() {
   const { user } = useAuth();
@@ -125,7 +126,7 @@ export default function AdminPeople() {
       setPeople(data || []);
     } catch (error) {
       console.error('Error fetching people:', error);
-      toast.error('Failed to load people');
+      toast.error(getFriendlyErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +157,7 @@ export default function AdminPeople() {
       toast.success(newStatus ? 'Profile verified ✓' : 'Verification removed');
     } catch (error) {
       console.error('Error toggling verification:', error);
-      toast.error('Failed to update verification status');
+      toast.error(getFriendlyErrorMessage(error));
     }
   };
 
@@ -176,7 +177,7 @@ export default function AdminPeople() {
       toast.success(newStatus ? 'Added to Spotlight ★' : 'Removed from Spotlight');
     } catch (error) {
       console.error('Error toggling spotlight:', error);
-      toast.error('Failed to update spotlight status');
+      toast.error(getFriendlyErrorMessage(error));
     }
   };
 
@@ -209,7 +210,7 @@ export default function AdminPeople() {
       setDeletingPerson(null);
     } catch (error) {
       console.error('Error deleting person:', error);
-      toast.error(`Deletion Failed: ${error.message || 'Check for related records'}`);
+      toast.error(`Deletion Failed: ${getFriendlyErrorMessage(error)}`);
     } finally {
       setIsDeleting(false);
     }
@@ -346,7 +347,7 @@ export default function AdminPeople() {
       setYoutubeChannelInput(`https://www.youtube.com/channel/${ytData.channelId}`);
       toast.success(`Fetched: ${ytData.title}`, { id: t });
     } catch (err) {
-      toast.error(err.message || 'YouTube Fetch Failed', { id: t });
+      toast.error(getFriendlyErrorMessage(err), { id: t });
     }
   };
 
@@ -414,7 +415,7 @@ export default function AdminPeople() {
       fetchPeople();
     } catch (error) {
       console.error('Error saving person:', error);
-      toast.error('Failed to save person');
+      toast.error(getFriendlyErrorMessage(error));
     } finally {
       setIsSaving(false);
     }
@@ -446,7 +447,7 @@ export default function AdminPeople() {
       await fetchPeople();
     } catch (error) {
       console.error('Error recalculating scores:', error);
-      toast.error('Failed to update scores');
+      toast.error(getFriendlyErrorMessage(error));
     } finally {
       setIsRecalculating(false);
     }
@@ -479,7 +480,7 @@ export default function AdminPeople() {
       setPersonBatchDeleteIds(null);
     } catch (err) {
       console.error(err);
-      toast.error(`Batch delete failed: ${err.message}`, { id: t });
+      toast.error(`Batch delete failed: ${getFriendlyErrorMessage(err)}`, { id: t });
     } finally {
       setIsBatchDeletingPeople(false);
     }
@@ -516,7 +517,7 @@ export default function AdminPeople() {
       fetchPeople();
     } catch (error) {
       console.error('Merge error:', error);
-      toast.error(`Merge failed: ${error.message}`, { id: t });
+      toast.error(`Merge failed: ${getFriendlyErrorMessage(error)}`, { id: t });
     } finally {
       setIsMerging(false);
     }

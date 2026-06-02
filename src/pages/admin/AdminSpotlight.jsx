@@ -19,6 +19,10 @@ export default function AdminSpotlight() {
   const [photoUrl, setPhotoUrl] = useState('');
   const [isActive, setIsActive] = useState(false);
 
+  const [personFilms, setPersonFilms] = useState([]);
+  const [selectedFilmIds, setSelectedFilmIds] = useState([]);
+  const [isFilmsLoading, setIsFilmsLoading] = useState(false);
+
   useEffect(() => {
     fetchSpotlights();
   }, []);
@@ -66,11 +70,53 @@ export default function AdminSpotlight() {
     }
   };
 
+  const fetchPersonFilms = async (id) => {
+    if (!id) {
+      setPersonFilms([]);
+      return;
+    }
+    setIsFilmsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('credits')
+        .select(`
+          film_id,
+          films (
+            id,
+            title,
+            poster_url,
+            release_type,
+            year
+          )
+        `)
+        .eq('person_id', id);
+
+      if (error) throw error;
+      
+      const uniqueFilms = [];
+      const seen = new Set();
+      (data || []).forEach(item => {
+        if (item.films && !seen.has(item.films.id)) {
+          seen.add(item.films.id);
+          uniqueFilms.push(item.films);
+        }
+      });
+      
+      setPersonFilms(uniqueFilms);
+    } catch (err) {
+      console.error('Error fetching person films:', err);
+      toast.error('Failed to load person films: ' + err.message);
+    } finally {
+      setIsFilmsLoading(false);
+    }
+  };
+
   const selectPerson = (person) => {
     setPersonId(person.id);
     setSelectedPerson(person);
     setPersonSearch('');
     setPersonResults([]);
+    fetchPersonFilms(person.id);
   };
 
   const handleOpenModal = (spotlight = null) => {
@@ -81,6 +127,8 @@ export default function AdminSpotlight() {
       setStory(spotlight.story || '');
       setPhotoUrl(spotlight.photo_url || '');
       setIsActive(spotlight.is_active);
+      setSelectedFilmIds(spotlight.featured_film_ids || []);
+      fetchPersonFilms(spotlight.person_id);
     } else {
       setCurrentSpotlight(null);
       setPersonId('');
@@ -88,6 +136,8 @@ export default function AdminSpotlight() {
       setStory('');
       setPhotoUrl('');
       setIsActive(false);
+      setSelectedFilmIds([]);
+      setPersonFilms([]);
     }
     setPersonSearch('');
     setIsModalOpen(true);
@@ -109,6 +159,7 @@ export default function AdminSpotlight() {
       story: story,
       photo_url: photoUrl || null,
       is_active: isActive,
+      featured_film_ids: selectedFilmIds,
       updated_at: new Date().toISOString()
     };
 
@@ -197,7 +248,12 @@ export default function AdminSpotlight() {
                           alt=""
                           className="w-10 h-10 rounded-lg object-cover"
                         />
-                        <span className="font-medium text-text-primary">{s.people?.name || 'Unknown'}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-text-primary">{s.people?.name || 'Unknown'}</span>
+                          <span className="text-[9px] text-text-muted uppercase font-bold tracking-wider mt-0.5">
+                            {s.featured_film_ids?.length || 0} Featured Works
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="p-4">
@@ -307,6 +363,92 @@ export default function AdminSpotlight() {
                   placeholder="Leave blank to use the person's default photo"
                   className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-text-primary focus:border-brand focus:ring-1 focus:ring-brand outline-none transition-all"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Featured Works (Select up to 4 films)
+                </label>
+                {personId ? (
+                  isFilmsLoading ? (
+                    <div className="flex items-center gap-2 py-4 justify-center text-sm text-text-muted">
+                      <Icon icon="solar:spinner-linear" className="w-5 h-5 animate-spin" />
+                      Loading films...
+                    </div>
+                  ) : personFilms.length === 0 ? (
+                    <p className="text-sm text-text-muted py-2">
+                      No movies found in the database for this person. Add films in the films panel to feature them.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-xs text-text-muted">
+                        <span>Available works: {personFilms.length}</span>
+                        <span className={`font-semibold ${selectedFilmIds.length > 4 ? 'text-red-500' : 'text-brand'}`}>
+                          Selected: {selectedFilmIds.length} / 4
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1.5 border border-border rounded-lg bg-surface-2/40">
+                        {personFilms.map((film) => {
+                          const isSelected = selectedFilmIds.includes(film.id);
+                          return (
+                            <button
+                              key={film.id}
+                              type="button"
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedFilmIds(selectedFilmIds.filter(id => id !== film.id));
+                                } else {
+                                  if (selectedFilmIds.length >= 4) {
+                                    toast.error('You can select a maximum of 4 films.');
+                                    return;
+                                  }
+                                  setSelectedFilmIds([...selectedFilmIds, film.id]);
+                                }
+                              }}
+                              className={`flex flex-col gap-2 p-2 rounded-lg border text-left transition-all relative overflow-hidden group ${
+                                isSelected 
+                                  ? 'bg-brand/10 border-brand ring-1 ring-brand' 
+                                  : 'bg-surface border-border hover:border-text-muted'
+                              }`}
+                            >
+                              <div className="aspect-[2/3] w-full rounded-md bg-surface-2 overflow-hidden relative">
+                                <img 
+                                  src={film.poster_url || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=150'} 
+                                  alt="" 
+                                  className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
+                                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=150'; }}
+                                />
+                                {isSelected && (
+                                  <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center shadow-md">
+                                    <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-text-primary text-[10px] line-clamp-1 leading-tight">
+                                  {film.title}
+                                </h5>
+                                <div className="flex items-center gap-1.5 mt-0.5 text-[8px] text-text-muted uppercase tracking-wider font-semibold">
+                                  <span>{film.year || 'N/A'}</span>
+                                  {film.release_type && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-brand/80">{film.release_type}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <p className="text-sm text-text-muted py-2 italic">
+                    Select a person above to choose their featured works.
+                  </p>
+                )}
               </div>
 
               <div>

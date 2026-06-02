@@ -99,7 +99,7 @@ export default function Browse() {
       const sortMap = {
         'views': { column: 'view_count', ascending: false },
         'rating': { column: 'average_rating', ascending: false },
-        'newest': { column: 'year', ascending: false },
+        'newest': { column: 'created_at', ascending: false },
         'oldest': { column: 'year', ascending: true }
       };
       
@@ -259,7 +259,11 @@ export default function Browse() {
               </div>
             ) : films.length > 0 ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {films.map(film => <FilmCard key={film.id} film={film} />)}
+                {films.map(film => (
+                  <div key={film.id} className="flex justify-center">
+                    <FilmCard film={film} />
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-32 text-center">

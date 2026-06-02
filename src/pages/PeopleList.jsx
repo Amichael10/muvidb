@@ -141,7 +141,7 @@ const PeopleList = () => {
   const [hasMore, setHasMore] = useState(true)
 
   const PAGE_SIZE = 20
-  const roles = ['All', 'Actor', 'Director', 'Writer', 'Producer']
+  const roles = ['All', 'Actor', 'Director', 'Writer', 'Producer', 'Cinematographer', 'Costume Designer', 'Gaffer', 'Editor', 'Sound']
 
   useEffect(() => {
     setPeople([])

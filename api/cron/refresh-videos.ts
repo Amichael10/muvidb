@@ -122,7 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             youtube_watch_url: `https://www.youtube.com/watch?v=${v.id}`,
             source_video_id: v.id,
             year: new Date(v.snippet.publishedAt).getFullYear(),
-            runtime_minutes: Math.round(parseDuration(v.contentDetails.duration) / 60)
+            runtime_minutes: Math.round(parseDuration(v.contentDetails.duration) / 60),
+            language: ch.primary_language || 'English'
           }));
 
           let insertedFilms: any[] = [];

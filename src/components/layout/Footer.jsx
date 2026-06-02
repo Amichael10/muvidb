@@ -51,7 +51,7 @@ export default function Footer() {
                 <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
                 <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join Ensembla</Link></li>
                 <li><Link to="/dashboard" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Dashboard</Link></li>
-                <li><Link to="/pro/claim" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Claim Profile</Link></li>
+                <li><Link to="/claim" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Claim Profile (For Filmmakers & Talent)</Link></li>
               </ul>
             </div>
           </div>
@@ -68,11 +68,11 @@ export default function Footer() {
 
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
               <p className="text-[10px] font-bold text-text-muted opacity-40 uppercase tracking-widest">
-                © 2025 Ensembla Database. All rights reserved.
+                © {new Date().getFullYear()} Ensembla Database. All rights reserved.
               </p>
               <div className="flex gap-8">
-                <Link to="#" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Terms</Link>
-                <Link to="#" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Privacy</Link>
+                <Link to="/terms" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Terms</Link>
+                <Link to="/privacy" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Privacy</Link>
               </div>
             </div>
           </div>

@@ -360,15 +360,21 @@ const PersonDetail = () => {
       }) || []
   }
 
-  const availableRoles = ['actor', 'director', 'writer', 'producer']
-    .filter(role => creditsByRole(role).length > 0)
+  const getAvailableRoles = () => {
+    if (!person?.credits) return [];
+    const roles = person.credits.map(c => c.role?.toLowerCase()?.trim()).filter(Boolean);
+    return [...new Set(roles)];
+  };
 
-  const roleLabels = {
-    actor: 'Actor',
-    director: 'Director',
-    writer: 'Writer',
-    producer: 'Producer'
-  }
+  const availableRoles = getAvailableRoles();
+
+  const getRoleLabel = (role) => {
+    if (!role) return '';
+    return role
+      .split(/[-_\s]+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  };
 
   if (loading) {
     return <PersonDetailSkeleton />
@@ -439,7 +445,7 @@ const PersonDetail = () => {
                       key={role}
                       className="text-text-muted text-[10px] font-bold tracking-wider"
                     >
-                      {roleLabels[role]}
+                      {getRoleLabel(role)}
                       {availableRoles.indexOf(role) <
                         availableRoles.length - 1 && ' ·'}
                     </span>
@@ -585,7 +591,7 @@ const PersonDetail = () => {
                       : 'text-text-muted hover:text-text-primary'
                   }`}
                 >
-                  {roleLabels[role]} ({creditsByRole(role).length})
+                  {getRoleLabel(role)} ({creditsByRole(role).length})
                 </button>
               ))}
             </div>

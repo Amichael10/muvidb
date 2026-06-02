@@ -197,7 +197,7 @@ export default function Dashboard() {
                     </div>
                     <div className="h-8 w-24 bg-surface-2 rounded-full"></div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                     {[1, 2, 3, 4].map(i => (
                         <SkeletonCard key={i} />
                     ))}

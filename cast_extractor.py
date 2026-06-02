@@ -241,7 +241,7 @@ def download_segment(url: str, start: float, duration: float, out_path: Path):
                 sys.executable, "-m", "yt_dlp", *YT_BASE_FLAGS,
                 "--download-sections", f"*{int(start)}-{int(start+duration)}",
                 "--force-keyframes-at-cuts",
-                "-f", "bestvideo+bestaudio/best", # Relaxed format
+                "-f", "worst", 
                 "-o", str(out_path),
                 url
             ], check=True, timeout=400) # Increased timeout
@@ -575,13 +575,13 @@ def extract(youtube_url: str, output_dir: str = "./output") -> str:
         safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in title)
 
         print("\n[2/6] Downloading intro (first 3 min)...")
-        intro_path = BASE_TEMP_DIR / f"lumi_intro_{safe[:30]}.mp4"
+        intro_path = BASE_TEMP_DIR / f"lumi_intro_{safe[:30].strip()}.mp4"
         temp_files.append(intro_path)
         download_segment(youtube_url, 0, INTRO_DURATION, intro_path)
 
         print("\n[3/6] Downloading outro (last 5 min)...")
         outro_start = max(0, duration - OUTRO_DURATION)
-        outro_path  = BASE_TEMP_DIR / f"lumi_outro_{safe[:30]}.mp4"
+        outro_path  = BASE_TEMP_DIR / f"lumi_outro_{safe[:30].strip()}.mp4"
         temp_files.append(outro_path)
         download_segment(youtube_url, outro_start, OUTRO_DURATION, outro_path)
 

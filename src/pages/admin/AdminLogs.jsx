@@ -40,6 +40,16 @@ const estimateWorkDuration = (actions) => {
   return `${hrs} hr${hrs > 1 ? 's' : ''} ${mins} min${mins > 1 ? 's' : ''}`;
 };
 
+const formatDuration = (ms) => {
+  if (!ms && ms !== 0) return 'N/A';
+  if (ms < 1000) return `${ms}ms`;
+  const secs = (ms / 1000).toFixed(1);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(ms / 60000);
+  const remainingSecs = ((ms % 60000) / 1000).toFixed(0);
+  return `${mins}m ${remainingSecs}s`;
+};
+
 const generatePDFWindow = (actions, selectedDate) => {
   const sortedActions = [...actions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   
@@ -54,6 +64,50 @@ const generatePDFWindow = (actions, selectedDate) => {
   const creates = sortedActions.filter(a => a.action_type === 'create').length;
   const updates = sortedActions.filter(a => a.action_type === 'update').length;
   const deletes = sortedActions.filter(a => a.action_type === 'delete').length;
+  
+  // Group actions by movie title to count unique movies edited and count cast/crew credit edits per movie
+  const movieBreakdown = {};
+  sortedActions.forEach(a => {
+    if (a.entity_type === 'film') {
+      const movieTitle = a.entity_name || 'Unknown Movie';
+      if (!movieBreakdown[movieTitle]) {
+        movieBreakdown[movieTitle] = { title: movieTitle, filmEdits: 0, creditsCreated: 0, creditsEdited: 0 };
+      }
+      if (a.action_type === 'update') {
+        movieBreakdown[movieTitle].filmEdits++;
+      }
+    } else if (a.entity_type === 'credit') {
+      let movieTitle = 'Unknown Movie';
+      if (a.entity_name && a.entity_name.includes(' in ')) {
+        const parts = a.entity_name.split(' in ');
+        movieTitle = parts[parts.length - 1].trim();
+      }
+      if (!movieBreakdown[movieTitle]) {
+        movieBreakdown[movieTitle] = { title: movieTitle, filmEdits: 0, creditsCreated: 0, creditsEdited: 0 };
+      }
+      if (a.action_type === 'create') {
+        movieBreakdown[movieTitle].creditsCreated++;
+      } else if (a.action_type === 'update') {
+        movieBreakdown[movieTitle].creditsEdited++;
+      }
+    }
+  });
+
+  const uniqueMovies = Object.values(movieBreakdown).filter(m => m.filmEdits > 0 || m.creditsCreated > 0 || m.creditsEdited > 0);
+  const totalUniqueMoviesEdited = uniqueMovies.length;
+  
+  const moviesCreated = sortedActions.filter(a => a.entity_type === 'film' && a.action_type === 'create').length;
+  const moviesDeleted = sortedActions.filter(a => a.entity_type === 'film' && a.action_type === 'delete').length;
+  
+  const castCreated = sortedActions.filter(a => a.entity_type === 'person' && a.action_type === 'create').length;
+  const castEdited = sortedActions.filter(a => a.entity_type === 'person' && a.action_type === 'update').length;
+  const castDeleted = sortedActions.filter(a => a.entity_type === 'person' && a.action_type === 'delete').length;
+
+  const creditsCreated = sortedActions.filter(a => a.entity_type === 'credit' && a.action_type === 'create').length;
+  const creditsEdited = sortedActions.filter(a => a.entity_type === 'credit' && a.action_type === 'update').length;
+
+  const companiesCreated = sortedActions.filter(a => a.entity_type === 'company' && a.action_type === 'create').length;
+  const companiesEdited = sortedActions.filter(a => a.entity_type === 'company' && a.action_type === 'update').length;
   
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -148,6 +202,58 @@ const generatePDFWindow = (actions, selectedDate) => {
           .summary-card .highlight {
             color: #ff5c00;
           }
+          
+          .breakdown-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #334155;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          .breakdown-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 35px;
+          }
+          .breakdown-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 14px;
+          }
+          .breakdown-card h4 {
+            margin: 0 0 10px 0;
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #475569;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+          }
+          .breakdown-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 12px;
+          }
+          .breakdown-stat:last-child {
+            margin-bottom: 0;
+          }
+          .breakdown-label {
+            color: #64748b;
+          }
+          .breakdown-value {
+            font-weight: 700;
+            color: #0f172a;
+          }
+          .breakdown-value.highlight {
+            color: #ff5c00;
+          }
+          
           .logs-table {
             width: 100%;
             border-collapse: collapse;
@@ -230,6 +336,85 @@ const generatePDFWindow = (actions, selectedDate) => {
           </div>
         </div>
 
+        <div class="breakdown-title">Detailed Contributions Breakdown</div>
+        <div class="breakdown-grid">
+          <div class="breakdown-card">
+            <h4>Movie Directory</h4>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Movies Created</span>
+              <span class="breakdown-value">${moviesCreated}</span>
+            </div>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Unique Movies Edited</span>
+              <span class="breakdown-value highlight">${totalUniqueMoviesEdited}</span>
+            </div>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Movies Deleted</span>
+              <span class="breakdown-value">${moviesDeleted}</span>
+            </div>
+          </div>
+          <div class="breakdown-card">
+            <h4>Cast Profiles (People)</h4>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Cast Created</span>
+              <span class="breakdown-value highlight">${castCreated}</span>
+            </div>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Cast Edited</span>
+              <span class="breakdown-value highlight">${castEdited}</span>
+            </div>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Cast Deleted</span>
+              <span class="breakdown-value">${castDeleted}</span>
+            </div>
+          </div>
+          <div class="breakdown-card">
+            <h4>Credits & Partnerships</h4>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Credits Created</span>
+              <span class="breakdown-value">${creditsCreated}</span>
+            </div>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Credits Edited</span>
+              <span class="breakdown-value">${creditsEdited}</span>
+            </div>
+            <div class="breakdown-stat">
+              <span class="breakdown-label">Companies Managed</span>
+              <span class="breakdown-value">${companiesCreated + companiesEdited}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="breakdown-title">Movie-Specific Contribution Detail</div>
+        <table class="logs-table" style="margin-bottom: 35px;">
+          <thead>
+            <tr>
+              <th style="width: 50%;">Edited Movie Title</th>
+              <th style="width: 25%; text-align: center;">Cast/Crew Created</th>
+              <th style="width: 25%; text-align: center;">Cast/Crew Edited</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${uniqueMovies.length === 0 ? `
+              <tr>
+                <td colspan="3" style="text-align: center; color: #64748b; font-style: italic;">
+                  No movie edits or credits logged in this period.
+                </td>
+              </tr>
+            ` : uniqueMovies.map(m => `
+              <tr>
+                <td style="font-weight: 700; color: #0f172a;">${m.title}</td>
+                <td style="text-align: center; font-weight: 600; color: #15803d;">
+                  ${m.creditsCreated > 0 ? `+${m.creditsCreated}` : '0'}
+                </td>
+                <td style="text-align: center; font-weight: 600; color: #1d4ed8;">
+                  ${m.creditsEdited > 0 ? `+${m.creditsEdited}` : '0'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
         <div class="summary-title">Chronological Log Trail (${totalCount} Entries)</div>
         <table class="logs-table">
           <thead>
@@ -286,6 +471,9 @@ const generatePDFWindow = (actions, selectedDate) => {
 
 export default function AdminLogs() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('actions'); // 'actions' | 'syncs'
+  
+  // Tab 1: Human Admin Logs States
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -294,15 +482,32 @@ export default function AdminLogs() {
   const [pageInput, setPageInput] = useState('1');
   const pageSize = 20;
 
-  // Filters
   const [filterAction, setFilterAction] = useState('all');
   const [filterEntity, setFilterEntity] = useState('all');
   const [filterName, setFilterName] = useState('');
   const [filterDate, setFilterDate] = useState('');
 
+  // Tab 2: Automated Sync Logs States
+  const [syncLogs, setSyncLogs] = useState([]);
+  const [filterSyncStatus, setFilterSyncStatus] = useState('all');
+  const [filterSyncSource, setFilterSyncSource] = useState('all');
+  const [expandedSyncLogs, setExpandedSyncLogs] = useState(new Set());
+
+  // Reset page when switching tabs or filters change
   useEffect(() => {
-    fetchLogs();
-  }, [page, filterAction, filterEntity, filterName, filterDate]);
+    setPage(1);
+    setPageInput('1');
+    setExpandedSyncLogs(new Set());
+  }, [activeTab, filterAction, filterEntity, filterName, filterDate, filterSyncStatus, filterSyncSource]);
+
+  // Main Fetch Switch
+  useEffect(() => {
+    if (activeTab === 'actions') {
+      fetchLogs();
+    } else {
+      fetchSyncLogs();
+    }
+  }, [page, activeTab, filterAction, filterEntity, filterName, filterDate, filterSyncStatus, filterSyncSource]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -347,6 +552,58 @@ export default function AdminLogs() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchSyncLogs = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('sync_logs')
+        .select('*', { count: 'exact' });
+
+      if (filterSyncStatus !== 'all') {
+        query = query.eq('status', filterSyncStatus);
+      }
+      if (filterSyncSource !== 'all') {
+        query = query.eq('source', filterSyncSource);
+      }
+      if (filterDate) {
+        const [year, month, day] = filterDate.split('-');
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+        query = query.gte('created_at', startOfDay.toISOString());
+        query = query.lte('created_at', endOfDay.toISOString());
+      }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, count, error } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      setSyncLogs(data || []);
+      setTotalCount(count || 0);
+      setPageInput(page.toString());
+    } catch (err) {
+      console.error('Error fetching sync logs:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSyncLogDetail = (id) => {
+    setExpandedSyncLogs(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   const handleGenerateReport = async () => {
@@ -400,7 +657,8 @@ export default function AdminLogs() {
   const handlePageSubmit = (e) => {
     e.preventDefault();
     const newPage = parseInt(pageInput, 10);
-    if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
+    if (!newPage && newPage !== 0) return;
+    if (newPage >= 1 && newPage <= totalPages) {
       setPage(newPage);
     } else {
       setPageInput(page.toString());
@@ -417,39 +675,99 @@ export default function AdminLogs() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-theme(spacing.32))] max-h-[800px]">
+    <div className="flex flex-col h-[calc(100vh-theme(spacing.32))] max-h-[850px]">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 shrink-0">
         <div>
-          <h2 className="text-xl font-bold text-text-primary tracking-tight">Activity Logs</h2>
-          <p className="text-sm text-text-muted mt-1">Monitor all administrative actions across the platform.</p>
+          <h2 className="text-xl font-bold text-text-primary tracking-tight">Database Logs</h2>
+          <p className="text-sm text-text-muted mt-1">Monitor administrator actions and automated syncing logs.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <button
-            onClick={handleGenerateReport}
-            disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white font-bold text-sm rounded-xl hover:scale-[1.02] shadow-lg shadow-brand/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {exporting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Exporting...</span>
-              </>
-            ) : (
-              <>
-                <Icon icon="solar:document-text-bold" width="18" />
-                <span>Export Audit PDF</span>
-              </>
-            )}
-          </button>
-          <input
-            type="text"
-            placeholder="Search by name..."
-            value={filterName}
-            onChange={(e) => { setFilterName(e.target.value); setPage(1); }}
-            className="w-full md:w-40 px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all placeholder:text-text-muted"
-          />
+          {activeTab === 'actions' && (
+            <button
+              onClick={handleGenerateReport}
+              disabled={exporting || loading}
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white font-bold text-sm rounded-xl hover:scale-[1.02] shadow-lg shadow-brand/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {exporting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <Icon icon="solar:document-text-bold" width="18" />
+                  <span>Export Audit PDF</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {activeTab === 'actions' ? (
+            <>
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={filterName}
+                onChange={(e) => { setFilterName(e.target.value); setPage(1); }}
+                className="w-full md:w-40 px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all placeholder:text-text-muted"
+              />
+
+              <select
+                value={filterAction}
+                onChange={(e) => { setFilterAction(e.target.value); setPage(1); }}
+                className="w-full md:w-auto px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
+              >
+                <option value="all">All Actions</option>
+                <option value="create">Created</option>
+                <option value="update">Updated</option>
+                <option value="delete">Deleted</option>
+              </select>
+
+              <select
+                value={filterEntity}
+                onChange={(e) => { setFilterEntity(e.target.value); setPage(1); }}
+                className="w-full md:w-auto px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
+              >
+                <option value="all">All Entities</option>
+                <option value="film">Films</option>
+                <option value="person">People</option>
+                <option value="credit">Credits</option>
+                <option value="company">Companies</option>
+              </select>
+            </>
+          ) : (
+            <>
+              <select
+                value={filterSyncSource}
+                onChange={(e) => { setFilterSyncSource(e.target.value); setPage(1); }}
+                className="w-full md:w-auto px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
+              >
+                <option value="all">All Modules</option>
+                <option value="master">Master Sync</option>
+                <option value="videos">YouTube Videos Sync</option>
+                <option value="showtimes">Cinema Showtimes</option>
+                <option value="tmdb">TMDB Records Sync</option>
+                <option value="ai_maintenance">AI Cast Extraction</option>
+                <option value="cast_vision_sync">OCR Cast Vision Sync</option>
+                <option value="filmhouse">Filmhouse Scraper</option>
+                <option value="genesis">Genesis Scraper</option>
+                <option value="kava">Kava Scraper</option>
+              </select>
+
+              <select
+                value={filterSyncStatus}
+                onChange={(e) => { setFilterSyncStatus(e.target.value); setPage(1); }}
+                className="w-full md:w-auto px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
+              >
+                <option value="all">All Outcomes</option>
+                <option value="success">Success</option>
+                <option value="running">Running</option>
+                <option value="error">Failed</option>
+              </select>
+            </>
+          )}
 
           <input
             type="date"
@@ -457,37 +775,16 @@ export default function AdminLogs() {
             onChange={(e) => { setFilterDate(e.target.value); setPage(1); }}
             className="w-full md:w-auto px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all [color-scheme:dark]"
           />
-
-          <select
-            value={filterAction}
-            onChange={(e) => { setFilterAction(e.target.value); setPage(1); }}
-            className="w-full md:w-auto px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
-          >
-            <option value="all">All Actions</option>
-            <option value="create">Created</option>
-            <option value="update">Updated</option>
-            <option value="delete">Deleted</option>
-          </select>
-
-          <select
-            value={filterEntity}
-            onChange={(e) => { setFilterEntity(e.target.value); setPage(1); }}
-            className="w-full md:w-auto px-4 py-2.5 bg-surface-2 border border-border rounded-xl text-sm text-text-primary focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
-          >
-            <option value="all">All Entities</option>
-            <option value="film">Films</option>
-            <option value="person">People</option>
-            <option value="credit">Credits</option>
-            <option value="company">Companies</option>
-          </select>
           
-          {(filterName || filterDate || filterAction !== 'all' || filterEntity !== 'all') && (
+          {(filterName || filterDate || filterAction !== 'all' || filterEntity !== 'all' || filterSyncSource !== 'all' || filterSyncStatus !== 'all') && (
             <button
               onClick={() => {
                 setFilterName('');
                 setFilterDate('');
                 setFilterAction('all');
                 setFilterEntity('all');
+                setFilterSyncSource('all');
+                setFilterSyncStatus('all');
                 setPage(1);
               }}
               className="p-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-muted hover:text-text-primary transition-all"
@@ -499,78 +796,203 @@ export default function AdminLogs() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-6 shrink-0">
+        <button
+          onClick={() => setActiveTab('actions')}
+          className={`px-6 py-3.5 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${
+            activeTab === 'actions'
+              ? 'border-brand text-brand'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Icon icon="solar:user-linear" className="text-base" />
+          <span>Admin Actions</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('syncs')}
+          className={`px-6 py-3.5 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 ${
+            activeTab === 'syncs'
+              ? 'border-brand text-brand'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Icon icon="solar:refresh-linear" className="text-base" />
+          <span>Automated Sync History</span>
+        </button>
+      </div>
+
       {/* Main Table Container */}
       <div className="bg-surface border border-border rounded-2xl flex flex-col min-h-0 flex-1 shadow-sm overflow-hidden">
         {/* Scrollable Table Area */}
         <div className="flex-1 overflow-auto custom-scrollbar">
           <table className="w-full text-sm text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-surface-2/95 backdrop-blur-sm shadow-sm">
-              <tr className="border-b border-border text-text-muted text-xs font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">Time</th>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">Action</th>
-                <th className="px-6 py-4">Entity</th>
-                <th className="px-6 py-4">Details</th>
+            <thead className="sticky top-0 z-10 bg-surface-2/95 backdrop-blur-sm shadow-sm border-b border-border">
+              <tr className="text-text-muted text-xs font-bold uppercase tracking-wider">
+                {activeTab === 'actions' ? (
+                  <>
+                    <th className="px-6 py-4">Time</th>
+                    <th className="px-6 py-4">User</th>
+                    <th className="px-6 py-4">Action</th>
+                    <th className="px-6 py-4">Entity</th>
+                    <th className="px-6 py-4">Details</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-6 py-4">Time</th>
+                    <th className="px-6 py-4">Module</th>
+                    <th className="px-6 py-4">Outcome</th>
+                    <th className="px-6 py-4">Duration</th>
+                    <th className="px-6 py-4">Metrics</th>
+                    <th className="px-6 py-4">Summary</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-text-muted">
+                  <td colSpan={activeTab === 'actions' ? 5 : 6} className="px-6 py-12 text-center text-text-muted">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
-                      <p>Loading activity logs...</p>
+                      <p>Loading logs...</p>
                     </div>
                   </td>
                 </tr>
-              ) : logs.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-text-muted">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <Icon icon="solar:history-linear" className="text-4xl text-text-muted/50" />
-                      <p>No activity logs found matching your filters.</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-surface-2/50 transition-colors group">
-                    <td className="px-6 py-4 whitespace-nowrap text-text-muted text-xs">
-                      {new Date(log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-brand font-bold text-xs border border-border">
-                          {log.users?.name?.charAt(0) || log.users?.email?.charAt(0) || '?'}
-                        </div>
-                        <div>
-                          <p className="font-medium text-text-primary">{log.users?.name || 'Unknown'}</p>
-                          <p className="text-[10px] text-text-muted">{log.users?.email}</p>
-                        </div>
+              ) : activeTab === 'actions' ? (
+                logs.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-text-muted">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <Icon icon="solar:history-linear" className="text-4xl text-text-muted/50" />
+                        <p>No activity logs found matching your filters.</p>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getActionColor(log.action_type)}`}>
-                        {log.action_type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium capitalize text-text-primary">{log.entity_type}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-text-primary text-sm line-clamp-1" title={log.entity_name}>
-                        {log.entity_name || <span className="italic text-text-muted">Unknown</span>}
-                      </p>
-                      {log.details && Object.keys(log.details).length > 0 && (
-                        <p className="text-xs text-text-muted line-clamp-1 mt-0.5">
-                          {JSON.stringify(log.details)}
-                        </p>
-                      )}
                     </td>
                   </tr>
-                ))
+                ) : (
+                  logs.map((log) => (
+                    <tr key={log.id} className="hover:bg-surface-2/50 transition-colors group">
+                      <td className="px-6 py-4 whitespace-nowrap text-text-muted text-xs">
+                        {new Date(log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-brand font-bold text-xs border border-border">
+                            {log.users?.name?.charAt(0) || log.users?.email?.charAt(0) || '?'}
+                          </div>
+                          <div>
+                            <p className="font-medium text-text-primary">{log.users?.name || 'Unknown'}</p>
+                            <p className="text-[10px] text-text-muted">{log.users?.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getActionColor(log.action_type)}`}>
+                          {log.action_type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium capitalize text-text-primary">{log.entity_type}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-text-primary text-sm line-clamp-1" title={log.entity_name}>
+                          {log.entity_name || <span className="italic text-text-muted">Unknown</span>}
+                        </p>
+                        {log.details && Object.keys(log.details).length > 0 && (
+                          <p className="text-xs text-text-muted line-clamp-1 mt-0.5">
+                            {JSON.stringify(log.details)}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )
+              ) : (
+                syncLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center text-text-muted">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <Icon icon="solar:refresh-linear" className="text-4xl text-text-muted/50" />
+                        <p>No automated sync runs logged matching your filters.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  syncLogs.map((log) => {
+                    const isExpanded = expandedSyncLogs.has(log.id);
+                    const hasDetails = log.details && Object.keys(log.details).length > 0;
+                    return (
+                      <React.Fragment key={log.id}>
+                        <tr 
+                          className={`hover:bg-surface-2/50 transition-colors group cursor-pointer ${isExpanded ? 'bg-surface-2/30' : ''}`}
+                          onClick={() => hasDetails && toggleSyncLogDetail(log.id)}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-text-muted text-xs">
+                            {new Date(log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-text-primary text-xs uppercase tracking-tight">
+                            <span>{log.source?.replace('_', ' ')}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                              log.status === 'success' ? 'text-green-500 bg-green-500/10 border-green-500/20' :
+                              log.status === 'running' ? 'text-amber-500 bg-amber-500/10 border-amber-500/20 animate-pulse' :
+                              'text-red-500 bg-red-500/10 border-red-500/20'
+                            }`}>
+                              {log.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-text-primary font-mono text-xs">
+                            {formatDuration(log.duration_ms)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2">
+                              <span className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] font-bold text-text-muted animate-in fade-in" title="Processed items count">
+                                P: {log.items_processed || 0}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-blue-500/5 border border-blue-500/10 text-[9px] font-bold text-blue-500 animate-in fade-in" title="Updated items count">
+                                U: {log.items_updated || 0}
+                              </span>
+                              {log.items_failed > 0 && (
+                                <span className="px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-[9px] font-bold text-red-500 animate-in fade-in" title="Failed items count">
+                                  F: {log.items_failed}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-xs max-w-xs truncate text-text-secondary" title={log.message}>
+                            <div className="flex items-center gap-2">
+                              <span className="truncate">{log.message || 'No status message'}</span>
+                              {hasDetails && (
+                                <Icon 
+                                  icon={isExpanded ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} 
+                                  className="text-text-muted shrink-0 w-3.5 h-3.5 ml-auto group-hover:text-brand transition-colors" 
+                                />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && hasDetails && (
+                          <tr>
+                            <td colSpan="6" className="bg-surface-2/30 border-b border-border/85 px-8 py-5">
+                              <div className="space-y-4 max-w-4xl animate-in slide-in-from-top-2 duration-300">
+                                <div className="text-[10px] font-black text-brand uppercase tracking-widest flex items-center gap-1.5">
+                                  <Icon icon="solar:document-text-bold" width="14" />
+                                  <span>Sync Logs Payload & Metadata Details</span>
+                                </div>
+                                <pre className="text-[10px] font-mono leading-relaxed bg-surface border border-border rounded-xl p-5 overflow-x-auto max-h-96 text-text-secondary custom-scrollbar shadow-inner select-all">
+                                  {JSON.stringify(log.details, null, 2)}
+                                </pre>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )
               )}
             </tbody>
           </table>

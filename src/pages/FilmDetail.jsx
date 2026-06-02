@@ -11,6 +11,7 @@ import WatchOptions from '../components/film/WatchOptions';
 import { Skeleton } from '../components/ui/Skeleton';
 import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
+import ImageWithFallback from '../components/ui/ImageWithFallback';
 
 const FilmDetailSkeleton = () => (
     <div className="w-full bg-bg min-h-screen">
@@ -244,10 +245,12 @@ export default function FilmDetail() {
     <div className="w-full bg-bg min-h-screen pb-20">
       {/* 1. CINEMATIC HEADER */}
       <div className="relative w-full h-[60vh] min-h-[500px] border-b border-border overflow-hidden">
-        <img
+        <ImageWithFallback
           src={film.backdrop_url || film.backdrop} 
           alt={`${film.title} Backdrop`} 
           className="absolute inset-0 w-full h-full object-cover"
+          fallbackType="banner"
+          name={film.title}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent w-full md:w-1/2"></div>
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg to-transparent"></div>
@@ -255,10 +258,12 @@ export default function FilmDetail() {
         <div className="absolute bottom-0 left-0 w-full">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-end gap-8 pb-8">
             <div className="hidden md:block w-64 shrink-0 translate-y-16 z-10">
-              <img
+              <ImageWithFallback
                 src={film.poster_url || film.poster} 
                 alt={`${film.title} Poster`} 
                 className="w-full rounded-xl shadow-2xl border border-white/10 object-cover aspect-[2/3]"
+                fallbackType="banner"
+                name={film.title}
               />
             </div>
 
@@ -303,19 +308,32 @@ export default function FilmDetail() {
               </div>
 
               <div className="flex flex-wrap items-end gap-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-brand text-4xl md:text-5xl font-bold font-heading leading-none tracking-tighter drop-shadow-lg">{film.tmdb_rating || film.rating}</span>
-                  <div className="flex flex-col justify-end pb-1">
-                    <span className="text-white/60 text-[10px] font-bold tracking-wide">Rating</span>
-                    <div className="flex items-center gap-1 mt-1">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <svg key={star} xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill={star <= Math.round((film.tmdb_rating || film.rating) / 2) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="text-brand">
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                        </svg>
-                      ))}
+                {Number(film.tmdb_rating || film.rating || 0) > 0 ? (
+                  <div className="flex items-center gap-3">
+                    <span className="text-brand text-4xl md:text-5xl font-bold font-heading leading-none tracking-tighter drop-shadow-lg">{film.tmdb_rating || film.rating}</span>
+                    <div className="flex flex-col justify-end pb-1">
+                      <span className="text-white/60 text-[10px] font-bold tracking-wide">Rating</span>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <svg key={star} xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill={star <= Math.round((film.tmdb_rating || film.rating) / 2) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="text-brand">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      const el = document.getElementById('reviews-section');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex items-center gap-2 bg-brand/10 border border-brand/20 text-brand px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-brand/20 transition-all duration-300 cursor-pointer active:scale-95 shadow-md shadow-brand/5 mb-1 shrink-0"
+                  >
+                    <Icon icon="solar:star-bold" className="text-xs" />
+                    <span>Be the first to rate</span>
+                  </button>
+                )}
 
                 <div className="flex items-center gap-1.5 text-white/60 pb-1">
                   <Icon icon="solar:fire-bold" className="text-orange-500 text-lg" />
@@ -431,7 +449,7 @@ export default function FilmDetail() {
             )}
 
             {/* Reviews */}
-            <section className="p-8 md:p-12">
+            <section id="reviews-section" className="p-8 md:p-12">
               <ReviewSection
                 filmId={film.id}
                 currentUser={user}
@@ -526,10 +544,12 @@ export default function FilmDetail() {
                     to={`/films/${relatedFilm.mubi_slug || relatedFilm.id}`}
                     className="flex gap-4 bg-surface hover:bg-surface-2 p-4 border-b border-border last:border-b-0 group transition-all"
                   >
-                    <img
+                    <ImageWithFallback
                       src={relatedFilm.poster_url || relatedFilm.poster} 
                       alt={relatedFilm.title}
                       className="w-12 h-16 object-cover rounded-md border border-border"
+                      fallbackType="banner"
+                      name={relatedFilm.title}
                     />
                     <div className="flex flex-col justify-center">
                       <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1 mb-1 tracking-tight">

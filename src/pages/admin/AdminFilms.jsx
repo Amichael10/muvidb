@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toTitleCase } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
+import { getFriendlyErrorMessage } from '../../utils/errors';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -868,7 +869,7 @@ export default function AdminFilms() {
       fetchYoutubeBuffer();
     } catch (error) {
       console.error('Error saving:', error);
-      toast.error(error.message || 'Failed to save film');
+      toast.error(getFriendlyErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -885,7 +886,7 @@ export default function AdminFilms() {
       fetchFilms();
       setDeletingFilm(null);
     } catch (error) {
-      toast.error('Delete failed');
+      toast.error(getFriendlyErrorMessage(error));
     }
   };
 
@@ -904,7 +905,7 @@ export default function AdminFilms() {
       setFilms(prev => prev.map(f => f.id === film.id ? { ...f, is_featured: newStatus } : f));
       toast.success(newStatus ? 'Production Featured' : 'Removed from Featured');
     } catch (err) {
-      toast.error('Feature toggle failed');
+      toast.error(getFriendlyErrorMessage(err));
     }
   };
 
@@ -952,7 +953,7 @@ export default function AdminFilms() {
       setFilmBatchDeleteIds(null);
       fetchFilms();
     } catch (error) {
-      toast.error('Batch delete failed');
+      toast.error(getFriendlyErrorMessage(error));
     } finally {
       setIsBatchDeleting(false);
     }
@@ -980,7 +981,7 @@ export default function AdminFilms() {
       fetchFilms();
     } catch (error) {
       console.error('Merge error:', error);
-      toast.error(`Merge failed: ${error.message}`, { id: t });
+      toast.error(`Merge failed: ${getFriendlyErrorMessage(error)}`, { id: t });
     } finally {
       setIsMerging(false);
     }
