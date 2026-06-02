@@ -168,7 +168,7 @@ export default function Search() {
         <div className="p-8 md:p-12">
           {loading ? (
             activeTab === 'films' ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
                 {[...Array(10)].map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}

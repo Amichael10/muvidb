@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
+import { getFriendlyErrorMessage } from '../utils/errors';
 
 export default function Waitlist() {
   const [email, setEmail] = useState('');
@@ -45,7 +46,7 @@ export default function Waitlist() {
       toast.success("Welcome to Ensembla!");
     } catch (err: any) {
       console.error('Waitlist error:', err);
-      toast.error(err.message || 'Something went wrong.');
+      toast.error(getFriendlyErrorMessage(err));
     } finally {
       setIsLoading(false);
     }

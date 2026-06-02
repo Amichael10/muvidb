@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import WatchOptions from './WatchOptions';
 import { Icon } from '@iconify/react';
+import ImageWithFallback from '../ui/ImageWithFallback';
 
 export default function HeroSection({ featuredFilms: featuredFilmsProp, featuredFilm: singleFilmProp, isLoading }) {
-  // Handle both array and single object props for backward compatibility
-  const featuredFilms = featuredFilmsProp || (singleFilmProp ? [singleFilmProp] : []);
+  // Handle both array and single object props for backward compatibility and slice to 6 items
+  const featuredFilms = (featuredFilmsProp || (singleFilmProp ? [singleFilmProp] : [])).slice(0, 6);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
 
   return (
-    <section className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg">
+    <section className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg group/hero">
       <AnimatePresence mode="wait">
         <motion.div
           key={featuredFilm.id || currentIndex}
@@ -77,24 +78,26 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
         >
           {/* Background Image & Overlays */}
           <div className="absolute inset-0 z-0">
-            <img 
+            <ImageWithFallback 
               src={featuredFilm.backdrop_url || featuredFilm.backdrop} 
               alt={featuredFilm.title} 
               className="w-full h-full object-cover"
+              fallbackType="banner"
+              name={featuredFilm.title}
             />
             
-            {/* Gradient Overlay: Consistently dark on the left for text readability across themes */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
+            {/* Gradient Overlay: Consistently dark on the left for text readability across themes (Issue 8) */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-transparent z-10"></div>
             
             {/* Subtle animated gradient shimmer */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-brand/5 via-transparent to-brand/5 animate-pulse mix-blend-overlay"></div>
+            <div className="absolute inset-0 bg-gradient-to-tr from-brand/5 via-transparent to-brand/5 animate-pulse mix-blend-overlay z-10"></div>
             
             {/* Bottom fade into page background */}
-            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-bg to-transparent"></div>
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-bg to-transparent z-10"></div>
           </div>
 
           {/* Content Container */}
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-32 pt-32 border-x border-white/5">
+          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-32 pt-32 border-x border-white/5">
             <div className="flex justify-between items-end w-full">
               
               {/* Left Content */}
@@ -114,8 +117,6 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                   The home of Nollywood — discover, explore, obsess.
                 </motion.p>
 
-
-
                 {/* Genre Pills */}
                 <div className="flex flex-wrap gap-2 mb-6">
                   {(featuredFilm.genres || []).map((genre) => (
@@ -132,11 +133,13 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
                 {/* Meta Info */}
                 <div className="flex flex-wrap items-center gap-6 mb-8 text-[11px] font-bold text-white/80">
-                  {/* Rating */}
-                  <div className="flex items-center gap-2 text-brand">
-                    <Icon icon="solar:star-bold" className="text-base" />
-                    <span>{Number(featuredFilm.tmdb_rating || featuredFilm.rating || 0).toFixed(1)}</span>
-                  </div>
+                  {/* Rating - Only shown if > 0 (Issue 4) */}
+                  {Number(featuredFilm.tmdb_rating || featuredFilm.rating || 0) > 0 && (
+                    <div className="flex items-center gap-2 text-brand">
+                      <Icon icon="solar:star-bold" className="text-base" />
+                      <span>{Number(featuredFilm.tmdb_rating || featuredFilm.rating || 0).toFixed(1)}</span>
+                    </div>
+                  )}
                   
                   {/* Status / Popularity Icon */}
                   {featuredFilm.is_in_cinemas ? (
@@ -144,25 +147,30 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       <Icon icon="solar:ticket-bold" className="text-base" />
                       <span className="uppercase tracking-widest text-[9px]">In Cinemas Now</span>
                     </div>
-                  ) : (
+                  ) : (featuredFilm.is_trending || featuredFilm.view_count > 100) ? (
                     <div className="flex items-center gap-2">
                       <Icon icon="solar:fire-bold" className="text-base text-orange-500" />
                       <span>Trending</span>
                     </div>
-                  )}
+                  ) : null}
                   
                   {/* Year */}
-                  <div className="flex items-center gap-2">
-                    <Icon icon="solar:calendar-linear" className="text-base" />
-                    <span>{featuredFilm.year}</span>
-                  </div>
+                  {featuredFilm.year && (
+                    <div className="flex items-center gap-2">
+                      <Icon icon="solar:calendar-linear" className="text-base" />
+                      <span>{featuredFilm.year}</span>
+                    </div>
+                  )}
                   
-                  {/* Runtime */}
-                  <div className="flex items-center gap-2">
-                    <Icon icon="solar:clock-circle-linear" className="text-base" />
-                    <span>{featuredFilm.runtime_minutes || featuredFilm.runtime} min</span>
-                  </div>
+                  {/* Runtime - Only show if value exists (Issue 23) */}
+                  {(featuredFilm.runtime_minutes || featuredFilm.runtime) && (
+                    <div className="flex items-center gap-2">
+                      <Icon icon="solar:clock-circle-linear" className="text-base" />
+                      <span>{featuredFilm.runtime_minutes || featuredFilm.runtime} min</span>
+                    </div>
+                  )}
                 </div>
+
 
                 {/* Synopsis */}
                 <p className="text-white/90 text-base md:text-lg mb-10 line-clamp-3 max-w-xl border-l-2 border-brand pl-6 leading-relaxed drop-shadow-lg opacity-90">
@@ -188,10 +196,12 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
               >
                 <Link to={`/films/${featuredFilm.mubi_slug || featuredFilm.id}`} className="block relative">
                   <div className="absolute inset-0 bg-brand rounded-2xl blur-2xl opacity-0 group-hover:opacity-20 transition-opacity duration-700"></div>
-                  <img 
+                  <ImageWithFallback 
                     src={featuredFilm.poster_url || featuredFilm.poster} 
                     alt={`${featuredFilm.title} Poster`} 
                     className="relative w-64 h-auto rounded-2xl border border-white/10 shadow-2xl object-cover transform transition-all duration-700 group-hover:scale-105 group-hover:rotate-2"
+                    fallbackType="banner"
+                    name={featuredFilm.title}
                   />
                 </Link>
               </motion.div>
@@ -215,6 +225,27 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
             />
           ))}
         </div>
+      )}
+
+      {/* Slider Controls (Chevron Arrows - visible on desktop hover) (Issue 5) */}
+      {featuredFilms.length > 1 && (
+        <>
+          <button 
+            onClick={() => setCurrentIndex(prev => (prev - 1 + featuredFilms.length) % featuredFilms.length)}
+            className="absolute left-6 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 hover:bg-brand hover:scale-110 active:scale-95 text-white backdrop-blur-md border border-white/10 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex cursor-pointer shadow-2xl"
+            aria-label="Previous featured movie"
+          >
+            <Icon icon="solar:alt-arrow-left-linear" width="24" height="24" />
+          </button>
+          
+          <button 
+            onClick={() => setCurrentIndex(prev => (prev + 1) % featuredFilms.length)}
+            className="absolute right-6 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 hover:bg-brand hover:scale-110 active:scale-95 text-white backdrop-blur-md border border-white/10 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex cursor-pointer shadow-2xl"
+            aria-label="Next featured movie"
+          >
+            <Icon icon="solar:alt-arrow-right-linear" width="24" height="24" />
+          </button>
+        </>
       )}
     </section>
   );

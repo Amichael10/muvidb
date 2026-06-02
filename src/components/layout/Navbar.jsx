@@ -10,6 +10,7 @@ export default function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState(['King of Boys', 'Funke Akindele', 'Anikulapo']);
+  const [unreadNotifications, setUnreadNotifications] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -78,7 +79,7 @@ export default function Navbar() {
           <img 
             src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.svg" : "/images/Ensembla Brand/Wordmark.svg"} 
             alt="Ensembla" 
-            className="h-7 object-contain group-hover:scale-105 transition-all duration-500" 
+            className="h-9 object-contain group-hover:scale-105 transition-all duration-500" 
           />
         </Link>
 
@@ -128,7 +129,9 @@ export default function Navbar() {
               {/* Notification Bell */}
               <button className="relative w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90">
                 <Icon icon="solar:bell-linear" width="22" height="22" />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
+                {unreadNotifications && (
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
+                )}
               </button>
 
               {/* User Avatar & Dropdown */}

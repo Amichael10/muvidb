@@ -220,7 +220,8 @@ export async function runVideosSync() {
                   // Only mark needs_review if we couldn't enrich from TMDB
                   needs_review: !tmdb?.synopsis, 
                   status: 'released',
-                  runtime_minutes: Math.round(v.duration_seconds / 60)
+                  runtime_minutes: Math.round(v.duration_seconds / 60),
+                  language: ch.primary_language || 'English'
                 });
               }
             }

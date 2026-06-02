@@ -24,7 +24,8 @@ import CompanyDetail from './pages/CompanyDetail';
 import PeopleList from './pages/PeopleList';
 import Channels from './pages/Channels';
 import ChannelDetail from './pages/ChannelDetail';
-
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import Waitlist from './pages/Waitlist';
 
 // Admin Pages
@@ -91,7 +92,7 @@ function BackToTop() {
   return (
     <button 
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      className="fixed bottom-24 right-4 bg-brand text-white p-3 rounded-full shadow-lg z-50 transition-all hover:scale-110 active:scale-95 lg:bottom-8 lg:right-8 lg:p-4"
+      className="fixed bottom-28 right-6 bg-brand/90 hover:bg-brand text-white p-3 rounded-full shadow-xl z-50 transition-all hover:scale-110 active:scale-95 lg:bottom-12 lg:right-12 lg:p-4 border border-white/10"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
     </button>
@@ -155,6 +156,8 @@ export default function App() {
                 <Route path="/channels/:slug" element={<ChannelDetail />} />
                 <Route path="/companies" element={<Companies />} />
                 <Route path="/companies/:slug" element={<CompanyDetail />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/privacy" element={<Privacy />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />

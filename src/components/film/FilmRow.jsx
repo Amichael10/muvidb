@@ -4,7 +4,7 @@ import FilmCard from './FilmCard';
 import SkeletonCard from '../ui/SkeletonCard';
 import { Icon } from '@iconify/react';
 
-export default function FilmRow({ title, subtitle, films, sortKey, isLoading = false, noHeader = false, linkTo }) {
+export default function FilmRow({ title, subtitle, films, sortKey, isLoading = false, noHeader = false, linkTo, cardVariant }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -50,7 +50,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
                 {title}
               </h2>
               {subtitle && (
-                <p className="text-text-muted text-sm font-medium opacity-80">{subtitle}</p>
+                <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-70">{subtitle}</p>
               )}
             </div>
             <Link 
@@ -69,22 +69,26 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
           <div className={`absolute top-0 left-0 bottom-0 w-20 z-10 bg-gradient-to-r from-bg to-transparent pointer-events-none transition-opacity duration-300 hidden md:block ${canScrollLeft ? 'opacity-100' : 'opacity-0'}`} />
           <div className={`absolute top-0 right-0 bottom-0 w-20 z-10 bg-gradient-to-l from-bg to-transparent pointer-events-none transition-opacity duration-300 hidden md:block ${canScrollRight ? 'opacity-100' : 'opacity-0'}`} />
 
-          {/* Navigation Arrows */}
-          <button 
-            onClick={() => scroll('left')}
-            className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollLeft && 'pointer-events-none !opacity-0'}`}
-            aria-label="Previous"
-          >
-            <Icon icon="solar:alt-arrow-left-linear" width="20" height="20" />
-          </button>
-          
-          <button 
-            onClick={() => scroll('right')}
-            className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollRight && 'pointer-events-none !opacity-0'}`}
-            aria-label="Next"
-          >
-            <Icon icon="solar:alt-arrow-right-linear" width="20" height="20" />
-          </button>
+          {/* Navigation Arrows - Only visible if there's more than 1 item */}
+          {films.length > 1 && (
+            <>
+              <button 
+                onClick={() => scroll('left')}
+                className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollLeft && 'pointer-events-none !opacity-0'}`}
+                aria-label="Previous"
+              >
+                <Icon icon="solar:alt-arrow-left-linear" width="20" height="20" />
+              </button>
+              
+              <button 
+                onClick={() => scroll('right')}
+                className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollRight && 'pointer-events-none !opacity-0'}`}
+                aria-label="Next"
+              >
+                <Icon icon="solar:alt-arrow-right-linear" width="20" height="20" />
+              </button>
+            </>
+          )}
 
           <div 
             ref={scrollRef}
@@ -94,7 +98,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
             {isLoading ? (
               [...Array(6)].map((_, i) => (
                 <div key={i} className="shrink-0">
-                  <SkeletonCard size="md" />
+                  <SkeletonCard size="md" variant={cardVariant} />
                 </div>
               ))
             ) : films.length === 0 ? (
@@ -102,9 +106,13 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
                 No titles available in this section.
               </div>
             ) : (
-              sortedFilms.map((film) => (
+              sortedFilms.map((film, index) => (
                 <div key={film.id} className="shrink-0">
-                  <FilmCard film={film} size="md" />
+                  <FilmCard 
+                    film={cardVariant === 'top10' ? { ...film, rank: index + 1 } : film} 
+                    size="md" 
+                    variant={cardVariant} 
+                  />
                 </div>
               ))
             )}

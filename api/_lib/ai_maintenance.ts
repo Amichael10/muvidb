@@ -163,7 +163,17 @@ export async function runCastExtraction() {
     }
   }
 
-  return { analyzed: allCastFilms.length, extracted: castExtracted.length, applied: castExtracted.length };
+  return {
+    analyzed: allCastFilms.length,
+    extracted: castExtracted.length,
+    applied: castExtracted.length,
+    extracted_items: castExtracted.map((item: any) => ({
+      film_id: item.id,
+      old_title: item.old_title,
+      new_title: item.new_title !== item.old_title ? item.new_title : undefined,
+      extracted_cast: item.cast
+    }))
+  };
 }
 
 export async function runTitleCleanup() {
@@ -212,5 +222,14 @@ export async function runTitleCleanup() {
     titlesApplied = updateResults.filter((res: any) => !res.error).length;
   }
   
-  return { analyzed: messyFilms.length, changes: titleChanges.length, applied: titlesApplied };
+  return {
+    analyzed: messyFilms.length,
+    changes: titleChanges.length,
+    applied: titlesApplied,
+    cleaned_items: titleChanges.map((item: any) => ({
+      film_id: item.id,
+      old_title: item.old_title,
+      new_title: item.new_title
+    }))
+  };
 }

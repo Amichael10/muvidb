@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
+import { getFriendlyErrorMessage } from '../utils/errors';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -43,7 +44,7 @@ export default function Login() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.message || 'Invalid email or password.');
+      setError(getFriendlyErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +54,7 @@ export default function Login() {
     try {
       await loginWithGoogle();
     } catch (err) {
-      setError(err.message || 'Google Auth failed.');
+      setError(getFriendlyErrorMessage(err));
     }
   };
 

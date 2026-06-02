@@ -24,45 +24,90 @@ const GENRES = [
   { name: 'Animation', icon: 'solar:ghost-bold', color: 'from-lime-500/20 to-lime-600/5' },
 ];
 
-export default function GenreRail() {
+export default function GenreRail({ films = [] }) {
+  // Compute valid genres with films
+  const activeGenres = GENRES.map(genre => {
+    const genreFilms = films.filter(f => f.genres?.includes(genre.name));
+    const count = genreFilms.length;
+    
+    // Find the latest added film (by created_at or year) to use as the cover background
+    const coverFilm = [...genreFilms]
+      .filter(f => f.backdrop_url || f.poster_url)
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+
+    const coverImage = coverFilm?.backdrop_url || coverFilm?.poster_url || '';
+    
+    return {
+      ...genre,
+      count,
+      coverImage
+    };
+  }).filter(g => g.count > 0);
+
+  if (activeGenres.length === 0) return null;
+
   return (
-    <section className="py-12 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+    <section className="py-16 overflow-hidden bg-surface-2/5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 border-x border-white/5">
         <h2 className="font-heading font-bold text-2xl text-text-primary tracking-tighter">
           Genre Moods
         </h2>
         <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">
-          Find your next obsession
+          Find your next obsession — dynamically updated
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 px-4 sm:px-6 lg:px-8 pb-4">
-        {GENRES.map((genre, i) => (
-          <motion.div
-            key={genre.name}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            viewport={{ once: true }}
-          >
-            <Link
-              to={`/browse?genre=${genre.name}`}
-              className={`group relative flex flex-col items-center justify-center w-full aspect-square rounded-2xl border border-border bg-gradient-to-br ${genre.color} hover:border-brand/40 transition-all duration-500 overflow-hidden`}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {activeGenres.map((genre, i) => (
+            <motion.div
+              key={genre.name}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.05, 0.4), duration: 0.5 }}
+              viewport={{ once: true }}
             >
-              <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <Icon 
-                icon={genre.icon} 
-                className="text-3xl text-text-primary group-hover:scale-110 group-hover:text-brand transition-all duration-500" 
-              />
-              <span className="mt-3 text-[10px] sm:text-xs font-black uppercase tracking-widest text-text-primary/80 group-hover:text-text-primary transition-colors text-center px-2">
-                {genre.name}
-              </span>
-              
-              {/* Decorative accent */}
-              <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-brand/10 rounded-full blur-xl group-hover:bg-brand/20 transition-all" />
-            </Link>
-          </motion.div>
-        ))}
+              <Link
+                to={`/browse?genre=${encodeURIComponent(genre.name)}`}
+                className="group relative flex flex-col justify-end w-full h-44 rounded-2xl border border-border overflow-hidden bg-surface hover:border-brand/40 hover:shadow-2xl hover:shadow-brand/5 transition-all duration-500"
+              >
+                {/* Background Cover Image (with blur-up effect) */}
+                {genre.coverImage ? (
+                  <img 
+                    src={genre.coverImage} 
+                    alt="" 
+                    className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50 group-hover:scale-110 transition-all duration-700" 
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-brand/10 to-transparent opacity-20" />
+                )}
+                
+                {/* Overlay Gradient for Text Readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+                
+                {/* Content Overlay */}
+                <div className="relative z-10 p-5 flex items-center justify-between w-full">
+                  <div className="space-y-1">
+                    <span className="text-white text-lg font-heading font-black tracking-tight group-hover:text-brand transition-colors block">
+                      {genre.name}
+                    </span>
+                    <p className="text-[10px] font-bold text-text-muted group-hover:text-white/80 transition-colors uppercase tracking-widest">
+                      {genre.count} {genre.count === 1 ? 'Film' : 'Films'}
+                    </p>
+                  </div>
+                  
+                  <div className="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-brand/20 border border-white/10 group-hover:border-brand/30 flex items-center justify-center text-white group-hover:text-brand transition-all shrink-0">
+                    <Icon icon={genre.icon} className="text-xl" />
+                  </div>
+                </div>
+                
+                {/* Bottom Line Accent */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
+              </Link>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );

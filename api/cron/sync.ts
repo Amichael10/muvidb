@@ -162,5 +162,10 @@ async function runAIMaintenance() {
     results.cleanup_titles = { error: err.message };
   }
 
-  return { task: 'ai_maintenance', ...results };
+  return {
+    task: 'ai_maintenance',
+    processed: (results.extract_cast?.analyzed || 0) + (results.cleanup_titles?.analyzed || 0),
+    upserted: (results.extract_cast?.applied || 0) + (results.cleanup_titles?.applied || 0),
+    ...results
+  };
 }

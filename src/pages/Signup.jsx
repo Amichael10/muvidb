@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
+import { getFriendlyErrorMessage } from '../utils/errors';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -61,7 +62,7 @@ export default function Signup() {
         setError('Please check your email to verify your account.');
       }
     } catch (err) {
-      setError(err.message || 'Account creation failed. Please try again.');
+      setError(getFriendlyErrorMessage(err));
     } finally {
       setIsLoading(false);
     }

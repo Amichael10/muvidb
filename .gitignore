@@ -9,3 +9,44 @@ coverage/
 .vercel
 .env*.local
 .claude
+
+# Temporary task/run directories
+temp_lumi_*/
+
+# Scratch and output directories
+scratch/
+output/
+
+# Root-level test, fix, and debug scripts
+check_constraints.js
+check_triggers.js
+crew_extractor.py
+db_debug.json
+find_cinemas.cjs
+fix_db.js
+fix_db_more.js
+retry_config.cjs
+sanitize_and_configure_cinemas.cjs
+test_merge.js
+test_merge_dummy.js
+test_merge_invalid.js
+test_merge_same.js
+test_sync.cjs
+test_sync.ts
+test_update.js
+update_cinemas.cjs
+update_cinemas2.cjs
+update_cinemas3.cjs
+
+# Untracked scripts in scripts/
+scripts/clean_hallucinated.cjs
+scripts/inspect.ts
+scripts/inspect_rpcs.ts
+scripts/seed-cinemas.ts
+scripts/sniff_ojaja.ts
+scripts/sniff_pepperoni.ts
+scripts/temp.ts
+scripts/test-api.ts
+scripts/test-films-query.ts
+scripts/test-get-people.ts
+scripts/test-scraper.ts

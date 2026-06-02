@@ -15,7 +15,7 @@ async function run() {
   // Fetch all channels that need refresh
   const { data: channels } = await supabase
     .from('channels')
-    .select('id, name, channel_url, channel_handle, owner_person_id, videos_last_fetched_at')
+    .select('id, name, channel_url, channel_handle, owner_person_id, videos_last_fetched_at, primary_language')
     .or('videos_last_fetched_at.is.null,videos_last_fetched_at.lt.' + new Date(Date.now() - 3.5*3600*1000).toISOString())
     .order('videos_last_fetched_at', { ascending: true, nullsFirst: true });
 
@@ -114,7 +114,8 @@ async function run() {
               poster_url: v.thumbnail_url,
               needs_review: true, 
               status: 'released',
-              runtime_minutes: Math.round((v.duration_seconds || 0) / 60)
+              runtime_minutes: Math.round((v.duration_seconds || 0) / 60),
+              language: ch.primary_language || 'English'
             }).select('id').single();
             filmId = newFilm?.id;
             if (filmId) newFilms++;

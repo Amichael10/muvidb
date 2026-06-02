@@ -21,6 +21,19 @@ const getHash = (str) => {
   return Math.abs(hash);
 };
 
+// Upgrade low-res YouTube thumbnails to high-res maxresdefault.jpg
+const getHighResYoutubeThumbnail = (url) => {
+  if (!url) return '';
+  if (url.includes('ytimg.com') || url.includes('youtube.com/vi/')) {
+    const match = url.match(/\/vi\/([^/?#]+)/) || url.match(/\/vi_webp\/([^/?#]+)/);
+    if (match && match[1]) {
+      const videoId = match[1];
+      return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    }
+  }
+  return url;
+};
+
 export default function ImageWithFallback({
   src,
   alt = '',
@@ -29,10 +42,12 @@ export default function ImageWithFallback({
   name = '',
   ...props
 }) {
+  const [imgSrc, setImgSrc] = useState(getHighResYoutubeThumbnail(src));
   const [hasError, setHasError] = useState(!src);
 
-  // Sync error state if the src changes dynamically
+  // Sync state if the src changes dynamically
   useEffect(() => {
+    setImgSrc(getHighResYoutubeThumbnail(src));
     setHasError(!src);
   }, [src]);
 
@@ -54,6 +69,20 @@ export default function ImageWithFallback({
   };
 
   const initials = getInitials(name || alt);
+
+  const handleImageError = () => {
+    if (imgSrc && imgSrc.includes('/maxresdefault.jpg')) {
+      // Fallback to hqdefault (480x360), which always exists
+      const fallbackSrc = imgSrc.replace('/maxresdefault.jpg', '/hqdefault.jpg');
+      setImgSrc(fallbackSrc);
+    } else if (imgSrc && imgSrc.includes('/hqdefault.jpg')) {
+      // If hqdefault also fails, try standard default (mqdefault)
+      const fallbackSrc = imgSrc.replace('/hqdefault.jpg', '/mqdefault.jpg');
+      setImgSrc(fallbackSrc);
+    } else {
+      setHasError(true);
+    }
+  };
 
   if (hasError) {
     if (fallbackType === 'banner') {
@@ -121,12 +150,23 @@ export default function ImageWithFallback({
     );
   }
 
+  const handleImageLoad = (e) => {
+    const img = e.target;
+    // YouTube's "unavailable" placeholder image is returned with a width of 120px (120x90).
+    // If we detect this placeholder, immediately swap to hqdefault.jpg which always exists.
+    if (imgSrc && imgSrc.includes('/maxresdefault.jpg') && img.naturalWidth <= 120) {
+      const fallbackSrc = imgSrc.replace('/maxresdefault.jpg', '/hqdefault.jpg');
+      setImgSrc(fallbackSrc);
+    }
+  };
+
   return (
     <img
-      src={src}
+      src={imgSrc}
       alt={alt}
       className={className}
-      onError={() => setHasError(true)}
+      onLoad={handleImageLoad}
+      onError={handleImageError}
       {...props}
     />
   );

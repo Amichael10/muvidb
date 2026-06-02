@@ -51,7 +51,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
             className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
           />
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-surface-2 border border-border text-text-primary text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
-            {person.film_count} Films
+            {person.film_count || 0} Films
           </div>
         </div>
         <h4 className="font-bold text-text-primary text-sm md:text-base group-hover:text-gold transition-colors line-clamp-1">
@@ -100,12 +100,12 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
         
         <div className="flex flex-wrap items-center gap-4 sm:gap-6">
           <div className="flex flex-col">
-            <span className="text-text-primary font-bold">{formatPopularity(person.popularity_score || person.popularity)}</span>
+            <span className="text-text-primary font-bold">{formatPopularity(person.popularity_score || person.popularity || 0)}</span>
             <span className="text-text-muted text-xs uppercase tracking-wider">Views</span>
           </div>
           <div className="w-px h-8 bg-border"></div>
           <div className="flex flex-col">
-            <span className="text-text-primary font-bold">{person.film_count}</span>
+            <span className="text-text-primary font-bold">{person.film_count || 0}</span>
             <span className="text-text-muted text-xs uppercase tracking-wider">Films</span>
           </div>
           
