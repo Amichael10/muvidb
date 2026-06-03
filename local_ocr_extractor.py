@@ -95,9 +95,9 @@ HASH_THRESHOLD  = 4     # Hamming distance threshold for duplicate frame detecti
 BASE_TEMP_DIR   = Path.cwd() / f"temp_lumi_{os.getpid()}"
 FRAMES_DIR      = BASE_TEMP_DIR / "frames"
 
-GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY")
-GROQ_API_KEY    = os.getenv("GROQ_API_KEY")
-OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "").strip() or None
+GROQ_API_KEY    = os.getenv("GROQ_API_KEY", "").strip() or None
+OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY", "").strip() or None
 
 YT_BASE_FLAGS   = [
     "--no-check-certificates", 
@@ -111,10 +111,10 @@ YT_BASE_FLAGS   = [
 ]
 
 # Configure SmartProxy if credentials exist
-PROXY_USER = os.getenv("SMARTPROXY_USER")
-PROXY_PASS = os.getenv("SMARTPROXY_PASS")
-PROXY_HOST = os.getenv("SMARTPROXY_HOST", "proxy.smartproxy.net")
-PROXY_PORT = os.getenv("SMARTPROXY_PORT", "3120")
+PROXY_USER = os.getenv("SMARTPROXY_USER", "").strip() or None
+PROXY_PASS = os.getenv("SMARTPROXY_PASS", "").strip() or None
+PROXY_HOST = os.getenv("SMARTPROXY_HOST", "proxy.smartproxy.net").strip()
+PROXY_PORT = os.getenv("SMARTPROXY_PORT", "3120").strip()
 
 if PROXY_USER and PROXY_PASS:
     proxy_url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
@@ -488,8 +488,8 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
 # ── Supabase Integration ──────────────────────────────────────────────────────
 class SupabaseSync:
     def __init__(self):
-        self.url = os.getenv("VITE_SUPABASE_URL")
-        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        self.url = os.getenv("VITE_SUPABASE_URL", "").strip() or None
+        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip() or None
         if not self.url or not self.key:
             self.enabled = False
         else:

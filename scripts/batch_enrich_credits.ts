@@ -5,11 +5,11 @@ import { spawn } from 'child_process';
 dotenv.config({ path: '.env.local' });
 
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  (process.env.VITE_SUPABASE_URL || '').trim(),
+  (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
 );
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
+const TMDB_API_KEY = (process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '').trim();
 
 // ─── Image Mirroring Helper ──────────────────────────────────────────────────
 async function mirrorImageToSupabase(externalUrl: string, bucket: string, fileName: string): Promise<string | null> {
