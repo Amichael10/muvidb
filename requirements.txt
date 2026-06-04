@@ -5,3 +5,7 @@ pillow
 openai
 python-dotenv
 scrapling
+pytesseract
+paddleocr
+imagehash
+rapidfuzz

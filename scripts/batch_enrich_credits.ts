@@ -277,24 +277,61 @@ async function main() {
   const runReport: any[] = [];
 
   try {
-    console.log('📦 Fetching YouTube films from database...');
-    const { data: films, error } = await supabase
-      .from('films')
-      .select('id, title, youtube_watch_url, year')
-      .eq('source', 'youtube')
-      .not('youtube_watch_url', 'is', null)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ Error fetching films:', error.message);
-      if (logId) {
-        await supabase.from('sync_logs').update({
-          status: 'error',
-          message: `Database query failed: ${error.message}`,
-          duration_ms: Date.now() - startTime
-        }).eq('id', logId);
+    const targetUrlArg = process.argv[2]?.trim();
+    let films: any[] = [];
+    if (targetUrlArg) {
+      console.log(`🎯 Targeting specific URL from command line: ${targetUrlArg}`);
+      let videoId = '';
+      if (targetUrlArg.includes('v=')) {
+        videoId = targetUrlArg.split('v=')[1]?.split('&')[0];
+      } else if (targetUrlArg.includes('youtu.be/')) {
+        videoId = targetUrlArg.split('youtu.be/')[1]?.split('?')[0];
       }
-      return;
+      
+      let query = supabase
+        .from('films')
+        .select('id, title, youtube_watch_url, year');
+        
+      if (videoId) {
+        query = query.or(`youtube_watch_url.eq.${targetUrlArg},source_video_id.eq.${videoId}`);
+      } else {
+        query = query.eq('youtube_watch_url', targetUrlArg);
+      }
+      
+      const { data, error } = await query;
+      if (error) {
+        console.error('❌ Error fetching target film:', error.message);
+        if (logId) {
+          await supabase.from('sync_logs').update({
+            status: 'error',
+            message: `Database query failed: ${error.message}`,
+            duration_ms: Date.now() - startTime
+          }).eq('id', logId);
+        }
+        return;
+      }
+      films = data || [];
+    } else {
+      console.log('📦 Fetching YouTube films from database...');
+      const { data, error } = await supabase
+        .from('films')
+        .select('id, title, youtube_watch_url, year')
+        .eq('source', 'youtube')
+        .not('youtube_watch_url', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching films:', error.message);
+        if (logId) {
+          await supabase.from('sync_logs').update({
+            status: 'error',
+            message: `Database query failed: ${error.message}`,
+            duration_ms: Date.now() - startTime
+          }).eq('id', logId);
+        }
+        return;
+      }
+      films = data || [];
     }
 
     console.log('🔍 Analyzing credit counts...');
@@ -307,7 +344,9 @@ async function main() {
       creditCounts[c.film_id] = (creditCounts[c.film_id] || 0) + 1;
     });
 
-    const targets = films.filter(f => (creditCounts[f.id] || 0) <= 10);
+    const targets = targetUrlArg 
+      ? films 
+      : films.filter(f => (creditCounts[f.id] || 0) <= 10);
     console.log(`\n📝 Found ${targets.length} candidates needing credit enrichment.`);
 
     if (targets.length === 0) {
