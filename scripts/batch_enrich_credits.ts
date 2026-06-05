@@ -312,10 +312,10 @@ async function main() {
       }
       films = data || [];
     } else {
-      console.log('📦 Fetching YouTube films from database...');
+      console.log('📦 Fetching YouTube films from database with credit counts...');
       const { data, error } = await supabase
         .from('films')
-        .select('id, title, youtube_watch_url, year')
+        .select('id, title, youtube_watch_url, year, credits(count)')
         .eq('source', 'youtube')
         .not('youtube_watch_url', 'is', null)
         .order('created_at', { ascending: false });
@@ -334,19 +334,12 @@ async function main() {
       films = data || [];
     }
 
-    console.log('🔍 Analyzing credit counts...');
-    const { data: credits } = await supabase
-      .from('credits')
-      .select('film_id');
-
-    const creditCounts: Record<string, number> = {};
-    credits?.forEach(c => {
-      creditCounts[c.film_id] = (creditCounts[c.film_id] || 0) + 1;
-    });
-
     const targets = targetUrlArg 
       ? films 
-      : films.filter(f => (creditCounts[f.id] || 0) <= 10);
+      : films.filter(f => {
+          const count = (f.credits as any)?.[0]?.count ?? 0;
+          return count <= 10;
+        });
     console.log(`\n📝 Found ${targets.length} candidates needing credit enrichment.`);
 
     if (targets.length === 0) {
