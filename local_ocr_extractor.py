@@ -220,6 +220,7 @@ class LocalOCR:
 
     def _init_paddle(self):
         if PADDLE_AVAILABLE:
+            last_err = None
             for args in [
                 {"use_angle_cls": True, "lang": "en", "show_log": False},
                 {"lang": "en", "show_log": False},
@@ -229,9 +230,10 @@ class LocalOCR:
                     self.paddle_ocr = PaddleOCR(**args)
                     print("  ✓ Local PaddleOCR engine loaded successfully.")
                     return
-                except Exception:
+                except Exception as e:
+                    last_err = e
                     continue
-            print("  ⚠️ Failed to initialize PaddleOCR with any arguments.")
+            print(f"  ⚠️ Failed to initialize PaddleOCR with any arguments. Error: {last_err}")
 
     def read_text(self, img_path: Path) -> str:
         """Reads text from a frame using PaddleOCR, falling back to Tesseract."""
@@ -447,7 +449,7 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
         except Exception as e:
             print(f"  ⚠️ Gemini Flash formatting failed: {e}")
 
-    # 2. Fallback: Groq Llama-3.3-70b-specdec (direct REST request)
+    # 2. Fallback: Groq Llama-3.3-70b-versatile (direct REST request)
     if GROQ_API_KEY:
         print("  [LLM Chain 2/3] Gemini failed. Falling back to Groq (Llama 70B)...")
         try:
@@ -456,7 +458,7 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "llama-3.3-70b-specdec",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1
             }
