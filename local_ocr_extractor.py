@@ -308,7 +308,7 @@ def download_segment(url: str, start: float, duration: float, out_path: Path):
                 sys.executable, "-m", "yt_dlp", *YT_BASE_FLAGS,
                 "--download-sections", f"*{int(start)}-{int(start+duration)}",
                 "--force-keyframes-at-cuts",
-                "-f", "worst",
+                "-f", "worstvideo/worst",
                 "-o", str(out_path),
                 url
             ], check=True, timeout=400)
