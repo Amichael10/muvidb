@@ -50,3 +50,13 @@ scripts/test-api.ts
 scripts/test-films-query.ts
 scripts/test-get-people.ts
 scripts/test-scraper.ts
+
+# Archive and backup files
+project.tar.gz
+*.tar.gz
+*.zip
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.bak

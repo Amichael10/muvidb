@@ -79,6 +79,11 @@ else:
         if p not in os.environ["PATH"]:
             os.environ["PATH"] = p + os.pathsep + os.environ["PATH"]
 
+# Ensure current Python virtualenv bin directory is in PATH (fixes yt-dlp binary search)
+python_bin_dir = os.path.dirname(sys.executable)
+if python_bin_dir and python_bin_dir not in os.environ["PATH"]:
+    os.environ["PATH"] = python_bin_dir + os.pathsep + os.environ["PATH"]
+
 # Load .env variables
 try:
     from dotenv import load_dotenv
