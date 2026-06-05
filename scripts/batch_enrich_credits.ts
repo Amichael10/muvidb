@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { spawn } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 
 dotenv.config({ path: '.env.local' });
 
@@ -232,7 +234,18 @@ async function syncFromTMDB(filmId: string, title: string, year: number | null):
 async function runCastExtractor(url: string, timeoutMs: number = 600000): Promise<boolean> {
   return new Promise((resolve) => {
     console.log(`\n🎬 Starting AI extraction for: ${url}`);
-    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    
+    let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const venvPythonLinux = path.join(process.cwd(), 'venv', 'bin', 'python3');
+    const venvPythonWin = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
+    
+    if (process.platform === 'win32' && fs.existsSync(venvPythonWin)) {
+      pythonCmd = venvPythonWin;
+    } else if (process.platform !== 'win32' && fs.existsSync(venvPythonLinux)) {
+      pythonCmd = venvPythonLinux;
+    }
+    
+    console.log(`🔍 Using Python executable: ${pythonCmd}`);
     
     const extractor = spawn(pythonCmd, ['local_ocr_extractor.py', url], {
       stdio: 'inherit',
@@ -367,71 +380,38 @@ async function main() {
       console.log(`\n[${i + 1}/${toProcess.length}] 🎥 "${film.title}"`);
       console.log(`🔗 URL: ${film.youtube_watch_url}`);
       
-      // --- Step 1: TMDB Sync ---
-      console.log(`  🌐 Step 1: Searching for "${film.title}" on TMDB...`);
-      const tmdbSuccess = await syncFromTMDB(film.id, film.title, film.year ? Number(film.year) : null);
-      
       let ocrSuccess = false;
-      let runMethod = 'TMDB';
-      let runMessage = 'Credits successfully enriched from TMDB API';
+      const runMethod = 'OCR_Tesseract';
+      let runMessage = '';
 
-      if (tmdbSuccess) {
-        console.log(`✅ SUCCESS: Synced from TMDB for ${film.title}`);
-        successCount++;
+      console.log(`🚀 Starting AI Vision frame capture and OCR extraction...`);
+
+      let success = false;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (attempt > 1) console.log(`   🔄 Retry attempt ${attempt}...`);
+        success = await runCastExtractor(film.youtube_watch_url!);
+        if (success) break;
+        if (attempt < 2) await delay(5000);
       }
+      
+      ocrSuccess = success;
 
-      // Query database for current credit count to determine if page remains sparse
-      const { count: currentCreditsCount } = await supabase
-        .from('credits')
-        .select('*', { count: 'exact', head: true })
-        .eq('film_id', film.id);
-
-      const creditsAfterTMDB = currentCreditsCount || 0;
-      console.log(`  📊 Credit count after TMDB sync: ${creditsAfterTMDB}`);
-
-      // If TMDB failed OR it yielded a very sparse credit list (< 8 credits), trigger the OCR Tesseract engine!
-      if (!tmdbSuccess || creditsAfterTMDB < 8) {
-        if (tmdbSuccess) {
-          console.log(`  ⚠️ TMDB sync succeeded but only yielded ${creditsAfterTMDB} credits. Proceeding to OCR for full crew enrichment...`);
-          runMethod = 'TMDB + OCR_Tesseract';
-        } else {
-          console.log(`  ❌ No TMDB match found. Step 2: Falling back to AI Vision frame capture...`);
-          runMethod = 'OCR_Tesseract';
-        }
-
-        let success = false;
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          if (attempt > 1) console.log(`   🔄 Retry attempt ${attempt}...`);
-          success = await runCastExtractor(film.youtube_watch_url!);
-          if (success) break;
-          if (attempt < 2) await delay(5000);
-        }
-        
-        ocrSuccess = success;
-
-        if (success) {
-          console.log(`✅ SUCCESS: Finished visual extraction for ${film.title}`);
-          if (!tmdbSuccess) successCount++;
-          runMessage = tmdbSuccess
-            ? 'Enriched first via TMDB, then full crew list extracted from video frames via local Tesseract OCR'
-            : 'Credits extracted from video frames via local Tesseract OCR engine';
-        } else {
-          if (!tmdbSuccess) {
-            console.log(`❌ FAILURE: Failed to process ${film.title} after all attempts.`);
-            failCount++;
-            runMessage = 'Failed to extract credits (no text detected or extraction failed)';
-            console.log(`\n⏳ Extra rate-limit recovery cooldown for 60s...`);
-            await delay(60000);
-          } else {
-            runMessage = 'Enriched via TMDB; local OCR fallback was attempted but failed to extract extra details';
-          }
-        }
+      if (success) {
+        console.log(`✅ SUCCESS: Finished visual extraction for ${film.title}`);
+        successCount++;
+        runMessage = 'Credits successfully extracted from video frames via local Tesseract OCR';
+      } else {
+        console.log(`❌ FAILURE: Failed to process ${film.title} after all attempts.`);
+        failCount++;
+        runMessage = 'Failed to extract credits (no text detected or extraction failed)';
+        console.log(`\n⏳ Extra rate-limit recovery cooldown for 60s...`);
+        await delay(60000);
       }
 
       runReport.push({
         film_id: film.id,
         title: film.title,
-        status: (tmdbSuccess || ocrSuccess) ? 'success' : 'failed',
+        status: ocrSuccess ? 'success' : 'failed',
         method: runMethod,
         message: runMessage
       });
