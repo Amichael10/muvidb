@@ -220,12 +220,18 @@ class LocalOCR:
 
     def _init_paddle(self):
         if PADDLE_AVAILABLE:
-            try:
-                # Initialize PaddleOCR (uses English model by default)
-                self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
-                print("  ✓ Local PaddleOCR engine loaded successfully.")
-            except Exception as e:
-                print(f"  ⚠️ Failed to initialize PaddleOCR: {e}")
+            for args in [
+                {"use_angle_cls": True, "lang": "en", "show_log": False},
+                {"lang": "en", "show_log": False},
+                {"lang": "en"},
+            ]:
+                try:
+                    self.paddle_ocr = PaddleOCR(**args)
+                    print("  ✓ Local PaddleOCR engine loaded successfully.")
+                    return
+                except Exception:
+                    continue
+            print("  ⚠️ Failed to initialize PaddleOCR with any arguments.")
 
     def read_text(self, img_path: Path) -> str:
         """Reads text from a frame using PaddleOCR, falling back to Tesseract."""
@@ -687,8 +693,8 @@ def main():
 
             # Download Slices
             print("  -> Downloading credit sections...")
-            intro_path = BASE_TEMP_DIR / f"lumi_intro_{safe_title[:20].strip()}.mp4"
-            outro_path = BASE_TEMP_DIR / f"lumi_outro_{safe_title[:20].strip()}.mp4"
+            intro_path = BASE_TEMP_DIR / f"lumi_intro_{safe_title[:20].strip()}.mkv"
+            outro_path = BASE_TEMP_DIR / f"lumi_outro_{safe_title[:20].strip()}.mkv"
             temp_files.extend([intro_path, outro_path])
 
             download_segment(url, 0, INTRO_DURATION, intro_path)
