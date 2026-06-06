@@ -27,6 +27,8 @@ try:
     urllib3_cn.HAS_IPV6 = False
 except ImportError:
     pass
+from urllib3.util import Retry
+from requests.adapters import HTTPAdapter
 from pathlib import Path
 from google import genai
 
@@ -524,6 +526,46 @@ class SupabaseSync:
                 "Content-Type": "application/json",
                 "Prefer": "return=representation"
             }
+            # Configure persistent session with automatic retries for robust proxy tunneling
+            self.session = requests.Session()
+            retries = Retry(
+                total=5,
+                connect=5,
+                read=5,
+                backoff_factor=1.5,
+                status_forcelist=[500, 502, 503, 504, 612],
+                raise_on_status=False
+            )
+            adapter = HTTPAdapter(max_retries=retries)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
+
+    def _request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """Robust request wrapper with explicit retry loop to handle SSL and Proxy flakes."""
+        max_attempts = 4
+        backoff = 2.0
+        for attempt in range(1, max_attempts + 1):
+            try:
+                if 'timeout' not in kwargs:
+                    kwargs['timeout'] = 30
+                
+                if attempt > 1:
+                    print(f"    🔄 Retrying Supabase {method} request (attempt {attempt}/{max_attempts})...")
+                
+                res = self.session.request(method, url, **kwargs)
+                
+                # Check for proxy custom error code 612 or other server issues
+                if res.status_code in [500, 502, 503, 504, 612]:
+                    raise requests.exceptions.RequestException(f"Bad status code: {res.status_code} - {res.text}")
+                
+                # Tiny pacing delay to prevent proxy/DB gateway exhaustion
+                time.sleep(0.15)
+                return res
+            except (requests.exceptions.RequestException, Exception) as e:
+                if attempt == max_attempts:
+                    print(f"  ❌ Supabase request failed after {max_attempts} attempts: {e}")
+                    raise e
+                time.sleep(backoff * attempt)
 
     def fetch_incomplete_youtube_films(self) -> list[dict]:
         """Phase 0: Query films table for youtube source and nested credit IDs to find incomplete pages (0-10 credits)."""
@@ -534,7 +576,7 @@ class SupabaseSync:
         # Rest query to grab films and credits relation
         query_url = f"{self.url}/rest/v1/films?source=eq.youtube&select=id,title,youtube_watch_url,credits(id)"
         try:
-            res = requests.get(query_url, headers=self.headers)
+            res = self._request("GET", query_url, headers=self.headers)
             if res.status_code != 200:
                 print(f"  ❌ Supabase query failed: {res.status_code} {res.text}")
                 return []
@@ -557,7 +599,7 @@ class SupabaseSync:
         if not self.enabled: return None
         video_id = youtube_url.split("v=")[-1].split("&")[0] if "v=" in youtube_url else ""
         query = f"{self.url}/rest/v1/films?or=(youtube_watch_url.eq.{youtube_url},source_video_id.eq.{video_id})&select=id,title,youtube_watch_url,credits(id)"
-        res = requests.get(query, headers=self.headers)
+        res = self._request("GET", query, headers=self.headers)
         if res.status_code == 200 and res.json():
             return res.json()[0]
         return None
@@ -565,12 +607,12 @@ class SupabaseSync:
     def upsert_person(self, name: str) -> str:
         # Rapidfuzz lookup fallback inside database can be done by standard lookup
         query = f"{self.url}/rest/v1/people?name=ilike.{name}&select=id"
-        res = requests.get(query, headers=self.headers)
+        res = self._request("GET", query, headers=self.headers)
         if res.status_code == 200 and res.json():
             return res.json()[0]['id']
             
         payload = {"name": name, "nationality": "Nigerian"}
-        res = requests.post(f"{self.url}/rest/v1/people", headers=self.headers, json=payload)
+        res = self._request("POST", f"{self.url}/rest/v1/people", headers=self.headers, json=payload)
         if res.status_code in [201, 200] and res.json():
             return res.json()[0]['id']
         return ""
@@ -578,7 +620,7 @@ class SupabaseSync:
     def link_credit(self, film_id: str, person_id: str, role: str, char_name: str = "", order: int = 0):
         q = f"{self.url}/rest/v1/credits?film_id=eq.{film_id}&person_id=eq.{person_id}&role=eq.{role}"
         if char_name: q += f"&character_name=eq.{char_name}"
-        check = requests.get(q, headers=self.headers)
+        check = self._request("GET", q, headers=self.headers)
         if check.status_code == 200 and check.json():
             return
 
@@ -589,7 +631,7 @@ class SupabaseSync:
             "character_name": char_name,
             "billing_order": order
         }
-        requests.post(f"{self.url}/rest/v1/credits", headers=self.headers, json=payload)
+        self._request("POST", f"{self.url}/rest/v1/credits", headers=self.headers, json=payload)
 
     def process(self, youtube_url: str, markdown: str):
         if not self.enabled: return
@@ -614,32 +656,35 @@ class SupabaseSync:
             entries = [l.strip('- ').strip() for l in lines[1:] if l.strip() and not l.startswith('(')]
             
             for idx, entry in enumerate(entries):
-                name, char, specific_role = entry, "", role
-                parts = []
-                if " - " in entry: parts = entry.split(" - ", 1)
-                elif " – " in entry: parts = entry.split(" – ", 1)
-                elif " as " in entry.lower(): parts = re.split(r"\s+as\s+", entry, flags=re.IGNORECASE)
-                elif " : " in entry: parts = entry.split(" : ", 1)
-                
-                if parts:
-                    name = parts[0].strip()
-                    extra = parts[1].strip()
-                    if role == "actor": char = extra
-                    else: specific_role = extra
-                else:
-                    if role == "producer": specific_role = "Producer"
-                    elif role == "cinematographer": specific_role = "Cinematographer"
-                    elif role == "editor": specific_role = "Editor"
-                    elif role == "composer": specific_role = "Composer"
-                    elif role == "crew": specific_role = "Crew"
-                    elif role == "director": specific_role = "Director"
-                
-                name = name.strip()
-                if not name: continue
-                person_id = self.upsert_person(name)
-                if person_id:
-                    self.link_credit(film_id, person_id, specific_role, char, idx)
-                    linked_count += 1
+                try:
+                    name, char, specific_role = entry, "", role
+                    parts = []
+                    if " - " in entry: parts = entry.split(" - ", 1)
+                    elif " – " in entry: parts = entry.split(" – ", 1)
+                    elif " as " in entry.lower(): parts = re.split(r"\s+as\s+", entry, flags=re.IGNORECASE)
+                    elif " : " in entry: parts = entry.split(" : ", 1)
+                    
+                    if parts:
+                        name = parts[0].strip()
+                        extra = parts[1].strip()
+                        if role == "actor": char = extra
+                        else: specific_role = extra
+                    else:
+                        if role == "producer": specific_role = "Producer"
+                        elif role == "cinematographer": specific_role = "Cinematographer"
+                        elif role == "editor": specific_role = "Editor"
+                        elif role == "composer": specific_role = "Composer"
+                        elif role == "crew": specific_role = "Crew"
+                        elif role == "director": specific_role = "Director"
+                    
+                    name = name.strip()
+                    if not name: continue
+                    person_id = self.upsert_person(name)
+                    if person_id:
+                        self.link_credit(film_id, person_id, specific_role, char, idx)
+                        linked_count += 1
+                except Exception as entry_err:
+                    print(f"    ⚠️ Failed to sync credit entry '{entry}': {entry_err}")
         print(f"  ✓ Linked {linked_count} credits to the film in database.")
 
 # ── Main Batch Runner ─────────────────────────────────────────────────────────
@@ -769,6 +814,8 @@ def main():
 
         except Exception as e:
             print(f"  ❌ Execution error on '{title}': {e}")
+            if len(sys.argv) > 1:
+                sys.exit(1)
         finally:
             # Clean up frames
             for path in temp_files:
