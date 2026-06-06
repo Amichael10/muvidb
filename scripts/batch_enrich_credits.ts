@@ -9,6 +9,29 @@ import * as path from 'path';
 
 dotenv.config({ path: '.env.local' });
 
+// ─── Proxy Configuration (SmartProxy Integration) ───────────────────────────
+const proxyUser = (process.env.SMARTPROXY_USER || '').trim();
+const proxyPass = (process.env.SMARTPROXY_PASS || '').trim();
+const proxyHost = (process.env.SMARTPROXY_HOST || 'proxy.smartproxy.net').trim();
+const proxyPort = (process.env.SMARTPROXY_PORT || '3120').trim();
+
+if (proxyUser && proxyPass) {
+  const proxyUrl = `http://${proxyUser}:${proxyPass}@${proxyHost}:${proxyPort}`;
+  process.env.HTTP_PROXY = proxyUrl;
+  process.env.HTTPS_PROXY = proxyUrl;
+  process.env.http_proxy = proxyUrl;
+  process.env.https_proxy = proxyUrl;
+  
+  try {
+    const { ProxyAgent, setGlobalDispatcher } = await import('undici');
+    const proxyAgent = new ProxyAgent(proxyUrl);
+    setGlobalDispatcher(proxyAgent);
+    console.log('🌐 Node fetch dispatcher successfully routed through SmartProxy.');
+  } catch (err) {
+    console.log('⚠️ Failed to initialize global undici ProxyAgent. Node fetch might bypass proxy.');
+  }
+}
+
 const supabase = createClient(
   (process.env.VITE_SUPABASE_URL || '').trim(),
   (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
