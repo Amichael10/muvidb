@@ -133,10 +133,9 @@ PROXY_PORT = os.getenv("SMARTPROXY_PORT", "3120").strip()
 if PROXY_USER and PROXY_PASS:
     proxy_url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
     YT_BASE_FLAGS.extend(["--proxy", proxy_url])
-    os.environ["HTTP_PROXY"] = proxy_url
-    os.environ["HTTPS_PROXY"] = proxy_url
-    os.environ["http_proxy"] = proxy_url
-    os.environ["https_proxy"] = proxy_url
+    # DO NOT set os.environ["HTTP_PROXY"] or os.environ["HTTPS_PROXY"] globally.
+    # This ensures that ffmpeg and other network connections connect directly (which works fine),
+    # while only yt-dlp's metadata/page extraction uses the proxy.
 
 # ── Check Dependencies ────────────────────────────────────────────────────────
 def check_dependencies():
