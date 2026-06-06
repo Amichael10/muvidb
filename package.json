@@ -40,6 +40,7 @@
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.14.0",
     "scrapegraph-js": "^2.1.0",
+    "undici": "^5.28.4",
     "vite": "^6.2.0",
     "xlsx": "^0.18.5"
   },

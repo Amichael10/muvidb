@@ -24,11 +24,11 @@ if (proxyUser && proxyPass) {
   
   try {
     const { ProxyAgent, setGlobalDispatcher } = await import('undici');
-    const proxyAgent = new ProxyAgent(proxyUrl);
+    const proxyAgent = new ProxyAgent({ uri: proxyUrl });
     setGlobalDispatcher(proxyAgent);
     console.log('🌐 Node fetch dispatcher successfully routed through SmartProxy.');
-  } catch (err) {
-    console.log('⚠️ Failed to initialize global undici ProxyAgent. Node fetch might bypass proxy.');
+  } catch (err: any) {
+    console.log('⚠️ Failed to initialize global undici ProxyAgent. Node fetch might bypass proxy. Error:', err.message || err);
   }
 }
 
