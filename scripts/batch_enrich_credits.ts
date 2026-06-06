@@ -1,3 +1,6 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { spawn } from 'child_process';

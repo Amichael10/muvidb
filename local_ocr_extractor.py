@@ -20,6 +20,13 @@ import re
 import requests
 import io
 import time
+
+# Force IPv4 globally in requests/urllib3 to bypass VPS IPv6 connection hangs
+try:
+    import urllib3.util.connection as urllib3_cn
+    urllib3_cn.HAS_IPV6 = False
+except ImportError:
+    pass
 from pathlib import Path
 from google import genai
 
