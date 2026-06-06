@@ -1,15 +1,25 @@
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { spawn } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 
 dotenv.config({ path: '.env.local' });
 
+// ─── Proxy Configuration (SmartProxy Integration) ───────────────────────────
+// We bypass proxy for Node database and API operations because Supabase does not block the VPS
+// and residential proxies are unstable for high-frequency database connections.
+// YouTube downloads (which require proxy) are handled separately in the Python extractor script.
+
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  (process.env.VITE_SUPABASE_URL || '').trim(),
+  (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
 );
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
+const TMDB_API_KEY = (process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY || '').trim();
 
 // ─── Image Mirroring Helper ──────────────────────────────────────────────────
 async function mirrorImageToSupabase(externalUrl: string, bucket: string, fileName: string): Promise<string | null> {
@@ -232,7 +242,18 @@ async function syncFromTMDB(filmId: string, title: string, year: number | null):
 async function runCastExtractor(url: string, timeoutMs: number = 600000): Promise<boolean> {
   return new Promise((resolve) => {
     console.log(`\n🎬 Starting AI extraction for: ${url}`);
-    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    
+    let pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const venvPythonLinux = path.join(process.cwd(), 'venv', 'bin', 'python3');
+    const venvPythonWin = path.join(process.cwd(), 'venv', 'Scripts', 'python.exe');
+    
+    if (process.platform === 'win32' && fs.existsSync(venvPythonWin)) {
+      pythonCmd = venvPythonWin;
+    } else if (process.platform !== 'win32' && fs.existsSync(venvPythonLinux)) {
+      pythonCmd = venvPythonLinux;
+    }
+    
+    console.log(`🔍 Using Python executable: ${pythonCmd}`);
     
     const extractor = spawn(pythonCmd, ['local_ocr_extractor.py', url], {
       stdio: 'inherit',
@@ -277,37 +298,69 @@ async function main() {
   const runReport: any[] = [];
 
   try {
-    console.log('📦 Fetching YouTube films from database...');
-    const { data: films, error } = await supabase
-      .from('films')
-      .select('id, title, youtube_watch_url, year')
-      .eq('source', 'youtube')
-      .not('youtube_watch_url', 'is', null)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('❌ Error fetching films:', error.message);
-      if (logId) {
-        await supabase.from('sync_logs').update({
-          status: 'error',
-          message: `Database query failed: ${error.message}`,
-          duration_ms: Date.now() - startTime
-        }).eq('id', logId);
+    const targetUrlArg = process.argv[2]?.trim();
+    let films: any[] = [];
+    if (targetUrlArg) {
+      console.log(`🎯 Targeting specific URL from command line: ${targetUrlArg}`);
+      let videoId = '';
+      if (targetUrlArg.includes('v=')) {
+        videoId = targetUrlArg.split('v=')[1]?.split('&')[0];
+      } else if (targetUrlArg.includes('youtu.be/')) {
+        videoId = targetUrlArg.split('youtu.be/')[1]?.split('?')[0];
       }
-      return;
+      
+      let query = supabase
+        .from('films')
+        .select('id, title, youtube_watch_url, year');
+        
+      if (videoId) {
+        query = query.or(`youtube_watch_url.eq.${targetUrlArg},source_video_id.eq.${videoId}`);
+      } else {
+        query = query.eq('youtube_watch_url', targetUrlArg);
+      }
+      
+      const { data, error } = await query;
+      if (error) {
+        console.error('❌ Error fetching target film:', error.message);
+        if (logId) {
+          await supabase.from('sync_logs').update({
+            status: 'error',
+            message: `Database query failed: ${error.message}`,
+            duration_ms: Date.now() - startTime
+          }).eq('id', logId);
+        }
+        return;
+      }
+      films = data || [];
+    } else {
+      console.log('📦 Fetching YouTube films from database with credit counts...');
+      const { data, error } = await supabase
+        .from('films')
+        .select('id, title, youtube_watch_url, year, credits(count)')
+        .eq('source', 'youtube')
+        .not('youtube_watch_url', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching films:', error.message);
+        if (logId) {
+          await supabase.from('sync_logs').update({
+            status: 'error',
+            message: `Database query failed: ${error.message}`,
+            duration_ms: Date.now() - startTime
+          }).eq('id', logId);
+        }
+        return;
+      }
+      films = data || [];
     }
 
-    console.log('🔍 Analyzing credit counts...');
-    const { data: credits } = await supabase
-      .from('credits')
-      .select('film_id');
-
-    const creditCounts: Record<string, number> = {};
-    credits?.forEach(c => {
-      creditCounts[c.film_id] = (creditCounts[c.film_id] || 0) + 1;
-    });
-
-    const targets = films.filter(f => (creditCounts[f.id] || 0) <= 10);
+    const targets = targetUrlArg 
+      ? films 
+      : films.filter(f => {
+          const count = (f.credits as any)?.[0]?.count ?? 0;
+          return count <= 10;
+        });
     console.log(`\n📝 Found ${targets.length} candidates needing credit enrichment.`);
 
     if (targets.length === 0) {
@@ -335,71 +388,38 @@ async function main() {
       console.log(`\n[${i + 1}/${toProcess.length}] 🎥 "${film.title}"`);
       console.log(`🔗 URL: ${film.youtube_watch_url}`);
       
-      // --- Step 1: TMDB Sync ---
-      console.log(`  🌐 Step 1: Searching for "${film.title}" on TMDB...`);
-      const tmdbSuccess = await syncFromTMDB(film.id, film.title, film.year ? Number(film.year) : null);
-      
       let ocrSuccess = false;
-      let runMethod = 'TMDB';
-      let runMessage = 'Credits successfully enriched from TMDB API';
+      const runMethod = 'OCR_Tesseract';
+      let runMessage = '';
 
-      if (tmdbSuccess) {
-        console.log(`✅ SUCCESS: Synced from TMDB for ${film.title}`);
-        successCount++;
+      console.log(`🚀 Starting AI Vision frame capture and OCR extraction...`);
+
+      let success = false;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (attempt > 1) console.log(`   🔄 Retry attempt ${attempt}...`);
+        success = await runCastExtractor(film.youtube_watch_url!);
+        if (success) break;
+        if (attempt < 2) await delay(5000);
       }
+      
+      ocrSuccess = success;
 
-      // Query database for current credit count to determine if page remains sparse
-      const { count: currentCreditsCount } = await supabase
-        .from('credits')
-        .select('*', { count: 'exact', head: true })
-        .eq('film_id', film.id);
-
-      const creditsAfterTMDB = currentCreditsCount || 0;
-      console.log(`  📊 Credit count after TMDB sync: ${creditsAfterTMDB}`);
-
-      // If TMDB failed OR it yielded a very sparse credit list (< 8 credits), trigger the OCR Tesseract engine!
-      if (!tmdbSuccess || creditsAfterTMDB < 8) {
-        if (tmdbSuccess) {
-          console.log(`  ⚠️ TMDB sync succeeded but only yielded ${creditsAfterTMDB} credits. Proceeding to OCR for full crew enrichment...`);
-          runMethod = 'TMDB + OCR_Tesseract';
-        } else {
-          console.log(`  ❌ No TMDB match found. Step 2: Falling back to AI Vision frame capture...`);
-          runMethod = 'OCR_Tesseract';
-        }
-
-        let success = false;
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          if (attempt > 1) console.log(`   🔄 Retry attempt ${attempt}...`);
-          success = await runCastExtractor(film.youtube_watch_url!);
-          if (success) break;
-          if (attempt < 2) await delay(5000);
-        }
-        
-        ocrSuccess = success;
-
-        if (success) {
-          console.log(`✅ SUCCESS: Finished visual extraction for ${film.title}`);
-          if (!tmdbSuccess) successCount++;
-          runMessage = tmdbSuccess
-            ? 'Enriched first via TMDB, then full crew list extracted from video frames via local Tesseract OCR'
-            : 'Credits extracted from video frames via local Tesseract OCR engine';
-        } else {
-          if (!tmdbSuccess) {
-            console.log(`❌ FAILURE: Failed to process ${film.title} after all attempts.`);
-            failCount++;
-            runMessage = 'Failed to extract credits (no text detected or extraction failed)';
-            console.log(`\n⏳ Extra rate-limit recovery cooldown for 60s...`);
-            await delay(60000);
-          } else {
-            runMessage = 'Enriched via TMDB; local OCR fallback was attempted but failed to extract extra details';
-          }
-        }
+      if (success) {
+        console.log(`✅ SUCCESS: Finished visual extraction for ${film.title}`);
+        successCount++;
+        runMessage = 'Credits successfully extracted from video frames via local Tesseract OCR';
+      } else {
+        console.log(`❌ FAILURE: Failed to process ${film.title} after all attempts.`);
+        failCount++;
+        runMessage = 'Failed to extract credits (no text detected or extraction failed)';
+        console.log(`\n⏳ Extra rate-limit recovery cooldown for 60s...`);
+        await delay(60000);
       }
 
       runReport.push({
         film_id: film.id,
         title: film.title,
-        status: (tmdbSuccess || ocrSuccess) ? 'success' : 'failed',
+        status: ocrSuccess ? 'success' : 'failed',
         method: runMethod,
         message: runMessage
       });

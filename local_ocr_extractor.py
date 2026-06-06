@@ -20,6 +20,15 @@ import re
 import requests
 import io
 import time
+
+# Force IPv4 globally in requests/urllib3 to bypass VPS IPv6 connection hangs
+try:
+    import urllib3.util.connection as urllib3_cn
+    urllib3_cn.HAS_IPV6 = False
+except ImportError:
+    pass
+from urllib3.util import Retry
+from requests.adapters import HTTPAdapter
 from pathlib import Path
 from google import genai
 
@@ -79,6 +88,11 @@ else:
         if p not in os.environ["PATH"]:
             os.environ["PATH"] = p + os.pathsep + os.environ["PATH"]
 
+# Ensure current Python virtualenv bin directory is in PATH (fixes yt-dlp binary search)
+python_bin_dir = os.path.dirname(sys.executable)
+if python_bin_dir and python_bin_dir not in os.environ["PATH"]:
+    os.environ["PATH"] = python_bin_dir + os.pathsep + os.environ["PATH"]
+
 # Load .env variables
 try:
     from dotenv import load_dotenv
@@ -95,9 +109,9 @@ HASH_THRESHOLD  = 4     # Hamming distance threshold for duplicate frame detecti
 BASE_TEMP_DIR   = Path.cwd() / f"temp_lumi_{os.getpid()}"
 FRAMES_DIR      = BASE_TEMP_DIR / "frames"
 
-GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY")
-GROQ_API_KEY    = os.getenv("GROQ_API_KEY")
-OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "").strip() or None
+GROQ_API_KEY    = os.getenv("GROQ_API_KEY", "").strip() or None
+OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY", "").strip() or None
 
 YT_BASE_FLAGS   = [
     "--no-check-certificates", 
@@ -111,14 +125,17 @@ YT_BASE_FLAGS   = [
 ]
 
 # Configure SmartProxy if credentials exist
-PROXY_USER = os.getenv("SMARTPROXY_USER")
-PROXY_PASS = os.getenv("SMARTPROXY_PASS")
-PROXY_HOST = os.getenv("SMARTPROXY_HOST", "proxy.smartproxy.net")
-PROXY_PORT = os.getenv("SMARTPROXY_PORT", "3120")
+PROXY_USER = os.getenv("SMARTPROXY_USER", "").strip() or None
+PROXY_PASS = os.getenv("SMARTPROXY_PASS", "").strip() or None
+PROXY_HOST = os.getenv("SMARTPROXY_HOST", "proxy.smartproxy.net").strip()
+PROXY_PORT = os.getenv("SMARTPROXY_PORT", "3120").strip()
 
 if PROXY_USER and PROXY_PASS:
     proxy_url = f"http://{PROXY_USER}:{PROXY_PASS}@{PROXY_HOST}:{PROXY_PORT}"
     YT_BASE_FLAGS.extend(["--proxy", proxy_url])
+    # DO NOT set os.environ["HTTP_PROXY"] or os.environ["HTTPS_PROXY"] globally.
+    # This ensures that ffmpeg and other network connections connect directly (which works fine),
+    # while only yt-dlp's metadata/page extraction uses the proxy.
 
 # ── Check Dependencies ────────────────────────────────────────────────────────
 def check_dependencies():
@@ -215,12 +232,20 @@ class LocalOCR:
 
     def _init_paddle(self):
         if PADDLE_AVAILABLE:
-            try:
-                # Initialize PaddleOCR (uses English model by default)
-                self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
-                print("  ✓ Local PaddleOCR engine loaded successfully.")
-            except Exception as e:
-                print(f"  ⚠️ Failed to initialize PaddleOCR: {e}")
+            last_err = None
+            for args in [
+                {"use_angle_cls": True, "lang": "en", "show_log": False},
+                {"lang": "en", "show_log": False},
+                {"lang": "en"},
+            ]:
+                try:
+                    self.paddle_ocr = PaddleOCR(**args)
+                    print("  ✓ Local PaddleOCR engine loaded successfully.")
+                    return
+                except Exception as e:
+                    last_err = e
+                    continue
+            print(f"  ⚠️ Failed to initialize PaddleOCR with any arguments. Error: {last_err}")
 
     def read_text(self, img_path: Path) -> str:
         """Reads text from a frame using PaddleOCR, falling back to Tesseract."""
@@ -295,7 +320,7 @@ def download_segment(url: str, start: float, duration: float, out_path: Path):
                 sys.executable, "-m", "yt_dlp", *YT_BASE_FLAGS,
                 "--download-sections", f"*{int(start)}-{int(start+duration)}",
                 "--force-keyframes-at-cuts",
-                "-f", "worst",
+                "-f", "worstvideo/worst",
                 "-o", str(out_path),
                 url
             ], check=True, timeout=400)
@@ -436,7 +461,7 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
         except Exception as e:
             print(f"  ⚠️ Gemini Flash formatting failed: {e}")
 
-    # 2. Fallback: Groq Llama-3.3-70b-specdec (direct REST request)
+    # 2. Fallback: Groq Llama-3.3-70b-versatile (direct REST request)
     if GROQ_API_KEY:
         print("  [LLM Chain 2/3] Gemini failed. Falling back to Groq (Llama 70B)...")
         try:
@@ -445,7 +470,7 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
                 "Content-Type": "application/json"
             }
             payload = {
-                "model": "llama-3.3-70b-specdec",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1
             }
@@ -488,8 +513,8 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
 # ── Supabase Integration ──────────────────────────────────────────────────────
 class SupabaseSync:
     def __init__(self):
-        self.url = os.getenv("VITE_SUPABASE_URL")
-        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        self.url = os.getenv("VITE_SUPABASE_URL", "").strip() or None
+        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip() or None
         if not self.url or not self.key:
             self.enabled = False
         else:
@@ -500,6 +525,47 @@ class SupabaseSync:
                 "Content-Type": "application/json",
                 "Prefer": "return=representation"
             }
+            # Configure persistent session with automatic retries for robust proxy tunneling
+            self.session = requests.Session()
+            self.session.trust_env = False
+            retries = Retry(
+                total=5,
+                connect=5,
+                read=5,
+                backoff_factor=1.5,
+                status_forcelist=[500, 502, 503, 504, 612],
+                raise_on_status=False
+            )
+            adapter = HTTPAdapter(max_retries=retries)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
+
+    def _request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """Robust request wrapper with explicit retry loop to handle SSL and Proxy flakes."""
+        max_attempts = 4
+        backoff = 2.0
+        for attempt in range(1, max_attempts + 1):
+            try:
+                if 'timeout' not in kwargs:
+                    kwargs['timeout'] = 30
+                
+                if attempt > 1:
+                    print(f"    🔄 Retrying Supabase {method} request (attempt {attempt}/{max_attempts})...")
+                
+                res = self.session.request(method, url, **kwargs)
+                
+                # Check for proxy custom error code 612 or other server issues
+                if res.status_code in [500, 502, 503, 504, 612]:
+                    raise requests.exceptions.RequestException(f"Bad status code: {res.status_code} - {res.text}")
+                
+                # Tiny pacing delay to prevent proxy/DB gateway exhaustion
+                time.sleep(0.15)
+                return res
+            except (requests.exceptions.RequestException, Exception) as e:
+                if attempt == max_attempts:
+                    print(f"  ❌ Supabase request failed after {max_attempts} attempts: {e}")
+                    raise e
+                time.sleep(backoff * attempt)
 
     def fetch_incomplete_youtube_films(self) -> list[dict]:
         """Phase 0: Query films table for youtube source and nested credit IDs to find incomplete pages (0-10 credits)."""
@@ -510,7 +576,7 @@ class SupabaseSync:
         # Rest query to grab films and credits relation
         query_url = f"{self.url}/rest/v1/films?source=eq.youtube&select=id,title,youtube_watch_url,credits(id)"
         try:
-            res = requests.get(query_url, headers=self.headers)
+            res = self._request("GET", query_url, headers=self.headers)
             if res.status_code != 200:
                 print(f"  ❌ Supabase query failed: {res.status_code} {res.text}")
                 return []
@@ -533,7 +599,7 @@ class SupabaseSync:
         if not self.enabled: return None
         video_id = youtube_url.split("v=")[-1].split("&")[0] if "v=" in youtube_url else ""
         query = f"{self.url}/rest/v1/films?or=(youtube_watch_url.eq.{youtube_url},source_video_id.eq.{video_id})&select=id,title,youtube_watch_url,credits(id)"
-        res = requests.get(query, headers=self.headers)
+        res = self._request("GET", query, headers=self.headers)
         if res.status_code == 200 and res.json():
             return res.json()[0]
         return None
@@ -541,12 +607,12 @@ class SupabaseSync:
     def upsert_person(self, name: str) -> str:
         # Rapidfuzz lookup fallback inside database can be done by standard lookup
         query = f"{self.url}/rest/v1/people?name=ilike.{name}&select=id"
-        res = requests.get(query, headers=self.headers)
+        res = self._request("GET", query, headers=self.headers)
         if res.status_code == 200 and res.json():
             return res.json()[0]['id']
             
         payload = {"name": name, "nationality": "Nigerian"}
-        res = requests.post(f"{self.url}/rest/v1/people", headers=self.headers, json=payload)
+        res = self._request("POST", f"{self.url}/rest/v1/people", headers=self.headers, json=payload)
         if res.status_code in [201, 200] and res.json():
             return res.json()[0]['id']
         return ""
@@ -554,7 +620,7 @@ class SupabaseSync:
     def link_credit(self, film_id: str, person_id: str, role: str, char_name: str = "", order: int = 0):
         q = f"{self.url}/rest/v1/credits?film_id=eq.{film_id}&person_id=eq.{person_id}&role=eq.{role}"
         if char_name: q += f"&character_name=eq.{char_name}"
-        check = requests.get(q, headers=self.headers)
+        check = self._request("GET", q, headers=self.headers)
         if check.status_code == 200 and check.json():
             return
 
@@ -565,7 +631,7 @@ class SupabaseSync:
             "character_name": char_name,
             "billing_order": order
         }
-        requests.post(f"{self.url}/rest/v1/credits", headers=self.headers, json=payload)
+        self._request("POST", f"{self.url}/rest/v1/credits", headers=self.headers, json=payload)
 
     def process(self, youtube_url: str, markdown: str):
         if not self.enabled: return
@@ -590,32 +656,35 @@ class SupabaseSync:
             entries = [l.strip('- ').strip() for l in lines[1:] if l.strip() and not l.startswith('(')]
             
             for idx, entry in enumerate(entries):
-                name, char, specific_role = entry, "", role
-                parts = []
-                if " - " in entry: parts = entry.split(" - ", 1)
-                elif " – " in entry: parts = entry.split(" – ", 1)
-                elif " as " in entry.lower(): parts = re.split(r"\s+as\s+", entry, flags=re.IGNORECASE)
-                elif " : " in entry: parts = entry.split(" : ", 1)
-                
-                if parts:
-                    name = parts[0].strip()
-                    extra = parts[1].strip()
-                    if role == "actor": char = extra
-                    else: specific_role = extra
-                else:
-                    if role == "producer": specific_role = "Producer"
-                    elif role == "cinematographer": specific_role = "Cinematographer"
-                    elif role == "editor": specific_role = "Editor"
-                    elif role == "composer": specific_role = "Composer"
-                    elif role == "crew": specific_role = "Crew"
-                    elif role == "director": specific_role = "Director"
-                
-                name = name.strip()
-                if not name: continue
-                person_id = self.upsert_person(name)
-                if person_id:
-                    self.link_credit(film_id, person_id, specific_role, char, idx)
-                    linked_count += 1
+                try:
+                    name, char, specific_role = entry, "", role
+                    parts = []
+                    if " - " in entry: parts = entry.split(" - ", 1)
+                    elif " – " in entry: parts = entry.split(" – ", 1)
+                    elif " as " in entry.lower(): parts = re.split(r"\s+as\s+", entry, flags=re.IGNORECASE)
+                    elif " : " in entry: parts = entry.split(" : ", 1)
+                    
+                    if parts:
+                        name = parts[0].strip()
+                        extra = parts[1].strip()
+                        if role == "actor": char = extra
+                        else: specific_role = extra
+                    else:
+                        if role == "producer": specific_role = "Producer"
+                        elif role == "cinematographer": specific_role = "Cinematographer"
+                        elif role == "editor": specific_role = "Editor"
+                        elif role == "composer": specific_role = "Composer"
+                        elif role == "crew": specific_role = "Crew"
+                        elif role == "director": specific_role = "Director"
+                    
+                    name = name.strip()
+                    if not name: continue
+                    person_id = self.upsert_person(name)
+                    if person_id:
+                        self.link_credit(film_id, person_id, specific_role, char, idx)
+                        linked_count += 1
+                except Exception as entry_err:
+                    print(f"    ⚠️ Failed to sync credit entry '{entry}': {entry_err}")
         print(f"  ✓ Linked {linked_count} credits to the film in database.")
 
 # ── Main Batch Runner ─────────────────────────────────────────────────────────
@@ -682,8 +751,8 @@ def main():
 
             # Download Slices
             print("  -> Downloading credit sections...")
-            intro_path = BASE_TEMP_DIR / f"lumi_intro_{safe_title[:20].strip()}.mp4"
-            outro_path = BASE_TEMP_DIR / f"lumi_outro_{safe_title[:20].strip()}.mp4"
+            intro_path = BASE_TEMP_DIR / f"lumi_intro_{safe_title[:20].strip()}.mkv"
+            outro_path = BASE_TEMP_DIR / f"lumi_outro_{safe_title[:20].strip()}.mkv"
             temp_files.extend([intro_path, outro_path])
 
             download_segment(url, 0, INTRO_DURATION, intro_path)
@@ -745,6 +814,8 @@ def main():
 
         except Exception as e:
             print(f"  ❌ Execution error on '{title}': {e}")
+            if len(sys.argv) > 1:
+                sys.exit(1)
         finally:
             # Clean up frames
             for path in temp_files:
