@@ -528,6 +528,7 @@ class SupabaseSync:
             }
             # Configure persistent session with automatic retries for robust proxy tunneling
             self.session = requests.Session()
+            self.session.trust_env = False
             retries = Retry(
                 total=5,
                 connect=5,
