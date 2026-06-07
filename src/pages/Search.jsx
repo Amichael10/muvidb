@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
@@ -18,7 +18,7 @@ export default function Search() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    document.title = "Ensembla | Search";
+    document.title = "MuviDB | Search";
     fetchGenres();
     if (initialQuery) {
       fetchAll();

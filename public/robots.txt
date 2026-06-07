@@ -1,4 +1,4 @@
-User-agent: *
+﻿User-agent: *
 Allow: /
 
 # Block AI scrapers and training crawlers
@@ -35,4 +35,4 @@ Disallow: /
 User-agent: YouBot
 Disallow: /
 
-Sitemap: https://ensembla.xyz/sitemap.xml
+Sitemap: https://muvidb.com/sitemap.xml

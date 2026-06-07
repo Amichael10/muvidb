@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -124,7 +124,7 @@ const Cinemas = () => {
   const CHAINS = ['All', 'Filmhouse', 'Genesis', 'Silverbird', 'Ozone', 'Blu Star', 'Kada', 'Viva']
 
   useEffect(() => {
-    document.title = 'Ensembla | Cinemas'
+    document.title = 'MuviDB | Cinemas'
     fetchCinemas()
   }, [])
 

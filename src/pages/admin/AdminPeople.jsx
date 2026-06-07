@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -66,7 +66,7 @@ export default function AdminPeople() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [youtubeChannelInput, setYoutubeChannelInput] = useState('');
 
-  const draftKey = isDrawerOpen ? (editingPerson ? `ensembla_draft_person_${editingPerson.id}` : 'ensembla_draft_person_new') : null;
+  const draftKey = isDrawerOpen ? (editingPerson ? `MuviDB_draft_person_${editingPerson.id}` : 'MuviDB_draft_person_new') : null;
   const draftData = useMemo(() => ({ ...formData, youtube_channel_id: youtubeChannelInput || formData.youtube_channel_id || formData.youtube_handle }), [formData, youtubeChannelInput]);
   const { clearDraft } = useLocalStorageDraft(draftKey, draftData, isDrawerOpen);
   const [draftRestoredMessage, setDraftRestoredMessage] = useState('');
@@ -220,7 +220,7 @@ export default function AdminPeople() {
     let draft = null;
     if (!ignoreDraft) {
       try {
-        const stored = localStorage.getItem('ensembla_draft_person_new');
+        const stored = localStorage.getItem('MuviDB_draft_person_new');
         if (stored) draft = JSON.parse(stored);
       } catch (e) {}
     }
@@ -253,7 +253,7 @@ export default function AdminPeople() {
     let draft = null;
     if (!ignoreDraft) {
       try {
-        const stored = localStorage.getItem(`ensembla_draft_person_${person.id}`);
+        const stored = localStorage.getItem(`MuviDB_draft_person_${person.id}`);
         if (stored) draft = JSON.parse(stored);
       } catch (e) {}
     }
@@ -424,7 +424,7 @@ export default function AdminPeople() {
   useEffect(() => {
     if (isDrawerOpen) {
       const handler = setTimeout(() => {
-        const key = editingPerson ? `ensembla_draft_person_${editingPerson.id}` : 'ensembla_draft_person_new';
+        const key = editingPerson ? `MuviDB_draft_person_${editingPerson.id}` : 'MuviDB_draft_person_new';
         localStorage.setItem(key, JSON.stringify({ ...formData, youtube_channel_id: youtubeChannelInput }));
       }, 1000);
       return () => clearTimeout(handler);

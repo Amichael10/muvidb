@@ -36,9 +36,10 @@ export async function findAndInsertMissingFilm(supabase: any, title: string) {
     if (!detailsRes.ok) return null;
     const detailsData = await detailsRes.json();
 
-    const isNollywood = detailsData.production_countries?.some((c: any) => c.iso_3166_1 === 'NG');
+    const isNollywood = detailsData.production_countries?.some((c: any) => c.iso_3166_1 === 'NG') ?? false;
     if (!isNollywood) {
-      console.log(`      ⚠️ Film is not from Nigeria (Nollywood): ${tmdbFilm.title}. Skipping.`);
+      // Not a Nigerian production — do NOT auto-insert into the films table.
+      // The caller should route this to pending_cinema_films for admin triage.
       return null;
     }
     
@@ -50,6 +51,7 @@ export async function findAndInsertMissingFilm(supabase: any, title: string) {
       source: 'tmdb_cinema',
       release_type: 'cinema',
       is_in_cinemas: true,
+      is_nollywood: true,
       tmdb_id: tmdbFilm.id,
       mubi_slug: tmdbFilm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
       needs_review: true

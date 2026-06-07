@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -247,7 +247,7 @@ export default function ChannelDetail() {
       if (chErr || !ch) throw new Error('Channel not found');
       setChannel(ch);
       setChannelId(ch.id);
-      document.title = `Ensembla | ${ch.name}`;
+      document.title = `MuviDB | ${ch.name}`;
 
       if (ch.owner_person_id) {
         const { data: p } = await supabase
@@ -369,7 +369,7 @@ export default function ChannelDetail() {
                   </button>
                   <ShareAction 
                     title={channel.name}
-                    text={`Check out ${channel.name} on Ensembla`}
+                    text={`Check out ${channel.name} on MuviDB`}
                     className="!w-auto"
                   />
                 </div>

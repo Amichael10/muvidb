@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -77,8 +77,8 @@ export default function Navbar() {
         {/* Left: Logo */}
         <Link to="/" className="flex items-center group shrink-0">
           <img 
-            src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.svg" : "/images/Ensembla Brand/Wordmark.svg"} 
-            alt="Ensembla" 
+            src={theme === 'dark' ? "/images/MuviDB Brand/Wordmark White.svg" : "/images/MuviDB Brand/Wordmark.svg"} 
+            alt="MuviDB" 
             className="h-9 object-contain group-hover:scale-105 transition-all duration-500" 
           />
         </Link>

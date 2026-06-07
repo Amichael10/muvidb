@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../ui/ImageWithFallback';
@@ -112,7 +112,7 @@ export default function FilmCard({
             {film.title}
           </Link>
           <span className="text-xs text-text-muted mt-0.5 tracking-wide line-clamp-1">
-            {film.channel_name || 'Ensembla Network'}
+            {film.channel_name || 'MuviDB Network'}
           </span>
         </div>
       </div>

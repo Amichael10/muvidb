@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatViewCount } from '../utils/youtube'
@@ -264,7 +264,7 @@ const CompanyDetail = () => {
                   </a>
                   <ShareAction 
                     title={company.name}
-                    text={`Check out ${company.name} on Ensembla`}
+                    text={`Check out ${company.name} on MuviDB`}
                     className="!w-auto"
                   />
                 </div>

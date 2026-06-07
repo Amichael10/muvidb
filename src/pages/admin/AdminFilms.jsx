@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
@@ -143,7 +143,7 @@ export default function AdminFilms() {
 
   const [formData, setFormData] = useState(initialFormState);
 
-  const draftKey = isDrawerOpen ? (editingFilm ? `ensembla_draft_film_${editingFilm.id}` : 'ensembla_draft_film_new') : null;
+  const draftKey = isDrawerOpen ? (editingFilm ? `MuviDB_draft_film_${editingFilm.id}` : 'MuviDB_draft_film_new') : null;
   const draftData = useMemo(() => ({ formData, credits, showtimes, selectedCompany }), [formData, credits, showtimes, selectedCompany]);
   const { clearDraft } = useLocalStorageDraft(draftKey, draftData, isDrawerOpen);
   const [draftRestoredMessage, setDraftRestoredMessage] = useState('');
@@ -510,7 +510,7 @@ export default function AdminFilms() {
 
   const handleOpenDrawer = async (film = null, ignoreDraft = false) => {
     let draft = null;
-    const key = film ? `ensembla_draft_film_${film.id}` : 'ensembla_draft_film_new';
+    const key = film ? `MuviDB_draft_film_${film.id}` : 'MuviDB_draft_film_new';
     if (!ignoreDraft) {
       try {
         const stored = localStorage.getItem(key);

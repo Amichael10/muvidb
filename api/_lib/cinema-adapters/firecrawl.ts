@@ -162,21 +162,21 @@ async function runScraplingBridge(url: string, options: { wait?: number; solveCl
       }
       
       try {
-        const lines = stdoutData.split('\n');
-        let jsonStr = '';
-        for (const line of lines) {
-          if (line.trim().startsWith('{') && line.trim().endsWith('}')) {
-            jsonStr = line.trim();
-            break;
-          }
+        // Parse the entire stdout as JSON — NOT line by line.
+        // The 'text' field can contain newlines which would break a line-by-line search.
+        const trimmed = stdoutData.trim();
+        if (!trimmed) {
+          throw new Error('Scrapling bridge produced no output');
         }
-        if (!jsonStr) {
-          throw new Error('Could not find JSON payload in Scrapling stdout');
+        const parsed = JSON.parse(trimmed);
+        // If scrapling reported an internal error but still exited 0
+        if (parsed.error) {
+          resolve({ status: parsed.status || 500, text: '', html: '', error: parsed.error });
+        } else {
+          resolve(parsed);
         }
-        const parsed = JSON.parse(jsonStr);
-        resolve(parsed);
       } catch (err: any) {
-        resolve({ status: 500, text: '', html: '', error: `Failed to parse output: ${err.message}` });
+        resolve({ status: 500, text: '', html: '', error: `Failed to parse Scrapling output: ${err.message}. Raw (first 300 chars): ${stdoutData.slice(0, 300)}` });
       }
     });
     

@@ -1,13 +1,8 @@
-import { chromium } from 'playwright-extra';
-import stealth from 'puppeteer-extra-plugin-stealth';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { findAndInsertMissingFilm } from './lib/tmdb_cinema.js';
-
-const stealthPlugin = stealth();
-chromium.use(stealthPlugin);
 
 // Support .env and .env.local
 const envLocal = fs.existsSync('.env.local') ? dotenv.parse(fs.readFileSync('.env.local')) : {};
@@ -38,13 +33,6 @@ async function scrapeFilmhouse() {
   
   const logId = logEntry?.id;
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    ignoreHTTPSErrors: true,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  });
-  const page = await context.newPage();
-
   const defaultCinemaId = '6c9c38f0-f790-4573-aaa0-483d96ccaa43'; // Lekki IMAX as default fallback
   const today = new Date().toISOString().split('T')[0];
   let totalProcessed = 0;
@@ -52,90 +40,141 @@ async function scrapeFilmhouse() {
   let totalErrors = 0;
 
   try {
-    await page.goto('https://filmhouseng.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(5000); // Wait for React to render
+    // Use Scrapling to fetch the homepage — it renders the React SPA and returns clean text.
+    // We proved this works: the homepage at filmhouseng.com/ shows all current films.
+    console.log('📡 Fetching Filmhouse homepage via Scrapling...');
+    const { spawn } = await import('child_process');
+    const path = await import('path');
+    const bridgePath = path.resolve('./scripts/scrapling_bridge.py');
 
-    console.log(`📡 Extracting movies from homepage...`);
-    
-    // Extract titles using aria-label on h5 elements (new Filmhouse NextJS layout)
-    const filmTitles = await page.evaluate(() => {
-      const titles: string[] = [];
-      const els = document.querySelectorAll('[aria-label]');
-      els.forEach((el) => {
-        const label = el.getAttribute('aria-label');
-        if (label && el.classList.contains('heading-style-h5')) {
-          titles.push(label);
+    const pageText: string = await new Promise((resolve, reject) => {
+      const child = spawn('python', [
+        '-u', bridgePath,
+        '--url', 'https://www.filmhouseng.com/',
+        '--wait', '6000',
+        '--timeout', '90000'
+      ], { shell: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' } });
+
+      let out = '', err = '';
+      child.stdout.on('data', (d: any) => { out += d.toString(); });
+      child.stderr.on('data', (d: any) => { err += d.toString(); });
+      const timer = setTimeout(() => { child.kill(); reject(new Error('Scrapling timed out')); }, 120000);
+      child.on('close', (code: number) => {
+        clearTimeout(timer);
+        try {
+          const parsed = JSON.parse(out.trim());
+          if (parsed.error) reject(new Error(parsed.error));
+          else resolve(parsed.text || '');
+        } catch (e) {
+          reject(new Error(`Scrapling parse failed (code ${code}): ${err.slice(0, 300)}`));
         }
       });
-      return Array.from(new Set(titles));
     });
+
+    // Extract film titles from the page text.
+    // Filmhouse homepage renders films as:   "Film Title\nXh Ym\nBuy Tickets\n..."
+    // We find every line followed by a runtime line like "1h 45m" or "2h 0m".
+    const lines = pageText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    const filmTitles: string[] = [];
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (/^\d+h\s+\d+m$/.test(lines[i + 1]) && lines[i].length > 2 && lines[i].length < 80) {
+        const candidate = lines[i];
+        // Skip nav/UI noise
+        if (!['Now Showing', 'Coming Soon', 'Buy Tickets', 'More Info', 'Play Trailer',
+              'Sign In', 'Login', 'Home Page', 'Food & Drinks', 'Gift Cards'].includes(candidate)) {
+          if (!filmTitles.includes(candidate)) filmTitles.push(candidate);
+        }
+      }
+    }
 
     console.log(`Found ${filmTitles.length} films on homepage:`, filmTitles);
     totalProcessed = filmTitles.length;
 
     for (const title of filmTitles) {
       const cleanedTitle = cleanTitle(title);
-      console.log(`  🎬 Syncing ${cleanedTitle}...`);
-      
+      console.log(`  🎬 Processing ${cleanedTitle}...`);
+
+      // ── Step 1: Exact match against is_nollywood=true films ──────────────────
       let { data: dbFilm } = await supabase
         .from('films')
         .select('id, title, is_in_cinemas')
-        .neq('source', 'youtube')
-        .neq('source', 'tmdb_youtube')
+        .eq('is_nollywood', true)
         .ilike('title', cleanedTitle)
         .maybeSingle();
 
-      if (!dbFilm && cleanedTitle.length > 3) {
-        const { data: fuzzy } = await supabase
-          .from('films')
-          .select('id, title, is_in_cinemas')
-          .neq('source', 'youtube')
-          .neq('source', 'tmdb_youtube')
-          .ilike('title', `%${cleanedTitle}%`)
-          .limit(1);
-        dbFilm = fuzzy && fuzzy.length > 0 ? fuzzy[0] : null;
-      }
-
+      // ── Step 2: Check if admin already promoted a pending record ─────────────
       if (!dbFilm) {
-        console.log(`    ⚠️ Film not found in DB: ${cleanedTitle}. Attempting TMDB fetch...`);
-        const newFilm = await findAndInsertMissingFilm(supabase, cleanedTitle);
-        if (newFilm) {
-          dbFilm = newFilm;
-        } else {
-          console.log(`    ❌ Could not resolve film: ${cleanedTitle}`);
-          continue;
+        const { data: promoted } = await supabase
+          .from('pending_cinema_films')
+          .select('promoted_film_id')
+          .ilike('title', cleanedTitle)
+          .eq('admin_decision', 'promoted')
+          .maybeSingle();
+        if (promoted?.promoted_film_id) {
+          const { data: pf } = await supabase
+            .from('films').select('id, title, is_in_cinemas').eq('id', promoted.promoted_film_id).maybeSingle();
+          dbFilm = pf;
         }
       }
 
-      // Ensure is_in_cinemas is true
+      // ── Step 3: TMDB verify — only auto-insert confirmed Nigerian films ───────
+      if (!dbFilm) {
+        console.log(`    ⚠️ Not in Nollywood DB — checking TMDB origin...`);
+        const newFilm = await findAndInsertMissingFilm(supabase, cleanedTitle);
+        if (newFilm) dbFilm = newFilm;
+      }
+
+      // ── Step 4: Not confirmed Nollywood → pending triage ─────────────────────
+      if (!dbFilm) {
+        const { data: existing } = await supabase
+          .from('pending_cinema_films')
+          .select('id, showtime_count, admin_decision')
+          .ilike('title', cleanedTitle)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from('pending_cinema_films').insert({
+            title:               title,
+            source:              'filmhouse_scrapling',
+            last_seen_cinema_id: defaultCinemaId,
+            showtime_count:      1,
+          });
+          console.log(`    📋 Sent to pending triage: "${cleanedTitle}"`);
+        } else if (!existing.admin_decision || existing.admin_decision === null) {
+          await supabase.from('pending_cinema_films')
+            .update({ showtime_count: (existing.showtime_count ?? 0) + 1, last_seen_cinema_id: defaultCinemaId })
+            .eq('id', existing.id);
+          console.log(`    📋 Updated pending count: "${cleanedTitle}"`);
+        } else if (existing.admin_decision === 'blacklisted') {
+          console.log(`    🚫 Blacklisted, skipping: "${cleanedTitle}"`);
+        }
+        continue;
+      }
+
+      // ── Step 5: Confirmed Nollywood — write showtime ──────────────────────────
       if (!dbFilm.is_in_cinemas) {
         await supabase.from('films').update({ is_in_cinemas: true }).eq('id', dbFilm.id);
       }
 
-      // Instead of getting exact showtimes per location (which are now hidden behind React payloads),
-      // we just clear old showtimes and insert a placeholder so it shows up in "Now Showing".
-      await supabase
-        .from('showtimes')
-        .delete()
+      await supabase.from('showtimes').delete()
         .match({ film_id: dbFilm.id, cinema_id: defaultCinemaId, show_date: today });
 
-      const showtimeToInsert = {
-        film_id: dbFilm.id,
-        cinema_id: defaultCinemaId,
-        show_date: today,
-        show_time: '12:00:00', // Placeholder
-        format: 'Standard',
-        source: 'filmhouse_playwright',
+      const { error } = await supabase.from('showtimes').insert({
+        film_id:      dbFilm.id,
+        cinema_id:    defaultCinemaId,
+        show_date:    today,
+        show_time:    '12:00:00',
+        format:       'Standard',
+        source:       'filmhouse_scrapling',
         is_available: true,
-        last_seen_at: new Date().toISOString()
-      };
+        last_seen_at: new Date().toISOString(),
+      });
 
-      const { error } = await supabase.from('showtimes').insert(showtimeToInsert);
       if (error) {
         console.error(`    ❌ Error: ${error.message}`);
         totalErrors++;
       } else {
-        console.log(`    ✅ Synced movie presence for ${cleanedTitle}`);
+        console.log(`    ✅ Synced showtime for "${dbFilm.title}"`);
         totalInserted++;
       }
     }
@@ -162,8 +201,6 @@ async function scrapeFilmhouse() {
         duration_ms: Date.now() - startTime
       }).eq('id', logId);
     }
-  } finally {
-    await browser.close();
   }
 }
 

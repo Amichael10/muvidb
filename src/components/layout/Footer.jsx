@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
@@ -10,13 +10,13 @@ export default function Footer() {
             <div className="space-y-6">
               <Link to="/" className="flex items-center gap-3 group">
                 <img 
-                  src="/images/Ensembla Brand/Logo.png" 
-                  alt="Ensembla Logo" 
+                  src="/images/MuviDB Brand/Logo.png" 
+                  alt="MuviDB Logo" 
                   className="w-10 h-10 object-contain group-hover:scale-110 transition-transform" 
                 />
                 <img 
-                  src="/images/Ensembla Brand/Wordmark White.png" 
-                  alt="Ensembla" 
+                  src="/images/MuviDB Brand/Wordmark White.png" 
+                  alt="MuviDB" 
                   className="h-6 object-contain" 
                 />
               </Link>
@@ -49,7 +49,7 @@ export default function Footer() {
               <h3 className="text-xs font-bold text-text-primary mb-6 uppercase tracking-widest">Platform</h3>
               <ul className="space-y-4">
                 <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
-                <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join Ensembla</Link></li>
+                <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join MuviDB</Link></li>
                 <li><Link to="/dashboard" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Dashboard</Link></li>
                 <li><Link to="/claim" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Claim Profile (For Filmmakers & Talent)</Link></li>
               </ul>
@@ -68,7 +68,7 @@ export default function Footer() {
 
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
               <p className="text-[10px] font-bold text-text-muted opacity-40 uppercase tracking-widest">
-                © {new Date().getFullYear()} Ensembla Database. All rights reserved.
+                © {new Date().getFullYear()} MuviDB Database. All rights reserved.
               </p>
               <div className="flex gap-8">
                 <Link to="/terms" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Terms</Link>

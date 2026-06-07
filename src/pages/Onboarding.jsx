@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
@@ -14,7 +14,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Ensembla | Complete Your Profile";
+    document.title = "MuviDB | Complete Your Profile";
     if (user?.onboarded) {
       navigate(user.role === 'professional' ? '/pro-dashboard' : '/dashboard');
     }
@@ -61,7 +61,7 @@ export default function Onboarding() {
           Complete <span className="text-brand">Profile</span>
         </h2>
         <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em] opacity-60">
-          Personalize your Ensembla experience
+          Personalize your MuviDB experience
         </p>
       </div>
 

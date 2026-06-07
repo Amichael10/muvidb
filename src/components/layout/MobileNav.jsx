@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -59,7 +59,7 @@ const MobileNav = () => {
         <div className="w-12 h-1.5 bg-border rounded-full mx-auto mb-6 opacity-60" />
         
         <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-center mb-6">
-          Explore Ensembla
+          Explore MuviDB
         </h3>
 
         {/* 2-Column Responsive Grid */}

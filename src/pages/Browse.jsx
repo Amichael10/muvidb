@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
@@ -27,7 +27,7 @@ export default function Browse() {
   const [sortBy, setSortBy] = useState(initialSort);
 
   useEffect(() => {
-    document.title = "Ensembla | Browse";
+    document.title = "MuviDB | Browse";
     fetchGenres();
   }, []);
 

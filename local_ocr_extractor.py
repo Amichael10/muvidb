@@ -254,7 +254,11 @@ class LocalOCR:
         # 1. Primary: PaddleOCR
         if self.paddle_ocr:
             try:
-                result = self.paddle_ocr.ocr(str(img_path), cls=True)
+                try:
+                    result = self.paddle_ocr.ocr(str(img_path))
+                except TypeError:
+                    result = self.paddle_ocr.ocr(str(img_path), cls=True)
+                
                 if result and result[0]:
                     for line in result[0]:
                         text = line[1][0]

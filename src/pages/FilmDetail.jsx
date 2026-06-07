@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -189,7 +189,7 @@ export default function FilmDetail() {
       fetchCredits(data.id);
 
       if (data) {
-        document.title = `Ensembla | ${data.title}`;
+        document.title = `MuviDB | ${data.title}`;
         const { data: related } = await supabase
           .from('films')
           .select(`
@@ -531,7 +531,7 @@ export default function FilmDetail() {
               </button>
               <ShareAction 
                 title={film.title}
-                text={`Check out ${film.title} on Ensembla`}
+                text={`Check out ${film.title} on MuviDB`}
               />
             </div>
 

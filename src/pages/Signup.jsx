@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
@@ -20,7 +20,7 @@ export default function Signup() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Ensembla | Join";
+    document.title = "MuviDB | Join";
   }, []);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function Signup() {
     <AuthLayout>
       <div className="mb-10 space-y-2">
         <h2 className="font-heading font-bold text-4xl md:text-5xl text-text-primary tracking-tighter uppercase italic leading-none">
-          Join <span className="text-brand">Ensembla</span>
+          Join <span className="text-brand">MuviDB</span>
         </h2>
         <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em] opacity-60">
           Create your archive profile

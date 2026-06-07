@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getPersonYoutubeChannelUrl } from '../lib/youtube';
@@ -41,7 +41,7 @@ export default function Home() {
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
   useEffect(() => {
-    document.title = "Ensembla | Home";
+    document.title = "MuviDB | Home";
     fetchAllData();
   }, []);
 
@@ -437,7 +437,7 @@ export default function Home() {
 
   const handleExternalClick = (e, url) => {
     if (!url || url === '#') return;
-    const hideWarning = localStorage.getItem('ensembla_hide_external_warning') === 'true';
+    const hideWarning = localStorage.getItem('MuviDB_hide_external_warning') === 'true';
     if (hideWarning) {
       return; // Let the browser open the link normally
     }
@@ -449,7 +449,7 @@ export default function Home() {
 
   const proceedToExternal = () => {
     if (dontShowAgain) {
-      localStorage.setItem('ensembla_hide_external_warning', 'true');
+      localStorage.setItem('MuviDB_hide_external_warning', 'true');
     }
     window.open(externalUrl, '_blank', 'noopener,noreferrer');
     setIsWarningModalOpen(false);
@@ -529,7 +529,7 @@ export default function Home() {
         <div className="border-b border-border py-12 bg-surface-2/5">
           <FilmRow
             title="Recently Added"
-            subtitle="Latest additions to the Ensembla library"
+            subtitle="Latest additions to the MuviDB library"
             films={recentlyAdded}
             isLoading={isLoading}
             linkTo="/browse?sort=newest"
@@ -928,14 +928,14 @@ export default function Home() {
                   Preserve the legacy. Celebrate the future.
                 </h2>
                 <p className="text-text-secondary text-sm md:text-base leading-relaxed">
-                  Join Ensembla today to rate films, write reviews, follow your favourite artists, and build your own custom library of African cinematic excellence.
+                  Join MuviDB today to rate films, write reviews, follow your favourite artists, and build your own custom library of African cinematic excellence.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
                   <Link 
                     to="/signup" 
                     className="bg-brand hover:bg-brand-hover text-white px-8 py-4 rounded-xl font-bold text-[11px] uppercase tracking-widest transition-all shadow-lg hover:shadow-brand/20 active:scale-95 shrink-0"
                   >
-                    Join Ensembla
+                    Join MuviDB
                   </Link>
                   <Link 
                     to="/browse" 
@@ -967,12 +967,12 @@ export default function Home() {
                 <Icon icon="solar:danger-triangle-linear" width="28" height="28" />
               </div>
               <h3 className="font-heading font-bold text-lg md:text-xl text-text-primary tracking-tight">
-                Leaving Ensembla
+                Leaving MuviDB
               </h3>
             </div>
             
             <p className="text-text-secondary text-sm leading-relaxed">
-              You are about to open an external YouTube channel in a new tab. Ensembla does not control external websites or content.
+              You are about to open an external YouTube channel in a new tab. MuviDB does not control external websites or content.
             </p>
             
             {/* Don't show again checkbox */}

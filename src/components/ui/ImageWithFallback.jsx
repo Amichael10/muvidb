@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 
 // Premium brand-aligned gradients for fallback backgrounds
 const PRESET_GRADIENTS = [
@@ -51,7 +51,7 @@ export default function ImageWithFallback({
     setHasError(!src);
   }, [src]);
 
-  const hash = getHash(name || alt || 'Ensembla');
+  const hash = getHash(name || alt || 'MuviDB');
   const gradient = PRESET_GRADIENTS[hash % PRESET_GRADIENTS.length];
 
   // Get initials for avatar (max 2 characters)
@@ -103,7 +103,7 @@ export default function ImageWithFallback({
           
           {/* Subtle text label if it's large enough */}
           <span className="absolute bottom-3 right-4 text-[9px] font-black uppercase tracking-[0.25em] text-white/40 pointer-events-none select-none font-heading">
-            {name || alt || 'ENSEMBLA'}
+            {name || alt || 'MuviDB'}
           </span>
         </div>
       );

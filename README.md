@@ -1,10 +1,10 @@
-<p align="center">
-  <a href="https://ensembla.xyz" target="_blank">
-    <img src="./public/images/Ensembla%20Brand/Logo%20Red.png" alt="Ensembla Logo" width="100" />
+﻿<p align="center">
+  <a href="https://muvidb.com" target="_blank">
+    <img src="./public/images/MuviDB%20Brand/Logo%20Red.png" alt="MuviDB Logo" width="100" />
   </a>
 </p>
 
-<h1 align="center">Ensembla</h1>
+<h1 align="center">MuviDB</h1>
 
 <p align="center">
   <strong>The Ultimate Nollywood Film Discovery & Cinema Showtime Platform.</strong>
@@ -19,22 +19,22 @@
 </p>
 
 <p align="center">
-  <a href="https://ensembla.xyz">🌐 Live Production Site</a> &bull;
-  <a href="https://staging.ensembla.xyz">🧪 Staging Environment</a> &bull;
-  <a href="https://waitlist.ensembla.xyz">🎟️ Standalone Waitlist</a>
+  <a href="https://muvidb.com">🌐 Live Production Site</a> &bull;
+  <a href="https://staging.muvidb.com">🧪 Staging Environment</a> &bull;
+  <a href="https://waitlist.muvidb.com">🎟️ Standalone Waitlist</a>
 </p>
 
 <hr />
 
 <p align="center">
-  <img src="./public/images/Ensembla%20Brand/Ensembla%20Social%20Share.png" alt="Ensembla Social Share Banner" width="100%" style="border-radius: 8px;" />
+  <img src="./public/images/MuviDB%20Brand/OG%20meta%20Image.png" alt="MuviDB Social Share Banner" width="100%" style="border-radius: 8px;" />
 </p>
 
 ## 🌟 Overview
 
-**Ensembla** is a premium, state-of-the-art web application dedicated to Nollywood cinema. It bridges the gap between Nollywood film lovers and theater showtimes across Nigeria.
+**MuviDB** is a premium, state-of-the-art web application dedicated to Nollywood cinema. It bridges the gap between Nollywood film lovers and theater showtimes across Nigeria.
 
-Ensembla features a robust, fully automated scheduling and scraping ecosystem that compiles film catalogs, maps theater schedules in real-time, displays crew/actor filmographies, syncs with major Nollywood YouTube creators, and protects resources using smart backend proxy structures and security honeypots.
+MuviDB features a robust, fully automated scheduling and scraping ecosystem that compiles film catalogs, maps theater schedules in real-time, displays crew/actor filmographies, syncs with major Nollywood YouTube creators, and protects resources using smart backend proxy structures and security honeypots.
 
 ---
 
@@ -62,7 +62,7 @@ Ensembla features a robust, fully automated scheduling and scraping ecosystem th
 ### 📂 Directory Structure
 
 ```
-ensembla/
+MuviDB/
 ├── .github/workflows/       # Highly optimized Actions cron sync pipelines
 ├── api/                     # Vercel serverless backend proxy API routes
 │   ├── _lib/                # Shared DB connections, rate limiters, & scraper adapters
@@ -87,7 +87,7 @@ ensembla/
 
 ## 🚀 Getting Started
 
-Follow these instructions to configure and run the Ensembla development server locally.
+Follow these instructions to configure and run the MuviDB development server locally.
 
 ### 📋 Prerequisites
 * Node.js v18+
@@ -100,7 +100,7 @@ Follow these instructions to configure and run the Ensembla development server l
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/Amichael10/ensembla.git
-   cd ensembla
+   cd MuviDB
    ```
 
 2. **Install dependencies:**
@@ -133,7 +133,7 @@ Follow these instructions to configure and run the Ensembla development server l
 
 ## 🛡️ Security & API Proxying
 
-To keep user accounts secure and protect credentials, Ensembla implements strict API proxy boundaries:
+To keep user accounts secure and protect credentials, MuviDB implements strict API proxy boundaries:
 
 * **Token Isolation:** Key APIs (`TMDB_API_KEY` and `YOUTUBE_API_KEY`) are stored safely in backend environment variables and **never** exposed to the browser.
 * **Server-Side Proxies:** The frontend makes clean fetch queries to Vercel Serverless proxy routes (`/api/tmdb` and `/api/youtube`) which handle authenticating, formatting, and returning sanitized payloads.
@@ -143,7 +143,7 @@ To keep user accounts secure and protect credentials, Ensembla implements strict
 
 ## ⚙️ Automated Sync Workflows
 
-Ensembla features automated data pipelines orchestrated via GitHub Actions. These schedules are heavily optimized to stay well within free limits and prevent account restrictions:
+MuviDB features automated data pipelines orchestrated via GitHub Actions. These schedules are heavily optimized to stay well within free limits and prevent account restrictions:
 
 * **📅 Daily Showtimes Scraping (`daily_sync.yml` @ `0 5 * * *`):** Ingests and processes active movie schedules from major cinema sites, pushing clean data to Supabase.
 * **📹 Youtube Channel Tracking (`daily_sync.yml` @ `0 */8 * * *`):** Runs three times a day to fetch and save metrics for featured Nollywood YouTube channels.
@@ -154,7 +154,7 @@ Ensembla features automated data pipelines orchestrated via GitHub Actions. Thes
 
 ## 🤝 Contributing
 
-Contributions to Ensembla are welcome! Please follow these guidelines:
+Contributions to MuviDB are welcome! Please follow these guidelines:
 1. Fork the repository.
 2. Create a clean feature branch: `git checkout -b feature/your-awesome-feature`
 3. Commit your changes: `git commit -m "feat(scope): add high-fidelity component"`

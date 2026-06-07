@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Icon } from '@iconify/react';
@@ -7,19 +7,19 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    return localStorage.getItem('ensembla_admin_collapsed') === 'true';
+    return localStorage.getItem('MuviDB_admin_collapsed') === 'true';
   });
   
   const [isDark, setIsDark] = useState(() => {
-    return localStorage.getItem('ensembla_theme_mode') !== 'light';
+    return localStorage.getItem('MuviDB_theme_mode') !== 'light';
   });
 
   useEffect(() => {
-    localStorage.setItem('ensembla_admin_collapsed', isCollapsed);
+    localStorage.setItem('MuviDB_admin_collapsed', isCollapsed);
   }, [isCollapsed]);
 
   useEffect(() => {
-    localStorage.setItem('ensembla_theme_mode', isDark ? 'dark' : 'light');
+    localStorage.setItem('MuviDB_theme_mode', isDark ? 'dark' : 'light');
     if (isDark) {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
@@ -89,14 +89,14 @@ export default function AdminLayout() {
         <div className={`h-16 flex items-center mb-4 ${isCollapsed ? 'justify-center px-6' : 'px-6'}`}>
           {isCollapsed ? (
             <img 
-              src="/images/Ensembla Brand/Logo.png" 
-              alt="Ensembla Logo" 
+              src="/images/MuviDB Brand/Logo.png" 
+              alt="MuviDB Logo" 
               className="w-8 h-8 object-contain" 
             />
           ) : (
             <img 
-              src="/images/Ensembla Brand/Wordmark White.svg" 
-              alt="Ensembla Admin" 
+              src="/images/MuviDB Brand/Wordmark White.svg" 
+              alt="MuviDB Admin" 
               className="h-6 object-contain" 
             />
           )}

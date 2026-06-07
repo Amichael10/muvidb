@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -74,7 +74,7 @@ export default function AdminPanel() {
   };
 
   useEffect(() => {
-    document.title = "Ensembla | Admin Panel";
+    document.title = "MuviDB | Admin Panel";
     fetchStats();
   }, []);
 
@@ -175,7 +175,7 @@ export default function AdminPanel() {
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="font-heading font-bold text-xl text-text-primary">Admin Panel</h1>
-            <span className="bg-brand/20 text-brand text-[10px] font-bold px-3 py-1 rounded">Ensembla Staff</span>
+            <span className="bg-brand/20 text-brand text-[10px] font-bold px-3 py-1 rounded">MuviDB Staff</span>
           </div>
         </div>
 
@@ -256,7 +256,7 @@ export default function AdminPanel() {
 
                   <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-2">
-                       <span className="text-sm text-text-muted">Ensembla AI Core</span>
+                       <span className="text-sm text-text-muted">MuviDB AI Core</span>
                        <span className="w-2 h-2 rounded-full bg-green-500" />
                     </div>
                     <div className="text-lg font-bold text-text-primary tracking-tight">Gemini-1.5-Flash</div>

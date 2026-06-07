@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 
 const ShareAction = ({ title, text, url, variant = 'default', className = '', containerClassName = '' }) => {
@@ -8,7 +8,7 @@ const ShareAction = ({ title, text, url, variant = 'default', className = '', co
 
   const shareUrl = url || window.location.href;
   const shareTitle = title || document.title;
-  const shareText = text || `Check this out on Ensembla`;
+  const shareText = text || `Check this out on MuviDB`;
 
   const socialPlatforms = [
     {

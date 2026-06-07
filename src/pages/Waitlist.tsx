@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -12,7 +12,7 @@ export default function Waitlist() {
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    document.title = "Ensembla | The Home of African Cinema";
+    document.title = "MuviDB | The Home of African Cinema";
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,7 +43,7 @@ export default function Waitlist() {
       }
 
       setIsSubmitted(true);
-      toast.success("Welcome to Ensembla!");
+      toast.success("Welcome to MuviDB!");
     } catch (err: any) {
       console.error('Waitlist error:', err);
       toast.error(getFriendlyErrorMessage(err));
@@ -86,8 +86,8 @@ export default function Waitlist() {
       <header className="absolute top-0 left-0 w-full p-8 md:p-12 z-20 flex justify-between items-center">
         <Link to="/" className="flex items-center group shrink-0">
           <img 
-            src={theme === 'dark' ? "/images/Ensembla Brand/Wordmark White.svg" : "/images/Ensembla Brand/Wordmark.svg"} 
-            alt="Ensembla" 
+            src={theme === 'dark' ? "/images/MuviDB Brand/Wordmark White.svg" : "/images/MuviDB Brand/Wordmark.svg"} 
+            alt="MuviDB" 
             className="h-7 object-contain group-hover:scale-105 transition-all duration-500" 
           />
         </Link>
@@ -212,7 +212,7 @@ export default function Waitlist() {
 
       <footer className="mt-auto w-full p-8 border-t border-border/50 text-center relative z-10">
         <p className="text-[10px] font-bold uppercase tracking-[0.4em] transition-colors text-text-secondary">
-          Ensembla Protocol © 2026 — Pioneering the African Archive
+          MuviDB Protocol © 2026 — Pioneering the African Archive
         </p>
       </footer>
     </div>

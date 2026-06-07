@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatViewCount } from '../utils/youtube';
@@ -130,7 +130,7 @@ export default function Channels() {
   const [searchInput, setSearchInput] = useState('');
 
   useEffect(() => {
-    document.title = 'Ensembla | YouTube Channels';
+    document.title = 'MuviDB | YouTube Channels';
     fetchChannels();
   }, [search, activeCategory]);
 

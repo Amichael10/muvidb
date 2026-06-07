@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
@@ -523,7 +523,7 @@ const PersonDetail = () => {
                 
                 <ShareAction 
                   title={person.name}
-                  text={`Check out ${person.name}'s profile on Ensembla`}
+                  text={`Check out ${person.name}'s profile on MuviDB`}
                   className="!w-auto"
                   containerClassName="w-auto flex-shrink-0"
                 />

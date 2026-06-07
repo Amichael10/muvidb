@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [editingReviewId, setEditingReviewId] = useState(null);
 
   useEffect(() => {
-    document.title = "Ensembla | Dashboard";
+    document.title = "MuviDB | Dashboard";
     
     // Redirect admin and admin_limited to Admin Workspace
     if (user?.role === 'admin' || user?.role === 'admin_limited') {

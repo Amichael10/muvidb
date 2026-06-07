@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 
 export default function Privacy() {
   useEffect(() => {
-    document.title = "Ensembla | Privacy Policy";
+    document.title = "MuviDB | Privacy Policy";
     window.scrollTo(0, 0);
   }, []);
 
@@ -31,7 +31,7 @@ export default function Privacy() {
         <section className="space-y-4">
           <h2 className="text-xl md:text-2xl font-heading font-black text-text-primary tracking-tight">1. Overview</h2>
           <p>
-            Ensembla ("we", "us", "our") values your privacy. This Privacy Policy describes how we collect, use, store, and share your personal information when you visit, register, or interact with our Nollywood database platform.
+            MuviDB ("we", "us", "our") values your privacy. This Privacy Policy describes how we collect, use, store, and share your personal information when you visit, register, or interact with our Nollywood database platform.
           </p>
         </section>
 
@@ -65,7 +65,7 @@ export default function Privacy() {
         <section className="space-y-4">
           <h2 className="text-xl md:text-2xl font-heading font-black text-text-primary tracking-tight">4. Information Sharing & Third Parties</h2>
           <p>
-            Ensembla will never sell your personal information. We only share details in specific, necessary circumstances:
+            MuviDB will never sell your personal information. We only share details in specific, necessary circumstances:
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li><strong>Public Profiles:</strong> Your username, public reviews, and shared watchlists are visible to visitors to foster community interactions.</li>
@@ -98,7 +98,7 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-4 border-t border-border pt-8 text-center text-xs text-text-muted">
-          <p>If you wish to exercise your rights or ask questions about our privacy policies, please contact support@ensembla.database.</p>
+          <p>If you wish to exercise your rights or ask questions about our privacy policies, please contact support@muvidb.com.</p>
         </section>
       </div>
     </div>

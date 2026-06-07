@@ -2,13 +2,21 @@
 import sys
 import argparse
 import json
-from scrapling import StealthyFetcher
+import logging
+
+# Redirect ALL library logging (scrapling, playwright, etc.) to stderr
+# so that ONLY our JSON result goes to stdout. Any debug/warning lines
+# from scrapling would otherwise corrupt the JSON the TS bridge reads.
+logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 
 # Force UTF-8 output encoding for reliable text extraction on Windows
 try:
     sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 except AttributeError:
     pass
+
+from scrapling import StealthyFetcher
 
 def main():
     parser = argparse.ArgumentParser(description="Lumi Scrapling Bridge")
@@ -38,21 +46,29 @@ def main():
     try:
         page = fetcher.fetch(args.url, **fetch_kwargs)
         
-        # We output a structured JSON response to stdout so TypeScript can easily parse it
+        # Output a structured JSON response to stdout ONLY.
+        # The 'html' field is included so the TS bridge type is satisfied.
         result = {
             "status": page.status,
             "url": page.url,
-            "text": page.get_all_text(),
+            "text": page.get_all_text(separator="\n", strip=True),
+            "html": "",
         }
         
-        print(json.dumps(result, ensure_ascii=False))
+        # Use separators to produce compact single-line JSON — avoids any
+        # ambiguity about multi-line output when the TS side reads stdout.
+        print(json.dumps(result, ensure_ascii=False, separators=(',', ':')))
         sys.exit(0)
         
     except Exception as e:
         error_res = {
             "error": str(e),
-            "status": 500
+            "status": 500,
+            "text": "",
+            "html": "",
         }
+        # Write to both stderr (for logs) and stdout (so TS bridge can parse it)
+        print(json.dumps(error_res, separators=(',', ':')))
         print(json.dumps(error_res), file=sys.stderr)
         sys.exit(1)
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -54,7 +54,7 @@ const generatePDFWindow = (actions, selectedDate) => {
   const sortedActions = [...actions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   
   // Identify sub-admin profile details
-  const subAdmin = sortedActions[0]?.users || { name: 'Ensembla Admin', email: 'admin@ensembla.xyz' };
+  const subAdmin = sortedActions[0]?.users || { name: 'MuviDB Admin', email: 'admin@muvidb.com' };
   const adminName = subAdmin.name || 'Unknown Admin';
   const adminEmail = subAdmin.email || 'N/A';
   
@@ -122,7 +122,7 @@ const generatePDFWindow = (actions, selectedDate) => {
   printWindow.document.write(`
     <html>
       <head>
-        <title>Ensembla Audit Report - ${adminName}</title>
+        <title>MuviDB Audit Report - ${adminName}</title>
         <style>
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -307,7 +307,7 @@ const generatePDFWindow = (actions, selectedDate) => {
       <body>
         <div class="header">
           <div>
-            <div class="brand-logo">ENSEMBLA</div>
+            <div class="brand-logo">MuviDB</div>
             <div class="brand-subtitle">Database Audit System</div>
           </div>
           <div class="report-meta">
@@ -452,7 +452,7 @@ const generatePDFWindow = (actions, selectedDate) => {
         </table>
 
         <div class="footer">
-          This document represents verified cryptographic database logs tracked by Ensembla.
+          This document represents verified cryptographic database logs tracked by MuviDB.
           All working durations are scientifically estimated using chronological action-gap clustering.
         </div>
         
