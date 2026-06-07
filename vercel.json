@@ -1,5 +1,6 @@
 {
   "routes": [
+    { "src": "/storage/v1/object/public/(.*)", "dest": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/$1" },
     { "src": "/api/film/(?<id>.*)", "dest": "/api/films?id=$id" },
     { "src": "/api/channel/(?<id>.*)", "dest": "/api/channels?id=$id" },
     { "src": "/api/youtube(.*)", "dest": "/api/external?provider=youtube$1" },

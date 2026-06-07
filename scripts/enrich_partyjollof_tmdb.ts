@@ -434,14 +434,34 @@ async function syncFromIMDbDirect(filmId: string, imdbId: string, title: string,
       })
     });
 
-    if (!res.ok) throw new Error(`Firecrawl API responded with ${res.status}`);
-    const data: any = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Unknown Firecrawl error');
+    let parsedCredits: ImdbCredit[] = [];
+    if (!res.ok || !(await res.clone().json()).success) {
+      console.log(`  ⚠️ Firecrawl failed or returned error. Falling back to Scrapling...`);
+      // Fallback to Scrapling Python script
+      const { execSync } = require('child_process');
+      try {
+        const scraplingOutput = execSync(`python scripts/scrapling_imdb.py ${imdbId}`, { encoding: 'utf-8' });
+        const scraplingData = JSON.parse(scraplingOutput);
+        if (scraplingData.success && scraplingData.credits) {
+          parsedCredits = scraplingData.credits.map((c: any) => ({
+            imdbId: c.imdbId,
+            name: c.name,
+            role: c.role,
+            characterName: c.characterName
+          }));
+        } else {
+          throw new Error(scraplingData.error || 'Scrapling failed');
+        }
+      } catch (scrapErr: any) {
+        throw new Error(`Firecrawl and Scrapling both failed: ${scrapErr.message}`);
+      }
+    } else {
+      const data: any = await res.json();
+      const markdown = data.data.markdown || '';
+      parsedCredits = parseImdbCredits(markdown);
     }
 
-    const markdown = data.data.markdown || '';
-    const parsedCredits = parseImdbCredits(markdown);
+
     console.log(`  🍿 Found ${parsedCredits.length} cast & crew credits on IMDb page.`);
 
     if (parsedCredits.length === 0) {
