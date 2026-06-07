@@ -15,7 +15,7 @@ export default function Footer() {
                   className="w-10 h-10 object-contain group-hover:scale-110 transition-transform" 
                 />
                 <img 
-                  src="/images/MuviDB Brand/Wordmark White.png" 
+                  src="/images/MuviDB Brand/White Wordmark.png" 
                   alt="MuviDB" 
                   className="h-6 object-contain" 
                 />

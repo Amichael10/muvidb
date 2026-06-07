@@ -95,7 +95,7 @@ export default function AdminLayout() {
             />
           ) : (
             <img 
-              src="/images/MuviDB Brand/Wordmark White.svg" 
+              src="/images/MuviDB Brand/White Wordmark.svg" 
               alt="MuviDB Admin" 
               className="h-6 object-contain" 
             />

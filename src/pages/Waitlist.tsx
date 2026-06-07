@@ -86,7 +86,7 @@ export default function Waitlist() {
       <header className="absolute top-0 left-0 w-full p-8 md:p-12 z-20 flex justify-between items-center">
         <Link to="/" className="flex items-center group shrink-0">
           <img 
-            src={theme === 'dark' ? "/images/MuviDB Brand/Wordmark White.svg" : "/images/MuviDB Brand/Wordmark.svg"} 
+            src={theme === 'dark' ? "/images/MuviDB Brand/White Wordmark.svg" : "/images/MuviDB Brand/Wordmark.svg"} 
             alt="MuviDB" 
             className="h-7 object-contain group-hover:scale-105 transition-all duration-500" 
           />
