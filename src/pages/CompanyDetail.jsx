@@ -8,7 +8,7 @@ import ShareAction from '../components/ui/ShareAction'
 
 const FilmCard = ({ film }) => (
   <Link
-    to={`/films/${film.mubi_slug || film.id}`}
+    to={`/films/${film.slug || film.id}`}
     className="group block"
   >
     <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[#13192B]">
@@ -93,7 +93,7 @@ const CompanyDetail = () => {
         film_companies(
           role,
           films(
-            id, title, year, poster_url, mubi_slug,
+            id, title, year, poster_url, slug,
             view_count, average_rating,
             film_genres(genres(name))
           )

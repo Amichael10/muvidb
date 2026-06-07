@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -119,7 +119,7 @@ export default function FilmDetail() {
         .from('credits')
         .select(`
           id, role, character_name, billing_order,
-          people(id, name, photo_url, popularity_score, mubi_slug)
+          people(id, name, photo_url, popularity_score, slug)
         `)
         .eq('film_id', uuid)
         .order('billing_order', { ascending: true });
@@ -193,7 +193,7 @@ export default function FilmDetail() {
         const { data: related } = await supabase
           .from('films')
           .select(`
-            id, title, year, poster_url, backdrop_url, mubi_slug,
+            id, title, year, poster_url, backdrop_url, slug,
             film_genres(genres(name))
           `)
           .neq('id', data.id)
@@ -214,7 +214,7 @@ export default function FilmDetail() {
   const handleWatchlist = async () => {
     if (!user) {
       navigate('/login', {
-        state: { from: `/films/${film?.mubi_slug || film?.id || slug}`, message: 'Sign in to add films to your watchlist' }
+        state: { from: `/films/${film?.slug || film?.id || slug}`, message: 'Sign in to add films to your watchlist' }
       });
       return;
     }
@@ -384,7 +384,7 @@ export default function FilmDetail() {
                   {(showAllCast ? cast : cast.slice(0, 5)).map(person => (
                     <Link 
                       key={person.id} 
-                      to={`/people/${person.mubi_slug || person.id}`}
+                      to={`/people/${person.slug || person.id}`}
                       className="group flex flex-col"
                     >
                       <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden border border-border/50 shadow-md group-hover:shadow-xl group-hover:border-gold/50 transition-all duration-300 transform group-hover:scale-[1.03]">
@@ -434,7 +434,7 @@ export default function FilmDetail() {
                   {crew.map((member, idx) => (
                     <Link 
                       key={idx} 
-                      to={`/people/${member.mubi_slug || member.id}`}
+                      to={`/people/${member.slug || member.id}`}
                       className="flex items-center gap-4 bg-surface p-4 border-r border-b border-border last:border-r-0 last:border-b-0 hover:bg-surface-2 transition-colors group"
                     >
                       <img src={member.photo_url || `https://placehold.co/150x150/1A1A1A/FF5C00?text=${member.name.split(' ').map(n => n[0]).join('')}`} alt={member.name} className="w-10 h-10 rounded-lg object-cover border border-border group-hover:border-gold transition-colors" />
@@ -541,7 +541,7 @@ export default function FilmDetail() {
                 {relatedFilms.map(relatedFilm => (
                   <Link
                     key={relatedFilm.id}
-                    to={`/films/${relatedFilm.mubi_slug || relatedFilm.id}`}
+                    to={`/films/${relatedFilm.slug || relatedFilm.id}`}
                     className="flex gap-4 bg-surface hover:bg-surface-2 p-4 border-b border-border last:border-b-0 group transition-all"
                   >
                     <ImageWithFallback

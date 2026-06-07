@@ -439,7 +439,7 @@ const CinemaDetail = () => {
                     <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
                       {/* Poster */}
                       <Link
-                        to={`/films/${film?.mubi_slug || film?.id}`}
+                        to={`/films/${film?.slug || film?.id}`}
                         className="sm:w-32 lg:w-40 flex-shrink-0 relative overflow-hidden"
                       >
                         {film?.poster_url ? (
@@ -461,7 +461,7 @@ const CinemaDetail = () => {
                         <div className="flex items-start justify-between gap-4 mb-4">
                           <div>
                             <Link
-                              to={`/films/${film?.mubi_slug || film?.id}`}
+                              to={`/films/${film?.slug || film?.id}`}
                               className="text-text-primary font-bold text-xl uppercase tracking-tighter group-hover:text-brand transition-colors"
                             >
                               {film?.title}

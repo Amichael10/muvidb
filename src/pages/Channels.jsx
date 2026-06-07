@@ -30,7 +30,7 @@ const CATEGORY_LABELS = {
 function ChannelCard({ channel }) {
   return (
     <Link
-      to={`/channels/${channel.mubi_slug || channel.id}`}
+      to={`/channels/${channel.slug || channel.id}`}
       className="group block bg-surface rounded-lg overflow-hidden border border-border hover:border-brand transition-all duration-500 shadow-sm"
     >
       {/* Banner */}

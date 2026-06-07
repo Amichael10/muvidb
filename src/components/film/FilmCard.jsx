@@ -62,7 +62,7 @@ export default function FilmCard({
     return (
       <div className="relative flex flex-col gap-2 w-72 sm:w-80 group">
         <Link 
-          to={`/films/${film.mubi_slug || film.id}`}
+          to={`/films/${film.slug || film.id}`}
           title={film.title}
           className="relative block aspect-video w-full rounded-2xl overflow-hidden bg-surface-2/60 border border-white/5 group-hover:border-brand/40 shadow-xl group-hover:shadow-2xl group-hover:shadow-brand/5 transition-all duration-500 z-0 hover:z-10"
         >
@@ -105,7 +105,7 @@ export default function FilmCard({
         {/* Info below image */}
         <div className="flex flex-col text-left px-1 mt-1">
           <Link 
-            to={`/films/${film.mubi_slug || film.id}`}
+            to={`/films/${film.slug || film.id}`}
             className="font-bold text-text-primary text-sm tracking-tight leading-snug group-hover:text-brand transition-colors line-clamp-1"
             title={film.title}
           >
@@ -168,7 +168,7 @@ export default function FilmCard({
   return (
     <div className="relative flex flex-col gap-3">
       <Link 
-        to={`/films/${film.mubi_slug || film.id}`}
+        to={`/films/${film.slug || film.id}`}
         title={film.title}
         className={`relative block rounded-xl overflow-hidden group transition-all duration-500 hover:shadow-2xl z-0 hover:z-10 bg-surface-2/60 ${sizeClasses[size]}`}
         onMouseEnter={() => setIsHovered(true)}

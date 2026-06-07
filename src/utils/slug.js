@@ -1,5 +1,5 @@
 /**
- * Slug utilities for Ensembla URL routing.
+ * Slug utilities for MuviDB URL routing.
  * Allows detail pages to accept both slugs (new) and UUIDs (legacy backwards compat).
  */
 
@@ -23,5 +23,5 @@ export const slugOrId = (param) => {
   if (!param) return { col: 'id', val: null };
   return isUuid(param)
     ? { col: 'id', val: param }
-    : { col: 'mubi_slug', val: param };
+    : { col: 'slug', val: param };
 };

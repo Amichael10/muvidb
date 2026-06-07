@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import WatchOptions from './WatchOptions';
@@ -180,7 +180,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 {/* Buttons */}
                 <div className="flex flex-wrap items-center gap-4">
                   <WatchOptions film={featuredFilm} />
-                  <Link to={`/films/${featuredFilm.mubi_slug || featuredFilm.id}`} className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-xl font-bold text-[10px] tracking-widest hover:bg-white hover:text-black transition-all duration-500 active:scale-95 shadow-xl">
+                  <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-xl font-bold text-[10px] tracking-widest hover:bg-white hover:text-black transition-all duration-500 active:scale-95 shadow-xl">
                     <Icon icon="solar:info-circle-linear" width="16" />
                     More Info
                   </Link>
@@ -194,7 +194,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
                 className="hidden lg:block relative group cursor-pointer"
               >
-                <Link to={`/films/${featuredFilm.mubi_slug || featuredFilm.id}`} className="block relative">
+                <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="block relative">
                   <div className="absolute inset-0 bg-brand rounded-2xl blur-2xl opacity-0 group-hover:opacity-20 transition-opacity duration-700"></div>
                   <ImageWithFallback 
                     src={featuredFilm.poster_url || featuredFilm.poster} 

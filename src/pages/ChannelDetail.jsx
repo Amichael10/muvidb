@@ -252,7 +252,7 @@ export default function ChannelDetail() {
       if (ch.owner_person_id) {
         const { data: p } = await supabase
           .from('people')
-          .select('id, name, photo_url, known_for_department, mubi_slug')
+          .select('id, name, photo_url, known_for_department, slug')
           .eq('id', ch.owner_person_id)
           .single();
         setOwner(p);
@@ -441,7 +441,7 @@ export default function ChannelDetail() {
             {owner && (
               <div className="p-8">
                 <h3 className="text-text-muted text-xs font-bold mb-6">Owner</h3>
-                <Link to={`/people/${owner.mubi_slug || owner.id}`} className="group flex flex-col items-center text-center p-6 bg-surface-2/20 rounded-xl border border-border hover:border-brand transition-all duration-300">
+                <Link to={`/people/${owner.slug || owner.id}`} className="group flex flex-col items-center text-center p-6 bg-surface-2/20 rounded-xl border border-border hover:border-brand transition-all duration-300">
                   {owner.photo_url ? (
                     <img src={owner.photo_url} alt={owner.name}
                       className="w-20 h-20 rounded-xl object-cover border border-border mb-4 group-hover:scale-105 transition-transform" />

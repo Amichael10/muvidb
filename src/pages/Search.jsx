@@ -214,7 +214,7 @@ export default function Search() {
                 companies.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {companies.map(company => (
-                      <Link key={company.id} to={`/companies/${company.mubi_slug || company.id}`} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
+                      <Link key={company.id} to={`/companies/${company.slug || company.id}`} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
                         <div className="w-14 h-14 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-heading font-bold text-xl shrink-0 group-hover:scale-110 transition-transform border border-border/50">
                            {company.logo_url ? <img src={company.logo_url} className="w-full h-full object-contain p-2" /> : company.name.charAt(0)}
                         </div>

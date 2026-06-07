@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
@@ -159,7 +159,7 @@ const PersonDetail = () => {
           id, role, character_name, billing_order,
           films(
             id, title, year, poster_url, trailer_youtube_id,
-            view_count, average_rating, mubi_slug,
+            view_count, average_rating, slug,
             release_type, trailer_youtube_id,
             film_genres(genres(name))
           )
@@ -337,7 +337,7 @@ const PersonDetail = () => {
     if (!user) {
       navigate('/login', {
         state: {
-          from: `/people/${person?.mubi_slug || person?.id || slug}`,
+          from: `/people/${person?.slug || person?.id || slug}`,
           message: 'Sign in to follow filmmakers'
         }
       })
@@ -606,7 +606,7 @@ const PersonDetail = () => {
                 const poster = film?.poster_url || video?.thumbnail_url
                 const link = video 
                   ? `https://www.youtube.com/watch?v=${video.video_id}` 
-                  : `/films/${film?.mubi_slug || film?.id}`
+                  : `/films/${film?.slug || film?.id}`
                 const isExternal = !!video
 
                 return (
@@ -671,7 +671,7 @@ const PersonDetail = () => {
             </h2>
 
             <Link
-              to={`/channels/${channel.mubi_slug || channel.id}`}
+              to={`/channels/${channel.slug || channel.id}`}
               className="relative z-10 group flex flex-col sm:flex-row items-center gap-8 bg-surface rounded-xl border border-border hover:border-brand transition-all duration-500 overflow-hidden shadow-sm p-8 max-w-3xl"
             >
               <div className="relative shrink-0">

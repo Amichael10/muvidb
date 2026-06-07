@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -9,7 +9,7 @@ const CompanyCard = ({ company, filmCount }) => {
 
   return (
     <Link
-      to={`/companies/${company.mubi_slug || company.id}`}
+      to={`/companies/${company.slug || company.id}`}
       className="group block bg-surface rounded-xl overflow-hidden border border-border hover:border-brand transition-all shadow-sm"
     >
       <div className="p-6">

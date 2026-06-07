@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -379,7 +379,8 @@ export default function AdminPeople() {
         photo_url: formData.photo_url || null,
         popularity_score: parseInt(formData.popularity_score) || 0,
         tmdb_id: formData.tmdb_id || null,
-        mubi_slug: formData.mubi_slug || (formData.name ? formData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '') + '-' + Math.random().toString(36).substring(2, 6) : null),
+        slug: formData.slug || (formData.name ? formData.name.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
+        mubi_slug: formData.mubi_slug || formData.slug || (formData.name ? formData.name.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         youtube_channel_id,
         youtube_handle,
         youtube_stats,

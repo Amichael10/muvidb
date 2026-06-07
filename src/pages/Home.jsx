@@ -567,7 +567,7 @@ export default function Home() {
                   crewMembers.map((crew) => (
                     <Link 
                       key={crew.id}
-                      to={`/people/${crew.mubi_slug || crew.id}`}
+                      to={`/people/${crew.slug || crew.id}`}
                       className="shrink-0 w-44 bg-surface border border-border hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
                     >
                       <div className="relative">
@@ -633,7 +633,7 @@ export default function Home() {
                     return (
                       <Link 
                         key={company.id}
-                        to={`/companies/${company.mubi_slug || company.id}`}
+                        to={`/companies/${company.slug || company.id}`}
                         className="shrink-0 w-64 bg-surface border border-border hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">
@@ -805,7 +805,7 @@ export default function Home() {
                         Spotlight
                       </span>
                       <Link 
-                        to={`/people/${spotlightContent.people.mubi_slug || spotlightContent.people.id}`}
+                        to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
                         className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter mb-4 block hover:text-brand transition-colors"
                       >
                         {spotlightContent.people.name}
@@ -815,7 +815,7 @@ export default function Home() {
                       </p>
                       <div>
                         <Link 
-                          to={`/people/${spotlightContent.people.mubi_slug || spotlightContent.people.id}`}
+                          to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
                           className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface-2 hover:bg-brand/10 hover:text-brand border border-border rounded-lg text-[10px] font-black uppercase tracking-widest text-text-primary transition-all"
                         >
                           Explore More
