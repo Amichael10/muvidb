@@ -8,12 +8,12 @@ scripts/
 node_modules/
 dist/
 
-# Ignore big media assets
-*.mp4
-*.png
-*.jpg
-*.jpeg
-*.gif
+# Ignore big media assets at root level only (NOT inside public/)
+/*.mp4
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
 
 # Ignore root-level scripts only (with leading slash)
 /*.js
