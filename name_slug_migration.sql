@@ -6,13 +6,24 @@
 -- New records will auto-generate slugs via triggers.
 -- ============================================================
 
--- Step 1: Ensure slug columns exist (idempotent)
-ALTER TABLE films     ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;
-ALTER TABLE people    ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;
-ALTER TABLE channels  ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;
-ALTER TABLE companies ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;
+-- Step 1: Temporarily drop unique constraints and indexes to allow backfill and deduplication
+ALTER TABLE films     DROP CONSTRAINT IF EXISTS films_slug_key;
+ALTER TABLE people    DROP CONSTRAINT IF EXISTS people_slug_key;
+ALTER TABLE channels  DROP CONSTRAINT IF EXISTS channels_slug_key;
+ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_slug_key;
 
--- Step 2: Slug generation helper (idempotent)
+DROP INDEX IF EXISTS idx_films_slug;
+DROP INDEX IF EXISTS idx_people_slug;
+DROP INDEX IF EXISTS idx_channels_slug;
+DROP INDEX IF EXISTS idx_companies_slug;
+
+-- Step 2: Ensure slug columns exist (without UNIQUE constraint first)
+ALTER TABLE films     ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE people    ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE channels  ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS slug TEXT;
+
+-- Step 3: Slug generation helper (idempotent)
 CREATE OR REPLACE FUNCTION generate_slug(input TEXT) RETURNS TEXT AS $$
 BEGIN
   RETURN TRIM(
@@ -30,7 +41,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
--- Step 3: Backfill films — use title as slug, fallback to mubi_slug
+-- Step 4: Backfill films — use title as slug, fallback to mubi_slug
 UPDATE films
 SET slug = generate_slug(title)
 WHERE slug IS NULL OR slug = '';
@@ -57,7 +68,7 @@ BEGIN
 END;
 $$;
 
--- Step 4: Backfill people — use name as slug
+-- Step 5: Backfill people — use name as slug
 UPDATE people
 SET slug = generate_slug(name)
 WHERE slug IS NULL OR slug = '';
@@ -84,7 +95,7 @@ BEGIN
 END;
 $$;
 
--- Step 5: Backfill channels
+-- Step 6: Backfill channels
 UPDATE channels
 SET slug = generate_slug(
   COALESCE(
@@ -116,7 +127,7 @@ BEGIN
 END;
 $$;
 
--- Step 6: Backfill companies
+-- Step 7: Backfill companies
 UPDATE companies
 SET slug = generate_slug(name)
 WHERE slug IS NULL OR slug = '';
@@ -143,13 +154,19 @@ BEGIN
 END;
 $$;
 
--- Step 7: Indexes
+-- Step 8: Apply UNIQUE constraints now that data is clean
+ALTER TABLE films     ADD CONSTRAINT films_slug_key UNIQUE (slug);
+ALTER TABLE people    ADD CONSTRAINT people_slug_key UNIQUE (slug);
+ALTER TABLE channels  ADD CONSTRAINT channels_slug_key UNIQUE (slug);
+ALTER TABLE companies ADD CONSTRAINT companies_slug_key UNIQUE (slug);
+
+-- Step 9: Create indexes
 CREATE INDEX IF NOT EXISTS idx_films_slug     ON films(slug);
 CREATE INDEX IF NOT EXISTS idx_people_slug    ON people(slug);
 CREATE INDEX IF NOT EXISTS idx_channels_slug  ON channels(slug);
 CREATE INDEX IF NOT EXISTS idx_companies_slug ON companies(slug);
 
--- Step 8: Auto-generate slug on INSERT
+-- Step 10: Auto-generate slug on INSERT
 CREATE OR REPLACE FUNCTION auto_slug_films() RETURNS TRIGGER AS $$
 DECLARE
   base TEXT;
@@ -235,14 +252,3 @@ CREATE TRIGGER trg_films_slug     BEFORE INSERT OR UPDATE OF title ON films     
 CREATE TRIGGER trg_people_slug    BEFORE INSERT OR UPDATE OF name  ON people    FOR EACH ROW EXECUTE FUNCTION auto_slug_people();
 CREATE TRIGGER trg_channels_slug  BEFORE INSERT ON channels  FOR EACH ROW EXECUTE FUNCTION auto_slug_channels();
 CREATE TRIGGER trg_companies_slug BEFORE INSERT ON companies FOR EACH ROW EXECUTE FUNCTION auto_slug_companies();
-
--- ============================================================
--- Verification (uncomment to check after running)
--- ============================================================
--- SELECT COUNT(*), COUNT(slug), COUNT(*) - COUNT(slug) AS missing FROM films;
--- SELECT COUNT(*), COUNT(slug), COUNT(*) - COUNT(slug) AS missing FROM people;
--- SELECT COUNT(*), COUNT(slug), COUNT(*) - COUNT(slug) AS missing FROM channels;
--- SELECT COUNT(*), COUNT(slug), COUNT(*) - COUNT(slug) AS missing FROM companies;
--- Sample check:
--- SELECT id, title, slug FROM films ORDER BY created_at DESC LIMIT 20;
--- SELECT id, name, slug FROM people ORDER BY created_at DESC LIMIT 20;
