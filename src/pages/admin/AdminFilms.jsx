@@ -1104,6 +1104,7 @@ export default function AdminFilms() {
             <option value="prime_video">Prime Video</option>
             <option value="kava">Kava</option>
             <option value="iroko_tv">IrokoTV</option>
+            <option value="docuth">Docuth</option>
           </select>
 
           <select
@@ -1118,6 +1119,7 @@ export default function AdminFilms() {
             <option value="kava">Kava Sync</option>
             <option value="irokotv">IrokoTV Sync</option>
             <option value="youtube">YouTube Sync</option>
+            <option value="docuth_sync">Docuth Sync</option>
           </select>
           
           <select
@@ -1268,7 +1270,12 @@ export default function AdminFilms() {
                             <Icon icon="solar:play-bold" className="w-4 h-4" />
                           </a>
                         )}
-                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && (
+                        {film.streaming_links?.docuth && (
+                          <a href={film.streaming_links.docuth} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-900 text-white hover:bg-black transition-all shadow-sm" title="Docuth Link">
+                            <Icon icon="solar:play-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && (
                           <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
                         )}
                       </div>
@@ -1877,7 +1884,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -1964,6 +1971,7 @@ export default function AdminFilms() {
                       { id: 'kava', label: 'Kava', placeholder: 'https://kava.tv/...' },
                       { id: 'youtube', label: 'YouTube (Full Movie)', placeholder: 'https://youtube.com/watch?v=...' },
                       { id: 'showmax', label: 'Showmax', placeholder: 'https://showmax.com/...' },
+                      { id: 'docuth', label: 'Docuth', placeholder: 'https://web.docuth.com/movies/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;

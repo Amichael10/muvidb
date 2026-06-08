@@ -12,6 +12,7 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
     youtube: 'https://youtube.com',
     showmax: 'https://showmax.com',
     ironflix: 'https://ironflix.com',
+    docuth: 'https://web.docuth.com',
   };
 
   const platforms = [
@@ -21,6 +22,7 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
     { id: 'ironflix', label: 'Ironflix', color: 'bg-[#D32F2F]', icon: 'solar:play-bold' },
     { id: 'youtube', label: 'YouTube', color: 'bg-[#FF0000]', icon: 'simple-icons:youtube' },
     { id: 'showmax', label: 'Showmax', color: 'bg-[#E10098]', icon: 'solar:tv-linear' },
+    { id: 'docuth', label: 'Docuth', color: 'bg-[#0F0F10]', icon: 'solar:play-bold' },
   ];
 
   const availableLinks = platforms.map(p => {

@@ -13,6 +13,7 @@
     "scrape:netflix": "tsx scripts/netflix_sync.ts",
     "scrape:prime": "tsx scripts/prime_sync.ts",
     "scrape:mubi": "tsx scripts/mubi_playwright.ts",
+    "scrape:docuth": "tsx scripts/docuth_sync.ts",
     "sync:kava": "tsx scripts/sync-kava.ts"
   },
   "dependencies": {
