@@ -1,4 +1,4 @@
-﻿import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../ui/ImageWithFallback';
@@ -151,7 +151,8 @@ export default function FilmCard({
       prime_video: { icon: 'simple-icons:primevideo', color: 'text-[#00A8E1]', label: 'Watch on Prime Video' },
       kava: { icon: 'solar:play-circle-bold', color: 'text-[#FF5C00]', label: 'Watch on Kava' },
       ironflix: { icon: 'solar:play-bold', color: 'text-[#D32F2F]', label: 'Watch on Ironflix' },
-      showmax: { icon: 'solar:tv-linear', color: 'text-[#E10098]', label: 'Watch on Showmax' }
+      showmax: { icon: 'solar:tv-linear', color: 'text-[#E10098]', label: 'Watch on Showmax' },
+      docuth: { icon: 'solar:play-bold', color: 'text-zinc-200', label: 'Watch on Docuth' }
     };
     
     Object.keys(platformMap).forEach(key => {

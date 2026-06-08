@@ -25,6 +25,7 @@ on:
           - kava
           - iroko
           - filmflux
+          - docuth
           - ai_maintenance
           - credits_enrichment
 
@@ -104,6 +105,20 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Sync Docuth (10 AM Local)
+        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'docuth'))
+        run: |
+          echo "Syncing Docuth (Local Playwright Script)..."
+          npx tsx scripts/docuth_sync.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SMARTPROXY_USER: ${{ secrets.SMARTPROXY_USER }}
+          SMARTPROXY_PASS: ${{ secrets.SMARTPROXY_PASS }}
+          SMARTPROXY_HOST: ${{ secrets.SMARTPROXY_HOST }}
+          SMARTPROXY_PORT: ${{ secrets.SMARTPROXY_PORT }}
 
       - name: Harvest Filmflux (Daily)
         if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'filmflux'))

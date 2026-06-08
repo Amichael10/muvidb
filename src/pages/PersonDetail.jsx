@@ -23,6 +23,7 @@ const PLATFORM_STYLES = {
   showmax:  { label: 'Showmax',  bg: 'bg-purple-500/20',  text: 'text-purple-400',  dot: 'bg-purple-400' },
   iroko:    { label: 'iROKO',    bg: 'bg-green-500/20',   text: 'text-green-400',   dot: 'bg-green-400'  },
   kava:     { label: 'Kava',     bg: 'bg-orange-500/20',  text: 'text-orange-400',  dot: 'bg-orange-400' },
+  docuth:   { label: 'Docuth',   bg: 'bg-zinc-800/40',    text: 'text-zinc-200',    dot: 'bg-zinc-400'   },
 }
 
 function PlatformBadge({ releaseType }) {

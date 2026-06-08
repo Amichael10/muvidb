@@ -240,7 +240,7 @@ function EditFilmModal({ film, onSave, onClose }) {
               <label className="block text-text-muted text-[10px] font-bold mb-3 px-1">Category</label>
               <div className="relative">
                 <select name="release_type" value={form.release_type} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-5 h-14 text-text-primary text-[11px] font-bold focus:border-brand/50 outline-none appearance-none cursor-pointer">
-                  {['youtube','cinema','netflix','amazon','showmax','iroko','kava'].map(v => <option key={v} value={v}>{v}</option>)}
+                  {['youtube','cinema','netflix','amazon','showmax','iroko','kava','docuth'].map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
                 <span className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">↓</span>
               </div>

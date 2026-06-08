@@ -44,3 +44,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SMARTPROXY_USER: ${{ secrets.SMARTPROXY_USER }}
+          SMARTPROXY_PASS: ${{ secrets.SMARTPROXY_PASS }}
+          SMARTPROXY_HOST: ${{ secrets.SMARTPROXY_HOST }}
+          SMARTPROXY_PORT: ${{ secrets.SMARTPROXY_PORT }}
