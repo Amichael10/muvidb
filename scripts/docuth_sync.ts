@@ -133,98 +133,112 @@ async function scrapeDocuth() {
 
         // 5. Extract Synopsis / Story Description
         let synopsis = '';
-        const pTags = Array.from(document.querySelectorAll('p'));
-        for (const p of pTags) {
-          const txt = p.textContent?.trim() || '';
-          if (txt.length > 30 && !txt.includes('Starring') && !txt.includes('PG-') && !txt.includes('Copyright')) {
-            synopsis = txt;
-            break;
+        const starringElForSyn = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div'))
+          .find(el => el.textContent?.trim() === 'Starring');
+        if (starringElForSyn) {
+          let prev = starringElForSyn.previousElementSibling;
+          while (prev) {
+            const txt = prev.textContent?.trim() || '';
+            if (txt.length > 20 && !/starring|pg-|copyright|scan|qr|download|app store/i.test(txt)) {
+              synopsis = txt;
+              break;
+            }
+            prev = prev.previousElementSibling;
           }
         }
         if (!synopsis) {
-          const starringHeader = Array.from(document.querySelectorAll('h5, h6, p')).find(el => el.textContent?.includes('Starring'));
-          if (starringHeader) {
-            let prev = starringHeader.previousElementSibling;
-            while (prev) {
-              const txt = prev.textContent?.trim() || '';
-              if (txt.length > 20 && !txt.includes('PG-') && !txt.includes('202')) {
-                synopsis = txt;
-                break;
-              }
-              prev = prev.previousElementSibling;
+          const pTags = Array.from(document.querySelectorAll('p'));
+          for (const p of pTags) {
+            const txt = p.textContent?.trim() || '';
+            if (
+              txt.length > 30 &&
+              !/starring|pg-|copyright|scan|qr|download|app store/i.test(txt)
+            ) {
+              synopsis = txt;
+              break;
             }
           }
         }
 
         // 6. Extract Genres
         const genres: string[] = [];
-        const ratingEl = Array.from(document.querySelectorAll('span, p, h6')).find(el => /^(G|PG|PG-13|R|13\+|16\+|18\+)$/i.test(el.textContent?.trim() || ''));
-        if (ratingEl) {
-          let sib = ratingEl.nextElementSibling;
-          while (sib && genres.length < 5) {
-            const txt = sib.textContent?.trim() || '';
-            if (txt && !txt.includes('•') && txt.length < 20) {
-              genres.push(txt);
+        const genreWords = ['Action', 'Drama', 'Comedy', 'Thriller', 'Romance', 'Documentary', 'Horror', 'Adventure', 'Sci-Fi', 'Fantasy', 'Crime', 'Family', 'Mystery', 'Biography', 'History', 'Yoruba', 'Nollywood'];
+        const allLeafs = Array.from(document.querySelectorAll('span, p, a, div, h5, h6'));
+        for (const el of allLeafs) {
+          if (el.children.length === 0) {
+            const txt = el.textContent?.trim() || '';
+            const matchedWord = genreWords.find(g => g.toLowerCase() === txt.toLowerCase());
+            if (matchedWord && !genres.includes(matchedWord)) {
+              genres.push(matchedWord);
             }
-            sib = sib.nextElementSibling;
           }
         }
-        if (genres.length === 0) {
-          const genreWords = ['Action', 'Drama', 'Comedy', 'Thriller', 'Romance', 'Documentary', 'Horror', 'Adventure', 'Sci-Fi', 'Fantasy', 'Crime', 'Family', 'Mystery', 'Biography', 'History'];
-          const spans = Array.from(document.querySelectorAll('span'));
-          spans.forEach(span => {
-            const txt = span.textContent?.trim() || '';
-            if (genreWords.includes(txt) && !genres.includes(txt)) {
-              genres.push(txt);
-            }
-          });
-        }
 
-        // 7. Extract Cast Members
-        const cast: string[] = [];
+        // 7. Extract Cast Members (with Roles)
+        const cast: { name: string; role: string }[] = [];
         const starringEl = Array.from(document.querySelectorAll('h5, h6, p, div')).find(el => el.textContent?.trim() === 'Starring');
         if (starringEl) {
+          const container = starringEl.nextElementSibling;
+          if (container) {
+            const cards = Array.from(container.children);
+            for (const card of cards) {
+              const textNodes = Array.from(card.querySelectorAll('p, span, h6, div, a'))
+                .filter(el => el.children.length === 0)
+                .map(el => el.textContent?.trim() || '')
+                .filter(Boolean);
+              
+              if (textNodes.length > 0) {
+                const name = textNodes[0];
+                const role = textNodes.length > 1 ? textNodes[1] : '';
+                if (name && !/starring|director|cast/i.test(name) && !cast.some(c => c.name === name)) {
+                  cast.push({ name, role });
+                }
+              }
+            }
+          }
+        }
+        if (cast.length === 0 && starringEl) {
           const next = starringEl.nextElementSibling;
           if (next) {
-            const castLinks = next.querySelectorAll('a, p, span');
-            if (castLinks.length > 0) {
-              castLinks.forEach(c => {
-                const txt = c.textContent?.trim() || '';
-                if (txt && txt.length > 2 && txt.length < 50 && !cast.includes(txt) && !txt.includes('Starring')) {
-                  cast.push(txt);
+            const txt = next.textContent?.trim() || '';
+            if (txt) {
+              txt.split(',').forEach(s => {
+                const parts = s.split(/\s+as\s+/i);
+                const name = parts[0].trim();
+                const role = parts.length > 1 ? parts[1].trim() : '';
+                if (name && !/starring/i.test(name)) {
+                  cast.push({ name, role });
                 }
               });
-            } else {
-              const txt = next.textContent?.trim() || '';
-              if (txt) {
-                txt.split(',').forEach(s => {
-                  const cleaned = s.trim();
-                  if (cleaned) cast.push(cleaned);
-                });
-              }
             }
           }
         }
 
         // 8. Extract Banner / Poster Image
-        let poster_url = null;
-        const divs = Array.from(document.querySelectorAll('div'));
-        for (const div of divs) {
-          const bg = window.getComputedStyle(div).backgroundImage;
-          if (bg && bg !== 'none' && bg.startsWith('url(')) {
-            const cleanBg = bg.replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
-            if (cleanBg.includes('http') || cleanBg.includes('supabase.co') || cleanBg.includes('docuth')) {
-              poster_url = cleanBg;
-              break;
+        const poster_url = (() => {
+          const ogImg = document.querySelector('meta[property="og:image"]')?.getAttribute('content');
+          if (ogImg && !/logo|icon|qr/i.test(ogImg) && ogImg.includes('http')) {
+            return ogImg;
+          }
+          const divs = Array.from(document.querySelectorAll('div'));
+          for (const div of divs) {
+            const bg = window.getComputedStyle(div).backgroundImage;
+            if (bg && bg !== 'none' && bg.startsWith('url(')) {
+              const cleanBg = bg.replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
+              if (cleanBg.includes('http') && !/logo|icon|avatar|user|qr|profile/i.test(cleanBg)) {
+                return cleanBg;
+              }
             }
           }
-        }
-        if (!poster_url) {
-          const img = document.querySelector('img[src*="poster"], img[src*="cover"], img[src*="banner"], img');
-          if (img) {
-            poster_url = (img as HTMLImageElement).src;
+          const imgs = Array.from(document.querySelectorAll('img'));
+          for (const img of imgs) {
+            const src = img.src;
+            if (src && !/logo|icon|avatar|user|qr|profile/i.test(src) && src.includes('http')) {
+              return src;
+            }
           }
-        }
+          return null;
+        })();
 
         return {
           title,
@@ -407,13 +421,14 @@ async function syncToDatabase(movies: any[]) {
 
       // 4. Sync Cast
       if (filmId && movie.cast && movie.cast.length > 0) {
-        for (const actorName of movie.cast) {
-          const personId = await upsertPerson(actorName);
+        for (const actor of movie.cast) {
+          const personId = await upsertPerson(actor.name);
           if (personId) {
             await supabase.from('credits').upsert({
               film_id: filmId,
               person_id: personId,
-              role: 'actor'
+              role: 'actor',
+              character_name: actor.role || null
             }, { onConflict: 'film_id,person_id,role' });
           }
         }
