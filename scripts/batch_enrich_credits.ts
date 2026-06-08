@@ -1,5 +1,4 @@
-import dns from 'dns';
-dns.setDefaultResultOrder('ipv4first');
+import * as dns from 'dns';dns.setDefaultResultOrder('ipv4first');
 
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
@@ -283,189 +282,208 @@ async function runCastExtractor(url: string, timeoutMs: number = 600000): Promis
 // ─── Main Pipeline Loop ───────────────────────────────────────────────────────
 
 async function main() {
-  const startTime = Date.now();
   console.log('🚀 Starting Hybrid Credit Enrichment (TMDB + AI Vision Fallback)...\n');
+  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+  const targetUrlArg = process.argv[2]?.trim();
 
-  // 1. Create a "running" log entry
-  const { data: logEntry } = await supabase.from('sync_logs').insert({
-    source: 'cast_vision_sync',
-    status: 'running',
-    message: 'Starting batch credit enrichment (TMDB & OCR Tesseract)...',
-    details: { started_at: new Date().toISOString() }
-  }).select().single();
-  
-  const logId = logEntry?.id;
-  const runReport: any[] = [];
+  while (true) {
+    const startTime = Date.now();
+    
+    // 1. Create a "running" log entry
+    const { data: logEntry } = await supabase.from('sync_logs').insert({
+      source: 'cast_vision_sync',
+      status: 'running',
+      message: `Starting batch credit enrichment (TMDB & OCR Tesseract)...${targetUrlArg ? ' Target: ' + targetUrlArg : ''}`,
+      details: { started_at: new Date().toISOString() }
+    }).select().single();
+    
+    const logId = logEntry?.id;
+    const runReport: any[] = [];
 
-  try {
-    const targetUrlArg = process.argv[2]?.trim();
-    let films: any[] = [];
-    if (targetUrlArg) {
-      console.log(`🎯 Targeting specific URL from command line: ${targetUrlArg}`);
-      let videoId = '';
-      if (targetUrlArg.includes('v=')) {
-        videoId = targetUrlArg.split('v=')[1]?.split('&')[0];
-      } else if (targetUrlArg.includes('youtu.be/')) {
-        videoId = targetUrlArg.split('youtu.be/')[1]?.split('?')[0];
-      }
-      
-      let query = supabase
-        .from('films')
-        .select('id, title, youtube_watch_url, year');
+    try {
+      let films: any[] = [];
+      if (targetUrlArg) {
+        console.log(`🎯 Targeting specific URL from command line: ${targetUrlArg}`);
+        let videoId = '';
+        if (targetUrlArg.includes('v=')) {
+          videoId = targetUrlArg.split('v=')[1]?.split('&')[0];
+        } else if (targetUrlArg.includes('youtu.be/')) {
+          videoId = targetUrlArg.split('youtu.be/')[1]?.split('?')[0];
+        }
         
-      if (videoId) {
-        query = query.or(`youtube_watch_url.eq.${targetUrlArg},source_video_id.eq.${videoId}`);
+        let query = supabase
+          .from('films')
+          .select('id, title, youtube_watch_url, year');
+          
+        if (videoId) {
+          query = query.or(`youtube_watch_url.eq.${targetUrlArg},source_video_id.eq.${videoId}`);
+        } else {
+          query = query.eq('youtube_watch_url', targetUrlArg);
+        }
+        
+        const { data, error } = await query;
+        if (error) {
+          console.error('❌ Error fetching target film:', error.message);
+          if (logId) {
+            await supabase.from('sync_logs').update({
+              status: 'error',
+              message: `Database query failed: ${error.message}`,
+              duration_ms: Date.now() - startTime
+            }).eq('id', logId);
+          }
+          break; // Exit loop on specific target error
+        }
+        films = data || [];
       } else {
-        query = query.eq('youtube_watch_url', targetUrlArg);
+        console.log('📦 Fetching YouTube films from database with credit counts...');
+        const { data, error } = await supabase
+          .from('films')
+          .select('id, title, youtube_watch_url, year, credits(count)')
+          .eq('source', 'youtube')
+          .not('youtube_watch_url', 'is', null)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Error fetching films:', error.message);
+          if (logId) {
+            await supabase.from('sync_logs').update({
+              status: 'error',
+              message: `Database query failed: ${error.message}`,
+              duration_ms: Date.now() - startTime
+            }).eq('id', logId);
+          }
+          console.log('⏳ Error fetching from DB. Retrying in 1 minute...');
+          await delay(60000);
+          continue;
+        }
+        films = data || [];
       }
+
+      const targets = targetUrlArg 
+        ? films 
+        : films.filter(f => {
+            const count = (f.credits as any)?.[0]?.count ?? 0;
+            return count <= 10;
+          });
       
-      const { data, error } = await query;
-      if (error) {
-        console.error('❌ Error fetching target film:', error.message);
+      console.log(`\n📝 Found ${targets.length} candidates needing credit enrichment.`);
+
+      if (targets.length === 0) {
+        console.log('✅ No films need enrichment at this time.');
         if (logId) {
           await supabase.from('sync_logs').update({
-            status: 'error',
-            message: `Database query failed: ${error.message}`,
+            status: 'success',
+            message: 'No films need enrichment at this time.',
+            details: { completed_at: new Date().toISOString(), total_processed: 0 },
             duration_ms: Date.now() - startTime
           }).eq('id', logId);
         }
-        return;
+        if (targetUrlArg) break; // End if specific target was done
+        console.log('💤 Sleeping for 10 minutes before next batch check...');
+        await delay(10 * 60 * 1000);
+        continue;
       }
-      films = data || [];
-    } else {
-      console.log('📦 Fetching YouTube films from database with credit counts...');
-      const { data, error } = await supabase
-        .from('films')
-        .select('id, title, youtube_watch_url, year, credits(count)')
-        .eq('source', 'youtube')
-        .not('youtube_watch_url', 'is', null)
-        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('❌ Error fetching films:', error.message);
-        if (logId) {
-          await supabase.from('sync_logs').update({
-            status: 'error',
-            message: `Database query failed: ${error.message}`,
-            duration_ms: Date.now() - startTime
-          }).eq('id', logId);
+      const LIMIT = 25; 
+      const toProcess = targets.slice(0, LIMIT);
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < toProcess.length; i++) {
+        const film = toProcess[i];
+        console.log(`\n[${i + 1}/${toProcess.length}] 🎥 "${film.title}"`);
+        console.log(`🔗 URL: ${film.youtube_watch_url}`);
+        
+        let ocrSuccess = false;
+        const runMethod = 'OCR_Tesseract';
+        let runMessage = '';
+
+        console.log(`🚀 Starting AI Vision frame capture and OCR extraction...`);
+
+        let success = false;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          if (attempt > 1) console.log(`   🔄 Retry attempt ${attempt}...`);
+          success = await runCastExtractor(film.youtube_watch_url!);
+          if (success) break;
+          if (attempt < 2) await delay(5000);
         }
-        return;
-      }
-      films = data || [];
-    }
+        
+        ocrSuccess = success;
 
-    const targets = targetUrlArg 
-      ? films 
-      : films.filter(f => {
-          const count = (f.credits as any)?.[0]?.count ?? 0;
-          return count <= 10;
+        if (success) {
+          console.log(`✅ SUCCESS: Finished visual extraction for ${film.title}`);
+          successCount++;
+          runMessage = 'Credits successfully extracted from video frames via local Tesseract OCR';
+        } else {
+          console.log(`❌ FAILURE: Failed to process ${film.title} after all attempts.`);
+          failCount++;
+          runMessage = 'Failed to extract credits (no text detected or extraction failed)';
+          console.log(`\n⏳ Extra rate-limit recovery cooldown for 60s...`);
+          await delay(60000);
+        }
+
+        runReport.push({
+          film_id: film.id,
+          title: film.title,
+          status: ocrSuccess ? 'success' : 'failed',
+          method: runMethod,
+          message: runMessage
         });
-    console.log(`\n📝 Found ${targets.length} candidates needing credit enrichment.`);
 
-    if (targets.length === 0) {
-      console.log('✅ No films need enrichment at this time.');
+        if (i < toProcess.length - 1) {
+          const cooldown = process.env.SMARTPROXY_USER ? 3000 : 45000;
+          console.log(`\n⏳ Cooling down for ${cooldown / 1000}s...`);
+          await delay(cooldown);
+        }
+      }
+
+      console.log('\n==========================================');
+      console.log('🏁 Batch Processing Complete');
+      console.log(`✅ Successes: ${successCount}`);
+      console.log(`❌ Failures:  ${failCount}`);
+      console.log('==========================================\n');
+
       if (logId) {
         await supabase.from('sync_logs').update({
-          status: 'success',
-          message: 'No films need enrichment at this time.',
-          details: { completed_at: new Date().toISOString(), total_processed: 0 },
+          status: failCount === 0 ? 'success' : 'partial',
+          message: `Enrichment complete. Successfully synced ${successCount} films, failed ${failCount} films.`,
+          details: { 
+            completed_at: new Date().toISOString(),
+            total_processed: toProcess.length,
+            success_count: successCount,
+            failure_count: failCount,
+            runs: runReport
+          },
+          duration_ms: Date.now() - startTime,
+          items_processed: toProcess.length,
+          items_updated: successCount,
+          items_failed: failCount
+        }).eq('id', logId);
+      }
+
+      if (targetUrlArg) {
+        console.log('🎯 Specific target processed. Exiting.');
+        break;
+      }
+      
+      console.log('🔄 Moving to next batch in 30 seconds...');
+      await delay(30000);
+
+    } catch (err: any) {
+      console.error('💥 Critical Error in main loop:', err);
+      if (logId) {
+        await supabase.from('sync_logs').update({
+          status: 'error',
+          message: err.message,
+          details: { error: err.stack, runs: runReport },
           duration_ms: Date.now() - startTime
         }).eq('id', logId);
       }
-      return;
+      if (targetUrlArg) break;
+      console.log('⏳ Sleeping for 5 minutes after error before retrying...');
+      await delay(5 * 60 * 1000);
     }
-
-    const LIMIT = 25; 
-    const toProcess = targets.slice(0, LIMIT);
-    const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (let i = 0; i < toProcess.length; i++) {
-      const film = toProcess[i];
-      console.log(`\n[${i + 1}/${toProcess.length}] 🎥 "${film.title}"`);
-      console.log(`🔗 URL: ${film.youtube_watch_url}`);
-      
-      let ocrSuccess = false;
-      const runMethod = 'OCR_Tesseract';
-      let runMessage = '';
-
-      console.log(`🚀 Starting AI Vision frame capture and OCR extraction...`);
-
-      let success = false;
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        if (attempt > 1) console.log(`   🔄 Retry attempt ${attempt}...`);
-        success = await runCastExtractor(film.youtube_watch_url!);
-        if (success) break;
-        if (attempt < 2) await delay(5000);
-      }
-      
-      ocrSuccess = success;
-
-      if (success) {
-        console.log(`✅ SUCCESS: Finished visual extraction for ${film.title}`);
-        successCount++;
-        runMessage = 'Credits successfully extracted from video frames via local Tesseract OCR';
-      } else {
-        console.log(`❌ FAILURE: Failed to process ${film.title} after all attempts.`);
-        failCount++;
-        runMessage = 'Failed to extract credits (no text detected or extraction failed)';
-        console.log(`\n⏳ Extra rate-limit recovery cooldown for 60s...`);
-        await delay(60000);
-      }
-
-      runReport.push({
-        film_id: film.id,
-        title: film.title,
-        status: ocrSuccess ? 'success' : 'failed',
-        method: runMethod,
-        message: runMessage
-      });
-
-      if (i < toProcess.length - 1) {
-        const cooldown = process.env.SMARTPROXY_USER ? 3000 : 45000;
-        console.log(`\n⏳ Cooling down for ${cooldown / 1000}s...`);
-        await delay(cooldown);
-      }
-    }
-
-    console.log('\n==========================================');
-    console.log('🏁 Batch Processing Complete');
-    console.log(`✅ Successes: ${successCount}`);
-    console.log(`❌ Failures:  ${failCount}`);
-    console.log('==========================================\n');
-
-    if (logId) {
-      await supabase.from('sync_logs').update({
-        status: failCount === 0 ? 'success' : 'partial',
-        message: `Enrichment complete. Successfully synced ${successCount} films, failed ${failCount} films.`,
-        details: { 
-          completed_at: new Date().toISOString(),
-          total_processed: toProcess.length,
-          success_count: successCount,
-          failure_count: failCount,
-          runs: runReport
-        },
-        duration_ms: Date.now() - startTime,
-        items_processed: toProcess.length,
-        items_updated: successCount,
-        items_failed: failCount
-      }).eq('id', logId);
-    }
-
-  } catch (err: any) {
-    console.error('💥 Critical Error in main loop:', err);
-    if (logId) {
-      await supabase.from('sync_logs').update({
-        status: 'error',
-        message: err.message,
-        details: { error: err.stack, runs: runReport },
-        duration_ms: Date.now() - startTime
-      }).eq('id', logId);
-    }
-    throw err;
   }
 }
 

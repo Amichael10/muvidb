@@ -234,9 +234,9 @@ class LocalOCR:
         if PADDLE_AVAILABLE:
             last_err = None
             for args in [
-                {"use_angle_cls": True, "lang": "en", "show_log": False},
-                {"lang": "en", "show_log": False},
-                {"lang": "en"},
+                {"use_angle_cls": True, "lang": "en", "show_log": False, "enable_mkldnn": False},
+                {"lang": "en", "show_log": False, "enable_mkldnn": False},
+                {"lang": "en", "enable_mkldnn": False},
             ]:
                 try:
                     self.paddle_ocr = PaddleOCR(**args)
