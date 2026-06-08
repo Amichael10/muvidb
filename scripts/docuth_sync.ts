@@ -37,6 +37,28 @@ function parseDocuthDuration(durationStr: string | null): number | null {
   return total > 0 ? total : null;
 }
 
+async function safeGoto(page: any, url: string, options: any = {}, retries: number = 3) {
+  let attempt = 0;
+  while (attempt < retries) {
+    try {
+      if (attempt > 0) {
+        console.log(`🧭 Retrying navigation to: ${url} (Attempt ${attempt + 1}/${retries})...`);
+      }
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000, ...options });
+      return;
+    } catch (e: any) {
+      attempt++;
+      console.warn(`⚠️ Warning: Navigation to ${url} failed on attempt ${attempt}: ${e.message}`);
+      if (attempt >= retries) {
+        throw e;
+      }
+      const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+      console.log(`💤 Waiting ${Math.round(delay)}ms before retry...`);
+      await page.waitForTimeout(delay);
+    }
+  }
+}
+
 async function scrapeDocuth() {
   console.log('🚀 Launching browser...');
   
@@ -63,7 +85,7 @@ async function scrapeDocuth() {
   const page = await context.newPage();
 
   console.log(`🚀 Navigating to Docuth Home: ${DOCUTH_HOME_URL}`);
-  await page.goto(DOCUTH_HOME_URL, { waitUntil: 'networkidle', timeout: 60000 });
+  await safeGoto(page, DOCUTH_HOME_URL, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(3500); // Allow initial content to load
 
   console.log('📜 Scrolling to lazy-load all movies...');
@@ -89,7 +111,7 @@ async function scrapeDocuth() {
   for (const url of movieUrls) {
     console.log(`📄 Fetching details for: ${url}`);
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await safeGoto(page, url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForSelector('h4', { timeout: 10000 }).catch(() => null);
       await page.waitForTimeout(1500); // Allow dynamic contents to settle
 
