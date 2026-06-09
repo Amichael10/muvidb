@@ -1187,6 +1187,7 @@ export default function AdminFilms() {
                 </th>
                 <th className="px-6 py-4 font-bold">Production</th>
                 <th className="px-6 py-4 font-bold">Year</th>
+                <th className="px-6 py-4 font-bold">Country</th>
                 <th className="px-6 py-4 font-bold">Platforms</th>
                 <th className="px-6 py-4 font-bold">Source</th>
                 <th className="px-6 py-4 font-bold text-center">Status</th>
@@ -1235,6 +1236,19 @@ export default function AdminFilms() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-text-primary font-mono text-xs">{film.year || 'TBD'}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {film.countries && film.countries.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-w-[120px]">
+                          {film.countries.map(c => (
+                            <span key={c} className="px-1.5 py-0.5 rounded bg-surface-3 border border-border text-[9px] font-bold text-text-muted uppercase tracking-tighter whitespace-nowrap">
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-text-muted opacity-50">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -1333,7 +1347,7 @@ export default function AdminFilms() {
                 ))
               ) : (
                 youtubeVideos.length === 0 ? (
-                  <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">No unmapped YouTube signals found.</td></tr>
+                  <tr><td colSpan="6" className="p-20 text-center text-text-muted italic">No unmapped YouTube signals found.</td></tr>
                 ) : youtubeVideos.map((vid) => (
                   <tr key={vid.id} className="group hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 py-4">
@@ -1358,6 +1372,9 @@ export default function AdminFilms() {
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-brand/5 text-brand border-brand/20 uppercase tracking-tighter">
                         Unmapped Signal
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                       <span className="text-[10px] text-text-muted opacity-50">-</span>
                     </td>
                     <td className="px-6 py-4">
                        <div className="text-[10px] text-text-muted font-bold uppercase">{new Date(vid.published_at).toLocaleDateString()}</div>
