@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
@@ -11,6 +11,8 @@ export default function Browse() {
   const initialCountry = searchParams.get('country') || '';
   const initialSort = searchParams.get('sort') || 'views';
 
+  const initialPlatform = searchParams.get('platform') || '';
+
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [films, setFilms] = useState([]);
   const [dbGenres, setDbGenres] = useState([]);
@@ -21,6 +23,7 @@ export default function Browse() {
   // Filters state
   const [selectedGenres, setSelectedGenres] = useState(initialGenre ? [initialGenre] : []);
   const [selectedCountries, setSelectedCountries] = useState(initialCountry ? [initialCountry] : []);
+  const [selectedPlatform, setSelectedPlatform] = useState(initialPlatform);
   const [yearRange, setYearRange] = useState(2000);
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [language, setLanguage] = useState('');
@@ -34,7 +37,7 @@ export default function Browse() {
   useEffect(() => {
     setError(null);
     fetchFilms();
-  }, [selectedGenres, selectedCountries, yearRange, selectedRatings, language, sortBy]);
+  }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy]);
 
   const fetchGenres = async () => {
     try {
@@ -58,6 +61,7 @@ export default function Browse() {
       let query = supabase.from('films').select(`
         id, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating,
+        release_type, streaming_links, source,
         film_genres!left(genres(name)),
         film_countries!left(countries(name))
       `);
@@ -66,6 +70,7 @@ export default function Browse() {
          query = supabase.from('films').select(`
           id, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
+          release_type, streaming_links, source,
           film_genres!inner(genres!inner(name)),
           film_countries!inner(countries!inner(name))
         `);
@@ -75,6 +80,7 @@ export default function Browse() {
         query = supabase.from('films').select(`
           id, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
+          release_type, streaming_links, source,
           film_genres!inner(genres!inner(name)),
           film_countries!left(countries(name))
         `);
@@ -83,6 +89,7 @@ export default function Browse() {
         query = supabase.from('films').select(`
           id, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
+          release_type, streaming_links, source,
           film_genres!left(genres(name)),
           film_countries!inner(countries!inner(name))
         `);
@@ -111,11 +118,27 @@ export default function Browse() {
       
       if (dbError) throw dbError;
 
-      const transformed = (data || []).map(f => ({
+      let transformed = (data || []).map(f => ({
         ...f,
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [],
         countries: f.film_countries?.map(fc => fc.countries?.name).filter(Boolean) || []
       }));
+
+      // Filter by platform client-side to handle json checks easily
+      if (selectedPlatform) {
+        transformed = transformed.filter(f => {
+          if (f.release_type === selectedPlatform) return true;
+          if (selectedPlatform === 'youtube' && f.source === 'youtube') return true;
+          
+          let streamingLinks = {};
+          if (typeof f.streaming_links === 'string') {
+            try { streamingLinks = JSON.parse(f.streaming_links); } catch(e) {}
+          } else if (f.streaming_links) {
+            streamingLinks = f.streaming_links;
+          }
+          return !!streamingLinks[selectedPlatform];
+        });
+      }
 
       setFilms(transformed);
     } catch (err) {
@@ -149,6 +172,7 @@ export default function Browse() {
   const clearAll = () => {
     setSelectedGenres([]);
     setSelectedCountries([]);
+    setSelectedPlatform('');
     setYearRange(2000);
     setSelectedRatings([]);
     setLanguage('');
@@ -196,6 +220,19 @@ export default function Browse() {
                 <option value="rating">Top Rated</option>
                 <option value="newest">Newest Arrivals</option>
                 <option value="oldest">Vintage</option>
+              </select>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Watch Platform</h4>
+              <select value={selectedPlatform} onChange={(e) => setSelectedPlatform(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all">
+                <option value="">All Platforms</option>
+                <option value="netflix">Netflix</option>
+                <option value="kava">Kava</option>
+                <option value="docuth">Docuth</option>
+                <option value="prime_video">Prime Video</option>
+                <option value="youtube">YouTube</option>
+                <option value="showmax">Showmax</option>
               </select>
             </div>
 

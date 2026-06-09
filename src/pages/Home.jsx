@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getPersonYoutubeChannelUrl } from '../lib/youtube';
@@ -108,7 +108,7 @@ export default function Home() {
       .select(`
         id, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating, 
-        is_featured, is_trending, release_type,
+        is_featured, is_trending, release_type, streaming_links, source,
         film_genres(genres(name))
       `)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')

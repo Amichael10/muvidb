@@ -1,0 +1,4 @@
+scrapling
+supabase
+python-dotenv
+beautifulsoup4

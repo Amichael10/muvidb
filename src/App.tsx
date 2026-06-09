@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { QuickViewProvider } from './context/QuickViewContext';
+import QuickViewModal from './components/film/QuickViewModal';
 
 // Public Pages
 import Home from './pages/Home';
@@ -124,9 +126,10 @@ export default function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <Router>
-          <SmoothScroll>
-            <Toaster 
+        <QuickViewProvider>
+          <Router>
+            <SmoothScroll>
+              <Toaster 
               position="top-center" 
               toastOptions={{
                 style: {
@@ -192,8 +195,10 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Layout>
+            <QuickViewModal />
           </SmoothScroll>
         </Router>
+        </QuickViewProvider>
       </ThemeProvider>
     </AuthProvider>
   );

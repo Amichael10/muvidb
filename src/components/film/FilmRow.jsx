@@ -40,7 +40,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
   };
 
   return (
-    <section className={noHeader ? '' : 'py-8 relative group'}>
+    <section className={`relative group/row ${noHeader ? '' : 'py-8'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         {!noHeader && (
@@ -74,7 +74,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
             <>
               <button 
                 onClick={() => scroll('left')}
-                className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollLeft && 'pointer-events-none !opacity-0'}`}
+                className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover/row:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollLeft && 'pointer-events-none !opacity-0'}`}
                 aria-label="Previous"
               >
                 <Icon icon="solar:alt-arrow-left-linear" width="20" height="20" />
@@ -82,7 +82,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
               
               <button 
                 onClick={() => scroll('right')}
-                className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollRight && 'pointer-events-none !opacity-0'}`}
+                className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20 w-10 h-10 bg-surface border border-border rounded-full flex items-center justify-center text-text-primary shadow-lg opacity-0 group-hover/row:opacity-100 transition-all duration-300 hover:scale-110 active:scale-95 hover:border-brand hidden md:flex ${!canScrollRight && 'pointer-events-none !opacity-0'}`}
                 aria-label="Next"
               >
                 <Icon icon="solar:alt-arrow-right-linear" width="20" height="20" />
@@ -93,7 +93,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
           <div 
             ref={scrollRef}
             onScroll={checkScroll}
-            className="flex overflow-x-auto gap-4 md:gap-6 pb-6 pt-2 px-4 sm:px-0 scrollbar-hide touch-pan-x"
+            className="flex overflow-x-auto gap-4 md:gap-6 py-16 -my-16 px-4 sm:px-0 scrollbar-hide touch-pan-x"
           >
             {isLoading ? (
               [...Array(6)].map((_, i) => (
