@@ -386,14 +386,33 @@ async function main() {
         console.log(`\n📄 Page ${p}/${MAX_PAGES} for ${country}`);
         const browseUrl = `https://api.mubi.com/v4/browse/films?country=${encodeURIComponent(country)}&all_films=true&sort=popularity_quality_score&page=${p}&per_page=24`;
         
-        const response = await context.request.get(browseUrl, {
-          headers: {
-            'Client-Country': getCountryCode(country),
-            'client': 'web',
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        let response;
+        let retries = 3;
+        while (retries > 0) {
+          try {
+            response = await context.request.get(browseUrl, {
+              headers: {
+                'Client-Country': getCountryCode(country),
+                'client': 'web',
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+              },
+              timeout: 60000
+            });
+            break;
+          } catch (e) {
+            console.error(`  ⚠️ Pagination fetch failed (${retries} retries left): ${e.message}`);
+            retries--;
+            if (retries === 0) {
+              console.error(`  ❌ Failed to fetch page ${p} after multiple retries.`);
+              pagesRemaining = false;
+              break;
+            }
+            await new Promise(r => setTimeout(r, 5000));
           }
-        });
+        }
+        
+        if (!response) break;
         
         if (!response.ok()) {
            console.error(`  ⚠️ API Error ${response.status()}`);
