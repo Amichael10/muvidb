@@ -216,15 +216,28 @@ async function syncFilm(filmData, credits) {
   
   if (filmData.genres?.length > 0) {
     for (const gName of filmData.genres) {
+      let genreId;
       const { data: genreRow } = await supabase
         .from('genres')
         .select('id')
         .ilike('name', gName)
         .maybeSingle();
+        
       if (genreRow) {
+        genreId = genreRow.id;
+      } else {
+        const { data: newGenre } = await supabase
+          .from('genres')
+          .insert({ name: gName, slug: gName.toLowerCase().replace(/[^a-z0-9]+/g, '-') })
+          .select('id')
+          .single();
+        if (newGenre) genreId = newGenre.id;
+      }
+      
+      if (genreId) {
         await supabase.from('film_genres').upsert({
           film_id: filmId,
-          genre_id: genreRow.id
+          genre_id: genreId
         }, { onConflict: 'film_id,genre_id' });
       }
     }
@@ -236,8 +249,8 @@ async function syncFilm(filmData, credits) {
       await supabase.from('credits').upsert({
         film_id: filmId,
         person_id: personId,
-        role: ROLE_MAP[c.role] || 'crew',
-        original_role: c.original_role || c.role,
+        role: c.role,
+        original_role: c.original_role,
         character_name: c.character_name
       }, { onConflict: 'film_id,person_id,role,character_name' });
     }
@@ -270,15 +283,26 @@ async function scrapeFilmDetails(context, mubiId, currentCountry) {
     }
     
     const credits = [];
-        if (film.cast_members && Array.isArray(film.cast_members)) {
-      film.cast_members.forEach(c => {
-        if (c?.name) credits.push({
-          name: c.name,
-          role: c.credits === 'Director' ? 'Crew' : (c.character_name ? 'Cast' : 'Crew'),
-          original_role: c.credits || 'Unknown',
-          character_name: c.character_name || null,
-          mubi_slug: c.slug
-        });
+    if (film.cast && Array.isArray(film.cast)) {
+      film.cast.forEach(c => {
+        if (c?.name) {
+          const mubiRoles = c.credits ? c.credits.split(', ') : ['Unknown'];
+          mubiRoles.forEach(mubiRole => {
+            let internalRole = 'crew';
+            if (mubiRole === 'Cast' || c.character_name) internalRole = 'actor';
+            else if (mubiRole === 'Director') internalRole = 'director';
+            else if (mubiRole === 'Producer' || mubiRole === 'Executive Producer') internalRole = 'producer';
+            else if (mubiRole === 'Screenplay' || mubiRole === 'Writer' || mubiRole === 'Story') internalRole = 'writer';
+            
+            credits.push({
+              name: c.name,
+              role: internalRole,
+              original_role: mubiRole,
+              character_name: c.character_name || null,
+              mubi_slug: c.slug
+            });
+          });
+        }
       });
     }
 
@@ -301,7 +325,7 @@ async function scrapeFilmDetails(context, mubiId, currentCountry) {
     const movieData = {
       title: film.title,
       synopsis: film.short_synopsis || film.default_editorial || '',
-      cast: credits.filter(c => c.role === 'Cast').map(c => c.name)
+      cast: credits.filter(c => c.role === 'actor').map(c => c.name)
     };
 
     const isConfirmedAfrican = await verifyNollywoodAI(movieData);
