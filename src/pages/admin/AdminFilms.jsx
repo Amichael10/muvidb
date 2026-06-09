@@ -524,6 +524,7 @@ export default function AdminFilms() {
       setFormData(draft?.formData || {
         ...initialFormState,
         ...film,
+        genres: film.genres || [],
         runtime_minutes: film.runtime_minutes || '',
         is_featured: film.is_featured || false,
         release_type: film.release_type || 'cinema',
@@ -1821,14 +1822,14 @@ export default function AdminFilms() {
                         <div className="relative flex items-center">
                           <input
                             type="checkbox"
-                            checked={formData.genres.includes(genre.id)}
+                            checked={Array.isArray(formData.genres) && formData.genres.includes(genre.id)}
                             onChange={(e) => {
                               const checked = e.target.checked;
                               setFormData(prev => ({
                                 ...prev,
                                 genres: checked 
-                                  ? [...prev.genres, genre.id]
-                                  : prev.genres.filter(id => id !== genre.id)
+                                  ? [...(prev.genres || []), genre.id]
+                                  : (prev.genres || []).filter(id => id !== genre.id)
                               }));
                             }}
                             className="w-4 h-4 rounded border-border text-brand bg-surface focus:ring-brand/30 accent-brand transition-all"
