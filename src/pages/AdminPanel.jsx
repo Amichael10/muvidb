@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -36,6 +36,9 @@ export default function AdminPanel() {
   const [rejectingClaimId, setRejectingClaimId] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncComplete, setSyncComplete] = useState(false);
+  const [verifySubTab, setVerifySubTab] = useState('new');
 
   const showToast = (message) => {
     setToastMessage(message);
