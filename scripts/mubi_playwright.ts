@@ -246,13 +246,15 @@ async function syncFilm(filmData, credits) {
   for (const c of credits) {
     const personId = await upsertPerson(c.name, c.mubi_slug);
     if (personId) {
-      await supabase.from('credits').upsert({
+      const { error } = await supabase.from('credits').upsert({
         film_id: filmId,
         person_id: personId,
         role: c.role,
-        original_role: c.original_role,
         character_name: c.character_name
-      }, { onConflict: 'film_id,person_id,role,character_name' });
+      }, { onConflict: 'film_id,person_id,role' });
+      if (error) {
+        console.error(`  ❌ Error inserting credit for ${c.name}:`, error.message);
+      }
     }
   }
 }
