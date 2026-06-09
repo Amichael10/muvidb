@@ -823,7 +823,6 @@ export default function AdminPeople() {
               </button>
             </div>
           )}
-        </div>
         <ErrorBoundary>
         <form onSubmit={handleSave} className="p-8 space-y-10 flex-1 overflow-y-auto">
           <section className="space-y-6">
