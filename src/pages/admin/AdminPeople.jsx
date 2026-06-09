@@ -14,6 +14,7 @@ import { toTitleCase } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { useMemo } from 'react';
 import { getFriendlyErrorMessage } from '../../utils/errors';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 
 export default function AdminPeople() {
   const { user } = useAuth();
@@ -822,6 +823,8 @@ export default function AdminPeople() {
               </button>
             </div>
           )}
+        </div>
+        <ErrorBoundary>
         <form onSubmit={handleSave} className="p-8 space-y-10 flex-1 overflow-y-auto">
           <section className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-border">
@@ -1117,6 +1120,7 @@ export default function AdminPeople() {
             </button>
           </div>
         </form>
+        </ErrorBoundary>
         </div>
       </Drawer>
       {deletingPerson && (

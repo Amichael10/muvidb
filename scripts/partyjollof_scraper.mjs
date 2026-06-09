@@ -29,8 +29,8 @@ const PJ_IMG     = 'https://www.partyjolloftv.com';   // poster URLs are relativ
 const AFRICAN_COUNTRIES = ['NG', 'GH', 'ZA', 'KE', 'TZ', 'CM', 'ET', 'SN', 'CI', 'EG', 'RW', 'UG'];
 
 // Limits
-const MAX_FILMS_PER_COUNTRY = 200;   // up to 200 per country
-const MAX_PEOPLE             = 500;   // person pages to scrape
+const MAX_FILMS_PER_COUNTRY = 5000;  // up to 5000 per country
+const MAX_PEOPLE             = 50000; // person pages to scrape
 const DELAY_MS               = 1200; // ms between requests
 
 // ─────────────────────────────────────────────
@@ -228,9 +228,9 @@ async function scrapePersonPage(slug) {
 // DB: Upsert film
 // ─────────────────────────────────────────────
 async function upsertFilm(apiFilm) {
-  const posterUrl = apiFilm.poster?.url
-    ? `${PJ_IMG}${apiFilm.poster.url}`
-    : null;
+  const posterUrl = apiFilm.poster?.sizes?.og?.url 
+    ? `${PJ_IMG}${apiFilm.poster.sizes.og.url}`
+    : apiFilm.poster?.url ? `${PJ_IMG}${apiFilm.poster.url}` : null;
 
   const releaseYear = apiFilm.releaseDate
     ? new Date(apiFilm.releaseDate).getFullYear()
@@ -241,6 +241,13 @@ async function upsertFilm(apiFilm) {
     platform: s.platform,
     url: s.url,
   }));
+
+  // PartyJollof genres map based on their frontend (we can fallback to extracting from known list)
+  const GENRE_MAP = {
+    1: 'Drama', 2: 'Comedy', 3: 'Action', 4: 'Thriller', 5: 'Romance', 
+    6: 'Horror', 7: 'Documentary', 8: 'Sci-Fi', 9: 'Fantasy', 10: 'Family'
+  };
+  const extractedGenres = (apiFilm.genres || []).map(id => typeof id === 'object' ? id.name : GENRE_MAP[id]).filter(Boolean);
 
   const payload = {
     title: apiFilm.title?.trim(),
@@ -254,6 +261,7 @@ async function upsertFilm(apiFilm) {
     mubi_slug: makeSlug(apiFilm.title),
     slug: makeSlug(apiFilm.title),
     countries: apiFilm.countryOfOrigin ? [apiFilm.countryOfOrigin] : null,
+    genres: extractedGenres.length > 0 ? extractedGenres : null,
   };
   if (streamingLinks.length) payload.streaming_links = streamingLinks;
 
@@ -263,16 +271,17 @@ async function upsertFilm(apiFilm) {
   // Find existing by title (case-insensitive)
   const { data: existing } = await supabase
     .from('films')
-    .select('id, title, synopsis, poster_url, mubi_slug, slug')
+    .select('id, title, synopsis, poster_url, mubi_slug, slug, genres')
     .ilike('title', payload.title)
     .maybeSingle();
 
   if (existing) {
     const updates = {};
     if (!existing.synopsis   && payload.synopsis)   updates.synopsis   = payload.synopsis;
-    if (!existing.poster_url && payload.poster_url)  updates.poster_url = payload.poster_url;
+    if (payload.poster_url)                         updates.poster_url = payload.poster_url; // ALWAYS override with PartyJollof HD poster
     if (!existing.mubi_slug  && payload.mubi_slug)   updates.mubi_slug  = payload.mubi_slug;
     if (!existing.slug       && payload.slug)        updates.slug       = payload.slug;
+    if ((!existing.genres || existing.genres.length === 0) && payload.genres) updates.genres = payload.genres;
 
     if (Object.keys(updates).length) {
       await supabase.from('films').update(updates).eq('id', existing.id);
@@ -352,6 +361,30 @@ async function upsertPerson(person) {
 }
 
 // ─────────────────────────────────────────────
+// DB: Upsert credit
+// ─────────────────────────────────────────────
+async function upsertCredit(filmId, personId, role) {
+  const { data: existing } = await supabase
+    .from('credits')
+    .select('id')
+    .eq('film_id', filmId)
+    .eq('person_id', personId)
+    .eq('role', role)
+    .maybeSingle();
+
+  if (existing) return { action: 'skipped' };
+
+  const { error } = await supabase.from('credits').insert({
+    film_id: filmId,
+    person_id: personId,
+    role: role
+  });
+  
+  if (error) return { action: 'error', error: error.message };
+  return { action: 'inserted' };
+}
+
+// ─────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────
 async function main() {
@@ -364,9 +397,11 @@ async function main() {
   const stats = {
     films:  { inserted: 0, enriched: 0, skipped: 0, errors: 0 },
     people: { inserted: 0, enriched: 0, skipped: 0, errors: 0 },
+    credits: { inserted: 0, skipped: 0, errors: 0 },
   };
   const allErrors = [];
   const processedPeople = new Set(); // slugs already scraped
+  const relationships = []; // to hold { filmId, personSlug }
 
   // ── Step 1: collect film list ──────────────
   const filmDocs = await collectAfricanFilms();
@@ -414,6 +449,9 @@ async function main() {
         if (!processedPeople.has(p.slug)) {
           processedPeople.add(p.slug);
         }
+        if (filmResult.id) {
+          relationships.push({ filmId: filmResult.id, personSlug: p.slug });
+        }
       }
     } else {
       process.stdout.write(` | 👥 no cast\n`);
@@ -454,6 +492,25 @@ async function main() {
       allErrors.push({ type: 'person', slug, error: result.error });
     }
 
+    if (result.id) {
+      // Link to credits
+      const rels = relationships.filter(r => r.personSlug === slug);
+      let role = 'Actor';
+      if (person.known_for_department === 'Directing') role = 'Director';
+      else if (person.known_for_department === 'Writing') role = 'Writer';
+      else if (person.known_for_department === 'Production') role = 'Producer';
+
+      for (const rel of rels) {
+        const credRes = await upsertCredit(rel.filmId, result.id, role);
+        if (credRes.action === 'inserted') stats.credits.inserted++;
+        else if (credRes.action === 'skipped') stats.credits.skipped++;
+        else {
+          stats.credits.errors++;
+          allErrors.push({ type: 'credit', slug, error: credRes.error });
+        }
+      }
+    }
+
     await sleep(DELAY_MS);
   }
 
@@ -471,8 +528,12 @@ async function main() {
   console.log(`   🔄 Enriched : ${stats.people.enriched}`);
   console.log(`   ⏭  Skipped  : ${stats.people.skipped}`);
   console.log(`   ❌ Errors   : ${stats.people.errors}`);
+  console.log('\n🔗 Credits:');
+  console.log(`   ✅ Inserted : ${stats.credits.inserted}`);
+  console.log(`   ⏭  Skipped  : ${stats.credits.skipped}`);
+  console.log(`   ❌ Errors   : ${stats.credits.errors}`);
 
-  const total = stats.films.inserted + stats.films.enriched + stats.people.inserted + stats.people.enriched;
+  const total = stats.films.inserted + stats.films.enriched + stats.people.inserted + stats.people.enriched + stats.credits.inserted;
   console.log(`\n🎯 Total DB changes: ${total}`);
 
   if (allErrors.length) {

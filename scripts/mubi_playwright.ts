@@ -169,7 +169,7 @@ async function syncFilm(filmData, credits) {
     poster_url: filmData.poster_url,
     backdrop_url: filmData.backdrop_url,
     is_nollywood: filmData.is_nollywood,
-    countries: filmData.countries?.join(', '),
+    countries: filmData.countries || [],
     source: 'mubi',
     status: 'released',
     needs_review: true
@@ -244,60 +244,47 @@ async function syncFilm(filmData, credits) {
   }
 }
 
-async function scrapeFilmDetails(context, slug, currentCountry) {
-  const filmUrl = `https://mubi.com/films/${slug}`;
-  const castUrl = `https://mubi.com/films/${slug}/cast`;
+async function scrapeFilmDetails(context, mubiId, currentCountry) {
+  const apiUrl = `https://api.mubi.com/v3/films/${mubiId}`;
   
-  const page = await context.newPage();
   try {
-    await page.goto(filmUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const dataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
-    if (!dataStr) return null;
-    
-    const pageProps = JSON.parse(dataStr).props?.pageProps;
-    const film = pageProps?.film;
+    const response = await context.request.get(apiUrl, {
+      headers: {
+        'Client-Country': getCountryCode(currentCountry),
+        'client': 'web',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok()) {
+      console.warn(`  ⚠️ Failed to fetch metadata for ${mubiId}: ${response.status()}`);
+      return null;
+    }
+
+    const film = await response.json();
     
     if (!film || typeof film !== 'object') {
-      console.warn(`  ⚠️ Missing or invalid film metadata for ${slug}`);
+      console.warn(`  ⚠️ Missing or invalid film metadata for ${mubiId}`);
       return null;
     }
     
-    await page.goto(castUrl, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
-    await page.waitForTimeout(1000);
-    const castDataStr = await page.evaluate(() => document.getElementById('__NEXT_DATA__')?.textContent);
     const credits = [];
-    
-    if (castDataStr) {
-      try {
-        const castData = JSON.parse(castDataStr).props?.pageProps;
-        if (castData?.cast && Array.isArray(castData.cast)) {
-          castData.cast.forEach(c => {
-            if (c?.name) credits.push({
-              name: c.name,
-              role: 'Cast',
-              character_name: c.role,
-              mubi_slug: c.slug
-            });
-          });
-        }
-        if (castData?.crew && Array.isArray(castData.crew)) {
-          castData.crew.forEach(c => {
-            if (c?.name) credits.push({
-              name: c.name,
-              role: 'Crew',
-              original_role: c.job,
-              mubi_slug: c.slug
-            });
-          });
-        }
-      } catch (e) {
-        console.warn(`  ⚠️ Could not parse cast data for ${slug}`);
-      }
+        if (film.cast_members && Array.isArray(film.cast_members)) {
+      film.cast_members.forEach(c => {
+        if (c?.name) credits.push({
+          name: c.name,
+          role: c.credits === 'Director' ? 'Crew' : (c.character_name ? 'Cast' : 'Crew'),
+          original_role: c.credits || 'Unknown',
+          character_name: c.character_name || null,
+          mubi_slug: c.slug
+        });
+      });
     }
-    
+
     const historicCountries = Array.isArray(film.historic_countries) ? film.historic_countries : [];
     const countries = historicCountries.filter(c => AFRICAN_COUNTRIES.includes(c));
-    
+
     // 1. Strict Title Blocklist
     const isExcluded = /007|James Bond|Mission Impossible|Marvel|Avengers|Hollywood|Fast & Furious/i.test(film.title);
     if (isExcluded) {
@@ -328,7 +315,7 @@ async function scrapeFilmDetails(context, slug, currentCountry) {
     return {
       metadata: {
         mubi_id: String(film.id),
-        mubi_slug: slug,
+        mubi_slug: film.slug,
         title: film.title || 'Unknown Title',
         year: film.year || null,
         synopsis: film.short_synopsis || film.default_editorial || '',
@@ -341,15 +328,26 @@ async function scrapeFilmDetails(context, slug, currentCountry) {
       },
       credits
     };
-  } finally {
-    await page.close();
+  } catch (error) {
+    console.error(`  ❌ Failed ${mubiId}: ${error.message}`);
+    return null;
   }
 }
 
 async function main() {
   const state = loadState();
   
-  const browser = await chromium.launch({ headless: true });
+  const proxyConfig = {
+    server: `http://${process.env.SMARTPROXY_HOST || 'proxy.smartproxy.net'}:${process.env.SMARTPROXY_PORT || '3120'}`,
+    username: process.env.SMARTPROXY_USER,
+    password: process.env.SMARTPROXY_PASS
+  };
+  
+  console.log(`🚀 Launching Playwright with proxy: ${proxyConfig.server}`);
+  const browser = await chromium.launch({ 
+    headless: true,
+    proxy: proxyConfig
+  });
   const context = await browser.newContext();
   
   try {
@@ -416,7 +414,7 @@ async function main() {
             console.log(`  🔗 Linking existing (upgrading metadata): ${f.title} (${f.year})`);
             try {
               const result = await Promise.race([
-                scrapeFilmDetails(context, f.slug, country),
+                scrapeFilmDetails(context, f.id, country),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 120000))
               ]);
               
@@ -435,7 +433,7 @@ async function main() {
           try {
             console.log(`  🎬 Processing: ${f.title} (${f.slug})`);
             const result = await Promise.race([
-              scrapeFilmDetails(context, f.slug, country),
+              scrapeFilmDetails(context, f.id, country),
               new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 120000))
             ]);
             
