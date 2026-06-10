@@ -61,10 +61,13 @@ export async function isValidAuth(req: VercelRequest): Promise<boolean> {
         
         console.log(`Auth check: [SUCCESS] User: ${user.email} | Role: ${role}`);
 
-        if (role === 'admin' || role === 'admin_limited' || role === 'pro') {
+        // Only admins may trigger these site-wide maintenance endpoints
+        // (full DB sync, AI cleanup, YouTube search). Professional/actor
+        // contributions happen via RLS-governed table writes, not here.
+        if (role === 'admin' || role === 'admin_limited') {
           return true;
         } else {
-          console.warn(`Auth check: [FORBIDDEN] ${user.email} lacks admin/pro role. Evaluated role: ${role}`);
+          console.warn(`Auth check: [FORBIDDEN] ${user.email} lacks admin role. Evaluated role: ${role}`);
         }
       }
     } catch (e: any) {

@@ -4,17 +4,27 @@ const requests = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 60;
 
+const readHeader = (headers: any, name: string): string | undefined => {
+  const raw = typeof headers.get === 'function' ? headers.get(name) : headers[name];
+  return Array.isArray(raw) ? raw[0] : raw;
+};
+
 export function checkRateLimit(req: any): boolean {
   try {
     const headers = req.headers;
     if (!headers) return false;
 
-    let forwarded = typeof headers.get === 'function' 
-      ? headers.get('x-forwarded-for') 
-      : headers['x-forwarded-for'];
-
-    if (Array.isArray(forwarded)) forwarded = forwarded[0];
-    const ip = (forwarded ?? '').split(',')[0].trim() || 'unknown';
+    // Resolve the client IP from a trusted source. A caller can put arbitrary
+    // values in x-forwarded-for, and Vercel APPENDS the real client IP as the
+    // last hop — so the spoofable leftmost value must not be used as the key.
+    // Prefer x-real-ip (set by Vercel to the immediate client), then fall back
+    // to the LAST entry of x-forwarded-for.
+    let ip = readHeader(headers, 'x-real-ip')?.trim();
+    if (!ip) {
+      const forwarded = readHeader(headers, 'x-forwarded-for') ?? '';
+      const hops = forwarded.split(',').map((h) => h.trim()).filter(Boolean);
+      ip = hops.length ? hops[hops.length - 1] : 'unknown';
+    }
 
     const now = Date.now();
     const entry = requests.get(ip);
