@@ -196,15 +196,15 @@ async function runChannelFetcher() {
         channel_id: channelId,
         name: item.snippet.title,
         description: item.snippet.description,
-        source: 'youtube',
-        discovered_via_query: query
+        source: 'youtube'
       });
     }
 
     if (newChannels.length > 0) {
       const { error: insertError } = await supabase.from('channels').insert(newChannels);
       if (insertError) {
-        throw new Error("Failed to insert channels into database");
+        console.error("Insert Error details:", insertError);
+        throw new Error(`Failed to insert channels: ${insertError.message}`);
       }
     }
 
