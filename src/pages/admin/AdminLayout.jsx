@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Icon } from '@iconify/react';
@@ -45,6 +45,7 @@ export default function AdminLayout() {
     { path: '/admin/ai', label: 'AI Agent', icon: 'solar:cpu-linear' },
     { path: '/admin/spotlight', label: 'Spotlight', icon: 'solar:star-fall-linear' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
+    { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear' },
   ];
 
   const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies'];

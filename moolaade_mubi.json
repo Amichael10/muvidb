@@ -1,0 +1,274 @@
+{
+  "id": 3303,
+  "slug": "moolaade",
+  "title": "Moolaadé",
+  "title_locale": "en-US",
+  "original_title": "Moolaadé",
+  "year": 2004,
+  "duration": 120,
+  "stills": {
+    "small": "https://assets.mubicdn.net/images/film/3303/image-w256.jpg?1745491892",
+    "medium": "https://assets.mubicdn.net/images/film/3303/image-w448.jpg?1745491892",
+    "standard": "https://assets.mubicdn.net/images/film/3303/image-w856.jpg?1745491892",
+    "retina": "https://assets.mubicdn.net/images/film/3303/image-w1280.jpg?1745491892",
+    "small_overlaid": "https://assets.mubicdn.net/images/film/3303/image-w512_overlaid.jpg?1745491892",
+    "large_overlaid": "https://assets.mubicdn.net/images/film/3303/image-w1504_overlaid.jpg?1745491892"
+  },
+  "still_focal_point": {
+    "x": 0.5,
+    "y": 0
+  },
+  "hd": false,
+  "average_colour_hex": "9C8260",
+  "trailer_url": "https://trailers.mubicdn.net/3303/optimised/720p-c-moolaade_ba_en_640_584_3303.mp4",
+  "trailer_id": 10472,
+  "popularity": 182,
+  "web_url": "https://mubi.com/films/moolaade",
+  "genres": [
+    "Drama"
+  ],
+  "average_rating": 4.1,
+  "average_rating_out_of_ten": 8.2,
+  "number_of_ratings": 571,
+  "mubi_release": false,
+  "should_use_safe_still": false,
+  "still_url": "https://images.mubicdn.net/images/film/3303/cache-91698-1745491892/image-w1280.jpg",
+  "title_upcase": "MOOLAADÉ",
+  "critic_review_rating": 5,
+  "content_rating": {
+    "label": "mature",
+    "rating_code": "MATURE",
+    "description": "Contains material and themes suitable only for mature audiences.",
+    "icon_url": null,
+    "label_hex_color": "dd2323"
+  },
+  "short_synopsis": "When a woman shelters a group of girls from suffering female circumcision, she starts a conflict that tears her village apart.",
+  "short_synopsis_html": "<p>When a woman shelters a group of girls from suffering female circumcision, she starts a conflict that tears her village apart.</p>",
+  "episode": null,
+  "cast": [
+    {
+      "id": 17980,
+      "name": "Ousmane Sembène",
+      "name_upcase": "OUSMANE SEMBÈNE",
+      "slug": "ousmane-sembene",
+      "credits": "Director, Producer, Screenplay",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/17980/image-w240.jpg?1478101707"
+    },
+    {
+      "id": 23295,
+      "name": "Fatoumate Coulibaly",
+      "name_upcase": "FATOUMATE COULIBALY",
+      "slug": "fatoumate-coulibaly",
+      "credits": "Cast",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/23295/image-w240.jpg?1475477004"
+    },
+    {
+      "id": 23296,
+      "name": "Maimouna Hélène Diarra",
+      "name_upcase": "MAIMOUNA HÉLÈNE DIARRA",
+      "slug": "maimouna-helene-diarra",
+      "credits": "Cast",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/23296/image-w240.jpg?1475477065"
+    },
+    {
+      "id": 23297,
+      "name": "Salimata Traoré",
+      "name_upcase": "SALIMATA TRAORÉ",
+      "slug": "salimata-traore",
+      "credits": "Cast",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/23297/image-w240.jpg?1475477135"
+    },
+    {
+      "id": 12590,
+      "name": "Rasmane Ouedraogo",
+      "name_upcase": "RASMANE OUEDRAOGO",
+      "slug": "rasmane-ouedraogo",
+      "credits": "Cast",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/12590/image-w240.jpg?1512180049"
+    },
+    {
+      "id": 15051,
+      "name": "Dominique Gentil",
+      "name_upcase": "DOMINIQUE GENTIL",
+      "slug": "dominique-gentil",
+      "credits": "Cinematography",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/15051/image-w240.jpg?1416759148"
+    },
+    {
+      "id": 128242,
+      "name": "Boncana Maïga",
+      "name_upcase": "BONCANA MAÏGA",
+      "slug": "boncana-maiga",
+      "credits": "Music",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/128242/image-w240.jpg?1475478603"
+    },
+    {
+      "id": 128243,
+      "name": "Abdellatif Raïss",
+      "name_upcase": "ABDELLATIF RAÏSS",
+      "slug": "abdellatif-raiss",
+      "credits": "Editing",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/128243/image-w240.jpg?1562201873"
+    },
+    {
+      "id": 96367,
+      "name": "Joseph Kpobly",
+      "name_upcase": "JOSEPH KPOBLY",
+      "slug": "joseph-kpobly",
+      "credits": "Production Design",
+      "image_url": "https://assets.mubicdn.net/images/cast_member/96367/image-w240.jpg?1507702222"
+    }
+  ],
+  "industry_events": [
+    {
+      "name": "Cannes Film Festival",
+      "slug": "cannes",
+      "year": 2004,
+      "entries": [
+        "2004 | Winner: Un Certain Regard",
+        "2004 | Special Mention: Prize of the Ecumenical Jury"
+      ],
+      "logo_url": "https://images.mubicdn.net/images/industry_event/1/cache-222790-1494527057/logo-small_black.png",
+      "logo_url_white": "https://images.mubicdn.net/images/industry_event/1/cache-222790-1494527057/logo-large_white.png",
+      "event_type": "generic"
+    },
+    {
+      "name": "Toronto International Film Festival",
+      "slug": "toronto",
+      "year": 2004,
+      "entries": [
+        "2004"
+      ],
+      "logo_url": "https://images.mubicdn.net/images/industry_event/8/cache-222796-1741107355/logo-small_black.png",
+      "logo_url_white": "https://images.mubicdn.net/images/industry_event/8/cache-222796-1741107355/logo-large_white.png",
+      "event_type": "generic"
+    },
+    {
+      "name": "International Film Festival Rotterdam",
+      "slug": "rotterdam",
+      "year": 2005,
+      "entries": [
+        "2005"
+      ],
+      "logo_url": "https://images.mubicdn.net/images/industry_event/9/cache-222797-1494527059/logo-small_black.png",
+      "logo_url_white": "https://images.mubicdn.net/images/industry_event/9/cache-222797-1494527059/logo-large_white.png",
+      "event_type": "generic"
+    },
+    {
+      "name": "San Sebastián International Film Festival",
+      "slug": "san-sebastian",
+      "year": 2004,
+      "entries": [
+        "2004"
+      ],
+      "logo_url": "https://images.mubicdn.net/images/industry_event/11/cache-1053390-1746028036/logo-small_black.png",
+      "logo_url_white": "https://images.mubicdn.net/images/industry_event/11/cache-1053390-1746028036/logo-large_white.png",
+      "event_type": "generic"
+    }
+  ],
+  "notebook_posts": [
+    {
+      "id": 9681,
+      "summary": "From the Russian Revolution to the Hong Kong protests, can cinema act as a tool for liberation? A (tentative) survey of revolutionary films.",
+      "authors": [
+        {
+          "name": "Leonardo Goi",
+          "link": "/notebook/posts/author/515"
+        }
+      ],
+      "type": "column",
+      "image_url": {
+        "w690": "https://assets.mubicdn.net/images/notebook/post_spotlight_images/9754/images-w690.jpg?1647270952",
+        "standard": "https://assets.mubicdn.net/images/notebook/post_spotlight_images/9754/images-w690.jpg?1647270952",
+        "retina": "https://assets.mubicdn.net/images/notebook/post_spotlight_images/9754/images-w1280.jpg?1647270952"
+      },
+      "title": "Notebook Primer: Cinema and Revolutions",
+      "updated_at": "2021-06-07T20:40:11Z",
+      "quote": null,
+      "source": null,
+      "published_at": "2021-06-08T08:00:00Z",
+      "comment_count": 1,
+      "tags": "Columns, Sergei Eisenstein, Esfir Shub, Jean Renoir, Yang Yanjin, Deng Yimin, Peng Ning, Wang Toon, Fernando Solanas, Octavio Getino, Gillo Pontecorvo, Sarah Maldoror, Haile Gerima, Spike Lee, Glauber Rocha, Gutiérrez Alea, Luchino Visconti, Ousmane Sembène, Gaston Kaboré, Jehane Noujaim, James Leong, Lynn Lee, Evans Chan, Notebook Primer",
+      "slug": "notebook-primer-cinema-and-revolutions",
+      "web_url": "https://mubi.com/notebook/posts/notebook-primer-cinema-and-revolutions"
+    }
+  ],
+  "historic_countries": [
+    "Burkina Faso",
+    "Cameroon"
+  ],
+  "portrait_image": null,
+  "title_treatment_url": null,
+  "default_editorial": "More than 200 million girls and women have undergone female genital mutilation. At 81, the legendary Senegalese director—and father of African cinema—Ousmane Sembène (Black Girl) tackles the practice of FGM with sensitivity and deeply felt rage: A ravishing drama on violence.",
+  "default_editorial_html": "<p>More than 200 million girls and women have undergone female genital mutilation. At 81, the legendary Senegalese director&#8212;and father of African cinema&#8212;Ousmane Sembène (<em>Black Girl</em>) tackles the practice of FGM with sensitivity and deeply felt rage: A ravishing drama on violence.</p>",
+  "cast_members_count": 9,
+  "industry_events_count": 22,
+  "comments_count": 28,
+  "mubi_go_highlighted": false,
+  "optimised_trailers": [
+    {
+      "url": "https://trailers.mubicdn.net/3303/optimised/240p-c-moolaade_ba_en_640_584_3303.mp4",
+      "profile": "240p"
+    },
+    {
+      "url": "https://trailers.mubicdn.net/3303/optimised/720p-c-moolaade_ba_en_640_584_3303.mp4",
+      "profile": "720p"
+    }
+  ],
+  "directors": [
+    {
+      "name": "Ousmane Sembène",
+      "name_upcase": "OUSMANE SEMBÈNE",
+      "slug": "ousmane-sembene"
+    }
+  ],
+  "consumable": null,
+  "press_quote": null,
+  "star_rating": null,
+  "award": null,
+  "content_warnings": [
+    {
+      "id": 2,
+      "name": "domestic violence",
+      "key": "domestic_violence"
+    }
+  ],
+  "artworks": [
+    {
+      "format": "tile_artwork",
+      "locale": null,
+      "image_url": "https://images.mubicdn.net/images/artworks/56808/cache-56808-1621545055/images-original.png"
+    },
+    {
+      "format": "cover_artwork_horizontal",
+      "locale": "en-US",
+      "image_url": "https://images.mubicdn.net/images/artworks/56812/cache-56812-1621545055/images-original.png"
+    },
+    {
+      "format": "cover_artwork_box",
+      "locale": "en-US",
+      "image_url": "https://images.mubicdn.net/images/artworks/278494/cache-278494-1621573628/images-original.png"
+    },
+    {
+      "format": "cover_artwork_vertical",
+      "locale": "en-US",
+      "image_url": "https://images.mubicdn.net/images/artworks/794465/cache-794465-1751965621/images-original.png"
+    }
+  ],
+  "highlighted_industry_event_entry": {
+    "id": 2887,
+    "year": 2004,
+    "status": "won",
+    "display_text": "Un Certain Regard",
+    "full_display_text": "2004 | Winner: Un Certain Regard",
+    "industry_event": {
+      "id": 1,
+      "name": "Cannes Film Festival",
+      "slug": "cannes",
+      "type": "festival",
+      "logo_url": "https://images.mubicdn.net/images/industry_event/1/cache-222790-1494527057/logo-small_black.png",
+      "white_logo_url": "https://images.mubicdn.net/images/industry_event/1/cache-222790-1494527057/logo-large_white.png",
+      "cover_url": "https://images.mubicdn.net/images/industry_event/1/cache-222788-1494406355/cover-original.jpg"
+    }
+  }
+}
