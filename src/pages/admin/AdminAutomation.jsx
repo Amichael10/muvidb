@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
+import { authHeaders } from '../../lib/apiAuth';
 
 export default function AdminAutomation() {
   const [automationJobs, setAutomationJobs] = useState([]);
@@ -32,7 +33,7 @@ export default function AdminAutomation() {
     setAutomationLoading(true);
     toast(`Triggering ${jobId}...`, { icon: '🔄' });
     try {
-      await fetch(endpoint, { method: 'POST' });
+      await fetch(endpoint, { method: 'POST', headers: await authHeaders() });
       toast.success('Job triggered successfully!');
       fetchAutomationJobs();
     } catch (e) {

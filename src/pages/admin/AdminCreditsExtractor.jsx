@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { authHeaders } from '../../lib/apiAuth';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toast } from 'react-hot-toast';
@@ -207,7 +208,7 @@ export default function AdminCreditsExtractor() {
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({
           task: 'extract_credits_from_image',
           data: {

@@ -11,6 +11,7 @@ import { logAdminAction } from '../../lib/adminLogger';
 import { toTitleCase } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { getFriendlyErrorMessage } from '../../utils/errors';
+import { authHeaders } from '../../lib/apiAuth';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -69,10 +70,10 @@ export default function AdminFilms() {
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          task: 'summarize_film', 
-          data: { title: formData.title, description: formData.synopsis } 
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          task: 'summarize_film',
+          data: { title: formData.title, description: formData.synopsis }
         })
       });
 
@@ -95,7 +96,7 @@ export default function AdminFilms() {
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ task: 'polish_title', data: { title: formData.title } })
       });
       const data = await res.json();

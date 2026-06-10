@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { authHeaders } from '../../lib/apiAuth';
 
 export default function AdminAI() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -28,7 +29,7 @@ export default function AdminAI() {
       addLog("Connecting to AI Core (Gemini/Groq)...", "info");
       const response = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ task, data: payload })
       });
 

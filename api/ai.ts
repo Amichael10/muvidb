@@ -1,11 +1,21 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { generateAIContent, parseJSON, generateAIVisionContent } from './_lib/ai_service.js';
 import { supabase } from './_lib/supabase.js';
+import { isValidAuth } from './_lib/auth.js';
 
 export const maxDuration = 60;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // This endpoint performs privileged, service-role DB writes (renaming
+  // films, inserting people/credits) and burns paid AI quota. Require an
+  // authenticated admin/cron caller.
+  if (!(await isValidAuth(req))) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const { task, data } = req.body;
 
   try {

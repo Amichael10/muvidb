@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { authHeaders } from '../../lib/apiAuth';
 import { formatViewCount } from '../../utils/youtube';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
@@ -79,7 +80,7 @@ function EditFilmModal({ film, onSave, onClose }) {
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({
           task: 'summarize_film',
           title: form.title,
@@ -108,7 +109,7 @@ function EditFilmModal({ film, onSave, onClose }) {
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ task: 'polish_title', data: { title: form.title } })
       });
       const data = await res.json();
