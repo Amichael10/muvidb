@@ -50,6 +50,15 @@ const formatDuration = (ms) => {
   return `${mins}m ${remainingSecs}s`;
 };
 
+// Escapes untrusted values (movie titles, admin names, log details — some
+// sourced from scraped YouTube data or user-set profile names) before they are
+// interpolated into the report HTML, preventing stored XSS in the exported
+// audit document.
+const escapeHtml = (value) =>
+  String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+
 const generatePDFWindow = (actions, selectedDate) => {
   const sortedActions = [...actions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   
@@ -122,7 +131,7 @@ const generatePDFWindow = (actions, selectedDate) => {
   printWindow.document.write(`
     <html>
       <head>
-        <title>MuviDB Audit Report - ${adminName}</title>
+        <title>MuviDB Audit Report - ${escapeHtml(adminName)}</title>
         <style>
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -321,8 +330,8 @@ const generatePDFWindow = (actions, selectedDate) => {
         <div class="summary-grid">
           <div class="summary-card" style="grid-column: span 2;">
             <h4>Audited Administrator</h4>
-            <p>${adminName}</p>
-            <span style="font-size: 11px; color: #64748b;">${adminEmail}</span>
+            <p>${escapeHtml(adminName)}</p>
+            <span style="font-size: 11px; color: #64748b;">${escapeHtml(adminEmail)}</span>
           </div>
           <div class="summary-card">
             <h4>Est. Active Duration</h4>
@@ -403,7 +412,7 @@ const generatePDFWindow = (actions, selectedDate) => {
               </tr>
             ` : uniqueMovies.map(m => `
               <tr>
-                <td style="font-weight: 700; color: #0f172a;">${m.title}</td>
+                <td style="font-weight: 700; color: #0f172a;">${escapeHtml(m.title)}</td>
                 <td style="text-align: center; font-weight: 600; color: #15803d;">
                   ${m.creditsCreated > 0 ? `+${m.creditsCreated}` : '0'}
                 </td>
@@ -433,18 +442,18 @@ const generatePDFWindow = (actions, selectedDate) => {
                   ${new Date(a.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </td>
                 <td>
-                  <span class="badge badge-${a.action_type}">
-                    ${a.action_type}
+                  <span class="badge badge-${escapeHtml(a.action_type)}">
+                    ${escapeHtml(a.action_type)}
                   </span>
                 </td>
                 <td style="text-transform: capitalize; font-weight: 600; color: #475569;">
-                  ${a.entity_type}
+                  ${escapeHtml(a.entity_type)}
                 </td>
                 <td style="font-weight: 700; color: #0f172a;">
-                  ${a.entity_name || '<span style="font-style: italic; color: #94a3b8;">N/A</span>'}
+                  ${a.entity_name ? escapeHtml(a.entity_name) : '<span style="font-style: italic; color: #94a3b8;">N/A</span>'}
                 </td>
                 <td style="color: #64748b; font-family: monospace; font-size: 9px; word-break: break-all;">
-                  ${a.details ? JSON.stringify(a.details) : '{}'}
+                  ${a.details ? escapeHtml(JSON.stringify(a.details)) : '{}'}
                 </td>
               </tr>
             `).join('')}
