@@ -12,17 +12,25 @@ export default function AdminAutomation() {
 
   const fetchAutomationJobs = async () => {
     try {
-      const res = await fetch('/api/admin/automation-status');
-      const data = await res.json();
-      if (data.jobs) setAutomationJobs(data.jobs);
+      const res = await fetch('/api/automation?action=status');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.jobs) setAutomationJobs(data.jobs);
+      }
     } catch (e) {
       console.error('Failed to fetch automation jobs', e);
     }
   };
 
-  const triggerJob = async (endpoint) => {
+  const triggerJob = async (jobId) => {
+    let endpoint = '';
+    if (jobId === 'channel_fetcher') endpoint = '/api/automation?action=fetch-channels';
+    if (jobId === 'actor_enricher') endpoint = '/api/automation?action=enrich-actors';
+
+    if (!endpoint) return;
+
     setAutomationLoading(true);
-    toast(`Triggering ${endpoint}...`, { icon: '🔄' });
+    toast(`Triggering ${jobId}...`, { icon: '🔄' });
     try {
       await fetch(endpoint, { method: 'POST' });
       toast.success('Job triggered successfully!');
@@ -93,7 +101,7 @@ export default function AdminAutomation() {
           </div>
           
           <button 
-            onClick={() => triggerJob('/api/cron/enrich-actors')}
+            onClick={() => triggerJob('actor_enricher')}
             disabled={automationLoading}
             className="w-full bg-brand hover:bg-brand/90 text-white font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
           >
@@ -145,7 +153,7 @@ export default function AdminAutomation() {
           </div>
           
           <button 
-            onClick={() => triggerJob('/api/cron/fetch-channels')}
+            onClick={() => triggerJob('channel_fetcher')}
             disabled={automationLoading}
             className="w-full bg-surface-2 hover:bg-surface-3 border border-border text-text-primary font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
           >

@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
-    tools: [{ googleSearch: {} }]
+    tools: [{ googleSearch: {} } as any]
   });
 
   try {
