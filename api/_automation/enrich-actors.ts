@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../_lib/supabase';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const XAI_API_KEY = process.env.XAI_API_KEY;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST (for manual trigger) or Vercel Cron
@@ -10,14 +10,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!GEMINI_API_KEY) {
+  if (!XAI_API_KEY) {
     await supabase.from('automation_jobs').upsert({
       id: 'actor_enricher',
       status: 'error',
-      last_message: 'GEMINI_API_KEY is missing',
+      last_message: 'XAI_API_KEY is missing',
       last_run: new Date().toISOString()
     });
-    return res.status(500).json({ error: 'Missing GEMINI_API_KEY' });
+    return res.status(500).json({ error: 'Missing XAI_API_KEY' });
   }
 
   // Update status to running
@@ -28,10 +28,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     last_run: new Date().toISOString()
   });
 
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    tools: [{ googleSearch: {} } as any]
+  const openai = new OpenAI({
+    apiKey: XAI_API_KEY,
+    baseURL: "https://api.x.ai/v1",
   });
 
   try {
@@ -58,14 +57,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let errorsCount = 0;
 
     for (const person of people) {
-      const prompt = `You are an expert Nollywood film historian with access to Google Search.
-Your task is to search the web for accurate biographical details about the Nollywood actor/filmmaker "${person.name}".
-Use your Google Search tool to find recent and accurate information, then extract their details and return it as a structured JSON object.
+      const prompt = `You are an expert Nollywood film historian.
+Your task is to provide accurate biographical details about the Nollywood actor/filmmaker "${person.name}".
 Rules:
-- Write a compelling, 2-3 paragraph professional biography based on what you find online.
-- Do NOT hallucinate. Only use facts present in your search results or from your deep knowledge of famous Nollywood actors.
-- If you find an image URL representing them online (e.g. from Wikipedia, IMDb, or a news article), provide it.
-- If a field cannot be reliably determined from your searches, return null.
+- Write a compelling, 2-3 paragraph professional biography based on your knowledge.
+- Do NOT hallucinate. Only use facts you are certain about.
+- If you know an image URL representing them online (e.g. from Wikipedia, IMDb, or a news article), provide it.
+- If a field cannot be reliably determined, return null.
 
 IMPORTANT: You must return ONLY raw JSON matching this structure:
 {
@@ -74,19 +72,24 @@ IMPORTANT: You must return ONLY raw JSON matching this structure:
   "birthplace": "string or null",
   "photo_url": "string or null"
 }
-Do NOT include markdown formatting or backticks around the JSON.
-
-Please execute a search for: "${person.name} Nollywood actor biography date of birth"`;
+Do NOT include markdown formatting or backticks around the JSON.`;
 
       let responseText = "";
       let retries = 2; // Reduced retries for serverless context
       while (retries > 0) {
         try {
-          const result = await model.generateContent(prompt);
-          responseText = result.response.text();
+          const completion = await openai.chat.completions.create({
+            model: "grok-2-latest",
+            messages: [
+              { role: "system", content: "You are a helpful assistant that outputs strict JSON without markdown." },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.1,
+          });
+          responseText = completion.choices[0].message.content || "";
           break;
         } catch (err: any) {
-          if (err.message?.includes('503') && retries > 1) {
+          if ((err.status === 429 || err.status === 503) && retries > 1) {
             // Wait 1.5 seconds instead of 3 to save execution time
             await new Promise(resolve => setTimeout(resolve, 1500));
             retries--;
