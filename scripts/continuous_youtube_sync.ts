@@ -17,7 +17,8 @@ async function enrichFromTMDB(title: string, year?: number | null): Promise<{
     const query = encodeURIComponent(title);
     const yearParam = year ? `&year=${year}` : '';
     const res = await fetch(
-      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${query}${yearParam}&with_origin_country=NG`
+      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${query}${yearParam}&with_origin_country=NG`,
+      { signal: AbortSignal.timeout(30000) }
     );
     if (!res.ok) return null;
     const data = await res.json();

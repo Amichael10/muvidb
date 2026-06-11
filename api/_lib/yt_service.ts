@@ -15,7 +15,9 @@ export async function ytGet(endpoint: string, params: Record<string, string>) {
   const url = new URL(`${YT_BASE}/${endpoint}`);
   Object.entries({ ...params, key: YT_KEY }).forEach(([k, v]) => url.searchParams.set(k, v));
   
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    signal: AbortSignal.timeout(30000)
+  });
   if (!res.ok) {
     const errorBody = await res.text();
     let detail = errorBody;
