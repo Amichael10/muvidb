@@ -195,8 +195,7 @@ async function runChannelFetcher() {
       newChannels.push({
         channel_id: channelId,
         name: item.snippet.title,
-        description: item.snippet.description,
-        source: 'youtube'
+        description: item.snippet.description
       });
     }
 

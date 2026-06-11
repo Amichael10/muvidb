@@ -1,7 +1,11 @@
 import { supabase } from '../api/_lib/supabase.js';
 import { ytGet, parseDuration, cleanTitle } from '../api/_lib/yt_service.js';
 import * as dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 /** Try to find a TMDB movie match and return enriched metadata */
 async function enrichFromTMDB(title: string, year?: number | null): Promise<{
