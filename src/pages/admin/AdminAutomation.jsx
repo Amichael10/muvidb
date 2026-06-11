@@ -33,11 +33,15 @@ export default function AdminAutomation() {
     setAutomationLoading(true);
     toast(`Triggering ${jobId}...`, { icon: '🔄' });
     try {
-      await fetch(endpoint, { method: 'POST', headers: await authHeaders() });
+      const res = await fetch(endpoint, { method: 'POST', headers: await authHeaders() });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
       toast.success('Job triggered successfully!');
       fetchAutomationJobs();
     } catch (e) {
-      toast.error('Failed to trigger job');
+      toast.error(`Failed to trigger: ${e.message}`);
     }
     setAutomationLoading(false);
   };

@@ -69,8 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         channel_id: channelId,
         name: item.snippet.title,
         description: item.snippet.description,
-        source: 'youtube',
-        discovered_via_query: query
+        source: 'youtube'
       });
     }
 
