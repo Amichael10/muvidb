@@ -178,6 +178,7 @@ const PersonDetail = () => {
 
     setPerson(data)
     setPersonId(data.id)
+    document.title = `MuviDB | ${data.name}`
 
     // Fetch linked YouTube channel
     const { data: ch } = await supabase
