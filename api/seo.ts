@@ -72,8 +72,8 @@ ${(films || []).map(f => `  <url>
     // ---- SEO META INJECTION HANDLING ----
     let html = '';
     try {
-      const indexPath = path.join(process.cwd(), 'dist', 'index.html');
-      html = fs.readFileSync(indexPath, 'utf8');
+      const indexPath = join(process.cwd(), 'dist', 'index.html');
+      html = readFileSync(indexPath, 'utf8');
     } catch (e) {
       console.error('Failed to read dist/index.html:', e);
       return res.status(500).send('Error loading base HTML');
