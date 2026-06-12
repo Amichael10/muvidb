@@ -122,13 +122,13 @@ ${(films || []).map(f => `  <url>
     const metaTags = `<title>${title}</title><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="${image}"><meta property="og:url" content="${url}"><meta name="twitter:card" content="summary_large_image">${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}`;
 
     html = html.replace(/<title>.*?<\/title>/i, '').replace(/<meta name="description".*?>/i, '');
-    html = html.replace('<head>', `<head>${metaTags}`);
+    html = html.replace('<head>', `<head>${metaTags}<!-- DEBUG: ${JSON.stringify({ type, slug, envUrl: process.env.VITE_SUPABASE_URL?.substring(0,10), envKey: process.env.VITE_SUPABASE_ANON_KEY?.substring(0,5) })} -->`);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate');
     res.status(200).send(html);
-  } catch (err) {
+  } catch (err: any) {
     console.error('SEO Error:', err);
-    res.status(500).send('Internal Server Error');
+    res.status(500).send('Internal Server Error: ' + err.message);
   }
 }
