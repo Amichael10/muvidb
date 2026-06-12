@@ -245,7 +245,7 @@ export default function FilmDetail() {
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
       <Helmet>
-        <title>MuviDB | {film.title}</title>
+        <title>{`MuviDB | ${film.title}`}</title>
         <meta name="description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on MuviDB.`} />
         <meta property="og:title" content={`MuviDB | ${film.title}`} />
         <meta property="og:description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on MuviDB.`} />

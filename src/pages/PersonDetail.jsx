@@ -409,7 +409,7 @@ const PersonDetail = () => {
   return (
     <div className="min-h-screen bg-bg">
       <Helmet>
-        <title>MuviDB | {person.name}</title>
+        <title>{`MuviDB | ${person.name}`}</title>
         <meta name="description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on MuviDB.`} />
         <meta property="og:title" content={`MuviDB | ${person.name}`} />
         <meta property="og:description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on MuviDB.`} />
