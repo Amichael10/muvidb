@@ -121,7 +121,11 @@ ${(films || []).map(f => `  <url>
 
     const metaTags = `<title>${title}</title><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="${image}"><meta property="og:url" content="${url}"><meta name="twitter:card" content="summary_large_image">${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}`;
 
-    html = html.replace(/<title>.*?<\/title>/i, '').replace(/<meta name="description".*?>/i, '');
+    html = html.replace(/<title>.*?<\/title>/gi, '');
+    html = html.replace(/<meta name="description".*?>/gi, '');
+    html = html.replace(/<meta property="og:[^"]+".*?>/gi, '');
+    html = html.replace(/<meta name="twitter:[^"]+".*?>/gi, '');
+    html = html.replace(/<meta property="twitter:[^"]+".*?>/gi, '');
     html = html.replace('<head>', `<head>${metaTags}`);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
