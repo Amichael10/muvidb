@@ -6,6 +6,12 @@
     { "src": "/api/youtube(.*)", "dest": "/api/external?provider=youtube$1" },
     { "src": "/api/tmdb", "dest": "/api/external?provider=tmdb" },
     { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/sitemap\\.xml", "dest": "/api/sitemap.xml" },
+    { "src": "/sitemap-static\\.xml", "dest": "/api/sitemap-static.xml" },
+    { "src": "/sitemap-people\\.xml", "dest": "/api/sitemap-people.xml" },
+    { "src": "/sitemap-films\\.xml", "dest": "/api/sitemap-films.xml" },
+    { "src": "/people/(?<slug>[^/]+)", "dest": "/api/seo?type=person&slug=$slug" },
+    { "src": "/films/(?<slug>[^/]+)", "dest": "/api/seo?type=film&slug=$slug" },
     { "handle": "filesystem" },
     { "src": "/(?!(?:src|node_modules|@vite|@id|@react-refresh|api|favicon\\.ico|manifest\\.webmanifest|.*\\.(?:js|css|png|jpg|svg|ico|json|map|xml|html|txt))).*", "dest": "/index.html" }
   ]

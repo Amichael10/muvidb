@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
@@ -406,6 +407,13 @@ const PersonDetail = () => {
 
   return (
     <div className="min-h-screen bg-bg">
+      <Helmet>
+        <title>{person.name} - Lumi</title>
+        <meta name="description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on Lumi.`} />
+        <meta property="og:title" content={`${person.name} - Lumi`} />
+        <meta property="og:description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on Lumi.`} />
+        {person.photo_url && <meta property="og:image" content={person.photo_url} />}
+      </Helmet>
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">

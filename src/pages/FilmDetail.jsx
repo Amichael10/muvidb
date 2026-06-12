@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '@iconify/react';
@@ -243,6 +244,13 @@ export default function FilmDetail() {
 
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
+      <Helmet>
+        <title>{film.title} - Lumi</title>
+        <meta name="description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on Lumi.`} />
+        <meta property="og:title" content={`${film.title} - Lumi`} />
+        <meta property="og:description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on Lumi.`} />
+        {(film.poster_url || film.poster) && <meta property="og:image" content={film.poster_url || film.poster} />}
+      </Helmet>
       {/* 1. CINEMATIC HEADER */}
       <div className="relative w-full h-[60vh] min-h-[500px] border-b border-border overflow-hidden">
         <ImageWithFallback
