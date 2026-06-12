@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from './_lib/supabase';
-import * as fs from 'fs';
-import * as path from 'path';
+import { supabase } from './_lib/supabase.js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { type, slug } = req.query;
