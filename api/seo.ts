@@ -91,7 +91,7 @@ ${(films || []).map(f => `  <url>
 
       if (data) {
         title = `MuviDB | ${data.name}`;
-        description = data.biography?.substring(0, 150) || `Discover ${data.name}'s filmography and videos on Lumi.`;
+        description = data.biography?.substring(0, 150) || `Discover ${data.name}'s filmography and videos on MuviDB.`;
         if (data.photo_url) image = data.photo_url;
         url = `${baseUrl}/people/${data.slug || data.id}`;
         jsonLd = { "@context": "https://schema.org", "@type": "Person", "name": data.name, "url": url, "image": image, "description": description, "jobTitle": "Actor" };
@@ -102,7 +102,7 @@ ${(films || []).map(f => `  <url>
 
       if (data) {
         title = `MuviDB | ${data.title}`;
-        description = data.synopsis?.substring(0, 150) || `Watch ${data.title} on Lumi.`;
+        description = data.synopsis?.substring(0, 150) || `Watch ${data.title} on MuviDB.`;
         if (data.poster_url || data.poster) image = data.poster_url || data.poster;
         url = `${baseUrl}/films/${data.slug || data.id}`;
         jsonLd = { "@context": "https://schema.org", "@type": "Movie", "name": data.title, "url": url, "image": image, "description": description, "dateCreated": data.year ? `${data.year}` : undefined };
@@ -113,7 +113,7 @@ ${(films || []).map(f => `  <url>
 
       if (data) {
         title = `MuviDB | ${data.name}`;
-        description = data.description?.substring(0, 150) || `Watch ${data.name} on Lumi.`;
+        description = data.description?.substring(0, 150) || `Watch ${data.name} on MuviDB.`;
         if (data.thumbnail_url || data.banner_url || data.avatar_url) image = data.thumbnail_url || data.banner_url || data.avatar_url;
         url = `${baseUrl}/channels/${data.slug || data.id}`;
       }

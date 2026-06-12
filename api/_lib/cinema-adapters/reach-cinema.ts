@@ -51,7 +51,7 @@ async function fetchJson<T = any>(url: string, jwt: string): Promise<T> {
     headers: {
       Authorization: `Bearer ${jwt}`,
       Accept: 'application/json',
-      'User-Agent': 'Lumi-Cinema-Sync/1.0',
+      'User-Agent': 'MuviDB-Cinema-Sync/1.0',
     },
   });
   if (!r.ok) {

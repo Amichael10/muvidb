@@ -19,8 +19,8 @@ export default defineConfig(({ mode }) => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 // 5MB
         },
         manifest: {
-          name: 'Lumi | African Cinema Database',
-          short_name: 'Lumi',
+          name: 'MuviDB | African Cinema Database',
+          short_name: 'MuviDB',
           description: 'The ultimate destination for African cinema, showtimes, and industry professionals.',
           theme_color: '#FF5C00',
           background_color: '#0A0A0B',

@@ -1,6 +1,6 @@
 
 /**
- * Shared YouTube API utilities for lumi sync tasks.
+ * Shared YouTube API utilities for muvidb sync tasks.
  */
 
 const YT_KEY = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;

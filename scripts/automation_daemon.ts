@@ -240,7 +240,7 @@ async function startChannelFetcherLoop() {
 
 // Start Both
 console.log("==========================================");
-console.log("   LUMI AUTOMATION DAEMON INITIALIZED");
+console.log("   MUVIDB AUTOMATION DAEMON INITIALIZED");
 console.log("==========================================");
 startActorEnricherLoop();
 startChannelFetcherLoop();

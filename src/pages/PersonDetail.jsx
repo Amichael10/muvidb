@@ -409,9 +409,9 @@ const PersonDetail = () => {
     <div className="min-h-screen bg-bg">
       <Helmet>
         <title>MuviDB | {person.name}</title>
-        <meta name="description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on Lumi.`} />
+        <meta name="description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on MuviDB.`} />
         <meta property="og:title" content={`MuviDB | ${person.name}`} />
-        <meta property="og:description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on Lumi.`} />
+        <meta property="og:description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on MuviDB.`} />
         {person.photo_url && <meta property="og:image" content={person.photo_url} />}
       </Helmet>
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">

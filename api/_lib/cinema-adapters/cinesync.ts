@@ -111,7 +111,7 @@ export const cinesyncAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'User-Agent': 'Lumi-Cinema-Sync/1.0',
+    'User-Agent': 'MuviDB-Cinema-Sync/1.0',
   };
   if (apiKey) headers['x-api-key'] = apiKey;
 
