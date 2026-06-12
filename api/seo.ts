@@ -10,14 +10,71 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const baseUrl = `${protocol}://${host}`;
 
   try {
-    // 1. Get the base HTML shell
+    // ---- SITEMAP HANDLING ----
+    if (type === 'sitemap') {
+      res.setHeader('Content-Type', 'text/xml');
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate');
+
+      if (slug === 'index') {
+        const sitemapIndex = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>${baseUrl}/sitemap-static.xml</loc></sitemap>
+  <sitemap><loc>${baseUrl}/sitemap-people.xml</loc></sitemap>
+  <sitemap><loc>${baseUrl}/sitemap-films.xml</loc></sitemap>
+</sitemapindex>`;
+        return res.status(200).send(sitemapIndex);
+      } 
+      
+      if (slug === 'static') {
+        const staticUrls = ['', '/browse', '/people', '/cinemas', '/watchlist', '/about'];
+        const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${staticUrls.map(url => `  <url>
+    <loc>${baseUrl}${url}</loc>
+    <changefreq>daily</changefreq>
+    <priority>${url === '' ? '1.0' : '0.8'}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+        return res.status(200).send(sitemap);
+      }
+
+      if (slug === 'people') {
+        const { data: people } = await supabase.from('people').select('id, slug, updated_at').limit(10000);
+        const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${(people || []).map(p => `  <url>
+    <loc>${baseUrl}/people/${p.slug || p.id}</loc>
+    ${p.updated_at ? `<lastmod>${new Date(p.updated_at).toISOString()}</lastmod>` : ''}
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`).join('\n')}
+</urlset>`;
+        return res.status(200).send(sitemap);
+      }
+
+      if (slug === 'films') {
+        const { data: films } = await supabase.from('films').select('id, slug, updated_at').limit(10000);
+        const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${(films || []).map(f => `  <url>
+    <loc>${baseUrl}/films/${f.slug || f.id}</loc>
+    ${f.updated_at ? `<lastmod>${new Date(f.updated_at).toISOString()}</lastmod>` : ''}
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`).join('\n')}
+</urlset>`;
+        return res.status(200).send(sitemap);
+      }
+
+      return res.status(404).send('Sitemap not found');
+    }
+
+    // ---- SEO META INJECTION HANDLING ----
     let html = '';
     try {
-      // Try to read dist/index.html from the local filesystem (works on Vercel)
       const indexPath = path.join(process.cwd(), 'dist', 'index.html');
       html = fs.readFileSync(indexPath, 'utf8');
     } catch (e) {
-      // Fallback: fetch from the deployed URL
       try {
         const resp = await fetch(`${baseUrl}/index.html`);
         html = await resp.text();
@@ -26,7 +83,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 2. Fetch data based on type
     let title = 'MuviDB | The Ultimate African Film & Entertainment Database';
     let description = 'Discover African films, actors, and entertainment.';
     let image = `${baseUrl}/filmhouse.png`;
@@ -35,76 +91,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (type === 'person' && slug) {
       const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(slug as string);
-      const col = isUuid ? 'id' : 'slug';
-      
-      const { data, error } = await supabase
-        .from('people')
-        .select('*')
-        .eq(col, slug)
-        .single();
+      const { data } = await supabase.from('people').select('*').eq(isUuid ? 'id' : 'slug', slug).single();
 
       if (data) {
         title = `${data.name} - Actor | MuviDB`;
         description = data.biography?.substring(0, 150) || `Discover ${data.name}'s filmography and videos on Lumi.`;
         if (data.photo_url) image = data.photo_url;
         url = `${baseUrl}/people/${data.slug || data.id}`;
-
-        jsonLd = {
-          "@context": "https://schema.org",
-          "@type": "Person",
-          "name": data.name,
-          "url": url,
-          "image": image,
-          "description": description,
-          "jobTitle": "Actor"
-        };
+        jsonLd = { "@context": "https://schema.org", "@type": "Person", "name": data.name, "url": url, "image": image, "description": description, "jobTitle": "Actor" };
       }
     } else if (type === 'film' && slug) {
       const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(slug as string);
-      const col = isUuid ? 'id' : 'slug';
-
-      const { data, error } = await supabase
-        .from('films')
-        .select('*')
-        .eq(col, slug)
-        .single();
+      const { data } = await supabase.from('films').select('*').eq(isUuid ? 'id' : 'slug', slug).single();
 
       if (data) {
         title = `${data.title} - MuviDB`;
         description = data.synopsis?.substring(0, 150) || `Watch ${data.title} on Lumi.`;
         if (data.poster_url || data.poster) image = data.poster_url || data.poster;
         url = `${baseUrl}/films/${data.slug || data.id}`;
-
-        jsonLd = {
-          "@context": "https://schema.org",
-          "@type": "Movie",
-          "name": data.title,
-          "url": url,
-          "image": image,
-          "description": description,
-          "dateCreated": data.year ? `${data.year}` : undefined
-        };
+        jsonLd = { "@context": "https://schema.org", "@type": "Movie", "name": data.title, "url": url, "image": image, "description": description, "dateCreated": data.year ? `${data.year}` : undefined };
       }
     }
 
-    // 3. Inject SEO tags into HTML
-    const metaTags = `
-      <title>${title}</title>
-      <meta name="description" content="${description}">
-      <meta property="og:title" content="${title}">
-      <meta property="og:description" content="${description}">
-      <meta property="og:image" content="${image}">
-      <meta property="og:url" content="${url}">
-      <meta name="twitter:card" content="summary_large_image">
-      ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}
-    `;
+    const metaTags = `<title>${title}</title><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="${image}"><meta property="og:url" content="${url}"><meta name="twitter:card" content="summary_large_image">${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}`;
 
-    // Replace default generic tags or just inject into <head>
-    // Remove default generic title if it exists
-    html = html.replace(/<title>.*?<\/title>/i, '');
-    html = html.replace(/<meta name="description".*?>/i, '');
-
-    // Inject our generated tags right after <head>
+    html = html.replace(/<title>.*?<\/title>/i, '').replace(/<meta name="description".*?>/i, '');
     html = html.replace('<head>', `<head>${metaTags}`);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
