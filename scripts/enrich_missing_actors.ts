@@ -21,10 +21,7 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // We will use gemini-2.5-flash as it is fast and supports JSON responseSchema
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-2.5-flash",
-  tools: [
-    { googleSearch: {} } // Enable native Google Search Grounding
-  ]
+  model: "gemini-2.5-flash"
 });
 
 async function sleep(ms: number) {
@@ -59,14 +56,14 @@ async function enrichActors() {
     
     try {
       // We'll instruct Gemini to use its native Google Search tool to find the information
-      const prompt = `You are an expert Nollywood film historian with access to Google Search.
-Your task is to search the web for accurate biographical details about the Nollywood actor/filmmaker "${person.name}".
-Use your Google Search tool to find recent and accurate information, then extract their details and return it as a structured JSON object.
+      const prompt = `You are an expert Nollywood film historian.
+Your task is to provide accurate biographical details about the Nollywood actor/filmmaker "${person.name}".
+Extract their details and return it as a structured JSON object.
 Rules:
-- Write a compelling, 2-3 paragraph professional biography based on what you find online.
-- Do NOT hallucinate. Only use facts present in your search results or from your deep knowledge of famous Nollywood actors.
-- If you find an image URL representing them online (e.g. from Wikipedia, IMDb, or a news article), provide it.
-- If a field cannot be reliably determined from your searches, return null.
+- Write a compelling, 2-3 paragraph professional biography based on your knowledge.
+- Do NOT hallucinate. Only use facts present in your knowledge of famous Nollywood actors.
+- If you know an image URL representing them online (e.g. from Wikipedia, IMDb, or a news article), provide it.
+- If a field cannot be reliably determined, return null.
 
 IMPORTANT: You must return ONLY raw JSON matching this structure:
 {
@@ -76,11 +73,9 @@ IMPORTANT: You must return ONLY raw JSON matching this structure:
   "photo_url": "string or null"
 }
 Do NOT include markdown formatting or backticks around the JSON.
-
-Please execute a search for: "${person.name} Nollywood actor biography date of birth"
 `;
 
-      console.log(`🧠 Asking Gemini to search Google and extract data...`);
+      console.log(`🧠 Asking Gemini to extract data...`);
       let responseText = "";
       let retries = 3;
       while (retries > 0) {
@@ -141,8 +136,8 @@ Please execute a search for: "${person.name} Nollywood actor biography date of b
       console.error(`❌ Error processing ${person.name}:`, err.message);
     }
 
-    // Rate limiting delay
-    await sleep(2000);
+    // Rate limiting delay (5 seconds to stay under 15 RPM free tier)
+    await sleep(5000);
   }
   
   console.log(`\n🎉 Script finished processing this batch of ${people.length} actors!`);
