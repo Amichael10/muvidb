@@ -90,7 +90,7 @@ ${(films || []).map(f => `  <url>
       const { data } = await supabase.from('people').select('*').eq(isUuid ? 'id' : 'slug', slug).single();
 
       if (data) {
-        title = `${data.name} - Actor | MuviDB`;
+        title = `MuviDB | ${data.name}`;
         description = data.biography?.substring(0, 150) || `Discover ${data.name}'s filmography and videos on Lumi.`;
         if (data.photo_url) image = data.photo_url;
         url = `${baseUrl}/people/${data.slug || data.id}`;
@@ -101,11 +101,21 @@ ${(films || []).map(f => `  <url>
       const { data } = await supabase.from('films').select('*').eq(isUuid ? 'id' : 'slug', slug).single();
 
       if (data) {
-        title = `${data.title} - MuviDB`;
+        title = `MuviDB | ${data.title}`;
         description = data.synopsis?.substring(0, 150) || `Watch ${data.title} on Lumi.`;
         if (data.poster_url || data.poster) image = data.poster_url || data.poster;
         url = `${baseUrl}/films/${data.slug || data.id}`;
         jsonLd = { "@context": "https://schema.org", "@type": "Movie", "name": data.title, "url": url, "image": image, "description": description, "dateCreated": data.year ? `${data.year}` : undefined };
+      }
+    } else if (type === 'channel' && slug) {
+      const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(slug as string);
+      const { data } = await supabase.from('channels').select('*').eq(isUuid ? 'id' : 'slug', slug).single();
+
+      if (data) {
+        title = `MuviDB | ${data.name}`;
+        description = data.description?.substring(0, 150) || `Watch ${data.name} on Lumi.`;
+        if (data.thumbnail_url || data.banner_url || data.avatar_url) image = data.thumbnail_url || data.banner_url || data.avatar_url;
+        url = `${baseUrl}/channels/${data.slug || data.id}`;
       }
     }
 

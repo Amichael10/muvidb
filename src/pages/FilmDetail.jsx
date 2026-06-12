@@ -245,9 +245,9 @@ export default function FilmDetail() {
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
       <Helmet>
-        <title>{film.title} - Lumi</title>
+        <title>MuviDB | {film.title}</title>
         <meta name="description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on Lumi.`} />
-        <meta property="og:title" content={`${film.title} - Lumi`} />
+        <meta property="og:title" content={`MuviDB | ${film.title}`} />
         <meta property="og:description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on Lumi.`} />
         {(film.poster_url || film.poster) && <meta property="og:image" content={film.poster_url || film.poster} />}
       </Helmet>

@@ -18,6 +18,7 @@
     { "src": "/sitemap-films\\.xml", "dest": "/api/seo?type=sitemap&slug=films" },
     { "src": "/people/(?<slug>[^/]+)", "dest": "/api/seo?type=person&slug=$slug" },
     { "src": "/films/(?<slug>[^/]+)", "dest": "/api/seo?type=film&slug=$slug" },
+    { "src": "/channels/(?<slug>[^/]+)", "dest": "/api/seo?type=channel&slug=$slug" },
     { "handle": "filesystem" },
     { "src": "/(?!(?:src|node_modules|@vite|@id|@react-refresh|api|favicon\\.ico|manifest\\.webmanifest|.*\\.(?:js|css|png|jpg|svg|ico|json|map|xml|html|txt))).*", "dest": "/index.html" }
   ]
