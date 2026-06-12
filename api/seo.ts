@@ -75,12 +75,8 @@ ${(films || []).map(f => `  <url>
       const indexPath = path.join(process.cwd(), 'dist', 'index.html');
       html = fs.readFileSync(indexPath, 'utf8');
     } catch (e) {
-      try {
-        const resp = await fetch(`${baseUrl}/index.html`);
-        html = await resp.text();
-      } catch (err) {
-        return res.status(500).send('Error loading base HTML');
-      }
+      console.error('Failed to read dist/index.html:', e);
+      return res.status(500).send('Error loading base HTML');
     }
 
     let title = 'MuviDB | The Ultimate African Film & Entertainment Database';

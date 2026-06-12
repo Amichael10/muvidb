@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/seo.ts": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "routes": [
     { "src": "/storage/v1/object/public/(.*)", "dest": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/$1" },
     { "src": "/api/film/(?<id>.*)", "dest": "/api/films?id=$id" },
