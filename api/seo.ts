@@ -87,7 +87,9 @@ ${(films || []).map(f => `  <url>
 
     if (type === 'person' && slug) {
       const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(slug as string);
-      const { data } = await supabase.from('people').select('*').eq(isUuid ? 'id' : 'slug', slug).single();
+      const { data, error } = await supabase.from('people').select('*').eq(isUuid ? 'id' : 'slug', slug).single();
+      (globalThis as any).__debugError = error;
+      (globalThis as any).__debugData = data;
 
       if (data) {
         title = `MuviDB | ${data.name}`;
@@ -122,7 +124,7 @@ ${(films || []).map(f => `  <url>
     const metaTags = `<title>${title}</title><meta name="description" content="${description}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="${image}"><meta property="og:url" content="${url}"><meta name="twitter:card" content="summary_large_image">${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}`;
 
     html = html.replace(/<title>.*?<\/title>/i, '').replace(/<meta name="description".*?>/i, '');
-    html = html.replace('<head>', `<head>${metaTags}<!-- DEBUG: ${JSON.stringify({ type, slug, envUrl: process.env.VITE_SUPABASE_URL?.substring(0,10), envKey: process.env.VITE_SUPABASE_ANON_KEY?.substring(0,5) })} -->`);
+    html = html.replace('<head>', `<head>${metaTags}<!-- DEBUG: ${JSON.stringify({ type, slug, title, error: globalThis.__debugError || null, data: globalThis.__debugData || null })} -->`);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate');
