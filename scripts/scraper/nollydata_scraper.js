@@ -2,12 +2,16 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
+const WebSocket = require('ws'); // Fix for Node 20
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false },
+  global: { WebSocket }
+});
 
 const BASE_URL = 'https://www.nollydata.com';
 const MOVIES_INDEX_URL = `${BASE_URL}/moviess`;
