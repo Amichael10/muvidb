@@ -41,22 +41,45 @@ async function saveMovieToSupabase(movie: any) {
   if (!movie || !movie.title) return;
   console.log(`  💾 Saving movie to Supabase: ${movie.title}`);
   
-  const { data, error } = await supabase
+  const { data: existing } = await supabase
     .from('films')
-    .upsert({
-      title: movie.title,
-      synopsis: movie.synopsis,
-      year: parseInt(movie.release_year) || null,
-      runtime_minutes: movie.duration,
-      // Adjust field names as per your actual DB schema
-    }, { onConflict: 'title' })
-    .select()
-    .single();
-    
-  if (error) {
-    console.error(`  ❌ Error saving movie ${movie.title}:`, error.message);
-  } else if (data) {
-    console.log(`  ✅ Saved movie ID: ${data.id}`);
+    .select('id')
+    .ilike('title', movie.title)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('films')
+      .update({
+        synopsis: movie.synopsis,
+        year: parseInt(movie.release_year) || null,
+        runtime_minutes: movie.duration
+      })
+      .eq('id', existing.id);
+      
+    if (error) {
+      console.error(`  ❌ Error updating movie ${movie.title}:`, error.message);
+    } else {
+      console.log(`  ✅ Updated movie ID: ${existing.id}`);
+    }
+  } else {
+    const { data, error } = await supabase
+      .from('films')
+      .insert({
+        title: movie.title,
+        synopsis: movie.synopsis,
+        year: parseInt(movie.release_year) || null,
+        runtime_minutes: movie.duration,
+        source: 'nollydata'
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error(`  ❌ Error inserting movie ${movie.title}:`, error.message);
+    } else if (data) {
+      console.log(`  ✅ Saved movie ID: ${data.id}`);
+    }
   }
 }
 
@@ -64,21 +87,44 @@ async function savePersonToSupabase(person: any) {
   if (!person || !person.name) return;
   console.log(`  👤 Saving person to Supabase: ${person.name}`);
   
-  const { data, error } = await supabase
+  const { data: existing } = await supabase
     .from('people')
-    .upsert({
-      name: person.name,
-      about: person.about,
-      twitter_url: person.twitter,
-      instagram_url: person.instagram,
-    }, { onConflict: 'name' })
-    .select()
-    .single();
-    
-  if (error) {
-    console.error(`  ❌ Error saving person ${person.name}:`, error.message);
-  } else if (data) {
-    console.log(`  ✅ Saved person ID: ${data.id}`);
+    .select('id')
+    .ilike('name', person.name)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('people')
+      .update({
+        about: person.about,
+        twitter_url: person.twitter,
+        instagram_url: person.instagram,
+      })
+      .eq('id', existing.id);
+      
+    if (error) {
+      console.error(`  ❌ Error updating person ${person.name}:`, error.message);
+    } else {
+      console.log(`  ✅ Updated person ID: ${existing.id}`);
+    }
+  } else {
+    const { data, error } = await supabase
+      .from('people')
+      .insert({
+        name: person.name,
+        about: person.about,
+        twitter_url: person.twitter,
+        instagram_url: person.instagram,
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error(`  ❌ Error inserting person ${person.name}:`, error.message);
+    } else if (data) {
+      console.log(`  ✅ Saved person ID: ${data.id}`);
+    }
   }
 }
 
