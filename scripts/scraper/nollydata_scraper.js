@@ -10,7 +10,7 @@ const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false },
-  global: { WebSocket }
+  realtime: { transport: WebSocket }
 });
 
 const BASE_URL = 'https://www.nollydata.com';
