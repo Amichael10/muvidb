@@ -76,6 +76,7 @@ async function saveMovieToSupabase(movie: any) {
       console.error(`  ❌ Error updating movie ${movie.title}:`, error.message);
     } else {
       console.log(`  ✅ Updated movie ID: ${existing.id}`);
+      return existing.id;
     }
   } else {
     const { data, error } = await supabase
@@ -94,8 +95,10 @@ async function saveMovieToSupabase(movie: any) {
       console.error(`  ❌ Error inserting movie ${movie.title}:`, error.message);
     } else if (data) {
       console.log(`  ✅ Saved movie ID: ${data.id}`);
+      return data.id;
     }
   }
+  return null;
 }
 
 async function savePersonToSupabase(person: any) {
@@ -122,6 +125,7 @@ async function savePersonToSupabase(person: any) {
       console.error(`  ❌ Error updating person ${person.name}:`, error.message);
     } else {
       console.log(`  ✅ Updated person ID: ${existing.id}`);
+      return existing.id;
     }
   } else {
     const { data, error } = await supabase
@@ -139,8 +143,10 @@ async function savePersonToSupabase(person: any) {
       console.error(`  ❌ Error inserting person ${person.name}:`, error.message);
     } else if (data) {
       console.log(`  ✅ Saved person ID: ${data.id}`);
+      return data.id;
     }
   }
+  return null;
 }
 
 async function main() {
@@ -216,7 +222,24 @@ async function main() {
       }, BASE_URL);
 
       if (movieData && movieData.title) {
-        await saveMovieToSupabase(movieData);
+        const filmId = await saveMovieToSupabase(movieData);
+        
+        if (filmId && movieData.genre && movieData.genre.length > 0) {
+          const genresList = movieData.genre.split(',').map((g: string) => g.trim());
+          for (const gName of genresList) {
+            const { data: genreRow } = await supabase
+              .from('genres')
+              .select('id')
+              .ilike('name', gName)
+              .maybeSingle();
+            if (genreRow) {
+              await supabase.from('film_genres').upsert({
+                film_id: filmId,
+                genre_id: genreRow.id
+              }, { onConflict: 'film_id,genre_id' });
+            }
+          }
+        }
         
         for (const castMember of movieData.cast) {
           if (castMember.url) {
@@ -242,7 +265,20 @@ async function main() {
             });
             
             if (personData && personData.name) {
-              await savePersonToSupabase(personData);
+              const personId = await savePersonToSupabase(personData);
+              if (filmId && personId) {
+                const { error: creditsError } = await supabase.from('credits').upsert({
+                  film_id: filmId,
+                  person_id: personId,
+                  role: 'actor'
+                }, { onConflict: 'film_id,person_id,role' });
+                
+                if (creditsError) {
+                  console.error(`  ❌ Error linking ${personData.name} to movie:`, creditsError.message);
+                } else {
+                  console.log(`  🔗 Linked ${personData.name} to movie as actor.`);
+                }
+              }
             }
           }
         }
