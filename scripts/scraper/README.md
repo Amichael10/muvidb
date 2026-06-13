@@ -14,10 +14,12 @@ This is a standalone Node.js script designed to run on a Vultr VPS to scrape dat
    ssh root@<YOUR_VULTR_IP>
    ```
 
-2. **Clone the repository (or copy this folder over):**
+2. **Pull the latest code:**
+   Since you already have the repository on your server, simply navigate to it and pull the latest changes:
    ```bash
-   git clone https://github.com/Amichael10/muvidb.git
-   cd muvidb/scripts/scraper
+   cd muvidb
+   git pull
+   cd scripts/scraper
    ```
 
 3. **Install Dependencies:**
