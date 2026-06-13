@@ -37,6 +37,21 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 const BASE_URL = 'https://www.nollydata.com';
 const MOVIES_INDEX_URL = `${BASE_URL}/moviess`;
 
+function parseRuntime(str: string) {
+  if (!str) return null;
+  const hMatch = str.match(/(\d+)\s*h/i);
+  const mMatch = str.match(/(\d+)\s*m/i);
+  let total = 0;
+  if (hMatch) total += parseInt(hMatch[1]) * 60;
+  if (mMatch) total += parseInt(mMatch[1]);
+  // If no h/m pattern, try to parse it just as a plain number (e.g. '90')
+  if (!hMatch && !mMatch) {
+    const raw = parseInt(str);
+    return isNaN(raw) ? null : raw;
+  }
+  return total > 0 ? total : null;
+}
+
 async function saveMovieToSupabase(movie: any) {
   if (!movie || !movie.title) return;
   console.log(`  💾 Saving movie to Supabase: ${movie.title}`);
@@ -53,7 +68,7 @@ async function saveMovieToSupabase(movie: any) {
       .update({
         synopsis: movie.synopsis,
         year: parseInt(movie.release_year) || null,
-        runtime_minutes: movie.duration
+        runtime_minutes: parseRuntime(movie.duration)
       })
       .eq('id', existing.id);
       
@@ -69,7 +84,7 @@ async function saveMovieToSupabase(movie: any) {
         title: movie.title,
         synopsis: movie.synopsis,
         year: parseInt(movie.release_year) || null,
-        runtime_minutes: movie.duration,
+        runtime_minutes: parseRuntime(movie.duration),
         source: 'nollydata'
       })
       .select()
