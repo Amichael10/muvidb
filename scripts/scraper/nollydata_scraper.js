@@ -30,8 +30,8 @@ async function scrapeMoviesIndex() {
     // Adjust selector based on actual nollydata HTML structure
     $('a').each((i, el) => {
       const href = $(el).attr('href');
-      if (href && href.includes('/movie/')) {
-        movieUrls.push(href.startsWith('http') ? href : `${BASE_URL}${href}`);
+      if (href && href.includes('movies/')) {
+        movieUrls.push(href.startsWith('http') ? href : `${BASE_URL}/${href.replace(/^\\//, '')}`);
       }
     });
     
