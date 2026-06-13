@@ -1,12 +1,29 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
-const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
-const WebSocket = require('ws'); // Fix for Node 20
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+import * as cheerio from 'cheerio';
+import { createClient } from '@supabase/supabase-js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import dotenv from 'dotenv';
+import WebSocket from 'ws'; // Fix for Node 20
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env.local first, then fallback to .env
+const envLocalPath = path.resolve(__dirname, '../../.env.local');
+const envPath = path.resolve(__dirname, '../../.env');
+
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath });
+} else if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+} else {
+  dotenv.config(); // fallback
+}
+
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+// Prefer Service Role Key for backend scraping to bypass RLS
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false },
@@ -23,15 +40,18 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function scrapeMoviesIndex() {
   console.log(`Fetching movies index from ${MOVIES_INDEX_URL}`);
   try {
-    const { data } = await axios.get(MOVIES_INDEX_URL);
+    const response = await fetch(MOVIES_INDEX_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.text();
     const $ = cheerio.load(data);
     
     const movieUrls = [];
     // Adjust selector based on actual nollydata HTML structure
     $('a').each((i, el) => {
-      const href = $(el).attr('href');
+      let href = $(el).attr('href');
+      if (href) href = href.trim();
       if (href && href.includes('movies/')) {
-        movieUrls.push(href.startsWith('http') ? href : `${BASE_URL}/${href.replace(/^\\//, '')}`);
+        movieUrls.push(href.startsWith('http') ? href : `${BASE_URL}/${href.replace(/^\//, '')}`);
       }
     });
     
@@ -46,7 +66,9 @@ async function scrapeMoviesIndex() {
 async function scrapeMovieDetails(url) {
   console.log(`Scraping movie details from ${url}`);
   try {
-    const { data } = await axios.get(url);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.text();
     const $ = cheerio.load(data);
     
     // Adjust these selectors based on the actual HTML structure
@@ -60,9 +82,9 @@ async function scrapeMovieDetails(url) {
     const cast = [];
     $('.cast-member').each((i, el) => {
         const name = $(el).find('.name').text().trim();
-        const url = $(el).find('a').attr('href');
+        const memberUrl = $(el).find('a').attr('href');
         if (name) {
-            cast.push({ name, url: url?.startsWith('http') ? url : `${BASE_URL}${url}` });
+            cast.push({ name, url: memberUrl?.startsWith('http') ? memberUrl : `${BASE_URL}${memberUrl}` });
         }
     });
 
@@ -84,7 +106,9 @@ async function scrapePersonDetails(url) {
   if (!url) return null;
   console.log(`Scraping person details from ${url}`);
   try {
-    const { data } = await axios.get(url);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.text();
     const $ = cheerio.load(data);
     
     const name = $('h1').first().text().trim();
@@ -126,7 +150,7 @@ async function saveMovieToSupabase(movie) {
     
   if (error) {
     console.error(`Error saving movie ${movie.title}:`, error.message);
-  } else {
+  } else if (data) {
     console.log(`Saved movie ID: ${data.id}`);
   }
 }
@@ -149,7 +173,7 @@ async function savePersonToSupabase(person) {
     
   if (error) {
     console.error(`Error saving person ${person.name}:`, error.message);
-  } else {
+  } else if (data) {
     console.log(`Saved person ID: ${data.id}`);
   }
 }

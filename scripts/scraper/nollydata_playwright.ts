@@ -35,7 +35,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 const BASE_URL = 'https://www.nollydata.com';
-const MOVIES_INDEX_URL = `${BASE_URL}/movies`;
+const MOVIES_INDEX_URL = `${BASE_URL}/moviess`;
 
 async function saveMovieToSupabase(movie: any) {
   if (!movie || !movie.title) return;
@@ -46,8 +46,8 @@ async function saveMovieToSupabase(movie: any) {
     .upsert({
       title: movie.title,
       synopsis: movie.synopsis,
-      release_year: movie.release_year,
-      duration: movie.duration,
+      year: parseInt(movie.release_year) || null,
+      runtime_minutes: movie.duration,
       // Adjust field names as per your actual DB schema
     }, { onConflict: 'title' })
     .select()
@@ -100,7 +100,8 @@ async function main() {
     const movieUrls = await page.evaluate((baseUrl) => {
       const urls: string[] = [];
       document.querySelectorAll('a').forEach(el => {
-        const href = el.getAttribute('href');
+        let href = el.getAttribute('href');
+        if (href) href = href.trim();
         // This is a naive check; adjust it to match how nollydata links to movies
         if (href && href.includes('movies/')) {
           urls.push(href.startsWith('http') ? href : `${baseUrl}/${href.replace(/^\//, '')}`);
@@ -111,8 +112,8 @@ async function main() {
 
     console.log(`Found ${movieUrls.length} movie links.`);
     
-    // Test mode: take first 3 movies
-    const testUrls = movieUrls.slice(0, 3);
+    // Process all movies
+    const testUrls = movieUrls;
     
     for (const url of testUrls) {
       console.log(`\n🎬 Scraping movie details from ${url}`);

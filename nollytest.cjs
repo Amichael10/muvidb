@@ -1,0 +1,1 @@
+const https = require('https'); https.get('https://www.nollydata.com/moviess', res => { let d = ''; res.on('data', c => d += c); res.on('end', () => { const regex = /href="([^"]+)"/g; let match; const links = []; while ((match = regex.exec(d)) !== null) { links.push(match[1]); } console.log([...new Set(links)].filter(l => l.includes('movie'))); }); });
