@@ -23,7 +23,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const NETFLIX_URL = 'https://www.netflix.com/browse/genre/1138254?bc=34399';
+const NETFLIX_URL = 'https://www.netflix.com/browse/genre/1138254?so=su';
 const LOGIN_URL = 'https://www.netflix.com/login';
 const STATE_FILE = 'netflix_playwright_state.json';
 
