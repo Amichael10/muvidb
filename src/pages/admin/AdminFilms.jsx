@@ -1941,7 +1941,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -2028,7 +2028,8 @@ export default function AdminFilms() {
                       { id: 'kava', label: 'Kava', placeholder: 'https://kava.tv/...' },
                       { id: 'youtube', label: 'YouTube (Full Movie)', placeholder: 'https://youtube.com/watch?v=...' },
                       { id: 'showmax', label: 'Showmax', placeholder: 'https://showmax.com/...' },
-                      { id: 'docuth', label: 'Docuth', placeholder: 'https://web.docuth.com/movies/...' },
+                      { id: 'docuth', label: 'Docuth', placeholder: 'https://docuth.com/...' },
+                      { id: 'ebonylife', label: 'EbonyLife', placeholder: 'https://ebonylifeonplus.com/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;
