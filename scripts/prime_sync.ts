@@ -197,6 +197,7 @@ async function scrapePrime() {
 
         const titleEl = document.querySelector('h1[data-testid="title"], h1[data-automation-id="title"], h1, .dv-node-dp-title');
         const synopsisEl = document.querySelector('.synopsis-FWBzLL span, span[data-testid="unclipped-text"], div[data-testid="synopsis"] span, [data-automation-id="description-text"], #pv-details-description, .pv-description');
+        const metaDescEl = document.querySelector('meta[name="description"]');
         const yearEl = document.querySelector('span[data-testid="release-year"], [data-automation-id="release-year-badge"], .dv-node-dp-release-year, [data-automation-id="release-year"]');
         const runtimeEl = document.querySelector('span[data-testid="runtime"], [data-automation-id="runtime-badge"], [data-automation-id="runtime"]');
         
@@ -243,7 +244,8 @@ async function scrapePrime() {
 
         // Detect if it's a series
         const titleText = titleEl?.textContent?.toLowerCase() || '';
-        const synopsisText = synopsisEl?.textContent?.toLowerCase() || '';
+        const extractedSynopsis = synopsisEl?.textContent?.trim() || metaDescEl?.getAttribute('content')?.trim() || '';
+        const synopsisText = extractedSynopsis.toLowerCase();
         const durationText = runtimeEl?.textContent?.toLowerCase() || '';
         const seasonSelector = !!document.querySelector('[data-automation-id="season-selector"], .dv-node-dp-season-selector, [data-testid="season-selector"], .season-selector');
         const episodeList = !!document.querySelector('[data-automation-id="episodes-list"], .dv-node-dp-episodes, .episode-list, .episode-container');
@@ -258,7 +260,7 @@ async function scrapePrime() {
 
         return {
           title: titleEl?.textContent?.trim() || 'Unknown',
-          synopsis: synopsisEl?.textContent?.trim() || '',
+          synopsis: extractedSynopsis,
           year: yearEl?.textContent?.trim() || null,
           runtime: runtimeEl?.textContent?.trim() || null,
           poster_url: extractedPosterUrl,
