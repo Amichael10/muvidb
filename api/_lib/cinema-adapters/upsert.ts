@@ -95,7 +95,7 @@ async function recordPending(
     return;
   }
 
-  await supabase.from('pending_cinema_films').insert({
+  const { error: insertErr } = await supabase.from('pending_cinema_films').insert({
     title:               st.filmTitle.trim(),
     external_id:         st.externalFilmId,
     poster_url:          st.filmMeta?.posterUrl  ?? null,
@@ -106,6 +106,10 @@ async function recordPending(
     last_seen_cinema_id: cinemaId,
     showtime_count:      1,
   });
+
+  if (insertErr) {
+    console.error(`[cinema-upsert] pending_cinema_films insert failed for ${st.filmTitle}:`, insertErr.message);
+  }
 }
 
 /**
