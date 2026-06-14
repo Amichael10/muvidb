@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -6,52 +6,53 @@ import { ThemeProvider } from './context/ThemeContext';
 import { QuickViewProvider } from './context/QuickViewContext';
 import QuickViewModal from './components/film/QuickViewModal';
 
-// Public Pages
+// Eager: landing page only (keeps first paint / LCP fast)
 import Home from './pages/Home';
-import FilmDetail from './pages/FilmDetail';
-import Search from './pages/Search';
-import Browse from './pages/Browse';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Onboarding from './pages/Onboarding';
-import Dashboard from './pages/Dashboard';
-import ProDashboard from './pages/ProDashboard';
-import ClaimProfile from './pages/ClaimProfile';
-import PersonDetail from './pages/PersonDetail';
-import Showtimes from './pages/Showtimes';
-import Cinemas from './pages/Cinemas';
-import CinemaDetail from './pages/CinemaDetail';
-import Companies from './pages/Companies';
-import CompanyDetail from './pages/CompanyDetail';
-import PeopleList from './pages/PeopleList';
-import Channels from './pages/Channels';
-import ChannelDetail from './pages/ChannelDetail';
-import Terms from './pages/Terms';
-import Privacy from './pages/Privacy';
-import Waitlist from './pages/Waitlist';
 
-// Admin Pages
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminOverview from './pages/admin/AdminOverview';
-import AdminFilms from './pages/admin/AdminFilms';
-import AdminPeople from './pages/admin/AdminPeople';
-import AdminCredits from './pages/admin/AdminCredits';
-import AdminCompanies from './pages/admin/AdminCompanies';
-import AdminClaims from './pages/admin/AdminClaims';
-import AdminYouTube from './pages/admin/AdminYouTube';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminCinemas from './pages/admin/AdminCinemas';
-import AdminChannels from './pages/admin/AdminChannels';
-import AdminYouTubeVideos from './pages/admin/AdminYouTubeVideos';
-import AdminCinemaFilms from './pages/admin/AdminCinemaFilms';
-import AdminCinemaScraping from './pages/admin/AdminCinemaScraping';
-import AdminCreditsExtractor from './pages/admin/AdminCreditsExtractor';
-import AdminChannelDetail from './pages/admin/AdminChannelDetail';
-import AdminImport from './pages/admin/AdminImport';
-import AdminAI from './pages/admin/AdminAI';
-import AdminSpotlight from './pages/admin/AdminSpotlight';
-import AdminLogs from './pages/admin/AdminLogs';
-import AdminAutomation from './pages/admin/AdminAutomation';
+// Lazy public pages — code-split out of the initial bundle
+const FilmDetail = lazy(() => import('./pages/FilmDetail'));
+const Search = lazy(() => import('./pages/Search'));
+const Browse = lazy(() => import('./pages/Browse'));
+const WatchPlatform = lazy(() => import('./pages/WatchPlatform'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ProDashboard = lazy(() => import('./pages/ProDashboard'));
+const ClaimProfile = lazy(() => import('./pages/ClaimProfile'));
+const PersonDetail = lazy(() => import('./pages/PersonDetail'));
+const Showtimes = lazy(() => import('./pages/Showtimes'));
+const Cinemas = lazy(() => import('./pages/Cinemas'));
+const CinemaDetail = lazy(() => import('./pages/CinemaDetail'));
+const Companies = lazy(() => import('./pages/Companies'));
+const CompanyDetail = lazy(() => import('./pages/CompanyDetail'));
+const PeopleList = lazy(() => import('./pages/PeopleList'));
+const Channels = lazy(() => import('./pages/Channels'));
+const ChannelDetail = lazy(() => import('./pages/ChannelDetail'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Waitlist = lazy(() => import('./pages/Waitlist'));
+
+// Lazy admin pages — kept entirely out of the public bundle
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
+const AdminFilms = lazy(() => import('./pages/admin/AdminFilms'));
+const AdminPeople = lazy(() => import('./pages/admin/AdminPeople'));
+const AdminCredits = lazy(() => import('./pages/admin/AdminCredits'));
+const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies'));
+const AdminClaims = lazy(() => import('./pages/admin/AdminClaims'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminCinemas = lazy(() => import('./pages/admin/AdminCinemas'));
+const AdminChannels = lazy(() => import('./pages/admin/AdminChannels'));
+const AdminCinemaFilms = lazy(() => import('./pages/admin/AdminCinemaFilms'));
+const AdminCinemaScraping = lazy(() => import('./pages/admin/AdminCinemaScraping'));
+const AdminCreditsExtractor = lazy(() => import('./pages/admin/AdminCreditsExtractor'));
+const AdminChannelDetail = lazy(() => import('./pages/admin/AdminChannelDetail'));
+const AdminImport = lazy(() => import('./pages/admin/AdminImport'));
+const AdminAI = lazy(() => import('./pages/admin/AdminAI'));
+const AdminSpotlight = lazy(() => import('./pages/admin/AdminSpotlight'));
+const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
+const AdminAutomation = lazy(() => import('./pages/admin/AdminAutomation'));
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -142,6 +143,7 @@ export default function App() {
               
             />
             <Layout>
+              <Suspense fallback={<div className="min-h-screen bg-bg" />}>
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
@@ -149,6 +151,7 @@ export default function App() {
                 <Route path="/film/:slug" element={<FilmDetail />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/browse" element={<Browse />} />
+                <Route path="/watch/:platform" element={<WatchPlatform />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/people" element={<PeopleList />} />
@@ -196,6 +199,7 @@ export default function App() {
 
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </Suspense>
             </Layout>
             <QuickViewModal />
           </SmoothScroll>

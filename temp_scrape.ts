@@ -1,21 +1,20 @@
-import * as cheerio from 'cheerio';
+import { chromium } from 'playwright-extra';
+import stealth from 'puppeteer-extra-plugin-stealth';
 
-async function test() {
-  const url = 'https://www.nollydata.com/moviess';
-  const res = await fetch(url);
-  const html = await res.text();
-  const $ = cheerio.load(html);
-  
-  const links = [];
-  $('a').each((i, el) => {
-    links.push($(el).attr('href'));
+chromium.use(stealth());
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   });
-  console.log("Total links:", links.length);
-  console.log("First 20 links:", links.slice(0, 20));
+  const page = await context.newPage();
   
-  // also check if any links contain 'movie'
-  const movieLinks = links.filter(l => l && l.includes('movie'));
-  console.log("Links containing 'movie':", movieLinks);
-}
-
-test();
+  await page.goto('https://www.nollydata.com/movies/jagun_jagun', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000);
+  
+  const fs = require('fs');
+  fs.writeFileSync('temp_html.txt', await page.content());
+  console.log('Saved to temp_html.txt');
+  await browser.close();
+})();

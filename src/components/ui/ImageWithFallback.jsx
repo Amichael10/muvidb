@@ -88,7 +88,7 @@ export default function ImageWithFallback({
     if (fallbackType === 'banner') {
       return (
         <div
-          className={`w-full h-full relative overflow-hidden flex items-center justify-center ${className}`}
+          className={`w-full h-full relative overflow-hidden flex items-center justify-center @container ${className}`}
           style={{
             background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
           }}
@@ -96,15 +96,23 @@ export default function ImageWithFallback({
         >
           {/* Subtle Grid overlay */}
           <div className="absolute inset-0 grid-bg opacity-15 pointer-events-none" />
-          
+
           {/* Glassmorphic decorative bubbles for that extra premium look */}
           <div className="absolute -top-12 -left-12 w-32 h-32 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full bg-black/15 blur-2xl pointer-events-none" />
-          
-          {/* Subtle text label if it's large enough */}
-          <span className="absolute bottom-3 right-4 text-[9px] font-black uppercase tracking-[0.25em] text-white/40 pointer-events-none select-none font-heading">
-            {name || alt || 'MuviDB'}
-          </span>
+
+          {/* Darkening scrim so the branded label reads as intentional, not broken */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/15 pointer-events-none" />
+
+          {/* Branded centered title + MuviDB mark */}
+          <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 pointer-events-none select-none">
+            <span className="font-heading font-black text-white leading-tight tracking-tight line-clamp-3 drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)] text-[clamp(13px,4cqi,22px)]">
+              {name || alt || 'Untitled'}
+            </span>
+            <span className="mt-2 text-[9px] font-black uppercase tracking-[0.28em] text-white/70 font-heading">
+              Muvi<span className="text-white">DB</span>
+            </span>
+          </div>
         </div>
       );
     }

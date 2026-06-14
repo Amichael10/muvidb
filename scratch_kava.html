@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="https://d3ggjyip6a9ibw.cloudfront.net/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/3D28C83C85544F0D9517DD2E7C7EEDAA/il/a852992b517d406c852429eb866ed2db/Kava_App_Icon_Transparent-1753867139758.png">
+    <script id="head_script">
+        //@ER: 74207 Show window alert when page reload during audio playing
+        //var isAudioPlaying = (isAudioPlaying) ? 1 : '';
+        window.onbeforeunload = function() {
+            if (window.isAudioPlaying) {
+                return 'Are you sure you want to leave?';
+            }
+        }
+        var scrollLoad = false; //@ER: 74207
+        var rootUrl = "//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/"
+        var asseturl = "//asset.muvi.com/muvione/"
+        var api_gateway = "https://kavaapi.muvi.com/"
+        var asthu_domain_url = "https://www.muvi.com/"
+        var chat_url = "https://chat.muvi.com"; //@ER: 89341 (chat in player)
+        var ip = "2a02:6ea0:1806:4000:1561:b9ba:633:e630, 162.158.90.124"
+        var vd_url = "kavavd.muvi.com"
+        var asset_cdn_url = "https://asset.muvi.com/visual-designer/cdn/img/"
+        var isAudioExists = "1"; //@ER: 74207 - Audio exist in store or not.
+        var slug = "category";
+        var cacheVersion = "v_1781165802";
+        var assetCacheVersion = "1.5.47";
+        window.tanslationJson = [];
+        var language_list = [{"code":"en","name":"English","is_rtl":0}];
+        var primary_language = "en";
+                    var page_layout = "layout"
+                    var page_navbar = "1"
+                    var page_footer = "1"
+                    var page_header = "1"
+                    var page_searchbar = "1"
+                    var page_is_client_ip_allowed = "0"
+                            var permalink = "p1"
+                    var template = "garnet"
+                    var language_separator = ""
+                localStorage.setItem('access_token', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJtdXZpLWNtcyIsInN1YiI6ImNseEJOWDVBam1qZGtaT2ZNWWV2S3F5Y284ekRzQ2dLNHVxOWRJMzBqUHVINWVpWTZKNVBLS2I2d09pcEczSGdQZ2tzdjBvZTdKVVZVT0lzK1BrY1wvYjJHTXhKcUVLUDc2N1RmZDJ2WUFqSUhUT0tyOHZRYVlYQ3lpK01vVkppcFNIaFl1aXJsU1FJdEhcL21ueHIxa1RESjFueGV5QUhGNUZNUlVhaldxaWhWdnhjdTRlMEVhZnI4RTArbGlmZndFMkEzY2FHMUo3TzZ5NDB6Um0xZG5iTDBPNDRsS3NJMVBEQnNkcXJCNGxFb3F3bjBiMlpzckh6U0pIUHJYVXhcL2o3MUFROFhUNncyc0tJaitoWGVWMzVJUlRLZzhoZmNBZmtUVlhkNSt2MHhUUys1XC9MNnhcL2dzOUEzcWxadUZCRVV1TzhFZURXUytVOThWR1dsNEVPZGphZjhCN1BsWEU2SnhDOUFqWWV2TE9kWWpCb1wvWFY5TmJId2ZSbnNcL2xRcGMzNktrWk5UQXpEZVdcL3VNbUJncU1PZTQyRnJQMUhSZXNDRG1oeWhqUkMzYXZjRjlYNkxrRWhKY2FqK0pUa2ZnUHQwa2g2aSs0WG9JSjNmOG5DZmdDQWNNREMxXC80bHRoRW5VdUo2dmdCYW1lOFpZTkZQMVRhN29ycXhSeVwvUWwxVEtUWElHWEFpS21JUUlxMktYeWxRa09ZNXJGajlPVCtZZVpKeDNaaFFESXRlaHlqNzIrSzdlWk9zTytZbEI3ZDk1WG8yUlRaa1AyNDJzYk9pdURtRVZmcU4xNzdOV3p5YWlTd00xYzlsVUJrWG41Qjk0TDROXC9qWDdURnl6TlNGM1ZlWkwwYkFlalcreTZmWWFKbFh4ZHRQaWo3Q3JiUnBmRG82TmhjVTNFWDVxQ25YcjNnaTM2VEVmNGl1VE41enViZWxzQ2p5bUVZVGJKREw0SnhJXC9XejI0Vk5tUkduQnZNVExPUm00Q3lcL0VvenBJSXhMS0E5Nm1acWFLWld5MEJzMGJWcFprU1ZnSUVibEd2ZElYV2Z4UXcwN2JRd2xCMndzaVVDbk13YmlCd0dWV1hxMllaMTkzQ3VTQ0FSOXRnNllaWjZ4aVAwS21nYWNXUVBLdFhMeEM2SkVISXFzUVwvRUpPdkdVd3AzQWpBK3huS2lFVU9ZeGVDdm5tZnkyMXhFVUJuR29cL0Y5UG1TRHpJVk9OWHBEbE5XWnRQcmQ2QnNHYWJVeFlJaVFSbVwva0c1R2QxMXMrYTJjczIzNTVpYU95T2pYR2F1ZnFkTVM4YjcyN3Frb0lPa0hNRVwvK1IrK2ZmekJQWFV2OTZHSHlSNEkrWCtcL3Bpek5PSDJhNFExSFFUeEVVNEQrYWM4YlZ2d3F2Q2dUZHluSmNYVmtwcnBQSnN5T2pncnFZUVloZUZCUjdpdUEwMWdqd2pZRUJxTFRjSHVyMjZnNWtqKzh4V0U4Ung0Skt0TGx1QjFlelhvTGQ2V0VVMlRRekZrRzBTQ1RLcE5INVFCTUZNQkN2aTIrbXk4T2s2eFdtNjJrZlBOeDhSNEk1MDk1R0pjTWtJXC96VDRDNmVcL1VGOTBPTndXcnhIZVVCTTR6SkFISjJMSm1TVlRTMWNxWlNWMEU2UWNRdnV3U3dmR0lkMk5wNTY3VlIwNHNEOUFPRlArVVQwb3NwZW1rSFlDK2syUStmUlU5R1dkYm40akptWDByRDJSRjBWVHFwU2U4ZlBlRUg3MXB3VWxBQjFnQ1FEWkk1RkRFNWdkVGc2SjJWYUdnR1VtRnJDc0dWd3RMaFlWN3RQK25USkdtUmxHaVlPMUdDTUwzXC9CM3FPcCtXWmpzeUNWUkZUQVQwQkRWbVVsUXVRV0t6NWxkb09wUWRKb0F5bVBHNVBOSnA4RmVZOUdNOSthSW41MlZtVVBTRXNaSVFlNFwveFwvbWNoU0ozNzhIRnNqNnlQZERDZnJUdVJkRDVDWFJqYXFrUHZvRFQ5KzlBY1RTNU1ZUmtlY2x5YTdjY0NSQ25jNHZ4ZlNEeU8yS1BDb000aXQ5K0NaaWhZeHhIb3FyWXpcL29YYnVUaGU4RGI0V2RINzFFMmloZFF6cmhTN0tuR2txcVwvNEV3NE9weHVhSmVwMVRvb1YyaVZkaTR2QjZUT2EwNlhEYkEyYXMwVW84aXVmV0RxSnR0c0VOS1htK2p3em5CdTE1bHIzNytUM1dtT1FtZmxFdjNMbno5dW1PM3Fpbm13XC9XbXVWYkFES2JJckVsblRaYjNEM1RQeFNrcGk5cTUwKzhpYXlpOWVBemJ0SEI2d08wRlpuc2JvTzBxWHNWdHNnWHhBMVNha0l0QVh5bitsejNNUldvTCt0SDdjZjc4Q2Zycmx4M2J5ODVHcVVDaHJiSXlBVmZtbUpMWEdnYk1FY0tmNkYrcGY3YjlFelgxTmVzZzZKN284RDVkR05ZNHRhK1lsK3hmdjVjcUF0TmI3Q3VDSk9JQ3ZrcFpLV3FGOE9QK1ZnNHhcL0FrVGhOYzYyb1MzZ2xad3dLdEN0dFFKR3FtRWVQUGVhOGxhSnZDRzFKR1duN3phdFJCTG9GXC9DXC9lVDVZRXVDWk9wTnBVUDJTZ1dLQWhvaG1XTFBvMWJaT3Fxb0dSbHF5bFpWR1N5RmppNGQyQmlYZmFUVTZ6VmVBUlRldEQrNm53dlVsVlQ0c1wvNEd0SE41R0dDclQ3enhoQlYzNFNEZ3B4ZG04VUNsNTZzQzIreml6OGc5clFRalhBQTN0WHh5MzJMQ1wvTFdCUm9KMkN6Mjd1OXlaQzFRY0dCOTFSaDBjZVZ5blBVZUFNQWhMU3lrbXRNd1NpRGNlK0lLZ1duQ1JhRUpibXRGQW1XNFhEWG1nVFNuUkVzU1kySitSUlJ6WExYeGlNN0N4ZnhMTllLdHpSc2tFVmZHUUVncE5kY25oSEJCU2xaR0RYRlhaWkN6XC9Ia1VPSkdBZWYyM3FUcWlRSGxObUlmQXMiLCJpYXQiOjE3ODE0NDA1MDEsImV4cCI6MTc4MTUyNjkwMX0.XeORrAU4tZ5gZTK1ur4riyEotGZRv8fz4-sxys2BXP8");
+        localStorage.setItem('reload_token', "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJtdXZpLWNtcyIsInN1YiI6ImJ0d0JOY2ZpNnVrcmxpK0ErT1c5d3lCOFZSd2ZJRFRmRnAwRjREbnNyQXpxbHlLS2hYaDE4S0hFZENkUGM0bTEza1lsd3lRalwvTlBnTHA3OVFYM1E0K0xrVTVZNmtwRk5hb1NOdkxRbXVlQzFDR2d4b1M4WXQrekVmTUl6RlBjN3NNTzU1YXJVQjduNEx3RHhralwvd21NOGJoQmZFOTNvQ3JnazhPOGFwaVJvb1FJOHJaYUdrelc2RmZ3d1dKWXVHcm9GUG1lSXoyNnI1SGRUeVBoWTFLTlRlM3lFMWx1K0h6NXJXYVlOdThaRytjdkFLNUdqN2xNcHhLSzJzSWt3ZG5ITFk5OHNienRyY0oyd1BNMU1tSXl3OGtLNTJoOUZmYkJXeUY2QmV2ZTBLTktFYTNCNFpjNWdMRmMwYUI0ajkiLCJpYXQiOjE3ODE0NDA1MDF9.pWIeeYxIaalDa9jxPelitZDHHb_9gNPtUGutqZyHj2I");
+        localStorage.setItem('locationHref', window.location.href);
+        //scroll to top
+        window.scrollTo(0, 0);
+    </script>
+
+    <script>
+        // <!-- scripts added in the vd application -->
+            </script>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="dns-prefetch" href="https://asset.muvi.com">
+<link rel="preconnect" href="https://asset.muvi.com" crossorigin>
+<link rel="dns-prefetch" href="https://js.braintreegateway.com">
+<link rel="preconnect" href="https://js.braintreegateway.com" crossorigin>
+
+
+<title></title>
+<link rel="icon" type="image/x-icon" href="">
+<meta name="description" content="" />
+<meta name="keywords" content="" />
+<meta property="og:site_name" content="Kava" />
+<meta property="og:url" content="https://kava.tv/category/p1" />
+<meta property="og:title" content="" />
+<meta property="og:description" content="" />
+<meta property="og:image" content="https://d3ggjyip6a9ibw.cloudfront.net/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/3D28C83C85544F0D9517DD2E7C7EEDAA/il/33dac03677524eaea9f328da47e7dd18/kava-logo-1749913840918-1756474080032.png" />
+<meta property="og:image:secure_url" content="https://d3ggjyip6a9ibw.cloudfront.net/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/3D28C83C85544F0D9517DD2E7C7EEDAA/il/33dac03677524eaea9f328da47e7dd18/kava-logo-1749913840918-1756474080032.png" />
+<meta property="og:image:type" content="image/*" />
+<meta property="og:image:width" content="" />
+<meta property="og:image:height" content="" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+
+<link rel="preload"  href="//asset.muvi.com/muvione/js/jquery.min.js?v=1.5.47" as="script">
+<script src="//asset.muvi.com/muvione/js/jquery.min.js?v=1.5.47"></script>
+
+<link rel="preload"  href="//asset.muvi.com/muvione/js/js-loader-form.min.js?v=1.5.47" as="script">
+
+
+<script src="https://js.braintreegateway.com/web/3.101.3/js/client.min.js"></script>
+<script src="https://js.braintreegateway.com/web/3.101.3/js/paypal-checkout.min.js"></script>
+
+<script src="//asset.muvi.com/muvione/js/version-check.js?v=1.5.47"></script>
+
+<script>
+    var analytics_url="https://kavaanalytics.muvi.com"
+    var is_rtl="LTR"
+
+</script>
+
+
+
+    <link rel="preload"  href="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/lang/en.js?v=v_1781165802" as="script">
+    <script src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/lang/en.js?v=v_1781165802"></script>
+
+<script>
+    var frontend_asset_url = "//kava.tv/resources/views/assets/";
+</script>
+
+    <script src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/global-widgets.js?v=1.5.47"></script>
+
+
+
+
+<link rel="preload" 
+      href="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet//css/parentcss.css?v=v_1781165802" 
+      as="style" 
+      onload="this.rel='stylesheet'">
+
+<noscript>
+  <link rel="stylesheet" 
+        href="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet//css/parentcss.css?v=v_1781165802">
+</noscript>
+
+<link rel="preload" href="https://asset.muvi.com/visual-designer/cdn/font-awesome/css/all.min.css" as="style"
+    onload="this.onload=null;this.rel='stylesheet'">
+<noscript>
+    <link rel="'stylesheet'" href="https://asset.muvi.com/visual-designer/cdn/font-awesome/css/all.min.css">
+</noscript>
+
+<link rel="preload" href="//asset.muvi.com/muvione/css/vdglobalstyle.css?v=1.5.47" as="style"
+    onload="this.onload=null;this.rel='stylesheet'">
+<noscript>
+    <link rel="'stylesheet'" href="//asset.muvi.com/muvione/css/vdglobalstyle.css?v=1.5.47">
+</noscript>
+
+
+
+
+<script>
+    var vdCTAInit = 0;
+</script>
+<script defer src="//asset.muvi.com/muvione/js/vue/vue-cookies.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.7.12/sweetalert2.all.min.js" crossorigin="anonymous"></script>
+
+<script defer src="//asset.muvi.com/muvione/js/js-loading-overlay.min.js?v=1.5.47"></script>
+
+<script defer id="custom_js" src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/custom.js?v=v_1781165802"></script>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.4/axios.min.js"></script>
+
+<script defer src="//asset.muvi.com/muvione/js/popper.min.js?v=1.5.47"></script>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0/js/bootstrap.min.js"></script>
+
+
+
+
+<script defer src="//asset.muvi.com/muvione/js/vue/vue.global.prod.js"></script>
+<script defer src="//asset.muvi.com/muvione/js/vue/vuex.global.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/vue-demi"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@vuelidate/core"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@vuelidate/validators"></script>
+<script defer src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+<script defer src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/custom-carousel.js?v=v_1781165802"></script>
+
+<script defer src="//asset.muvi.com/muvione/js/owl.carousel.js?v=1.5.47"></script>
+<script defer src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/override-check-website.js?v=v_1781165802"></script>
+<script defer src="//asset.muvi.com/muvione/js/main.js?v=1.5.47" type="module"></script>
+
+
+ <script defer src="//asset.muvi.com/muvione/js/lodash.min.js?v=1.5.47"></script> 
+
+
+
+<script defer src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/owl.carousel.min.js?v=v_1781165802"></script>
+<script defer src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/select2.min.js?v=v_1781165802"></script>
+<script defer src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/jquery.magnific-popup.min.js?v=v_1781165802"></script>
+
+<script defer src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/gsap.min.js?v=v_1781165802"></script>
+<script defer src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/gsap-scripts.js?v=v_1781165802"></script>
+<script defer src="//asset.muvi.com/muvione/js/i18n.js?v=1.5.47" type="module"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.18/js/bootstrap-select.min.js"></script>
+
+<script defer id="ajaxScript" src="//asset.muvi.com/muvione/js/ajax.v1.js?v=1.5.47" type="text/javascript">
+</script>
+
+    <style id="vdjs-styles">
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        section#main-header > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > nav:nth-child(1) > a:nth-child(2) > img:nth-child(1) {cursor: pointer;position: relative;transition-behavior: normal;transition-duration: 0s;transition-timing-function: ease;transition-delay: 0s;transition-property: all;z-index: 9999;}.body-container.vd-browse div#banner-1 > div:nth-child(2) > div:nth-child(2) > ul:nth-child(2) > li:nth-child(1) {display: inherit;justify-content: center;align-items: center;position: relative;cursor: pointer;transition-duration: 0s;transition-timing-function: ease;transition-delay: 0s;transition-behavior: normal;transition-property: all;z-index: 9999;}.body-container.vd-home div#app > section:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > p:nth-child(2) {left: 0px;margin-right: px;margin-left: px;color: rgba(255,255,255,0.9);font-size: 1.2rem;font-weight: 400;line-height: 1.6;margin-top: 0px;margin-bottom: 40px!important !important;z-index: 9999;cursor: pointer;position: relative;transition: all;width: 100%px;}.body-container.vd-home div#app > section:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div:nth-child(1) > h1:nth-child(1) {color: rgb(255,255,255);font-size: 3.5rem;font-weight: 700;line-height: 1.2;text-shadow: rgba(0,0,0,0.5)2px2px40px;margin: auto;cursor: pointer;position: relative;transition: all;z-index: 9999;}                            .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    .hoverClass:hover {
+	color:#eb4296 !important;
+	-webkit-text-fill-color:#eb4296!important;
+}.activeClass {
+	color:#ffffff !important;
+	-webkit-text-fill-color:#ffffff!important;
+}    </style>
+    <link rel="preload" href="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/css/local.css?v=v_1781165802" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link rel="'stylesheet'" href="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/css/local.css?v=v_1781165802">
+    </noscript>
+    <script type="module" src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/js/local.js?v=v_1781165802"></script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HRD4W63ZNL"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-HRD4W63ZNL'); // GA4 Measurement ID
+    </script>
+    
+   <!-- New Meta -->
+   <!-- Facebook Pixel Code -->
+    <script>
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window,document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '1213289250209149'); 
+        fbq('track', 'PageView');
+    </script>
+    <noscript>
+        <img height="1" width="1" 
+        src="https://www.facebook.com/tr?id=1213289250209149&ev=PageView
+        &noscript=1"/>
+    </noscript>
+    <!-- End Facebook Pixel Code -->
+ 
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18178855767"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'AW-18178855767');
+    </script>
+
+</head>
+
+<body id='layout_body' class="page-bg-category">
+
+
+    <header id="navbar">
+    
+            <navbar_five label1="Toggle Dropdown" label2="About Us" label3="Contact" label4="No result found" label5="Sign Up" label6="Login" label7="My Profile" label8="Sign Out" label9="Search" label10="" label11="SUBSCRIBE NOW" class="header" id="header_navbar_five_5"></navbar_five>
+       
+</header>    <section class='p-0 body-container vd-category' id="ajaxApp">
+        <div id="app">
+    <div>
+        <category_list_five
+            id="category_category_list_five_5"
+            label1="Play Now"
+            label2="Watch Trailer"
+            label3="Play All"
+            label4="Play Now"
+            label5="Free"
+            label6="See All"
+            >
+    </div>
+    <div>
+        <content_purchase_four 
+            id="category_content_purchase_four_4" 
+        />
+    </div>
+</div>
+<script src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/pages/category/category.js?v=v_1781165802" type="module" ></script>
+        <div id="cookieDiv">
+    <cookie_five class="footer" id="mycookie_cookie_five_5" label1="Allow Cookies" label2="Dismiss"
+        label3="Agree &amp; Proceed" label4="Customize" label5="Accept All" label6="Customize Consent Preferences"
+        label7="Save" />
+</div>
+<script id="cookieId" src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/cookie.js?v=v_1781165802" type="module"></script>    </section>
+    <footer id="footer">
+        <div>
+        <footer_five label1="Category" label2="Companies" label3="Need Help" label4="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>Action</a>" label5="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>Adventure</a>" label6="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>Animation</a>" label7="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot;>Comedy</a>" label8="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot;>Crime</a>" label9="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>Drama</a>" label10="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>Fantasy</a>" label11="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot;>Horror</a>" label12="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot;>Mystery</a>" label13="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot;>Romance</a>" label14="<a vd-node=&quot;link&quot; href=&quot;https://inkblot60.muvi.com/about-us&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>About Us</a>" label15="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>My Account</a>" label16="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax ui-draggable ui-draggable-handle&quot; style=&quot;cursor: pointer; display: inline-block; position: relative;&quot;>Faq</a>" label17="<a vd-node=&quot;link&quot; href=&quot;https://inkblot.muvi.com/privacy-policy&quot; class=&quot;callByAjax ui-draggable ui-draggable-handle&quot; style=&quot;cursor: pointer; display: inline-block; position: relative;&quot; link-type=&quot;page&quot;>Privacy Policy</a>" label18="<a vd-node=&quot;link&quot; href=&quot;https://inkblot60.muvi.com/terms-condition&quot; class=&quot;callByAjax ui-draggable ui-draggable-handle&quot; style=&quot;cursor: pointer; display: inline-block; position: relative;&quot;>Terms Of Use</a>" label19="<a vd-node=&quot;link&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot;>Contact Us</a>" label20="support@kava.tv" label21="<a vd-node=&quot;text&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>+66 2399 1145</a>" label22="<a vd-node=&quot;text&quot; href=&quot;https://www.muvi.com/&quot; class=&quot;callByAjax&quot; style=&quot;cursor: pointer;&quot;>Help Center</a>" label23="Kava is the global streaming platform for Nollywood and Premium African content.<br>Watch the latest Nollywood blockbusters, exclusive African series, anytime, anywhere. From box office hits to hidden gems, Kava delivers premium African storytelling on demand." label24="Follow Us" label25="<a vd-name=&quot;facebook&quot; href=&quot;https://www.facebook.com/kava&quot; rel=&quot;noopener noreferrer external&quot; class=&quot;callByAjax&quot; default-url=&quot;aHR0cHM6Ly93d3cuZmFjZWJvb2suY29tL211dmlkb3Rjb20=&quot; default-icon=&quot;PGkgY2xhc3M9ImZhLWJyYW5kcyBmYS1mYWNlYm9vay1mIj48L2k+&quot; target=&quot;_blank&quot;><i class=&quot;fa-brands fa-facebook-f&quot;></i></a>" label26="<a vd-name=&quot;linkedin&quot; href=&quot;https://instagram.com/kava.tv&quot; rel=&quot;noopener noreferrer external&quot; class=&quot;callByAjax&quot; default-url=&quot;aHR0cHM6Ly9saW5rZWRpbi5jb20vY29tcGFueS9tdXZpLWNvbQ==&quot; default-icon=&quot;PGkgY2xhc3M9ImZhYiBmYS1saW5rZWRpbi1pbiIgc3R5bGU9ImN1cnNvcjogcG9pbnRlcjsiPjwvaT4=&quot; target=&quot;_blank&quot;><i class=&quot;fa-brands fa-instagram&quot;></i></a>" label27="<a vd-name=&quot;twitter&quot; href=&quot;https://x.com/watchkava&quot; rel=&quot;noopener noreferrer external&quot; class=&quot;callByAjax&quot; default-url=&quot;aHR0cHM6Ly94LmNvbS9tdXZp&quot; default-icon=&quot;PGkgY2xhc3M9ImZhLWJyYW5kcyBmYS14LXR3aXR0ZXIiPjwvaT4=&quot; target=&quot;_blank&quot;><i class=&quot;fa-brands fa-x-twitter&quot; style=&quot;cursor: pointer;&quot;></i></a>" label31="<a vd-name=&quot;tiktok&quot; href=&quot;https://tiktok.com/@watchkava&quot; rel=&quot;noopener noreferrer external&quot; class=&quot;callByAjax&quot; default-url=&quot;aHR0cHM6Ly94LmNvbS9tdXZp&quot; default-icon=&quot;PGkgY2xhc3M9ImZhLWJyYW5kcyBmYS14LXR3aXR0ZXIiPjwvaT4=&quot; target=&quot;_blank&quot;><i class=&quot;fa-brands fa-tiktok&quot; style=&quot;cursor: pointer;&quot;></i></a>" label28="©2025 Kava. All Rights Reserved." label29="Follow Us" class="footer" id="footer_footer_five_5"></footer_five></div>
+    </footer>    <div id="audio-player"></div>
+    <div id="player_poll" class="audiopoll"></div>
+    <!-- ER 83830-->
+    <div class="tag-wrapper" id="audiotag-wrapper" style="display:none !important">
+        <div class="audiocontent" id="tagContainer">
+            <div id="container"></div>
+        </div>
+        <span id="countdownUi" title="Ad Countdown"></span>
+        <button id="audioplaypause" title="Play/Pause"></button>
+        <button class="mute-audio" id="muteunmute" title="Mute/Unmute"></button>
+    </div>
+      
+
+</body>
+<script src="//kava.tv/resources/views/LWtdYCVTbOmTSk9djbUJYVAOC82faEft/garnet/layout.js?v=v_1781165802" type="module"></script>
+
+</html>

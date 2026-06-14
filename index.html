@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#FF5C00" />
+
+    <!-- Speed up the first image/data round-trips (Core Web Vitals) -->
+    <link rel="preconnect" href="https://pkenrmorywmuvnzfoylp.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://pkenrmorywmuvnzfoylp.supabase.co" />
+    <link rel="preconnect" href="https://i.ytimg.com" />
+    <link rel="dns-prefetch" href="https://www.partyjolloftv.com" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -31,6 +37,31 @@
     <meta name="twitter:title" content="MuviDB | The Ultimate African Film & Entertainment Database" />
     <meta name="twitter:description" content="Every film. Every credit. Explore African cinema, discover talent, track releases, and connect with the people behind the stories.">
     <meta name="twitter:image" content="https://muvidb.com/images/MuviDB%20Brand/og-image.png" />
+
+    <!-- Site-level structured data (enables sitelinks search box + brand entity) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "MuviDB",
+      "url": "https://muvidb.com/",
+      "logo": "https://muvidb.com/images/MuviDB%20Brand/og-image.png",
+      "description": "The home of Nollywood — every film, every credit, and where to watch."
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "MuviDB",
+      "url": "https://muvidb.com/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": { "@type": "EntryPoint", "urlTemplate": "https://muvidb.com/search?q={search_term_string}" },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

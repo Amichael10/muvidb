@@ -16,10 +16,17 @@
     { "src": "/sitemap-static\\.xml", "dest": "/api/seo?type=sitemap&slug=static" },
     { "src": "/sitemap-people\\.xml", "dest": "/api/seo?type=sitemap&slug=people" },
     { "src": "/sitemap-films\\.xml", "dest": "/api/seo?type=sitemap&slug=films" },
+    { "src": "/sitemap-watch\\.xml", "dest": "/api/seo?type=sitemap&slug=watch" },
+    { "src": "/sitemap-companies\\.xml", "dest": "/api/seo?type=sitemap&slug=companies" },
+    { "src": "/sitemap-cinemas\\.xml", "dest": "/api/seo?type=sitemap&slug=cinemas" },
+    { "src": "/sitemap-channels\\.xml", "dest": "/api/seo?type=sitemap&slug=channels" },
     { "src": "/people/(?<slug>[^/]+)", "dest": "/api/seo?type=person&slug=$slug" },
     { "src": "/films/(?<slug>[^/]+)", "dest": "/api/seo?type=film&slug=$slug" },
     { "src": "/film/(?<slug>[^/]+)", "dest": "/api/seo?type=film&slug=$slug" },
+    { "src": "/watch/(?<slug>[^/]+)", "dest": "/api/seo?type=watch&slug=$slug" },
     { "src": "/channels/(?<slug>[^/]+)", "dest": "/api/seo?type=channel&slug=$slug" },
+    { "src": "/companies/(?<slug>[^/]+)", "dest": "/api/seo?type=company&slug=$slug" },
+    { "src": "/cinemas/(?<slug>[^/]+)", "dest": "/api/seo?type=cinema&slug=$slug" },
     { "handle": "filesystem" },
     { "src": "/(?!(?:src|node_modules|@vite|@id|@react-refresh|api|favicon\\.ico|manifest\\.webmanifest|.*\\.(?:js|css|png|jpg|svg|ico|json|map|xml|html|txt))).*", "dest": "/index.html" }
   ]

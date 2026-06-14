@@ -1,108 +1,96 @@
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
+import { PLATFORMS, isFilmOnPlatform } from '../../lib/platforms';
 
-const PLATFORMS = [
-  { id: 'netflix', name: 'Netflix', icon: 'simple-icons:netflix', color: 'from-[#E50914]/20 to-[#E50914]/5' },
-  { id: 'kava', name: 'Kava', icon: 'solar:play-circle-bold', color: 'from-[#FF5C00]/20 to-[#FF5C00]/5' },
-  { id: 'docuth', name: 'Docuth', icon: 'solar:play-bold', color: 'from-zinc-500/20 to-zinc-600/5' },
-  { id: 'prime_video', name: 'Prime Video', icon: 'simple-icons:primevideo', color: 'from-[#00A8E1]/20 to-[#00A8E1]/5' },
-  { id: 'youtube', name: 'YouTube', icon: 'simple-icons:youtube', color: 'from-[#FF0000]/20 to-[#FF0000]/5' },
-  { id: 'showmax', name: 'Showmax', icon: 'solar:tv-linear', color: 'from-[#E10098]/20 to-[#E10098]/5' },
-];
-
-export default function PlatformRail({ films = [] }) {
-  // Compute valid platforms with films
-  const activePlatforms = PLATFORMS.map(platform => {
-    const platformFilms = films.filter(f => {
-      if (f.release_type === platform.id) return true;
-      if (platform.id === 'youtube' && f.source === 'youtube') return true;
-      
-      let streamingLinks = {};
-      if (typeof f.streaming_links === 'string') {
-        try { streamingLinks = JSON.parse(f.streaming_links); } catch(e) {}
-      } else if (f.streaming_links) {
-        streamingLinks = f.streaming_links;
-      }
-      return !!streamingLinks[platform.id];
-    });
-    
-    const count = platformFilms.length;
-    
-    // Find the latest added film (by created_at or year) to use as the cover background
-    const coverFilm = [...platformFilms]
-      .filter(f => f.backdrop_url || f.poster_url)
+// "Where to Watch" — the signature top-level entry point answering the #1
+// Nollywood query: "where can I watch it?". Each tile links to /watch/:platform.
+export default function PlatformRail({ films = [], counts = {} }) {
+  // Counts come from accurate DB-level queries (passed in). Cover art is a
+  // best-effort pick from the client film list (may be absent for low-view
+  // platforms — the gradient fallback covers that).
+  const activePlatforms = PLATFORMS.map((platform) => {
+    const coverFilm = films
+      .filter((f) => (f.backdrop_url || f.poster_url) && isFilmOnPlatform(f, platform.id))
       .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
 
-    const coverImage = coverFilm?.backdrop_url || coverFilm?.poster_url || '';
-    
     return {
       ...platform,
-      count,
-      coverImage
+      count: counts[platform.id] || 0,
+      coverImage: coverFilm?.backdrop_url || coverFilm?.poster_url || '',
     };
-  }).filter(p => p.count > 0);
+  }).filter((p) => p.count > 0);
 
   if (activePlatforms.length === 0) return null;
 
   return (
-    <section className="py-16 overflow-hidden bg-surface-2/5">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 border-x border-white/5">
-        <h2 className="font-heading font-bold text-2xl text-text-primary tracking-tighter">
-          Watch Platforms
-        </h2>
-        <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">
-          Stream Nollywood favorites instantly on your choice of service
-        </p>
-      </div>
+    <section className="relative overflow-hidden py-16 bg-gradient-to-b from-surface-2/20 to-bg">
+      {/* Brand radial glow (mockup .watch treatment) */}
+      <div className="absolute top-0 left-[12%] w-[700px] h-[300px] bg-brand/10 blur-[120px] rounded-full pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-10">
+          <h2 className="font-heading font-black text-2xl md:text-4xl text-text-primary tracking-tighter">
+            Where can <span className="text-brand">I watch it?</span>
+          </h2>
+          <p className="text-text-secondary text-sm mt-2 max-w-xl">
+            Every Nollywood title, and exactly where it&apos;s streaming right now.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-5">
           {activePlatforms.map((platform, i) => (
             <motion.div
               key={platform.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(i * 0.05, 0.4), duration: 0.5 }}
+              transition={{ delay: Math.min(i * 0.05, 0.3), duration: 0.5 }}
               viewport={{ once: true }}
             >
               <Link
-                to={`/browse?platform=${encodeURIComponent(platform.id)}`}
-                className="group relative flex flex-col justify-end w-full h-44 rounded-2xl border border-border overflow-hidden bg-surface hover:border-brand/40 hover:shadow-2xl hover:shadow-brand/5 transition-all duration-500"
+                to={`/watch/${platform.id}`}
+                className="group relative flex flex-col justify-end w-full h-36 md:h-40 rounded-2xl border border-border overflow-hidden bg-surface hover:border-brand/50 hover:shadow-2xl hover:shadow-brand/10 hover:-translate-y-1 transition-all duration-500"
               >
-                {/* Background Cover Image (with blur-up effect) */}
+                {/* Cover art */}
                 {platform.coverImage ? (
-                  <img 
-                    src={platform.coverImage} 
-                    alt="" 
-                    className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50 group-hover:scale-110 transition-all duration-700" 
+                  <img
+                    src={platform.coverImage}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700"
                     loading="lazy"
                   />
                 ) : (
-                  <div className={`absolute inset-0 bg-gradient-to-br ${platform.color} opacity-20`} />
+                  <div
+                    className="absolute inset-0 opacity-20"
+                    style={{ background: `linear-gradient(135deg, ${platform.color}33, transparent)` }}
+                  />
                 )}
-                
-                {/* Overlay Gradient for Text Readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-                
-                {/* Content Overlay */}
-                <div className="relative z-10 p-5 flex items-center justify-between w-full">
-                  <div className="space-y-1">
-                    <span className="text-white text-lg font-heading font-black tracking-tight group-hover:text-brand transition-colors block">
-                      {platform.name}
-                    </span>
-                    <p className="text-[10px] font-bold text-text-muted group-hover:text-white/80 transition-colors uppercase tracking-widest">
-                      {platform.count} {platform.count === 1 ? 'Film' : 'Films'}
-                    </p>
+
+                {/* Brand-color left accent (mockup .plat::before) */}
+                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: platform.color }} />
+
+                {/* Readability overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
+
+                {/* Arrow */}
+                <span className="absolute top-3.5 right-3.5 text-white/40 group-hover:text-brand group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all z-10">
+                  <Icon icon="solar:arrow-right-up-linear" className="text-base" />
+                </span>
+
+                <div className="relative z-10 p-4">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 border border-white/10"
+                    style={{ background: `${platform.color}22`, color: platform.color }}
+                  >
+                    <Icon icon={platform.icon} className="text-lg" />
                   </div>
-                  
-                  <div className="w-10 h-10 rounded-xl bg-white/5 group-hover:bg-brand/20 border border-white/10 group-hover:border-brand/30 flex items-center justify-center text-white group-hover:text-brand transition-all shrink-0">
-                    <Icon icon={platform.icon} className="text-xl" />
-                  </div>
+                  <span className="block text-white font-heading font-bold text-sm md:text-base tracking-tight group-hover:text-brand transition-colors">
+                    {platform.name}
+                  </span>
+                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-0.5">
+                    {platform.count} {platform.count === 1 ? 'title' : 'titles'}
+                  </p>
                 </div>
-                
-                {/* Bottom Line Accent using brand color (orange) instead of netflix red */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
               </Link>
             </motion.div>
           ))}

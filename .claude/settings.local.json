@@ -135,7 +135,12 @@
       "Bash(node scripts/run-scrape-all.mjs)",
       "Bash(xargs -I{} node -e \" const {createClient} = require\\('@supabase/supabase-js'\\); \")",
       "Bash(node -e ' *)",
-      "Bash(curl -s -X POST https://lumi-rho-seven.vercel.app/api/cron/refresh-videos -H 'x-cron-secret: lumi-cron-pkenrm-2026' -H 'Content-Type: application/json' -d '{}')"
+      "Bash(curl -s -X POST https://lumi-rho-seven.vercel.app/api/cron/refresh-videos -H 'x-cron-secret: lumi-cron-pkenrm-2026' -H 'Content-Type: application/json' -d '{}')",
+      "Bash(npm run *)",
+      "Bash(git rm *)",
+      "Bash(findstr /i \"include exclude api\")",
+      "Bash(dir tsconfig*.json /b)",
+      "Bash(node -e \"const h=require\\('fs'\\).readFileSync\\('dist/index.html','utf8'\\); console.log\\('preconnect supabase:', h.includes\\('preconnect'\\)&&h.includes\\('supabase.co'\\)\\); console.log\\('Organization ld:', h.includes\\('\\\\\"@type\\\\\": \\\\\"Organization\\\\\"'\\)\\); console.log\\('WebSite SearchAction:', h.includes\\('SearchAction'\\)\\); console.log\\('root div intact:', h.includes\\('<div id=\\\\\"root\\\\\"></div>'\\)\\);\")"
     ]
   }
 }

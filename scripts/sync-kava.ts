@@ -1,159 +1,248 @@
 import { chromium } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
+import * as cheerio from 'cheerio';
+import fetch from 'node-fetch';
 import dotenv from 'dotenv';
-import fs from 'fs';
-import { cleanTitle } from '../api/_lib/yt_service.js';
-import { detectAndNormalizeSeries } from '../api/_lib/series_utils.js';
+import path from 'path';
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-// Support .env and .env.local
-const envLocal = fs.existsSync('.env.local') ? dotenv.parse(fs.readFileSync('.env.local')) : {};
-const envDefault = fs.existsSync('.env') ? dotenv.parse(fs.readFileSync('.env')) : {};
-const env = { ...envDefault, ...envLocal, ...process.env };
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl!, supabaseKey!);
 
-const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
-const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error("Missing Supabase credentials");
-  process.exit(1);
+function cleanTitle(title: string) {
+  return title.replace(/season\s+\d+/i, '').replace(/episode\s+\d+/i, '').replace(/-\s*$/, '').trim();
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+function detectAndNormalizeSeries(title: string) {
+  const sMatch = title.match(/season\s+(\d+)/i);
+  const eMatch = title.match(/episode\s+(\d+)/i);
+  return {
+    isSeries: !!(sMatch || eMatch),
+    baseTitle: cleanTitle(title),
+    episodeNum: eMatch ? parseInt(eMatch[1]) : null
+  };
+}
+
+function parseRuntime(text: string): number | null {
+  const matchH = text.match(/(\d+)h\s+(\d+)m/);
+  if (matchH) return parseInt(matchH[1]) * 60 + parseInt(matchH[2]);
+  
+  const matchM = text.match(/(\d+)m\s+(\d+)s/);
+  if (matchM) return parseInt(matchM[1]);
+
+  const matchOnlyM = text.match(/^(\d+)m$/);
+  if (matchOnlyM) return parseInt(matchOnlyM[1]);
+
+  return null;
+}
+
+const decodeHtmlEntities = (text: string) => {
+  return text.replace(/&#x([0-9A-Fa-f]+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 16)))
+             .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
+             .replace(/&amp;/g, '&');
+};
 
 async function syncKava() {
+  console.log('🚀 Starting Kava Sync via Sitemap + Playwright...');
+  let logId;
   const startTime = Date.now();
-  console.log('🚀 Starting Kava Sync via Playwright...');
-
-  // 1. Create a "running" log entry
-  const { data: logEntry } = await supabase.from('sync_logs').insert({
-    source: 'kava',
-    status: 'running',
-    message: 'Scraping Kava.tv catalog...',
-    details: { started_at: new Date().toISOString() }
-  }).select().single();
   
-  const logId = logEntry?.id;
-
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-  });
-  const page = await context.newPage();
-
   try {
-    // Ensure Kava Channel exists
-    let { data: channel } = await supabase.from('channels').select('id').eq('name', 'Kava Data').maybeSingle();
-    
-    if (!channel) {
-      console.log('Creating Kava Data channel...');
-      const { data: newChannel, error } = await supabase.from('channels').insert([{ 
-        name: 'Kava Data', 
-        channel_handle: 'kava.tv'
-      }]).select().single();
+    const { data: logData } = await supabase.from('sync_logs').insert({
+      source: 'kava',
+      status: 'running',
+      message: 'Started sitemap sync'
+    }).select('id').single();
+    logId = logData?.id;
+  } catch (err) {}
+
+  let browser;
+  try {
+    console.log('Fetching Kava.tv sitemap...');
+    const sitemapUrl = 'https://kava.tv/sitemap.xml';
+    const sitemapRes = await fetch(sitemapUrl);
+    const xml = await sitemapRes.text();
+    const sitemapDoc = cheerio.load(xml, { xmlMode: true });
+    const urls = sitemapDoc('loc').map((_, el) => sitemapDoc(el).text()).get()
+      .filter((u: string) => u.includes('/content/'));
       
-      if (error) throw error;
-      channel = newChannel;
-    }
+    console.log(`Found ${urls.length} content URLs. Launching browser for metadata extraction...`);
 
-    console.log('Navigating to Kava.tv...');
-    await page.goto('https://kava.tv/category/p1', { waitUntil: 'networkidle', timeout: 60000 });
-    await page.waitForSelector('.dataContents', { timeout: 15000 });
+    browser = await chromium.launch({ headless: true });
+    
+    console.log(`Preparing to process ${urls.length} urls...`);
 
-    console.log('Extracting movie data...');
-    const movies = await page.evaluate(() => {
-      const cards = Array.from(document.querySelectorAll('.col-lg-3, .col-md-4, .col-sm-6'));
-      return cards.map(card => {
-        const titleEl = card.querySelector('.dataContents span');
-        const descEl = card.querySelector('.dataContents div');
-        const linkEl = card.querySelector('a.dataContents');
-        const posterDiv = card.querySelector('.content_img');
-        
-        if (!titleEl || !linkEl) return null;
+    const { data: existingFilms } = await supabase.from('films').select('source_video_id, id').eq('source', 'kava');
+    const existingMap = new Map(existingFilms?.map(f => [f.source_video_id, f.id]) || []);
 
-        let posterUrl = null;
-        if (posterDiv) {
-          const style = window.getComputedStyle(posterDiv);
-          const bgImage = style.backgroundImage;
-          if (bgImage && bgImage !== 'none') {
-            const match = bgImage.match(/url\("?(.+?)"?\)/);
-            if (match) posterUrl = match[1];
-          }
+    let inserted = 0;
+    let errors = 0;
+    
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      const page = await browser.newPage();
+      
+      let apiTitle, apiSynopsis, apiPoster;
+      let apiGenres: string[] = [];
+      let apiCast: any[] = [];
+      
+      page.on('response', async response => {
+        if (response.url().includes('kavaapi.muvi.com/content') && response.request().method() === 'POST') {
+          try {
+            const json = await response.json();
+            if (json?.data?.contentList?.content_list && json.data.contentList.content_list.length > 0) {
+              const movieData = json.data.contentList.content_list[0];
+              if (movieData?.cast_details && movieData.cast_details.length > 0) {
+                apiCast = movieData.cast_details.map((c: any) => ({
+                  name: c.cast_name,
+                  image: c.no_image_available_url !== 'https://d3ggjyip6a9ibw.cloudfront.net/images/users/default_cast.png' ? c.no_image_available_url : null
+                }));
+              }
+              if (movieData?.categories && movieData.categories.length > 0) {
+                apiGenres = movieData.categories.map((c: any) => c.category_name);
+              }
+            }
+          } catch (e) {}
         }
+      });
 
-        return {
-          title: titleEl.textContent?.trim(),
-          synopsis: descEl?.textContent?.trim() || '',
-          slug: linkEl.getAttribute('href')?.split('/').pop() || '',
-          url: (linkEl as HTMLAnchorElement).href,
-          poster_url: posterUrl
-        };
-      }).filter(m => m !== null && m.title);
-    });
-
-    console.log(`✅ Found ${movies.length} movies on Kava.`);
-
-    if (movies.length === 0) {
-      console.warn('⚠️ No movies found.');
-      if (logId) {
-        await supabase.from('sync_logs').update({
-          status: 'success',
-          message: 'No movies found on Kava.tv',
-          duration_ms: Date.now() - startTime
-        }).eq('id', logId);
+      try {
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+        await page.waitForTimeout(10000);
+      } catch (navError) {
+        console.warn(`Navigation or timeout error for ${url}`);
       }
-      return;
-    }
 
-    const { data: existingFilms } = await supabase
-      .from('films')
-      .select('source_video_id')
-      .eq('source', 'kava');
-    const existingSet = new Set(existingFilms?.map(f => f.source_video_id) || []);
+      const html = await page.content();
+      const getMeta = (prop: string) => {
+        const regex = new RegExp(`<meta\\s+property="${prop}"\\s+content="([^"]+)"`, 'i');
+        const m = html.match(regex);
+        return m ? decodeHtmlEntities(m[1]) : null;
+      };
+      
+      const title = getMeta('og:title');
+      const description = getMeta('og:description') || '';
+      const posterUrl = getMeta('og:image');
+      const slug = url.split('/').pop();
+      
+      const runtime_minutes = await page.evaluate(() => {
+         const text = document.body.innerText;
+         const match = text.match(/(\d+)h\s*(\d+)m|(\d+)m\s*(\d+)s|(\d+)m/);
+         if (!match) return null;
+         if (match[1] && match[2]) return parseInt(match[1]) * 60 + parseInt(match[2]);
+         if (match[3]) return parseInt(match[3]);
+         if (match[5]) return parseInt(match[5]);
+         return null;
+      });
 
-    const filmsToUpsert = movies.map(m => {
-      const source_video_id = `kava-${m!.slug || m!.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-      const watchUrl = m!.url || `https://kava.tv/watch/${m!.slug}`;
-      const { isSeries, baseTitle, episodeNum } = detectAndNormalizeSeries(m!.title!);
+      await page.close();
+
+      if (!title || !slug) continue;
+      
+      const m = {
+        title: title || apiTitle,
+        slug,
+        url,
+        poster_url: posterUrl || apiPoster,
+        synopsis: apiSynopsis || description,
+        genres: apiGenres,
+        cast: apiCast,
+        runtime_minutes
+      };
+      
+      const source_video_id = `kava-${m.slug}`;
+      const watchUrl = m.url;
+      const { baseTitle } = detectAndNormalizeSeries(m.title!);
       const cleanedTitle = cleanTitle(baseTitle);
       
-      return {
+      const film = {
         title: cleanedTitle,
-        synopsis: m!.synopsis,
-        poster_url: m!.poster_url,
-        backdrop_url: m!.poster_url,
+        synopsis: m.synopsis,
+        poster_url: m.poster_url,
+        backdrop_url: m.poster_url,
         source: 'kava',
         source_video_id,
         youtube_watch_url: watchUrl,
         streaming_links: { kava: watchUrl },
         release_type: 'kava',
         countries: ['Nigeria'],
+        runtime_minutes: m.runtime_minutes,
+        genres: m.genres,
         needs_review: true,
         status: 'released'
       };
-    }).filter(row => !existingSet.has(row.source_video_id));
 
-    let inserted = 0;
-    let errors = 0;
-    
-    for (const film of filmsToUpsert) {
-      const { error } = await supabase.from('films').insert([film]);
-      if (error) {
-        console.error(`Error inserting ${film.title}:`, error.message);
-        errors++;
+      let filmId = existingMap.get(source_video_id);
+      
+      if (filmId) {
+        const { error: filmError } = await supabase.from('films').update({
+          runtime_minutes: film.runtime_minutes,
+          genres: film.genres,
+          synopsis: film.synopsis,
+          poster_url: film.poster_url,
+          backdrop_url: film.backdrop_url
+        }).eq('id', filmId);
+        if (filmError) { console.error(`Error updating ${film.title}:`, filmError.message); errors++; continue; }
       } else {
-        inserted++;
+        const { data: insertedFilm, error: filmError } = await supabase.from('films').insert([film]).select('id').single();
+        if (filmError) { console.error(`Error inserting ${film.title}:`, filmError.message); errors++; continue; }
+        filmId = insertedFilm.id;
+        existingMap.set(source_video_id, filmId);
       }
+      inserted++;
+
+      if (m.genres && m.genres.length > 0) {
+         for (const gName of m.genres) {
+            if (!gName) continue;
+            let genreId;
+            const { data: g } = await supabase.from('genres').select('id').ilike('name', gName).maybeSingle();
+            if (g) genreId = g.id;
+            else {
+               const { data: newG } = await supabase.from('genres').insert({ name: gName }).select('id').single();
+               genreId = newG?.id;
+            }
+            if (genreId) {
+               const { error: fgError } = await supabase.from('film_genres').insert({ film_id: filmId, genre_id: genreId });
+               if (fgError) console.error("film_genres insert error:", fgError.message);
+            }
+         }
+      }
+
+      if (m.cast && m.cast.length > 0) {
+         for (let idx = 0; idx < m.cast.length; idx++) {
+            const castMember = m.cast[idx];
+            if (!castMember.name) continue;
+            let personId;
+            const { data: p } = await supabase.from('people').select('id').eq('name', castMember.name).maybeSingle();
+            if (p) personId = p.id;
+            else {
+               const pData: any = { name: castMember.name };
+               if (castMember.image && castMember.image !== 'https://d3ggjyip6a9ibw.cloudfront.net/images/users/default_cast.png') {
+                   pData.profile_path = castMember.image;
+               }
+               const { data: newP } = await supabase.from('people').insert(pData).select('id').single();
+               personId = newP?.id;
+            }
+            if (personId) {
+               const { error: cError } = await supabase.from('credits').insert({ film_id: filmId, person_id: personId, role: 'cast', billing_order: idx });
+               if (cError) console.error("credits insert error:", cError.message);
+            }
+         }
+      }
+      
+      console.log(`Processed ${i + 1}/${urls.length} urls...`);
     }
 
-    console.log(`✨ Successfully synced ${inserted} new items. Errors: ${errors}.`);
+    console.log(`✨ Successfully synced ${inserted} items. Errors: ${errors}.`);
 
     if (logId) {
       await supabase.from('sync_logs').update({
         status: errors === 0 ? 'success' : 'partial',
-        message: `Kava sync complete. Synced ${inserted} new films.`,
-        details: { total_scraped: movies.length, inserted, errors },
+        message: `Kava sync complete. Synced ${inserted} films.`,
+        details: { total_scraped: urls.length, inserted, errors },
         duration_ms: Date.now() - startTime,
-        items_processed: movies.length,
+        items_processed: urls.length,
         items_updated: inserted,
         items_failed: errors
       }).eq('id', logId);
@@ -170,7 +259,7 @@ async function syncKava() {
       }).eq('id', logId);
     }
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
   }
 }
 

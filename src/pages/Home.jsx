@@ -5,10 +5,11 @@ import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
 import GenreRail from '../components/film/GenreRail';
-import CountryRail from '../components/film/CountryRail';
+import PlatformRail from '../components/film/PlatformRail';
 import PersonCard from '../components/person/PersonCard';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
+import { isFilmOnPlatform, PLATFORMS, platformFilter } from '../lib/platforms';
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
@@ -31,6 +32,13 @@ export default function Home() {
   const [top10Films, setTop10Films] = useState([]);
   const [crewMembers, setCrewMembers] = useState([]);
   const [productionCompanies, setProductionCompanies] = useState([]);
+
+  // What's New consolidated tabs (Coming Soon / New Releases / Recently Added)
+  const [whatsNewTab, setWhatsNewTab] = useState('coming');
+
+  // Accurate per-platform title counts (counted at the DB level — the client film
+  // list is capped at 1000 rows and undercounts the 19k+ catalogue).
+  const [platformCounts, setPlatformCounts] = useState({});
 
   // Spotlight Image Fallback state (Issue 24)
   const [spotlightImgError, setSpotlightImgError] = useState(false);
@@ -74,13 +82,27 @@ export default function Home() {
         fetchSpotlightContent().catch(e => console.error('Error fetching spotlight content:', e)),
         fetchTop10Films().catch(e => console.error('Error fetching top 10:', e)),
         fetchCrewMembers().catch(e => console.error('Error fetching crew:', e)),
-        fetchCompanies().catch(e => console.error('Error fetching companies:', e))
+        fetchCompanies().catch(e => console.error('Error fetching companies:', e)),
+        fetchPlatformCounts().catch(e => console.error('Error fetching platform counts:', e))
       ]);
     } catch (error) {
       console.error('Error in progressive fetches:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchPlatformCounts = async () => {
+    const entries = await Promise.all(
+      PLATFORMS.map(async (p) => {
+        const { count } = await supabase
+          .from('films')
+          .select('id', { count: 'exact', head: true })
+          .or(platformFilter(p.id));
+        return [p.id, count || 0];
+      })
+    );
+    setPlatformCounts(Object.fromEntries(entries));
   };
 
   const fetchFeaturedFilms = async () => {
@@ -106,9 +128,10 @@ export default function Home() {
     const { data, error } = await supabase
       .from('films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language, 
-        runtime_minutes, view_count, average_rating, nfvcb_rating, 
+        id, title, poster_url, backdrop_url, year, language,
+        runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, streaming_links, source,
+        is_in_cinemas, created_at, release_date,
         film_genres(genres(name))
       `)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
@@ -328,6 +351,7 @@ export default function Home() {
         is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
       `)
+      .eq('is_top_10', true)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('view_count', { ascending: false })
       .limit(10);
@@ -455,35 +479,97 @@ export default function Home() {
     setIsWarningModalOpen(false);
   };
 
+  // ---- Streaming discovery rails (derived from already-fetched data) ----
+  const byRecency = (a, b) =>
+    new Date(b.created_at || b.release_date || 0) - new Date(a.created_at || a.release_date || 0);
 
+  // New on Netflix Naija — films with a Netflix watch link, freshest first.
+  const netflixNew = [...films].filter((f) => isFilmOnPlatform(f, 'netflix')).sort(byRecency).slice(0, 20);
+
+  // Cinema split: a title still showing for < 2 months stays in "In Cinemas Now";
+  // anything showing longer than 2 months moves to "Leaving Cinemas Soon".
+  // `inCinemas` already only contains titles with current showtimes / is_in_cinemas;
+  // release_date is the proxy for how long it has been on screen.
+  const TWO_MONTHS_MS = 1000 * 60 * 60 * 24 * 62;
+  const cinemaAge = (f) => (f.release_date ? Date.now() - new Date(f.release_date).getTime() : 0);
+  const cinemasNow = inCinemas.filter((f) => cinemaAge(f) < TWO_MONTHS_MS);
+  const leavingCinemas = [...inCinemas]
+    .filter((f) => cinemaAge(f) >= TWO_MONTHS_MS)
+    .sort((a, b) => new Date(a.release_date || 0) - new Date(b.release_date || 0))
+    .slice(0, 20);
+
+  // What's New consolidated tabs
+  const whatsNewMap = { coming: comingSoon, new: newReleases, recent: recentlyAdded };
 
   return (
     <div className="w-full pb-20 bg-bg min-h-screen">
       {/* 1. HERO (Progressive Above-the-Fold Loading) (Issue 1) */}
-      <HeroSection 
-        featuredFilms={[...inCinemas, ...featuredFilms].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i)} 
+      <HeroSection
+        featuredFilms={featuredFilms}
         isLoading={isHeroLoading}
       />
 
       <div className="max-w-7xl mx-auto border-x border-border">
-        {/* 2. IN CINEMAS NOW */}
-        {(isLoading || inCinemas.length > 0) && (
+        {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
+        <div className="border-b border-border">
+          <PlatformRail films={films} counts={platformCounts} />
+        </div>
+
+        {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
+        {(isLoading || cinemasNow.length > 0) && (
           <div className="border-b border-border py-12">
             <FilmRow
               title="In Cinemas Now"
-              subtitle="Catch the latest Nollywood magic on the big screen"
-              films={inCinemas}
+              subtitle="On the big screen this week — find showtimes near you"
+              films={cinemasNow}
+              isLoading={isLoading}
+              linkTo="/showtimes"
+              cardVariant="landscape"
+            />
+          </div>
+        )}
+
+        {/* 4. STREAMING RAILS (turn watch-link data into a browse axis) */}
+        {(isLoading || netflixNew.length > 0) && (
+          <div className="border-b border-border py-12 bg-surface-2/5">
+            <FilmRow
+              title="New on Netflix Naija"
+              subtitle="Just added — stream tonight"
+              films={netflixNew}
+              isLoading={isLoading}
+              linkTo="/watch/netflix"
+            />
+          </div>
+        )}
+        {(isLoading || youtubeFeed.length > 0) && (
+          <div className="border-b border-border py-12">
+            <FilmRow
+              title="Free on YouTube"
+              subtitle="No subscription needed"
+              films={youtubeFeed}
+              isLoading={isLoading}
+              linkTo="/watch/youtube"
+            />
+          </div>
+        )}
+        {leavingCinemas.length > 0 && (
+          <div className="border-b border-border py-12 bg-surface-2/5">
+            <FilmRow
+              title="Leaving Cinemas Soon"
+              subtitle="Catch them before they go"
+              films={leavingCinemas}
               isLoading={isLoading}
               linkTo="/showtimes"
             />
           </div>
         )}
-        {/* 2.5. TOP 10 IN NIGERIA TODAY */}
+
+        {/* 5. TOP 10 THIS WEEK */}
         {(isLoading || top10Films.length > 0) && (
-          <div className="border-b border-border py-12 bg-surface-2/5">
+          <div className="border-b border-border py-12">
             <FilmRow
-              title="Top 10 in Nigeria"
-              subtitle="The most popular Nollywood stories today"
+              title="Top 10 This Week"
+              subtitle="The most-watched Nollywood stories right now"
               films={top10Films}
               isLoading={isLoading}
               cardVariant="top10"
@@ -491,52 +577,221 @@ export default function Home() {
           </div>
         )}
 
-        {/* 3. GENRE MOOD RAIL - FilmFlux-style dynamic covers and count badges (Issue 10) */}
-        <div className="border-b border-border">
-          <GenreRail films={films} />
-        </div>
-
-{/* 3.5. COUNTRY RAIL - DISABLED AS REQUESTED */}
-{/* <div className="border-b border-border">
-  <CountryRail />
-</div> */}
-
-        {/* 4. COMING SOON */}
-        {(isLoading || comingSoon.length > 0) && (
-          <div className="border-b border-border py-16 bg-brand/5">
-            <FilmRow
-              title="Coming Soon"
-              subtitle="Confirmed upcoming Nigerian releases"
-              films={comingSoon}
-              isLoading={isLoading}
-            />
-          </div>
-        )}
-
-        {/* 5. NEW RELEASES */}
-        {(isLoading || newReleases.length > 0) && (
+        {/* 6. WHAT'S NEW (three redundant rows consolidated into tabs) */}
+        {(isLoading || comingSoon.length > 0 || newReleases.length > 0 || recentlyAdded.length > 0) && (
           <div className="border-b border-border py-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="space-y-1 mb-6">
+                <h2 className="text-2xl font-bold text-text-primary tracking-tight">What&apos;s New</h2>
+                <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest opacity-70">Fresh on MuviDB</p>
+              </div>
+              <div className="flex gap-6 border-b border-border mb-2">
+                {[
+                  { key: 'coming', label: 'Coming Soon' },
+                  { key: 'new', label: 'New Releases' },
+                  { key: 'recent', label: 'Recently Added' },
+                ].map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setWhatsNewTab(t.key)}
+                    className={`pb-3 -mb-px text-sm font-bold border-b-2 transition-colors ${
+                      whatsNewTab === t.key
+                        ? 'text-text-primary border-brand'
+                        : 'text-text-muted border-transparent hover:text-text-secondary'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <FilmRow
-              title="New Releases"
-              subtitle="The freshest stories from this quarter"
-              films={newReleases}
+              films={whatsNewMap[whatsNewTab] || []}
+              isLoading={isLoading}
+              noHeader
+            />
+          </div>
+        )}
+
+        {/* 7. GENRE MOODS (compact chip strip) */}
+        <div className="border-b border-border">
+          <GenreRail films={films} variant="chips" />
+        </div>
+
+        {/* 8. CURATED PICK (editorial film row — discovery) */}
+        {curatedCollection && curatedCollection.films.length > 0 && (
+          <div className="border-b border-border py-16 bg-brand/5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
+            <FilmRow
+              title={curatedCollection.name}
+              subtitle={curatedCollection.description}
+              films={curatedCollection.films}
               isLoading={isLoading}
             />
           </div>
         )}
 
-        {/* 5. RECENTLY ADDED */}
-        <div className="border-b border-border py-12 bg-surface-2/5">
-          <FilmRow
-            title="Recently Added"
-            subtitle="Latest additions to the MuviDB library"
-            films={recentlyAdded}
-            isLoading={isLoading}
-            linkTo="/browse?sort=newest"
-          />
-        </div>
+        {/* ===================== EDITORIAL ZONE (the Nollywood moat — magazine treatment) ===================== */}
+        <div className="bg-brand/[0.03]">
 
-        {/* 6. BEHIND THE MAGIC (Crew Spotlights) */}
+          {/* — Zone label: People of Nollywood — */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
+            <span className="font-heading font-black text-xs tracking-[0.2em] uppercase text-brand whitespace-nowrap">People of Nollywood</span>
+            <span className="flex-1 h-px bg-border" />
+          </div>
+
+        {/* 9. SPOTLIGHT (Editorial) */}
+        {(isLoading || spotlightContent) && (
+          <div className="border-b border-border py-16 bg-surface-2/10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-2 mb-10">
+                <Icon icon="solar:star-linear" className="text-brand text-xl" />
+                <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                  Spotlight
+                </h2>
+              </div>
+
+              <div className="relative bg-surface rounded-xl overflow-hidden border border-border shadow-sm">
+                {isLoading ? (
+                  <div className="h-[400px] animate-pulse bg-surface-2" />
+                ) : spotlightContent && spotlightContent.people && (
+                  <div className="flex flex-col md:flex-row items-stretch min-h-[400px]">
+                    {/* 1. Artist Photo Cover (Left Pane) */}
+                    <div className="md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
+                      {!spotlightImgError && (spotlightContent.photo_url || spotlightContent.people.photo_url) ? (
+                        <img
+                          src={spotlightContent.photo_url || spotlightContent.people.photo_url}
+                          alt={spotlightContent.people.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          onError={() => setSpotlightImgError(true)}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-tr from-brand/20 via-surface-2 to-surface-3 flex items-center justify-center">
+                          <span className="text-white/20 text-7xl font-heading font-black tracking-tighter select-none">
+                            {spotlightContent.people.name ? spotlightContent.people.name.split(' ').map(n => n[0]).join('') : 'AA'}
+                          </span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/40 via-transparent to-black/20 pointer-events-none" />
+                    </div>
+
+                    {/* 2. Editorial Story & Info (Middle Pane) */}
+                    <div className="md:w-[42%] p-8 flex flex-col justify-center shrink-0">
+                      <span className="text-brand text-[9px] font-black uppercase tracking-widest mb-2 block">
+                        Spotlight
+                      </span>
+                      <Link
+                        to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
+                        className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter mb-4 block hover:text-brand transition-colors"
+                      >
+                        {spotlightContent.people.name}
+                      </Link>
+                      <p className="text-text-secondary text-xs md:text-sm mb-8 leading-relaxed whitespace-pre-wrap line-clamp-6 text-justify">
+                        {spotlightContent.story}
+                      </p>
+                      <div>
+                        <Link
+                          to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface-2 hover:bg-brand/10 hover:text-brand border border-border rounded-lg text-[10px] font-black uppercase tracking-widest text-text-primary transition-all"
+                        >
+                          Explore More
+                          <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* 3. Pane Divider */}
+                    <div className="hidden md:block w-px bg-border my-8 shrink-0" />
+
+                    {/* 4. Featured Works (Right Pane) */}
+                    <div className="md:w-[30%] p-8 flex flex-col justify-center flex-1">
+                      <h3 className="text-text-muted text-[10px] font-black uppercase tracking-widest mb-6">
+                        Featured Works
+                      </h3>
+                      {spotlightContent.featured_films && spotlightContent.featured_films.length > 0 ? (
+                        <div className="grid grid-cols-4 gap-3">
+                          {spotlightContent.featured_films.map((film) => (
+                            <Link
+                              key={film.id}
+                              to={`/film/${film.id}`}
+                              className="group flex flex-col gap-1.5 transition-all"
+                              title={film.title}
+                            >
+                              <div className="aspect-[2/3] w-full rounded-lg overflow-hidden border border-border bg-surface-2 relative shadow-md">
+                                <img
+                                  src={film.poster_url || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'}
+                                  alt={film.title}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'; }}
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
+                                  <span className="text-[8px] font-bold text-white line-clamp-2 leading-tight">
+                                    {film.title}
+                                  </span>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-text-muted py-8">
+                          No featured works curated.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 10. FEATURED ARTIST */}
+        {(isLoading || spotlightPerson) && (
+          <div className="border-b border-border">
+            <section className="py-16">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-end justify-between mb-10">
+                  <div className="space-y-1">
+                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                      Featured Artist
+                    </h2>
+                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The talent behind the camera</p>
+                  </div>
+                  <Link
+                    to="/people"
+                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline"
+                  >
+                    View all
+                  </Link>
+                </div>
+
+                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-border shadow-sm">
+                  <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
+                  <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
+                    <div className="xl:flex-1">
+                      <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
+                    </div>
+                    <div className="h-px xl:w-px xl:h-64 bg-border"></div>
+                    <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
+                      {isLoading ? (
+                        [...Array(4)].map((_, i) => (
+                          <PersonCard key={i} variant="compact" isLoading={true} />
+                        ))
+                      ) : (
+                        otherPeople.map(person => (
+                          <PersonCard key={person.id} person={person} variant="compact" />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* 11. BEHIND THE MAGIC (Crew Spotlights) */}
         {(isLoading || crewMembers.length > 0) && (
           <div className="border-b border-border py-16">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -565,14 +820,14 @@ export default function Home() {
                   ))
                 ) : (
                   crewMembers.map((crew) => (
-                    <Link 
+                    <Link
                       key={crew.id}
                       to={`/people/${crew.slug || crew.id}`}
                       className="shrink-0 w-44 bg-surface border border-border hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
                     >
                       <div className="relative">
-                        <img 
-                          src={crew.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
+                        <img
+                          src={crew.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'}
                           alt={crew.name}
                           className="w-24 h-24 rounded-full object-cover border-2 border-transparent group-hover:border-brand transition-all duration-300"
                           onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
@@ -594,7 +849,13 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6.5. NOLLYWOOD STUDIOS (Production Companies) */}
+          {/* — Zone label: The Industry — */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
+            <span className="font-heading font-black text-xs tracking-[0.2em] uppercase text-brand whitespace-nowrap">The Industry</span>
+            <span className="flex-1 h-px bg-border" />
+          </div>
+
+        {/* 12. NOLLYWOOD STUDIOS (Production Companies) */}
         {(isLoading || productionCompanies.length > 0) && (
           <div className="border-b border-border py-16 bg-surface-2/5">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -676,21 +937,7 @@ export default function Home() {
           </div>
         )}
 
-
-        {/* 7. CURATED PICK (Editorial Row) */}
-        {curatedCollection && curatedCollection.films.length > 0 && (
-          <div className="border-b border-border py-16 bg-brand/5 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
-            <FilmRow
-              title={curatedCollection.name}
-              subtitle={curatedCollection.description}
-              films={curatedCollection.films}
-              isLoading={isLoading}
-            />
-          </div>
-        )}
-
-        {/* 8. FEATURED CHANNELS */}
+        {/* 13. FEATURED CHANNELS */}
         {(isLoading || creators.length > 0) && (
           <div className="border-b border-border bg-surface-2/10 relative overflow-hidden">
              <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
@@ -764,157 +1011,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* 9. SPOTLIGHT (Editorial) */}
-        {(isLoading || spotlightContent) && (
-          <div className="border-b border-border py-16 bg-surface-2/10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-2 mb-10">
-                <Icon icon="solar:star-linear" className="text-brand text-xl" />
-                <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                  Spotlight
-                </h2>
-              </div>
- 
-              <div className="relative bg-surface rounded-xl overflow-hidden border border-border shadow-sm">
-                {isLoading ? (
-                  <div className="h-[400px] animate-pulse bg-surface-2" />
-                ) : spotlightContent && spotlightContent.people && (
-                  <div className="flex flex-col md:flex-row items-stretch min-h-[400px]">
-                    {/* 1. Artist Photo Cover (Left Pane) */}
-                    <div className="md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
-                      {!spotlightImgError && (spotlightContent.photo_url || spotlightContent.people.photo_url) ? (
-                        <img 
-                          src={spotlightContent.photo_url || spotlightContent.people.photo_url} 
-                          alt={spotlightContent.people.name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onError={() => setSpotlightImgError(true)}
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-tr from-brand/20 via-surface-2 to-surface-3 flex items-center justify-center">
-                          <span className="text-white/20 text-7xl font-heading font-black tracking-tighter select-none">
-                            {spotlightContent.people.name ? spotlightContent.people.name.split(' ').map(n => n[0]).join('') : 'AA'}
-                          </span>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/40 via-transparent to-black/20 pointer-events-none" />
-                    </div>
+        </div>{/* ===================== end editorial zone ===================== */}
 
-                    {/* 2. Editorial Story & Info (Middle Pane) */}
-                    <div className="md:w-[42%] p-8 flex flex-col justify-center shrink-0">
-                      <span className="text-brand text-[9px] font-black uppercase tracking-widest mb-2 block">
-                        Spotlight
-                      </span>
-                      <Link 
-                        to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
-                        className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter mb-4 block hover:text-brand transition-colors"
-                      >
-                        {spotlightContent.people.name}
-                      </Link>
-                      <p className="text-text-secondary text-xs md:text-sm mb-8 leading-relaxed whitespace-pre-wrap line-clamp-6 text-justify">
-                        {spotlightContent.story}
-                      </p>
-                      <div>
-                        <Link 
-                          to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface-2 hover:bg-brand/10 hover:text-brand border border-border rounded-lg text-[10px] font-black uppercase tracking-widest text-text-primary transition-all"
-                        >
-                          Explore More
-                          <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </div>
-
-                    {/* 3. Pane Divider */}
-                    <div className="hidden md:block w-px bg-border my-8 shrink-0" />
-
-                    {/* 4. Featured Works (Right Pane) */}
-                    <div className="md:w-[30%] p-8 flex flex-col justify-center flex-1">
-                      <h3 className="text-text-muted text-[10px] font-black uppercase tracking-widest mb-6">
-                        Featured Works
-                      </h3>
-                      {spotlightContent.featured_films && spotlightContent.featured_films.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-3">
-                          {spotlightContent.featured_films.map((film) => (
-                            <Link 
-                              key={film.id}
-                              to={`/film/${film.id}`}
-                              className="group flex flex-col gap-1.5 transition-all"
-                              title={film.title}
-                            >
-                              <div className="aspect-[2/3] w-full rounded-lg overflow-hidden border border-border bg-surface-2 relative shadow-md">
-                                <img 
-                                  src={film.poster_url || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'} 
-                                  alt={film.title}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'; }}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
-                                  <span className="text-[8px] font-bold text-white line-clamp-2 leading-tight">
-                                    {film.title}
-                                  </span>
-                                </div>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-text-muted py-8">
-                          No featured works curated.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 10. FEATURED ARTIST */}
-        {(isLoading || spotlightPerson) && (
-          <div className="border-b border-border">
-            <section className="py-16">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-end justify-between mb-10">
-                  <div className="space-y-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                      Featured Artist
-                    </h2>
-                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The talent behind the camera</p>
-                  </div>
-                  <Link
-                    to="/people"
-                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline"
-                  >
-                    View all
-                  </Link>
-                </div>
-
-                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-border shadow-sm">
-                  <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-                  <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
-                    <div className="xl:flex-1">
-                      <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
-                    </div>
-                    <div className="h-px xl:w-px xl:h-64 bg-border"></div>
-                    <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
-                      {isLoading ? (
-                        [...Array(4)].map((_, i) => (
-                          <PersonCard key={i} variant="compact" isLoading={true} />
-                        ))
-                      ) : (
-                        otherPeople.map(person => (
-                          <PersonCard key={person.id} person={person} variant="compact" />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-        {/* 11. NEW MEMBER CTA BANNER (Issue 29) */}
+        {/* 14. NEW MEMBER CTA BANNER (Issue 29) */}
         {!isAuthenticated && (
           <div className="px-4 sm:px-6 lg:px-8 py-16 border-t border-border/40">
             <div className="relative bg-gradient-to-br from-brand/20 via-surface-2 to-surface border border-border rounded-3xl p-8 md:p-16 overflow-hidden shadow-2xl text-center max-w-5xl mx-auto group">

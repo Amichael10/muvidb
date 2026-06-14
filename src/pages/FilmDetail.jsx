@@ -9,6 +9,7 @@ import ReviewSection from '../components/film/ReviewSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 import WatchOptions from '../components/film/WatchOptions';
+import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
 import { Skeleton } from '../components/ui/Skeleton';
 import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
@@ -537,11 +538,46 @@ export default function FilmDetail() {
               >
                 {inWatchlist ? 'Added' : 'Add to Watchlist'}
               </button>
-              <ShareAction 
+              <ShareAction
                 title={film.title}
                 text={`Check out ${film.title} on MuviDB`}
               />
             </div>
+
+            {/* WHERE TO WATCH — explicit per-platform list (answers the #1 query) */}
+            {PLATFORMS.some((p) => isFilmOnPlatform(film, p.id)) && (
+              <div className="p-8 border-t border-border">
+                <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider flex items-center gap-2">
+                  <Icon icon="solar:tv-bold" className="text-brand" />
+                  Where to Watch
+                </h3>
+                <div className="flex flex-col gap-2">
+                  {PLATFORMS.filter((p) => isFilmOnPlatform(film, p.id)).map((p) => {
+                    const url = getWatchUrl(film, p.id);
+                    const inner = (
+                      <>
+                        <span className="flex items-center gap-3">
+                          <span
+                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 shrink-0"
+                            style={{ background: `${p.color}22`, color: p.color }}
+                          >
+                            <Icon icon={p.icon} className="text-base" />
+                          </span>
+                          <span className="text-[11px] font-black uppercase tracking-widest text-text-primary">{p.name}</span>
+                        </span>
+                        <Icon icon={url ? 'solar:arrow-right-up-linear' : 'solar:alt-arrow-right-linear'} className="text-text-muted group-hover:text-brand transition-colors" />
+                      </>
+                    );
+                    const className = 'group flex items-center justify-between px-4 py-3 rounded-lg bg-surface-2/40 border border-border hover:border-brand/50 transition-all';
+                    return url ? (
+                      <a key={p.id} href={url} target="_blank" rel="noopener noreferrer" className={className}>{inner}</a>
+                    ) : (
+                      <Link key={p.id} to={`/watch/${p.id}`} className={className}>{inner}</Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="p-8">
               <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider">More Like This</h3>

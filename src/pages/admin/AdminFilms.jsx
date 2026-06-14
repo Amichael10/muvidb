@@ -731,6 +731,7 @@ export default function AdminFilms() {
         tmdb_rating: formData.tmdb_rating && !isNaN(parseFloat(formData.tmdb_rating)) ? parseFloat(formData.tmdb_rating) : null,
         is_trending: Boolean(formData.is_trending),
         is_featured: Boolean(formData.is_featured),
+        is_top_10: Boolean(formData.is_top_10),
         slug: formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         mubi_slug: formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
@@ -1312,10 +1313,11 @@ export default function AdminFilms() {
                         }`}>
                           {(film.status || 'unknown').replace('-', ' ')}
                         </span>
-                        {(film.is_featured || film.is_trending) && (
+                        {(film.is_featured || film.is_trending || film.is_top_10) && (
                           <div className="flex gap-1">
                              {film.is_featured && <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" title="Featured"></span>}
                              {film.is_trending && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" title="Trending"></span>}
+                            {film.is_top_10 && <span className="w-1.5 h-1.5 rounded-full bg-purple-500" title="Top 10"></span>}
                           </div>
                         )}
                       </div>

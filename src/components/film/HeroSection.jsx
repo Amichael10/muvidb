@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import WatchOptions from './WatchOptions';
@@ -79,7 +79,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
           {/* Background Image & Overlays */}
           <div className="absolute inset-0 z-0">
             <ImageWithFallback 
-              src={featuredFilm.backdrop_url || featuredFilm.backdrop} 
+              src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster} 
               alt={featuredFilm.title} 
               className="w-full h-full object-cover"
               fallbackType="banner"

@@ -26,7 +26,8 @@ const GENRES = [
   { name: 'Animation', icon: 'solar:ghost-bold', color: 'from-lime-500/20 to-lime-600/5' },
 ];
 
-export default function GenreRail({ films = [] }) {
+export default function GenreRail({ films = [], variant = 'grid' }) {
+  const isChips = variant === 'chips';
   const [selectedGenre, setSelectedGenre] = useState('');
   
   // Ref and state for scrollable lineup row
@@ -91,16 +92,48 @@ export default function GenreRail({ films = [] }) {
   return (
     <section className="py-16 overflow-hidden bg-surface-2/5">
       {/* Title */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 border-x border-white/5">
-        <h2 className="font-heading font-bold text-2xl text-text-primary tracking-tighter">
-          Genre Moods
-        </h2>
-        <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">
-          Find your next obsession — dynamically updated
-        </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 border-x border-white/5 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="font-heading font-bold text-2xl text-text-primary tracking-tighter">
+            Browse by Mood
+          </h2>
+          <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">
+            Find your next obsession — dynamically updated
+          </p>
+        </div>
+        <Link to="/browse" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline whitespace-nowrap shrink-0">
+          All genres →
+        </Link>
       </div>
 
-      {/* Grid of Genre Cards */}
+      {/* Compact chip strip (homepage) */}
+      {isChips ? (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 mb-2">
+          <div className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-hide touch-pan-x">
+            {activeGenres.map((genre) => {
+              const isSelected = selectedGenre === genre.name;
+              return (
+                <button
+                  key={genre.name}
+                  onClick={() => setSelectedGenre(genre.name)}
+                  className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap border transition-all duration-200 ${
+                    isSelected
+                      ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20'
+                      : 'bg-surface border-border text-text-secondary hover:border-brand/50 hover:text-text-primary'
+                  }`}
+                >
+                  <Icon icon={genre.icon} className="text-base" />
+                  {genre.name}
+                  <span className={`text-[10px] font-black ${isSelected ? 'text-white/70' : 'text-text-muted'}`}>
+                    {genre.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+      /* Grid of Genre Cards */
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 mb-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {activeGenres.map((genre, i) => {
@@ -164,10 +197,11 @@ export default function GenreRail({ films = [] }) {
           })}
         </div>
       </div>
+      )}
 
       {/* Selected Genre Lineup Row */}
       {selectedGenre && filteredFilms.length > 0 && (
-        <div className="border-t border-border pt-12 mt-12 relative group/row">
+        <div className={`${isChips ? 'pt-2' : 'border-t border-border pt-12 mt-12'} relative group/row`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Row Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
