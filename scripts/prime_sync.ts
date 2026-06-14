@@ -202,7 +202,7 @@ async function scrapePrime() {
         
         // Image Extraction using HTML regex
         const htmlStr = document.documentElement.innerHTML;
-        const allUrls = [...new Set(htmlStr.match(/https:\\/\\/m\\.media-amazon\\.com\\/images\\/S\\/pv-target-images\\/[a-f0-9]{64}[^"'\\s\\\\]*/gi) || [])];
+        const allUrls = [...new Set(htmlStr.match(/https:\/\/m\.media-amazon\.com\/images\/S\/pv-target-images\/[a-f0-9]{64}[^"'\s\\]*/gi) || [])];
         
         let extractedPosterUrl = null;
         let extractedBackdropUrl = null;
