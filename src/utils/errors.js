@@ -77,9 +77,20 @@ export function getFriendlyErrorMessage(error) {
     status === 429 ||
     status === "429" ||
     message.includes("too many requests") ||
+    message.includes("429") ||
     message.includes("rate limit")
   ) {
-    return "Whoops! You're moving a bit too fast. Please wait a quick moment and try again.";
+    return "We're processing a lot of requests right now. Please try again in a couple of hours.";
+  }
+
+  // 5.5 AI Quota / Billing limits
+  if (message.includes("quota") || message.includes("billing")) {
+    return "Our scanning service hit its daily limit. We'll be back tomorrow.";
+  }
+
+  // 5.6 Database COALESCE / Unmatched
+  if (message.includes("coalesce") || message.includes("cannot be matched")) {
+    return "Something went wrong saving this. Our team has been notified.";
   }
 
   // 6. Token & Authorization Expiration
@@ -104,5 +115,5 @@ export function getFriendlyErrorMessage(error) {
   }
 
   // General elegant fallback
-  return "We encountered an unexpected error while processing your request. Please try again shortly.";
+  return "Something went wrong. Please try again.";
 }

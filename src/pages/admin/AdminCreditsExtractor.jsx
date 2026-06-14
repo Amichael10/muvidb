@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { authHeaders } from '../../lib/apiAuth';
+import { apiAuthFetch } from '../../lib/apiAuth';
+import { getFriendlyErrorMessage } from '../../utils/errors';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toast } from 'react-hot-toast';
@@ -82,7 +83,7 @@ export default function AdminCreditsExtractor() {
       } catch (err) {
         console.error('Dynamic film search failed:', err);
         if (active) {
-          toast.error(`Search failed: ${err.message}`);
+          toast.error(`Search failed: ${getFriendlyErrorMessage(err)}`);
         }
       } finally {
         if (active) {
@@ -256,7 +257,7 @@ export default function AdminCreditsExtractor() {
       setOcrLogs(prev => [...prev, `✅ Successfully parsed ${extracted.length} rows.`]);
     } catch (err) {
       console.error('OCR Error:', err);
-      toast.error(`OCR Extraction failed: ${err.message}`);
+      toast.error(`OCR Extraction failed: ${getFriendlyErrorMessage(err)}`);
       setOcrLogs(prev => [...prev, `❌ Error: ${err.message}`]);
     } finally {
       setIsProcessingOCR(false);
@@ -406,7 +407,7 @@ export default function AdminCreditsExtractor() {
         countSaved++;
       } catch (err) {
         console.error(`Failed to save row: ${row.name}`, err);
-        toast.error(`Error saving ${row.name}: ${err.message}`);
+        toast.error(`Error saving ${row.name}: ${getFriendlyErrorMessage(err)}`);
       } finally {
         // Unlock saving lock
         setSavingRows(prev => {
