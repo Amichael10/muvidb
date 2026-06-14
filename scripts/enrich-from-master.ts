@@ -123,8 +123,6 @@ async function main() {
       poster_url:         c.poster_url,
       backdrop_url:       c.backdrop_url,
       trailer_youtube_id: c.trailer_youtube_id,
-      is_featured:        c.is_featured === 't' || c.is_featured === true,
-      is_trending:        c.is_trending === 't' || c.is_trending === true,
       tmdb_id:            c.tmdb_id ? Number(c.tmdb_id) : null,
       tmdb_rating:        c.tmdb_rating ? Number(c.tmdb_rating) : null,
     };
@@ -197,7 +195,6 @@ async function main() {
       subscriber_count:       c.subscriber_count ? Number(c.subscriber_count) : null,
       thumbnail_url:          c.thumbnail_url,
       banner_url:             c.banner_url,
-      is_featured:            c.is_featured === 't' || c.is_featured === true,
       // owner_person_id set in Channel_Owners step below to avoid FK failures
       owner_name:             c.owner_name,
       videos_last_fetched_at: c.videos_last_fetched_at,
