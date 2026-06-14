@@ -233,6 +233,8 @@ async function scrapeNetflix() {
   if (profileSelected) {
     await context.storageState({ path: STATE_FILE });
     console.log(`💾 Session state updated after profile selection.`);
+    console.log(`🚀 Returning to target genre page: ${NETFLIX_URL}`);
+    await page.goto(NETFLIX_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
   }
 
   console.log('⌛ Waiting for titles to appear...');
@@ -360,40 +362,53 @@ async function scrapeNetflix() {
         const cache = (window as any).netflix?.falcorCache || {};
         const videoData = videoId ? (cache.videos?.[videoId] || {}) : {};
         
-        const getFromLabels = (labelName: string) => {
-          const labels = Array.from(document.querySelectorAll('.label, .item-label, .about-item-label, [data-uia$="-label"]'));
-          for (const l of labels) {
-            const text = l.textContent?.toLowerCase() || '';
-            if (text.includes(labelName.toLowerCase())) {
-              const container = l.closest('.about-item, .more-details-item, .item-container, .previewModal--about');
-              const contentEl = container?.querySelector('.content, .about-item-content, .item-text, [data-uia$="-content"]');
-              if (contentEl) return contentEl.textContent?.split(',').map(s => s.trim()).filter(Boolean);
-              if (l.nextElementSibling) return l.nextElementSibling.textContent?.split(',').map(s => s.trim()).filter(Boolean);
-            }
-          }
-          return null;
-        };
-
         // 1. Direct DOM Selectors
         let synopsis = document.querySelector('[data-uia="video-metadata--synopsis"], [data-uia="video-description"], .description-text')?.textContent?.trim() || '';
+        let releaseYear = document.querySelector('.item-year, [data-uia="item-year"]')?.textContent?.trim() || '';
+        let duration = document.querySelector('.item-runtime, [data-uia="item-runtime"]')?.textContent?.trim() || '';
+        let maturityRating = document.querySelector('.item-maturity, .maturity-rating, [data-uia="item-maturity"]')?.textContent?.trim() || '';
         
-        // Broaden cast selectors
-        let cast = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-cast"] .about-item-content, .item-cast, .more-details-item-cast, .ptrack-content[data-uia="about-item-cast"]'))
+        let cast = Array.from(document.querySelectorAll('.cast-list .cast-item, [data-uia="info-starring"] .item-content'))
                         .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
-        
-        let directors = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-director"] .about-item-content, .item-directors, .more-details-item-director'))
-                        .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
-
-        let writers = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-writer"] .about-item-content, .item-writers, .more-details-item-writer'))
-                        .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
-
-        let genres = Array.from(document.querySelectorAll('.about-item[data-uia="about-item-genre"] .about-item-content, .item-genres, .more-details-item-genre'))
+        let directors = Array.from(document.querySelectorAll('.director-list .director-item, [data-uia="info-creators"] .item-content'))
+                             .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
+        let writers: string[] = [];
+        let genres = Array.from(document.querySelectorAll('.genre-list .genre-item, [data-uia="info-genres"] .item-content'))
                           .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
         
         // 2. Label-based fallbacks
-        if (cast.length === 0) cast = getFromLabels('Cast') || [];
-        if (directors.length === 0) directors = getFromLabels('Director') || getFromLabels('Directors') || [];
-        if (genres.length === 0) genres = getFromLabels('Genres') || getFromLabels('Genre') || [];
+        const allLabels = Array.from(document.querySelectorAll('.label, .item-label, .about-item-label, [data-uia$="-label"]'));
+        
+        if (cast.length === 0) {
+           for(let i = 0; i < allLabels.length; i++) {
+              if (allLabels[i].textContent?.toLowerCase().includes('cast')) {
+                 const container = allLabels[i].closest('.about-item, .more-details-item, .item-container, .previewModal--about');
+                 const contentEl = container?.querySelector('.content, .about-item-content, .item-text, [data-uia$="-content"]');
+                 if (contentEl) { cast = contentEl.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+                 if (allLabels[i].nextElementSibling) { cast = allLabels[i].nextElementSibling.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+              }
+           }
+        }
+        if (directors.length === 0) {
+           for(let i = 0; i < allLabels.length; i++) {
+              if (allLabels[i].textContent?.toLowerCase().includes('director')) {
+                 const container = allLabels[i].closest('.about-item, .more-details-item, .item-container, .previewModal--about');
+                 const contentEl = container?.querySelector('.content, .about-item-content, .item-text, [data-uia$="-content"]');
+                 if (contentEl) { directors = contentEl.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+                 if (allLabels[i].nextElementSibling) { directors = allLabels[i].nextElementSibling.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+              }
+           }
+        }
+        if (genres.length === 0) {
+           for(let i = 0; i < allLabels.length; i++) {
+              if (allLabels[i].textContent?.toLowerCase().includes('genre')) {
+                 const container = allLabels[i].closest('.about-item, .more-details-item, .item-container, .previewModal--about');
+                 const contentEl = container?.querySelector('.content, .about-item-content, .item-text, [data-uia$="-content"]');
+                 if (contentEl) { genres = contentEl.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+                 if (allLabels[i].nextElementSibling) { genres = allLabels[i].nextElementSibling.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+              }
+           }
+        }
 
         // 3. Falcor Cache Fallback (Targeted to THIS video) - Much more robust
         if (videoData) {
