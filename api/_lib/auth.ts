@@ -9,27 +9,25 @@ const CRON_SECRET = process.env.CRON_SECRET;
  * 2. A x-cron-secret header with CRON_SECRET
  * 3. A Supabase Access Token from an Admin user
  */
-export async function isValidAuth(req: VercelRequest): Promise<boolean> {
+export async function isValidAuth(req: VercelRequest): Promise<{ valid: boolean, reason?: string }> {
   if (!req?.headers) {
     console.error('Auth check: [CRITICAL] Request headers are missing.');
-    return false;
+    return { valid: false, reason: 'Request headers are missing' };
   }
   const authHeader = req.headers['authorization'];
   const cronSecretHeader = req.headers['x-cron-secret'];
   
-  // 1 & 2: Check CRON_SECRET bypass
   if (CRON_SECRET) {
-    if (cronSecretHeader === CRON_SECRET) return true;
-    if (authHeader === `Bearer ${CRON_SECRET}`) return true;
+    if (cronSecretHeader === CRON_SECRET) return { valid: true };
+    if (authHeader === `Bearer ${CRON_SECRET}`) return { valid: true };
   }
 
-  // 3: Verify Supabase Session
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     
     if (!token || token === 'undefined') {
       console.warn('Auth check: Token is empty or undefined');
-      return false;
+      return { valid: false, reason: 'Token is empty or undefined' };
     }
 
     try {
@@ -37,14 +35,12 @@ export async function isValidAuth(req: VercelRequest): Promise<boolean> {
       
       if (error) {
         console.error('Auth check: Supabase verification failed:', error.message);
-        return false;
+        return { valid: false, reason: `Supabase verification failed: ${error.message}` };
       }
 
       if (user) {
-        // Fallback to user_metadata if DB check fails
         let role = user.user_metadata?.role || 'fan';
         
-        // Prioritize role from public.users table (matches AuthContext logic)
         try {
           const { data: profile } = await supabase
             .from('users')
@@ -59,23 +55,24 @@ export async function isValidAuth(req: VercelRequest): Promise<boolean> {
           console.warn('Auth check: Failed to fetch role from public.users', dbErr);
         }
         
-        console.log(`Auth check: [SUCCESS] User: ${user.email} | Role: ${role}`);
-
-        // Only admins may trigger these site-wide maintenance endpoints
-        // (full DB sync, AI cleanup, YouTube search). Professional/actor
-        // contributions happen via RLS-governed table writes, not here.
         if (role === 'admin' || role === 'admin_limited') {
-          return true;
+          return { valid: true };
         } else {
           console.warn(`Auth check: [FORBIDDEN] ${user.email} lacks admin role. Evaluated role: ${role}`);
+          return { valid: false, reason: `User lacks admin role. Evaluated role: ${role}` };
         }
+      } else {
+         return { valid: false, reason: 'User not found from token' };
       }
     } catch (e: any) {
       console.error('Auth check: [EXCEPTION]', e.message);
+      return { valid: false, reason: `Exception: ${e.message}` };
     }
   } else {
     console.warn('Auth check: [MISSING] No Bearer token in Authorization header. Headers received:', Object.keys(req.headers));
+    return { valid: false, reason: 'No Bearer token in Authorization header' };
   }
 
-  return false;
+  return { valid: false, reason: 'Unknown error' };
 }
+

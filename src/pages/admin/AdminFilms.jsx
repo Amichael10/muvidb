@@ -240,6 +240,7 @@ export default function AdminFilms() {
       if (yearFilter !== 'all') countQuery = countQuery.eq('year', parseInt(yearFilter));
       if (featuredFilter === 'featured') countQuery = countQuery.eq('is_featured', true);
       if (featuredFilter === 'regular') countQuery = countQuery.eq('is_featured', false);
+      if (featuredFilter === 'top10') countQuery = countQuery.eq('is_top_10', true);
       if (sourceFilter !== 'all') countQuery = countQuery.eq('source', sourceFilter);
       if (typeFilter !== 'all') countQuery = countQuery.eq('type', typeFilter);
       if (platformFilter !== 'all') {
@@ -258,6 +259,7 @@ export default function AdminFilms() {
       if (yearFilter !== 'all') query = query.eq('year', parseInt(yearFilter));
       if (featuredFilter === 'featured') query = query.eq('is_featured', true);
       if (featuredFilter === 'regular') query = query.eq('is_featured', false);
+      if (featuredFilter === 'top10') query = query.eq('is_top_10', true);
       if (trendingFilter === 'trending') query = query.eq('is_trending', true);
       if (trendingFilter === 'regular') query = query.eq('is_trending', false);
       if (sourceFilter !== 'all') query = query.eq('source', sourceFilter);
@@ -1130,9 +1132,10 @@ export default function AdminFilms() {
             onChange={(e) => setFeaturedFilter(e.target.value)}
             className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
           >
-            <option value="all">Any Placement</option>
+            <option value="all">All Placement</option>
             <option value="featured">Featured Hero</option>
-            <option value="regular">Regular Only</option>
+            <option value="top10">Top 10</option>
+            <option value="regular">Regular</option>
           </select>
           
           <select
@@ -1798,6 +1801,24 @@ export default function AdminFilms() {
                       }`} />
                     </button>
                   </div>
+
+                  <div className="flex items-center justify-between border-t border-border/50 pt-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-text-primary tracking-tight font-heading">Top 10 of the Week</h4>
+                      <p className="text-[11px] text-text-muted mt-0.5 italic">Highlight this in the Top 10 section.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_top_10: !formData.is_top_10 })}
+                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none focus:ring-2 focus:ring-brand/20 ${
+                        formData.is_top_10 ? 'bg-purple-500' : 'bg-slate-200 dark:bg-slate-800'
+                      }`}
+                    >
+                      <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        formData.is_top_10 ? 'translate-x-5' : 'translate-x-0'
+                      }`} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
@@ -1874,6 +1895,21 @@ export default function AdminFilms() {
                         <div className={`absolute top-1 w-3 h-3 rounded-full transition-all ${formData.is_trending ? 'left-6 bg-white' : 'left-1 bg-text-muted'}`} />
                       </div>
                       <span className="text-xs font-bold text-text uppercase tracking-wider group-hover:text-orange-500 transition-colors">Trending</span>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input 
+                          type="checkbox" 
+                          name="is_top_10" 
+                          checked={formData.is_top_10 || false} 
+                          onChange={(e) => setFormData({ ...formData, is_top_10: e.target.checked })}
+                          className="sr-only" 
+                        />
+                        <div className={`w-10 h-5 rounded-full transition-all ${formData.is_top_10 ? 'bg-purple-500' : 'bg-surface-muted border border-border'}`} />
+                        <div className={`absolute top-1 w-3 h-3 rounded-full transition-all ${formData.is_top_10 ? 'left-6 bg-white' : 'left-1 bg-text-muted'}`} />
+                      </div>
+                      <span className="text-xs font-bold text-text uppercase tracking-wider group-hover:text-purple-500 transition-colors">Top 10</span>
                     </label>
                   </div>
                 </div>

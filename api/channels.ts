@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (action === 'yt_search') {
     try {
       const authOk = await isValidAuth(req);
-      if (!authOk) return res.status(401).json({ error: 'Unauthorized' });
+      if (!authOk.valid) return res.status(401).json({ error: 'Unauthorized' });
     } catch (e: any) {
       return res.status(401).json({ error: e.message });
     }

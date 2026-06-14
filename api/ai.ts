@@ -12,8 +12,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // This endpoint performs privileged, service-role DB writes (renaming
   // films, inserting people/credits) and burns paid AI quota. Require an
   // authenticated admin/cron caller.
-  if (!(await isValidAuth(req))) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  const authCheck = await isValidAuth(req);
+  if (!authCheck.valid) {
+    return res.status(401).json({ error: `Unauthorized - debug info: authHeader=${req.headers['authorization'] ? 'present' : 'missing'}, reason=${authCheck.reason}` });
   }
 
   const { task, data } = req.body;

@@ -244,7 +244,10 @@ async function scrapePrime() {
 
         // Detect if it's a series
         const titleText = titleEl?.textContent?.toLowerCase() || '';
-        const extractedSynopsis = synopsisEl?.textContent?.trim() || metaDescEl?.getAttribute('content')?.trim() || '';
+        let extractedSynopsis = synopsisEl?.textContent?.trim() || metaDescEl?.getAttribute('content')?.trim() || '';
+        if (extractedSynopsis.toLowerCase().includes('cookie') || extractedSynopsis.toLowerCase().includes('javascript')) {
+            extractedSynopsis = '';
+        }
         const synopsisText = extractedSynopsis.toLowerCase();
         const durationText = runtimeEl?.textContent?.toLowerCase() || '';
         const seasonSelector = !!document.querySelector('[data-automation-id="season-selector"], .dv-node-dp-season-selector, [data-testid="season-selector"], .season-selector');

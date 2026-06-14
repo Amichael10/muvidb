@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end();
   
   // Auth Check
-  if (!(await isValidAuth(req))) {
+  if (!(await isValidAuth(req)).valid) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

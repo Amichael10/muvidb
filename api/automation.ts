@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // The remaining actions write to the DB and consume paid AI/YouTube
   // quota, so they require an authenticated admin/cron caller.
   if (action === 'fetch-channels' || action === 'enrich-actors') {
-    if (!(await isValidAuth(req))) {
+    if (!(await isValidAuth(req)).valid) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     return action === 'fetch-channels'
