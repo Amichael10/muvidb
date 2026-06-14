@@ -110,12 +110,26 @@ async function scrapePrime() {
   } catch (e) {}
 
   let movieUrls = new Set<string>();
-  console.log('📜 Scrolling to load more Nollywood titles...');
-  let lastHeight = 0;
-  let scrollAttempts = 0;
-  const maxScrollAttempts = 15;
+  let pageNumber = 1;
+  const maxPages = 10; // Cap at 10 pages for safety
 
-  while (scrollAttempts < maxScrollAttempts) {
+  while (pageNumber <= maxPages) {
+    console.log(`📜 Scraping Prime Search Page ${pageNumber}...`);
+    let lastHeight = 0;
+    let scrollAttempts = 0;
+    const maxScrollAttempts = 15;
+
+    // Scroll to the bottom to load all dynamic elements
+    while (scrollAttempts < maxScrollAttempts) {
+      const newHeight = await page.evaluate('document.body.scrollHeight');
+      if (newHeight === lastHeight) break;
+      lastHeight = newHeight;
+      await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+      await page.waitForTimeout(2000);
+      scrollAttempts++;
+    }
+
+    // Extract all links on the current page
     const links = await page.evaluate(() => {
       const containers = Array.from(document.querySelectorAll('.s-result-list-placeholder, .av-grid-container, .f-grid-container, div[data-automation-id="grid"]'));
       let allLinks: string[] = [];
@@ -142,12 +156,28 @@ async function scrapePrime() {
     });
     
     links.forEach(url => movieUrls.add(url));
-    const newHeight = await page.evaluate('document.body.scrollHeight');
-    if (newHeight === lastHeight) break;
-    lastHeight = newHeight;
-    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
-    await page.waitForTimeout(2000);
-    scrollAttempts++;
+    console.log(`  🔍 Found ${links.length} links on page ${pageNumber}. Total unique: ${movieUrls.size}`);
+
+    // Look for the "Next" button
+    const nextButton = await page.$('.s-pagination-next:not(.s-pagination-disabled), a[aria-label="Next page"], li.a-last a');
+    if (!nextButton) {
+      console.log('🏁 No more pages found or Next button is disabled.');
+      break;
+    }
+
+    console.log('⏭️ Clicking Next Page...');
+    try {
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
+        nextButton.click()
+      ]);
+      await page.waitForTimeout(3000);
+    } catch (e) {
+      console.log('⚠️ Failed to navigate to next page:', e.message);
+      break;
+    }
+    
+    pageNumber++;
   }
 
   console.log(`📽️ Discovered ${movieUrls.size} unique movie URLs. Starting deep extraction...`);
@@ -177,7 +207,8 @@ async function scrapePrime() {
         const posterEl = document.querySelector('img[data-testid="poster-image"], img.dv-node-dp-image, a.contentCardLink-_UM9Xj img, a.detailLink-zyfcZQ img');
         
         // Click Details tab if it exists to get full cast/director
-        const detailsTab = document.querySelector('#tab-selector-details, [data-automation-id="details-tab"], button:has-text("Details"), a:has-text("Details")') as HTMLElement;
+        const detailsTabs = Array.from(document.querySelectorAll('#tab-selector-details, [data-automation-id="details-tab"], button, a')) as HTMLElement[];
+        const detailsTab = detailsTabs.find(el => el.textContent?.trim() === 'Details');
         if (detailsTab) {
           detailsTab.click();
           await new Promise(r => setTimeout(r, 1500));
