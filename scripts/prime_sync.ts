@@ -200,11 +200,33 @@ async function scrapePrime() {
         const yearEl = document.querySelector('span[data-testid="release-year"], [data-automation-id="release-year-badge"], .dv-node-dp-release-year, [data-automation-id="release-year"]');
         const runtimeEl = document.querySelector('span[data-testid="runtime"], [data-automation-id="runtime-badge"], [data-automation-id="runtime"]');
         
-        // Horizontal Hero / Backdrop
-        const backdropEl = document.querySelector('picture img, div[data-automation-id="hero-background"] img, .dv-node-dp-hero-image img');
+        // Image Extraction using HTML regex
+        const htmlStr = document.documentElement.innerHTML;
+        const allUrls = [...new Set(htmlStr.match(/https:\\/\\/m\\.media-amazon\\.com\\/images\\/S\\/pv-target-images\\/[a-f0-9]{64}[^"'\\s\\\\]*/gi) || [])];
         
-        // Vertical Poster
-        const posterEl = document.querySelector('img[data-testid="poster-image"], img.dv-node-dp-image, a.contentCardLink-_UM9Xj img, a.detailLink-zyfcZQ img');
+        let extractedPosterUrl = null;
+        let extractedBackdropUrl = null;
+
+        for (const url of allUrls) {
+           if (/(_SX\d+_|_SY\d+_)/i.test(url) && !url.includes('_UR')) {
+              if (!extractedPosterUrl) extractedPosterUrl = url;
+           }
+           if (/(_UR\d+,\d+_|_UX\d+_)/i.test(url)) {
+              if (!extractedBackdropUrl) extractedBackdropUrl = url;
+           }
+        }
+
+        if (!extractedBackdropUrl) {
+           const og = document.querySelector('meta[property="og:image"]');
+           if (og) extractedBackdropUrl = og.getAttribute('content');
+        }
+        
+        if (!extractedPosterUrl) {
+           extractedPosterUrl = allUrls.find(u => !u.includes('_UR') && !u.includes('BottomRightCardGradient')) || null;
+        }
+        if (!extractedBackdropUrl) {
+           extractedBackdropUrl = allUrls.find(u => !u.includes('_SX') && !u.includes('BottomRightCardGradient')) || null;
+        }
         
         // Click Details tab if it exists to get full cast/director
         const detailsTabs = Array.from(document.querySelectorAll('#tab-selector-details, [data-automation-id="details-tab"], button, a')) as HTMLElement[];
@@ -239,8 +261,8 @@ async function scrapePrime() {
           synopsis: synopsisEl?.textContent?.trim() || '',
           year: yearEl?.textContent?.trim() || null,
           runtime: runtimeEl?.textContent?.trim() || null,
-          poster_url: (posterEl as HTMLImageElement)?.src || null,
-          backdrop_url: (backdropEl as HTMLImageElement)?.src || null,
+          poster_url: extractedPosterUrl,
+          backdrop_url: extractedBackdropUrl,
           cast: [...new Set(castEls.map(el => el.textContent?.trim()).filter(Boolean))].slice(0, 50), // Increased limit
           directors: [...new Set(directorEls.map(el => el.textContent?.trim()).filter(Boolean))],
           writers: [...new Set(writerEls.map(el => el.textContent?.trim()).filter(Boolean))],
