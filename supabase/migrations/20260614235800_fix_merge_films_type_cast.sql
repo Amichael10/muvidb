@@ -24,17 +24,17 @@ BEGIN
     );
     UPDATE public.credits SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
-    -- Update watch destinations (Move from secondary film to primary film)
-    DELETE FROM public.watch_destinations w_sec
-    WHERE w_sec.film_id = p_secondary_id
+    -- Transfer watch links
+    DELETE FROM public.film_watch_links wl_sec
+    WHERE wl_sec.film_id = p_secondary_id
     AND EXISTS (
-        SELECT 1 FROM public.watch_destinations w_pri 
-        WHERE w_pri.film_id = p_primary_id 
-        AND w_pri.platform = w_sec.platform
+        SELECT 1 FROM public.film_watch_links wl_pri 
+        WHERE wl_pri.film_id = p_primary_id 
+        AND wl_pri.platform_id = wl_sec.platform_id
     );
-    UPDATE public.watch_destinations SET film_id = p_primary_id WHERE film_id = p_secondary_id;
+    UPDATE public.film_watch_links SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
-    -- Update film_countries (Move from secondary to primary)
+    -- Transfer countries
     DELETE FROM public.film_countries fc_sec
     WHERE fc_sec.film_id = p_secondary_id
     AND EXISTS (
@@ -44,21 +44,15 @@ BEGIN
     );
     UPDATE public.film_countries SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
-    -- Update videos (Move from secondary to primary)
-    UPDATE public.videos SET film_id = p_primary_id WHERE film_id = p_secondary_id;
-
-    -- Update mubi_urls (Move from secondary to primary)
-    UPDATE public.mubi_urls SET film_id = p_primary_id WHERE film_id = p_secondary_id;
-
-    -- Update waitlist (Move from secondary to primary)
-    DELETE FROM public.waitlist w_sec
-    WHERE w_sec.film_id = p_secondary_id
+    -- Transfer genres
+    DELETE FROM public.film_genres fg_sec
+    WHERE fg_sec.film_id = p_secondary_id
     AND EXISTS (
-        SELECT 1 FROM public.waitlist w_pri 
-        WHERE w_pri.film_id = p_primary_id 
-        AND w_pri.email = w_sec.email
+        SELECT 1 FROM public.film_genres fg_pri 
+        WHERE fg_pri.film_id = p_primary_id 
+        AND fg_pri.genre_id = fg_sec.genre_id
     );
-    UPDATE public.waitlist SET film_id = p_primary_id WHERE film_id = p_secondary_id;
+    UPDATE public.film_genres SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
     -- C. Apply Enriched Metadata
     UPDATE public.films
