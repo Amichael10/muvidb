@@ -19,7 +19,7 @@ export default function PlatformRail({ films = [], counts = {} }) {
       count: counts[platform.id] || 0,
       coverImage: coverFilm?.backdrop_url || coverFilm?.poster_url || '',
     };
-  }).filter((p) => p.count > 0);
+  }).filter((p) => p.count > 0 || p.id === 'ebonylife');
 
   if (activePlatforms.length === 0) return null;
 

@@ -344,22 +344,24 @@ export default function Home() {
 
   const fetchTop10Films = async () => {
     const { data, error } = await supabase
-      .from('films')
+      .from('top_10_films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language, 
-        runtime_minutes, view_count, average_rating, nfvcb_rating, 
-        is_featured, is_trending, release_type, created_at, release_date,
-        film_genres(genres(name))
+        rank,
+        films (
+          id, title, poster_url, backdrop_url, year, language, 
+          runtime_minutes, view_count, average_rating, nfvcb_rating, 
+          is_featured, is_trending, release_type, created_at, release_date,
+          film_genres(genres(name))
+        )
       `)
-      .eq('is_top_10', true)
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('view_count', { ascending: false })
+      .order('rank', { ascending: true })
       .limit(10);
       
     if (!error && data) {
-      setTop10Films(data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+      setTop10Films(data.filter(item => item.films).map(item => ({
+        ...item.films,
+        genres: item.films.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [],
+        rank: item.rank
       })));
     }
   };

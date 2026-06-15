@@ -9,6 +9,7 @@ export const PLATFORMS = [
   { id: 'showmax',     name: 'Showmax',     icon: 'solar:tv-bold',           color: '#E10098' },
   { id: 'kava',        name: 'Kava',        icon: 'solar:play-circle-bold',  color: '#FF5C00' },
   { id: 'docuth',      name: 'Docuth',      icon: 'solar:play-stream-bold',  color: '#16A34A' },
+  { id: 'ebonylife',   name: 'Ebonylife',   icon: 'solar:play-circle-bold',  color: '#800080' },
   { id: 'cinema',      name: 'In Cinemas',  icon: 'solar:ticket-bold',       color: '#FF5A1F', isCinema: true },
 ];
 

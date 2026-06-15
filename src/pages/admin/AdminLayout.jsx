@@ -44,6 +44,7 @@ export default function AdminLayout() {
     { path: '/admin/logs', label: 'Activity Logs', icon: 'solar:history-linear' },
     { path: '/admin/ai', label: 'AI Agent', icon: 'solar:cpu-linear' },
     { path: '/admin/spotlight', label: 'Spotlight', icon: 'solar:star-fall-linear' },
+    { path: '/admin/top10', label: 'Top 10', icon: 'solar:medal-star-linear' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
     { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear' },
   ];
