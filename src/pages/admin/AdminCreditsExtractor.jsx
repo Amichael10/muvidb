@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { apiAuthFetch } from '../../lib/apiAuth';
+import { authHeaders } from '../../lib/apiAuth';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';

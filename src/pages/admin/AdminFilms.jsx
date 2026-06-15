@@ -1796,7 +1796,6 @@ export default function AdminFilms() {
                       }`} />
                     </button>
                   </div>
-                  </div>
                 </div>
               </div>
             </section>
