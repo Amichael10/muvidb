@@ -65,8 +65,9 @@ BEGIN
         tmdb_id = v_tmdb_id,
         status = COALESCE((NULLIF(p_metadata->>'status', ''))::film_status, status),
         release_type = COALESCE(NULLIF(p_metadata->>'release_type', ''), release_type),
-        rating = COALESCE(NULLIF(p_metadata->>'rating', ''), rating),
-        youtube_watch_url = COALESCE(NULLIF(p_metadata->>'youtube_watch_url', ''), youtube_watch_url)
+        nfvcb_rating = COALESCE(NULLIF(p_metadata->>'rating', ''), nfvcb_rating),
+        youtube_watch_url = COALESCE(NULLIF(p_metadata->>'youtube_watch_url', ''), youtube_watch_url),
+        language = COALESCE(NULLIF(p_metadata->>'language', ''), language)
     WHERE id = p_primary_id;
 
     -- D. Delete Secondary Film
