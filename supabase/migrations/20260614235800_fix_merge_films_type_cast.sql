@@ -30,7 +30,7 @@ BEGIN
     AND EXISTS (
         SELECT 1 FROM public.film_watch_links wl_pri 
         WHERE wl_pri.film_id = p_primary_id 
-        AND wl_pri.platform_id = wl_sec.platform_id
+        AND wl_pri.distributor = wl_sec.distributor
     );
     UPDATE public.film_watch_links SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
@@ -40,7 +40,7 @@ BEGIN
     AND EXISTS (
         SELECT 1 FROM public.film_countries fc_pri 
         WHERE fc_pri.film_id = p_primary_id 
-        AND fc_pri.country_code = fc_sec.country_code
+        AND fc_pri.country_id = fc_sec.country_id
     );
     UPDATE public.film_countries SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
