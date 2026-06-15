@@ -6,6 +6,8 @@ import { authHeaders } from '../../lib/apiAuth';
 export default function AdminAutomation() {
   const [automationJobs, setAutomationJobs] = useState([]);
   const [automationLoading, setAutomationLoading] = useState(false);
+  const [imdbActorInput, setImdbActorInput] = useState('');
+  const [imdbLoading, setImdbLoading] = useState(false);
 
   useEffect(() => {
     fetchAutomationJobs();
@@ -44,6 +46,29 @@ export default function AdminAutomation() {
       toast.error(`Failed to trigger: ${e.message}`);
     }
     setAutomationLoading(false);
+  };
+
+  const triggerImdbScrape = async () => {
+    if (!imdbActorInput.trim()) return toast.error('Enter an actor name');
+    setImdbLoading(true);
+    toast(`Scraping IMDb for ${imdbActorInput}...`, { icon: '🎬' });
+    try {
+      const res = await fetch('/api/scrape-imdb-actor', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ actorName: imdbActorInput })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP error ${res.status}`);
+      }
+      const data = await res.json();
+      toast.success(`Scraped ${data.actor}! Added ${data.moviesAdded} new movies.`);
+      setImdbActorInput('');
+    } catch (e) {
+      toast.error(`Failed to scrape: ${e.message}`);
+    }
+    setImdbLoading(false);
   };
 
   return (
@@ -165,6 +190,39 @@ export default function AdminAutomation() {
             <Icon icon="solar:play-bold" />
             Run Manual Batch Now
           </button>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h3 className="font-heading font-bold text-2xl text-text-primary mb-4">Manual Enrichments</h3>
+        <div className="bg-surface border border-border rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+             <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                <Icon icon="solar:clapperboard-play-bold" className="text-xl" />
+             </div>
+             <div>
+               <h3 className="font-bold text-lg text-text-primary">IMDb Actor Scrape</h3>
+               <p className="text-xs text-text-muted">Instantly fetch an actor's bio and filmography from IMDb</p>
+             </div>
+          </div>
+          
+          <div className="flex gap-4 items-center">
+            <input 
+              type="text" 
+              value={imdbActorInput}
+              onChange={(e) => setImdbActorInput(e.target.value)}
+              placeholder="e.g. Hubert Ogunde, Alade Aromire"
+              className="flex-1 bg-bg border border-border rounded-xl px-4 py-3 text-text-primary focus:outline-none focus:border-brand"
+            />
+            <button 
+              onClick={triggerImdbScrape}
+              disabled={imdbLoading || !imdbActorInput.trim()}
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 px-6 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            >
+              {imdbLoading ? <Icon icon="solar:spinner-bold" className="animate-spin" /> : <Icon icon="solar:magic-stick-3-bold" />}
+              {imdbLoading ? 'Scraping...' : 'Scrape Actor'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

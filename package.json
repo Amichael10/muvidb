@@ -14,6 +14,8 @@
     "scrape:prime": "tsx scripts/prime_sync.ts",
     "scrape:mubi": "tsx scripts/mubi_playwright.ts",
     "scrape:docuth": "tsx scripts/docuth_sync.ts",
+    "scrape:imdb": "tsx scripts/imdb_scraper.ts",
+    "scrape:imdb-bulk": "tsx scripts/imdb_bulk_sync.ts",
     "sync:kava": "tsx scripts/sync-kava.ts"
   },
   "dependencies": {

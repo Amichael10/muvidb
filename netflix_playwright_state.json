@@ -5,7 +5,7 @@
       "value": "9fad3187-f693-4387-81dc-514809480746",
       "domain": ".netflix.com",
       "path": "/",
-      "expires": 1781541058.096856,
+      "expires": 1781541928.657978,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
@@ -55,7 +55,7 @@
       "value": "true",
       "domain": ".netflix.com",
       "path": "/",
-      "expires": 1789306257.598013,
+      "expires": 1789307128.657746,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
@@ -65,17 +65,7 @@
       "value": "true",
       "domain": ".netflix.com",
       "path": "/",
-      "expires": 1789306257.598616,
-      "httpOnly": false,
-      "secure": false,
-      "sameSite": "Lax"
-    },
-    {
-      "name": "OptanonConsent",
-      "value": "isGpcEnabled=0&datestamp=Mon+Jun+15+2026+14%3A31%3A04+GMT%2B0100+(West+Africa+Standard+Time)&version=202604.2.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&consentId=497a9427-64bd-4602-a8ac-1c09c6422724&interactionCount=0&isAnonUser=1&prevHadToken=0&landingPath=https%3A%2F%2Fwww.netflix.com%2Fph-en%2Flogin&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1",
-      "domain": ".netflix.com",
-      "path": "/",
-      "expires": 1813066264,
+      "expires": 1789307128.657898,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
@@ -86,6 +76,16 @@
       "domain": "www.netflix.com",
       "path": "/",
       "expires": 1781616664,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OptanonConsent",
+      "value": "isGpcEnabled=0&datestamp=Mon+Jun+15+2026+14%3A45%3A35+GMT%2B0100+(West+Africa+Standard+Time)&version=202604.2.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&consentId=497a9427-64bd-4602-a8ac-1c09c6422724&interactionCount=0&isAnonUser=1&prevHadToken=0&landingPath=https%3A%2F%2Fwww.netflix.com%2Fph-en%2Flogin&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1813067135,
       "httpOnly": false,
       "secure": false,
       "sameSite": "Lax"
