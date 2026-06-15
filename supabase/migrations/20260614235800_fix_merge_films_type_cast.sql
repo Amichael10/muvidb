@@ -54,6 +54,50 @@ BEGIN
     );
     UPDATE public.film_genres SET film_id = p_primary_id WHERE film_id = p_secondary_id;
 
+    -- Transfer film_companies
+    DELETE FROM public.film_companies c_sec
+    WHERE c_sec.film_id = p_secondary_id
+    AND EXISTS (
+        SELECT 1 FROM public.film_companies c_pri 
+        WHERE c_pri.film_id = p_primary_id 
+        AND c_pri.company_id = c_sec.company_id
+        AND c_pri.role = c_sec.role
+    );
+    UPDATE public.film_companies SET film_id = p_primary_id WHERE film_id = p_secondary_id;
+
+    -- Transfer collection_films
+    DELETE FROM public.collection_films cf_sec
+    WHERE cf_sec.film_id = p_secondary_id
+    AND EXISTS (
+        SELECT 1 FROM public.collection_films cf_pri 
+        WHERE cf_pri.film_id = p_primary_id 
+        AND cf_pri.collection_id = cf_sec.collection_id
+    );
+    UPDATE public.collection_films SET film_id = p_primary_id WHERE film_id = p_secondary_id;
+
+    -- Transfer watchlist
+    DELETE FROM public.watchlist w_sec
+    WHERE w_sec.film_id = p_secondary_id
+    AND EXISTS (
+        SELECT 1 FROM public.watchlist w_pri 
+        WHERE w_pri.film_id = p_primary_id 
+        AND w_pri.user_id = w_sec.user_id
+    );
+    UPDATE public.watchlist SET film_id = p_primary_id WHERE film_id = p_secondary_id;
+
+    -- Transfer reviews
+    DELETE FROM public.reviews r_sec
+    WHERE r_sec.film_id = p_secondary_id
+    AND EXISTS (
+        SELECT 1 FROM public.reviews r_pri 
+        WHERE r_pri.film_id = p_primary_id 
+        AND r_pri.user_id = r_sec.user_id
+    );
+    UPDATE public.reviews SET film_id = p_primary_id WHERE film_id = p_secondary_id;
+
+    -- Transfer pending_cinema_films
+    UPDATE public.pending_cinema_films SET promoted_film_id = p_primary_id WHERE promoted_film_id = p_secondary_id;
+
     -- C. Apply Enriched Metadata
     UPDATE public.films
     SET 
