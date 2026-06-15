@@ -142,11 +142,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (movieId && personId) {
-        await supabase.from('film_cast').upsert({
+        const { error } = await supabase.from('film_cast').upsert({
           film_id: movieId,
           person_id: personId,
           role_type: 'actor'
-        }, { onConflict: 'film_id, person_id' }).catch(() => null);
+        }, { onConflict: 'film_id, person_id' });
       }
     }
 

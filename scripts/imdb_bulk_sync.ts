@@ -45,7 +45,7 @@ async function scrapeBulkNollywood() {
     let hasMore = true;
     let pagesScraped = 0;
     
-    const movieLinksToScrape: { title: string, url: string }[] = [];
+    const movieLinksToScrape: { title: string, url: string, existingId?: string }[] = [];
 
     // Step 1: Collect Links
     while (hasMore && pagesScraped < 3) {
@@ -67,14 +67,15 @@ async function scrapeBulkNollywood() {
          if (!movie.title || !movie.link) continue;
          
          // Check if movie exists and has a synopsis
-         const { data: existingMovie } = await supabase.from('films').select('id, synopsis').ilike('title', movie.title).maybeSingle();
+         const { data: existingMovies } = await supabase.from('films').select('id, synopsis').ilike('title', movie.title).limit(1);
+         const existingMovie = existingMovies?.[0];
          
          if (existingMovie && existingMovie.synopsis) {
             console.log(`⏭️ Skipping ${movie.title} (already has full details)`);
             continue;
          }
          
-         movieLinksToScrape.push({ title: movie.title, url: `https://www.imdb.com${movie.link}` });
+         movieLinksToScrape.push({ title: movie.title, url: `https://www.imdb.com${movie.link}`, existingId: existingMovie?.id });
       }
       
       const loadMoreBtn = await page.$('button.ipc-see-more__button');
@@ -155,19 +156,53 @@ async function scrapeBulkNollywood() {
         console.log(`   - Cast: ${metadata.cast?.length || 0} members`);
 
         // Insert / Update Movie
-        const { data: insertedMovie, error: filmErr } = await supabase
-          .from('films')
-          .upsert({
-             title: metadata.title,
-             year: metadata.year,
-             runtime_minutes: metadata.runtimeMinutes,
-             synopsis: metadata.synopsis,
-             poster_url: metadata.posterUrl,
-             backdrop_url: metadata.backdropUrl,
-             source: 'imdb'
-          }, { onConflict: 'title' })
-          .select('id')
-          .single();
+        let insertedMovie;
+        let filmErr;
+        
+        let actualExistingId = movie.existingId;
+        
+        // Double check against DB using the deep title
+        if (!actualExistingId) {
+            const { data: deepCheck } = await supabase.from('films').select('id').ilike('title', metadata.title).limit(1);
+            if (deepCheck && deepCheck.length > 0) {
+               actualExistingId = deepCheck[0].id;
+               console.log(`   - Found existing ID using deep title: ${actualExistingId}`);
+            }
+        }
+        
+        if (actualExistingId) {
+          const { data, error } = await supabase
+            .from('films')
+            .update({
+               year: metadata.year,
+               runtime_minutes: metadata.runtimeMinutes,
+               synopsis: metadata.synopsis,
+               poster_url: metadata.posterUrl,
+               backdrop_url: metadata.backdropUrl,
+               source: 'imdb'
+            })
+            .eq('id', actualExistingId)
+            .select('id')
+            .single();
+          insertedMovie = data;
+          filmErr = error;
+        } else {
+          const { data, error } = await supabase
+            .from('films')
+            .insert({
+               title: metadata.title,
+               year: metadata.year,
+               runtime_minutes: metadata.runtimeMinutes,
+               synopsis: metadata.synopsis,
+               poster_url: metadata.posterUrl,
+               backdrop_url: metadata.backdropUrl,
+               source: 'imdb'
+            })
+            .select('id')
+            .single();
+          insertedMovie = data;
+          filmErr = error;
+        }
 
         if (filmErr || !insertedMovie) {
           console.error(`❌ Error saving film ${metadata.title}:`, filmErr);
@@ -193,12 +228,12 @@ async function scrapeBulkNollywood() {
            }
 
            if (personId) {
-             await supabase.from('film_cast').upsert({
-               film_id: movieId,
+             const { error: castErr } = await supabase.from('film_cast').upsert({
+               film_id: insertedMovie.id,
                person_id: personId,
                role_type: 'actor',
                character_name: actor.character
-             }, { onConflict: 'film_id, person_id' }).catch(() => null);
+             }, { onConflict: 'film_id, person_id' });
            }
         }
 

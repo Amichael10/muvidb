@@ -21,7 +21,7 @@ export default function MergeModal({
   if (!isOpen || items.length < 2) return null;
 
   const primary = items.find(item => item.id === primaryId) || items[0];
-  const secondary = items.find(item => item.id !== primaryId) || items[1];
+  const secondaries = items.filter(item => item.id !== primaryId);
 
   // Fields to compare based on type
   const fieldConfig = type === 'person' ? [
@@ -43,10 +43,18 @@ export default function MergeModal({
     { key: 'release_type', label: 'Release Type' },
   ];
 
+  // Create a composite secondary to show the best available data from ALL duplicates
+  const compositeSecondary = secondaries.reduce((acc, curr) => {
+    fieldConfig.forEach(f => {
+      if (!acc[f.key] && curr[f.key]) acc[f.key] = curr[f.key];
+    });
+    return acc;
+  }, {});
+
   const handleInitializeEnrichment = () => {
     const initial = {};
     fieldConfig.forEach(f => {
-      initial[f.key] = primary[f.key] || secondary[f.key] || '';
+      initial[f.key] = primary[f.key] || compositeSecondary[f.key] || '';
     });
     setEnrichedData(initial);
     setStep(2);
@@ -190,23 +198,23 @@ export default function MergeModal({
 
                   {/* Secondary Option */}
                   <div 
-                    onClick={() => toggleField(field.key, secondary[field.key])}
+                    onClick={() => toggleField(field.key, compositeSecondary[field.key])}
                     className={`col-span-4 p-6 cursor-pointer transition-all flex flex-col gap-2 ${
-                      enrichedData[field.key] === secondary[field.key] 
+                      enrichedData[field.key] === compositeSecondary[field.key] 
                         ? 'bg-brand/5 border-x border-brand/20' 
                         : 'opacity-40 grayscale hover:opacity-70'
                     }`}
                   >
                     {field.type === 'image' ? (
                       <div className="w-16 h-16 rounded-lg border border-border overflow-hidden bg-surface shadow-sm">
-                        <img src={secondary[field.key] || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
+                        <img src={compositeSecondary[field.key] || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
                       </div>
                     ) : field.type === 'longtext' ? (
-                      <p className="text-xs text-text-primary line-clamp-3 leading-relaxed">{secondary[field.key] || <em className="text-text-muted/50">No data</em>}</p>
+                      <p className="text-xs text-text-primary line-clamp-3 leading-relaxed">{compositeSecondary[field.key] || <em className="text-text-muted/50">No data</em>}</p>
                     ) : (
-                      <span className="text-sm font-bold text-text-primary">{secondary[field.key] || <em className="text-text-muted/50">No data</em>}</span>
+                      <span className="text-sm font-bold text-text-primary">{compositeSecondary[field.key] || <em className="text-text-muted/50">No data</em>}</span>
                     )}
-                    {enrichedData[field.key] === secondary[field.key] && (
+                    {enrichedData[field.key] === compositeSecondary[field.key] && (
                       <div className="flex items-center gap-1.5 text-brand text-[9px] font-black uppercase mt-1">
                         <Icon icon="solar:check-circle-bold" /> Selected
                       </div>
@@ -244,7 +252,7 @@ export default function MergeModal({
               </button>
             ) : (
               <button
-                onClick={() => onConfirm(primaryId, [secondary.id], enrichedData)}
+                onClick={() => onConfirm(primaryId, secondaries.map(s => s.id), enrichedData)}
                 className="px-8 py-2.5 bg-brand text-white font-black text-sm rounded-lg shadow-lg shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
               >
                 Finalize & Merge Records
