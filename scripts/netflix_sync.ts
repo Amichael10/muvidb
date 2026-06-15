@@ -189,7 +189,24 @@ async function handleProfileSelection(page) {
 }
 
 async function scrapeNetflix() {
-  const browser = await chromium.launch({ headless: true });
+  const launchOptions: any = { headless: true };
+  
+  const proxyServer = process.env.SMARTPROXY_HOST && process.env.SMARTPROXY_PORT 
+    ? `${process.env.SMARTPROXY_HOST}:${process.env.SMARTPROXY_PORT}` 
+    : null;
+  const proxyUser = process.env.SMARTPROXY_USER;
+  const proxyPass = process.env.SMARTPROXY_PASS;
+
+  if (proxyServer && proxyUser && proxyPass) {
+    console.log(`🛡️ Configuring browser to use SmartProxy: ${proxyServer}`);
+    launchOptions.proxy = {
+      server: proxyServer,
+      username: proxyUser,
+      password: proxyPass
+    };
+  }
+
+  const browser = await chromium.launch(launchOptions);
   
   // Use persistent context or storage state if available
   let context;

@@ -251,9 +251,15 @@ export default function AdminFilms() {
       setTotalCount(count || 0);
 
       // 2. Get paginated data
-      let query = supabase.from('films').select('*');
+      let query;
       
-      if (searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
+      if (duplicateFilter) {
+        query = supabase.rpc('get_duplicate_films');
+      } else {
+        query = supabase.from('films').select('*');
+      }
+      
+      if (!duplicateFilter && searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
       if (yearFilter !== 'all') query = query.eq('year', parseInt(yearFilter));
       if (featuredFilter === 'featured') query = query.eq('is_featured', true);
@@ -278,22 +284,15 @@ export default function AdminFilms() {
       
       const config = sortConfig[sortBy] || sortConfig.newest;
 
-      const { data, error } = await query
-        .order(config.column, { ascending: config.ascending })
-        .range(from, to);
+      // Duplicate filter ignores typical order to keep dupes grouped by title
+      if (!duplicateFilter) {
+        query = query.order(config.column, { ascending: config.ascending });
+      }
+
+      const { data, error } = await query.range(from, to);
 
       if (error) throw error;
       let finalData = data || [];
-
-      // 3. Handle Duplicate Name Filter (Local filtering for now as it's complex for RPC)
-      if (duplicateFilter) {
-        const titleCounts = {};
-        finalData.forEach(f => {
-          const t = f.title.toLowerCase().trim();
-          titleCounts[t] = (titleCounts[t] || 0) + 1;
-        });
-        finalData = finalData.filter(f => titleCounts[f.title.toLowerCase().trim()] > 1);
-      }
 
       setFilms(finalData);
     } catch (error) {
