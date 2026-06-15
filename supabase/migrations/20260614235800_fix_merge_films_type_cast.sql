@@ -8,7 +8,7 @@ DECLARE
   v_tmdb_id INT;
 BEGIN
     -- A. Prevent Unique Constraint Violation
-    v_tmdb_id := (p_metadata->>'tmdb_id')::INT;
+    v_tmdb_id := (NULLIF(p_metadata->>'tmdb_id', ''))::INT;
     IF v_tmdb_id IS NOT NULL THEN
         UPDATE public.films SET tmdb_id = NULL WHERE tmdb_id = v_tmdb_id;
     END IF;
@@ -60,8 +60,8 @@ BEGIN
         title = COALESCE(NULLIF(p_metadata->>'title', ''), title),
         synopsis = COALESCE(NULLIF(p_metadata->>'synopsis', ''), synopsis),
         poster_url = COALESCE(NULLIF(p_metadata->>'poster_url', ''), poster_url),
-        year = COALESCE((p_metadata->>'year')::INT, year),
-        runtime_minutes = COALESCE((p_metadata->>'runtime_minutes')::INT, runtime_minutes),
+        year = COALESCE((NULLIF(p_metadata->>'year', ''))::INT, year),
+        runtime_minutes = COALESCE((NULLIF(p_metadata->>'runtime_minutes', ''))::INT, runtime_minutes),
         tmdb_id = v_tmdb_id,
         status = COALESCE((NULLIF(p_metadata->>'status', ''))::film_status, status),
         release_type = COALESCE(NULLIF(p_metadata->>'release_type', ''), release_type),
