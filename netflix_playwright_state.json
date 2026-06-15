@@ -1,0 +1,114 @@
+{
+  "cookies": [
+    {
+      "name": "flwssn",
+      "value": "9fad3187-f693-4387-81dc-514809480746",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1781541058.096856,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "nfvdid",
+      "value": "BQFmAAEBEFmBkmbk2T08243a6KfvrI9AvPCrbm9srS20usjpi-aXtALUGEojCe2vyAkmpJFmh70BBBZYPl324sMQv-ngYyX3phXTtXdG9_M2r4n1EK6WOQ%3D%3D",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1813066252.879206,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "SecureNetflixId",
+      "value": "v%3D3%26mac%3DAQEAEQABABRZJ8nAIc_qyI3kI3N26ZgUAzY18d4UM2Y.%26dt%3D1781530252617",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1813066252.879257,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "NetflixId",
+      "value": "v%3D3%26ct%3DBgjHlOvcAxLAAcFhAwvF3X0nTo9pHUOEywQjan6XJGt5HXgdUXaqf_83evUMAgrbPYoyI7uDA76nSPqkz4Y7CLL5cAX7rxDGl2gc7G-3c0e1EpgCQlfk--9PoDXq0Zal8Zcpfs5FaKeoeZ9yTuRA5S1SOCtpQ8xdDpbS9LNqI2nm0FMLaf67k5_Q1ocjvH4U38AFsguJe3C4o2_-nkUoc0QquDQi2ZryvNXG-EyDeatXDiyIrgI1S_trbaMLikZVPh3Bg1H-HUz3DRgGIg4KDMLvUlwKOZZyYtrMMQ..",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1813066252.879293,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "gsid",
+      "value": "892ac11a-589d-4066-be3a-6840139608a0",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1781616653.973777,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "netflix-sans-normal-3-loaded",
+      "value": "true",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1789306257.598013,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "netflix-sans-bold-3-loaded",
+      "value": "true",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1789306257.598616,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OptanonConsent",
+      "value": "isGpcEnabled=0&datestamp=Mon+Jun+15+2026+14%3A31%3A04+GMT%2B0100+(West+Africa+Standard+Time)&version=202604.2.0&browserGpcFlag=0&isDntEnabled=0&isIABGlobal=false&hosts=&consentId=497a9427-64bd-4602-a8ac-1c09c6422724&interactionCount=0&isAnonUser=1&prevHadToken=0&landingPath=https%3A%2F%2Fwww.netflix.com%2Fph-en%2Flogin&groups=C0001%3A1%2CC0002%3A1%2CC0003%3A1%2CC0004%3A1",
+      "domain": ".netflix.com",
+      "path": "/",
+      "expires": 1813066264,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OTSessionTracking",
+      "value": "87b6a5c0-0104-4e96-a291-092c11350111",
+      "domain": "www.netflix.com",
+      "path": "/",
+      "expires": 1781616664,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://www.netflix.com",
+      "localStorage": [
+        {
+          "name": "ntl_logger_unsent_events",
+          "value": "[]"
+        }
+      ]
+    },
+    {
+      "origin": "https://www.google.com",
+      "localStorage": [
+        {
+          "name": "rc::a",
+          "value": "c2Yyazd6ZDQzZWU3"
+        }
+      ]
+    }
+  ]
+}

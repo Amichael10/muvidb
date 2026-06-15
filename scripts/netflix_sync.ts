@@ -103,10 +103,13 @@ async function login(page) {
     
     // 4. Finalize Login
     console.log('⌛ Waiting for login to finalize...');
-    await page.waitForURL(url => url.includes('/browse') || url.includes('/ProfilesGate') || url.includes('/browse/genre/'), { timeout: 30000 }).catch(() => {
+    await page.waitForURL(url => url.includes('/browse') || url.includes('/ProfilesGate') || url.includes('/browse/genre/') || url.includes('/account') || url.includes('/household'), { timeout: 30000 }).catch(() => {
       console.log('⚠️ Navigation timeout after login. Checking for errors...');
     });
     
+    // Handle Household Block
+    await handleHouseholdBlock(page);
+
     // Handle CAPTCHA or error messages
     const errorMsg = await page.$('.ui-message-error, [data-uia="login-error"], .recaptcha-error');
     if (errorMsg) {
@@ -132,6 +135,29 @@ async function login(page) {
   } catch (e) {
     console.log('ℹ️ Login flow encountered an issue:', e.message);
     await page.screenshot({ path: 'netflix-login-exception.png' });
+  }
+}
+
+async function handleHouseholdBlock(page) {
+  try {
+    console.log('🛡️ Checking for Household Block...');
+    for (let i = 0; i < 6; i++) {
+      try {
+        const watchTempBtn = await page.$('button:has-text("Watch Temporarily"), [data-uia="watch-temporarily-button"], a:has-text("Watch Temporarily"), :text-is("Watch Temporarily")');
+        if (watchTempBtn) {
+          console.log('🛡️ Detected Household Block. Clicking "Watch Temporarily"...');
+          await watchTempBtn.click({ force: true });
+          await page.waitForTimeout(5000);
+          await page.screenshot({ path: 'netflix-post-household.png' });
+          return;
+        }
+      } catch (e) {
+        // ignore navigation errors during check
+      }
+      await page.waitForTimeout(2000);
+    }
+  } catch (e) {
+    console.log('ℹ️ Error handling household block:', e.message);
   }
 }
 
