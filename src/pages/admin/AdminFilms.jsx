@@ -139,6 +139,7 @@ export default function AdminFilms() {
     release_type: '',
     youtube_watch_url: '',
     source_video_id: '',
+    content_type: 'movie',
     streaming_links: {}
   };
 
@@ -241,7 +242,7 @@ export default function AdminFilms() {
       if (featuredFilter === 'featured') countQuery = countQuery.eq('is_featured', true);
       if (featuredFilter === 'regular') countQuery = countQuery.eq('is_featured', false);
       if (sourceFilter !== 'all') countQuery = countQuery.eq('source', sourceFilter);
-      if (typeFilter !== 'all') countQuery = countQuery.eq('type', typeFilter);
+      if (typeFilter !== 'all') countQuery = countQuery.eq('content_type', typeFilter);
       if (platformFilter !== 'all') {
         if (platformFilter === 'youtube') countQuery = countQuery.not('youtube_watch_url', 'is', null);
         else countQuery = countQuery.not(`streaming_links->${platformFilter}`, 'is', null);
@@ -267,7 +268,7 @@ export default function AdminFilms() {
       if (trendingFilter === 'trending') query = query.eq('is_trending', true);
       if (trendingFilter === 'regular') query = query.eq('is_trending', false);
       if (sourceFilter !== 'all') query = query.eq('source', sourceFilter);
-      if (typeFilter !== 'all') query = query.eq('type', typeFilter);
+      if (typeFilter !== 'all') query = query.eq('content_type', typeFilter);
       if (platformFilter !== 'all') {
         if (platformFilter === 'youtube') query = query.not('youtube_watch_url', 'is', null);
         else query = query.not(`streaming_links->${platformFilter}`, 'is', null);
@@ -1223,8 +1224,8 @@ export default function AdminFilms() {
                             {film.is_trending && <Icon icon="solar:fire-bold" className="w-3 h-3 text-amber-500" />}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border ${film.type === 'series' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-surface-3 text-text-muted border-border'}`}>
-                              {film.type || 'movie'}
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border ${film.content_type === 'series' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-surface-3 text-text-muted border-border'}`}>
+                              {film.content_type || 'movie'}
                             </span>
                             {film.needs_review && (
                               <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 text-[8px] font-black uppercase tracking-tighter border border-red-500/20">
@@ -1683,7 +1684,7 @@ export default function AdminFilms() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-text-primary mb-2">Release Year</label>
                     <input 
@@ -1693,6 +1694,18 @@ export default function AdminFilms() {
                       onChange={handleChange} 
                       className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" 
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-2">Content Type</label>
+                    <select 
+                      name="content_type" 
+                      value={formData.content_type || 'movie'} 
+                      onChange={handleChange} 
+                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="movie">Movie</option>
+                      <option value="series">Series</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-text-primary mb-2">Status</label>

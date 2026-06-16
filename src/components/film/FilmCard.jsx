@@ -1,8 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
-import { useAuth } from '../context/AuthContext';
-import { useReactions } from '../hooks/useReactions';
+import { useAuth } from '../../context/AuthContext';
+import { useReactions } from '../../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
 
 const formatDeltaViews = (views) => {
