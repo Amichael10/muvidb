@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '@iconify/react';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { useReactions } from '../hooks/useReactions';
 import ReviewSection from '../components/film/ReviewSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
@@ -13,6 +14,7 @@ import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
 import { Skeleton } from '../components/ui/Skeleton';
 import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
+import { getShowName } from '../utils/series';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 
 const FilmDetailSkeleton = () => (
@@ -100,12 +102,59 @@ export default function FilmDetail() {
   const [filmId, setFilmId] = useState(null); // actual UUID for sub-queries
   const [relatedFilms, setRelatedFilms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [episodes, setEpisodes] = useState([]);
+  const [parentSeries, setParentSeries] = useState(null);
+
+  const fetchEpisodes = async (seriesId, showName) => {
+    try {
+      let query = supabase
+        .from('films')
+        .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug');
+
+      if (showName) {
+         query = query.eq('content_type', 'series').ilike('title', `${showName}%`);
+      } else {
+         query = query.eq('series_id', seriesId);
+      }
+
+      // Order by title so "Chapter 1" comes before "Chapter 2" etc.
+      const { data, error } = await query.order('title', { ascending: true });
+
+      if (error) throw error;
+      setEpisodes(data || []);
+    } catch (error) {
+      console.error('Error fetching episodes:', error);
+    }
+  };
+
+  const fetchParentSeries = async (parentId) => {
+    try {
+      const { data, error } = await supabase
+        .from('films')
+        .select('id, title, slug')
+        .eq('id', parentId)
+        .single();
+      if (!error && data) {
+        setParentSeries(data);
+      }
+    } catch (e) {
+      console.error('Error fetching parent series:', e);
+    }
+  };
 
   const {
     inWatchlist,
     loading: watchlistLoading,
     toggleWatchlist
   } = useWatchlist(filmId, user);
+
+  const {
+    userReaction,
+    likesCount,
+    dislikesCount,
+    loading: reactionLoading,
+    toggleReaction
+  } = useReactions(filmId, user);
 
   const [cast, setCast] = useState([]);
   const [crew, setCrew] = useState([]);
@@ -190,6 +239,13 @@ export default function FilmDetail() {
       setFilmId(data.id);
       fetchCredits(data.id);
 
+      if (data.content_type === 'series') {
+        const showName = getShowName(data.title);
+        fetchEpisodes(data.id, showName);
+      } else if (data.series_id) {
+        fetchParentSeries(data.series_id);
+      }
+
       if (data) {
         document.title = `MuviDB | ${data.title}`;
         const { data: related } = await supabase
@@ -221,6 +277,16 @@ export default function FilmDetail() {
       return;
     }
     await toggleWatchlist();
+  };
+
+  const handleReaction = async (type) => {
+    if (!user) {
+      navigate('/login', {
+        state: { from: `/films/${film?.slug || film?.id || slug}`, message: `Sign in to ${type} films` }
+      });
+      return;
+    }
+    await toggleReaction(type);
   };
 
 
@@ -277,6 +343,15 @@ export default function FilmDetail() {
             </div>
 
             <div className="flex-1 z-10 w-full">
+              {parentSeries && (
+                <Link 
+                  to={`/films/${parentSeries.slug || parentSeries.id}`}
+                  className="inline-flex items-center gap-1.5 bg-brand/10 border border-brand/20 text-brand px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide uppercase mb-3 hover:bg-brand/20 transition-all"
+                >
+                  <Icon icon="solar:tv-bold" className="text-xs" />
+                  <span>Part of Series: {parentSeries.title}</span>
+                </Link>
+              )}
               <h1 className="font-heading font-bold text-4xl md:text-6xl text-white mb-4 leading-tight tracking-tighter drop-shadow-2xl">
                 {film.title}
               </h1>
@@ -284,7 +359,11 @@ export default function FilmDetail() {
               <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-white/80 font-bold mb-4">
                 <span>{film.year}</span>
                 <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                <span>{film.runtime_minutes || film.runtime} min</span>
+                <span>
+                  {film.content_type === 'series'
+                    ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
+                    : `${film.runtime_minutes || film.runtime || 0} min`}
+                </span>
                 <span className="w-1 h-1 rounded-full bg-white/20"></span>
                 <span>{film.language}</span>
                 <span className="w-1 h-1 rounded-full bg-white/20"></span>
@@ -367,6 +446,86 @@ export default function FilmDetail() {
                 {film.synopsis}
               </p>
             </section>
+
+            {/* Episodes (for series) */}
+            {episodes.length > 0 && (
+              <section className="p-8 md:p-12 border-b border-border bg-surface-2/5">
+                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter flex items-center gap-2">
+                  <Icon icon="solar:playlist-play-bold" className="text-brand" />
+                  Episodes
+                </h2>
+                <div className="flex flex-col gap-4">
+                  {episodes.map((episode) => (
+                    <div 
+                      key={episode.id} 
+                      className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-xl border border-border hover:border-brand/40 hover:shadow-xl transition-all duration-300 group"
+                    >
+                      {/* Episode Thumbnail */}
+                      <div className="relative w-full sm:w-48 aspect-video rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-white/5">
+                        <ImageWithFallback
+                          src={episode.poster_url || film.poster_url || film.poster}
+                          alt={episode.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          fallbackType="banner"
+                          name={episode.title}
+                        />
+                        {episode.youtube_watch_url && (
+                          <a 
+                            href={episode.youtube_watch_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                          >
+                            <span className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-300">
+                              <Icon icon="solar:play-bold" className="text-sm" />
+                            </span>
+                          </a>
+                        )}
+                      </div>
+                      
+                      {/* Episode Info */}
+                      <div className="flex-1 flex flex-col justify-between py-1">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-brand">
+                              Episode {episode.episode_number || 'N/A'}
+                            </span>
+                            {episode.runtime_minutes && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-white/20" />
+                                <span className="text-[10px] font-bold text-text-muted">
+                                  {episode.runtime_minutes} min
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <h3 className="font-heading font-bold text-base text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors mb-2">
+                            {episode.title}
+                          </h3>
+                          <p className="text-xs text-text-muted line-clamp-2 leading-relaxed font-medium">
+                            {episode.synopsis || film.synopsis}
+                          </p>
+                        </div>
+                        
+                        {episode.youtube_watch_url && (
+                          <div className="mt-3 sm:mt-0">
+                            <a 
+                              href={episode.youtube_watch_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-brand hover:text-white transition-colors"
+                            >
+                              <Icon icon="simple-icons:youtube" className="text-[#FF0000] text-xs" />
+                              <span>Watch Episode</span>
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Trailer */}
             {film.trailer_youtube_id && (
@@ -514,9 +673,19 @@ export default function FilmDetail() {
                   <span className="text-text-primary">{film.language}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">Runtime</span>
-                  <span className="text-text-primary">{film.runtime_minutes || film.runtime} min</span>
+                  <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>
+                  <span className="text-text-primary">
+                    {film.content_type === 'series'
+                      ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
+                      : `${film.runtime_minutes || film.runtime} min`}
+                  </span>
                 </div>
+                {film.content_type === 'series' && film.episode_count && (
+                  <div className="flex justify-between items-center border-b border-border pb-3">
+                    <span className="text-text-muted tracking-wider">Episodes</span>
+                    <span className="text-text-primary">{film.episode_count} Episodes</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-text-muted tracking-wider">Rating</span>
                   <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-bold">
@@ -538,6 +707,29 @@ export default function FilmDetail() {
               >
                 {inWatchlist ? 'Added' : 'Add to Watchlist'}
               </button>
+
+              <div className="flex gap-3 mt-3">
+                <button
+                  onClick={() => handleReaction('dislike')}
+                  disabled={reactionLoading}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg border transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'dislike' ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-surface-2 border-border text-text-muted hover:border-white hover:text-white'}`}
+                  title="Dislike"
+                >
+                  <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-xl" />
+                  <span className="text-[10px] font-bold">{dislikesCount}</span>
+                </button>
+
+                <button
+                  onClick={() => handleReaction('like')}
+                  disabled={reactionLoading}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg border transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'like' ? 'bg-brand/10 border-brand text-brand' : 'bg-surface-2 border-border text-text-muted hover:border-white hover:text-white'}`}
+                  title="Like"
+                >
+                  <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-xl" />
+                  <span className="text-[10px] font-bold">{likesCount}</span>
+                </button>
+              </div>
+
               <ShareAction
                 title={film.title}
                 text={`Check out ${film.title} on MuviDB`}

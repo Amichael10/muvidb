@@ -470,6 +470,12 @@ export type Database = {
           view_count: number
           year: number | null
           youtube_watch_url: string | null
+          content_type: string | null
+          season_count: number | null
+          episode_count: number | null
+          series_id: string | null
+          episode_number: number | null
+          season_number: number | null
         }
         Insert: {
           average_rating?: number
@@ -502,6 +508,12 @@ export type Database = {
           view_count?: number
           year?: number | null
           youtube_watch_url?: string | null
+          content_type?: string | null
+          season_count?: number | null
+          episode_count?: number | null
+          series_id?: string | null
+          episode_number?: number | null
+          season_number?: number | null
         }
         Update: {
           average_rating?: number
@@ -534,6 +546,12 @@ export type Database = {
           view_count?: number
           year?: number | null
           youtube_watch_url?: string | null
+          content_type?: string | null
+          season_count?: number | null
+          episode_count?: number | null
+          series_id?: string | null
+          episode_number?: number | null
+          season_number?: number | null
         }
         Relationships: []
       }

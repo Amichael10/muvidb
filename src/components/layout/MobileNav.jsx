@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -27,6 +27,7 @@ const MobileNav = () => {
   ];
 
   const drawerItems = [
+    { name: 'TV Shows', path: '/tv-shows', icon: 'solar:tv-linear' },
     { name: 'Showtimes', path: '/showtimes', icon: 'solar:calendar-date-linear' },
     { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
     { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },

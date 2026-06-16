@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
+import { useAuth } from '../context/AuthContext';
+import { useReactions } from '../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
-import { useQuickView } from '../../context/QuickViewContext';
 
 const formatDeltaViews = (views) => {
   if (!views) return null;
@@ -32,7 +33,9 @@ export default function FilmCard({
   variant = 'portrait' // Reverted to portrait as default layout
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  const { openQuickView } = useQuickView();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { userReaction, likesCount, dislikesCount, loading: reactionLoading, toggleReaction } = useReactions(film.id, user, isHovered);
 
   if (variant === 'top10') {
     return (
@@ -59,7 +62,9 @@ export default function FilmCard({
 
   if (variant === 'landscape') {
     const formattedViews = formatDeltaViews(film.view_count);
-    const durationLabel = formatRuntimeHours(film.runtime_minutes || film.runtime);
+    const durationLabel = (film.content_type === 'series' || film.is_series_group)
+      ? (film.episodes_count > 1 ? `${film.episodes_count} Episodes` : (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series'))
+      : formatRuntimeHours(film.runtime_minutes || film.runtime);
     
     return (
       <div className="relative flex flex-col gap-2 w-72 sm:w-80 group">
@@ -167,7 +172,9 @@ export default function FilmCard({
   };
   
   const activePlatforms = getPlatforms();
-  const durationLabel = formatRuntimeHours(film.runtime_minutes || film.runtime) || '2h 5m';
+  const durationLabel = film.content_type === 'series'
+    ? (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series')
+    : (formatRuntimeHours(film.runtime_minutes || film.runtime) || '2h 5m');
   const matchScore = 75 + ((film.id ? Number(String(film.id).charCodeAt(0) || 0) : 0) % 24);
 
   const [hoverPosition, setHoverPosition] = useState('center');
@@ -184,6 +191,7 @@ export default function FilmCard({
     } else {
       setHoverPosition('center');
     }
+    setIsHovered(true);
   };
 
   const getHoverClasses = () => {
@@ -225,6 +233,14 @@ export default function FilmCard({
             <span className="text-[10px] font-bold">
               {filmRating.toFixed(1)}
             </span>
+          </div>
+        )}
+
+        {/* Series Badge */}
+        {(film.content_type === 'series' || film.is_series_group) && (
+          <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-14' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
+            <Icon icon={film.episodes_count > 1 ? "solar:folder-bold" : "solar:tv-bold"} className="text-white text-[9px]" />
+            <span>{film.episodes_count > 1 ? `${film.episodes_count} EPS` : 'TV'}</span>
           </div>
         )}
 
@@ -342,13 +358,28 @@ export default function FilmCard({
           {/* Buttons Row */}
           <div className="flex items-center justify-between mb-3.5">
             <div className="flex items-center gap-2">
-              {/* Play Button */}
-              <Link 
-                to={`/films/${film.slug || film.id}`}
-                className="w-9 h-9 rounded-full bg-white flex items-center justify-center text-black hover:bg-white/95 transition shadow-md hover:scale-105 active:scale-95 shrink-0"
+              {/* Dislike Button */}
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!user) {
+                    navigate('/login', { state: { from: `/films/${film.slug || film.id}`, message: 'Sign in to dislike films' } });
+                    return;
+                  }
+                  toggleReaction('dislike');
+                }}
+                disabled={reactionLoading}
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'dislike' ? 'bg-red-500/20 border-red-500 text-red-500' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
+                title="Dislike"
               >
-                <Icon icon="solar:play-bold" className="text-lg ml-0.5" />
-              </Link>
+                <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-lg" />
+                {dislikesCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-black/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white/10 opacity-0 group-hover/btn:opacity-100 transition-opacity">
+                    {dislikesCount}
+                  </span>
+                )}
+              </button>
               
               {/* Add Watchlist Button */}
               <button 
@@ -363,27 +394,29 @@ export default function FilmCard({
                 <Icon icon={actionType === 'add' ? "solar:plus-linear" : "solar:close-circle-linear"} className="text-lg" />
               </button>
               
-              {/* Thumbs Up Button */}
+              {/* Like Button */}
               <button 
-                className="w-9 h-9 rounded-full border border-white/30 hover:border-white flex items-center justify-center text-white bg-transparent hover:bg-white/10 transition hover:scale-105 active:scale-95 shrink-0"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!user) {
+                    navigate('/login', { state: { from: `/films/${film.slug || film.id}`, message: 'Sign in to like films' } });
+                    return;
+                  }
+                  toggleReaction('like');
+                }}
+                disabled={reactionLoading}
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'like' ? 'bg-brand/20 border-brand text-brand' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
                 title="Like"
               >
-                <Icon icon="solar:like-linear" className="text-lg" />
+                <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-lg" />
+                {likesCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-black/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white/10 opacity-0 group-hover/btn:opacity-100 transition-opacity">
+                    {likesCount}
+                  </span>
+                )}
               </button>
             </div>
-            
-            {/* Info Arrow Button */}
-            <button 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openQuickView(film);
-              }}
-              className="w-9 h-9 rounded-full border border-white/30 hover:border-white flex items-center justify-center text-white bg-transparent hover:bg-white/10 transition hover:scale-105 active:scale-95 shrink-0"
-              title="More Info"
-            >
-              <Icon icon="solar:alt-arrow-down-linear" className="text-lg" />
-            </button>
           </div>
 
           {/* Metadata Row */}
