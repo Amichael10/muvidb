@@ -13,6 +13,7 @@ import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
 import { Skeleton } from '../components/ui/Skeleton';
 import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
+import { getShowName } from '../utils/series';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 
 const FilmDetailSkeleton = () => (
@@ -103,13 +104,20 @@ export default function FilmDetail() {
   const [episodes, setEpisodes] = useState([]);
   const [parentSeries, setParentSeries] = useState(null);
 
-  const fetchEpisodes = async (seriesId) => {
+  const fetchEpisodes = async (seriesId, showName) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('films')
-        .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes')
-        .eq('series_id', seriesId)
-        .order('episode_number', { ascending: true });
+        .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug');
+
+      if (showName) {
+         query = query.eq('content_type', 'series').ilike('title', `${showName}%`);
+      } else {
+         query = query.eq('series_id', seriesId);
+      }
+
+      // Order by title so "Chapter 1" comes before "Chapter 2" etc.
+      const { data, error } = await query.order('title', { ascending: true });
 
       if (error) throw error;
       setEpisodes(data || []);
@@ -223,7 +231,8 @@ export default function FilmDetail() {
       fetchCredits(data.id);
 
       if (data.content_type === 'series') {
-        fetchEpisodes(data.id);
+        const showName = getShowName(data.title);
+        fetchEpisodes(data.id, showName);
       } else if (data.series_id) {
         fetchParentSeries(data.series_id);
       }

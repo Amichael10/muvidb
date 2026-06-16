@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getShowName } from '../utils/series';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -28,6 +29,7 @@ export default function Browse() {
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [language, setLanguage] = useState('');
   const [sortBy, setSortBy] = useState(initialSort);
+  const [activeTab, setActiveTab] = useState('movie');
 
   useEffect(() => {
     document.title = "MuviDB | Browse";
@@ -37,7 +39,7 @@ export default function Browse() {
   useEffect(() => {
     setError(null);
     fetchFilms();
-  }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy]);
+  }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy, activeTab]);
 
   const fetchGenres = async () => {
     try {
@@ -96,7 +98,7 @@ export default function Browse() {
         query = query.in('film_countries.countries.name', selectedCountries);
       }
 
-      query = query.eq('content_type', 'movie');
+      query = query.eq('content_type', activeTab);
 
       if (yearRange > 1990) query = query.gte('year', yearRange);
       if (language) query = query.eq('language', language);
@@ -140,6 +142,31 @@ export default function Browse() {
           }
           return !!streamingLinks[selectedPlatform];
         });
+      }
+
+      // Group TV Shows into Folders
+      if (activeTab === 'series') {
+        const groupedShows = {};
+        transformed.forEach(film => {
+          const showName = getShowName(film.title);
+          if (!groupedShows[showName]) {
+            groupedShows[showName] = { 
+              ...film, 
+              title: showName, // Use the base show name for display
+              original_title: film.title, // Keep original title just in case
+              episodes_list: [film] 
+            };
+          } else {
+            groupedShows[showName].episodes_list.push(film);
+          }
+        });
+
+        // Convert grouped object back to array
+        transformed = Object.values(groupedShows).map(group => ({
+          ...group,
+          is_series_group: true,
+          episodes_count: group.episodes_list.length
+        }));
       }
 
       setFilms(transformed);
@@ -188,13 +215,41 @@ export default function Browse() {
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-4">
-              <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary tracking-tighter">
-                Movies
-              </h1>
-              <p className="text-text-muted text-sm max-w-xl border-l-2 border-brand pl-6">
-                Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters.
-              </p>
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary tracking-tighter transition-colors duration-300">
+                  {activeTab === 'movie' ? 'Movies' : 'TV Shows'}
+                </h1>
+                <p className="text-text-muted text-sm max-w-xl border-l-2 border-brand pl-6 transition-all duration-300">
+                  {activeTab === 'movie' 
+                    ? 'Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters.'
+                    : 'Discover the best Nollywood TV series and episodic stories spanning across genres and platforms.'}
+                </p>
+              </div>
+
+              {/* Category Tabs */}
+              <div className="flex items-center gap-2 bg-surface-2/50 p-1.5 rounded-xl border border-border w-fit backdrop-blur-sm">
+                <button
+                  onClick={() => setActiveTab('movie')}
+                  className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
+                    activeTab === 'movie'
+                      ? 'bg-brand text-white shadow-lg shadow-brand/20'
+                      : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+                  }`}
+                >
+                  Movies
+                </button>
+                <button
+                  onClick={() => setActiveTab('series')}
+                  className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
+                    activeTab === 'series'
+                      ? 'bg-brand text-white shadow-lg shadow-brand/20'
+                      : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+                  }`}
+                >
+                  TV Shows
+                </button>
+              </div>
             </div>
             <button 
               className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-xs font-bold text-text-primary"

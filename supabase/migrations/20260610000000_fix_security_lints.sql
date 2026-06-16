@@ -134,6 +134,7 @@ GRANT EXECUTE ON FUNCTION public.refresh_all_popularity_scores() TO service_role
 -- Currently: WITH CHECK (true) — anyone can insert
 -- Fix: Only authenticated users can flag
 DROP POLICY IF EXISTS "Anyone can flag a channel" ON public.channel_flags;
+DROP POLICY IF EXISTS "Authenticated users can flag a channel" ON public.channel_flags;
 CREATE POLICY "Authenticated users can flag a channel"
   ON public.channel_flags
   FOR INSERT

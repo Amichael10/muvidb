@@ -59,8 +59,8 @@ export default function FilmCard({
 
   if (variant === 'landscape') {
     const formattedViews = formatDeltaViews(film.view_count);
-    const durationLabel = film.content_type === 'series'
-      ? (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series')
+    const durationLabel = (film.content_type === 'series' || film.is_series_group)
+      ? (film.episodes_count > 1 ? `${film.episodes_count} Episodes` : (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series'))
       : formatRuntimeHours(film.runtime_minutes || film.runtime);
     
     return (
@@ -233,10 +233,10 @@ export default function FilmCard({
         )}
 
         {/* Series Badge */}
-        {film.content_type === 'series' && (
+        {(film.content_type === 'series' || film.is_series_group) && (
           <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-14' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
-            <Icon icon="solar:tv-bold" className="text-white text-[9px]" />
-            <span>TV</span>
+            <Icon icon={film.episodes_count > 1 ? "solar:folder-bold" : "solar:tv-bold"} className="text-white text-[9px]" />
+            <span>{film.episodes_count > 1 ? `${film.episodes_count} EPS` : 'TV'}</span>
           </div>
         )}
 

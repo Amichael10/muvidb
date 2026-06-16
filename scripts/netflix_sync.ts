@@ -23,7 +23,11 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const NETFLIX_URL = 'https://www.netflix.com/browse/genre/1138254?so=su';
+const NETFLIX_URLS = [
+  'https://www.netflix.com/browse/genre/1138254?so=su', // Nollywood
+  'https://www.netflix.com/browse/genre/3761?so=su', // African Movies & TV
+  'https://www.netflix.com/search?q=Nollywood' // General search includes TV shows
+];
 const LOGIN_URL = 'https://www.netflix.com/login';
 const STATE_FILE = 'netflix_playwright_state.json';
 
@@ -217,7 +221,7 @@ async function handleProfileSelection(page) {
 async function scrapeNetflix() {
   // Use NETFLIX_HEADLESS=false to run in visible mode (useful for manual CAPTCHA solving)
   const headless = process.env.NETFLIX_HEADLESS !== 'false';
-  const launchOptions: any = { headless };
+  const launchOptions: any = { headless, channel: 'chrome' };
 
   // Skip proxy if NETFLIX_NO_PROXY=true — the SmartProxy triggers Netflix CAPTCHAs
   const skipProxy = process.env.NETFLIX_NO_PROXY === 'true';
@@ -262,132 +266,151 @@ async function scrapeNetflix() {
   }
 
   const page = await context.newPage();
+  let movies: any[] = [];
+  const globalMovieMap = new Map();
 
-  console.log(`🚀 Navigating to: ${NETFLIX_URL}`);
-  await page.goto(NETFLIX_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  for (const targetUrl of NETFLIX_URLS) {
+    console.log(`\n🚀 Navigating to: ${targetUrl}`);
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-  // Check if we were redirected to login
-  if (page.url().includes('/login')) {
-    console.log('ℹ️ Redirected to login. Starting authentication flow...');
-    await login(page);
-    
-    // Save state after login
-    await context.storageState({ path: STATE_FILE });
-    console.log(`💾 Session state saved to ${STATE_FILE}`);
-    
-    // After login, go back to the target URL
-    console.log(`🚀 Returning to: ${NETFLIX_URL}`);
-    await page.goto(NETFLIX_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  } else {
-    console.log('✅ Already logged in or no redirect.');
-  }
-
-  // Handle profile selection if it appears
-  const profileSelected = await handleProfileSelection(page);
-  
-  // If we selected a profile, save the state again to capture the profile selection cookies
-  if (profileSelected) {
-    await context.storageState({ path: STATE_FILE });
-    console.log(`💾 Session state updated after profile selection.`);
-    console.log(`🚀 Returning to target genre page: ${NETFLIX_URL}`);
-    await page.goto(NETFLIX_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  }
-
-  console.log('⌛ Waiting for titles to appear...');
-  try {
-    // Discovery Improvement: Wait for common title card selectors or the main content container
-    await page.waitForSelector('.slider-item, .title-card, [data-testid="title-card"], a.slider-refocus, a[href*="/watch/"], a[data-uia="video-canvas"], .rowContainer, .lolomo', { timeout: 60000 });
-  } catch (e) {
-    console.warn('⚠️ Timeout waiting for titles. Page might be lazy loading or empty.');
-    // Check if we are still on profile gate
-    if (page.url().includes('/ProfilesGate') || page.url().includes('/profiles')) {
-      console.log('🔄 Still on profile gate after timeout. Retrying selection...');
-      await handleProfileSelection(page);
+    // Check if we were redirected to login
+    if (page.url().includes('/login')) {
+      console.log('ℹ️ Redirected to login. Starting authentication flow...');
+      await login(page);
+      
+      // Save state after login
+      await context.storageState({ path: STATE_FILE });
+      console.log(`💾 Session state saved to ${STATE_FILE}`);
+      
+      // After login, go back to the target URL
+      console.log(`🚀 Returning to: ${targetUrl}`);
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    } else {
+      console.log('✅ Already logged in or no redirect.');
     }
-    await page.screenshot({ path: 'netflix-titles-timeout.png' });
-  }
 
-  console.log('📜 Scrolling to load all Nollywood titles...');
-  // Infinite scroll to trigger lazy loading of all rows
-  let lastHeight = await page.evaluate('document.body.scrollHeight');
-  for (let i = 0; i < 25; i++) {
-    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
-    await page.waitForTimeout(2500);
-    let newHeight = await page.evaluate('document.body.scrollHeight');
-    if (newHeight === lastHeight) {
-      // Try one more time with a longer wait and a small scroll up to shake it
-      await page.evaluate('window.scrollBy(0, -200)');
-      await page.waitForTimeout(1000);
+    // Handle profile selection if it appears
+    const profileSelected = await handleProfileSelection(page);
+    
+    // If we selected a profile, save the state again to capture the profile selection cookies
+    if (profileSelected) {
+      await context.storageState({ path: STATE_FILE });
+      console.log(`💾 Session state updated after profile selection.`);
+      console.log(`🚀 Returning to target genre page: ${targetUrl}`);
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    }
+
+    console.log('⌛ Waiting for titles to appear...');
+    try {
+      // Discovery Improvement: Wait for common title card selectors or the main content container
+      await page.waitForSelector('.slider-item, .title-card, [data-testid="title-card"], a.slider-refocus, a[href*="/watch/"], a[data-uia="video-canvas"], .rowContainer, .lolomo', { timeout: 60000 });
+    } catch (e) {
+      console.warn('⚠️ Timeout waiting for titles. Page might be lazy loading or empty.');
+      // Sometimes we land on the profile gate again?
+      if (page.url().includes('/ProfilesGate') || page.url().includes('/profiles')) {
+        await handleProfileSelection(page);
+      }
+    }
+
+    console.log('📜 Scrolling to load all titles on this page...');
+    let lastHeight = await page.evaluate('document.body.scrollHeight');
+    let noChangeCount = 0;
+    for (let i = 0; i < 25; i++) {
       await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
-      await page.waitForTimeout(3000);
-      newHeight = await page.evaluate('document.body.scrollHeight');
-      if (newHeight === lastHeight) break;
-    }
-    lastHeight = newHeight;
-    console.log(`   - Scrolled to ${newHeight}px...`);
-  }
-
-  const movies = await page.evaluate(() => {
-    const rows = Array.from(document.querySelectorAll('.lolomoRow, .rowContainer, .slider-item'));
-    const movieMap = new Map();
-
-    rows.forEach(row => {
-      const rowTitle = row.querySelector('.rowTitle, .row-header-title, h2')?.textContent || '';
+      await page.waitForTimeout(2500);
+      let newHeight = await page.evaluate('document.body.scrollHeight');
       
-      // Expanded African/Nollywood keywords for row discovery.
-      // We also include thematic terms like 'Lagos', 'Yoruba', etc.
-      const isAfricanRow = /African|Nigerian|Nollywood|South African|Ghanaian|Kenya|Senegal|Egypt|Ethiopia|Cameroon|Morocco|Lagos|Yoruba|Hausa|Igbo|Accra|Nairobi|Dakar|Johannesburg|Soil|Culture|Heritage/i.test(rowTitle);
-      
-      // Personalized/Algorithmic rows that might contain non-African content
-      const isAlgorithmicRow = /Top Picks|Next Watch|New on Netflix|My List|Trending|Popular|Favorites/i.test(rowTitle) && !isAfricanRow;
-
-      // On the Nollywood genre page, we allow all rows for discovery.
-      // We will filter out non-African content later in the sync phase using detail-page metadata.
-      const isOnGenrePage = window.location.href.includes('1138254');
-      if (isAlgorithmicRow && !isOnGenrePage) return;
-      if (!isAfricanRow && !isOnGenrePage) return;
-
-      const links = Array.from(row.querySelectorAll('a[href*="/title/"], a[href*="/watch/"], a.slider-refocus, a[data-uia="video-canvas"]'));
-      
-      links.forEach(linkEl => {
-        const href = linkEl.getAttribute('href') || '';
-        const idMatch = href.match(/\/(watch|title)\/(\d+)/);
-        if (!idMatch) return;
+      if (newHeight === lastHeight) {
+        // Try scrolling up a bit and back down to trigger lazy loading
+        await page.evaluate('window.scrollBy(0, -200)');
+        await page.waitForTimeout(1000);
+        await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+        await page.waitForTimeout(3000);
         
-        const watchId = idMatch[2];
-        if (movieMap.has(watchId)) return;
-
-        let titleText = linkEl.getAttribute('aria-label') || 
-                        linkEl.querySelector('img')?.getAttribute('alt') || 
-                        linkEl.querySelector('.fallback-text')?.textContent?.trim() ||
-                        linkEl.textContent?.trim();
-
-        if (titleText) {
-          titleText = titleText.replace(/^(Watch|Go to|Play|View)\s+/i, '').trim();
+        newHeight = await page.evaluate('document.body.scrollHeight');
+        if (newHeight === lastHeight) {
+          noChangeCount++;
+          if (noChangeCount >= 2) break; // Break if no change twice
+        } else {
+          noChangeCount = 0;
         }
+      } else {
+        noChangeCount = 0;
+      }
+      lastHeight = newHeight;
+    }
 
-        if (titleText && titleText !== 'Unknown' && titleText.length > 1) {
-          movieMap.set(watchId, {
-            title: titleText,
-            netflix_id: watchId,
-            url: `https://www.netflix.com/title/${watchId}`,
-            watch_url: `https://www.netflix.com/watch/${watchId}`,
-            poster_url: linkEl.querySelector('img')?.src || null,
-            isAfricanDiscovery: isAfricanRow
-          });
-        }
+    // Extract basic information from the DOM
+    const pageMovies = await page.evaluate(() => {
+      const rows = Array.from(document.querySelectorAll('.lolomoRow, .rowContainer, .slider-item, .galleryLockups'));
+      const map = new Map();
+
+      rows.forEach(row => {
+        const rowTitle = row.querySelector('.rowTitle, .row-header-title, h2')?.textContent || '';
+        
+        // Very lenient check for African content row names
+        const isAfricanRow = /African|Nigerian|Nollywood|South African|Ghanaian|Kenya|Senegal|Egypt|Ethiopia|Cameroon|Morocco|Lagos|Yoruba|Hausa|Igbo|Accra|Nairobi|Dakar|Johannesburg|Soil|Culture|Heritage/i.test(rowTitle);
+        const isAlgorithmicRow = /Top Picks|Next Watch|New on Netflix|My List|Trending|Popular|Favorites/i.test(rowTitle) && !isAfricanRow;
+        
+        // If we are on a specific African genre page, we can be more lenient and take everything.
+        const isOnGenrePage = window.location.href.includes('1138254') || window.location.href.includes('3761');
+
+        if (isAlgorithmicRow && !isOnGenrePage) return;
+        if (!isAfricanRow && !isOnGenrePage && !window.location.href.includes('search')) return;
+
+        const links = Array.from(row.querySelectorAll('a[href*="/title/"], a[href*="/watch/"], a.slider-refocus, a[data-uia="video-canvas"], a.slider-item-link'));
+        
+        links.forEach(linkEl => {
+          const href = linkEl.getAttribute('href') || '';
+          const idMatch = href.match(/\/(watch|title)\/(\d+)/);
+          
+          if (!idMatch) return;
+          
+          const watchId = idMatch[2];
+          
+          if (map.has(watchId)) return;
+
+          let titleText = linkEl.getAttribute('aria-label') || 
+                          linkEl.querySelector('img')?.getAttribute('alt') || 
+                          linkEl.querySelector('.fallback-text')?.textContent?.trim() ||
+                          linkEl.textContent?.trim();
+
+          if (titleText) {
+             titleText = titleText.replace(/^(Watch|Go to|Play|View)\s+/i, '').trim();
+          }
+
+          if (titleText && titleText !== 'Unknown' && titleText.length > 1) {
+            map.set(watchId, {
+              title: titleText,
+              netflix_id: watchId,
+              url: `https://www.netflix.com/title/${watchId}`,
+              watch_url: `https://www.netflix.com/watch/${watchId}`,
+              poster_url: linkEl.querySelector('img')?.src || null,
+              isAfricanDiscovery: isAfricanRow || window.location.href.includes('search')
+            });
+          }
+        });
       });
+
+      return Array.from(map.values());
     });
 
-    return Array.from(movieMap.values());
-  });
+    console.log(`🎬 Found ${pageMovies.length} titles on ${targetUrl}`);
+    pageMovies.forEach(m => {
+      if (!globalMovieMap.has(m.netflix_id)) {
+        globalMovieMap.set(m.netflix_id, m);
+      }
+    });
+  }
+
+  movies = Array.from(globalMovieMap.values());
 
   if (movies.length === 0) {
     console.log('📸 Saving debug screenshot...');
     await page.screenshot({ path: 'netflix-debug.png', fullPage: true });
-    console.log('⚠️ No titles found. Check netflix-debug.png to see what the scraper saw.');
+    console.log('⚠️ No titles found across all pages. Try checking netflix-debug.png to see what Netflix is serving.');
   } else {
-    console.log(`🎬 Found ${movies.length} Nollywood titles on Netflix.`);
+    console.log(`🎬 Found ${movies.length} UNIQUE titles across all Netflix pages.`);
   }
   
   const detailedMovies: any[] = [];
