@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { generateAIContent } from '../api/_lib/ai_service.js';
-import { detectAndNormalizeSeries } from '../api/_lib/series_utils.js';
+import { detectAndNormalizeSeries, normalizeSeriesTitle } from '../api/_lib/series_utils.js';
 
 // Load stealth plugin
 const stealthPlugin = stealth();
@@ -215,21 +215,34 @@ async function handleProfileSelection(page) {
 }
 
 async function scrapeNetflix() {
-  const launchOptions: any = { headless: true };
-  
-  const proxyServer = process.env.SMARTPROXY_HOST && process.env.SMARTPROXY_PORT 
-    ? `${process.env.SMARTPROXY_HOST}:${process.env.SMARTPROXY_PORT}` 
-    : null;
-  const proxyUser = process.env.SMARTPROXY_USER;
-  const proxyPass = process.env.SMARTPROXY_PASS;
+  // Use NETFLIX_HEADLESS=false to run in visible mode (useful for manual CAPTCHA solving)
+  const headless = process.env.NETFLIX_HEADLESS !== 'false';
+  const launchOptions: any = { headless };
 
-  if (proxyServer && proxyUser && proxyPass) {
-    console.log(`🛡️ Configuring browser to use SmartProxy: ${proxyServer}`);
-    launchOptions.proxy = {
-      server: proxyServer,
-      username: proxyUser,
-      password: proxyPass
-    };
+  // Skip proxy if NETFLIX_NO_PROXY=true — the SmartProxy triggers Netflix CAPTCHAs
+  const skipProxy = process.env.NETFLIX_NO_PROXY === 'true';
+
+  if (!skipProxy) {
+    const proxyServer = process.env.SMARTPROXY_HOST && process.env.SMARTPROXY_PORT 
+      ? `${process.env.SMARTPROXY_HOST}:${process.env.SMARTPROXY_PORT}` 
+      : null;
+    const proxyUser = process.env.SMARTPROXY_USER;
+    const proxyPass = process.env.SMARTPROXY_PASS;
+
+    if (proxyServer && proxyUser && proxyPass) {
+      console.log(`🛡️ Configuring browser to use SmartProxy: ${proxyServer}`);
+      launchOptions.proxy = {
+        server: proxyServer,
+        username: proxyUser,
+        password: proxyPass
+      };
+    }
+  } else {
+    console.log('ℹ️ Proxy disabled via NETFLIX_NO_PROXY=true — using direct connection.');
+  }
+
+  if (!headless) {
+    console.log('👁️ Running in HEADFUL mode — browser window will open. Handle any CAPTCHA manually.');
   }
 
   const browser = await chromium.launch(launchOptions);
@@ -482,21 +495,55 @@ async function scrapeNetflix() {
         const runtimeEl = document.querySelector('[data-uia="duration"], [data-uia="video-runtime"], .duration');
         const detailTitleEl = document.querySelector('[data-uia="video-title"], .title-title, h1');
         
-        // Detect if it's a series
+        // ── Series Detection ──────────────────────────────────────────────
         const titleText = (detailTitleEl?.textContent || '').toLowerCase();
         const synopsisText = (synopsis || '').toLowerCase();
         const durationText = (runtimeEl?.textContent || '').toLowerCase();
         
-        // Check for common series markers in title, synopsis, or metadata
-        // Added more markers like Ep, Season, Series
         const seriesRegex = /\b(ep|episode|vol|volume|part|pt|season|series|anthology)\b\s*\d*|seasons|episodes/i;
         const hasSeriesKeywords = seriesRegex.test(titleText) || 
                                  seriesRegex.test(durationText) ||
                                  seriesRegex.test(synopsisText);
         
-        const hasSeriesSelectors = !!document.querySelector('.duration-badge, [data-uia="duration-badge"], .season-count, [data-uia="season-selector"], .episode-list, [data-uia="episode-list"], .series-title');
+        const hasSeriesSelectors = !!document.querySelector(
+          '.duration-badge, [data-uia="duration-badge"], .season-count, ' +
+          '[data-uia="season-selector"], .episode-list, [data-uia="episode-list"], ' +
+          '.series-title, [data-uia="episodes-container"]'
+        );
         
-        const isSeries = hasSeriesSelectors || hasSeriesKeywords;
+        const isSeries = hasSeriesSelectors || hasSeriesKeywords ||
+          !!(videoData.numberSeasonsLabel?.value || videoData.numberOfSeasons?.value);
+
+        // ── Season / Episode Counts ───────────────────────────────────────
+        let seasonCount: number | null = null;
+        let episodeCount: number | null = null;
+
+        if (isSeries) {
+          // 1. From falcorCache
+          const cacheSeasons = videoData.numberOfSeasons?.value || videoData.numberSeasonsLabel?.value;
+          const cacheEpisodes = videoData.episodeCount?.value || videoData.numberOfEpisodes?.value;
+          if (cacheSeasons) seasonCount = parseInt(String(cacheSeasons).match(/\d+/)?.[0] || '0') || null;
+          if (cacheEpisodes) episodeCount = parseInt(String(cacheEpisodes).match(/\d+/)?.[0] || '0') || null;
+
+          // 2. From DOM season selector (dropdown options = number of seasons)
+          if (!seasonCount) {
+            const seasonOptions = document.querySelectorAll('[data-uia="season-selector"] option, select.season-selector option');
+            if (seasonOptions.length > 0) seasonCount = seasonOptions.length;
+          }
+
+          // 3. From a "X Seasons" text pattern
+          if (!seasonCount) {
+            const allText = document.body.innerText;
+            const seasonsMatch = allText.match(/(\d+)\s+seasons?/i);
+            if (seasonsMatch) seasonCount = parseInt(seasonsMatch[1]);
+          }
+
+          // 4. From episode list items
+          if (!episodeCount) {
+            const epItems = document.querySelectorAll('[data-uia="episode-item"], .episode-item, .episodeCard');
+            if (epItems.length > 0) episodeCount = epItems.length;
+          }
+        }
 
         return {
           title: detailTitleEl?.textContent?.trim() || null,
@@ -508,7 +555,9 @@ async function scrapeNetflix() {
           writers: Array.from(new Set(writers)),
           genres: Array.from(new Set(genres)),
           isAfrican,
-          isSeries
+          isSeries,
+          seasonCount,
+          episodeCount
         };
       });
 
@@ -612,8 +661,14 @@ async function syncToDatabase(scrapedMovies) {
   let errorCount = 0;
 
   for (const movie of scrapedMovies) {
-    const { isSeries, baseTitle, episodeNum } = detectAndNormalizeSeries(movie.title);
-    const cleanedTitle = cleanTitle(baseTitle);
+    // Use raw series detection from scrape OR from title
+    const isSeries = movie.isSeries || movie.type === 'series';
+    const { isSeries: titleIsSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(movie.title);
+    const isSeriesFinal = isSeries || titleIsSeries;
+    // Normalize: strip "Blood Sisters: Season 2" → "Blood Sisters"
+    const normalizedTitle = isSeriesFinal ? normalizeSeriesTitle(baseTitle) : baseTitle;
+    const cleanedTitle = cleanTitle(normalizedTitle);
+    const contentType = isSeriesFinal ? 'series' : 'movie';
     const movieYear = movie.year ? parseInt(movie.year.toString().match(/\d{4}/)?.[0] || '0') : null;
     
     // Check for African identity
@@ -692,7 +747,11 @@ async function syncToDatabase(scrapedMovies) {
           synopsis: existing.synopsis || movie.synopsis,
           runtime_minutes: existing.runtime_minutes || movie.runtime_minutes,
           poster_url: existing.poster_url || movie.poster_url,
-          backdrop_url: existing.backdrop_url || movie.poster_url
+          backdrop_url: existing.backdrop_url || movie.poster_url,
+          // Always update series metadata
+          content_type: contentType,
+          ...(movie.seasonCount != null && { season_count: movie.seasonCount }),
+          ...(movie.episodeCount != null && { episode_count: movie.episodeCount }),
         };
 
         if (['announced', 'coming_soon'].includes(existing.status)) {
@@ -708,7 +767,7 @@ async function syncToDatabase(scrapedMovies) {
         if (updateError) throw updateError;
         
         updatedCount++;
-        console.log(`  🆙 Updated existing film record.`);
+        console.log(`  🆙 Updated existing film record (${contentType}, ${movie.seasonCount ?? '?'} seasons).`);
 
       } else {
         // If NO existing record, we MUST be sure it's African before creating new
@@ -729,7 +788,8 @@ async function syncToDatabase(scrapedMovies) {
           title: cleanedTitle,
           year: movieYear,
           synopsis: movie.synopsis,
-          runtime_minutes: movie.runtime_minutes,
+          // Series: no runtime — movies get it if available
+          runtime_minutes: contentType === 'movie' ? movie.runtime_minutes : null,
           poster_url: movie.poster_url,
           backdrop_url: movie.poster_url,
           release_type: 'netflix',
@@ -740,7 +800,10 @@ async function syncToDatabase(scrapedMovies) {
           source: 'netflix',
           status: 'released',
           countries: countries.length > 0 ? countries : ['Nigeria'],
-          needs_review: true
+          needs_review: true,
+          content_type: contentType,
+          season_count: movie.seasonCount || null,
+          episode_count: movie.episodeCount || null,
         }).select('id').single();
 
         if (error) throw error;

@@ -96,6 +96,8 @@ export default function Browse() {
         query = query.in('film_countries.countries.name', selectedCountries);
       }
 
+      query = query.eq('content_type', 'movie');
+
       if (yearRange > 1990) query = query.gte('year', yearRange);
       if (language) query = query.eq('language', language);
       if (selectedRatings.length > 0) query = query.in('nfvcb_rating', selectedRatings);

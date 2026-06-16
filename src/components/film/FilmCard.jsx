@@ -59,7 +59,9 @@ export default function FilmCard({
 
   if (variant === 'landscape') {
     const formattedViews = formatDeltaViews(film.view_count);
-    const durationLabel = formatRuntimeHours(film.runtime_minutes || film.runtime);
+    const durationLabel = film.content_type === 'series'
+      ? (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series')
+      : formatRuntimeHours(film.runtime_minutes || film.runtime);
     
     return (
       <div className="relative flex flex-col gap-2 w-72 sm:w-80 group">
@@ -167,7 +169,9 @@ export default function FilmCard({
   };
   
   const activePlatforms = getPlatforms();
-  const durationLabel = formatRuntimeHours(film.runtime_minutes || film.runtime) || '2h 5m';
+  const durationLabel = film.content_type === 'series'
+    ? (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series')
+    : (formatRuntimeHours(film.runtime_minutes || film.runtime) || '2h 5m');
   const matchScore = 75 + ((film.id ? Number(String(film.id).charCodeAt(0) || 0) : 0) % 24);
 
   const [hoverPosition, setHoverPosition] = useState('center');
@@ -225,6 +229,14 @@ export default function FilmCard({
             <span className="text-[10px] font-bold">
               {filmRating.toFixed(1)}
             </span>
+          </div>
+        )}
+
+        {/* Series Badge */}
+        {film.content_type === 'series' && (
+          <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-14' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
+            <Icon icon="solar:tv-bold" className="text-white text-[9px]" />
+            <span>TV</span>
           </div>
         )}
 

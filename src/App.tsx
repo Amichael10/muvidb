@@ -13,6 +13,7 @@ import Home from './pages/Home';
 const FilmDetail = lazy(() => import('./pages/FilmDetail'));
 const Search = lazy(() => import('./pages/Search'));
 const Browse = lazy(() => import('./pages/Browse'));
+const TVShows = lazy(() => import('./pages/TVShows'));
 const WatchPlatform = lazy(() => import('./pages/WatchPlatform'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
@@ -152,6 +153,7 @@ export default function App() {
                 <Route path="/film/:slug" element={<FilmDetail />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/browse" element={<Browse />} />
+                <Route path="/tv-shows" element={<TVShows />} />
                 <Route path="/watch/:platform" element={<WatchPlatform />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />

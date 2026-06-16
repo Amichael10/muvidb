@@ -1,7 +1,7 @@
-
 import { supabase } from './supabase.js';
 import { ADAPTERS, upsertShowtimes } from './cinema-adapters/index.js';
 import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
+import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
 
 /** Try to find a TMDB movie match and return enriched metadata */
 async function enrichFromTMDB(title: string, year?: number | null): Promise<{
@@ -197,32 +197,118 @@ export async function runVideosSync() {
             if (existingFilms) existingFilms.forEach((f: any) => existingFilmsMap.set(f.source_video_id, f.id));
 
             const filmsToInsert = [];
+            // Track series parent IDs to avoid duplicate lookups
+            const seriesParentCache = new Map<string, string>(); // baseTitle → filmId
+
             for (const v of videosToProcess) {
               if (!existingFilmsMap.has(v.video_id)) {
-                const cleanedTitle = cleanTitle(v.title);
+                const rawTitle = v.title;
+                const cleanedTitle = cleanTitle(rawTitle);
                 const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
-                // Try TMDB enrichment first
-                const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
-                filmsToInsert.push({
-                  title: cleanedTitle, 
-                  year: vidYear,
-                  release_type: 'youtube', 
-                  source: 'youtube', 
-                  source_video_id: v.video_id,
-                  youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
-                  trailer_youtube_id: v.video_id, 
-                  // Use TMDB poster if available, else fall back to YouTube thumbnail
-                  poster_url: tmdb?.poster_url || v.thumbnail_url,
-                  backdrop_url: tmdb?.backdrop_url || v.thumbnail_url,
-                  synopsis: tmdb?.synopsis || null,
-                  tmdb_id: tmdb?.tmdb_id || null,
-                  tmdb_rating: tmdb?.tmdb_rating || null,
-                  // Only mark needs_review if we couldn't enrich from TMDB
-                  needs_review: !tmdb?.synopsis, 
-                  status: 'released',
-                  runtime_minutes: Math.round(v.duration_seconds / 60),
-                  language: ch.primary_language || 'English'
-                });
+
+                // ── Detect if this is an episode of a series ──────────────────────────────
+                const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(rawTitle);
+                const normalizedBase = normalizeSeriesTitle(baseTitle);
+                const cleanedBase = cleanTitle(normalizedBase);
+
+                if (isSeries) {
+                  // ── Find or create the PARENT series record ────────────────────────────
+                  let parentId = seriesParentCache.get(cleanedBase);
+
+                  if (!parentId) {
+                    // Look for existing series in DB
+                    const { data: existingSeries } = await supabase
+                      .from('films')
+                      .select('id, poster_url')
+                      .ilike('title', cleanedBase)
+                      .eq('content_type', 'series')
+                      .eq('source', 'youtube')
+                      .maybeSingle();
+
+                    if (existingSeries) {
+                      parentId = existingSeries.id;
+                      // Update parent poster with Ep1 thumbnail if parent has none
+                      if (!existingSeries.poster_url && v.thumbnail_url) {
+                        await supabase.from('films').update({
+                          poster_url: v.thumbnail_url,
+                          backdrop_url: v.thumbnail_url
+                        }).eq('id', parentId);
+                      }
+                    } else {
+                      // Create new parent series record
+                      const tmdb = await enrichFromTMDB(cleanedBase, vidYear);
+                      const { data: newParent } = await supabase.from('films').insert({
+                        title: cleanedBase,
+                        year: vidYear,
+                        release_type: 'youtube',
+                        source: 'youtube',
+                        content_type: 'series',
+                        youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
+                        poster_url: tmdb?.poster_url || v.thumbnail_url,
+                        backdrop_url: tmdb?.backdrop_url || v.thumbnail_url,
+                        synopsis: tmdb?.synopsis || null,
+                        tmdb_id: tmdb?.tmdb_id || null,
+                        tmdb_rating: tmdb?.tmdb_rating || null,
+                        needs_review: true,
+                        status: 'released',
+                        language: ch.primary_language || 'English'
+                      }).select('id').single();
+
+                      parentId = newParent?.id || null;
+                      if (parentId) {
+                        console.log(`  🎦 Created series parent: "${cleanedBase}" (${parentId})`);
+                        newFilms++;
+                      }
+                    }
+                    if (parentId) seriesParentCache.set(cleanedBase, parentId);
+                  }
+
+                  // ── Create the episode record linked to the parent ────────────────────────
+                  filmsToInsert.push({
+                    title: cleanedTitle,
+                    year: vidYear,
+                    release_type: 'youtube',
+                    source: 'youtube',
+                    source_video_id: v.video_id,
+                    youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
+                    trailer_youtube_id: v.video_id,
+                    poster_url: v.thumbnail_url,
+                    backdrop_url: v.thumbnail_url,
+                    needs_review: true,
+                    status: 'released',
+                    runtime_minutes: Math.round(v.duration_seconds / 60),
+                    language: ch.primary_language || 'English',
+                    content_type: 'series',
+                    series_id: parentId || null,
+                    episode_number: episodeNum,
+                    season_number: seasonNum || 1,
+                    _videoId: v.video_id // temp key for mapping
+                  });
+
+                } else {
+                  // ── Regular standalone movie ────────────────────────────────────
+                  const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
+                  filmsToInsert.push({
+                    title: cleanedTitle,
+                    year: vidYear,
+                    release_type: 'youtube',
+                    source: 'youtube',
+                    source_video_id: v.video_id,
+                    youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
+                    trailer_youtube_id: v.video_id,
+                    poster_url: tmdb?.poster_url || v.thumbnail_url,
+                    backdrop_url: tmdb?.backdrop_url || v.thumbnail_url,
+                    synopsis: tmdb?.synopsis || null,
+                    tmdb_id: tmdb?.tmdb_id || null,
+                    tmdb_rating: tmdb?.tmdb_rating || null,
+                    needs_review: !tmdb?.synopsis,
+                    status: 'released',
+                    runtime_minutes: Math.round(v.duration_seconds / 60),
+                    language: ch.primary_language || 'English',
+                    content_type: 'movie',
+                    _videoId: v.video_id // temp key for mapping
+                  });
+                }
               }
             }
 

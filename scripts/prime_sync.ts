@@ -317,7 +317,7 @@ async function syncToDatabase(scrapedMovies) {
   let updatedCount = 0; let newCount = 0; let errorCount = 0;
 
   for (const movie of scrapedMovies) {
-    const { isSeries, baseTitle, episodeNum } = detectAndNormalizeSeries(movie.title);
+    const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(movie.title);
     const cleanedTitle = cleanTitle(baseTitle);
     const movieYear = movie.year ? parseInt(movie.year.match(/\d{4}/)?.[0] || '0') : null;
     const runtimeMinutes = parsePrimeDuration(movie.runtime);
@@ -331,37 +331,144 @@ async function syncToDatabase(scrapedMovies) {
     }
 
     try {
-      let { data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle).eq('year', movieYear || 0);
-      if (!results?.length) {
-         ({ data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle));
-      }
-      const existing = results?.[0];
       let filmId;
 
-      if (existing) {
-        filmId = existing.id;
-        const updatePayload: any = {
-          streaming_links: { ...(existing.streaming_links || {}), prime_video: movie.url },
-          synopsis: existing.synopsis || movie.synopsis,
-          runtime_minutes: existing.runtime_minutes || runtimeMinutes,
-          poster_url: existing.poster_url || movie.poster_url,
-          backdrop_url: (existing as any).backdrop_url || movie.backdrop_url || movie.poster_url
-        };
-        const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix'].includes(existing.release_type);
-        if (!isSuperPrimary) updatePayload.release_type = 'prime_video';
+      if (isSeries) {
+        // Find or create parent series record
+        const cleanedBase = cleanTitle(baseTitle);
+        let parentRecord;
 
-        await supabase.from('films').update(updatePayload).eq('id', existing.id);
-        updatedCount++;
+        // Search for existing parent series record in DB
+        let { data: parentResults } = await supabase.from('films')
+          .select('id, poster_url, backdrop_url, streaming_links')
+          .ilike('title', cleanedBase)
+          .eq('content_type', 'series')
+          .is('series_id', null);
+
+        let parentExisting = parentResults?.[0];
+
+        if (parentExisting) {
+          parentRecord = parentExisting;
+          // Update parent poster / backdrop if missing
+          const parentUpdate: any = {};
+          if (!parentExisting.poster_url && movie.poster_url) parentUpdate.poster_url = movie.poster_url;
+          if (!parentExisting.backdrop_url && (movie.backdrop_url || movie.poster_url)) parentUpdate.backdrop_url = movie.backdrop_url || movie.poster_url;
+          
+          const existingLinks = parentExisting.streaming_links || {};
+          if (!existingLinks.prime_video) {
+            parentUpdate.streaming_links = { ...existingLinks, prime_video: movie.url };
+          }
+          if (Object.keys(parentUpdate).length > 0) {
+            await supabase.from('films').update(parentUpdate).eq('id', parentExisting.id);
+          }
+        } else {
+          // Create new parent series record
+          const { data: newParent, error: parentError } = await supabase.from('films').insert({
+            title: cleanedBase,
+            year: movieYear,
+            release_type: 'prime_video',
+            source: 'prime_video',
+            content_type: 'series',
+            poster_url: movie.poster_url,
+            backdrop_url: movie.backdrop_url || movie.poster_url,
+            synopsis: movie.synopsis || null,
+            needs_review: true,
+            status: 'released',
+            countries: ['Nigeria']
+          }).select('id').single();
+
+          if (parentError) throw parentError;
+          parentRecord = newParent;
+          console.log(`  🎦 Created series parent: "${cleanedBase}"`);
+          newCount++;
+        }
+
+        const parentId = parentRecord.id;
+
+        // If it's a specific episode
+        if (episodeNum !== null) {
+          // Find if this specific episode record exists
+          let { data: epResults } = await supabase.from('films')
+            .select('*')
+            .eq('series_id', parentId)
+            .eq('episode_number', episodeNum)
+            .eq('season_number', seasonNum || 1);
+
+          const epExisting = epResults?.[0];
+
+          if (epExisting) {
+            filmId = epExisting.id;
+            const updatePayload: any = {
+              streaming_links: { ...(epExisting.streaming_links || {}), prime_video: movie.url },
+              synopsis: epExisting.synopsis || movie.synopsis,
+              runtime_minutes: epExisting.runtime_minutes || runtimeMinutes,
+              poster_url: epExisting.poster_url || movie.poster_url,
+              backdrop_url: epExisting.backdrop_url || movie.backdrop_url || movie.poster_url
+            };
+            await supabase.from('films').update(updatePayload).eq('id', epExisting.id);
+            updatedCount++;
+          } else {
+            // Create new episode record
+            const { data: insertedEp, error: epError } = await supabase.from('films').insert({
+              title: movie.title,
+              year: movieYear,
+              release_type: 'prime_video',
+              source: 'prime_video',
+              content_type: 'series',
+              series_id: parentId,
+              episode_number: episodeNum,
+              season_number: seasonNum || 1,
+              streaming_links: { prime_video: movie.url },
+              runtime_minutes: runtimeMinutes,
+              poster_url: movie.poster_url,
+              backdrop_url: movie.backdrop_url || movie.poster_url,
+              synopsis: movie.synopsis || null,
+              status: 'released',
+              countries: ['Nigeria'],
+              needs_review: true
+            }).select('id').single();
+
+            if (epError) throw epError;
+            filmId = insertedEp.id;
+            newCount++;
+            console.log(`  ✨ Created episode ${episodeNum} for series: "${cleanedBase}"`);
+          }
+        } else {
+          filmId = parentId;
+        }
+
       } else {
-        const { data: inserted, error } = await supabase.from('films').insert({
-          title: cleanedTitle, year: movieYear, synopsis: movie.synopsis, runtime_minutes: runtimeMinutes,
-          poster_url: movie.poster_url, backdrop_url: movie.backdrop_url || movie.poster_url,
-          release_type: 'prime_video', streaming_links: { prime_video: movie.url }, source: 'prime_video',
-          status: 'released', countries: ['Nigeria'], needs_review: true
-        }).select('id').single();
-        if (error) throw error;
-        filmId = inserted.id;
-        newCount++;
+        let { data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle).eq('year', movieYear || 0);
+        if (!results?.length) {
+           ({ data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle));
+        }
+        const existing = results?.[0];
+
+        if (existing) {
+          filmId = existing.id;
+          const updatePayload: any = {
+            streaming_links: { ...(existing.streaming_links || {}), prime_video: movie.url },
+            synopsis: existing.synopsis || movie.synopsis,
+            runtime_minutes: existing.runtime_minutes || runtimeMinutes,
+            poster_url: existing.poster_url || movie.poster_url,
+            backdrop_url: (existing as any).backdrop_url || movie.backdrop_url || movie.poster_url
+          };
+          const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix'].includes(existing.release_type);
+          if (!isSuperPrimary) updatePayload.release_type = 'prime_video';
+
+          await supabase.from('films').update(updatePayload).eq('id', existing.id);
+          updatedCount++;
+        } else {
+          const { data: inserted, error } = await supabase.from('films').insert({
+            title: cleanedTitle, year: movieYear, synopsis: movie.synopsis, runtime_minutes: runtimeMinutes,
+            poster_url: movie.poster_url, backdrop_url: movie.backdrop_url || movie.poster_url,
+            release_type: 'prime_video', streaming_links: { prime_video: movie.url }, source: 'prime_video',
+            status: 'released', countries: ['Nigeria'], needs_review: true, content_type: 'movie'
+          }).select('id').single();
+          if (error) throw error;
+          filmId = inserted.id;
+          newCount++;
+        }
       }
 
       if (movie.genres) {

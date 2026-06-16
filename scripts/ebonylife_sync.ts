@@ -3,6 +3,7 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { cleanTitle } from '../api/_lib/yt_service.js';
+import { detectAndNormalizeSeries } from '../api/_lib/series_utils.js';
 
 const stealthPlugin = stealth();
 chromium.use(stealthPlugin);
@@ -87,7 +88,9 @@ async function syncToDatabase(scrapedMovies) {
   let updatedCount = 0; let newCount = 0; let errorCount = 0;
 
   for (const movie of scrapedMovies) {
-    const cleanedTitle = cleanTitle(movie.content_name || movie.title);
+    const rawTitle = movie.content_name || movie.title;
+    const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(rawTitle);
+    const cleanedTitle = cleanTitle(baseTitle);
     if (!cleanedTitle) continue;
     
     // year from tags if present, or leave null
@@ -109,48 +112,155 @@ async function syncToDatabase(scrapedMovies) {
     // construct the movie URL
     const watchUrl = `https://ebonylifeonplus.com/content/${movie.content_permalink}`;
 
-    console.log(`🔄 Processing: ${cleanedTitle}`);
+    console.log(`🔄 Processing: ${cleanedTitle} ${episodeNum ? `(Episode ${episodeNum})` : ''}`);
 
     try {
-      // Find existing
-      let { data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle);
-      const existing = results?.[0];
       let filmId;
 
-      if (existing) {
-        filmId = existing.id;
-        const updatePayload = {
-          streaming_links: { ...(existing.streaming_links || {}), ebonylife: watchUrl },
-          synopsis: existing.synopsis || movie.content_desc,
-        };
-        if (!existing.runtime_minutes && runtimeMinutes) updatePayload.runtime_minutes = runtimeMinutes;
-        if (!existing.poster_url && poster_url) updatePayload.poster_url = poster_url;
-        if (!existing.backdrop_url && backdrop_url) updatePayload.backdrop_url = backdrop_url;
-        
-        const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix', 'prime_video'].includes(existing.release_type);
-        if (!isSuperPrimary) updatePayload.release_type = 'cinema'; // fallback to cinema
+      if (isSeries) {
+        // Find or create parent series record
+        const cleanedBase = cleanTitle(baseTitle);
+        let parentRecord;
 
-        await supabase.from('films').update(updatePayload).eq('id', existing.id);
-        updatedCount++;
+        // Search for existing parent series record in DB
+        let { data: parentResults } = await supabase.from('films')
+          .select('id, poster_url, backdrop_url, streaming_links')
+          .ilike('title', cleanedBase)
+          .eq('content_type', 'series')
+          .is('series_id', null);
+
+        let parentExisting = parentResults?.[0];
+
+        if (parentExisting) {
+          parentRecord = parentExisting;
+          // Update parent poster / backdrop if missing
+          const parentUpdate: any = {};
+          if (!parentExisting.poster_url && poster_url) parentUpdate.poster_url = poster_url;
+          if (!parentExisting.backdrop_url && (backdrop_url || poster_url)) parentUpdate.backdrop_url = backdrop_url || poster_url;
+          
+          const existingLinks = parentExisting.streaming_links || {};
+          if (!existingLinks.ebonylife) {
+            parentUpdate.streaming_links = { ...existingLinks, ebonylife: watchUrl };
+          }
+          if (Object.keys(parentUpdate).length > 0) {
+            await supabase.from('films').update(parentUpdate).eq('id', parentExisting.id);
+          }
+        } else {
+          // Create new parent series record
+          const { data: newParent, error: parentError } = await supabase.from('films').insert({
+            title: cleanedBase,
+            year: movieYear,
+            release_type: 'ebonylife',
+            source: 'ebonylife',
+            content_type: 'series',
+            poster_url: poster_url,
+            backdrop_url: backdrop_url || poster_url,
+            synopsis: movie.content_desc || null,
+            needs_review: true,
+            status: 'released',
+            countries: ['Nigeria']
+          }).select('id').single();
+
+          if (parentError) throw parentError;
+          parentRecord = newParent;
+          console.log(`  🎦 Created series parent: "${cleanedBase}"`);
+          newCount++;
+        }
+
+        const parentId = parentRecord.id;
+
+        // If it's a specific episode
+        if (episodeNum !== null) {
+          // Find if this specific episode record exists
+          let { data: epResults } = await supabase.from('films')
+            .select('*')
+            .eq('series_id', parentId)
+            .eq('episode_number', episodeNum)
+            .eq('season_number', seasonNum || 1);
+
+          const epExisting = epResults?.[0];
+
+          if (epExisting) {
+            filmId = epExisting.id;
+            const updatePayload: any = {
+              streaming_links: { ...(epExisting.streaming_links || {}), ebonylife: watchUrl },
+              synopsis: epExisting.synopsis || movie.content_desc,
+              runtime_minutes: epExisting.runtime_minutes || runtimeMinutes,
+              poster_url: epExisting.poster_url || poster_url,
+              backdrop_url: epExisting.backdrop_url || backdrop_url || poster_url
+            };
+            await supabase.from('films').update(updatePayload).eq('id', epExisting.id);
+            updatedCount++;
+          } else {
+            // Create new episode record
+            const { data: insertedEp, error: epError } = await supabase.from('films').insert({
+              title: movie.content_name || movie.title,
+              year: movieYear,
+              release_type: 'ebonylife',
+              source: 'ebonylife',
+              content_type: 'series',
+              series_id: parentId,
+              episode_number: episodeNum,
+              season_number: seasonNum || 1,
+              streaming_links: { ebonylife: watchUrl },
+              runtime_minutes: runtimeMinutes,
+              poster_url: poster_url,
+              backdrop_url: backdrop_url || poster_url,
+              synopsis: movie.content_desc || null,
+              status: 'released',
+              countries: ['Nigeria'],
+              needs_review: true
+            }).select('id').single();
+
+            if (epError) throw epError;
+            filmId = insertedEp.id;
+            newCount++;
+            console.log(`  ✨ Created episode ${episodeNum} for series: "${cleanedBase}"`);
+          }
+        } else {
+          filmId = parentId;
+        }
+
       } else {
-        const { data: inserted, error } = await supabase.from('films').insert({
-          title: cleanedTitle, 
-          year: movieYear, 
-          synopsis: movie.content_desc, 
-          runtime_minutes: runtimeMinutes,
-          poster_url: poster_url, 
-          backdrop_url: backdrop_url || poster_url,
-          release_type: 'cinema', // fallback to cinema since ebonylife not in enum
-          streaming_links: { ebonylife: watchUrl }, 
-          source: 'ebonylife',
-          status: 'released', 
-          countries: ['Nigeria'], 
-          needs_review: true
-        }).select('id').single();
-        
-        if (error) throw error;
-        filmId = inserted.id;
-        newCount++;
+        let { data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle);
+        const existing = results?.[0];
+
+        if (existing) {
+          filmId = existing.id;
+          const updatePayload: any = {
+            streaming_links: { ...(existing.streaming_links || {}), ebonylife: watchUrl },
+            synopsis: existing.synopsis || movie.content_desc,
+          };
+          if (!existing.runtime_minutes && runtimeMinutes) updatePayload.runtime_minutes = runtimeMinutes;
+          if (!existing.poster_url && poster_url) updatePayload.poster_url = poster_url;
+          if (!existing.backdrop_url && backdrop_url) updatePayload.backdrop_url = backdrop_url;
+          
+          const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix', 'prime_video'].includes(existing.release_type);
+          if (!isSuperPrimary) updatePayload.release_type = 'ebonylife';
+
+          await supabase.from('films').update(updatePayload).eq('id', existing.id);
+          updatedCount++;
+        } else {
+          const { data: inserted, error } = await supabase.from('films').insert({
+            title: cleanedTitle, 
+            year: movieYear, 
+            synopsis: movie.content_desc, 
+            runtime_minutes: runtimeMinutes,
+            poster_url: poster_url, 
+            backdrop_url: backdrop_url || poster_url,
+            release_type: 'ebonylife',
+            streaming_links: { ebonylife: watchUrl }, 
+            source: 'ebonylife',
+            status: 'released', 
+            countries: ['Nigeria'], 
+            needs_review: true,
+            content_type: 'movie'
+          }).select('id').single();
+          
+          if (error) throw error;
+          filmId = inserted.id;
+          newCount++;
+        }
       }
 
       // Sync Cast

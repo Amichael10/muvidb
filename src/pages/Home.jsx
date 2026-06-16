@@ -32,6 +32,7 @@ export default function Home() {
   const [top10Films, setTop10Films] = useState([]);
   const [crewMembers, setCrewMembers] = useState([]);
   const [productionCompanies, setProductionCompanies] = useState([]);
+  const [featuredSeries, setFeaturedSeries] = useState([]);
 
   // What's New consolidated tabs (Coming Soon / New Releases / Recently Added)
   const [whatsNewTab, setWhatsNewTab] = useState('coming');
@@ -73,6 +74,7 @@ export default function Home() {
     try {
       await Promise.all([
         fetchFilms().catch(e => console.error('Error fetching films:', e)),
+        fetchFeaturedSeries().catch(e => console.error('Error fetching series:', e)),
         fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
         fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e)),
         fetchYoutubeFeed().catch(e => console.error('Error fetching youtube feed:', e)),
@@ -151,6 +153,29 @@ export default function Home() {
         }
       });
       setFilms(Array.from(filmMap.values()));
+    }
+  };
+
+  const fetchFeaturedSeries = async () => {
+    const { data, error } = await supabase
+      .from('films')
+      .select(`
+        id, title, poster_url, backdrop_url, year, language, 
+        runtime_minutes, view_count, average_rating, nfvcb_rating, 
+        is_featured, is_trending, release_type, streaming_links, source,
+        content_type, season_count, episode_count,
+        film_genres(genres(name))
+      `)
+      .eq('content_type', 'series')
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+      .order('view_count', { ascending: false })
+      .limit(20);
+
+    if (!error && data) {
+      setFeaturedSeries(data.map(f => ({
+        ...f,
+        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+      })));
     }
   };
 
@@ -540,6 +565,17 @@ export default function Home() {
               films={netflixNew}
               isLoading={isLoading}
               linkTo="/watch/netflix"
+            />
+          </div>
+        )}
+        {(isLoading || featuredSeries.length > 0) && (
+          <div className="border-b border-border py-12 bg-surface-2/5">
+            <FilmRow
+              title="Popular TV Shows & Series"
+              subtitle="Must-watch African series and episodes"
+              films={featuredSeries}
+              isLoading={isLoading}
+              linkTo="/tv-shows"
             />
           </div>
         )}

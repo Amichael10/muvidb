@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -59,6 +59,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: 'Browse', path: '/browse' },
+    { name: 'TV Shows', path: '/tv-shows' },
     { name: 'Showtimes', path: '/showtimes' },
     { name: 'Cinemas', path: '/cinemas' },
     { name: 'Channels', path: '/channels' },
