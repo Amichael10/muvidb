@@ -69,25 +69,8 @@ export function detectAndNormalizeSeries(title: string) {
     };
   }
 
-  // "Part N" or "Part II" (Roman numerals)
-  const partRegex = /\b(?:part|pt|vol(?:ume)?|chapter)[\s.]+([IVXivx]+|\d{1,3})\b/i;
-  const partMatch = clean.match(partRegex);
-  if (partMatch) {
-    const numStr = partMatch[1];
-    const num = /^\d+$/.test(numStr) ? parseInt(numStr) : romanToInt(numStr);
-    const baseTitle = clean.replace(partRegex, '')
-      .replace(/[\s:–\-]+$/, '')
-      .replace(/\(\s*\)/g, '')
-      .replace(/\[\s*\]/g, '')
-      .trim();
-    return {
-      isSeries: true,
-      baseTitle,
-      seasonNum: null,
-      episodeNum: num,
-      originalTitle
-    };
-  }
+  // "Part N" or "Part II" - USER REQUEST: Parts 1 and 2 are regular movies, do not treat as series.
+  // We removed the partRegex matching here.
 
   // Broad markers: title contains "seasons", "episodes", "series" as standalone words
   if (/\b(seasons|episodes|series)\b/i.test(clean)) {

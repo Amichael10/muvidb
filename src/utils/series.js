@@ -21,6 +21,19 @@ export function getShowName(title) {
     return match[1].replace(/[\s:-]+$/, '').trim();
   }
   
+  // Try to remove common Yoruba episode markers (e.g. IKAN, EJI, ETA, KERIN, KARUN, KEFA, KEJE, KEJO, KESAN, KEWA, ELESE)
+  // Or "Episode" in Yoruba: "Abala", "Ipin"
+  const yorubaMatch = title.match(/^(.*?)(?:[\s:-]+)?\b(?:IKAN|EJI|ETA|ERIN|ARUN|EFA|EJE|EJO|ESAN|EWA|ELESE|KEJI|KETA|KERIN|KARUN|KEFA|KEJE|KEJO|KESAN|KEWA|ABALA|IPIN)\b/i);
+  if (yorubaMatch && yorubaMatch[1]) {
+    return yorubaMatch[1].replace(/[\s:-]+$/, '').trim();
+  }
+
+  // Also remove trailing standalone numbers like " 1", " 2" if they are at the end
+  const numberMatch = title.match(/^(.*?)(?:[\s:-]+)?\b\d+$/);
+  if (numberMatch && numberMatch[1]) {
+    return numberMatch[1].replace(/[\s:-]+$/, '').trim();
+  }
+
   // If no marker is found, return the original title
   return title.trim();
 }

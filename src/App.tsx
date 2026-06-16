@@ -4,7 +4,6 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { QuickViewProvider } from './context/QuickViewContext';
-import QuickViewModal from './components/film/QuickViewModal';
 
 // Eager: landing page only (keeps first paint / LCP fast)
 import Home from './pages/Home';
@@ -205,7 +204,6 @@ export default function App() {
               </Routes>
               </Suspense>
             </Layout>
-            <QuickViewModal />
           </SmoothScroll>
         </Router>
         </QuickViewProvider>

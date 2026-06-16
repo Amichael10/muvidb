@@ -5,6 +5,7 @@ import { Icon } from '@iconify/react';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Skeleton } from '../components/ui/Skeleton';
+import { getShowName } from '../utils/series';
 
 const PLATFORM_OPTIONS = [
   { value: '', label: 'All Platforms' },
@@ -75,10 +76,74 @@ export default function TVShows() {
       const { data, error: dbError, count } = await query;
       if (dbError) throw dbError;
 
+      let rawData = data || [];
+      
+      // Grouping Logic
+      const groupedShows = {};
+      const getPrefixMatch = (str1, str2) => {
+        const words1 = str1.split(/[\s:-]+/);
+        const words2 = str2.split(/[\s:-]+/);
+        let prefix = [];
+        for (let i = 0; i < Math.min(words1.length, words2.length); i++) {
+          if (words1[i].toLowerCase() === words2[i].toLowerCase()) {
+            prefix.push(words1[i]);
+          } else {
+            break;
+          }
+        }
+        return prefix.join(' ');
+      };
+
+      // If pageNum > 0, we can just group the new page independently, 
+      // or we group the whole list. Since we only have `rawData` here, let's group it.
+      // (If some episodes of the same show are on different pages, they might appear as separate groups 
+      // per page, but for sorting by newest/popular, they usually cluster together).
+      rawData.forEach(film => {
+        let showName = getShowName(film.title);
+
+        let foundGroup = false;
+        if (!groupedShows[showName]) {
+          for (const existingShowName in groupedShows) {
+            const prefix = getPrefixMatch(existingShowName, showName);
+            if (prefix.length >= 6 && prefix.split(' ').length >= 1) {
+              if (prefix.length / existingShowName.length >= 0.4 && prefix.length / showName.length >= 0.4) {
+                const group = groupedShows[existingShowName];
+                group.episodes_list.push(film);
+                group.title = prefix;
+                if (prefix !== existingShowName) {
+                  groupedShows[prefix] = group;
+                  delete groupedShows[existingShowName];
+                }
+                foundGroup = true;
+                break;
+              }
+            }
+          }
+        } else {
+          groupedShows[showName].episodes_list.push(film);
+          foundGroup = true;
+        }
+
+        if (!foundGroup) {
+          groupedShows[showName] = { 
+            ...film, 
+            title: showName, 
+            original_title: film.title, 
+            episodes_list: [film] 
+          };
+        }
+      });
+
+      let transformed = Object.values(groupedShows).map(group => ({
+        ...group,
+        is_series_group: true,
+        episodes_count: group.episodes_list.length
+      }));
+
       if (pageNum === 0) {
-        setShows(data || []);
+        setShows(transformed);
       } else {
-        setShows(prev => [...prev, ...(data || [])]);
+        setShows(prev => [...prev, ...transformed]);
       }
       setTotalCount(count || 0);
     } catch (err) {

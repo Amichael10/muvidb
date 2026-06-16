@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '@iconify/react';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { useReactions } from '../hooks/useReactions';
 import ReviewSection from '../components/film/ReviewSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
@@ -147,6 +148,14 @@ export default function FilmDetail() {
     toggleWatchlist
   } = useWatchlist(filmId, user);
 
+  const {
+    userReaction,
+    likesCount,
+    dislikesCount,
+    loading: reactionLoading,
+    toggleReaction
+  } = useReactions(filmId, user);
+
   const [cast, setCast] = useState([]);
   const [crew, setCrew] = useState([]);
   const [showAllCast, setShowAllCast] = useState(false);
@@ -268,6 +277,16 @@ export default function FilmDetail() {
       return;
     }
     await toggleWatchlist();
+  };
+
+  const handleReaction = async (type) => {
+    if (!user) {
+      navigate('/login', {
+        state: { from: `/films/${film?.slug || film?.id || slug}`, message: `Sign in to ${type} films` }
+      });
+      return;
+    }
+    await toggleReaction(type);
   };
 
 
@@ -688,6 +707,29 @@ export default function FilmDetail() {
               >
                 {inWatchlist ? 'Added' : 'Add to Watchlist'}
               </button>
+
+              <div className="flex gap-3 mt-3">
+                <button
+                  onClick={() => handleReaction('dislike')}
+                  disabled={reactionLoading}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg border transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'dislike' ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-surface-2 border-border text-text-muted hover:border-white hover:text-white'}`}
+                  title="Dislike"
+                >
+                  <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-xl" />
+                  <span className="text-[10px] font-bold">{dislikesCount}</span>
+                </button>
+
+                <button
+                  onClick={() => handleReaction('like')}
+                  disabled={reactionLoading}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg border transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'like' ? 'bg-brand/10 border-brand text-brand' : 'bg-surface-2 border-border text-text-muted hover:border-white hover:text-white'}`}
+                  title="Like"
+                >
+                  <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-xl" />
+                  <span className="text-[10px] font-bold">{likesCount}</span>
+                </button>
+              </div>
+
               <ShareAction
                 title={film.title}
                 text={`Check out ${film.title} on MuviDB`}

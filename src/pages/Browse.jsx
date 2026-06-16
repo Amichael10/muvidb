@@ -147,17 +147,56 @@ export default function Browse() {
       // Group TV Shows into Folders
       if (activeTab === 'series') {
         const groupedShows = {};
+        
+        const getPrefixMatch = (str1, str2) => {
+          const words1 = str1.split(/[\s:-]+/);
+          const words2 = str2.split(/[\s:-]+/);
+          let prefix = [];
+          for (let i = 0; i < Math.min(words1.length, words2.length); i++) {
+            if (words1[i].toLowerCase() === words2[i].toLowerCase()) {
+              prefix.push(words1[i]);
+            } else {
+              break;
+            }
+          }
+          return prefix.join(' ');
+        };
+
         transformed.forEach(film => {
-          const showName = getShowName(film.title);
+          let showName = getShowName(film.title);
+
+          let foundGroup = false;
           if (!groupedShows[showName]) {
+            for (const existingShowName in groupedShows) {
+              const prefix = getPrefixMatch(existingShowName, showName);
+              // if they share at least 1 word and the prefix is at least 6 chars
+              if (prefix.length >= 6 && prefix.split(' ').length >= 1) {
+                // Require the prefix to be a significant part of the title (> 50%)
+                if (prefix.length / existingShowName.length >= 0.4 && prefix.length / showName.length >= 0.4) {
+                  const group = groupedShows[existingShowName];
+                  group.episodes_list.push(film);
+                  group.title = prefix; // Update title to the broader prefix
+                  if (prefix !== existingShowName) {
+                    groupedShows[prefix] = group;
+                    delete groupedShows[existingShowName];
+                  }
+                  foundGroup = true;
+                  break;
+                }
+              }
+            }
+          } else {
+            groupedShows[showName].episodes_list.push(film);
+            foundGroup = true;
+          }
+
+          if (!foundGroup) {
             groupedShows[showName] = { 
               ...film, 
               title: showName, // Use the base show name for display
               original_title: film.title, // Keep original title just in case
               episodes_list: [film] 
             };
-          } else {
-            groupedShows[showName].episodes_list.push(film);
           }
         });
 
