@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { generateAIContent, parseJSON, generateAIVisionContent } from './_lib/ai_service.js';
 import { supabase } from './_lib/supabase.js';
 import { isValidAuth } from './_lib/auth.js';
+import { searchActorBio, searchDiscoverList } from './_lib/firecrawl_search.js';
 
 export const maxDuration = 60;
 
@@ -101,11 +102,23 @@ async function enrichMetadata(res: VercelResponse) {
     
   const filmsToEnrich = films?.filter(f => !f.synopsis || f.synopsis.length < 50).slice(0, 5) || [];
 
-  // Fetch people with missing photos OR missing biographies
+  // Fetch people with missing photos, biographies, or social links
   const { data: people } = await supabase.from('people')
-    .select('id, name, biography, photo_url')
-    .or('photo_url.is.null,photo_url.eq."",biography.is.null,biography.eq.""')
+    .select('id, name, biography, photo_url, instagram_url, facebook_url')
+    .or('photo_url.is.null,photo_url.eq."",biography.is.null,biography.eq."",instagram_url.is.null,facebook_url.is.null')
     .limit(5);
+
+  // Fetch search contexts for people
+  const peopleWithContext = [];
+  if (people && people.length > 0) {
+    for (const p of people) {
+      const searchContext = await searchActorBio(p.name);
+      peopleWithContext.push({
+        ...p,
+        searchContext
+      });
+    }
+  }
 
   // Fetch companies with missing logos
   const { data: companies } = await supabase.from('companies')
@@ -113,15 +126,15 @@ async function enrichMetadata(res: VercelResponse) {
     .or('logo_url.is.null,logo_url.eq."",description.is.null,description.eq.""')
     .limit(5);
 
-  const missingData = { films: filmsToEnrich, people, companies };
+  const missingData = { films: filmsToEnrich, people: peopleWithContext, companies };
   const prompt = `
     Enrich this Nollywood metadata. 
     - Films: factual, detailed synopsis (min 200 chars). Use sources like TMDB, IMDb, and kava.tv.
-    - People: Detailed biography, a REAL high-quality photo URL, and date of birth (YYYY-MM-DD format if available).
+    - People: Provide a detailed biography. Use the provided "searchContext" (which contains real Google results) to extract the most accurate biography, their Instagram URL, and Facebook URL. Provide a REAL high-quality photo URL, and date of birth (YYYY-MM-DD format if available).
     - Companies: Logo URL and full description.
     - If no photo/logo found, use: https://ui-avatars.com/api/?name=NAME&background=random
     
-    Return ONLY JSON: [{"type": "film/person/company", "id": "...", "name": "...", "synopsis": "...", "biography": "...", "date_of_birth": "...", "image_url": "..."}]
+    Return ONLY JSON: [{"type": "film/person/company", "id": "...", "name": "...", "synopsis": "...", "biography": "...", "date_of_birth": "...", "image_url": "...", "instagram_url": "...", "facebook_url": "..."}]
     Data: ${JSON.stringify(missingData)}
   `;
 
@@ -138,20 +151,53 @@ async function discoverActors(data: any, res: VercelResponse) {
     .ilike('nationality', 'Nigerian')
     .limit(400);
 
+  // Search google for list of upcoming actors
+  const listContext = await searchDiscoverList(region);
+
   const prompt = `
     Research 20 NEW and UPCOMING actors from the ${region} film industry (Nollywood). 
     Focus on rising stars seen in recent YouTube releases, kava.tv, or recent cinema hits.
     
     CRITICAL: Do NOT suggest these actors as they are already in the database:
     ${existingSample?.map(p => p.name).join(', ')}
+
+    Use this real Google search context to find accurate upcoming actors, their biographies, and social links:
+    ${listContext}
     
-    Return ONLY JSON: [{"name": "...", "biography": "...", "date_of_birth": "...", "image_url": "...", "notable_movies": [], "type": "person"}]
+    Return ONLY JSON: [{"name": "...", "biography": "...", "date_of_birth": "...", "image_url": "...", "instagram_url": "...", "facebook_url": "...", "notable_movies": [], "type": "person"}]
   `;
 
   const { text, telemetry } = await generateAIContent(prompt);
   let aiResults = parseJSON(text);
 
   if (!Array.isArray(aiResults)) aiResults = [];
+
+  // Deep dive search for each found new actor to guarantee bio and links
+  for (let i = 0; i < aiResults.length; i++) {
+    if (aiResults[i].name) {
+      const bioContext = await searchActorBio(aiResults[i].name);
+      
+      if (bioContext) {
+        const refinePrompt = `
+          Extract a detailed biography, instagram_url, and facebook_url for the actor "${aiResults[i].name}" based strictly on this search data:
+          ${bioContext}
+          
+          Return ONLY JSON: {"biography": "...", "instagram_url": "...", "facebook_url": "..."}
+        `;
+        try {
+          const { text: refinedText } = await generateAIContent(refinePrompt);
+          const refinedData = parseJSON(refinedText);
+          if (!Array.isArray(refinedData) && typeof refinedData === 'object') {
+            aiResults[i].biography = refinedData.biography || aiResults[i].biography;
+            aiResults[i].instagram_url = refinedData.instagram_url || aiResults[i].instagram_url;
+            aiResults[i].facebook_url = refinedData.facebook_url || aiResults[i].facebook_url;
+          }
+        } catch (e) {
+          console.warn('Failed to refine actor bio', e);
+        }
+      }
+    }
+  }
 
   // 2. SERVER-SIDE FILTER: Actually check the database for these names to ensure zero duplicates
   const namesToCheck = aiResults.map((r: any) => r.name).filter(Boolean);

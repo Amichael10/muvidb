@@ -254,7 +254,7 @@ async function scrapePrime() {
         const episodeList = !!document.querySelector('[data-automation-id="episodes-list"], .dv-node-dp-episodes, .episode-list, .episode-container');
         
         // Broaden series detection for "Ep 1", "Season 1", etc.
-        const seriesRegex = /\b(ep|episode|vol|volume|part|pt|season|series|anthology)\b\s*\d*|seasons|episodes/i;
+        const seriesRegex = /\b(ep|episode|season|series|anthology)\b\s*\d*|seasons|episodes/i;
         const isSeries = seasonSelector || 
                          episodeList ||
                          seriesRegex.test(titleText) || 
@@ -455,6 +455,8 @@ async function syncToDatabase(scrapedMovies) {
           };
           const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix'].includes(existing.release_type);
           if (!isSuperPrimary) updatePayload.release_type = 'prime_video';
+          
+          if (existing.content_type !== 'movie') updatePayload.content_type = 'movie';
 
           await supabase.from('films').update(updatePayload).eq('id', existing.id);
           updatedCount++;

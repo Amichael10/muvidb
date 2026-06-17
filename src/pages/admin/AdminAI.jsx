@@ -108,6 +108,8 @@ export default function AdminAI() {
           bio: item.biography || item.bio,
           date_of_birth: item.date_of_birth || null,
           photo_url: item.image_url,
+          instagram_url: item.instagram_url || null,
+          facebook_url: item.facebook_url || null,
           nationality: item.nationality || 'Nigerian',
           created_at: new Date().toISOString()
         });
@@ -117,7 +119,9 @@ export default function AdminAI() {
         const { data, error } = await supabase.from('people').update({
           bio: item.biography || item.bio,
           date_of_birth: item.date_of_birth || null,
-          photo_url: item.image_url
+          photo_url: item.image_url,
+          instagram_url: item.instagram_url || null,
+          facebook_url: item.facebook_url || null
         }).eq('id', item.id).select();
         dbError = error;
         count = data?.length || 0;
@@ -596,6 +600,13 @@ function ResultItem({ item, task, onAction }) {
             <p className="text-[10px] font-black text-brand/60 uppercase">
               🎂 Born: {item.date_of_birth}
             </p>
+          )}
+
+          {(item.instagram_url || item.facebook_url) && (
+            <div className="flex gap-2">
+              {item.instagram_url && <a href={item.instagram_url} target="_blank" rel="noreferrer" className="text-[10px] text-pink-500 font-bold hover:underline">📸 {item.instagram_url}</a>}
+              {item.facebook_url && <a href={item.facebook_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 font-bold hover:underline">📘 {item.facebook_url}</a>}
+            </div>
           )}
           
           <div className="flex gap-2 pt-1 border-t border-border/50">
