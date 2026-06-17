@@ -27,32 +27,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log(`🎬 API: Searching IMDb for actor: ${actorName}`);
 
-    // 1. Search for the actor
-    const searchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(actorName)}&s=nm`;
-    const searchRes = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
+    let actorPath = '';
+    
+    // Check if the input is an IMDb URL or directly an nmID
+    const nmMatch = actorName.match(/(nm\d+)/);
+    if (nmMatch) {
+      actorPath = `/name/${nmMatch[1]}/`;
+      console.log(`🔗 API: Detected direct IMDb ID/URL: ${actorPath}`);
+    } else {
+      // 1. Search for the actor
+      const searchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(actorName)}&s=nm`;
+      const searchRes = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        }
+      });
+
+      if (!searchRes.ok) throw new Error(`Search failed: ${searchRes.statusText}`);
+      const searchHtml = await searchRes.text();
+      const $search = cheerio.load(searchHtml);
+      
+      const firstResultHref = $search('.ipc-metadata-list-summary-item a.ipc-metadata-list-summary-item__t').first().attr('href');
+      
+      if (!firstResultHref) {
+         // IMDb uses anti-bot heavily. If Cheerio fails, let's try regex as fallback
+         const match = searchHtml.match(/href="(\/name\/nm\d+\/)"/);
+         if (!match) {
+           return res.status(404).json({ error: `Could not find actor "${actorName}" on IMDb. They may not exist or we were blocked.` });
+         }
       }
-    });
 
-    if (!searchRes.ok) throw new Error(`Search failed: ${searchRes.statusText}`);
-    const searchHtml = await searchRes.text();
-    const $search = cheerio.load(searchHtml);
-    
-    const firstResultHref = $search('.ipc-metadata-list-summary-item a.ipc-metadata-list-summary-item__t').first().attr('href');
-    
-    if (!firstResultHref) {
-       // IMDb uses anti-bot heavily. If Cheerio fails, let's try regex as fallback
-       const match = searchHtml.match(/href="(\/name\/nm\d+\/)"/);
-       if (!match) {
-         return res.status(404).json({ error: `Could not find actor "${actorName}" on IMDb. They may not exist or we were blocked.` });
-       }
-    }
-
-    const actorPath = firstResultHref || searchHtml.match(/href="(\/name\/nm\d+\/)"/)?.[1];
-    if (!actorPath) {
-      return res.status(404).json({ error: `Actor URL not found.` });
+      actorPath = firstResultHref || searchHtml.match(/href="(\/name\/nm\d+\/)"/)?.[1];
+      if (!actorPath) {
+        return res.status(404).json({ error: `Actor URL not found.` });
+      }
     }
 
     // 2. Go to Actor Profile
