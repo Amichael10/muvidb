@@ -217,9 +217,15 @@ async function discoverActors(data: any, res: VercelResponse) {
 }
 
 async function mergeDuplicates(data: any, res: VercelResponse) {
+  const { offset = 0, limit = 800 } = data;
+
   // Set to 800 to stay within most limits while maintaining high coverage
-  const { data: items } = await supabase.from('people').select('id, name').order('name').limit(800);
-  if (!items) return res.json({ results: [] });
+  const { data: items, count } = await supabase.from('people')
+    .select('id, name', { count: 'exact' })
+    .order('name')
+    .range(offset, offset + limit - 1);
+    
+  if (!items || items.length === 0) return res.json({ results: [], totalCount: count || 0 });
 
   // Extremely compact format to maximize the 12k token window
   const compactData = items.map(i => `${i.id.slice(0,8)}:${i.name}`).join('|');
@@ -249,7 +255,7 @@ async function mergeDuplicates(data: any, res: VercelResponse) {
     };
   }).filter((r: any) => r.master_id && r.duplicate_ids.length > 0);
 
-  return res.json({ results: mappedResults, telemetry });
+  return res.json({ results: mappedResults, telemetry, totalCount: count || 0, analyzedCount: items.length });
 }
 
 async function summarizeFilm(data: any, res: VercelResponse) {

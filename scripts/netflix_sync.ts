@@ -840,10 +840,14 @@ async function syncToDatabase(scrapedMovies) {
         const currentLinks = existing.streaming_links || {};
         
         const updatePayload: any = {
-          streaming_links: { 
-            ...currentLinks, 
+          streaming_links: {
+            ...currentLinks,
             netflix: movie.url,
-            netflix_watch: movie.watch_url || currentLinks.netflix_watch
+            netflix_watch: movie.watch_url || currentLinks.netflix_watch,
+            // First-seen-on-Netflix timestamp. Preserve it once set so the
+            // "New on Netflix" rail can surface freshly discovered catalog titles
+            // even when the film row itself (created_at) is old.
+            netflix_added_at: currentLinks.netflix_added_at || new Date().toISOString()
           },
           synopsis: existing.synopsis || movie.synopsis,
           runtime_minutes: existing.runtime_minutes || movie.runtime_minutes,
@@ -894,9 +898,10 @@ async function syncToDatabase(scrapedMovies) {
           poster_url: movie.poster_url,
           backdrop_url: movie.poster_url,
           release_type: 'netflix',
-          streaming_links: { 
+          streaming_links: {
             netflix: movie.url,
-            netflix_watch: movie.watch_url
+            netflix_watch: movie.watch_url,
+            netflix_added_at: new Date().toISOString()
           },
           source: 'netflix',
           status: 'released',

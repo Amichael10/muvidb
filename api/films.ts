@@ -80,7 +80,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     query = supabase.from('films').select(FIELDS);
   }
 
-  if (search) query = query.ilike('title', `%${search}%`);
+  if (search) {
+    const formattedQuery = search.trim().split(/\s+/).join(':* & ') + ':*';
+    query = query.textSearch('title', formattedQuery);
+  }
   if (country) query = query.eq('country', country);
   if (year) query = query.gte('year', Number(year));
   if (language) query = query.eq('language', language);

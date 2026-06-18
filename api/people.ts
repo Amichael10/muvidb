@@ -35,7 +35,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let query = supabase.from('people').select(FIELDS).range(offset, offset + limit - 1);
 
-  if (search) query = query.ilike('name', `%${search}%`);
+  if (search) {
+    const formattedQuery = (search as string).trim().split(/\s+/).join(':* & ') + ':*';
+    query = query.textSearch('name', formattedQuery);
+  }
 
   if (sort === 'name') {
     query = query.order('name', { ascending: true });

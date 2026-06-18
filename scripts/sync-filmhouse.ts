@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
+import { sweepStaleCinemas } from '../api/_lib/cinema-adapters/index.js';
 import { findAndInsertMissingFilm } from './lib/tmdb_cinema.js';
 
 // Support .env and .env.local
@@ -179,6 +180,15 @@ async function scrapeFilmhouse() {
       }
     }
     
+    // Hygiene sweep: expire past showtimes and demote titles no longer showing
+    // so they drop from "In Cinemas Now" into "Leaving Cinemas Soon" and off.
+    try {
+      const sweep = await sweepStaleCinemas();
+      console.log(`🧹 Cinema sweep: expired ${sweep.expired_showtimes} showtimes, dropped ${sweep.dropped_films} stale films.`);
+    } catch (e: any) {
+      console.error('⚠️ Cinema sweep failed:', e.message);
+    }
+
     if (logId) {
       await supabase.from('sync_logs').update({
         status: totalErrors === 0 ? 'success' : 'partial',
