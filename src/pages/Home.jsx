@@ -9,7 +9,7 @@ import PlatformRail from '../components/film/PlatformRail';
 import PersonCard from '../components/person/PersonCard';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
-import { isFilmOnPlatform, PLATFORMS, platformFilter } from '../lib/platforms';
+import { PLATFORMS, platformFilter } from '../lib/platforms';
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
@@ -17,6 +17,8 @@ export default function Home() {
   const [isHeroLoading, setIsHeroLoading] = useState(true);
   const [films, setFilms] = useState([]);
   const [inCinemas, setInCinemas] = useState([]);
+  const [leavingCinemas, setLeavingCinemas] = useState([]);
+  const [netflixNew, setNetflixNew] = useState([]);
   const [youtubeFeed, setYoutubeFeed] = useState([]);
   const [youtubeFilter, setYoutubeFilter] = useState('All');
   const [spotlightPerson, setSpotlightPerson] = useState(null);
@@ -76,6 +78,7 @@ export default function Home() {
         fetchFilms().catch(e => console.error('Error fetching films:', e)),
         fetchFeaturedSeries().catch(e => console.error('Error fetching series:', e)),
         fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
+        fetchNetflixNew().catch(e => console.error('Error fetching netflix new:', e)),
         fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e)),
         fetchYoutubeFeed().catch(e => console.error('Error fetching youtube feed:', e)),
         fetchPeople().catch(e => console.error('Error fetching people:', e)),
@@ -180,18 +183,20 @@ export default function Home() {
   };
 
   const fetchNewReleases = async () => {
-    // Fetch curated new releases (designated by admin via is_trending flag)
+    // New Releases = the freshest YouTube movies fetched this year, newest first,
+    // so the row turns over with whatever dropped most recently each day.
+    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
     const { data, error } = await supabase
       .from('films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language, 
-        runtime_minutes, view_count, average_rating, nfvcb_rating, 
+        id, title, poster_url, backdrop_url, year, language,
+        runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
       `)
-      .eq('is_trending', true)
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('release_date', { ascending: false, nullsFirst: false })
+      .eq('source', 'youtube')
+      .eq('content_type', 'movie')
+      .gte('created_at', yearStart)
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -203,24 +208,48 @@ export default function Home() {
     }
   };
 
-  const fetchInCinemasData = async () => {
-    // 1. Fetch by explicit is_in_cinemas flag
-    const { data: cinemaMovies } = await supabase
+  const fetchNetflixNew = async () => {
+    // New on Netflix = the latest titles fetched onto Netflix this year, newest
+    // first. Queried directly (not derived from the view-count-capped film list)
+    // so freshly scraped 2026 titles always surface even with low view counts.
+    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+    const { data, error } = await supabase
       .from('films')
-      .select(`*, film_genres(genres(name))`)
-      .eq('is_in_cinemas', true)
-      .neq('source', 'youtube')
-      .or('youtube_watch_url.is.null,youtube_watch_url.eq.""')
+      .select(`
+        id, title, poster_url, backdrop_url, year, language,
+        runtime_minutes, view_count, average_rating, nfvcb_rating,
+        is_featured, is_trending, release_type, streaming_links, source,
+        created_at, release_date,
+        film_genres(genres(name))
+      `)
+      .or('release_type.eq.netflix,source.eq.netflix,streaming_links->>netflix.not.is.null')
+      .gte('created_at', yearStart)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('release_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(20);
 
-    // 2. Fetch from showtimes (movies currently showing)
+    if (!error && data) {
+      setNetflixNew(data.map(f => ({
+        ...f,
+        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+      })));
+    }
+  };
+
+  const fetchInCinemasData = async () => {
     const today = new Date().toISOString().split('T')[0];
+    const notYoutube = (f) => !(f.source === 'youtube' || (f.youtube_watch_url && String(f.youtube_watch_url).length > 5));
+    const withGenres = (f) => ({
+      ...f,
+      genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+    });
+
+    // 1. "In Cinemas Now" = titles with a live, upcoming showtime. This is the
+    //    freshness source of truth — once a film's schedule lapses it falls out.
     const { data: showtimesData } = await supabase
       .from('showtimes')
       .select(`
-        film_id, 
+        film_id,
         films!inner(*, film_genres(genres(name)))
       `)
       .gte('show_date', today)
@@ -229,42 +258,41 @@ export default function Home() {
       .or('youtube_watch_url.is.null,youtube_watch_url.eq.""', { foreignTable: 'films' })
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}', { foreignTable: 'films' })
       .order('show_date', { ascending: true })
-      .limit(60);
+      .limit(200);
 
-    const filmMap = new Map();
+    const nowMap = new Map();
+    (showtimesData || []).forEach(s => {
+      const f = s.films;
+      if (f && notYoutube(f) && !nowMap.has(f.id)) nowMap.set(f.id, withGenres(f));
+    });
 
-    // Prioritize explicit flag
-    if (cinemaMovies) {
-      cinemaMovies.forEach(f => {
-        // Double check to ensure no youtube movies sneak in
-        const isYoutube = f.source === 'youtube' || (f.youtube_watch_url && f.youtube_watch_url.length > 5);
-        if (!isYoutube) {
-          filmMap.set(f.id, {
-            ...f,
-            genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-          });
-        }
-      });
+    // 2. "Leaving Cinemas Soon" = still flagged is_in_cinemas but no live showtime
+    //    left, i.e. the sync stopped finding it on screen. The weekly sweep clears
+    //    the flag entirely once a title has been gone past the grace window.
+    const { data: flagged } = await supabase
+      .from('films')
+      .select(`*, film_genres(genres(name))`)
+      .eq('is_in_cinemas', true)
+      .neq('source', 'youtube')
+      .or('youtube_watch_url.is.null,youtube_watch_url.eq.""')
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+      .order('release_date', { ascending: false })
+      .limit(40);
+
+    const leavingMap = new Map();
+    (flagged || []).forEach(f => {
+      if (notYoutube(f) && !nowMap.has(f.id)) leavingMap.set(f.id, withGenres(f));
+    });
+
+    // Fallback: if no live showtimes exist at all (e.g. scraper hasn't run yet
+    // today), surface flagged titles as "now" so the rail isn't blank.
+    if (nowMap.size === 0 && leavingMap.size > 0) {
+      leavingMap.forEach((v, k) => nowMap.set(k, v));
+      leavingMap.clear();
     }
 
-    // Add movies with active showtimes
-    if (showtimesData) {
-      showtimesData.forEach(s => {
-        if (s.films && !filmMap.has(s.films.id)) {
-          // Double check to ensure no youtube movies sneak in
-          const f = s.films;
-          const isYoutube = f.source === 'youtube' || (f.youtube_watch_url && String(f.youtube_watch_url).length > 5);
-          if (!isYoutube) {
-            filmMap.set(f.id, {
-              ...f,
-              genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-            });
-          }
-        }
-      });
-    }
-
-    setInCinemas(Array.from(filmMap.values()));
+    setInCinemas(Array.from(nowMap.values()));
+    setLeavingCinemas(Array.from(leavingMap.values()).slice(0, 20));
   };
 
   const fetchComingSoon = async () => {
@@ -506,25 +534,6 @@ export default function Home() {
     setIsWarningModalOpen(false);
   };
 
-  // ---- Streaming discovery rails (derived from already-fetched data) ----
-  const byRecency = (a, b) =>
-    new Date(b.created_at || b.release_date || 0) - new Date(a.created_at || a.release_date || 0);
-
-  // New on Netflix Naija — films with a Netflix watch link, freshest first.
-  const netflixNew = [...films].filter((f) => isFilmOnPlatform(f, 'netflix')).sort(byRecency).slice(0, 20);
-
-  // Cinema split: a title still showing for < 2 months stays in "In Cinemas Now";
-  // anything showing longer than 2 months moves to "Leaving Cinemas Soon".
-  // `inCinemas` already only contains titles with current showtimes / is_in_cinemas;
-  // release_date is the proxy for how long it has been on screen.
-  const TWO_MONTHS_MS = 1000 * 60 * 60 * 24 * 62;
-  const cinemaAge = (f) => (f.release_date ? Date.now() - new Date(f.release_date).getTime() : 0);
-  const cinemasNow = inCinemas.filter((f) => cinemaAge(f) < TWO_MONTHS_MS);
-  const leavingCinemas = [...inCinemas]
-    .filter((f) => cinemaAge(f) >= TWO_MONTHS_MS)
-    .sort((a, b) => new Date(a.release_date || 0) - new Date(b.release_date || 0))
-    .slice(0, 20);
-
   // What's New consolidated tabs
   const whatsNewMap = { coming: comingSoon, new: newReleases, recent: recentlyAdded };
 
@@ -543,12 +552,12 @@ export default function Home() {
         </div>
 
         {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
-        {(isLoading || cinemasNow.length > 0) && (
+        {(isLoading || inCinemas.length > 0) && (
           <div className="border-b border-border py-12">
             <FilmRow
               title="In Cinemas Now"
               subtitle="On the big screen this week — find showtimes near you"
-              films={cinemasNow}
+              films={inCinemas}
               isLoading={isLoading}
               linkTo="/showtimes"
               cardVariant="landscape"

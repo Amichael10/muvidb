@@ -206,9 +206,89 @@ export async function upsertShowtimes(
     }
   }
 
+  // Flag every film we just scheduled as currently in cinemas. The weekly
+  // sweep (sweepStaleCinemas) later clears this flag once a title stops
+  // appearing in scrapes, moving it to "Leaving Cinemas Soon" and eventually off.
+  const matchedFilmIds = Array.from(new Set(rows.map(r => r.film_id as string)));
+  if (matchedFilmIds.length) {
+    await supabase.from('films').update({ is_in_cinemas: true }).in('id', matchedFilmIds);
+  }
+
   return {
     matched_showtimes:  rows.length,
     unmatched_titles:   unmatchedSeen.size,
     marked_unavailable: markedUnavailable,
   };
+}
+
+/**
+ * Weekly cinema hygiene sweep — keeps the "In Cinemas" experience fresh instead
+ * of letting stale showtimes and flags pile up indefinitely.
+ *
+ *   1. Expire every past showtime (show_date < today) → is_available=false, so
+ *      last month's schedule stops counting and drops out of the UI.
+ *   2. A film that still has an upcoming showtime, or was seen in a scrape within
+ *      the grace window, keeps is_in_cinemas=true. With upcoming showtimes it
+ *      reads as "In Cinemas Now"; without them it reads as "Leaving Cinemas Soon"
+ *      (the split is derived client-side from whether live showtimes exist).
+ *   3. A scraper-sourced film not seen for longer than `graceDays` has
+ *      is_in_cinemas cleared, so it leaves the cinema rails entirely.
+ *
+ * Only films that have at least one showtime row (i.e. came from a scraper) are
+ * ever auto-unflagged — manually curated cinema films are left untouched.
+ */
+export async function sweepStaleCinemas(
+  graceDays = 14,
+): Promise<{ expired_showtimes: number; dropped_films: number }> {
+  const today = new Date().toISOString().split('T')[0];
+  const graceCutoff = new Date(Date.now() - graceDays * 86_400_000).toISOString();
+
+  // 1. Expire past showtimes so they stop surfacing as "available".
+  const { data: expired } = await supabase
+    .from('showtimes')
+    .update({ is_available: false })
+    .lt('show_date', today)
+    .eq('is_available', true)
+    .select('id');
+
+  // 2. Which films are currently flagged as in cinemas?
+  const { data: flagged } = await supabase
+    .from('films')
+    .select('id')
+    .eq('is_in_cinemas', true);
+
+  if (!flagged?.length) {
+    return { expired_showtimes: expired?.length ?? 0, dropped_films: 0 };
+  }
+  const flaggedIds = flagged.map(f => f.id);
+
+  // 3a. Films that came from a scraper (have at least one showtime row).
+  const { data: withShowtimes } = await supabase
+    .from('showtimes')
+    .select('film_id')
+    .in('film_id', flaggedIds);
+  const scrapedIds = new Set((withShowtimes ?? []).map(s => s.film_id));
+
+  // 3b. Films still "fresh" — an upcoming showtime or seen within the grace window.
+  const { data: fresh } = await supabase
+    .from('showtimes')
+    .select('film_id')
+    .in('film_id', flaggedIds)
+    .or(`show_date.gte.${today},last_seen_at.gte.${graceCutoff}`);
+  const keepIds = new Set((fresh ?? []).map(s => s.film_id));
+
+  // Drop only scraper-sourced films that have gone stale.
+  const dropIds = flaggedIds.filter(id => scrapedIds.has(id) && !keepIds.has(id));
+
+  let dropped = 0;
+  if (dropIds.length) {
+    const { data: cleared } = await supabase
+      .from('films')
+      .update({ is_in_cinemas: false })
+      .in('id', dropIds)
+      .select('id');
+    dropped = cleared?.length ?? 0;
+  }
+
+  return { expired_showtimes: expired?.length ?? 0, dropped_films: dropped };
 }
