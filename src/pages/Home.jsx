@@ -209,10 +209,12 @@ export default function Home() {
   };
 
   const fetchNetflixNew = async () => {
-    // New on Netflix = the latest titles fetched onto Netflix this year, newest
-    // first. Queried directly (not derived from the view-count-capped film list)
-    // so freshly scraped 2026 titles always surface even with low view counts.
-    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+    // New on Netflix = the most recently discovered Netflix titles, newest first.
+    // Ordered by the Netflix-specific `netflix_added_at` stamp (set by the Netflix
+    // sync) so titles that were already in the catalogue but were *newly* found on
+    // Netflix surface too — their old `created_at` would otherwise hide them.
+    // Queried directly (not derived from the view-count-capped film list) so fresh
+    // low-view titles still appear; no hard year cutoff, recency ordering handles it.
     const { data, error } = await supabase
       .from('films')
       .select(`
@@ -223,8 +225,8 @@ export default function Home() {
         film_genres(genres(name))
       `)
       .or('release_type.eq.netflix,source.eq.netflix,streaming_links->>netflix.not.is.null')
-      .gte('created_at', yearStart)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+      .order('streaming_links->>netflix_added_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(20);
 

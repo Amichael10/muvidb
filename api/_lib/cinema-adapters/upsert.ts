@@ -262,11 +262,14 @@ export async function sweepStaleCinemas(
   }
   const flaggedIds = flagged.map(f => f.id);
 
-  // 3a. Films that came from a scraper (have at least one showtime row).
+  // 3a. Films that came from a scraper. Scraper showtimes always carry a
+  //     `source` (adapter name); admin-entered showtimes leave it null, so we
+  //     filter to non-null source to avoid ever demoting manually curated titles.
   const { data: withShowtimes } = await supabase
     .from('showtimes')
     .select('film_id')
-    .in('film_id', flaggedIds);
+    .in('film_id', flaggedIds)
+    .not('source', 'is', null);
   const scrapedIds = new Set((withShowtimes ?? []).map(s => s.film_id));
 
   // 3b. Films still "fresh" — an upcoming showtime or seen within the grace window.
