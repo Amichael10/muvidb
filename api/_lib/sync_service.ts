@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { ADAPTERS, upsertShowtimes } from './cinema-adapters/index.js';
+import { ADAPTERS, upsertShowtimes, sweepStaleCinemas } from './cinema-adapters/index.js';
 import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
 
@@ -52,11 +52,22 @@ export async function runShowtimesSync() {
       const scraped = await adapter(cinema);
       const stats = await upsertShowtimes(cinema.id, scraped.showtimes, cinema.scrape_adapter);
       results.push({ name: cinema.name, ...stats });
-    } catch (e: any) { 
-      results.push({ name: cinema.name, error: e.message }); 
+    } catch (e: any) {
+      results.push({ name: cinema.name, error: e.message });
     }
   }
-  return { task: 'showtimes', results };
+
+  // After every scrape pass, run the hygiene sweep: expire last month's
+  // showtimes and demote titles that no longer appear in any cinema so the
+  // "In Cinemas Now" / "Leaving Cinemas Soon" rails stay fresh.
+  let sweep: { expired_showtimes: number; dropped_films: number } | { error: string };
+  try {
+    sweep = await sweepStaleCinemas();
+  } catch (e: any) {
+    sweep = { error: e.message };
+  }
+
+  return { task: 'showtimes', results, sweep };
 }
 
 /**

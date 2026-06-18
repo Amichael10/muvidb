@@ -137,7 +137,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .range(offset, offset + limit - 1)
     .order('subscriber_count', { ascending: false, nullsFirst: false });
 
-  if (search) dbQuery = dbQuery.ilike('name', `%${search}%`);
+  if (search) {
+    const formattedQuery = (search as string).trim().split(/\s+/).join(':* & ') + ':*';
+    dbQuery = dbQuery.textSearch('name', formattedQuery);
+  }
   if (category && category !== 'All') dbQuery = dbQuery.eq('category', category);
   if (featured === 'true') dbQuery = dbQuery.eq('is_featured', true);
 

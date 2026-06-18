@@ -8,6 +8,7 @@ export default function AdminAI() {
   const [logs, setLogs] = useState([]);
   const [results, setResults] = useState(null);
   const [activeTask, setActiveTask] = useState(null);
+  const [pagination, setPagination] = useState({ page: 1, limit: 800, totalCount: 0 });
   const logEndRef = useRef(null);
 
   const addLog = (msg, type = 'info') => {
@@ -60,6 +61,9 @@ export default function AdminAI() {
       }
 
       setResults(data.results);
+      if (data.totalCount !== undefined) {
+        setPagination(prev => ({ ...prev, totalCount: data.totalCount }));
+      }
       
       if (data.results?.length > 0) {
         addLog(`Found ${data.results.length} items requiring action.`, 'success');
@@ -92,6 +96,22 @@ export default function AdminAI() {
     check('youtube'); check('tmdb');
   }, []);
 
+  const handleRunTask = (task) => {
+    if (task === 'deduplicate') {
+      setPagination(prev => ({ ...prev, page: 1 }));
+      runTask(task, { offset: 0, limit: pagination.limit });
+    } else {
+      runTask(task);
+    }
+  };
+
+  const handlePageChange = (direction) => {
+    const newPage = direction === 'next' ? pagination.page + 1 : pagination.page - 1;
+    setPagination(prev => ({ ...prev, page: newPage }));
+    const offset = (newPage - 1) * pagination.limit;
+    runTask(activeTask, { offset, limit: pagination.limit });
+  };
+
   const handleApplyAction = async (item, action) => {
     try {
       addLog(`Applying ${action} to ${item.name || item.title || item.id}...`, 'info');
@@ -108,6 +128,8 @@ export default function AdminAI() {
           bio: item.biography || item.bio,
           date_of_birth: item.date_of_birth || null,
           photo_url: item.image_url,
+          instagram_url: item.instagram_url || null,
+          facebook_url: item.facebook_url || null,
           nationality: item.nationality || 'Nigerian',
           created_at: new Date().toISOString()
         });
@@ -117,7 +139,9 @@ export default function AdminAI() {
         const { data, error } = await supabase.from('people').update({
           bio: item.biography || item.bio,
           date_of_birth: item.date_of_birth || null,
-          photo_url: item.image_url
+          photo_url: item.image_url,
+          instagram_url: item.instagram_url || null,
+          facebook_url: item.facebook_url || null
         }).eq('id', item.id).select();
         dbError = error;
         count = data?.length || 0;
@@ -300,28 +324,28 @@ export default function AdminAI() {
                 icon="🧹"
                 title="Hygiene Check"
                 desc="Find & Fix broken metadata"
-                onClick={() => runTask('cleanup_films')}
+                onClick={() => handleRunTask('cleanup_films')}
                 disabled={isProcessing}
               />
               <OperationButton 
                 icon="💎"
                 title="Enrich Records"
                 desc="Discover missing posters/bios"
-                onClick={() => runTask('enrich_metadata')}
+                onClick={() => handleRunTask('enrich_metadata')}
                 disabled={isProcessing}
               />
               <OperationButton 
                 icon="🌟"
                 title="Discover Cast"
                 desc="Identify new people profiles"
-                onClick={() => runTask('discover_actors')}
+                onClick={() => handleRunTask('discover_actors')}
                 disabled={isProcessing}
               />
                <OperationButton 
                 icon="🧬"
                 title="Merge Duplicates"
                 desc="Consolidate duplicate people"
-                onClick={() => runTask('deduplicate')}
+                onClick={() => handleRunTask('deduplicate')}
                 disabled={isProcessing}
                 variant="danger"
               />
@@ -329,14 +353,14 @@ export default function AdminAI() {
                 icon="✍️"
                 title="Title Polish"
                 desc="Clean YouTube noise from titles"
-                onClick={() => runTask('cleanup_titles')}
+                onClick={() => handleRunTask('cleanup_titles')}
                 disabled={isProcessing}
               />
               <OperationButton 
                 icon="🎭"
                 title="Extract Cast"
                 desc="Parse actors from video titles"
-                onClick={() => runTask('extract_cast')}
+                onClick={() => handleRunTask('extract_cast')}
                 disabled={isProcessing}
               />
             </div>
@@ -444,6 +468,30 @@ export default function AdminAI() {
               )}
                 </div>
               </div>
+              
+              {activeTask === 'deduplicate' && pagination.totalCount > 0 && (
+                <div className="p-4 bg-surface-2 flex items-center justify-between border-t border-border">
+                  <div className="text-xs text-text-muted font-medium">
+                    Scanning records {(pagination.page - 1) * pagination.limit + 1} - {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handlePageChange('prev')} 
+                      disabled={pagination.page === 1 || isProcessing}
+                      className="px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold disabled:opacity-50 hover:bg-surface-3 transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button 
+                      onClick={() => handlePageChange('next')} 
+                      disabled={pagination.page * pagination.limit >= pagination.totalCount || isProcessing}
+                      className="px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold disabled:opacity-50 hover:bg-surface-3 transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
               
               <div className="p-4 bg-surface-2/30 text-[10px] text-center font-black text-brand tracking-widest border-t border-border">
                 ALL ACTIONS ARE LOGGED AND REVERSIBLE
@@ -596,6 +644,13 @@ function ResultItem({ item, task, onAction }) {
             <p className="text-[10px] font-black text-brand/60 uppercase">
               🎂 Born: {item.date_of_birth}
             </p>
+          )}
+
+          {(item.instagram_url || item.facebook_url) && (
+            <div className="flex gap-2">
+              {item.instagram_url && <a href={item.instagram_url} target="_blank" rel="noreferrer" className="text-[10px] text-pink-500 font-bold hover:underline">📸 {item.instagram_url}</a>}
+              {item.facebook_url && <a href={item.facebook_url} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 font-bold hover:underline">📘 {item.facebook_url}</a>}
+            </div>
           )}
           
           <div className="flex gap-2 pt-1 border-t border-border/50">

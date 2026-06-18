@@ -67,8 +67,12 @@ async function scrapeBulkNollywood() {
          if (!movie.title || !movie.link) continue;
          
          // Check if movie exists and has a synopsis
-         const { data: existingMovies } = await supabase.from('films').select('id, synopsis').ilike('title', movie.title).limit(1);
-         const existingMovie = existingMovies?.[0];
+         const { data: fuzzyMatch } = await supabase.rpc('match_film_fuzzy', { query_title: movie.title }).maybeSingle();
+         let existingMovie = null;
+         if (fuzzyMatch?.id) {
+            const { data } = await supabase.from('films').select('id, synopsis').eq('id', fuzzyMatch.id).single();
+            existingMovie = data;
+         }
          
          if (existingMovie && existingMovie.synopsis) {
             console.log(`⏭️ Skipping ${movie.title} (already has full details)`);
@@ -163,7 +167,7 @@ async function scrapeBulkNollywood() {
         
         // Double check against DB using the deep title
         if (!actualExistingId) {
-            const { data: deepCheck } = await supabase.from('films').select('id').ilike('title', metadata.title).limit(1);
+            const { data: deepCheck } = await supabase.rpc('match_film_fuzzy', { query_title: metadata.title });
             if (deepCheck && deepCheck.length > 0) {
                actualExistingId = deepCheck[0].id;
                console.log(`   - Found existing ID using deep title: ${actualExistingId}`);
@@ -215,7 +219,7 @@ async function scrapeBulkNollywood() {
         for (const actor of metadata.cast) {
            if (!actor.name) continue;
            
-           const { data: existingPerson } = await supabase.from('people').select('id').ilike('name', actor.name).maybeSingle();
+           const { data: existingPerson } = await supabase.rpc('match_person_fuzzy', { query_name: actor.name }).maybeSingle();
            let personId = existingPerson?.id;
 
            if (!personId) {

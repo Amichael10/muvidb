@@ -91,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`✅ Extracted Profile: ${nameStr}`);
     
     // Upsert Person
-    const { data: existingPerson } = await supabase.from('people').select('id').ilike('name', nameStr).maybeSingle();
+    const { data: existingPerson } = await supabase.rpc('match_person_fuzzy', { query_name: nameStr }).maybeSingle();
     let personId = existingPerson?.id;
 
     if (existingPerson) {
@@ -137,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const insertedFilms = [];
 
     for (const credit of credits) {
-      const { data: existingMovie } = await supabase.from('films').select('id').ilike('title', credit.title).maybeSingle();
+      const { data: existingMovie } = await supabase.rpc('match_film_fuzzy', { query_title: credit.title }).maybeSingle();
       
       let movieId = existingMovie?.id;
       

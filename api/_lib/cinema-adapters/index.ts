@@ -19,4 +19,4 @@ export const ADAPTERS: Record<string, CinemaAdapter> = {
 };
 
 export * from './types.js';
-export { upsertShowtimes } from './upsert.js';
+export { upsertShowtimes, sweepStaleCinemas } from './upsert.js';

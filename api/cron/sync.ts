@@ -3,6 +3,7 @@ import { supabase } from '../_lib/supabase.js';
 import { isValidAuth } from '../_lib/auth.js';
 import { runCastExtraction, runTitleCleanup } from '../_lib/ai_maintenance.js';
 import { runShowtimesSync, runVideosSync, runTMDBSync } from '../_lib/sync_service.js';
+import { sweepStaleCinemas } from '../_lib/cinema-adapters/index.js';
 
 /**
  * Main Cron Entry Point
@@ -100,6 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     switch (task) {
       case 'showtimes':      result = await runShowtimesSync(); break;
+      case 'cinema_cleanup': result = { task: 'cinema_cleanup', ...(await sweepStaleCinemas()) }; break;
       case 'videos':         result = await runVideosSync(); break;
       case 'tmdb':           result = await runTMDBSync(); break;
       case 'ai_maintenance': result = await runAIMaintenance(); break;

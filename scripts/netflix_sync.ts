@@ -255,17 +255,37 @@ async function scrapeNetflix() {
   let context;
   if (fs.existsSync(STATE_FILE)) {
     console.log('📄 Loading existing session state...');
-    context = await browser.newContext({
-      storageState: STATE_FILE,
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    });
+    try {
+      context = await browser.newContext({
+        storageState: STATE_FILE,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        viewport: { width: 1280, height: 720 },
+        deviceScaleFactor: 1,
+      });
+    } catch (err: any) {
+      console.error('💀 Fatal error: browser.newContext: Error setting storage state:', err.message);
+      console.log('   Removing corrupt state file and trying again...');
+      try { fs.unlinkSync(STATE_FILE); } catch (err) {}
+      context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        viewport: { width: 1280, height: 720 },
+      });
+    }
   } else {
     context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 720 },
     });
   }
 
+  // Create an anonymous context for fetching clean JSON-LD metadata from public title pages
+  const anonContext = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 720 },
+  });
+  
   const page = await context.newPage();
+  const anonPage = await anonContext.newPage();
   let movies: any[] = [];
   const globalMovieMap = new Map();
 
@@ -418,46 +438,75 @@ async function scrapeNetflix() {
     if (!movie.url) continue;
     console.log(`📄 Fetching details for: ${movie.title} (${movie.url})`);
     try {
-      await page.goto(movie.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Use the anonymous page for metadata extraction so we get the public SEO page (with JSON-LD)
+      await anonPage.goto(movie.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       
-      // 0. Handle intermittent Profile Gate or Login issues
-      if (page.url().includes('/ProfilesGate') || page.url().includes('/profiles') || page.url().includes('/login')) {
-        console.log('  👤 Re-authenticating or selecting profile...');
-        if (page.url().includes('/login')) await login(page);
-        await handleProfileSelection(page);
-        await page.goto(movie.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      }
-
-      // 1. Wait for core content or the "About" section
-      await page.waitForSelector('.about-container, [data-uia="about-container"], .title-info-metadata-wrapper', { timeout: 10000 }).catch(() => {
+      // Wait for core content
+      await anonPage.waitForSelector('.about-container, [data-uia="about-container"], .title-info-metadata-wrapper, script[type="application/ld+json"]', { timeout: 20000 }).catch(() => {
         console.log('  ⚠️ Metadata container not found, proceeding with fallback...');
       });
       
       // Extra wait for async content
-      await page.waitForTimeout(2000);
+      await anonPage.waitForTimeout(4000);
       
-      const rawData: any = await page.evaluate(() => {
+      const rawData: any = await anonPage.evaluate(() => {
         const videoId = window.location.href.match(/\/title\/(\d+)/)?.[1];
         const cache = (window as any).netflix?.falcorCache || {};
         const videoData = videoId ? (cache.videos?.[videoId] || {}) : {};
         
-        // 1. Direct DOM Selectors
+        // 1. Direct DOM Selectors (Metadata)
         let synopsis = document.querySelector('[data-uia="video-metadata--synopsis"], [data-uia="video-description"], .description-text')?.textContent?.trim() || '';
         let releaseYear = document.querySelector('.item-year, [data-uia="item-year"]')?.textContent?.trim() || '';
         let duration = document.querySelector('.item-runtime, [data-uia="item-runtime"]')?.textContent?.trim() || '';
         let maturityRating = document.querySelector('.item-maturity, .maturity-rating, [data-uia="item-maturity"]')?.textContent?.trim() || '';
         
-        let cast = Array.from(document.querySelectorAll('.cast-list .cast-item, [data-uia="info-starring"] .item-content'))
-                        .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
-        let directors = Array.from(document.querySelectorAll('.director-list .director-item, [data-uia="info-creators"] .item-content'))
-                             .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
+        // 2. JSON-LD Schema (Most robust for cast/crew)
+        let cast: string[] = [];
+        let directors: string[] = [];
         let writers: string[] = [];
+        
+        const schemaScript = document.querySelector('script[type="application/ld+json"]');
+        if (schemaScript && schemaScript.textContent) {
+           try {
+              const schema = JSON.parse(schemaScript.textContent);
+              if (schema.actors) cast = (Array.isArray(schema.actors) ? schema.actors : [schema.actors]).map((a: any) => a.name).filter(Boolean);
+              else if (schema.actor) cast = (Array.isArray(schema.actor) ? schema.actor : [schema.actor]).map((a: any) => a.name).filter(Boolean);
+              
+              if (schema.directors) directors = (Array.isArray(schema.directors) ? schema.directors : [schema.directors]).map((d: any) => d.name).filter(Boolean);
+              else if (schema.director) directors = (Array.isArray(schema.director) ? schema.director : [schema.director]).map((d: any) => d.name).filter(Boolean);
+              
+              if (schema.creators) writers = (Array.isArray(schema.creators) ? schema.creators : [schema.creators]).map((c: any) => c.name).filter(Boolean);
+              else if (schema.creator) writers = (Array.isArray(schema.creator) ? schema.creator : [schema.creator]).map((c: any) => c.name).filter(Boolean);
+           } catch(e) {}
+        }
+
+        // 2. Direct DOM Selectors (Legacy)
+        if (cast.length === 0) {
+           cast = Array.from(document.querySelectorAll('.cast-list .cast-item, [data-uia="info-starring"] .item-content'))
+                           .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
+        }
+        if (directors.length === 0) {
+           directors = Array.from(document.querySelectorAll('.director-list .director-item, [data-uia="info-creators"] .item-content'))
+                                .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
+        }
+        if (writers.length === 0) {
+           writers = Array.from(document.querySelectorAll('.writer-list .writer-item, [data-uia="info-writers"] .item-content'))
+                                .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
+        }
+        
         let genres = Array.from(document.querySelectorAll('.genre-list .genre-item, [data-uia="info-genres"] .item-content'))
                           .map(el => el.textContent?.trim().split(',')).flat().map(s => s?.trim()).filter(Boolean);
         
-        // 2. Label-based fallbacks
+        // 3. Label-based fallbacks
         const allLabels = Array.from(document.querySelectorAll('.label, .item-label, .about-item-label, [data-uia$="-label"]'));
         
+        // 4. Raw Text fallback (for obfuscated classes)
+        if (cast.length === 0) {
+           const bodyText = document.body.innerText;
+           const starringMatch = bodyText.match(/Starring:\s*([^\n]+)/i);
+           if (starringMatch) cast = starringMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+        }
+
         if (cast.length === 0) {
            for(let i = 0; i < allLabels.length; i++) {
               if (allLabels[i].textContent?.toLowerCase().includes('cast')) {
@@ -478,6 +527,16 @@ async function scrapeNetflix() {
               }
            }
         }
+        if (writers.length === 0) {
+           for(let i = 0; i < allLabels.length; i++) {
+              if (allLabels[i].textContent?.toLowerCase().includes('writer') || allLabels[i].textContent?.toLowerCase().includes('creator')) {
+                 const container = allLabels[i].closest('.about-item, .more-details-item, .item-container, .previewModal--about');
+                 const contentEl = container?.querySelector('.content, .about-item-content, .item-text, [data-uia$="-content"]');
+                 if (contentEl) { writers = contentEl.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+                 if (allLabels[i].nextElementSibling) { writers = allLabels[i].nextElementSibling.textContent?.split(',').map(s => s.trim()).filter(Boolean) || []; break; }
+              }
+           }
+        }
         if (genres.length === 0) {
            for(let i = 0; i < allLabels.length; i++) {
               if (allLabels[i].textContent?.toLowerCase().includes('genre')) {
@@ -489,16 +548,28 @@ async function scrapeNetflix() {
            }
         }
 
-        // 3. Falcor Cache Fallback (Targeted to THIS video) - Much more robust
+        // 5. Falcor Cache Fallback (Targeted to THIS video) - Much more robust
         if (videoData) {
           if (!synopsis) synopsis = videoData.synopsis?.value || videoData.synopsis || '';
           
-          // Try to extract cast from cache if DOM failed
+          // Try to extract cast and crew from cache if DOM failed
           if (cast.length === 0 && videoData.cast) {
             const cacheCast = videoData.cast.value || videoData.cast;
             if (Array.isArray(cacheCast)) {
               cast = cacheCast.map(c => c.name || c).filter(Boolean);
             }
+          }
+          if (directors.length === 0 && videoData.directors) {
+            const cacheDirectors = videoData.directors.value || videoData.directors;
+            if (Array.isArray(cacheDirectors)) directors = cacheDirectors.map(c => c.name || c).filter(Boolean);
+          }
+          if (writers.length === 0 && videoData.writers) {
+            const cacheWriters = videoData.writers.value || videoData.writers;
+            if (Array.isArray(cacheWriters)) writers = cacheWriters.map(c => c.name || c).filter(Boolean);
+          }
+          if (writers.length === 0 && videoData.creators) {
+            const cacheCreators = videoData.creators.value || videoData.creators;
+            if (Array.isArray(cacheCreators)) writers = cacheCreators.map(c => c.name || c).filter(Boolean);
           }
 
           if (genres.length === 0) {
@@ -594,7 +665,7 @@ async function scrapeNetflix() {
         return total > 0 ? total : null;
       };
 
-      detailedMovies.push({ 
+      const detailedMovie = { 
         ...movie, 
         ...rawData,
         title: movie.title === 'Unknown' ? (rawData.title || movie.title) : movie.title,
@@ -605,7 +676,14 @@ async function scrapeNetflix() {
           netflix: movie.url,
           netflix_watch: movie.watch_url
         }
-      });
+      };
+      
+      console.log(`    ↳ Extracted: Cast (${detailedMovie.cast?.length || 0}), Directors (${detailedMovie.directors?.length || 0}), Writers (${detailedMovie.writers?.length || 0})`);
+      if (detailedMovie.cast?.length === 0) {
+        console.log(`    ↳ ⚠️ Failed to extract cast from DOM or cache!`);
+      }
+      
+      detailedMovies.push(detailedMovie);
     } catch (e) {
       console.warn(`  ❌ Failed to get details for ${movie.title}: ${e.message}`);
       detailedMovies.push({
@@ -762,10 +840,14 @@ async function syncToDatabase(scrapedMovies) {
         const currentLinks = existing.streaming_links || {};
         
         const updatePayload: any = {
-          streaming_links: { 
-            ...currentLinks, 
+          streaming_links: {
+            ...currentLinks,
             netflix: movie.url,
-            netflix_watch: movie.watch_url || currentLinks.netflix_watch
+            netflix_watch: movie.watch_url || currentLinks.netflix_watch,
+            // First-seen-on-Netflix timestamp. Preserve it once set so the
+            // "New on Netflix" rail can surface freshly discovered catalog titles
+            // even when the film row itself (created_at) is old.
+            netflix_added_at: currentLinks.netflix_added_at || new Date().toISOString()
           },
           synopsis: existing.synopsis || movie.synopsis,
           runtime_minutes: existing.runtime_minutes || movie.runtime_minutes,
@@ -816,9 +898,10 @@ async function syncToDatabase(scrapedMovies) {
           poster_url: movie.poster_url,
           backdrop_url: movie.poster_url,
           release_type: 'netflix',
-          streaming_links: { 
+          streaming_links: {
             netflix: movie.url,
-            netflix_watch: movie.watch_url
+            netflix_watch: movie.watch_url,
+            netflix_added_at: new Date().toISOString()
           },
           source: 'netflix',
           status: 'released',
@@ -861,6 +944,32 @@ async function syncToDatabase(scrapedMovies) {
                 film_id: filmId,
                 person_id: personId,
                 role: 'actor'
+              }, { onConflict: 'film_id,person_id,role' });
+            }
+          }
+        }
+
+        if (movie.directors && movie.directors.length > 0) {
+          for (const directorName of movie.directors) {
+            const personId = await upsertPerson(directorName);
+            if (personId) {
+              await supabase.from('credits').upsert({
+                film_id: filmId,
+                person_id: personId,
+                role: 'director'
+              }, { onConflict: 'film_id,person_id,role' });
+            }
+          }
+        }
+
+        if (movie.writers && movie.writers.length > 0) {
+          for (const writerName of movie.writers) {
+            const personId = await upsertPerson(writerName);
+            if (personId) {
+              await supabase.from('credits').upsert({
+                film_id: filmId,
+                person_id: personId,
+                role: 'writer'
               }, { onConflict: 'film_id,person_id,role' });
             }
           }
