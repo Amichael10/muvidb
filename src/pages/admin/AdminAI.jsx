@@ -160,12 +160,24 @@ export default function AdminAI() {
         dbError = error;
         count = data?.length || 0;
       } else if (action === 'MERGE') {
-        const { error } = await supabase.rpc('merge_people', {
-          p_master_id: item.master_id,
-          p_duplicate_ids: item.duplicate_ids
-        });
-        dbError = error;
-        count = error ? 0 : 1;
+        let hasError = false;
+        let lastError = null;
+        let successCount = 0;
+        for (const duplicateId of item.duplicate_ids) {
+          const { error } = await supabase.rpc('merge_people', {
+            p_primary_id: item.master_id,
+            p_secondary_id: duplicateId
+          });
+          if (error) {
+            hasError = true;
+            lastError = error;
+            addLog(`Failed to merge ${duplicateId}: ${error.message}`, 'error');
+          } else {
+            successCount++;
+          }
+        }
+        dbError = lastError;
+        count = successCount;
       } else if (action === 'DELETE') {
         const { error } = await supabase.from('films').delete().eq('id', item.id);
         dbError = error;
