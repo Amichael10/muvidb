@@ -378,10 +378,7 @@ async function main() {
             duration_ms: Date.now() - startTime
           }).eq('id', logId);
         }
-        if (targetUrlArg) break; // End if specific target was done
-        console.log('💤 Sleeping for 10 minutes before next batch check...');
-        await delay(10 * 60 * 1000);
-        continue;
+        break;
       }
 
       const LIMIT = 25; 
