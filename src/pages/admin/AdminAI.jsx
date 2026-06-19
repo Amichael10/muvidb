@@ -9,6 +9,8 @@ export default function AdminAI() {
   const [results, setResults] = useState(null);
   const [activeTask, setActiveTask] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 800, totalCount: 0 });
+  const [isMirrorRunning, setIsMirrorRunning] = useState(false);
+  const [mirrorStats, setMirrorStats] = useState(null);
   const logEndRef = useRef(null);
 
   const addLog = (msg, type = 'info') => {
@@ -102,6 +104,28 @@ export default function AdminAI() {
       runTask(task, { offset: 0, limit: pagination.limit });
     } else {
       runTask(task);
+    }
+  };
+
+  const handleMirrorImages = async (table = 'films') => {
+    setIsMirrorRunning(true);
+    setMirrorStats(null);
+    addLog(`Starting image mirror for ${table}... (batch of 30)`, 'info');
+    try {
+      const response = await fetch(`/api/mirror-images?table=${table}&batch=30`, {
+        method: 'POST',
+        headers: await authHeaders(),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setMirrorStats(data);
+      addLog(`✓ Done: ${data.mirrored} mirrored, ${data.failed} failed, ${data.nulled} nulled.`, 'success');
+      toast.success(`${data.mirrored} images moved to our storage`);
+    } catch (err) {
+      addLog(`Mirror error: ${err.message}`, 'error');
+      toast.error('Image mirror failed');
+    } finally {
+      setIsMirrorRunning(false);
     }
   };
 
@@ -375,6 +399,44 @@ export default function AdminAI() {
                 onClick={() => handleRunTask('extract_cast')}
                 disabled={isProcessing}
               />
+              <div className="mt-2 pt-4 border-t border-border space-y-3">
+                <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Image Hygiene</p>
+                <button
+                  onClick={() => handleMirrorImages('films')}
+                  disabled={isMirrorRunning || isProcessing}
+                  className="w-full text-left p-4 rounded-2xl border transition-all duration-300 group bg-amber-500/5 border-amber-500/10 hover:border-amber-500/40 disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 flex items-center justify-center rounded-xl text-xl bg-amber-500/10 text-amber-500 group-hover:scale-110 transition-transform">
+                      {isMirrorRunning ? '⏳' : '🖼️'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-text-primary text-sm">Mirror Film Posters</p>
+                      <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Re-host 3rd-party images (30/batch)</p>
+                    </div>
+                  </div>
+                  {mirrorStats && (
+                    <div className="mt-3 pt-3 border-t border-border/50 grid grid-cols-3 gap-2 text-center">
+                      <div><p className="text-lg font-black text-green-500">{mirrorStats.mirrored}</p><p className="text-[9px] text-text-muted">Mirrored</p></div>
+                      <div><p className="text-lg font-black text-red-500">{mirrorStats.failed}</p><p className="text-[9px] text-text-muted">Failed</p></div>
+                      <div><p className="text-lg font-black text-amber-500">{mirrorStats.nulled}</p><p className="text-[9px] text-text-muted">Cleared</p></div>
+                    </div>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleMirrorImages('people')}
+                  disabled={isMirrorRunning || isProcessing}
+                  className="w-full text-left p-4 rounded-2xl border transition-all duration-300 group bg-amber-500/5 border-amber-500/10 hover:border-amber-500/40 disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 flex items-center justify-center rounded-xl text-xl bg-amber-500/10 text-amber-500 group-hover:scale-110 transition-transform">👤</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-text-primary text-sm">Mirror Actor Photos</p>
+                      <p className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Re-host external actor images</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <div className="mt-8 pt-6 border-t border-border">

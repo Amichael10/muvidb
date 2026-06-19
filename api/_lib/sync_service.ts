@@ -2,6 +2,7 @@ import { supabase } from './supabase.js';
 import { ADAPTERS, upsertShowtimes, sweepStaleCinemas } from './cinema-adapters/index.js';
 import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
+import { mirrorIfExternal } from './image_mirror.js';
 
 /** Try to find a TMDB movie match and return enriched metadata */
 async function enrichFromTMDB(title: string, year?: number | null): Promise<{
@@ -240,14 +241,20 @@ export async function runVideosSync() {
                       parentId = existingSeries.id;
                       // Update parent poster with Ep1 thumbnail if parent has none
                       if (!existingSeries.poster_url && v.thumbnail_url) {
+                        const mirroredThumb = await mirrorIfExternal(v.thumbnail_url, 'posters', `series-${parentId}`);
                         await supabase.from('films').update({
-                          poster_url: v.thumbnail_url,
-                          backdrop_url: v.thumbnail_url
+                          poster_url: mirroredThumb,
+                          backdrop_url: mirroredThumb
                         }).eq('id', parentId);
                       }
                     } else {
                       // Create new parent series record
                       const tmdb = await enrichFromTMDB(cleanedBase, vidYear);
+                      const posterSrc = tmdb?.poster_url || v.thumbnail_url;
+                      const backdropSrc = tmdb?.backdrop_url || v.thumbnail_url;
+                      const seriesSlug = cleanedBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+                      const mirroredPoster = await mirrorIfExternal(posterSrc, 'posters', `series-new-${seriesSlug}`);
+                      const mirroredBackdrop = await mirrorIfExternal(backdropSrc, 'backdrops', `series-new-${seriesSlug}-bd`);
                       const { data: newParent } = await supabase.from('films').insert({
                         title: cleanedBase,
                         year: vidYear,
@@ -255,8 +262,8 @@ export async function runVideosSync() {
                         source: 'youtube',
                         content_type: 'series',
                         youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
-                        poster_url: tmdb?.poster_url || v.thumbnail_url,
-                        backdrop_url: tmdb?.backdrop_url || v.thumbnail_url,
+                        poster_url: mirroredPoster,
+                        backdrop_url: mirroredBackdrop,
                         synopsis: tmdb?.synopsis || null,
                         tmdb_id: tmdb?.tmdb_id || null,
                         tmdb_rating: tmdb?.tmdb_rating || null,
@@ -275,6 +282,8 @@ export async function runVideosSync() {
                   }
 
                   // ── Create the episode record linked to the parent ────────────────────────
+                  const epSlug = `ep-${v.video_id}`;
+                  const mirroredEpPoster = await mirrorIfExternal(v.thumbnail_url, 'posters', epSlug);
                   filmsToInsert.push({
                     title: cleanedTitle,
                     year: vidYear,
@@ -283,8 +292,8 @@ export async function runVideosSync() {
                     source_video_id: v.video_id,
                     youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
                     trailer_youtube_id: v.video_id,
-                    poster_url: v.thumbnail_url,
-                    backdrop_url: v.thumbnail_url,
+                    poster_url: mirroredEpPoster,
+                    backdrop_url: mirroredEpPoster,
                     needs_review: true,
                     status: 'released',
                     runtime_minutes: Math.round(v.duration_seconds / 60),
@@ -299,6 +308,13 @@ export async function runVideosSync() {
                 } else {
                   // ── Regular standalone movie ────────────────────────────────────
                   const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
+                  const rawPoster = tmdb?.poster_url || v.thumbnail_url;
+                  const rawBackdrop = tmdb?.backdrop_url || v.thumbnail_url;
+                  const movieSlug = `movie-${v.video_id}`;
+                  const mirroredMoviePoster = await mirrorIfExternal(rawPoster, 'posters', movieSlug);
+                  const mirroredMovieBackdrop = rawBackdrop !== rawPoster
+                    ? await mirrorIfExternal(rawBackdrop, 'backdrops', `${movieSlug}-bd`)
+                    : mirroredMoviePoster;
                   filmsToInsert.push({
                     title: cleanedTitle,
                     year: vidYear,
@@ -307,8 +323,8 @@ export async function runVideosSync() {
                     source_video_id: v.video_id,
                     youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
                     trailer_youtube_id: v.video_id,
-                    poster_url: tmdb?.poster_url || v.thumbnail_url,
-                    backdrop_url: tmdb?.backdrop_url || v.thumbnail_url,
+                    poster_url: mirroredMoviePoster,
+                    backdrop_url: mirroredMovieBackdrop,
                     synopsis: tmdb?.synopsis || null,
                     tmdb_id: tmdb?.tmdb_id || null,
                     tmdb_rating: tmdb?.tmdb_rating || null,

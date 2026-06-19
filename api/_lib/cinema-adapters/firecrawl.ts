@@ -21,6 +21,7 @@ import { inferFormat, todayLagos } from './types.js';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { mirrorIfExternal } from '../image_mirror.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -334,6 +335,12 @@ Return ONLY a valid JSON object matching this schema (do not include any convers
   for (const film of extracted.films ?? []) {
     if (!film.title?.trim()) continue;
 
+    // Mirror any scraped poster URL into our own storage immediately
+    // so we never store partyjolloftv.com / cinema-site URLs
+    const safePosterUrl = film.poster_url
+      ? await mirrorIfExternal(film.poster_url, 'posters', `cinema-${film.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`)
+      : null;
+
     for (const st of film.showtimes ?? []) {
       const showTime = normalizeTime(st.time);
       if (!showTime) {
@@ -349,7 +356,7 @@ Return ONLY a valid JSON object matching this schema (do not include any convers
         externalFilmId: `fc-${film.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
         filmTitle: film.title.trim(),
         filmMeta: {
-          posterUrl: film.poster_url ?? null,
+          posterUrl: safePosterUrl,
           rating: film.rating ?? null,
         },
         showDate,
