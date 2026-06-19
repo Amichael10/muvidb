@@ -57,6 +57,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const batchSize = parseInt((req.query.batch as string) || '30', 10);
   const table = (req.query.table as string) || 'films'; // 'films' | 'people'
 
+  interface ItemInfo {
+    id: string;
+    name: string;
+    type: 'film' | 'person';
+    reason?: string;
+    url?: string;
+  }
+
   const results = {
     processed: 0,
     mirrored: 0,
@@ -64,11 +72,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     skipped: 0,
     nulled: 0,
     errors: [] as string[],
+    failedItems: [] as ItemInfo[],
+    clearedItems: [] as ItemInfo[],
   };
 
   try {
     if (table === 'films') {
-      await processFIlms(batchSize, results);
+      await processFilms(batchSize, results);
     } else if (table === 'people') {
       await processPeople(batchSize, results);
     } else {
@@ -85,9 +95,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function processFIlms(
+async function processFilms(
   batchSize: number,
-  results: { processed: number; mirrored: number; failed: number; skipped: number; nulled: number; errors: string[] },
+  results: { 
+    processed: number; 
+    mirrored: number; 
+    failed: number; 
+    skipped: number; 
+    nulled: number; 
+    errors: string[];
+    failedItems: any[];
+    clearedItems: any[];
+  },
 ) {
   // Build a query that prioritizes the worst offender domains first
   // We fetch films whose poster_url is NOT already on our own storage or TMDB
@@ -130,6 +149,7 @@ async function processFIlms(
     if (isBlocked) {
       await supabase.from('films').update({ poster_url: null }).eq('id', film.id);
       results.nulled++;
+      results.clearedItems.push({ id: film.id, name: film.title, type: 'film', url: film.poster_url });
       console.log(`[mirror-images] ✗ Nulled blocked domain poster for film "${film.title}"`);
       continue;
     }
@@ -153,6 +173,7 @@ async function processFIlms(
     } else {
       results.failed++;
       results.errors.push(`Film ${film.id} (${film.title}): mirror failed`);
+      results.failedItems.push({ id: film.id, name: film.title, type: 'film', reason: 'mirroring failed' });
       console.warn(`[mirror-images] ✗ Could not mirror poster for "${film.title}" from ${film.poster_url}`);
     }
   }
@@ -160,7 +181,16 @@ async function processFIlms(
 
 async function processPeople(
   batchSize: number,
-  results: { processed: number; mirrored: number; failed: number; skipped: number; nulled: number; errors: string[] },
+  results: { 
+    processed: number; 
+    mirrored: number; 
+    failed: number; 
+    skipped: number; 
+    nulled: number; 
+    errors: string[];
+    failedItems: any[];
+    clearedItems: any[];
+  },
 ) {
   const { data: people, error } = await supabase
     .from('people')
@@ -191,6 +221,7 @@ async function processPeople(
     if (isBlocked) {
       await supabase.from('people').update({ photo_url: null }).eq('id', person.id);
       results.nulled++;
+      results.clearedItems.push({ id: person.id, name: person.name, type: 'person', url: person.photo_url });
       continue;
     }
 
@@ -203,6 +234,7 @@ async function processPeople(
     } else {
       results.failed++;
       results.errors.push(`Person ${person.id} (${person.name}): mirror failed`);
+      results.failedItems.push({ id: person.id, name: person.name, type: 'person', reason: 'mirroring failed' });
     }
   }
 }

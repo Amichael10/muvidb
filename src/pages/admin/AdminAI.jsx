@@ -110,6 +110,8 @@ export default function AdminAI() {
   const handleMirrorImages = async (table = 'films') => {
     setIsMirrorRunning(true);
     setMirrorStats(null);
+    setResults(null);
+    setActiveTask(table === 'films' ? 'mirror_films' : 'mirror_people');
     addLog(`Starting image mirror for ${table}... (batch of 30)`, 'info');
     try {
       const response = await fetch(`/api/mirror-images?table=${table}&batch=30`, {
@@ -119,6 +121,7 @@ export default function AdminAI() {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       setMirrorStats(data);
+      setResults(data);
       addLog(`✓ Done: ${data.mirrored} mirrored, ${data.failed} failed, ${data.nulled} nulled.`, 'success');
       toast.success(`${data.mirrored} images moved to our storage`);
     } catch (err) {
@@ -505,101 +508,203 @@ export default function AdminAI() {
 
           {results && (
             <div className="bg-surface border border-border rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-6 border-b border-border bg-brand/5 flex items-center justify-between">
-                <h3 className="font-black flex items-center gap-2 text-brand">
-                  <span className="text-2xl">{activeTask === 'cleanup_films' ? '🧹' : activeTask === 'discover_actors' ? '🌟' : activeTask === 'extract_cast' ? '🎭' : '🪄'}</span>
-                  <span className="tracking-tight">{activeTask?.replace('_', ' ').toUpperCase()} RESULTS</span>
-                </h3>
-                <div className="flex items-center gap-4">
-                  <span className="px-2 py-1 bg-brand/10 text-brand text-[10px] font-black rounded-lg uppercase tracking-widest">{results.length} items found</span>
+              {activeTask?.startsWith('mirror_') ? (
+                <div>
+                  <div className="p-6 border-b border-border bg-amber-500/5 flex items-center justify-between">
+                    <h3 className="font-black flex items-center gap-2 text-amber-500">
+                      <span className="text-2xl">🖼️</span>
+                      <span className="tracking-tight">IMAGE MIRROR BATCH COMPLETE</span>
+                    </h3>
+                    <button 
+                      onClick={() => setResults(null)}
+                      className="text-text-muted hover:text-red-500 transition-colors font-bold text-xs flex items-center gap-1"
+                    >
+                      <span>✕</span> Clear
+                    </button>
+                  </div>
                   
-                  {activeTask === 'deduplicate' && results.length > 0 && (
-                    <button 
-                      onClick={async () => {
-                        const confirmMerge = window.confirm(`Are you sure you want to merge all ${results.length} identified duplicate groups on this page? This cannot be undone.`);
-                        if (!confirmMerge) return;
-                        
-                        let successCount = 0;
-                        for (const item of [...results]) {
-                          try {
-                            for (const duplicateId of item.duplicate_ids) {
-                              await supabase.rpc('merge_people', {
-                                p_primary_id: item.master_id,
-                                p_secondary_id: duplicateId
-                              });
-                            }
-                            successCount++;
-                            setResults(prev => prev ? prev.filter(i => i !== item) : null);
-                          } catch (err) {
-                            console.error("Batch merge error:", err);
-                          }
-                        }
-                        toast.success(`Successfully batch merged ${successCount} groups.`);
-                      }}
-                      className="px-4 py-1.5 bg-red-500 text-white rounded-lg text-xs font-black shadow-lg hover:bg-red-600 transition-colors"
-                    >
-                      BATCH MERGE ALL
-                    </button>
-                  )}
+                  {/* Detailed Stats Cards */}
+                  <div className="p-6 bg-surface-2/30 border-b border-border grid grid-cols-3 gap-4 text-center">
+                    <div className="bg-surface border border-border p-4 rounded-2xl">
+                      <p className="text-2xl font-black text-green-500">{results.mirrored || 0}</p>
+                      <p className="text-xs font-bold text-text-muted mt-1 uppercase tracking-wider">Mirrored</p>
+                      <p className="text-[10px] text-text-muted/60 mt-0.5">Uploaded to Storage</p>
+                    </div>
+                    <div className="bg-surface border border-border p-4 rounded-2xl">
+                      <p className="text-2xl font-black text-red-500">{results.failed || 0}</p>
+                      <p className="text-xs font-bold text-text-muted mt-1 uppercase tracking-wider">Failed</p>
+                      <p className="text-[10px] text-text-muted/60 mt-0.5">Download errors</p>
+                    </div>
+                    <div className="bg-surface border border-border p-4 rounded-2xl">
+                      <p className="text-2xl font-black text-amber-500">{results.nulled || 0}</p>
+                      <p className="text-xs font-bold text-text-muted mt-1 uppercase tracking-wider">Cleared</p>
+                      <p className="text-[10px] text-text-muted/60 mt-0.5">Blocked CDNs removed</p>
+                    </div>
+                  </div>
 
-                  <button 
-                    onClick={() => setResults(null)}
-                    className="text-text-muted hover:text-red-500 transition-colors font-bold text-xs flex items-center gap-1"
-                  >
-                    <span>✕</span> Clear
-                  </button>
+                  <div className="p-6 space-y-6 max-h-[600px] overflow-y-auto">
+                    {/* Cleared Items Section */}
+                    {results.clearedItems?.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-black text-amber-500 uppercase tracking-wider flex items-center gap-2">
+                          <span>⚠️</span> Cleared Items ({results.clearedItems.length}) - Needs Alternative Poster URL
+                        </h4>
+                        <div className="divide-y divide-border border border-border rounded-2xl overflow-hidden bg-surface">
+                          {results.clearedItems.map((item, idx) => (
+                            <div key={idx} className="p-4 flex items-center justify-between gap-4 hover:bg-surface-2/30 transition-colors">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-text-primary text-sm truncate">{item.name}</p>
+                                <p className="text-[10px] text-text-muted font-mono truncate mt-0.5">Original URL: {item.url}</p>
+                              </div>
+                              <a
+                                href={activeTask === 'mirror_films' ? `/admin/films?edit=${item.id}` : `/admin/people`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-1.5 bg-brand/10 hover:bg-brand text-brand hover:text-on-brand text-xs font-bold rounded-lg transition-colors shrink-0"
+                              >
+                                Edit {item.type === 'film' ? 'Movie' : 'Actor'} ↗
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Failed Items Section */}
+                    {results.failedItems?.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-black text-red-500 uppercase tracking-wider flex items-center gap-2">
+                          <span>❌</span> Failed to Mirror ({results.failedItems.length})
+                        </h4>
+                        <div className="divide-y divide-border border border-border rounded-2xl overflow-hidden bg-surface">
+                          {results.failedItems.map((item, idx) => (
+                            <div key={idx} className="p-4 flex items-center justify-between gap-4 hover:bg-surface-2/30 transition-colors">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold text-text-primary text-sm truncate">{item.name}</p>
+                                <p className="text-[10px] text-red-400 mt-0.5">Reason: {item.reason}</p>
+                              </div>
+                              <a
+                                href={activeTask === 'mirror_films' ? `/admin/films?edit=${item.id}` : `/admin/people`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-1.5 bg-brand/10 hover:bg-brand text-brand hover:text-on-brand text-xs font-bold rounded-lg transition-colors shrink-0"
+                              >
+                                Edit {item.type === 'film' ? 'Movie' : 'Actor'} ↗
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {results.clearedItems?.length === 0 && results.failedItems?.length === 0 && (
+                      <div className="text-center py-10 space-y-3">
+                        <div className="text-4xl">🎉</div>
+                        <p className="font-bold text-text-primary">All items processed successfully!</p>
+                        <p className="text-xs text-text-muted max-w-xs mx-auto">No items were failed or cleared in this batch. All images were successfully mirrored to our own Supabase storage.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="max-h-[600px] overflow-y-auto overflow-x-hidden">
-                <div className="divide-y divide-border">
-                  {results.map((item, idx) => (
-                    <ResultItem 
-                      key={idx} 
-                      item={item} 
-                      task={activeTask} 
-                      onAction={(item, action) => handleApplyAction(item, action)}
-                    />
-                  ))}
-              {results.length === 0 && (
-                <div className="p-20 text-center space-y-4">
-                  <div className="text-4xl opacity-20">📂</div>
-                  <p className="text-text-muted italic max-w-xs mx-auto">
-                    No items found matching the "missing data" criteria in this batch. 
-                    Your current records might already be complete or initialized.
-                  </p>
+              ) : (
+                <div>
+                  <div className="p-6 border-b border-border bg-brand/5 flex items-center justify-between">
+                    <h3 className="font-black flex items-center gap-2 text-brand">
+                      <span className="text-2xl">{activeTask === 'cleanup_films' ? '🧹' : activeTask === 'discover_actors' ? '🌟' : activeTask === 'extract_cast' ? '🎭' : '🪄'}</span>
+                      <span className="tracking-tight">{activeTask?.replace('_', ' ').toUpperCase()} RESULTS</span>
+                    </h3>
+                    <div className="flex items-center gap-4">
+                      <span className="px-2 py-1 bg-brand/10 text-brand text-[10px] font-black rounded-lg uppercase tracking-widest">{results.length} items found</span>
+                      
+                      {activeTask === 'deduplicate' && results.length > 0 && (
+                        <button 
+                          onClick={async () => {
+                            const confirmMerge = window.confirm(`Are you sure you want to merge all ${results.length} identified duplicate groups on this page? This cannot be undone.`);
+                            if (!confirmMerge) return;
+                            
+                            let successCount = 0;
+                            for (const item of [...results]) {
+                              try {
+                                for (const duplicateId of item.duplicate_ids) {
+                                  await supabase.rpc('merge_people', {
+                                    p_primary_id: item.master_id,
+                                    p_secondary_id: duplicateId
+                                  });
+                                }
+                                successCount++;
+                                setResults(prev => prev ? prev.filter(i => i !== item) : null);
+                              } catch (err) {
+                                console.error("Batch merge error:", err);
+                              }
+                            }
+                            toast.success(`Successfully batch merged ${successCount} groups.`);
+                          }}
+                          className="px-4 py-1.5 bg-red-500 text-white rounded-lg text-xs font-black shadow-lg hover:bg-red-600 transition-colors"
+                        >
+                          BATCH MERGE ALL
+                        </button>
+                      )}
+
+                      <button 
+                        onClick={() => setResults(null)}
+                        className="text-text-muted hover:text-red-500 transition-colors font-bold text-xs flex items-center gap-1"
+                      >
+                        <span>✕</span> Clear
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-[600px] overflow-y-auto overflow-x-hidden">
+                    <div className="divide-y divide-border">
+                      {results.map((item, idx) => (
+                        <ResultItem 
+                          key={idx} 
+                          item={item} 
+                          task={activeTask} 
+                          onAction={(item, action) => handleApplyAction(item, action)}
+                        />
+                      ))}
+                  {results.length === 0 && (
+                    <div className="p-20 text-center space-y-4">
+                      <div className="text-4xl opacity-20">📂</div>
+                      <p className="text-text-muted italic max-w-xs mx-auto">
+                        No items found matching the "missing data" criteria in this batch. 
+                        Your current records might already be complete or initialized.
+                      </p>
+                    </div>
+                  )}
+                    </div>
+                  </div>
+                  
+                  {activeTask === 'deduplicate' && pagination.totalCount > 0 && (
+                    <div className="p-4 bg-surface-2 flex items-center justify-between border-t border-border">
+                      <div className="text-xs text-text-muted font-medium">
+                        Scanning records {(pagination.page - 1) * pagination.limit + 1} - {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handlePageChange('prev')} 
+                          disabled={pagination.page === 1 || isProcessing}
+                          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold disabled:opacity-50 hover:bg-surface-3 transition-colors"
+                        >
+                          Previous
+                        </button>
+                        <button 
+                          onClick={() => handlePageChange('next')} 
+                          disabled={pagination.page * pagination.limit >= pagination.totalCount || isProcessing}
+                          className="px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold disabled:opacity-50 hover:bg-surface-3 transition-colors"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="p-4 bg-surface-2/30 text-[10px] text-center font-black text-brand tracking-widest border-t border-border">
+                    ALL ACTIONS ARE LOGGED AND REVERSIBLE
+                  </div>
                 </div>
               )}
-                </div>
-              </div>
-              
-              {activeTask === 'deduplicate' && pagination.totalCount > 0 && (
-                <div className="p-4 bg-surface-2 flex items-center justify-between border-t border-border">
-                  <div className="text-xs text-text-muted font-medium">
-                    Scanning records {(pagination.page - 1) * pagination.limit + 1} - {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => handlePageChange('prev')} 
-                      disabled={pagination.page === 1 || isProcessing}
-                      className="px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold disabled:opacity-50 hover:bg-surface-3 transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <button 
-                      onClick={() => handlePageChange('next')} 
-                      disabled={pagination.page * pagination.limit >= pagination.totalCount || isProcessing}
-                      className="px-3 py-1.5 bg-surface border border-border rounded-lg text-xs font-bold disabled:opacity-50 hover:bg-surface-3 transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              <div className="p-4 bg-surface-2/30 text-[10px] text-center font-black text-brand tracking-widest border-t border-border">
-                ALL ACTIONS ARE LOGGED AND REVERSIBLE
-              </div>
             </div>
           )}
         </div>
