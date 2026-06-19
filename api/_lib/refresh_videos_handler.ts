@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../_lib/supabase.js';
-import { isValidAuth } from '../_lib/auth.js';
-import { ytGet, parseDuration, cleanTitle } from '../_lib/yt_service.js';
+import { supabase } from './supabase.js';
+import { isValidAuth } from './auth.js';
+import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 
 /**
  * Manual/Targeted Video Refresh

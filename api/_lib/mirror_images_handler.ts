@@ -1,17 +1,7 @@
-/**
- * api/cron/mirror-images.ts
- *
- * Cron-safe entry point for the image mirroring pipeline.
- * Runs as a clean path with no query parameters (Vercel requirement).
- *
- * Processes 50 films per run — at nightly frequency that's 1,500/month.
- * The worst offenders (partyjolloftv: 1,757) will be cleared in ~2 nights.
- */
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../_lib/supabase.js';
-import { mirrorImageToStorage, isOwnUrl } from '../_lib/image_mirror.js';
-import { isValidAuth } from '../_lib/auth.js';
+import { supabase } from './supabase.js';
+import { mirrorImageToStorage, isOwnUrl } from './image_mirror.js';
+import { isValidAuth } from './auth.js';
 
 export const config = { maxDuration: 60 };
 

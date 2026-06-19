@@ -4,6 +4,9 @@ import { isValidAuth } from '../_lib/auth.js';
 import { runCastExtraction, runTitleCleanup } from '../_lib/ai_maintenance.js';
 import { runShowtimesSync, runVideosSync, runTMDBSync } from '../_lib/sync_service.js';
 import { sweepStaleCinemas } from '../_lib/cinema-adapters/index.js';
+import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
+import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
+
 
 /**
  * Main Cron Entry Point
@@ -105,6 +108,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'videos':         result = await runVideosSync(); break;
       case 'tmdb':           result = await runTMDBSync(); break;
       case 'ai_maintenance': result = await runAIMaintenance(); break;
+      case 'refresh_videos': return await refreshVideosHandler(req, res);
+      case 'mirror_images':  return await mirrorImagesHandler(req, res);
       case 'kava':      
         return res.status(200).json({ 
           task: 'kava', 

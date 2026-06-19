@@ -3,6 +3,7 @@ import { isValidAuth } from './_lib/auth';
 import statusHandler from './_automation/status';
 import fetchChannelsHandler from './_automation/fetch-channels';
 import enrichActorsHandler from './_automation/enrich-actors';
+import scrapeImdbActorHandler from './_lib/scrape_imdb_actor_handler';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
@@ -10,6 +11,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Read-only job status — no privileged side effects.
   if (action === 'status') {
     return statusHandler(req, res);
+  }
+
+  if (action === 'scrape-imdb-actor') {
+    return scrapeImdbActorHandler(req, res);
   }
 
   // The remaining actions write to the DB and consume paid AI/YouTube

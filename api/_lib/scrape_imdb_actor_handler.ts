@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import * as cheerio from 'cheerio';
-import { supabase } from './_lib/supabase.js';
+import { supabase } from './supabase.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS setup

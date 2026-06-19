@@ -80,8 +80,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     query = supabase.from('films').select(FIELDS);
   }
 
-  if (search) {
-    const formattedQuery = search.trim().split(/\s+/).join(':* & ') + ':*';
+  const searchStr = Array.isArray(search) ? search[0] : search;
+  if (searchStr) {
+    const formattedQuery = searchStr.trim().split(/\s+/).join(':* & ') + ':*';
     query = query.textSearch('title', formattedQuery);
   }
   if (country) query = query.eq('country', country);
