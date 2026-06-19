@@ -6,7 +6,7 @@
   },
   "crons": [
     { "path": "/api/cron/sync", "schedule": "0 * * * *" },
-    { "path": "/api/mirror-images?table=films&batch=30", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/mirror-images", "schedule": "0 3 * * *" }
   ],
   "routes": [
     { "src": "/storage/v1/object/public/(.*)", "dest": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/$1" },
