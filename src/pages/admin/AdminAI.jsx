@@ -450,6 +450,36 @@ export default function AdminAI() {
                 </h3>
                 <div className="flex items-center gap-4">
                   <span className="px-2 py-1 bg-brand/10 text-brand text-[10px] font-black rounded-lg uppercase tracking-widest">{results.length} items found</span>
+                  
+                  {activeTask === 'deduplicate' && results.length > 0 && (
+                    <button 
+                      onClick={async () => {
+                        const confirmMerge = window.confirm(`Are you sure you want to merge all ${results.length} identified duplicate groups on this page? This cannot be undone.`);
+                        if (!confirmMerge) return;
+                        
+                        let successCount = 0;
+                        for (const item of [...results]) {
+                          try {
+                            for (const duplicateId of item.duplicate_ids) {
+                              await supabase.rpc('merge_people', {
+                                p_primary_id: item.master_id,
+                                p_secondary_id: duplicateId
+                              });
+                            }
+                            successCount++;
+                            setResults(prev => prev ? prev.filter(i => i !== item) : null);
+                          } catch (err) {
+                            console.error("Batch merge error:", err);
+                          }
+                        }
+                        toast.success(`Successfully batch merged ${successCount} groups.`);
+                      }}
+                      className="px-4 py-1.5 bg-red-500 text-white rounded-lg text-xs font-black shadow-lg hover:bg-red-600 transition-colors"
+                    >
+                      BATCH MERGE ALL
+                    </button>
+                  )}
+
                   <button 
                     onClick={() => setResults(null)}
                     className="text-text-muted hover:text-red-500 transition-colors font-bold text-xs flex items-center gap-1"
