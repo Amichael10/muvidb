@@ -1,4 +1,4 @@
-﻿import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function PersonCard({ person, variant = 'compact', isLoading }) {
   if (isLoading) {
@@ -100,7 +100,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
         
         <div className="flex flex-wrap items-center gap-4 sm:gap-6">
           <div className="flex flex-col">
-            <span className="text-text-primary font-bold">{formatPopularity(person.popularity_score || person.popularity || 0)}</span>
+            <span className="text-text-primary font-bold">{formatPopularity(person.profile_views || person.popularity_score || person.popularity || 0)}</span>
             <span className="text-text-muted text-xs uppercase tracking-wider">Views</span>
           </div>
           <div className="w-px h-8 bg-border"></div>

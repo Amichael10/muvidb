@@ -10,7 +10,7 @@ CREATE OR REPLACE FUNCTION match_person_fuzzy(query_name text, threshold float D
 RETURNS TABLE (id uuid, name text, sim float) AS $$
 BEGIN
   RETURN QUERY
-  SELECT p.id, p.name, extensions.similarity(p.name, query_name) as sim
+  SELECT p.id, p.name, extensions.similarity(p.name, query_name)::float as sim
   FROM public.people p
   WHERE extensions.similarity(p.name, query_name) >= threshold
   ORDER BY sim DESC
@@ -23,7 +23,7 @@ CREATE OR REPLACE FUNCTION match_film_fuzzy(query_title text, threshold float DE
 RETURNS TABLE (id uuid, title text, sim float) AS $$
 BEGIN
   RETURN QUERY
-  SELECT f.id, f.title, extensions.similarity(f.title, query_title) as sim
+  SELECT f.id, f.title, extensions.similarity(f.title, query_title)::float as sim
   FROM public.films f
   WHERE extensions.similarity(f.title, query_title) >= threshold
   ORDER BY sim DESC

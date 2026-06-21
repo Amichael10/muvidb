@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { findAndInsertMissingFilm } from './lib/tmdb_cinema.js';
+import { isOwnUrl, mirrorImageToStorage } from '../api/_lib/image_mirror.js';
 
 // Support .env and .env.local
 const envLocal = fs.existsSync('.env.local') ? dotenv.parse(fs.readFileSync('.env.local')) : {};
@@ -168,7 +169,7 @@ async function scrapeGenesis() {
         // ── Step 1: Exact match against is_nollywood=true films ────────────────
         let { data: dbFilm } = await supabase
           .from('films')
-          .select('id, title')
+          .select('id, title, poster_url, backdrop_url, is_in_cinemas')
           .eq('is_nollywood', true)
           .ilike('title', cleanTitleStr)
           .maybeSingle();
@@ -183,7 +184,10 @@ async function scrapeGenesis() {
             .maybeSingle();
           if (promoted?.promoted_film_id) {
             const { data: pf } = await supabase
-              .from('films').select('id, title').eq('id', promoted.promoted_film_id).maybeSingle();
+              .from('films')
+              .select('id, title, poster_url, backdrop_url, is_in_cinemas')
+              .eq('id', promoted.promoted_film_id)
+              .maybeSingle();
             dbFilm = pf;
           }
         }
@@ -225,6 +229,26 @@ async function scrapeGenesis() {
         }
 
         // ── Step 5: Confirmed Nollywood — write showtimes ─────────────────────
+        if (dbFilm) {
+          const hasValidPoster = dbFilm.poster_url && isOwnUrl(dbFilm.poster_url);
+          const hasValidBackdrop = dbFilm.backdrop_url && isOwnUrl(dbFilm.backdrop_url);
+          const updatedFields: Record<string, any> = {};
+
+          if (!hasValidPoster && film.posterUrl) {
+            console.log(`      [sync-genesis] "${dbFilm.title}" has no valid poster. Attempting to mirror scraped poster: ${film.posterUrl}`);
+            const filename = `${dbFilm.id.slice(0, 8)}-${dbFilm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`;
+            const mirroredPoster = await mirrorImageToStorage(film.posterUrl, 'posters', filename);
+            if (mirroredPoster) {
+              updatedFields.poster_url = mirroredPoster;
+              dbFilm.poster_url = mirroredPoster;
+            }
+          }
+
+          if (Object.keys(updatedFields).length > 0) {
+            console.log(`      [sync-genesis] Updating film "${dbFilm.title}" with mirrored images:`, updatedFields);
+            await supabase.from('films').update(updatedFields).eq('id', dbFilm.id);
+          }
+        }
         const seen = new Set<string>();
         const uniqueShowtimes = film.showtimes.filter(s => {
           if (seen.has(s.time)) return false;

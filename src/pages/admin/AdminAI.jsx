@@ -453,8 +453,8 @@ export default function AdminAI() {
                 />
               </div>
               <p className="text-[9px] text-text-muted mt-2 leading-relaxed">
-                Active: Gemini-1.5-Flash <br/>
-                Secondary: Llama-3 (Auto-Fallback)
+                Active: Gemini-2.5-Flash <br/>
+                Fallback: Gemini-2.0-Flash-Lite → OpenAI-4o-mini
               </p>
             </div>
           </div>

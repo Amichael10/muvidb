@@ -1,6 +1,7 @@
 import './dotenv_init.js';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
+import * as https from 'https';
 import { mirrorImageToStorage } from '../api/_lib/image_mirror.js';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { detectAndNormalizeSeries } from '../api/_lib/series_utils.js';
@@ -31,6 +32,29 @@ function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+async function callSupabaseWithRetry<T>(fn: () => Promise<{ data: T | null; error: any }>, retries = 5, delay = 2000): Promise<T | null> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const { data, error } = await fn();
+      if (error) {
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('fetch failed') || msg.includes('timeout') || error.code === '40001' || error.status === 503) {
+          throw error;
+        }
+        console.error(`❌ DB Error: ${error.message}`);
+        return null;
+      }
+      return data;
+    } catch (e: any) {
+      if (attempt === retries) throw e;
+      console.warn(`⚠️ [Attempt ${attempt}/${retries}] Supabase call failed: ${e.message}. Retrying in ${delay / 1000}s...`);
+      await sleep(delay);
+      delay *= 1.5;
+    }
+  }
+  throw new Error('Retries exhausted');
+}
+
 function generateSlug(text: string): string {
   return text
     .toLowerCase()
@@ -50,11 +74,25 @@ function mapRole(roleStr: string): string {
 async function fetchWithRetry(url: string, retries = 3): Promise<string> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(url, { headers: HEADERS });
-      if (!res.ok) {
-        throw new Error(`HTTP status ${res.status}`);
-      }
-      return await res.text();
+      return await new Promise<string>((resolve, reject) => {
+        https.get(url, {
+          headers: HEADERS
+        }, (res) => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`HTTP status ${res.statusCode}`));
+            return;
+          }
+          let data = '';
+          res.on('data', chunk => {
+            data += chunk;
+          });
+          res.on('end', () => {
+            resolve(data);
+          });
+        }).on('error', (err) => {
+          reject(err);
+        });
+      });
     } catch (e: any) {
       if (attempt === retries) throw e;
       console.warn(`⚠️ [Attempt ${attempt}/${retries}] Fetch failed for ${url}: ${e.message}. Retrying in 2s...`);
@@ -102,24 +140,30 @@ async function upsertPerson(name: string, actorPageUrl: string, initialPhotoUrl:
 
   try {
     // 1. Search for existing person in database (case-insensitive name check)
-    let { data: existing } = await supabase
-      .from('people')
-      .select('id, photo_url, bio, instagram_url, facebook_url, twitter_url')
-      .ilike('name', cleanName)
-      .limit(1);
+    let existing = await callSupabaseWithRetry<any[]>(async () => {
+      return await supabase
+        .from('people')
+        .select('id, photo_url, bio, instagram_url, facebook_url, twitter_url')
+        .ilike('name', cleanName)
+        .limit(1);
+    });
 
     let personId: string | null = null;
     let existingPerson = existing?.[0];
 
     // 2. If not found by exact name, try fuzzy match RPC
     if (!existingPerson) {
-      const { data: fuzzy } = await supabase.rpc('match_person_fuzzy', { query_name: cleanName, threshold: 0.85 }).maybeSingle();
+      const fuzzy = await callSupabaseWithRetry<any>(async () => {
+        return await supabase.rpc('match_person_fuzzy', { query_name: cleanName, threshold: 0.85 }).maybeSingle();
+      });
       if (fuzzy?.id) {
-        const { data } = await supabase
-          .from('people')
-          .select('id, photo_url, bio, instagram_url, facebook_url, twitter_url')
-          .eq('id', fuzzy.id)
-          .single();
+        const data = await callSupabaseWithRetry<any>(async () => {
+          return await supabase
+            .from('people')
+            .select('id, photo_url, bio, instagram_url, facebook_url, twitter_url')
+            .eq('id', fuzzy.id)
+            .single();
+        });
         existingPerson = data;
       }
     }
@@ -158,7 +202,9 @@ async function upsertPerson(name: string, actorPageUrl: string, initialPhotoUrl:
           }
 
           if (Object.keys(updatePayload).length > 0) {
-            await supabase.from('people').update(updatePayload).eq('id', personId);
+            await callSupabaseWithRetry(async () => {
+              return await supabase.from('people').update(updatePayload).eq('id', personId);
+            });
             console.log(`    ✓ Enriched details for "${cleanName}"`);
           }
         }
@@ -172,23 +218,25 @@ async function upsertPerson(name: string, actorPageUrl: string, initialPhotoUrl:
       const photoToMirror = scraped?.photoUrl || initialPhotoUrl;
       const ownPhotoUrl = photoToMirror ? await mirrorImageToStorage(photoToMirror, 'people') : null;
 
-      const { data: newPerson, error: insertErr } = await supabase
-        .from('people')
-        .insert({
-          name: cleanName,
-          bio: scraped?.bio || null,
-          photo_url: ownPhotoUrl,
-          instagram_url: scraped?.instagramUrl || null,
-          facebook_url: scraped?.facebookUrl || null,
-          twitter_url: scraped?.twitterUrl || null,
-          source: 'nollymeter',
-          nationality: 'Nigerian',
-        })
-        .select('id')
-        .single();
+      const newPerson = await callSupabaseWithRetry<any>(async () => {
+        return await supabase
+          .from('people')
+          .insert({
+            name: cleanName,
+            bio: scraped?.bio || null,
+            photo_url: ownPhotoUrl,
+            instagram_url: scraped?.instagramUrl || null,
+            facebook_url: scraped?.facebookUrl || null,
+            twitter_url: scraped?.twitterUrl || null,
+            source: 'nollymeter',
+            nationality: 'Nigerian',
+          })
+          .select('id')
+          .single();
+      });
 
-      if (insertErr) {
-        console.error(`  ❌ Error inserting person "${cleanName}": ${insertErr.message}`);
+      if (!newPerson) {
+        console.error(`  ❌ Failed to insert person "${cleanName}"`);
         return null;
       }
 
@@ -356,24 +404,74 @@ async function syncMovie(movieUrl: string) {
   console.log(`   - Cast size: ${scraped.cast.length}`);
 
   try {
-    // 1. Match Movie in Database
-    let { data: existing } = await supabase
-      .from('films')
-      .select('*')
-      .ilike('title', normalizedTitle);
+    let filmId: string | null = null;
+    let film: any = null;
 
-    // Narrow down by year if multiple matches exist
-    if (existing && existing.length > 1 && scraped.year) {
-      const matchWithYear = existing.filter(f => f.year === scraped.year);
-      if (matchWithYear.length > 0) existing = matchWithYear;
+    // A. Check by source_video_id first if available
+    if (scraped.sourceVideoId) {
+      const existingById = await callSupabaseWithRetry<any[]>(async () => {
+        return await supabase
+          .from('films')
+          .select('*')
+          .eq('source_video_id', scraped.sourceVideoId)
+          .limit(1);
+      });
+      if (existingById && existingById.length > 0) {
+        film = existingById[0];
+      }
     }
 
-    let filmId: string | null = null;
+    // B. Fall back to matching by title (exact and then fuzzy)
+    if (!film) {
+      const existing = await callSupabaseWithRetry<any[]>(async () => {
+        return await supabase
+          .from('films')
+          .select('*')
+          .ilike('title', normalizedTitle);
+      });
+
+      if (existing && existing.length > 0) {
+        if (scraped.year) {
+          const exactMatch = existing.find(f => f.year === scraped.year);
+          if (exactMatch) {
+            film = exactMatch;
+          } else {
+            const noYearMatch = existing.find(f => !f.year);
+            if (noYearMatch) {
+              film = noYearMatch;
+            }
+          }
+        } else {
+          film = existing[0];
+        }
+      }
+    }
+
+    if (!film) {
+      const fuzzy = await callSupabaseWithRetry<any>(async () => {
+        return await supabase.rpc('match_film_fuzzy', { query_title: normalizedTitle, threshold: 0.85 }).maybeSingle();
+      });
+      if (fuzzy?.id) {
+        const data = await callSupabaseWithRetry<any>(async () => {
+          return await supabase
+            .from('films')
+            .select('*')
+            .eq('id', fuzzy.id)
+            .single();
+        });
+        if (data) {
+          if (!scraped.year || !data.year || data.year === scraped.year) {
+            film = data;
+            console.log(`  🔍 Fuzzy matched existing film by title: "${normalizedTitle}" ~ "${data.title}" (ID: ${film.id})`);
+          }
+        }
+      }
+    }
+
     const movieDetailUrl = movieUrl;
     const nollymeterLink = { nollymeter: movieDetailUrl };
 
-    if (existing && existing.length > 0) {
-      const film = existing[0];
+    if (film) {
       filmId = film.id;
       console.log(`  ✓ Found existing movie (ID: ${filmId})`);
 
@@ -412,7 +510,9 @@ async function syncMovie(movieUrl: string) {
         }
       }
 
-      await supabase.from('films').update(updatePayload).eq('id', filmId);
+      await callSupabaseWithRetry(async () => {
+        return await supabase.from('films').update(updatePayload).eq('id', filmId);
+      });
       console.log(`  ✓ Updated existing movie metadata`);
 
     } else {
@@ -423,31 +523,33 @@ async function syncMovie(movieUrl: string) {
         ? await mirrorImageToStorage(scraped.posterUrl, 'posters')
         : null;
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from('films')
-        .insert({
-          title: normalizedTitle,
-          year: scraped.year,
-          runtime_minutes: scraped.runtimeMinutes,
-          synopsis: scraped.synopsis,
-          poster_url: ownPosterUrl,
-          backdrop_url: ownPosterUrl,
-          countries: scraped.countries.length > 0 ? scraped.countries : ['Nigeria'],
-          genres: scraped.genres,
-          source: 'nollymeter',
-          source_video_id: scraped.sourceVideoId || `nollymeter-${generateSlug(scraped.title)}`,
-          streaming_links: nollymeterLink,
-          status: 'released',
-          needs_review: true,
-          content_type: 'movie',
-          release_type: scraped.youtubeWatchUrl ? 'youtube' : 'cinema',
-          youtube_watch_url: scraped.youtubeWatchUrl || null
-        })
-        .select('id')
-        .single();
+      const inserted = await callSupabaseWithRetry<any>(async () => {
+        return await supabase
+          .from('films')
+          .insert({
+            title: normalizedTitle,
+            year: scraped.year,
+            runtime_minutes: scraped.runtimeMinutes,
+            synopsis: scraped.synopsis,
+            poster_url: ownPosterUrl,
+            backdrop_url: ownPosterUrl,
+            countries: scraped.countries.length > 0 ? scraped.countries : ['Nigeria'],
+            genres: scraped.genres,
+            source: 'nollymeter',
+            source_video_id: scraped.sourceVideoId || `nollymeter-${generateSlug(scraped.title)}${scraped.year ? `-${scraped.year}` : ''}-${Math.random().toString(36).substring(2, 6)}`,
+            streaming_links: nollymeterLink,
+            status: 'released',
+            needs_review: true,
+            content_type: 'movie',
+            release_type: scraped.youtubeWatchUrl ? 'youtube' : 'cinema',
+            youtube_watch_url: scraped.youtubeWatchUrl || null
+          })
+          .select('id')
+          .single();
+      });
 
-      if (insertErr) {
-        console.error(`  ❌ Error inserting movie: ${insertErr.message}`);
+      if (!inserted) {
+        console.error(`  ❌ Failed to insert movie: "${normalizedTitle}"`);
         return;
       }
 
@@ -461,12 +563,14 @@ async function syncMovie(movieUrl: string) {
         const personId = await upsertPerson(castMember.name, castMember.actorPageUrl, castMember.imageUrl);
         if (personId) {
           const role = mapRole(castMember.role);
-          await supabase.from('credits').upsert({
-            film_id: filmId,
-            person_id: personId,
-            role,
-            character_name: null
-          }, { onConflict: 'film_id,person_id,role' });
+          await callSupabaseWithRetry(async () => {
+            return await supabase.from('credits').upsert({
+              film_id: filmId,
+              person_id: personId,
+              role,
+              character_name: null
+            }, { onConflict: 'film_id,person_id,role' });
+          });
         }
       }
       console.log(`  ✓ Cast & Crew credits linked successfully`);
@@ -481,7 +585,9 @@ async function run() {
   const args = process.argv.slice(2);
   let startPage = 1;
   let endPage = 1;
+  let crawlAll = true;
   let delayMs = 1000;
+  let force = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--start-page' && args[i + 1]) {
@@ -489,19 +595,27 @@ async function run() {
       i++;
     } else if (args[i] === '--end-page' && args[i + 1]) {
       endPage = parseInt(args[i + 1]);
+      crawlAll = false;
       i++;
     } else if (args[i] === '--delay' && args[i + 1]) {
       delayMs = parseInt(args[i + 1]);
       i++;
+    } else if (args[i] === '--force') {
+      force = true;
     }
   }
 
   console.log(`🚀 Starting Nollymeter Scraper...`);
   console.log(`   - Start Page: ${startPage}`);
-  console.log(`   - End Page: ${endPage}`);
-  console.log(`   - Request Delay: ${delayMs}ms\n`);
+  console.log(`   - End Page: ${crawlAll ? 'Scrape until empty' : endPage}`);
+  console.log(`   - Request Delay: ${delayMs}ms`);
+  console.log(`   - Force Sync: ${force}\n`);
 
-  for (let page = startPage; page <= endPage; page++) {
+  let page = startPage;
+  while (true) {
+    if (!crawlAll && page > endPage) {
+      break;
+    }
     const listUrl = `${BASE}/movies?page=${page}`;
     console.log(`📋 Fetching Movies List Page ${page}: ${listUrl}`);
     
@@ -518,14 +632,35 @@ async function run() {
       });
       
       console.log(`🔍 Found ${movieUrls.length} movies on Page ${page}`);
+      if (movieUrls.length === 0) {
+        console.log(`🏁 No more movies found on Page ${page}. Stopping.`);
+        break;
+      }
       
       for (const movieUrl of movieUrls) {
+        if (!force) {
+          const exists = await callSupabaseWithRetry<any[]>(async () => {
+            return await supabase
+              .from('films')
+              .select('id')
+              .contains('streaming_links', { nollymeter: movieUrl })
+              .limit(1);
+          });
+
+          if (exists && exists.length > 0) {
+            console.log(`⏭️ Skipping already synced movie: ${movieUrl}`);
+            continue;
+          }
+        }
+
         await syncMovie(movieUrl);
         await sleep(delayMs);
       }
     } catch (e: any) {
       console.error(`❌ Error fetching list page ${page}: ${e.message}`);
+      break;
     }
+    page++;
   }
 
   console.log(`\n🎉 Nollymeter scraping and sync complete.`);

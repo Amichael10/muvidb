@@ -176,6 +176,9 @@ const PersonDetail = () => {
       return
     }
 
+    // Increment profile views in the background
+    supabase.rpc('increment_profile_views', { person_uuid: data.id }).then(() => {});
+
     setPerson(data)
     setPersonId(data.id)
     document.title = `MuviDB | ${data.name}`
@@ -466,7 +469,7 @@ const PersonDetail = () => {
               <div className="grid grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden bg-surface max-w-sm mx-auto md:mx-0 shadow-sm">
                 <div className="p-4 border-r border-border text-center">
                   <p className="text-brand text-xl font-bold font-heading">
-                    {formatViewCount(person.popularity_score || totalViews)}
+                    {formatViewCount(person.profile_views || person.popularity_score || totalViews)}
                   </p>
                   <p className="text-text-muted text-[9px] font-bold">Views</p>
                 </div>

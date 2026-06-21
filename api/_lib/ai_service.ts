@@ -152,6 +152,7 @@ export async function generateAIVisionContent(prompt: string, base64Data: string
     }
   };
 
+  // Attempt 1: Gemini 2.5 Flash (primary)
   try {
     const result = await geminiModel.generateContent([prompt, imagePart]);
     return {
@@ -159,17 +160,46 @@ export async function generateAIVisionContent(prompt: string, base64Data: string
       telemetry: { engine: 'gemini-vision-2.5', status: 'ok' }
     };
   } catch (err: any) {
-    console.warn('[AI Service] Gemini 2.5 Flash Vision failed, trying Gemini 1.5 Flash fallback...', err.message);
+    console.warn('[AI Service] Gemini 2.5 Flash Vision failed:', err.message);
+
+    // Attempt 2: Gemini 2.0 Flash Lite (free tier fallback)
     try {
-      const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log('[AI Service] Trying Gemini 2.0 Flash Lite fallback...');
+      const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       const result = await fallbackModel.generateContent([prompt, imagePart]);
       return {
         text: result.response.text(),
-        telemetry: { engine: 'gemini-vision-1.5-fallback', status: 'ok' }
+        telemetry: { engine: 'gemini-vision-2.0-lite', status: 'ok' }
       };
     } catch (fallbackErr: any) {
-      console.error('[AI Service] Gemini 1.5 Flash fallback failed too:', fallbackErr.message);
-      throw new Error(`Vision API execution failed: ${err.message} (Fallback error: ${fallbackErr.message})`);
+      console.warn('[AI Service] Gemini 2.0 Flash Lite fallback failed:', fallbackErr.message);
+
+      // Attempt 3: OpenAI gpt-4o-mini vision (if configured)
+      if (openai) {
+        try {
+          console.log('[AI Service] Trying OpenAI Vision fallback...');
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
+              ]
+            }],
+            temperature: 0.2,
+          });
+          return {
+            text: response.choices[0]?.message?.content || '',
+            telemetry: { engine: 'openai-vision-4o-mini', status: 'ok' }
+          };
+        } catch (openaiErr: any) {
+          console.error('[AI Service] OpenAI Vision fallback failed:', openaiErr.message);
+          throw new Error(`All vision providers failed. Gemini 2.5: ${err.message} | Gemini 2.0 Lite: ${fallbackErr.message} | OpenAI: ${openaiErr.message}`);
+        }
+      }
+
+      throw new Error(`Vision API failed: ${err.message} (Gemini 2.0 Lite fallback: ${fallbackErr.message}). No OpenAI key configured for further fallback.`);
     }
   }
 }

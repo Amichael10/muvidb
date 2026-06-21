@@ -88,6 +88,7 @@ export default function Home() {
         fetchTop10Films().catch(e => console.error('Error fetching top 10:', e)),
         fetchCrewMembers().catch(e => console.error('Error fetching crew:', e)),
         fetchCompanies().catch(e => console.error('Error fetching companies:', e)),
+        fetchRecentlyAdded().catch(e => console.error('Error fetching recently added:', e)),
         fetchPlatformCounts().catch(e => console.error('Error fetching platform counts:', e))
       ]);
     } catch (error) {
@@ -170,6 +171,7 @@ export default function Home() {
         film_genres(genres(name))
       `)
       .eq('content_type', 'series')
+      .eq('is_trending', true)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('view_count', { ascending: false })
       .limit(20);
@@ -183,9 +185,7 @@ export default function Home() {
   };
 
   const fetchNewReleases = async () => {
-    // New Releases = the freshest YouTube movies fetched this year, newest first,
-    // so the row turns over with whatever dropped most recently each day.
-    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+    // New Releases = newly added movies of year 2026, newest first.
     const { data, error } = await supabase
       .from('films')
       .select(`
@@ -194,9 +194,9 @@ export default function Home() {
         is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
       `)
-      .eq('source', 'youtube')
       .eq('content_type', 'movie')
-      .gte('created_at', yearStart)
+      .eq('year', 2026)
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -226,6 +226,7 @@ export default function Home() {
       `)
       .or('release_type.eq.netflix,source.eq.netflix,streaming_links->>netflix.not.is.null')
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+      .gte('year', 2026)
       .order('streaming_links->>netflix_added_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(20);
@@ -449,7 +450,7 @@ export default function Home() {
   };
 
   const fetchYoutubeFeed = async () => {
-    // Recently added are the new fetches from youtube (Issue 3)
+    // Free on YouTube = all fetched YouTube movies, newest first
     const { data } = await supabase
       .from('films')
       .select(`
@@ -459,8 +460,9 @@ export default function Home() {
         film_genres(genres(name))
       `)
       .eq('source', 'youtube')
+      .eq('content_type', 'movie')
       .order('created_at', { ascending: false })
-      .limit(40);
+      .limit(20);
 
     if (data) {
       const mapped = data.map(f => ({
@@ -472,16 +474,27 @@ export default function Home() {
     }
   };
 
-  // Keep recentlyAdded synchronized and deduplicated (Issue 3)
-  useEffect(() => {
-    if (youtubeFeed.length > 0) {
-      const filtered = youtubeFeed.filter(film => 
-        !inCinemas.some(ic => ic.id === film.id) &&
-        !newReleases.some(nr => nr.id === film.id)
-      );
-      setRecentlyAdded(filtered.slice(0, 20));
+  const fetchRecentlyAdded = async () => {
+    // Recently Added = all newly added films from all sources (netflix, prime, youtube, docuth, kava, cinema, etc.)
+    const { data, error } = await supabase
+      .from('films')
+      .select(`
+        id, title, poster_url, backdrop_url, year, language,
+        runtime_minutes, view_count, average_rating, nfvcb_rating,
+        is_featured, is_trending, release_type, created_at, release_date,
+        film_genres(genres(name))
+      `)
+      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (!error && data) {
+      setRecentlyAdded(data.map(f => ({
+        ...f,
+        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+      })));
     }
-  }, [youtubeFeed, inCinemas, newReleases]);
+  };
 
   const fetchPeople = async () => {
     const { data } = await supabase
@@ -629,7 +642,7 @@ export default function Home() {
         {/* 6. WHAT'S NEW (three redundant rows consolidated into tabs) */}
         {(isLoading || comingSoon.length > 0 || newReleases.length > 0 || recentlyAdded.length > 0) && (
           <div className="border-b border-border py-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
               <div className="space-y-1 mb-6">
                 <h2 className="text-2xl font-bold text-text-primary tracking-tight">What&apos;s New</h2>
                 <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest opacity-70">Fresh on MuviDB</p>
@@ -643,7 +656,7 @@ export default function Home() {
                   <button
                     key={t.key}
                     onClick={() => setWhatsNewTab(t.key)}
-                    className={`pb-3 -mb-px text-sm font-bold border-b-2 transition-colors ${
+                    className={`pb-3 -mb-px text-sm font-bold border-b-2 transition-colors cursor-pointer ${
                       whatsNewTab === t.key
                         ? 'text-text-primary border-brand'
                         : 'text-text-muted border-transparent hover:text-text-secondary'

@@ -17,6 +17,7 @@
     "scrape:imdb": "tsx scripts/imdb_scraper.ts",
     "scrape:imdb-bulk": "tsx scripts/imdb_bulk_sync.ts",
     "sync:kava": "tsx scripts/sync-kava.ts",
+    "sync:ugandan": "tsx scripts/ugandan_sync.ts",
     "sync:nollymeter": "tsx scripts/nollymeter_sync.ts",
     "cleanup:cinemas": "tsx scripts/cleanup-cinemas.ts",
     "fix-db": "tsx scripts/fix_db.ts"

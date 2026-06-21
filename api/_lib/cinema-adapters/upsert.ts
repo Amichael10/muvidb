@@ -16,8 +16,16 @@
 
 import { supabase } from '../supabase.js';
 import type { ScrapedShowtime } from './types.js';
+import { isOwnUrl, mirrorImageToStorage } from '../image_mirror.js';
 
-type MatchCache = Map<string, string | null>; // normalized title → films.id | null (= pending)
+interface MatchedFilm {
+  id: string;
+  poster_url: string | null;
+  backdrop_url: string | null;
+  is_in_cinemas: boolean;
+}
+
+type MatchCache = Map<string, MatchedFilm | null>; // normalized title → MatchedFilm | null (= pending)
 
 function normalizeTitle(t: string): string {
   return t.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -33,20 +41,20 @@ function normalizeTitle(t: string): string {
  * promotes a title or aliases it to an existing film, this exact matcher will
  * start linking it automatically next run.
  */
-async function matchNollywoodFilm(title: string): Promise<string | null> {
+async function matchNollywoodFilm(title: string): Promise<MatchedFilm | null> {
   const clean = title.trim().replace(/\s+/g, ' ');
   if (!clean) return null;
 
   // 1. Direct case-insensitive exact match in films
   const { data: directMatch } = await supabase
     .from('films')
-    .select('id')
+    .select('id, poster_url, backdrop_url, is_in_cinemas')
     .eq('is_nollywood', true)
     .ilike('title', clean)       // ilike with no %..% = case-insensitive exact
     .limit(1);
 
   if (directMatch && directMatch.length) {
-    return directMatch[0].id;
+    return directMatch[0] as MatchedFilm;
   }
 
   // 2. Resolve via pending triage mapping (admin-promoted alias)
@@ -58,7 +66,14 @@ async function matchNollywoodFilm(title: string): Promise<string | null> {
     .limit(1);
 
   if (aliasMatch && aliasMatch.length && aliasMatch[0].promoted_film_id) {
-    return aliasMatch[0].promoted_film_id;
+    const { data: pf } = await supabase
+      .from('films')
+      .select('id, poster_url, backdrop_url, is_in_cinemas')
+      .eq('id', aliasMatch[0].promoted_film_id)
+      .limit(1);
+    if (pf && pf.length) {
+      return pf[0] as MatchedFilm;
+    }
   }
 
   return null;
@@ -134,19 +149,51 @@ export async function upsertShowtimes(
 
   for (const st of scraped) {
     const key = normalizeTitle(st.filmTitle);
-    let filmId = cache.get(key);
-    if (filmId === undefined) {
-      filmId = await matchNollywoodFilm(st.filmTitle);
-      cache.set(key, filmId);
+    let film = cache.get(key);
+    if (film === undefined) {
+      film = await matchNollywoodFilm(st.filmTitle);
+      cache.set(key, film);
     }
 
-    if (!filmId) {
+    if (!film) {
       // Not a Nollywood film — route to pending table once per unique title per run
       if (!unmatchedSeen.has(key)) {
         await recordPending(st, cinemaId, source);
         unmatchedSeen.add(key);
       }
       continue;
+    }
+
+    const filmId = film.id;
+
+    // Check if the film is missing a valid mirrored poster or backdrop (cover)
+    const hasValidPoster = film.poster_url && isOwnUrl(film.poster_url);
+    const hasValidBackdrop = film.backdrop_url && isOwnUrl(film.backdrop_url);
+    const updatedFields: Record<string, any> = {};
+
+    if (!hasValidPoster && st.filmMeta?.posterUrl) {
+      console.log(`[cinema-upsert] Film "${st.filmTitle}" has no valid poster. Attempting to mirror scraped poster: ${st.filmMeta.posterUrl}`);
+      const filename = `${filmId.slice(0, 8)}-${st.filmTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`;
+      const mirroredPoster = await mirrorImageToStorage(st.filmMeta.posterUrl, 'posters', filename);
+      if (mirroredPoster) {
+        updatedFields.poster_url = mirroredPoster;
+        film.poster_url = mirroredPoster;
+      }
+    }
+
+    if (!hasValidBackdrop && st.filmMeta?.backdropUrl) {
+      console.log(`[cinema-upsert] Film "${st.filmTitle}" has no valid backdrop. Attempting to mirror scraped backdrop: ${st.filmMeta.backdropUrl}`);
+      const filename = `${filmId.slice(0, 8)}-${st.filmTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}-bd`;
+      const mirroredBackdrop = await mirrorImageToStorage(st.filmMeta.backdropUrl, 'backdrops', filename);
+      if (mirroredBackdrop) {
+        updatedFields.backdrop_url = mirroredBackdrop;
+        film.backdrop_url = mirroredBackdrop;
+      }
+    }
+
+    if (Object.keys(updatedFields).length > 0) {
+      console.log(`[cinema-upsert] Updating film "${st.filmTitle}" with mirrored images:`, updatedFields);
+      await supabase.from('films').update(updatedFields).eq('id', filmId);
     }
 
     if (st.showDate < minDate) minDate = st.showDate;

@@ -9,17 +9,19 @@ export default function PlatformRail({ films = [], counts = {} }) {
   // Counts come from accurate DB-level queries (passed in). Cover art is a
   // best-effort pick from the client film list (may be absent for low-view
   // platforms — the gradient fallback covers that).
-  const activePlatforms = PLATFORMS.map((platform) => {
-    const coverFilm = films
-      .filter((f) => (f.backdrop_url || f.poster_url) && isFilmOnPlatform(f, platform.id))
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+  const activePlatforms = PLATFORMS
+    .filter((platform) => !platform.isCinema && platform.id !== 'cinema')
+    .map((platform) => {
+      const coverFilm = films
+        .filter((f) => (f.backdrop_url || f.poster_url) && isFilmOnPlatform(f, platform.id))
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
 
-    return {
-      ...platform,
-      count: counts[platform.id] || 0,
-      coverImage: coverFilm?.backdrop_url || coverFilm?.poster_url || '',
-    };
-  }).filter((p) => p.count > 0 || p.id === 'ebonylife');
+      return {
+        ...platform,
+        count: counts[platform.id] || 0,
+        coverImage: coverFilm?.backdrop_url || coverFilm?.poster_url || '',
+      };
+    }).filter((p) => p.count > 0 || p.id === 'ebonylife');
 
   if (activePlatforms.length === 0) return null;
 
