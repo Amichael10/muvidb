@@ -39,6 +39,7 @@ export default function AdminLayout() {
     { path: '/admin/users', label: 'Users', icon: 'solar:users-group-two-rounded-linear' },
     { path: '/admin/cinemas', label: 'Cinemas', icon: 'solar:buildings-2-linear' },
     { path: '/admin/channels', label: 'Channels', icon: 'solar:videocamera-record-linear' },
+    { path: '/admin/countries', label: 'Countries', icon: 'solar:global-linear' },
     { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear' },
     { path: '/admin/cinema-scraping', label: 'Scraping', icon: 'solar:refresh-linear' },
     { path: '/admin/logs', label: 'Activity Logs', icon: 'solar:history-linear' },

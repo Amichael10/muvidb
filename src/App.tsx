@@ -54,6 +54,7 @@ const AdminSpotlight = lazy(() => import('./pages/admin/AdminSpotlight'));
 const AdminTop10 = lazy(() => import('./pages/admin/AdminTop10'));
 const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
 const AdminAutomation = lazy(() => import('./pages/admin/AdminAutomation'));
+const AdminCountries = lazy(() => import('./pages/admin/AdminCountries'));
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -197,6 +198,7 @@ export default function App() {
                   <Route path="spotlight" element={<AdminSpotlight />} />
                   <Route path="top10" element={<AdminTop10 />} />
                   <Route path="automation" element={<AdminAutomation />} />
+                  <Route path="countries" element={<AdminCountries />} />
                   <Route path="logs" element={<ProtectedRoute allowedRoles={['admin']}><AdminLogs /></ProtectedRoute>} />
                 </Route>
 
