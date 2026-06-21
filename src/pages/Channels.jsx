@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatViewCount } from '../utils/youtube';
@@ -74,6 +74,11 @@ function ChannelCard({ channel }) {
             {channel.category && (
               <span className="text-[10px] font-bold text-text-muted bg-surface-2 px-2 py-0.5 rounded border border-border">
                 {CATEGORY_LABELS[channel.category] || channel.category}
+              </span>
+            )}
+            {channel.country && (
+              <span className="text-[10px] font-bold text-text-muted bg-surface-2 px-2 py-0.5 rounded border border-border">
+                {channel.country}
               </span>
             )}
             {channel.subscriber_count > 0 && (

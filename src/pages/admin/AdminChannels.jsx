@@ -292,7 +292,7 @@ function ChannelModal({ channel, onSave, onClose }) {
             <CompanySearch value={company} onChange={setCompany} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Channel Name</label>
               <input name="name" value={form.name} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" />
@@ -303,6 +303,10 @@ function ChannelModal({ channel, onSave, onClose }) {
                 <option value="">Select Category</option>
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Country</label>
+              <input name="country" value={form.country} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" placeholder="e.g. Nigeria" />
             </div>
           </div>
 
@@ -670,7 +674,7 @@ export default function AdminChannels() {
                     </div>
                   </div>
                   <h3 className="text-sm font-bold text-text-primary mb-1">{ch.name}</h3>
-                  <p className="text-[10px] text-brand font-black uppercase tracking-widest mb-4">{ch.category || 'Uncategorized'}</p>
+                  <p className="text-[10px] text-brand font-black uppercase tracking-widest mb-4">{ch.category || 'Uncategorized'} • {ch.country || 'Nigeria'}</p>
                   
                   <div className="space-y-3 bg-surface-2/50 rounded-xl p-4 mb-4">
                     <div className="flex items-center justify-between text-[10px] font-bold">
