@@ -264,9 +264,31 @@ class LocalOCR:
                 
                 if result and result[0]:
                     for line in result[0]:
-                        text = line[1][0]
-                        confidence = line[1][1]
-                        if confidence > 0.4:
+                        if not line:
+                            continue
+                        
+                        text = ""
+                        confidence = 0.0
+                        
+                        # Format 1: Standard [[box, (text, confidence)], ...]
+                        if len(line) >= 2 and isinstance(line[1], (tuple, list)) and len(line[1]) >= 2:
+                            text = line[1][0]
+                            confidence = line[1][1]
+                        # Format 2: Flat [[box, text, confidence], ...]
+                        elif len(line) >= 3 and isinstance(line[1], str):
+                            text = line[1]
+                            try:
+                                confidence = float(line[2])
+                            except:
+                                confidence = 1.0
+                        # Format 3: Simple string representation or single tuple
+                        elif isinstance(line, str):
+                            text = line
+                            confidence = 1.0
+                        else:
+                            continue
+                            
+                        if text and confidence > 0.4:
                             extracted_lines.append(text)
                     return "\n".join(extracted_lines)
             except Exception as e:
