@@ -270,7 +270,9 @@ class LocalOCR:
                             extracted_lines.append(text)
                     return "\n".join(extracted_lines)
             except Exception as e:
+                import traceback
                 print(f"     ⚠️ PaddleOCR execution failed: {e}")
+                traceback.print_exc()
 
         # 2. Fallback: Tesseract OCR
         if TESSERACT_AVAILABLE:
