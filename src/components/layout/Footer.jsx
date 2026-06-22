@@ -51,7 +51,6 @@ export default function Footer() {
                 <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
                 <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join MuviDB</Link></li>
                 <li><Link to="/dashboard" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Dashboard</Link></li>
-                <li><Link to="/claim" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Claim Profile (For Filmmakers & Talent)</Link></li>
               </ul>
             </div>
           </div>
@@ -73,6 +72,13 @@ export default function Footer() {
               <div className="flex gap-8">
                 <Link to="/terms" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Terms</Link>
                 <Link to="/privacy" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Privacy</Link>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event('open-cookie-consent'))}
+                  className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest"
+                >
+                  Cookie Settings
+                </button>
               </div>
             </div>
           </div>
