@@ -352,10 +352,10 @@ def download_segment(url: str, start: float, duration: float, out_path: Path):
                 sys.executable, "-m", "yt_dlp", *YT_BASE_FLAGS,
                 "--download-sections", f"*{int(start)}-{int(start+duration)}",
                 "--force-keyframes-at-cuts",
-                "-f", "worstvideo/worst",
+                "-f", "bestvideo[height<=360]/best[height<=360]",
                 "-o", str(out_path),
                 url
-            ], check=True, timeout=400)
+            ], check=True, timeout=1200)
             return
         except Exception as e:
             if attempt == 3: raise e
