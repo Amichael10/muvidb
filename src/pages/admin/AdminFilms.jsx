@@ -680,14 +680,15 @@ export default function AdminFilms() {
   };
 
   const addCredit = (person, role = 'actor') => {
-    if (credits.some(c => c.person_id === person.id && c.role === role)) {
+    const normRole = role.trim().toLowerCase();
+    if (credits.some(c => c.person_id === person.id && (c.role || '').trim().toLowerCase() === normRole)) {
       toast.error('Person already added with this role');
       return;
     }
     setCredits(prev => [...prev, {
       person_id: person.id,
       name: person.name,
-      role: role,
+      role: normRole,
       character_name: '',
       billing_order: prev.length + 1
     }]);
@@ -826,14 +827,34 @@ export default function AdminFilms() {
           // 3. Only insert credits whose person_id is confirmed valid
           const validCredits = creditsWithId.filter(c => validIds.has(c.person_id));
           if (validCredits.length > 0) {
-            const creditPayload = validCredits.map(c => ({
-              film_id: filmId,
-              person_id: c.person_id,
-              role: c.role ? toTitleCase(c.role) : '',
-              character_name: c.character_name ? toTitleCase(c.character_name) : '',
-              billing_order: c.billing_order
-            }));
-            insertPromises.push(supabase.from('credits').insert(creditPayload));
+            const uniquePayloads = [];
+            const seen = new Set();
+
+            for (const c of validCredits) {
+              const normalizedRole = c.role ? toTitleCase(c.role.trim()) : '';
+              const key = `${c.person_id}-${normalizedRole}`;
+
+              if (!seen.has(key)) {
+                seen.add(key);
+                uniquePayloads.push({
+                  film_id: filmId,
+                  person_id: c.person_id,
+                  role: normalizedRole,
+                  character_name: c.character_name ? toTitleCase(c.character_name.trim()) : '',
+                  billing_order: c.billing_order
+                });
+              } else {
+                // If duplicate exists, merge character_name if original doesn't have it
+                const existing = uniquePayloads.find(p => p.person_id === c.person_id && p.role === normalizedRole);
+                if (existing && !existing.character_name && c.character_name) {
+                  existing.character_name = toTitleCase(c.character_name.trim());
+                }
+              }
+            }
+
+            if (uniquePayloads.length > 0) {
+              insertPromises.push(supabase.from('credits').insert(uniquePayloads));
+            }
           }
         }
       }

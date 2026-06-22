@@ -62,11 +62,12 @@ async function safeGoto(page: any, url: string, options: any = {}, retries: numb
 async function scrapeDocuth() {
   console.log('🚀 Launching browser...');
   
-  const proxyServer = process.env.SMARTPROXY_HOST && process.env.SMARTPROXY_PORT
+  const isNoProxy = process.env.DOCUTH_NO_PROXY === 'true' || process.env.NO_PROXY === 'true';
+  const proxyServer = !isNoProxy && process.env.SMARTPROXY_HOST && process.env.SMARTPROXY_PORT
     ? `http://${process.env.SMARTPROXY_HOST}:${process.env.SMARTPROXY_PORT}`
     : null;
-  const proxyUser = process.env.SMARTPROXY_USER;
-  const proxyPass = process.env.SMARTPROXY_PASS;
+  const proxyUser = !isNoProxy ? process.env.SMARTPROXY_USER : undefined;
+  const proxyPass = !isNoProxy ? process.env.SMARTPROXY_PASS : undefined;
 
   const launchOptions: any = { headless: true };
   if (proxyServer && proxyUser && proxyPass) {
@@ -76,6 +77,8 @@ async function scrapeDocuth() {
       username: proxyUser,
       password: proxyPass
     };
+  } else if (isNoProxy) {
+    console.log('🛡️ Proxy disabled via environment flag.');
   }
 
   const browser = await chromium.launch(launchOptions);

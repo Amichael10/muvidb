@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -494,6 +494,15 @@ export default function AdminLogs() {
   const [filterAction, setFilterAction] = useState('all');
   const [filterEntity, setFilterEntity] = useState('all');
   const [filterName, setFilterName] = useState('');
+  const [debouncedFilterName, setDebouncedFilterName] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilterName(filterName);
+    }, filterName ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [filterName]);
+
   const [filterDate, setFilterDate] = useState('');
 
   // Tab 2: Automated Sync Logs States
@@ -507,7 +516,7 @@ export default function AdminLogs() {
     setPage(1);
     setPageInput('1');
     setExpandedSyncLogs(new Set());
-  }, [activeTab, filterAction, filterEntity, filterName, filterDate, filterSyncStatus, filterSyncSource]);
+  }, [activeTab, filterAction, filterEntity, debouncedFilterName, filterDate, filterSyncStatus, filterSyncSource]);
 
   // Main Fetch Switch
   useEffect(() => {
@@ -516,19 +525,19 @@ export default function AdminLogs() {
     } else {
       fetchSyncLogs();
     }
-  }, [page, activeTab, filterAction, filterEntity, filterName, filterDate, filterSyncStatus, filterSyncSource]);
+  }, [page, activeTab, filterAction, filterEntity, debouncedFilterName, filterDate, filterSyncStatus, filterSyncSource]);
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const selectQuery = filterName ? '*, users!inner(name, email, role)' : '*, users(name, email, role)';
+      const selectQuery = debouncedFilterName ? '*, users!inner(name, email, role)' : '*, users(name, email, role)';
       
       let query = supabase
         .from('admin_actions')
         .select(selectQuery, { count: 'exact' });
 
-      if (filterName) {
-        query = query.ilike('users.name', `%${filterName}%`);
+      if (debouncedFilterName) {
+        query = query.ilike('users.name', `%${debouncedFilterName}%`);
       }
       if (filterAction !== 'all') {
         query = query.eq('action_type', filterAction);

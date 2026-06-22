@@ -24,6 +24,15 @@ export default function AdminPeople() {
   const [totalCount, setTotalCount] = useState(0);
   const pageSize = 25;
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, search ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const [verifiedFilter, setVerifiedFilter] = useState('All'); 
   const [spotlightFilter, setSpotlightFilter] = useState('All'); 
   const [profileStatus, setProfileStatus] = useState('All'); 
@@ -81,8 +90,8 @@ export default function AdminPeople() {
         .from('people')
         .select('*', { count: 'exact', head: true });
 
-      if (search.trim()) {
-        countQuery = countQuery.ilike('name', `%${search}%`);
+      if (debouncedSearch.trim()) {
+        countQuery = countQuery.ilike('name', `%${debouncedSearch}%`);
       }
       if (profileStatus === 'Incomplete') {
         // OR logic for incomplete profiles (missing bio OR missing photo)
@@ -113,7 +122,7 @@ export default function AdminPeople() {
       const sort = sortConfigs[sortBy] || sortConfigs['Most Popular'];
       
       const { data, error } = await supabase.rpc('get_people_with_counts', {
-        p_search: search,
+        p_search: debouncedSearch,
         p_verified: verifiedFilter.toLowerCase(),
         p_spotlight: spotlightFilter.toLowerCase(),
         p_sort_col: sort.col,
@@ -136,11 +145,11 @@ export default function AdminPeople() {
   useEffect(() => {
     setPage(1);
     setSelectedPersonIds([]);
-  }, [search, verifiedFilter, spotlightFilter, profileStatus, sortBy]);
+  }, [debouncedSearch, verifiedFilter, spotlightFilter, profileStatus, sortBy]);
 
   useEffect(() => {
     fetchPeople();
-  }, [page, search, sortBy, profileStatus, spotlightFilter, verifiedFilter]);
+  }, [page, debouncedSearch, sortBy, profileStatus, spotlightFilter, verifiedFilter]);
 
   const handleToggleVerify = async (person) => {
     try {

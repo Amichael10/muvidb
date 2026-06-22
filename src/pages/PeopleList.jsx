@@ -135,6 +135,15 @@ const PeopleList = () => {
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, search ? 400 : 0)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const [roleFilter, setRoleFilter] = useState('All')
   const [sortBy, setSortBy] = useState('popularity')
   const [page, setPage] = useState(0)
@@ -148,7 +157,7 @@ const PeopleList = () => {
     setPage(0)
     setHasMore(true)
     fetchPeople(0, true)
-  }, [search, roleFilter, sortBy])
+  }, [debouncedSearch, roleFilter, sortBy])
 
   const fetchPeople = async (pageNum, reset = false) => {
     setLoading(true)
@@ -162,8 +171,8 @@ const PeopleList = () => {
         credits(id)
       `)
 
-    if (search) {
-      query = query.ilike('name', `%${search}%`)
+    if (debouncedSearch) {
+      query = query.ilike('name', `%${debouncedSearch}%`)
     }
 
     if (sortBy === 'popularity') {
