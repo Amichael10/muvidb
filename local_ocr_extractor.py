@@ -448,8 +448,32 @@ def local_regex_fallback(title: str, raw_text: str) -> str:
     return "\n\n".join(markdown)
 
 def run_ai_cleanup(title: str, raw_text: str) -> str:
-    """Triple-redundant formatting chain: Gemini Flash -> Groq Llama -> OpenAI -> Local Failsafe."""
+    """Multi-stage formatting chain: Ollama -> Gemini Flash -> Groq Llama -> OpenAI -> Local Failsafe."""
     prompt = AI_STRUCTURE_PROMPT.format(title=title, raw=raw_text)
+
+    # 0. Ollama (if OLLAMA_MODEL is configured)
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434").strip()
+    ollama_model = os.getenv("OLLAMA_MODEL", "").strip() or None
+    if ollama_model:
+        print(f"  [Ollama] Structuring raw text via {ollama_model}...")
+        try:
+            payload = {
+                "model": ollama_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "options": {
+                    "temperature": 0.1
+                }
+            }
+            res = requests.post(f"{ollama_host}/api/chat", json=payload, timeout=60)
+            if res.status_code == 200:
+                result = res.json()["message"]["content"]
+                if result and result.strip():
+                    return result
+            else:
+                print(f"  ⚠️ Log: Ollama API responded with code {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"  ⚠️ Ollama formatting failed: {e}")
 
     # 1. Primary: Gemini Flash
     if GEMINI_API_KEY:
