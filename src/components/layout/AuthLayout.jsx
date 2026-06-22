@@ -1,11 +1,8 @@
 ﻿import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { films } from '../../data/mockData';
-import { useTheme } from '../../context/ThemeContext';
 
 export default function AuthLayout({ children }) {
   const [currentFilmIndex, setCurrentFilmIndex] = useState(0);
-  const { theme } = useTheme();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -82,17 +79,6 @@ export default function AuthLayout({ children }) {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-16 bg-surface relative">
         <div className="absolute inset-0 grid-bg opacity-[0.03] pointer-events-none"></div>
         
-        {/* Mobile Logo */}
-        <div className="absolute top-10 left-10 lg:hidden">
-          <Link to="/" className="flex items-center group shrink-0">
-            <img 
-              src={theme === 'dark' ? "/images/MuviDB Brand/White Wordmark.svg" : "/images/MuviDB Brand/Wordmark.svg"} 
-              alt="MuviDB" 
-              className="h-6 object-contain group-hover:scale-105 transition-all duration-500" 
-            />
-          </Link>
-        </div>
-
         <div className="w-full max-w-md relative z-10">
           {children}
         </div>

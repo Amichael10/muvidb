@@ -142,7 +142,7 @@ export default function Signup() {
               className="w-4 h-4 border-2 border-border rounded bg-surface-2/50 checked:bg-brand checked:border-brand transition-all cursor-pointer accent-brand"
             />
           <label htmlFor="terms" className="text-[9px] font-black text-text-muted uppercase tracking-widest cursor-pointer opacity-60">
-            I AGREE TO <Link to="/terms" className="text-brand hover:underline">PROTOCOL</Link> & <Link to="/privacy" className="text-brand hover:underline">PRIVACY</Link>
+            I AGREE TO THE <Link to="/terms" className="text-brand hover:underline">TERMS &amp; CONDITIONS</Link> AND <Link to="/privacy" className="text-brand hover:underline">PRIVACY POLICY</Link>
           </label>
         </div>
 
@@ -168,7 +168,7 @@ export default function Signup() {
       <button
         type="button"
         onClick={() => loginWithGoogle()}
-        className="w-full bg-white text-bg text-[10px] font-black uppercase tracking-widest py-4 rounded-xl flex items-center justify-center gap-3 hover:bg-white/90 active:scale-95 transition-all"
+        className="w-full bg-white text-[#1f1f1f] border border-black/10 shadow-sm text-[10px] font-black uppercase tracking-widest py-4 rounded-xl flex items-center justify-center gap-3 hover:bg-white/90 active:scale-95 transition-all"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
