@@ -471,7 +471,6 @@ class SupabaseSync:
             self.enabled = True
             self.headers = {
                 "apikey": self.key,
-                "Authorization": f"Bearer {self.key}",
                 "Content-Type": "application/json",
                 "Prefer": "return=representation"
             }
