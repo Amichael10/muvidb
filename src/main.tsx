@@ -13,8 +13,9 @@ if (import.meta.env.VITE_POSTHOG_KEY) {
   posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
     api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
     person_profiles: 'identified_only', // Captures users when they log in
-    opt_out_capturing_by_default: true, // Wait for explicit consent before capturing
-    disable_session_recording: true,    // Never record screen-activity replays
+    opt_out_capturing_by_default: true,    // Wait for explicit consent before capturing
+    opt_out_persistence_by_default: true,  // No cookies/identifiers written before consent
+    disable_session_recording: true,       // Never record screen-activity replays
   });
 }
 
