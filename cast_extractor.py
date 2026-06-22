@@ -70,6 +70,7 @@ YT_BASE_FLAGS   = [
     "--no-playlist", 
     "--quiet", 
     "--no-warnings",
+    "--js-runtimes", "node",
     "--retries", "5", 
     "--socket-timeout", "60",
     "--extractor-args", "youtube:player_client=android,web",
