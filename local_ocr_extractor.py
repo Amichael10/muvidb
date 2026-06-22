@@ -12,6 +12,9 @@ Extracts cast/crew from Nollywood YouTube videos using:
 """
 
 import os
+os.environ["FLAGS_use_mkldnn"] = "0"
+os.environ["PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT"] = "0"
+
 import sys
 import base64
 import subprocess
