@@ -58,7 +58,7 @@ export default function Navbar() {
   };
 
   const navLinks = [
-    { name: 'Browse', path: '/browse' },
+    { name: 'Movies', path: '/browse' },
     { name: 'TV Shows', path: '/tv-shows' },
     { name: 'Showtimes', path: '/showtimes' },
     { name: 'Cinemas', path: '/cinemas' },

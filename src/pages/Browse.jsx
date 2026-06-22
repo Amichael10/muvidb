@@ -29,17 +29,26 @@ export default function Browse() {
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [language, setLanguage] = useState('');
   const [sortBy, setSortBy] = useState(initialSort);
-  const [activeTab, setActiveTab] = useState('movie');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const activeTab = 'movie';
 
   useEffect(() => {
-    document.title = "MuviDB | Browse";
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    document.title = "MuviDB | Movies";
     fetchGenres();
   }, []);
 
   useEffect(() => {
     setError(null);
     fetchFilms();
-  }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy, activeTab]);
+  }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy, debouncedSearchQuery]);
 
   const fetchGenres = async () => {
     try {
@@ -99,6 +108,10 @@ export default function Browse() {
       }
 
       query = query.eq('content_type', activeTab);
+
+      if (debouncedSearchQuery.trim()) {
+        query = query.ilike('title', `%${debouncedSearchQuery.trim()}%`);
+      }
 
       if (yearRange > 1990) query = query.gte('year', yearRange);
       if (language) query = query.eq('language', language);
@@ -245,6 +258,7 @@ export default function Browse() {
     setSelectedRatings([]);
     setLanguage('');
     setSortBy('views');
+    setSearchQuery('');
   };
 
   return (
@@ -257,37 +271,11 @@ export default function Browse() {
             <div className="space-y-6">
               <div className="space-y-4">
                 <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary tracking-tighter transition-colors duration-300">
-                  {activeTab === 'movie' ? 'Movies' : 'TV Shows'}
+                  Movies
                 </h1>
                 <p className="text-text-muted text-sm max-w-xl border-l-2 border-brand pl-6 transition-all duration-300">
-                  {activeTab === 'movie' 
-                    ? 'Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters.'
-                    : 'Discover the best Nollywood TV series and episodic stories spanning across genres and platforms.'}
+                  Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters.
                 </p>
-              </div>
-
-              {/* Category Tabs */}
-              <div className="flex items-center gap-2 bg-surface-2/50 p-1.5 rounded-xl border border-border w-fit backdrop-blur-sm">
-                <button
-                  onClick={() => setActiveTab('movie')}
-                  className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
-                    activeTab === 'movie'
-                      ? 'bg-brand text-white shadow-lg shadow-brand/20'
-                      : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
-                  }`}
-                >
-                  Movies
-                </button>
-                <button
-                  onClick={() => setActiveTab('series')}
-                  className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 ${
-                    activeTab === 'series'
-                      ? 'bg-brand text-white shadow-lg shadow-brand/20'
-                      : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
-                  }`}
-                >
-                  TV Shows
-                </button>
               </div>
             </div>
             <button 
@@ -382,6 +370,26 @@ export default function Browse() {
 
           {/* Films Grid */}
           <div className="flex-1 p-8 md:p-12">
+            {/* Search Bar */}
+            <div className="mb-8 relative max-w-md">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search movies by title..."
+                className="w-full h-12 bg-surface border border-border text-text-primary rounded-xl px-5 pl-11 text-sm focus:border-brand focus:outline-none transition-all shadow-md"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-50">🔍</span>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-sm font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             {loading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 {[...Array(8)].map((_, i) => (

@@ -27,6 +27,8 @@ export default function TVShows() {
   const [error, setError] = useState(null);
   const [selectedPlatform, setSelectedPlatform] = useState(searchParams.get('platform') || '');
   const [sortBy, setSortBy] = useState('newest');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
@@ -37,9 +39,16 @@ export default function TVShows() {
   }, []);
 
   useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  useEffect(() => {
     setPage(0);
     fetchShows(0);
-  }, [selectedPlatform, sortBy]);
+  }, [selectedPlatform, sortBy, debouncedSearchQuery]);
 
   const fetchShows = async (pageNum = 0) => {
     setLoading(true);
@@ -60,6 +69,10 @@ export default function TVShows() {
         query = query.eq('source', 'youtube');
       } else if (selectedPlatform) {
         query = query.eq('release_type', selectedPlatform);
+      }
+
+      if (debouncedSearchQuery.trim()) {
+        query = query.ilike('title', `%${debouncedSearchQuery.trim()}%`);
       }
 
       // Sort
@@ -205,7 +218,7 @@ export default function TVShows() {
             <div className="flex items-center justify-between border-b border-border pb-4">
               <h3 className="font-heading font-bold text-sm text-text-primary">Filters</h3>
               <button
-                onClick={() => { setSelectedPlatform(''); setSortBy('newest'); }}
+                onClick={() => { setSelectedPlatform(''); setSortBy('newest'); setSearchQuery(''); }}
                 className="text-[9px] font-bold text-brand hover:underline"
               >
                 Clear All
@@ -256,6 +269,26 @@ export default function TVShows() {
 
           {/* Grid */}
           <div className="flex-1 p-8 md:p-12">
+            {/* Search Bar */}
+            <div className="mb-8 relative max-w-md">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search TV shows by title..."
+                className="w-full h-12 bg-surface border border-border text-text-primary rounded-xl px-5 pl-11 text-sm focus:border-brand focus:outline-none transition-all shadow-md"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-50">🔍</span>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-sm font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             {loading && shows.length === 0 ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                 {[...Array(12)].map((_, i) => (
@@ -296,7 +329,7 @@ export default function TVShows() {
                 <Icon icon="solar:tv-linear" className="text-4xl text-text-muted mx-auto mb-4" />
                 <p className="text-text-muted text-xs font-bold mb-6">No TV shows found for these filters.</p>
                 <button
-                  onClick={() => { setSelectedPlatform(''); setSortBy('newest'); }}
+                  onClick={() => { setSelectedPlatform(''); setSortBy('newest'); setSearchQuery(''); }}
                   className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg transition-all hover:shadow-lg"
                 >
                   Reset Filters

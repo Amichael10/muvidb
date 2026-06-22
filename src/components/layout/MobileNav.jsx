@@ -22,7 +22,7 @@ const MobileNav = () => {
 
   const navItems = [
     { name: 'Home', path: '/', icon: 'solar:home-2-linear', activeIcon: 'solar:home-2-bold' },
-    { name: 'Browse', path: '/browse', icon: 'solar:clapperboard-play-linear', activeIcon: 'solar:clapperboard-play-bold' },
+    { name: 'Movies', path: '/browse', icon: 'solar:clapperboard-play-linear', activeIcon: 'solar:clapperboard-play-bold' },
     { name: 'Search', path: '/search', icon: 'solar:magnifer-linear', activeIcon: 'solar:magnifer-bold' },
   ];
 
