@@ -36,8 +36,8 @@ export const extractChannelIdentifier = (url) => {
   const channelMatch = url.match(/\/channel\/(UC[\w-]+)/);
   if (channelMatch) return { type: 'id', value: channelMatch[1] };
   
-  // Handle /@handle or /c/handle or /user/handle
-  const handleMatch = url.match(/\/(?:@|c\/|user\/)([\w-]+)/);
+  // Handle /@handle or /c/handle or /user/handle (handles can contain dots)
+  const handleMatch = url.match(/\/(?:@|c\/|user\/)([\w.-]+)/);
   if (handleMatch) return { type: 'handle', value: handleMatch[1] };
 
   // Just return the value if it's already an ID or Handle
@@ -53,48 +53,29 @@ export const extractChannelIdentifier = (url) => {
  */
 export const fetchChannelData = async (identifier) => {
   try {
-    let channelId = identifier.value;
-
-    // If it's a handle, resolve it to a channel ID first
-    if (identifier.type === 'handle') {
-      const searchRes = await fetch(
-        `/api/youtube?endpoint=search&part=snippet&type=channel&q=${encodeURIComponent(identifier.value)}`
-      );
-      
-      if (!searchRes.ok) {
-        let errorMsg = `YouTube search returned status ${searchRes.status}`;
-        const text = await searchRes.text();
-        try {
-          const errorData = JSON.parse(text);
-          if (errorData.error) errorMsg = errorData.error;
-          else if (errorData.message) errorMsg = errorData.message;
-        } catch (e) {
-          // Fallback to text if JSON fails
-          if (text) errorMsg += `: ${text.substring(0, 100)}`;
-        }
-        console.error('YouTube Search Failed:', searchRes.status, errorMsg);
-        throw new Error(errorMsg);
-      }
-      
-      const searchData = await searchRes.json();
-      if (!searchData.items || searchData.items.length === 0) {
-        throw new Error('Channel not found');
-      }
-      channelId = searchData.items[0].id.channelId;
+    let url;
+    if (identifier.type === 'id') {
+      url = `/api/youtube?endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(identifier.value)}`;
+    } else {
+      url = `/api/youtube?endpoint=channels&part=snippet,statistics,brandingSettings&forHandle=${encodeURIComponent(identifier.value)}`;
     }
 
-    // Fetch full stats and branding
-    const detailRes = await fetch(
-      `/api/youtube?endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(channelId)}`
-    );
+    const detailRes = await fetch(url);
     
     if (!detailRes.ok) {
       let errorMsg = `YouTube details returned status ${detailRes.status}`;
       const text = await detailRes.text();
       try {
         const errorData = JSON.parse(text);
-        if (errorData.error) errorMsg = errorData.error;
-        else if (errorData.message) errorMsg = errorData.message;
+        if (errorData.error) {
+          if (typeof errorData.error === 'object') {
+            errorMsg = errorData.error.message || JSON.stringify(errorData.error);
+          } else {
+            errorMsg = errorData.error;
+          }
+        } else if (errorData.message) {
+          errorMsg = errorData.message;
+        }
       } catch (e) {
         if (text) errorMsg += `: ${text.substring(0, 100)}`;
       }
@@ -112,10 +93,10 @@ export const fetchChannelData = async (identifier) => {
       channelId: channel.id,
       handle: channel.snippet.customUrl,
       title: channel.snippet.title,
-      thumbnail: channel.snippet.thumbnails.high?.url || channel.snippet.thumbnails.default?.url,
-      banner: channel.brandingSettings.image?.bannerExternalUrl,
-      subscribers: channel.statistics.subscriberCount,
-      videos: channel.statistics.videoCount,
+      thumbnail: channel.snippet.thumbnails?.high?.url || channel.snippet.thumbnails?.default?.url,
+      banner: channel.brandingSettings?.image?.bannerExternalUrl,
+      subscribers: channel.statistics?.subscriberCount || '0',
+      videos: channel.statistics?.videoCount || '0',
       lastUpdated: new Date().toISOString()
     };
   } catch (err) {
