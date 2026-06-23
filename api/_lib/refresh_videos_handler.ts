@@ -86,15 +86,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 2. Fetch latest videos incrementally
-        const { data: latestVid } = await supabase.from('channel_videos').select('published_at').eq('channel_id', ch.id).order('published_at', { ascending: false }).limit(1).single();
-        const latestDate = latestVid ? new Date(latestVid.published_at) : new Date(0);
-        
         let nextPageToken = '';
-        let fetchedCount = 0;
+        let checkedCount = 0;
+        let newVideosFound = 0;
         let stopFetching = false;
         const allVideoRows = [];
 
-        while (!stopFetching && fetchedCount < 200) {
+        // Fetch up to 500 checked videos or 200 new videos, or until we run out of playlist items
+        while (!stopFetching && checkedCount < 500 && newVideosFound < 200) {
           const plData = await ytGet('playlistItems', { 
             part: 'snippet', playlistId: uploadsId, maxResults: '50', pageToken: nextPageToken
           });
@@ -102,69 +101,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           const videoIds = plData.items.map((i: any) => i.snippet.resourceId.videoId).join(',');
           const vData = await ytGet('videos', { part: 'contentDetails,snippet', id: videoIds });
+          if (!vData.items?.length) break;
 
-          const promotableVids = vData.items.filter((v: any) => parseDuration(v.contentDetails.duration) >= 900 && !hiddenSet.has(v.id));
+          // Check which videos are already in the database
+          const batchIds = vData.items.map((v: any) => v.id);
+          const { data: existingVids } = await supabase
+            .from('channel_videos')
+            .select('video_id')
+            .eq('channel_id', ch.id)
+            .in('video_id', batchIds);
+          
+          const existingSet = new Set(existingVids?.map(v => v.video_id) || []);
+          const newVideosInBatch = vData.items.filter((v: any) => !existingSet.has(v.id));
 
-          // 1. Bulk check existing films
-          const existingFilmsMap = new Map();
-          if (promotableVids.length > 0) {
-            const vIds = promotableVids.map((v: any) => v.id);
-            const { data: existingFilms } = await supabase.from('films').select('id, source_video_id').in('source_video_id', vIds);
-            if (existingFilms) existingFilms.forEach((f: any) => existingFilmsMap.set(f.source_video_id, f.id));
-          }
+          newVideosFound += newVideosInBatch.length;
+          checkedCount += vData.items.length;
 
-          // 2. Auto-promote
-          const filmsToInsert = promotableVids.filter((v: any) => !existingFilmsMap.has(v.id)).map((v: any) => ({
-            title: cleanTitle(v.snippet.title),
-            synopsis: v.snippet.description || '',
-            poster_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
-            release_type: 'youtube',
-            youtube_watch_url: `https://www.youtube.com/watch?v=${v.id}`,
-            source_video_id: v.id,
-            year: new Date(v.snippet.publishedAt).getFullYear(),
-            runtime_minutes: Math.round(parseDuration(v.contentDetails.duration) / 60),
-            language: ch.primary_language || 'English'
-          }));
+          // Process only new videos to avoid unnecessary processing and database duplicate writes
+          if (newVideosInBatch.length > 0) {
+            const promotableVids = newVideosInBatch.filter((v: any) => parseDuration(v.contentDetails.duration) >= 900 && !hiddenSet.has(v.id));
 
-          let insertedFilms: any[] = [];
-          if (filmsToInsert.length > 0) {
-            const { data: newFilms } = await supabase.from('films').insert(filmsToInsert).select();
-            if (newFilms) {
-              insertedFilms = newFilms;
-              insertedFilms.forEach((f: any) => {
-                existingFilmsMap.set(f.source_video_id, f.id);
-                totalCreated++;
-              });
+            // 1. Bulk check existing films
+            const existingFilmsMap = new Map();
+            if (promotableVids.length > 0) {
+              const vIds = promotableVids.map((v: any) => v.id);
+              const { data: existingFilms } = await supabase.from('films').select('id, source_video_id').in('source_video_id', vIds);
+              if (existingFilms) existingFilms.forEach((f: any) => existingFilmsMap.set(f.source_video_id, f.id));
+            }
+
+            // 2. Auto-promote
+            const filmsToInsert = promotableVids.filter((v: any) => !existingFilmsMap.has(v.id)).map((v: any) => ({
+              title: cleanTitle(v.snippet.title),
+              synopsis: v.snippet.description || '',
+              poster_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
+              release_type: 'youtube',
+              youtube_watch_url: `https://www.youtube.com/watch?v=${v.id}`,
+              source_video_id: v.id,
+              year: new Date(v.snippet.publishedAt).getFullYear(),
+              runtime_minutes: Math.round(parseDuration(v.contentDetails.duration) / 60),
+              language: ch.primary_language || 'English'
+            }));
+
+            let insertedFilms: any[] = [];
+            if (filmsToInsert.length > 0) {
+              const { data: newFilms } = await supabase.from('films').insert(filmsToInsert).select();
+              if (newFilms) {
+                insertedFilms = newFilms;
+                insertedFilms.forEach((f: any) => {
+                  existingFilmsMap.set(f.source_video_id, f.id);
+                  totalCreated++;
+                });
+              }
+            }
+
+            // 3. Auto-credit owner
+            if (ch.owner_person_id && insertedFilms.length > 0) {
+              await supabase.from('credits').insert(insertedFilms.map(f => ({
+                film_id: f.id, person_id: ch.owner_person_id, role: 'Actor', billing_order: 1
+              })));
+            }
+
+            // 4. Construct video rows for new videos
+            for (const v of newVideosInBatch) {
+              if (hiddenSet.has(v.id)) continue;
+              const duration = parseDuration(v.contentDetails.duration);
+              const row: any = {
+                channel_id: ch.id,
+                video_id: v.id,
+                title: v.snippet.title,
+                thumbnail_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
+                published_at: v.snippet.publishedAt,
+                duration_seconds: duration,
+                match_status: (duration >= 900 && existingFilmsMap.has(v.id)) ? 'matched' : 'unmatched',
+                film_id: (duration >= 900) ? existingFilmsMap.get(v.id) : null
+              };
+              allVideoRows.push(row);
             }
           }
 
-          // 3. Auto-credit owner
-          if (ch.owner_person_id && insertedFilms.length > 0) {
-            await supabase.from('credits').insert(insertedFilms.map(f => ({
-              film_id: f.id, person_id: ch.owner_person_id, role: 'Actor', billing_order: 1
-            })));
-          }
-
-          // 4. Construct video rows
-          for (const v of vData.items) {
-            if (hiddenSet.has(v.id)) continue;
-            const duration = parseDuration(v.contentDetails.duration);
-            const row: any = {
-              channel_id: ch.id,
-              video_id: v.id,
-              title: v.snippet.title,
-              thumbnail_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
-              published_at: v.snippet.publishedAt,
-              duration_seconds: duration,
-              match_status: (duration >= 900 && existingFilmsMap.has(v.id)) ? 'matched' : 'unmatched',
-              film_id: (duration >= 900) ? existingFilmsMap.get(v.id) : null
-            };
-            allVideoRows.push(row);
-          }
-
-          fetchedCount += vData.items.length;
-          const oldestInPage = new Date(vData.items[vData.items.length - 1].snippet.publishedAt);
-          if (oldestInPage <= latestDate) stopFetching = true;
           nextPageToken = plData.nextPageToken;
           if (!nextPageToken) stopFetching = true;
         }
