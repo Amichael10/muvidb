@@ -1241,15 +1241,23 @@ def main():
         return
 
     # DB-driven mode: sweep the incomplete-films queue (page 1 → backward).
+    # `attempted` remembers every URL we've already tried THIS session so a film
+    # that yields no credits (creditless title) isn't re-downloaded every sweep —
+    # otherwise the loop would spin forever on the same unextractable films.
+    # (On a fresh session/restart this resets, giving each film one more attempt.)
+    attempted: set[str] = set()
     sweep = 0
     while True:
         sweep += 1
         if loop_mode:
             print(f"\n🔁 Sweep #{sweep} — scanning DB for incomplete films...")
         incomplete_queue = sync.fetch_incomplete_youtube_films()
+        if loop_mode:
+            incomplete_queue = [f for f in incomplete_queue
+                                if f.get("youtube_watch_url") not in attempted]
 
         if not incomplete_queue:
-            print("✅ No incomplete YouTube films with 0 to 10 credits found.")
+            print("✅ No further incomplete films to attempt this session.")
             if not loop_mode:
                 return
             print(f"   Sleeping {LOOP_SLEEP_SECS}s before next sweep...")
@@ -1257,10 +1265,14 @@ def main():
             continue
 
         process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode=False)
+        for f in incomplete_queue:
+            if f.get("youtube_watch_url"):
+                attempted.add(f["youtube_watch_url"])
 
         if not loop_mode:
             return
-        print(f"\n😴 Sweep #{sweep} done. Sleeping {LOOP_SLEEP_SECS}s before re-scanning...")
+        print(f"\n😴 Sweep #{sweep} done ({len(attempted)} films attempted this session). "
+              f"Sleeping {LOOP_SLEEP_SECS}s before re-scanning...")
         time.sleep(LOOP_SLEEP_SECS)
 
 
