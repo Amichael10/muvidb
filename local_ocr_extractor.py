@@ -629,6 +629,22 @@ _PLACEHOLDER_TOKENS = (
     "specific role", "e.g.",
 )
 
+# Phrases that mark a "name" as model commentary/notes rather than a real person.
+_JUNK_NAME_TOKENS = (
+    "omitted", "not listed", "not a person", "note:", "appreciation",
+    "n/a", "unknown", "no character", "misreading", "error", "see ocr",
+)
+
+def _looks_like_junk_name(name: str) -> bool:
+    """True if this 'name' is really prose/commentary, not a person to save."""
+    low = name.lower()
+    if any(tok in low for tok in _JUNK_NAME_TOKENS):
+        return True
+    # Real credit names are short; a 7+ word 'name' is a sentence, not a person.
+    if len(name.split()) > 6:
+        return True
+    return False
+
 def strip_template_placeholders(markdown: str) -> str:
     """Drop lines that echo the prompt's example placeholders, then drop any
     section header left with no real entries under it."""
@@ -982,6 +998,8 @@ class SupabaseSync:
                     
                     name = name.strip()
                     if not name: continue
+                    if _looks_like_junk_name(name):
+                        continue
                     person_id = self.upsert_person(name)
                     if person_id:
                         self.link_credit(film_id, person_id, specific_role, char, idx)
