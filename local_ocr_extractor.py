@@ -595,44 +595,68 @@ Below is raw text extracted via Local OCR from the credit cards of a movie calle
 Some characters may be garbled, misspelled, duplicated, or out of order due to video background noise.
 Clean it up using Nollywood industry knowledge. Deduplicate entries. Separate cast from crew.
 
-Return ONLY a markdown document with these sections (skip empty sections):
-# Cast
-Format EXACTLY like this:
-- Actor Name - Character Name (e.g. - Maurice Sam - Prince Caleb)
-If NO character name is visible, write only:
-- Actor Name
+CRITICAL RULES:
+- Use ONLY real names that actually appear in the RAW OCR TEXT below. Never invent names.
+- If the OCR text contains no usable names for a section, OMIT that entire section
+  (header and all). An empty database is better than a wrong one.
+- NEVER output the literal words "Name", "Specific Role", or any example placeholder.
+  If you would write "Director Name" or "Crew Name", that means you have no real name —
+  so omit the section instead.
 
-# Director
-Format EXACTLY:
-- Director Name - Director
+Return ONLY a markdown document, using whichever of these sections you have REAL names for:
+# Cast  -> "- Actor Name - Character Name", or just "- Actor Name" if no character shown
+# Director  -> "- <name> - Director"
+# Producers  -> "- <name> - <their producer role>"
+# Cinematography  -> "- <name> - Cinematographer"
+# Editor  -> "- <name> - Editor"
+# Music  -> "- <name> - Composer"
+# Costume & Makeup  -> "- <name> - <their role>"
+# Crew  -> "- <name> - <their role>"  (Gaffer, Sound, PM, Continuity, etc.)
 
-# Producers
-Format EXACTLY:
-- Producer Name - Specific Role (e.g. - Jane Producer - Executive Producer)
-
-# Cinematography
-Format EXACTLY:
-- Cinematographer Name - Cinematographer
-
-# Editor
-Format EXACTLY:
-- Editor Name - Editor
-
-# Music
-Format EXACTLY:
-- Composer Name - Composer
-
-# Costume & Makeup
-Format EXACTLY:
-- Crew Name - Specific Role (e.g. - Mary Makeup - Makeup Artist, Wardrobe Designer - Costumier)
-
-# Crew
-(All other roles like Gaffer, Sound, PM, Continuity, etc.)
-Format EXACTLY:
-- Crew Name - Specific Role (e.g. - John Gaf - Gaffer)
+Example of the FORMAT only (do not copy these names): "- Maurice Sam - Prince Caleb"
 
 RAW OCR TEXT:
 {raw}"""
+
+# Tokens that only appear in the prompt's format examples, never in real credits.
+# A weak model with thin OCR input tends to echo these placeholders verbatim; we
+# strip any line containing one so garbage never reaches the DB.
+_PLACEHOLDER_TOKENS = (
+    "actor name", "character name", "director name", "producer name",
+    "cinematographer name", "editor name", "composer name", "crew name",
+    "specific role", "e.g.",
+)
+
+def strip_template_placeholders(markdown: str) -> str:
+    """Drop lines that echo the prompt's example placeholders, then drop any
+    section header left with no real entries under it."""
+    kept = []
+    for line in markdown.splitlines():
+        low = line.lower()
+        if line.lstrip().startswith("-") and any(tok in low for tok in _PLACEHOLDER_TOKENS):
+            continue
+        kept.append(line)
+    # Remove headers that now have no bullet lines before the next header/EOF.
+    out = []
+    for i, line in enumerate(kept):
+        if line.startswith("#"):
+            has_entry = any(
+                kept[j].lstrip().startswith("-")
+                for j in range(i + 1, len(kept))
+                if not (j > i + 1 and kept[j].startswith("#"))
+            )
+            # look ahead only until the next header
+            has_entry = False
+            for j in range(i + 1, len(kept)):
+                if kept[j].startswith("#"):
+                    break
+                if kept[j].lstrip().startswith("-"):
+                    has_entry = True
+                    break
+            if not has_entry:
+                continue
+        out.append(line)
+    return "\n".join(out).strip()
 
 def local_regex_fallback(title: str, raw_text: str) -> str:
     """Failsafe regex-based parser when all LLM API tokens are exhausted."""
@@ -1066,6 +1090,9 @@ def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
 
             # ── Step 6: AI Cleanup ────────────────────────────────────────────
             structured_markdown = run_ai_cleanup(title, combined_ocr_text)
+            # Drop any placeholder lines the model echoed from the prompt examples
+            # (and now-empty sections) so fake "Director Name" credits never save.
+            structured_markdown = strip_template_placeholders(structured_markdown)
 
             if not structured_markdown.strip():
                 skip_reason = "AI formatting returned empty result"
@@ -1084,6 +1111,12 @@ def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
             out_file = output_dir / f"ocr_{safe_title[:40]}.md"
             out_file.write_text(header + structured_markdown, encoding="utf-8")
             print(f"  ✓ Saved: {out_file.name}")
+
+            # Sidecar with the raw OCR text — lets us see what the readers actually
+            # captured when the structured names look thin.
+            raw_file = output_dir / f"ocr_{safe_title[:40]}.raw.txt"
+            raw_file.write_text(combined_ocr_text, encoding="utf-8")
+            print(f"  ✓ Raw OCR text: {raw_file.name} ({len(combined_ocr_text)} chars)")
 
             sync.process(url, structured_markdown)
             success_count += 1
