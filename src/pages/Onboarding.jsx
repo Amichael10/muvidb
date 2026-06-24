@@ -5,7 +5,7 @@ import AuthLayout from '../components/layout/AuthLayout';
 import { Icon } from '@iconify/react';
 
 export default function Onboarding() {
-  const [role, setRole] = useState('fan');
+  const role = 'fan'; // Only fan accounts are offered
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -16,7 +16,7 @@ export default function Onboarding() {
   useEffect(() => {
     document.title = "MuviDB | Complete Your Profile";
     if (user?.onboarded) {
-      navigate(user.role === 'professional' ? '/pro-dashboard' : '/dashboard');
+      navigate('/dashboard');
     }
     if (user?.name) setName(user.name);
   }, [user, navigate]);
@@ -46,7 +46,7 @@ export default function Onboarding() {
         // avatar_url: preview // This would be the storage URL normally
       });
       
-      navigate(role === 'professional' ? '/pro-dashboard' : '/dashboard');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Onboarding failed:', err);
     } finally {
@@ -86,89 +86,21 @@ export default function Onboarding() {
           </p>
         </div>
 
-        {/* Account Type Selection (Always Visible) */}
-        <div className="space-y-4">
-          <label className="block text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">
-            Select Account Type
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setRole('fan')}
-              className={`flex flex-col items-center p-6 rounded-xl border-2 transition-all duration-500 ${
-                role === 'fan' ? 'border-brand bg-brand/5' : 'border-border bg-surface-2/30'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${role === 'fan' ? 'bg-brand text-white' : 'bg-surface-2 text-text-muted'}`}>
-                <Icon icon="solar:heart-bold" className="text-xl" />
-              </div>
-              <span className="text-[9px] font-black uppercase tracking-widest">FAN HUB</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRole('professional')}
-              className={`flex flex-col items-center p-6 rounded-xl border-2 transition-all duration-500 ${
-                role === 'professional' ? 'border-brand bg-brand/5' : 'border-border bg-surface-2/30'
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${role === 'professional' ? 'bg-brand text-white' : 'bg-surface-2 text-text-muted'}`}>
-                <Icon icon="solar:user-id-bold" className="text-xl" />
-              </div>
-              <span className="text-[9px] font-black uppercase tracking-widest">INDUSTRY</span>
-            </button>
+        {/* Display Name */}
+        <div className="space-y-8">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">
+              Display Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="your name"
+              className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:border-brand focus:outline-none transition-all"
+            />
           </div>
         </div>
-
-        {/* Step-based Content */}
-        {role === 'professional' ? (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="p-8 bg-surface-2/30 border-2 border-brand/20 rounded-2xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-brand/10 text-brand rounded-xl flex items-center justify-center text-xl">
-                        <Icon icon="solar:magnifer-linear" />
-                    </div>
-                    <div className="space-y-1">
-                        <h3 className="font-heading font-bold text-lg text-text-primary tracking-tight uppercase italic">Identify Yourself</h3>
-                        <p className="text-[9px] font-black text-text-muted uppercase tracking-widest opacity-60">Search for your existing archive profile</p>
-                    </div>
-                </div>
-                <div className="relative group">
-                    <input 
-                      type="text" 
-                      placeholder="search your stage name..."
-                      className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:border-brand transition-all"
-                    />
-                </div>
-                <div className="pt-6 border-t border-border/50 text-center">
-                    <p className="text-[9px] font-black text-text-muted uppercase tracking-widest opacity-40 mb-4">NOT IN THE ARCHIVE YET?</p>
-                    <button 
-                      type="button"
-                      onClick={() => navigate('/pro-dashboard')} 
-                      className="text-[10px] font-black text-brand hover:underline uppercase tracking-widest"
-                    >
-                      + CREATE NEW OFFICIAL PROFILE
-                    </button>
-                </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Display Name */}
-            <div className="space-y-2">
-              <label className="block text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">
-                Display Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="your name"
-                className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-[11px] font-bold tracking-widest focus:border-brand focus:outline-none transition-all"
-              />
-            </div>
-          </div>
-        )}
 
         <button
           type="submit"
