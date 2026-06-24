@@ -484,9 +484,14 @@ def get_video_info(url: str) -> tuple[str, float]:
                     stdout=f, stderr=subprocess.PIPE, text=True, timeout=120
                 )
             if result.returncode != 0:
+                err = (result.stderr or "").strip().splitlines()
+                reason = err[-1] if err else "no stderr"
                 if attempt < 3:
                     time.sleep(5)
                     continue
+                # Surface WHY so we can tell "video unavailable" (skip is correct)
+                # from "Sign in to confirm you're not a bot" (IP rate-limited).
+                print(f"     yt-dlp info failed: {reason[:200]}")
                 return "unknown_movie", 0.0
                 
             lines = info_file.read_text(encoding="utf-8").strip().splitlines()
