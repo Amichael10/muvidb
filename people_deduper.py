@@ -106,29 +106,72 @@ def _norm(name: str) -> str:
     return " ".join(name.lower().replace(".", " ").replace("-", " ").split())
 
 
+class _UnionFind:
+    def __init__(self):
+        self.parent = {}
+
+    def find(self, x):
+        self.parent.setdefault(x, x)
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]
+            x = self.parent[x]
+        return x
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[ra] = rb
+
+
+def _block_keys(norm_name: str) -> set:
+    """Cheap blocking keys: the first 3 chars of each token. A name only needs to
+    share ONE key with another to become a comparison candidate, so word-order
+    swaps and most misspellings still land in a common block."""
+    return {t[:3] for t in norm_name.split() if len(t) >= 3}
+
+
 def build_candidate_clusters(people: list) -> list:
-    """Group people whose names are fuzzy-similar. Each returned cluster has >=2
-    people and is a *candidate* set — the LLM makes the final same-person call."""
-    remaining = list(people)
-    clusters = []
-    used = set()
-    for i, p in enumerate(remaining):
-        if p["id"] in used:
+    """Group people whose names are fuzzy-similar, using blocking so we never do
+    the full N^2 comparison (infeasible at ~38k people). Each returned cluster has
+    >=2 people and is a *candidate* set — the LLM makes the final same-person call.
+    """
+    from collections import defaultdict
+
+    # Pre-normalise once and bucket each person into blocks by token prefix.
+    norms = {p["id"]: _norm(p["name"]) for p in people}
+    by_id = {p["id"]: p for p in people}
+    blocks = defaultdict(list)
+    for p in people:
+        for k in _block_keys(norms[p["id"]]):
+            blocks[k].append(p["id"])
+
+    uf = _UnionFind()
+    comparisons = 0
+    big = 0
+    for k, ids in blocks.items():
+        if len(ids) < 2:
             continue
-        cluster = [p]
-        ni = _norm(p["name"])
-        for q in remaining[i + 1:]:
-            if q["id"] in used:
-                continue
-            nj = _norm(q["name"])
-            # token_sort_ratio handles word-order swaps; ratio catches misspellings.
-            score = max(fuzz.token_sort_ratio(ni, nj), fuzz.ratio(ni, nj))
-            if score >= FUZZ_MIN:
-                cluster.append(q)
-        if len(cluster) >= 2:
-            for c in cluster:
-                used.add(c["id"])
-            clusters.append(cluster)
+        if len(ids) > 4000:
+            # Pathologically common prefix (e.g. "moh"); skip to stay tractable.
+            big += 1
+            continue
+        for a in range(len(ids)):
+            ni = norms[ids[a]]
+            for b in range(a + 1, len(ids)):
+                nj = norms[ids[b]]
+                comparisons += 1
+                score = max(fuzz.token_sort_ratio(ni, nj), fuzz.ratio(ni, nj))
+                if score >= FUZZ_MIN:
+                    uf.union(ids[a], ids[b])
+
+    # Collect connected components of size >= 2.
+    groups = defaultdict(list)
+    for pid in norms:
+        root = uf.find(pid)
+        groups[root].append(by_id[pid])
+    clusters = [g for g in groups.values() if len(g) >= 2]
+    print(f"  Blocking: {len(blocks)} blocks, {comparisons:,} comparisons"
+          f"{f', {big} oversized blocks skipped' if big else ''}.")
     return clusters
 
 
