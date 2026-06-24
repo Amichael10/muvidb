@@ -111,6 +111,10 @@ FRAME_INTERVAL  = 2     # Fallback sample rate (seconds) if mpdecimate yields no
 HASH_THRESHOLD  = 4     # Hamming distance threshold for duplicate frame detection
 FRAME_MAX_EDGE  = 1024  # Downscale long edge — keeps credit text legible, cuts VLM vision tokens 3-4x
 PADDLE_CONF_MIN = 0.85  # PaddleOCR line confidence below this escalates the frame to the VLM
+PADDLE_ESC_FLOOR = 0.45 # ...but below THIS the frame is garbage (no real text) — don't waste a VLM call
+MAX_FRAMES      = 150   # Hard cap on frames read per film. Scrolling credits can yield thousands of
+                        # near-unique frames; without a cap a single film can run for hours. We evenly
+                        # subsample down to this many, which still covers every distinct credit card.
 LOOP_SLEEP_SECS = 300   # Pause between full DB sweeps in --loop mode
 
 # VLM rescue of low-confidence frames is OFF by default: on a CPU a single
@@ -451,8 +455,12 @@ def read_frame_hybrid(frame: Path, paddle: "PaddleReader | None",
         paddle_text = "\n".join(text for text, _ in lines)
         if weakest >= PADDLE_CONF_MIN:
             return paddle_text
-        # Shaky frame. Escalate to the VLM only if it's enabled (GPU); otherwise
-        # keep Paddle's best-effort read rather than dropping the names.
+        # Below the floor PaddleOCR is reading noise, not stylized credits — the VLM
+        # can't rescue text that isn't there, so don't burn a call on it. Drop the frame.
+        if weakest < PADDLE_ESC_FLOOR:
+            return ""
+        # Genuinely shaky-but-real text. Escalate to the VLM only if it's enabled
+        # (GPU); otherwise keep Paddle's best-effort read rather than dropping names.
         if vlm is not None:
             print(f"     ↑ Escalating frame to VLM (low confidence {weakest:.2f}).")
             return vlm.read_text(frame)
@@ -1029,14 +1037,24 @@ def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
             # imagehash is a cheap second pass to catch any residual repeats.
             unique_frames = filter_unique_frames(raw_frames)
 
+            # Hard cap: even on a GPU, thousands of scrolling-credit frames take hours.
+            # Evenly subsample so we still span the whole outro but bound the runtime.
+            if len(unique_frames) > MAX_FRAMES:
+                step = len(unique_frames) / MAX_FRAMES
+                unique_frames = [unique_frames[int(i * step)] for i in range(MAX_FRAMES)]
+                print(f"  [cap] Subsampled to {len(unique_frames)} frames (MAX_FRAMES={MAX_FRAMES}).")
+
             # ── Step 5: Hybrid OCR (PaddleOCR-first, Qwen3-VL fallback) ───────
             engine = "PaddleOCR + Qwen3-VL fallback" if paddle else "Qwen3-VL only"
             print(f"  -> Reading {len(unique_frames)} frames ({engine})...")
             ocr_text_blocks = []
-            for frame in unique_frames:
+            total = len(unique_frames)
+            for i, frame in enumerate(unique_frames, 1):
                 text = read_frame_hybrid(frame, paddle, ocr)
                 if text.strip():
                     ocr_text_blocks.append(text)
+                if i % 10 == 0 or i == total:
+                    print(f"     ...read {i}/{total} frames")
 
             combined_ocr_text = "\n".join(ocr_text_blocks)
 
