@@ -106,7 +106,9 @@ except ImportError:
     pass
 
 # ── Config ────────────────────────────────────────────────────────────────────
-OUTRO_DURATION  = 600   # Last 10 minutes (outro-only strategy — avoids double-download bot detection)
+OUTRO_DURATION  = 600   # Last 10 minutes — where end-credit rolls live
+INTRO_DURATION  = 180   # First 3 minutes — many Nollywood films list cast here instead of an end-roll
+SCAN_INTRO      = os.getenv("SCAN_INTRO", "1").strip().lower() in ("1", "true", "yes")
 FRAME_INTERVAL  = 2     # Fallback sample rate (seconds) if mpdecimate yields nothing
 HASH_THRESHOLD  = 4     # Hamming distance threshold for duplicate frame detection
 FRAME_MAX_EDGE  = 1024  # Downscale long edge — keeps credit text legible, cuts VLM vision tokens 3-4x
@@ -992,7 +994,9 @@ class SupabaseSync:
 def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
     """Process one queue of films. Returns the count successfully enriched."""
     print(f"\n🚀 Starting batch OCR extraction for {len(incomplete_queue)} films...")
-    print(f"   Strategy: Outro-only (last {OUTRO_DURATION//60} min). No intro download.")
+    seg_desc = (f"intro (first {INTRO_DURATION//60} min) + outro (last {OUTRO_DURATION//60} min)"
+                if SCAN_INTRO else f"outro-only (last {OUTRO_DURATION//60} min)")
+    print(f"   Strategy: scanning {seg_desc}.")
 
     # Report tracking
     skipped_log: list[str] = []
@@ -1021,42 +1025,37 @@ def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
                 skipped_log.append(f"| {title} | {url} | {skip_reason} |")
                 continue
 
-            # ── Step 2: Download outro only (last 10 min) ─────────────────────
-            print(f"  -> Downloading outro (last {OUTRO_DURATION//60} min)...")
-            outro_path = BASE_TEMP_DIR / f"lumi_outro_{safe_title[:20].strip()}.mkv"
-            temp_files.append(outro_path)
+            # ── Step 2-4: Download + extract frames from each segment ─────────
+            # Credits vary: some films roll them at the end, others list cast in
+            # the intro. Scan both (intro optional via SCAN_INTRO) and pool frames.
+            segments = []
+            if SCAN_INTRO:
+                segments.append(("intro", 0.0, min(INTRO_DURATION, duration)))
+            segments.append(("outro", max(0, duration - OUTRO_DURATION), min(OUTRO_DURATION, duration)))
 
-            outro_start = max(0, duration - OUTRO_DURATION)
-            outro_dur = min(OUTRO_DURATION, duration)
-            outro_ok = download_segment(url, outro_start, outro_dur, outro_path)
-
-            if not outro_ok or not outro_path.exists():
-                skip_reason = "Outro download failed (bot detection or stream error)"
-                print(f"  ❌ {skip_reason}. Skipping.")
-                skipped_log.append(f"| {title} | {url} | {skip_reason} |")
-                continue
-
-            # Validate file is not corrupt/partial (moov atom missing etc.)
-            file_size_kb = outro_path.stat().st_size // 1024
-            if file_size_kb < 200:
-                skip_reason = f"Downloaded file too small ({file_size_kb} KB) — likely corrupt or partial"
-                print(f"  ❌ {skip_reason}. Skipping.")
-                skipped_log.append(f"| {title} | {url} | {skip_reason} |")
-                continue
-
-            # ── Step 3: Frame extraction ──────────────────────────────────────
-            print("  -> Capturing frames from outro...")
-            outro_dir = FRAMES_DIR / "outro"
-            temp_files.append(outro_dir)
-            raw_frames = extract_frames(outro_path, outro_dir, "outro")
+            raw_frames = []
+            for seg_label, seg_start, seg_dur in segments:
+                seg_path = BASE_TEMP_DIR / f"lumi_{seg_label}_{safe_title[:20].strip()}.mkv"
+                temp_files.append(seg_path)
+                print(f"  -> Downloading {seg_label} ({int(seg_dur//60)} min from {int(seg_start//60)}m)...")
+                if not download_segment(url, seg_start, seg_dur, seg_path) or not seg_path.exists():
+                    print(f"  ⚠️ {seg_label} download failed — skipping this segment.")
+                    continue
+                if seg_path.stat().st_size // 1024 < 200:
+                    print(f"  ⚠️ {seg_label} file too small — likely corrupt, skipping segment.")
+                    continue
+                print(f"  -> Capturing frames from {seg_label}...")
+                seg_dir = FRAMES_DIR / seg_label
+                temp_files.append(seg_dir)
+                raw_frames.extend(extract_frames(seg_path, seg_dir, seg_label))
 
             if not raw_frames:
-                skip_reason = "No frames extracted from outro video"
+                skip_reason = "No frames extracted from intro or outro"
                 print(f"  ❌ {skip_reason}. Skipping.")
                 skipped_log.append(f"| {title} | {url} | {skip_reason} |")
                 continue
 
-            # ── Step 4: Deduplication ─────────────────────────────────────────
+            # ── Deduplication ─────────────────────────────────────────────────
             # mpdecimate already dropped near-identical frames at extraction time;
             # imagehash is a cheap second pass to catch any residual repeats.
             unique_frames = filter_unique_frames(raw_frames)
