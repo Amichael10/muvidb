@@ -605,6 +605,13 @@ CRITICAL RULES:
   If you would write "Director Name" or "Crew Name", that means you have no real name —
   so omit the section instead.
 
+CAST PAIRING (important): credit rolls list the CHARACTER and the ACTOR next to
+each other — usually the character name on one line and the actor's real name on
+the adjacent line (or separated by "/", "as", or "-"). Combine each such pair
+into ONE entry as "- Actor Real Name - Character Name". The actor is the real
+person's name (e.g. "Deza The Great"); the character is the role they play (e.g.
+"Odogwu"). Never list a character name on its own line as if it were an actor.
+
 Return ONLY a markdown document, using whichever of these sections you have REAL names for:
 # Cast  -> "- Actor Name - Character Name", or just "- Actor Name" if no character shown
 # Director  -> "- <name> - Director"
