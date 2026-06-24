@@ -245,7 +245,7 @@ def filter_unique_frames(frames: list[Path]) -> list[Path]:
 # Point OLLAMA_VISION_MODEL at a Q4_K_M tag (e.g. "qwen3-vl-4b:q4_K_M") for ~1.7x
 # faster CPU prefill — with downscaled frames the legibility loss on clean credits
 # is negligible. Falls back to the default Q8 tag if unset.
-OLLAMA_MODEL   = os.getenv("OLLAMA_VISION_MODEL", "").strip() or "qwen3-vl-4b"
+OLLAMA_MODEL   = os.getenv("OLLAMA_VISION_MODEL", "").strip() or "qwen3-vl:4b-instruct"
 OLLAMA_API_URL = "http://localhost:11434/api/generate"
 
 OLLAMA_PROMPT = """You are analysing a frame from a Nollywood movie.
@@ -699,7 +699,7 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
 
     # 0. Ollama (if OLLAMA_MODEL is configured)
     ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434").strip()
-    ollama_model = os.getenv("OLLAMA_MODEL", "").strip() or None
+    ollama_model = os.getenv("OLLAMA_MODEL", "").strip() or OLLAMA_MODEL
     if ollama_model:
         print(f"  [Ollama] Structuring raw text via {ollama_model}...")
         try:
