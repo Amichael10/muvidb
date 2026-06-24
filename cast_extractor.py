@@ -61,12 +61,16 @@ FRAMES_DIR      = BASE_TEMP_DIR / "frames"
 
 GROK_API_KEY    = os.getenv("GROK_API_KEY")
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY")
+OLLAMA_HOST     = os.getenv("OLLAMA_HOST", "http://localhost:11434").strip()
+OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "").strip() or None
+OLLAMA_VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "").strip() or OLLAMA_MODEL
 
 YT_BASE_FLAGS   = [
     "--no-check-certificates", 
     "--no-playlist", 
     "--quiet", 
     "--no-warnings",
+    "--js-runtimes", "node",
     "--retries", "5", 
     "--socket-timeout", "60",
     "--extractor-args", "youtube:player_client=android,web",
@@ -118,6 +122,18 @@ class AIOrchestrator:
 
     def _init_providers(self):
         """Initialise all available AI clients."""
+        self.ollama_host = OLLAMA_HOST
+        self.ollama_model = OLLAMA_MODEL
+        self.ollama_vision_model = OLLAMA_VISION_MODEL
+        
+        if self.ollama_model:
+            try:
+                from openai import OpenAI
+                self.ollama_client = OpenAI(api_key="ollama", base_url=f"{self.ollama_host}/v1")
+                self.available_providers.append("ollama")
+            except Exception as e:
+                print(f"  ⚠️ Failed to init Ollama client: {e}")
+
         if GROK_API_KEY:
             try:
                 from openai import OpenAI
@@ -137,7 +153,20 @@ class AIOrchestrator:
             raise RuntimeError("No AI providers available. Check your API keys and dependencies.")
 
     def run_task(self, task_name, fn_grok, fn_gemini, *args, **kwargs):
-        """Try Grok first, fallback to Gemini on any error."""
+        """Try Ollama first, then Grok, then Gemini."""
+        if "ollama" in self.available_providers:
+            try:
+                print(f"  [Attempting] '{task_name}' via Ollama...")
+                if "structure" in task_name:
+                    res = structure_credits_ollama(self.ollama_client, self.ollama_model, *args, **kwargs)
+                else:
+                    res = extract_credits_ollama(self.ollama_client, self.ollama_vision_model, *args, **kwargs)
+                return res, f"ollama ({self.ollama_model})"
+            except Exception as e:
+                print(f"  ❌ Ollama Error during '{task_name}': {e}")
+                if len(self.available_providers) == 1:
+                    raise
+
         # We'll try Grok first if it's available
         tried_grok = False
         if "grok" in self.available_providers:
@@ -241,10 +270,10 @@ def download_segment(url: str, start: float, duration: float, out_path: Path):
                 sys.executable, "-m", "yt_dlp", *YT_BASE_FLAGS,
                 "--download-sections", f"*{int(start)}-{int(start+duration)}",
                 "--force-keyframes-at-cuts",
-                "-f", "worst", 
+                "-f", "bestvideo[height<=360]/best[height<=360]", 
                 "-o", str(out_path),
                 url
-            ], check=True, timeout=400) # Increased timeout
+            ], check=True, timeout=1200) # Increased timeout
             return # Success
         except subprocess.TimeoutExpired:
             last_err = "Timeout"
@@ -347,6 +376,35 @@ RAW TEXT:
 {raw}"""
 
 
+# ── Ollama Functions ──────────────────────────────────────────────────────────
+
+def extract_credits_ollama(client, model: str, frames: list[Path], section: str) -> str:
+    if not frames:
+        return ""
+    content = [{"type": "text", "text": CREDITS_PROMPT.format(section=section)}]
+    for frame in frames:
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{encode_image(frame)}"}
+        })
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": content}],
+        max_tokens=2000
+    )
+    return response.choices[0].message.content
+
+
+def structure_credits_ollama(client, model: str, intro_raw: str, outro_raw: str, title: str) -> str:
+    combined = f"INTRO CREDITS:\n{intro_raw}\n\nOUTRO CREDITS:\n{outro_raw}"
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": STRUCTURE_PROMPT.format(title=title, raw=combined)}],
+        max_tokens=3000
+    )
+    return response.choices[0].message.content
+
+
 # ── Grok Functions ────────────────────────────────────────────────────────────
 
 def extract_credits_grok(client, frames: list[Path], section: str) -> str:
@@ -414,7 +472,6 @@ class SupabaseSync:
             self.enabled = True
             self.headers = {
                 "apikey": self.key,
-                "Authorization": f"Bearer {self.key}",
                 "Content-Type": "application/json",
                 "Prefer": "return=representation"
             }

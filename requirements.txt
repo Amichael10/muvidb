@@ -9,3 +9,4 @@ pytesseract
 paddleocr
 imagehash
 rapidfuzz
+paddlepaddle
