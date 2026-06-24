@@ -143,6 +143,17 @@ YT_BASE_FLAGS   = [
     "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 ]
 
+# YouTube bot-detection ("Sign in to confirm you're not a bot") blocks shared
+# datacenter IPs like Kaggle's after a burst of requests. Authenticated cookies
+# are the most reliable bypass. Export a logged-in YouTube cookies.txt, upload it
+# to Kaggle, and set YT_COOKIES_FILE to its path (e.g. /kaggle/input/yt/cookies.txt).
+YT_COOKIES_FILE = os.getenv("YT_COOKIES_FILE", "").strip() or None
+if YT_COOKIES_FILE and os.path.exists(YT_COOKIES_FILE):
+    YT_BASE_FLAGS.extend(["--cookies", YT_COOKIES_FILE])
+    print(f"  🍪 Using YouTube cookies: {YT_COOKIES_FILE}")
+elif YT_COOKIES_FILE:
+    print(f"  ⚠️ YT_COOKIES_FILE set but not found: {YT_COOKIES_FILE}")
+
 # Configure SmartProxy if credentials exist
 PROXY_USER = os.getenv("SMARTPROXY_USER", "").strip() or None
 PROXY_PASS = os.getenv("SMARTPROXY_PASS", "").strip() or None
