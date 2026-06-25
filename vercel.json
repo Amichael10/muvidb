@@ -4,6 +4,11 @@
       "includeFiles": "dist/index.html"
     }
   },
+  "images": {
+    "sizes": [160, 256, 384, 640, 750, 828, 1080, 1280, 1920],
+    "formats": ["image/webp"],
+    "minimumCacheTTL": 86400
+  },
   "routes": [
     { "src": "/storage/v1/object/public/(.*)", "dest": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/$1" },
     { "src": "/api/film/(?<id>.*)", "dest": "/api/films?id=$id" },

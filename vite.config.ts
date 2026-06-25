@@ -53,10 +53,30 @@ export default defineConfig(({ mode }) => {
       'process.env.SUPABASE_URL':      JSON.stringify(env.VITE_SUPABASE_URL      || env.SUPABASE_URL      || ''),
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Split heavy, rarely-changing vendor code into cacheable chunks so the
+          // main bundle (and main-thread parse/exec cost) stays small.
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'supabase-vendor': ['@supabase/supabase-js'],
+            'motion-vendor': ['motion'],
+          },
+        },
+      },
+    },
     server: {
       port: 3001,
       host: '0.0.0.0',
       proxy: {
+        // In production, /storage is reverse-proxied to Supabase via vercel.json.
+        // Mirror that locally so relative storage paths (from getProxiedImageUrl)
+        // resolve during dev.
+        '/storage': {
+          target: 'https://pkenrmorywmuvnzfoylp.supabase.co',
+          changeOrigin: true,
+        },
         '/api/youtube': {
           target: 'https://www.googleapis.com/youtube/v3',
           changeOrigin: true,

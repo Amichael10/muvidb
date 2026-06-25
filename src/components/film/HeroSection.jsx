@@ -67,23 +67,28 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
   return (
     <section className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg group/hero">
-      <AnimatePresence mode="wait">
+      {/* initial={false} skips the enter fade on first render so the LCP backdrop
+          paints instantly; slide-to-slide crossfades still animate. */}
+      <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={featuredFilm.id || currentIndex}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1 }}
+          transition={{ duration: 0.4 }}
           className="absolute inset-0 z-0"
         >
           {/* Background Image & Overlays */}
           <div className="absolute inset-0 z-0">
-            <ImageWithFallback 
-              src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster} 
-              alt={featuredFilm.title} 
+            <ImageWithFallback
+              src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster}
+              alt={featuredFilm.title}
               className="w-full h-full object-cover"
               fallbackType="banner"
               name={featuredFilm.title}
+              width={1280}
+              loading="eager"
+              fetchPriority="high"
             />
             
             {/* Gradient Overlay: Consistently dark on the left for text readability across themes (Issue 8) */}
@@ -196,12 +201,13 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
               >
                 <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="block relative">
                   <div className="absolute inset-0 bg-brand rounded-2xl blur-2xl opacity-0 group-hover:opacity-20 transition-opacity duration-700"></div>
-                  <ImageWithFallback 
-                    src={featuredFilm.poster_url || featuredFilm.poster} 
-                    alt={`${featuredFilm.title} Poster`} 
-                    className="relative w-64 h-auto rounded-2xl border border-white/10 shadow-2xl object-cover transform transition-all duration-700 group-hover:scale-105 group-hover:rotate-2"
+                  <ImageWithFallback
+                    src={featuredFilm.poster_url || featuredFilm.poster}
+                    alt={`${featuredFilm.title} Poster`}
+                    className="relative w-64 aspect-[2/3] rounded-2xl border border-white/10 shadow-2xl object-cover transform transition-all duration-700 group-hover:scale-105 group-hover:rotate-2"
                     fallbackType="banner"
                     name={featuredFilm.title}
+                    width={384}
                   />
                 </Link>
               </motion.div>
