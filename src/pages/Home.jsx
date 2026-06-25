@@ -267,9 +267,17 @@ export default function Home() {
   };
 
   const fetchComingSoon = async () => {
+    // Explicit columns instead of `*`: the wide select made this query take ~3.7s,
+    // which tipped over Postgres' statement timeout (57014) under the burst of
+    // concurrent homepage queries. The lean column set returns the same rows in ~1s.
     const { data, error } = await supabase
       .from('films')
-      .select(`*, film_genres(genres(name))`)
+      .select(`
+        id, title, poster_url, backdrop_url, year, language,
+        runtime_minutes, view_count, average_rating, nfvcb_rating,
+        is_featured, is_trending, release_type, created_at, release_date,
+        film_genres(genres(name))
+      `)
       .in('status', ['upcoming', 'in_production', 'post-production'])
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('release_date', { ascending: true })
