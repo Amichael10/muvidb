@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap');
+/* Fonts are loaded via <link> in index.html (preconnect + stylesheet) so they are
+   discovered immediately instead of after this CSS downloads — improves FCP/LCP. */
 @import "tailwindcss";
 
 :root {

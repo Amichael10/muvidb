@@ -2,10 +2,11 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { PLATFORMS, isFilmOnPlatform } from '../../lib/platforms';
+import { getProxiedImageUrl } from '../../lib/imageUrl';
 
 // "Where to Watch" — the signature top-level entry point answering the #1
 // Nollywood query: "where can I watch it?". Each tile links to /watch/:platform.
-export default function PlatformRail({ films = [], counts = {} }) {
+export default function PlatformRail({ films = [], counts = {}, isLoading = false }) {
   // Counts come from accurate DB-level queries (passed in). Cover art is a
   // best-effort pick from the client film list (may be absent for low-view
   // platforms — the gradient fallback covers that).
@@ -23,7 +24,25 @@ export default function PlatformRail({ films = [], counts = {} }) {
       };
     }).filter((p) => p.count > 0 || p.id === 'ebonylife');
 
-  if (activePlatforms.length === 0) return null;
+  // Reserve the section height while data loads so it doesn't shift the page (CLS).
+  if (activePlatforms.length === 0) {
+    if (!isLoading) return null;
+    return (
+      <section className="relative overflow-hidden py-16 bg-gradient-to-b from-surface-2/20 to-bg">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 space-y-2">
+            <div className="h-9 w-72 bg-white/10 rounded animate-pulse" />
+            <div className="h-4 w-96 max-w-full bg-white/10 rounded animate-pulse" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="w-full h-36 md:h-40 rounded-2xl border border-border bg-white/5 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="relative overflow-hidden py-16 bg-gradient-to-b from-surface-2/20 to-bg">
@@ -56,7 +75,7 @@ export default function PlatformRail({ films = [], counts = {} }) {
                 {/* Cover art */}
                 {platform.coverImage ? (
                   <img
-                    src={platform.coverImage}
+                    src={getProxiedImageUrl(platform.coverImage, { width: 384 })}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700"
                     loading="lazy"
