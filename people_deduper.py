@@ -39,7 +39,7 @@ MODEL    = os.getenv("OLLAMA_TEXT_MODEL", "qwen3-vl:8b-instruct").strip()
 DRY_RUN  = os.getenv("DEDUPE_DRY_RUN", "1").strip().lower() in ("1", "true", "yes")
 LOOP     = os.getenv("DEDUPE_LOOP", "0").strip().lower() in ("1", "true", "yes")
 SLEEP    = int(os.getenv("DEDUPE_SLEEP_SECS", "1800"))
-FUZZ_MIN = int(os.getenv("DEDUPE_FUZZ_MIN", "88"))
+FUZZ_MIN = int(os.getenv("DEDUPE_FUZZ_MIN", "93"))  # stricter default — avoids merging different surnames
 
 # Fields we never touch when merging metadata onto the primary.
 PROTECTED_FIELDS = {"id", "name", "created_at", "updated_at"}
@@ -221,6 +221,17 @@ def merge_person(primary: dict, dup: dict, people_by_id: dict) -> bool:
     only if the duplicate was fully merged and removed."""
     pid, did = primary["id"], dup["id"]
     if pid == did:
+        return False
+
+    # Deterministic safety net: even if the LLM said "same person", refuse to merge
+    # two names that don't actually clear the fuzzy bar AND don't share a surname.
+    # This blocks over-eager merges like "Emmanuel Oduneye" vs "Emmanuel Odunyemi".
+    np, nd = _norm(primary["name"]), _norm(dup["name"])
+    score = max(fuzz.token_sort_ratio(np, nd), fuzz.ratio(np, nd))
+    surname_ok = fuzz.ratio(np.split()[-1], nd.split()[-1]) >= 90 if np and nd else False
+    if score < FUZZ_MIN and not surname_ok:
+        print(f"  ↯ SKIP merge '{dup['name']}' -> '{primary['name']}' "
+              f"(similarity {score} < {FUZZ_MIN}, surnames differ).")
         return False
 
     primary_credits = credits_for(pid)
