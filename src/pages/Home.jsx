@@ -266,10 +266,13 @@ export default function Home() {
     setLeavingCinemas(Array.from(leavingMap.values()).slice(0, 20));
   };
 
-  const fetchComingSoon = async () => {
+  const fetchComingSoon = async (attempt = 0) => {
     // Explicit columns instead of `*`: the wide select made this query take ~3.7s,
-    // which tipped over Postgres' statement timeout (57014) under the burst of
-    // concurrent homepage queries. The lean column set returns the same rows in ~1s.
+    // which tipped over Postgres' statement timeout (57014). The lean column set
+    // returns the same rows in ~1s. There is no index on films.status, so under the
+    // burst of concurrent homepage queries it can still occasionally exceed the
+    // anon-role timeout — when that happens we retry once after the burst clears,
+    // at which point the query runs (near) alone and completes comfortably.
     const { data, error } = await supabase
       .from('films')
       .select(`
@@ -282,11 +285,16 @@ export default function Home() {
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('release_date', { ascending: true })
       .limit(20);
-    
+
     if (error) {
+      if (attempt === 0 && error.code === '57014') {
+        await new Promise(r => setTimeout(r, 1500));
+        return fetchComingSoon(attempt + 1);
+      }
       console.error('Error fetching coming soon:', error);
+      return;
     }
-    
+
     if (data) {
       setComingSoon(data.map(f => ({
         ...f,
