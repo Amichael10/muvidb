@@ -42,6 +42,7 @@ export default function ImageWithFallback({
   fallbackType = 'avatar', // 'avatar' | 'banner' | 'video'
   name = '',
   width, // optional: request an optimized image of this width (Supabase storage only)
+  style,
   ...props
 }) {
   const [imgSrc, setImgSrc] = useState(getHighResYoutubeThumbnail(src));
@@ -170,6 +171,18 @@ export default function ImageWithFallback({
     }
   };
 
+  // Blur-up placeholder: render a tiny (32px) optimized version of the same image
+  // as the element's CSS background so the slot is never an empty/white flash —
+  // the soft low-res image shows instantly and the full photo paints over it
+  // (object-cover hides the background once loaded). Only Supabase storage images
+  // get the LQIP (those become a /_vercel/image path); everything else falls back
+  // to the branded gradient. No wrapper/structural change, so nothing else breaks.
+  const lqip = getProxiedImageUrl(imgSrc, { width: 32, quality: 40 });
+  const placeholderStyle =
+    typeof lqip === 'string' && lqip.startsWith('/_vercel/image')
+      ? { backgroundImage: `url("${lqip}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+      : { background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` };
+
   // Optimize only at render time so the raw imgSrc above keeps driving the
   // YouTube/error fallback logic untouched.
   return (
@@ -177,6 +190,7 @@ export default function ImageWithFallback({
       src={getProxiedImageUrl(imgSrc, { width })}
       alt={alt}
       className={className}
+      style={{ ...placeholderStyle, ...style }}
       onLoad={handleImageLoad}
       onError={handleImageError}
       {...props}
