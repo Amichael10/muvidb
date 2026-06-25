@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
+import { supabase } from '../../lib/supabase';
 import FilmCard from './FilmCard';
 
 const GENRES = [
@@ -26,43 +27,83 @@ const GENRES = [
   { name: 'Animation', icon: 'solar:ghost-bold', color: 'from-lime-500/20 to-lime-600/5' },
 ];
 
-export default function GenreRail({ films = [], variant = 'grid' }) {
+export default function GenreRail({ variant = 'grid' }) {
   const isChips = variant === 'chips';
   const [selectedGenre, setSelectedGenre] = useState('');
-  
+  // genreCounts: null = still loading; {} or map = loaded. Replaces the old
+  // dependency on a 1,000-film array passed down from the homepage.
+  const [genreCounts, setGenreCounts] = useState(null);
+  const [filteredFilms, setFilteredFilms] = useState([]);
+
   // Ref and state for scrollable lineup row
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  // Compute active genres
-  const activeGenres = GENRES.map(genre => {
-    const genreFilms = films.filter(f => f.genres?.includes(genre.name));
-    const count = genreFilms.length;
-    
-    const coverFilm = [...genreFilms]
-      .filter(f => f.backdrop_url || f.poster_url)
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
-
-    const coverImage = coverFilm?.backdrop_url || coverFilm?.poster_url || '';
-    
-    return {
-      ...genre,
-      count,
-      coverImage
-    };
-  }).filter(g => g.count > 0);
-
-  // Auto-select top genre with most films by default
+  // Fetch whole-catalogue genre counts once via a single light aggregate query
+  // (instead of counting a capped film list on the client).
   useEffect(() => {
-    if (activeGenres.length > 0 && !selectedGenre) {
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from('genres')
+        .select('name, film_genres(count)');
+      if (!active) return;
+      if (error || !data) {
+        setGenreCounts({});
+        return;
+      }
+      const counts = {};
+      data.forEach(g => { counts[g.name] = g.film_genres?.[0]?.count || 0; });
+      setGenreCounts(counts);
+    })();
+    return () => { active = false; };
+  }, []);
+
+  // Compute active genres from the curated list + fetched counts.
+  const activeGenres = GENRES
+    .map(genre => ({ ...genre, count: genreCounts?.[genre.name] || 0, coverImage: '' }))
+    .filter(g => g.count > 0);
+
+  // Auto-select top genre with most films once counts arrive.
+  useEffect(() => {
+    if (!selectedGenre && activeGenres.length > 0) {
       const topGenre = [...activeGenres].sort((a, b) => b.count - a.count)[0].name;
       setSelectedGenre(topGenre);
     }
-  }, [films, activeGenres, selectedGenre]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genreCounts]);
 
-  // Filter films for selected genre
-  const filteredFilms = films.filter(f => f.genres?.includes(selectedGenre));
+  // Lazy-load the films for the selected genre only when it changes (top 20 by views).
+  useEffect(() => {
+    if (!selectedGenre) return;
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from('films')
+        .select(`
+          id, title, poster_url, backdrop_url, year, language,
+          runtime_minutes, view_count, average_rating, nfvcb_rating,
+          is_featured, is_trending, release_type, streaming_links, source,
+          content_type, season_count, created_at, release_date,
+          film_genres!inner(genres!inner(name))
+        `)
+        .eq('film_genres.genres.name', selectedGenre)
+        .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+        .order('view_count', { ascending: false })
+        .limit(20);
+      if (!active) return;
+      if (!error && data) {
+        setFilteredFilms(data.map(f => ({
+          ...f,
+          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        })));
+      } else {
+        setFilteredFilms([]);
+      }
+    })();
+    return () => { active = false; };
+  }, [selectedGenre]);
 
   // Scroll checking logic for lineup
   const checkScroll = () => {
@@ -86,6 +127,26 @@ export default function GenreRail({ films = [], variant = 'grid' }) {
       scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
+
+  // While counts load, reserve the chip strip's height so it doesn't shift the
+  // page in (CLS) once it appears.
+  if (genreCounts === null) {
+    if (!isChips) return null;
+    return (
+      <section className="py-16 overflow-hidden bg-surface-2/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 border-x border-white/5">
+          <div className="h-7 w-48 bg-white/10 rounded animate-pulse" />
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5">
+          <div className="flex gap-2.5 overflow-hidden pb-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="shrink-0 h-10 w-28 rounded-full bg-white/10 animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (activeGenres.length === 0) return null;
 

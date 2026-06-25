@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
+import { getProxiedImageUrl } from '../../lib/imageUrl';
 
 // Premium brand-aligned gradients for fallback backgrounds
 const PRESET_GRADIENTS = [
@@ -40,6 +41,7 @@ export default function ImageWithFallback({
   className = '',
   fallbackType = 'avatar', // 'avatar' | 'banner' | 'video'
   name = '',
+  width, // optional: request an optimized image of this width (Supabase storage only)
   ...props
 }) {
   const [imgSrc, setImgSrc] = useState(getHighResYoutubeThumbnail(src));
@@ -168,9 +170,11 @@ export default function ImageWithFallback({
     }
   };
 
+  // Optimize only at render time so the raw imgSrc above keeps driving the
+  // YouTube/error fallback logic untouched.
   return (
     <img
-      src={imgSrc}
+      src={getProxiedImageUrl(imgSrc, { width })}
       alt={alt}
       className={className}
       onLoad={handleImageLoad}

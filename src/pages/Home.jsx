@@ -15,7 +15,6 @@ export default function Home() {
   const { isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isHeroLoading, setIsHeroLoading] = useState(true);
-  const [films, setFilms] = useState([]);
   const [inCinemas, setInCinemas] = useState([]);
   const [leavingCinemas, setLeavingCinemas] = useState([]);
   const [netflixNew, setNetflixNew] = useState([]);
@@ -75,7 +74,6 @@ export default function Home() {
     // 2. Fetch all other sections in the background progressively
     try {
       await Promise.all([
-        fetchFilms().catch(e => console.error('Error fetching films:', e)),
         fetchFeaturedSeries().catch(e => console.error('Error fetching series:', e)),
         fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
         fetchNetflixNew().catch(e => console.error('Error fetching netflix new:', e)),
@@ -127,36 +125,6 @@ export default function Home() {
         ...f,
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
       })));
-    }
-  };
-
-  const fetchFilms = async () => {
-    const { data, error } = await supabase
-      .from('films')
-      .select(`
-        id, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, nfvcb_rating,
-        is_featured, is_trending, release_type, streaming_links, source,
-        is_in_cinemas, created_at, release_date,
-        film_genres(genres(name))
-      `)
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('view_count', { ascending: false });
-
-    if (!error) {
-      // Deduplicate regular films list
-      const filmMap = new Map();
-      (data || []).forEach(f => {
-        const titleKey = f.title?.toLowerCase().trim();
-        if (!titleKey) return;
-        if (!filmMap.has(titleKey)) {
-          filmMap.set(titleKey, {
-            ...f,
-            genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-          });
-        }
-      });
-      setFilms(Array.from(filmMap.values()));
     }
   };
 
@@ -552,6 +520,17 @@ export default function Home() {
   // What's New consolidated tabs
   const whatsNewMap = { coming: comingSoon, new: newReleases, recent: recentlyAdded };
 
+  // Cover art for the "Where to watch" rail is best-effort: pick from the rails we
+  // already loaded instead of pulling the entire catalogue. Any platform without a
+  // match falls back to its gradient (handled inside PlatformRail).
+  const platformCoverPool = [
+    ...featuredFilms,
+    ...recentlyAdded,
+    ...netflixNew,
+    ...newReleases,
+    ...top10Films,
+  ];
+
   return (
     <div className="w-full pb-20 bg-bg min-h-screen">
       {/* 1. HERO (Progressive Above-the-Fold Loading) (Issue 1) */}
@@ -563,7 +542,7 @@ export default function Home() {
       <div className="max-w-7xl mx-auto border-x border-border">
         {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
         <div className="border-b border-border">
-          <PlatformRail films={films} counts={platformCounts} />
+          <PlatformRail films={platformCoverPool} counts={platformCounts} isLoading={isLoading} />
         </div>
 
         {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
@@ -677,7 +656,7 @@ export default function Home() {
 
         {/* 7. GENRE MOODS (compact chip strip) */}
         <div className="border-b border-border">
-          <GenreRail films={films} variant="chips" />
+          <GenreRail variant="chips" />
         </div>
 
         {/* 8. CURATED PICK (editorial film row — discovery) */}

@@ -74,13 +74,14 @@ export default function FilmCard({
           className="relative block aspect-video w-full rounded-2xl overflow-hidden bg-surface-2/60 border border-white/5 group-hover:border-brand/40 shadow-xl group-hover:shadow-2xl group-hover:shadow-brand/5 transition-all duration-500 z-0 hover:z-10"
         >
           {/* Poster Image (Landscape aspect-video) */}
-          <ImageWithFallback 
-            src={film.backdrop_url || film.poster_url || film.poster} 
-            alt={film.title} 
+          <ImageWithFallback
+            src={film.backdrop_url || film.poster_url || film.poster}
+            alt={film.title}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             fallbackType="banner"
             name={film.title}
             loading="lazy"
+            width={640}
           />
 
           {/* Gradient Overlay */}
@@ -214,13 +215,14 @@ export default function FilmCard({
         className={`relative block rounded-xl overflow-hidden transition-all duration-500 hover:shadow-2xl z-0 bg-surface-2/60 hover:border-brand/40 border border-white/5 ${sizeClasses[size]}`}
       >
         {/* Poster Image */}
-        <ImageWithFallback 
-          src={film.poster_url || film.poster} 
-          alt={film.title} 
+        <ImageWithFallback
+          src={film.poster_url || film.poster}
+          alt={film.title}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
           fallbackType="banner"
           name={film.title}
           loading="lazy"
+          width={384}
         />
 
         {/* Gradient Overlay */}
@@ -307,13 +309,14 @@ export default function FilmCard({
         {/* Aspect-Video Preview Header */}
         <Link to={`/films/${film.slug || film.id}`} className="relative aspect-video w-full overflow-hidden block group/image bg-black">
           {film.backdrop_url ? (
-            <ImageWithFallback 
-              src={film.backdrop_url} 
-              alt={film.title} 
+            <ImageWithFallback
+              src={film.backdrop_url}
+              alt={film.title}
               className="w-full h-full object-cover transition-transform duration-700 group-hover/image:scale-105"
               fallbackType="banner"
               name={film.title}
               loading="lazy"
+              width={640}
             />
           ) : (
             <div className="relative w-full h-full overflow-hidden">
