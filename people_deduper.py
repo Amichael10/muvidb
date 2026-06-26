@@ -125,26 +125,31 @@ ROLE_PHRASES = [
 ]
 _ROLE_WORDS = {w for ph in ROLE_PHRASES for w in ph.split()} | {
     "1", "2", "3", "i", "ii", "iii", "the", "and", "of", "dp", "pm", "asst", "snr", "jnr",
+    "custom", "costumer", "makeover", "mua", "dop1", "dop2",  # common OCR/shorthand variants
 }
 
 
+_LONG_ROLE_WORDS = [w for w in _ROLE_WORDS if len(w) >= 5]
+
+
+def _is_role_token(t: str) -> bool:
+    """A token is 'role-ish' if it's a known role word, or (for longer tokens) an
+    OCR-garbled near-match of one — 'custom'~'costume', 'managet'~'manager'."""
+    if t in _ROLE_WORDS:
+        return True
+    if len(t) >= 5:
+        return max((fuzz.ratio(t, w) for w in _LONG_ROLE_WORDS), default=0) >= 82
+    return False
+
+
 def is_role_junk(name: str) -> bool:
-    """True if the name is ONLY a crew-role label (no real personal name)."""
+    """True ONLY if every token is a crew-role word (or OCR garble of one), i.e.
+    there is no real personal name anywhere. 'Production Manager' -> junk;
+    'Fola Makeup Artist' / 'Production Manager Uchendu Mbunabo' -> kept (real name)."""
     n = _norm(name)
     if not n:
         return True
-    toks = n.split()
-    # Every token is a generic role/filler word -> no actual name present.
-    if all(t in _ROLE_WORDS for t in toks):
-        return True
-    # Close to a known role phrase (catches OCR garble like "production managet",
-    # "custom manager") without extra name tokens dragging the score down.
-    # 80 catches OCR garble ("custom manager"~"costume manager" = 83) while real
-    # name+role combos ("Grace Manager") stay well below (~65).
-    for ph in ROLE_PHRASES:
-        if len(ph.split()) >= 2 and fuzz.ratio(n, ph) >= 80:
-            return True
-    return False
+    return all(_is_role_token(t) for t in n.split())
 
 
 class _UnionFind:
