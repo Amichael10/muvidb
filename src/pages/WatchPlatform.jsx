@@ -31,20 +31,32 @@ export default function WatchPlatform() {
     setLoading(true);
     try {
       // Filter at the DB level so we get ALL of the platform's titles (the catalogue
-      // is 19k+; a recency window would miss most of a platform's films), plus an
-      // exact total count for the header.
-      const { data, count, error } = await supabase
-        .from('films')
-        .select(`
-          id, title, slug, poster_url, backdrop_url, year, language,
-          runtime_minutes, view_count, average_rating, nfvcb_rating,
-          release_type, streaming_links, source, is_in_cinemas, created_at,
-          film_genres(genres(name))
-        `, { count: 'exact' })
-        .or(platformFilter(platformId))
-        .order('created_at', { ascending: false })
-        .limit(1000);
+      // is 19k+; a recency window would miss most of a platform's films).
+      // NB: we intentionally DON'T ask for `count: 'exact'` here — the streaming_links
+      // JSON filter is unindexed, and adding an exact count roughly tripled the query
+      // time (~3.1s vs ~1.2s) which tipped it over the statement timeout under load,
+      // throwing and leaving the page blank. The count is fetched separately below as
+      // a non-blocking best-effort so it can never blank the grid.
+      const runQuery = async (attempt = 0) => {
+        const res = await supabase
+          .from('films')
+          .select(`
+            id, title, slug, poster_url, backdrop_url, year, language,
+            runtime_minutes, view_count, average_rating, nfvcb_rating,
+            release_type, streaming_links, source, is_in_cinemas, created_at,
+            film_genres(genres(name))
+          `)
+          .or(platformFilter(platformId))
+          .order('created_at', { ascending: false })
+          .limit(1000);
+        if (res.error && attempt < 2 && res.error.code === '57014') {
+          await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+          return runQuery(attempt + 1);
+        }
+        return res;
+      };
 
+      const { data, error } = await runQuery();
       if (error) throw error;
 
       const mapped = (data || []).map((f) => ({
@@ -53,7 +65,25 @@ export default function WatchPlatform() {
       }));
 
       setFilms(mapped);
-      setTotalCount(count || mapped.length);
+      setTotalCount(mapped.length); // provisional; refined by the count query below
+
+      // Best-effort exact total for the header — separate + non-blocking so a slow
+      // or timed-out count never affects the film grid.
+      (async () => {
+        const countOne = async (attempt = 0) => {
+          const { count, error: cErr } = await supabase
+            .from('films')
+            .select('id', { count: 'exact', head: true })
+            .or(platformFilter(platformId));
+          if (cErr && attempt < 2 && cErr.code === '57014') {
+            await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+            return countOne(attempt + 1);
+          }
+          return cErr ? null : count;
+        };
+        const total = await countOne();
+        if (typeof total === 'number') setTotalCount(total);
+      })();
     } catch (err) {
       console.error('Error fetching platform films:', err);
     } finally {
