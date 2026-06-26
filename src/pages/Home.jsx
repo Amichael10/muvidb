@@ -53,6 +53,9 @@ export default function Home() {
   useEffect(() => {
     document.title = "MuviDB | Home";
     fetchAllData();
+    // Decoupled from fetchAllData so the headline section's reliability/timing is
+    // independent of the rest of the page.
+    fetchPlatformCounts();
   }, []);
 
   const fetchAllData = async () => {
@@ -86,8 +89,7 @@ export default function Home() {
         fetchTop10Films().catch(e => console.error('Error fetching top 10:', e)),
         fetchCrewMembers().catch(e => console.error('Error fetching crew:', e)),
         fetchCompanies().catch(e => console.error('Error fetching companies:', e)),
-        fetchRecentlyAdded().catch(e => console.error('Error fetching recently added:', e)),
-        fetchPlatformCounts().catch(e => console.error('Error fetching platform counts:', e))
+        fetchRecentlyAdded().catch(e => console.error('Error fetching recently added:', e))
       ]);
     } catch (error) {
       console.error('Error in progressive fetches:', error);
@@ -97,16 +99,38 @@ export default function Home() {
   };
 
   const fetchPlatformCounts = async () => {
-    const entries = await Promise.all(
-      PLATFORMS.map(async (p) => {
-        const { count } = await supabase
-          .from('films')
-          .select('id', { count: 'exact', head: true })
-          .or(platformFilter(p.id));
-        return [p.id, count || 0];
-      })
-    );
-    setPlatformCounts(Object.fromEntries(entries));
+    // Count one platform, retrying once on a statement timeout (57014). Returns
+    // null (unknown) only if it genuinely keeps failing, so a transient timeout
+    // never silently collapses a real count to 0 and hides the platform.
+    const countOne = async (p, attempt = 0) => {
+      const { count, error } = await supabase
+        .from('films')
+        .select('id', { count: 'exact', head: true })
+        .or(platformFilter(p.id));
+      if (error) {
+        if (attempt < 2 && error.code === '57014') {
+          await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+          return countOne(p, attempt + 1);
+        }
+        console.error(`Error counting platform ${p.id}:`, error);
+        return null;
+      }
+      return count ?? 0;
+    };
+
+    // Let the initial homepage query burst settle before hammering the DB with
+    // exact-count scans — improves reliability of the first platform counted.
+    await new Promise(r => setTimeout(r, 800));
+
+    // Sequential, not parallel: 8 simultaneous exact-count scans over the 19k
+    // catalogue saturate the connection pool and time out. Running them one at a
+    // time keeps each well under the timeout. The tiles render immediately
+    // regardless; each count is applied as soon as it resolves.
+    const result = {};
+    for (const p of PLATFORMS) {
+      result[p.id] = await countOne(p);
+      setPlatformCounts({ ...result });
+    }
   };
 
   const fetchFeaturedFilms = async () => {
@@ -558,7 +582,7 @@ export default function Home() {
       <div className="max-w-7xl mx-auto border-x border-border">
         {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
         <div className="border-b border-border">
-          <PlatformRail films={platformCoverPool} counts={platformCounts} isLoading={isLoading} />
+          <PlatformRail films={platformCoverPool} counts={platformCounts} />
         </div>
 
         {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
