@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { SuggestPersonModal } from '../components/contribute/ContributeModals'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
@@ -132,6 +133,7 @@ const PersonSkeleton = () => (
 
 const PeopleList = () => {
   const { user } = useAuth()
+  const [showSuggest, setShowSuggest] = useState(false)
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -227,8 +229,16 @@ const PeopleList = () => {
           <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6">
             The actors, directors, and creatives shaping the future of Nollywood cinema. Explore their journey and filmography.
           </p>
+          <button
+            onClick={() => setShowSuggest(true)}
+            className="mt-6 inline-flex items-center gap-2 bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
+          >
+            <Icon icon="solar:user-plus-linear" width="16" />
+            Suggest a missing person
+          </button>
         </div>
       </div>
+      {showSuggest && <SuggestPersonModal onClose={() => setShowSuggest(false)} />}
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">
         {/* Filters Section */}
