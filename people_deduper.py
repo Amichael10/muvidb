@@ -40,6 +40,7 @@ DRY_RUN  = os.getenv("DEDUPE_DRY_RUN", "1").strip().lower() in ("1", "true", "ye
 LOOP     = os.getenv("DEDUPE_LOOP", "0").strip().lower() in ("1", "true", "yes")
 SLEEP    = int(os.getenv("DEDUPE_SLEEP_SECS", "1800"))
 FUZZ_MIN = int(os.getenv("DEDUPE_FUZZ_MIN", "93"))  # stricter default — avoids merging different surnames
+CLEAN_JUNK = os.getenv("DEDUPE_CLEAN_JUNK", "1").strip().lower() in ("1", "true", "yes")
 
 # Fields we never touch when merging metadata onto the primary.
 PROTECTED_FIELDS = {"id", "name", "created_at", "updated_at"}
@@ -104,6 +105,46 @@ def credits_for(person_id: str) -> list:
 # ── Candidate clustering (cheap, narrows what the LLM sees) ────────────────────
 def _norm(name: str) -> str:
     return " ".join(name.lower().replace(".", " ").replace("-", " ").split())
+
+
+# ── Role-label junk detection ─────────────────────────────────────────────────
+# The cast enricher sometimes saved a bare crew-role label ("Production Manager")
+# as if it were a person. Those have no real name and should be DELETED — unless a
+# real name is attached ("Fola Makeup Artist", "Production Manager Uchendu Mbunabo").
+ROLE_PHRASES = [
+    "production manager", "production assistant", "costume manager", "costume assistant",
+    "costumier", "make up", "makeup", "makeup artist", "make up artist", "wardrobe",
+    "director", "assistant director", "director of photography", "cinematographer", "dop",
+    "editor", "supervising editor", "producer", "executive producer", "associate producer",
+    "line producer", "sound", "sound recordist", "sound mixer", "gaffer", "continuity",
+    "screenplay", "story", "still photo", "still photographer", "props", "set", "props and set",
+    "welfare", "welfare assistant", "script supervisor", "light", "lighting", "art director",
+    "set designer", "location manager", "colorist", "color", "vfx", "special effects",
+    "music", "composer", "soundtrack", "writer", "screenwriter", "unit manager", "production",
+    "manager", "assistant", "crew", "cast", "actor", "actress", "director name",
+]
+_ROLE_WORDS = {w for ph in ROLE_PHRASES for w in ph.split()} | {
+    "1", "2", "3", "i", "ii", "iii", "the", "and", "of", "dp", "pm", "asst", "snr", "jnr",
+}
+
+
+def is_role_junk(name: str) -> bool:
+    """True if the name is ONLY a crew-role label (no real personal name)."""
+    n = _norm(name)
+    if not n:
+        return True
+    toks = n.split()
+    # Every token is a generic role/filler word -> no actual name present.
+    if all(t in _ROLE_WORDS for t in toks):
+        return True
+    # Close to a known role phrase (catches OCR garble like "production managet",
+    # "custom manager") without extra name tokens dragging the score down.
+    # 80 catches OCR garble ("custom manager"~"costume manager" = 83) while real
+    # name+role combos ("Grace Manager") stay well below (~65).
+    for ph in ROLE_PHRASES:
+        if len(ph.split()) >= 2 and fuzz.ratio(n, ph) >= 80:
+            return True
+    return False
 
 
 class _UnionFind:
@@ -296,6 +337,22 @@ def run_pass() -> int:
 
     merged_total = 0
 
+    # ── Tier 0: delete role-label junk "people" (no real name attached) ──────
+    removed_junk = 0
+    if CLEAN_JUNK:
+        junk = [p for p in people if is_role_junk(p["name"])]
+        print(f"  Tier 0: {len(junk)} role-label junk 'people' to delete.")
+        for p in junk:
+            print(f"  🗑 JUNK '{p['name']}'")
+            if DRY_RUN:
+                continue
+            sb_delete(f"credits?person_id=eq.{p['id']}")   # nameless credit — discard
+            if sb_delete(f"people?id=eq.{p['id']}"):
+                removed_junk += 1
+        # Drop them from the working set so later tiers ignore them.
+        junk_ids = {p["id"] for p in junk}
+        people = [p for p in people if p["id"] not in junk_ids]
+
     # ── Tier 1: exact-after-normalisation duplicates — no LLM needed ──────────
     # "Yomi Fash Lanso" == "Yomi Fash-Lanso", "UCHE NANCY" == "Uche Nancy", etc.
     # Identical normalised names are the same person with ~100% confidence.
@@ -338,7 +395,7 @@ def run_pass() -> int:
                     merged_total += 1
                     merged_ids.add(dup_id)
 
-    print(f"[Dedupe pass] Done. {merged_total} duplicates merged"
+    print(f"[Dedupe pass] Done. {removed_junk} junk deleted, {merged_total} duplicates merged"
           f"{' (DRY RUN — nothing written)' if DRY_RUN else ''}.")
     return merged_total
 
