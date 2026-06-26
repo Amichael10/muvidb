@@ -122,6 +122,14 @@ ROLE_PHRASES = [
     "set designer", "location manager", "colorist", "color", "vfx", "special effects",
     "music", "composer", "soundtrack", "writer", "screenwriter", "unit manager", "production",
     "manager", "assistant", "crew", "cast", "actor", "actress", "director name",
+    # logistics / support roles that also leak in as fake "people"
+    "logistics", "logistics manager", "logixtic", "logistic manager", "driver", "drivers",
+    "security", "runner", "caterer", "catering", "transport", "transportation",
+    "accountant", "account", "marketer", "marketing", "publicity", "publicist", "graphics",
+    "graphic", "poster", "trailer", "dubbing", "subtitle", "translator", "boom", "boom operator",
+    "grip", "best boy", "focus puller", "dolly", "crane", "drone", "generator", "power",
+    "medic", "usher", "extra", "extras", "stunt", "stunts", "choreographer", "choreography",
+    "dancer", "decor", "set decor", "post production", "color grading", "colourist", "landlord",
 ]
 _ROLE_WORDS = {w for ph in ROLE_PHRASES for w in ph.split()} | {
     "1", "2", "3", "i", "ii", "iii", "the", "and", "of", "dp", "pm", "asst", "snr", "jnr",
@@ -203,11 +211,21 @@ def build_candidate_clusters(people: list) -> list:
             continue
         for a in range(len(ids)):
             ni = norms[ids[a]]
+            ti = set(ni.split())
             for b in range(a + 1, len(ids)):
                 nj = norms[ids[b]]
                 comparisons += 1
                 score = max(fuzz.token_sort_ratio(ni, nj), fuzz.ratio(ni, nj))
                 if score >= FUZZ_MIN:
+                    uf.union(ids[a], ids[b])
+                    continue
+                # Containment: one full name sits inside the other ("Linda Adedeji"
+                # ⊂ "Linda Adedeji Landlord" — same person + a character/role word).
+                # Require the smaller to have >=2 tokens so single first names don't
+                # over-merge ("John" ⊄ "John Paul Mbah").
+                tj = set(nj.split())
+                small, big_set = (ti, tj) if len(ti) <= len(tj) else (tj, ti)
+                if len(small) >= 2 and small < big_set:
                     uf.union(ids[a], ids[b])
 
     # Collect connected components of size >= 2.
@@ -230,6 +248,9 @@ are genuinely DIFFERENT people who happen to have similar names.
 For each set of records that refer to the SAME real person, output a merge group.
 Choose the primary_id as the record with the cleanest, most complete, correctly
 spelled name (prefer the one with more credits when spelling is equally good).
+When one name is another name PLUS an extra trailing word (e.g. "Linda Adedeji"
+vs "Linda Adedeji Landlord"), that extra word is the CHARACTER they played, not
+part of their name — choose the SHORTER name as primary and merge the longer one in.
 Do NOT merge people you are not confident are the same. When unsure, leave them
 separate (omit them from the output).
 
@@ -275,7 +296,11 @@ def merge_person(primary: dict, dup: dict, people_by_id: dict) -> bool:
     np, nd = _norm(primary["name"]), _norm(dup["name"])
     score = max(fuzz.token_sort_ratio(np, nd), fuzz.ratio(np, nd))
     surname_ok = fuzz.ratio(np.split()[-1], nd.split()[-1]) >= 90 if np and nd else False
-    if score < FUZZ_MIN and not surname_ok:
+    # Containment ("Linda Adedeji" ⊂ "Linda Adedeji Landlord") is a strong same-person
+    # signal even though the trailing word differs — exempt it from the surname guard.
+    tp, td = set(np.split()), set(nd.split())
+    contained = (len(tp) >= 2 and tp < td) or (len(td) >= 2 and td < tp)
+    if score < FUZZ_MIN and not surname_ok and not contained:
         print(f"  ↯ SKIP merge '{dup['name']}' -> '{primary['name']}' "
               f"(similarity {score} < {FUZZ_MIN}, surnames differ).")
         return False
