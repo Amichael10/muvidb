@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 import { CONTRIBUTION_LABELS } from '../../lib/contributions';
+import { signedContributionUrl, publishContributionImage, deleteContributionImage } from '../../lib/imageUpload';
 
 // Map a single submitted social URL to the right people.* column.
 function socialField(url = '') {
@@ -26,6 +27,7 @@ const TYPE_STYLE = {
 export default function AdminContributions() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
+  const [signedUrls, setSignedUrls] = useState({}); // contribution id -> preview URL
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
@@ -43,6 +45,13 @@ export default function AdminContributions() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       setItems(data || []);
+
+      // Resolve short-lived preview URLs for any quarantined images.
+      const withImg = (data || []).filter((d) => d.image_path);
+      const entries = await Promise.all(
+        withImg.map(async (d) => [d.id, await signedContributionUrl(d.image_path)])
+      );
+      setSignedUrls(Object.fromEntries(entries.filter(([, url]) => url)));
     } catch (e) {
       console.error('Error fetching contributions:', e);
       toast.error('Failed to load the queue');
@@ -67,11 +76,13 @@ export default function AdminContributions() {
     try {
       if (item.type === 'new_person') {
         const p = item.payload || {};
+        // Re-encode + publish the quarantined image to the public bucket.
+        const photoUrl = item.image_path ? await publishContributionImage(item.image_path) : null;
         const insert = {
           name: p.name,
           gender: p.sex || null,
           date_of_birth: p.date_of_birth || null,
-          photo_url: item.image_url || null,
+          photo_url: photoUrl,
           bio: [p.bio, p.films ? `Filmography (community-submitted): ${p.films}` : null]
             .filter(Boolean).join('\n\n') || null,
           source: 'community',
@@ -83,6 +94,8 @@ export default function AdminContributions() {
         if (insErr) throw insErr;
       }
       await markReviewed(item, 'approved');
+      // Remove the quarantined upload now that moderation is complete.
+      if (item.image_path) await deleteContributionImage(item.image_path);
       toast.success(item.type === 'new_person' ? 'Person created ✓' : 'Approved');
       setItems((prev) => prev.filter((x) => x.id !== item.id));
     } catch (e) {
@@ -97,6 +110,7 @@ export default function AdminContributions() {
     setBusyId(item.id);
     try {
       await markReviewed(item, 'rejected');
+      if (item.image_path) await deleteContributionImage(item.image_path);
       toast.success('Rejected');
       setItems((prev) => prev.filter((x) => x.id !== item.id));
       setRejectingId(null);
@@ -192,9 +206,9 @@ export default function AdminContributions() {
                       </div>
                     )}
                   </div>
-                  {item.image_url && (
-                    <a href={item.image_url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                      <img src={item.image_url} alt="" className="w-28 h-28 object-cover rounded-xl border border-border" />
+                  {signedUrls[item.id] && (
+                    <a href={signedUrls[item.id]} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                      <img src={signedUrls[item.id]} alt="" className="w-28 h-28 object-cover rounded-xl border border-border" />
                     </a>
                   )}
                 </div>

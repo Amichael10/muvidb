@@ -10,6 +10,7 @@ import {
   reportLink,
   reportChannel,
 } from '../../lib/contributions';
+import { uploadContributionImage } from '../../lib/imageUpload';
 
 // Shared modal shell ---------------------------------------------------------
 function ModalShell({ title, subtitle, onClose, children }) {
@@ -35,6 +36,55 @@ function ModalShell({ title, subtitle, onClose, children }) {
 const inputCls =
   'w-full bg-surface-2 border border-border text-text-primary rounded-xl px-4 py-3 text-sm focus:border-brand focus:outline-none placeholder-text-muted transition-all';
 const labelCls = 'text-text-secondary text-xs font-bold block mb-1.5 tracking-wide';
+
+// Secure image upload field: validates + re-encodes + uploads to the private
+// quarantine bucket, then reports the storage path up via onUploaded(path).
+function ImageUploadField({ label, onUploaded }) {
+  const [status, setStatus] = useState('idle'); // idle | uploading | done | error
+  const [preview, setPreview] = useState(null);
+  const [err, setErr] = useState('');
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setErr('');
+    setStatus('uploading');
+    setPreview(URL.createObjectURL(file));
+    const { path, error } = await uploadContributionImage(file);
+    if (error) {
+      setStatus('error');
+      setErr(error);
+      onUploaded(null);
+      return;
+    }
+    setStatus('done');
+    onUploaded(path);
+  };
+
+  return (
+    <Field label={label}>
+      <div className="flex items-center gap-3">
+        <label className="cursor-pointer inline-flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs font-bold text-text-secondary hover:border-brand/50 transition-all">
+          <Icon icon="solar:upload-linear" width="16" />
+          {status === 'uploading' ? 'Uploading…' : status === 'done' ? 'Replace image' : 'Choose image'}
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFile} />
+        </label>
+        {preview && (
+          <div className="relative">
+            <img src={preview} alt="" className="w-12 h-12 rounded-lg object-cover border border-border" />
+            {status === 'done' && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center text-white">
+                <Icon icon="solar:check-circle-bold" width="14" />
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      {err && <p className="text-red-500 text-[11px] font-bold mt-1">{err}</p>}
+      <p className="text-text-muted text-[10px] mt-1">PNG, JPEG or WebP · max 5 MB</p>
+    </Field>
+  );
+}
 
 function Field({ label, required, children }) {
   return (
@@ -105,8 +155,9 @@ function useContributionSubmit(onClose) {
 export function SuggestPersonModal({ onClose }) {
   const { submitting, run } = useContributionSubmit(onClose);
   const [f, setF] = useState({
-    name: '', social_link: '', sex: '', bio: '', photo_url: '', date_of_birth: '', films: '',
+    name: '', social_link: '', sex: '', bio: '', date_of_birth: '', films: '',
   });
+  const [imagePath, setImagePath] = useState(null);
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
 
   const handleSubmit = (e) => {
@@ -115,7 +166,7 @@ export function SuggestPersonModal({ onClose }) {
       toast.error('Name, a social link, and sex are required.');
       return;
     }
-    run(() => suggestNewPerson(f));
+    run(() => suggestNewPerson({ ...f, image_path: imagePath }));
   };
 
   return (
@@ -141,14 +192,10 @@ export function SuggestPersonModal({ onClose }) {
         <Field label="Films they've acted in / worked on">
           <textarea className={`${inputCls} resize-none h-20`} value={f.films} onChange={set('films')} placeholder="One title per line, or comma-separated" />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Date of birth">
-            <input type="date" className={inputCls} value={f.date_of_birth} onChange={set('date_of_birth')} />
-          </Field>
-          <Field label="Photo URL">
-            <input className={inputCls} value={f.photo_url} onChange={set('photo_url')} placeholder="https://…" />
-          </Field>
-        </div>
+        <Field label="Date of birth">
+          <input type="date" className={inputCls} value={f.date_of_birth} onChange={set('date_of_birth')} />
+        </Field>
+        <ImageUploadField label="Photo" onUploaded={setImagePath} />
         <Field label="Short bio">
           <textarea className={`${inputCls} resize-none h-20`} value={f.bio} onChange={set('bio')} placeholder="Optional" />
         </Field>
@@ -163,18 +210,18 @@ export function SuggestEditModal({ onClose, target, targetId, targetName }) {
   // target: 'person' | 'film'
   const { submitting, run } = useContributionSubmit(onClose);
   const [changes, setChanges] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imagePath, setImagePath] = useState(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!changes.trim() && !imageUrl.trim()) {
-      toast.error('Describe what should change, or provide a new image.');
+    if (!changes.trim() && !imagePath) {
+      toast.error('Describe what should change, or attach a new image.');
       return;
     }
     if (target === 'person') {
-      run(() => suggestPersonEdit({ personId: targetId, changes, photo_url: imageUrl }));
+      run(() => suggestPersonEdit({ personId: targetId, changes, image_path: imagePath }));
     } else {
-      run(() => suggestFilmEdit({ filmId: targetId, changes, image_url: imageUrl }));
+      run(() => suggestFilmEdit({ filmId: targetId, changes, image_path: imagePath }));
     }
   };
 
@@ -193,9 +240,7 @@ export function SuggestEditModal({ onClose, target, targetId, targetName }) {
             placeholder="e.g. The release year should be 2023, the director is X, add the social link…"
           />
         </Field>
-        <Field label="New image URL">
-          <input className={inputCls} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Optional — link to a better photo/poster" />
-        </Field>
+        <ImageUploadField label="New image (optional)" onUploaded={setImagePath} />
         <SubmitRow submitting={submitting} onClose={onClose} label="Submit edit" />
       </form>
     </ModalShell>
