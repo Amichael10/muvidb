@@ -916,9 +916,9 @@ export default function Home() {
                         />
                       </div>
                       <div className="space-y-2 w-full">
-                        <h4 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-1">
+                        <h3 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-1">
                           {crew.name}
-                        </h4>
+                        </h3>
                         <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
                           {crew.known_for_department || 'Crew'}
                         </span>
@@ -994,9 +994,9 @@ export default function Home() {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <h4 className="font-bold text-text-primary text-xs uppercase tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
+                            <h3 className="font-bold text-text-primary text-xs uppercase tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
                               {company.name}
-                            </h4>
+                            </h3>
                             {company.founded_year && (
                               <p className="text-text-muted text-[8px] font-black uppercase tracking-widest mt-0.5 opacity-60">
                                 EST. {company.founded_year}
