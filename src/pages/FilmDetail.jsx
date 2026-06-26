@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '@iconify/react';
+import { SuggestEditModal, ReportModal } from '../components/contribute/ContributeModals';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useReactions } from '../hooks/useReactions';
 import ReviewSection from '../components/film/ReviewSection';
@@ -158,6 +159,8 @@ export default function FilmDetail() {
 
   const [cast, setCast] = useState([]);
   const [crew, setCrew] = useState([]);
+  const [showFilmEdit, setShowFilmEdit] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
 
   useEffect(() => {
@@ -445,6 +448,28 @@ export default function FilmDetail() {
               <p className="text-text-muted text-lg leading-relaxed opacity-80 border-l-2 border-brand pl-6">
                 {film.synopsis}
               </p>
+              <div className="flex flex-wrap items-center gap-4 mt-6">
+                <button
+                  onClick={() => setShowFilmEdit(true)}
+                  className="inline-flex items-center gap-1.5 text-text-muted hover:text-brand text-[11px] font-bold transition-colors"
+                >
+                  <Icon icon="solar:pen-2-linear" width="14" />
+                  Suggest an edit
+                </button>
+                <button
+                  onClick={() => setShowReport(true)}
+                  className="inline-flex items-center gap-1.5 text-text-muted hover:text-red-500 text-[11px] font-bold transition-colors"
+                >
+                  <Icon icon="solar:flag-linear" width="14" />
+                  Report a broken / pirate link
+                </button>
+              </div>
+              {showFilmEdit && (
+                <SuggestEditModal target="film" targetId={filmId} targetName={film.title} onClose={() => setShowFilmEdit(false)} />
+              )}
+              {showReport && (
+                <ReportModal kind="link" targetId={filmId} targetName={film.title} onClose={() => setShowReport(false)} />
+              )}
             </section>
 
             {/* Episodes (for series) */}

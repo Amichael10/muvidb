@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '@iconify/react'
+import { SuggestEditModal } from '../components/contribute/ContributeModals'
 import {
   formatViewCount,
   fetchRecentVideosFromChannel,
@@ -132,6 +133,7 @@ const PersonDetail = () => {
   const [channelVideos, setChannelVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showEdit, setShowEdit] = useState(false)
   const [activeRole, setActiveRole] = useState('actor')
   const [youtubeVideoIds, setYoutubeVideoIds] = useState([])
   const [youtubeLoading, setYoutubeLoading] = useState(false)
@@ -464,6 +466,22 @@ const PersonDetail = () => {
                     </span>
                   ))}
                 </div>
+
+                <button
+                  onClick={() => setShowEdit(true)}
+                  className="mt-4 inline-flex items-center gap-1.5 text-text-muted hover:text-brand text-[11px] font-bold transition-colors"
+                >
+                  <Icon icon="solar:pen-2-linear" width="14" />
+                  Suggest an edit
+                </button>
+                {showEdit && (
+                  <SuggestEditModal
+                    target="person"
+                    targetId={personId}
+                    targetName={person.name}
+                    onClose={() => setShowEdit(false)}
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden bg-surface max-w-sm mx-auto md:mx-0 shadow-sm">
