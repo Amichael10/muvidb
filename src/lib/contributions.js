@@ -26,7 +26,7 @@ export const CONTRIBUTION_LABELS = {
  * Low-level insert. Requires a signed-in user (RLS enforces submitted_by = self).
  * Returns { ok, error }.
  */
-async function submit({ type, target_table = null, target_id = null, payload = {}, image_url = null, note = null }) {
+async function submit({ type, target_table = null, target_id = null, payload = {}, image_path = null, note = null }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: new Error('You must be signed in to contribute.') };
 
@@ -35,7 +35,7 @@ async function submit({ type, target_table = null, target_id = null, payload = {
     target_table,
     target_id,
     payload,
-    image_url: image_url || null,
+    image_path: image_path || null,
     note: note || null,
     submitted_by: user.id,
   });
@@ -51,37 +51,37 @@ async function submit({ type, target_table = null, target_id = null, payload = {
 
 // Suggest a missing actor/crew member. Required: name, socials, sex. Optional:
 // bio, photo (URL), date_of_birth, films (free-text list of titles).
-export function suggestNewPerson({ name, social_link, sex, bio, photo_url, date_of_birth, films, note }) {
+export function suggestNewPerson({ name, social_link, sex, bio, image_path, date_of_birth, films, note }) {
   return submit({
     type: CONTRIBUTION_TYPES.NEW_PERSON,
     target_table: 'people',
     payload: { name, social_link, sex, bio, date_of_birth, films },
-    image_url: photo_url,
+    image_path,
     note,
   });
 }
 
 // Suggest corrections/additions to an existing person. `changes` is a free-form
 // description and/or a map of field -> proposed value; image optional.
-export function suggestPersonEdit({ personId, changes, photo_url, note }) {
+export function suggestPersonEdit({ personId, changes, image_path, note }) {
   return submit({
     type: CONTRIBUTION_TYPES.EDIT_PERSON,
     target_table: 'people',
     target_id: personId,
     payload: { changes },
-    image_url: photo_url,
+    image_path,
     note,
   });
 }
 
 // Suggest corrections/additions to an existing film.
-export function suggestFilmEdit({ filmId, changes, image_url, note }) {
+export function suggestFilmEdit({ filmId, changes, image_path, note }) {
   return submit({
     type: CONTRIBUTION_TYPES.EDIT_FILM,
     target_table: 'films',
     target_id: filmId,
     payload: { changes },
-    image_url,
+    image_path,
     note,
   });
 }
