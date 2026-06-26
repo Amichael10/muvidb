@@ -52,10 +52,11 @@ export default function Home() {
 
   useEffect(() => {
     document.title = "MuviDB | Home";
-    fetchAllData();
-    // Decoupled from fetchAllData so the headline section's reliability/timing is
-    // independent of the rest of the page.
-    fetchPlatformCounts();
+    // Run the platform counts AFTER the main load burst clears, not during it —
+    // the unindexed streaming_links count scans are slow and were timing out while
+    // ~13 other queries hammered the DB, leaving tiles stuck on "Browse". The tiles
+    // render immediately regardless; this just makes their labels reliable.
+    fetchAllData().finally(() => fetchPlatformCounts());
   }, []);
 
   const fetchAllData = async () => {
