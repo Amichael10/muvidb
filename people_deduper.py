@@ -294,17 +294,37 @@ def run_pass() -> int:
     print(f"  Loaded {len(people)} people.")
     by_id = {p["id"]: p for p in people}
 
-    clusters = build_candidate_clusters(people)
-    print(f"  {len(clusters)} candidate duplicate clusters (fuzz >= {FUZZ_MIN}).")
-
     merged_total = 0
+
+    # ── Tier 1: exact-after-normalisation duplicates — no LLM needed ──────────
+    # "Yomi Fash Lanso" == "Yomi Fash-Lanso", "UCHE NANCY" == "Uche Nancy", etc.
+    # Identical normalised names are the same person with ~100% confidence.
+    from collections import defaultdict
+    exact = defaultdict(list)
+    for p in people:
+        exact[_norm(p["name"])].append(p)
+    exact_groups = [g for g in exact.values() if len(g) >= 2]
+    print(f"  Tier 1: {len(exact_groups)} exact-normalised duplicate groups.")
+    merged_ids = set()
+    for group in exact_groups:
+        # primary = the member with the most credits (keeps the richest record)
+        for p in group:
+            p["_credits"] = len(credits_for(p["id"]))
+        group.sort(key=lambda p: p["_credits"], reverse=True)
+        primary = group[0]
+        for dup in group[1:]:
+            if merge_person(primary, dup, by_id):
+                merged_total += 1
+                merged_ids.add(dup["id"])
+
+    # ── Tier 2: fuzzy candidates — LLM confirms the same-person call ──────────
+    clusters = build_candidate_clusters([p for p in people if p["id"] not in merged_ids])
+    print(f"  Tier 2: {len(clusters)} fuzzy clusters (fuzz >= {FUZZ_MIN}).")
     for cluster in clusters:
-        # annotate credit counts to help the LLM pick a primary
         for p in cluster:
-            try:
-                p["_credits"] = len(credits_for(p["id"]))
-            except Exception:
-                p["_credits"] = "?"
+            if "_credits" not in p:
+                try: p["_credits"] = len(credits_for(p["id"]))
+                except Exception: p["_credits"] = "?"
         merges = llm_confirm_merges(cluster)
         for m in merges:
             primary = by_id.get(m.get("primary_id"))
@@ -312,10 +332,11 @@ def run_pass() -> int:
                 continue
             for dup_id in m.get("duplicate_ids", []):
                 dup = by_id.get(dup_id)
-                if not dup or dup_id == primary["id"]:
+                if not dup or dup_id == primary["id"] or dup_id in merged_ids:
                     continue
                 if merge_person(primary, dup, by_id):
                     merged_total += 1
+                    merged_ids.add(dup_id)
 
     print(f"[Dedupe pass] Done. {merged_total} duplicates merged"
           f"{' (DRY RUN — nothing written)' if DRY_RUN else ''}.")
