@@ -1,5 +1,8 @@
--- RPC to get people with filmography counts inclusive of qualifying YouTube videos
--- THRESHOLDS: Actor >= 35m (2100s), Skit Maker >= 15m (900s)
+-- Migration: Fix get_people_with_counts return signature and type mismatch
+-- Drop old function to allow different column layout/types in return table
+DROP FUNCTION IF EXISTS public.get_people_with_counts(text, text, text, text, boolean, integer, integer, text);
+
+-- Recreate function with correct type casts and column structure
 CREATE OR REPLACE FUNCTION public.get_people_with_counts(
   p_search TEXT DEFAULT '',
   p_verified TEXT DEFAULT 'all',
@@ -78,3 +81,8 @@ BEGIN
   LIMIT p_limit OFFSET p_offset;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Set correct permissions
+REVOKE EXECUTE ON FUNCTION public.get_people_with_counts(text, text, text, text, boolean, integer, integer, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_people_with_counts(text, text, text, text, boolean, integer, integer, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_people_with_counts(text, text, text, text, boolean, integer, integer, text) TO authenticated;
