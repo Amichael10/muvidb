@@ -41,6 +41,7 @@ const AdminPeople = lazy(() => import('./pages/admin/AdminPeople'));
 const AdminCredits = lazy(() => import('./pages/admin/AdminCredits'));
 const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies'));
 const AdminClaims = lazy(() => import('./pages/admin/AdminClaims'));
+const AdminContributions = lazy(() => import('./pages/admin/AdminContributions'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminCinemas = lazy(() => import('./pages/admin/AdminCinemas'));
 const AdminChannels = lazy(() => import('./pages/admin/AdminChannels'));
@@ -189,6 +190,7 @@ export default function App() {
                   <Route path="credits/extractor" element={<AdminCreditsExtractor />} />
                   <Route path="companies" element={<AdminCompanies />} />
                   <Route path="claims" element={<AdminClaims />} />
+                  <Route path="contributions" element={<AdminContributions />} />
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="cinemas" element={<AdminCinemas />} />
                   <Route path="channels" element={<AdminChannels />} />
