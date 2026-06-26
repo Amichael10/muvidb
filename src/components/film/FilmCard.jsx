@@ -248,12 +248,13 @@ export default function FilmCard({
 
         {/* Action Button (Hover State) */}
         <div className="absolute top-2.5 right-2.5 transition-all duration-500 z-20 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0">
-          <button 
+          <button
             className="bg-brand hover:bg-white text-white hover:text-brand w-7 h-7 rounded-lg transition-all duration-300 active:scale-90 shadow-xl flex items-center justify-center border border-white/10"
             onClick={(e) => {
               e.preventDefault();
               if (onAction) onAction(film);
             }}
+            aria-label={actionType === 'add' ? `Add ${film.title} to watchlist` : `Remove ${film.title} from watchlist`}
           >
             <Icon icon={actionType === 'add' ? "solar:add-circle-linear" : "solar:close-circle-linear"} width="14" />
           </button>
@@ -375,6 +376,7 @@ export default function FilmCard({
                 disabled={reactionLoading}
                 className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'dislike' ? 'bg-red-500/20 border-red-500 text-red-500' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
                 title="Dislike"
+                aria-label={`Dislike ${film.title}`}
               >
                 <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-lg" />
                 {dislikesCount > 0 && (
@@ -393,6 +395,7 @@ export default function FilmCard({
                 }}
                 className="w-9 h-9 rounded-full border border-white/30 hover:border-white flex items-center justify-center text-white bg-transparent hover:bg-white/10 transition hover:scale-105 active:scale-95 shrink-0"
                 title={actionType === 'add' ? "Add to Watchlist" : "Remove from Watchlist"}
+                aria-label={actionType === 'add' ? `Add ${film.title} to watchlist` : `Remove ${film.title} from watchlist`}
               >
                 <Icon icon={actionType === 'add' ? "solar:plus-linear" : "solar:close-circle-linear"} className="text-lg" />
               </button>
@@ -411,6 +414,7 @@ export default function FilmCard({
                 disabled={reactionLoading}
                 className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'like' ? 'bg-brand/20 border-brand text-brand' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
                 title="Like"
+                aria-label={`Like ${film.title}`}
               >
                 <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-lg" />
                 {likesCount > 0 && (
