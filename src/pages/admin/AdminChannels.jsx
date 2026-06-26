@@ -460,6 +460,15 @@ export default function AdminChannels() {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, search ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const [filterTab, setFilterTab] = useState('all'); 
   const [editingChannel, setEditingChannel] = useState(null);
   const [syncingId, setSyncingId] = useState(null);
@@ -468,7 +477,7 @@ export default function AdminChannels() {
 
   useEffect(() => {
     if (activeTab === 'monitored') fetchChannels();
-  }, [search, filterTab, activeTab]);
+  }, [debouncedSearch, filterTab, activeTab]);
 
   const fetchChannels = async () => {
     setLoading(true);
@@ -477,7 +486,7 @@ export default function AdminChannels() {
       .select('*, people!owner_person_id(name, photo_url), companies!owner_company_id(name)')
       .order('subscriber_count', { ascending: false, nullsFirst: false });
 
-    if (search) query = query.ilike('name', `%${search}%`);
+    if (debouncedSearch) query = query.ilike('name', `%${debouncedSearch}%`);
     if (filterTab === 'featured') {
       query = query.eq('is_featured', true);
     } else if (filterTab !== 'all') {

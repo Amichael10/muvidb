@@ -175,15 +175,6 @@ export default function Dashboard() {
             ))}
           </nav>
 
-          <div className="px-6">
-            <div className="bg-surface rounded-xl p-6 border border-border space-y-4">
-              <h4 className="text-xs font-bold text-brand">Professional access</h4>
-              <p className="text-[10px] text-text-muted font-bold leading-relaxed">Upgrade to a professional account to manage your profile and view industry insights.</p>
-              <Link to="/claim" className="block w-full text-center py-3 bg-surface-2 text-text-primary border border-border text-[9px] font-bold rounded-lg hover:border-brand hover:text-brand transition-all">
-                Learn more
-              </Link>
-            </div>
-          </div>
         </aside>
 
         {/* Content */}

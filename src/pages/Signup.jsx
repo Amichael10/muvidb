@@ -9,7 +9,7 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('fan');
+  const role = 'fan'; // Only fan accounts are offered at signup
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
   const [showPassword, setShowPassword] = useState(false);
@@ -133,43 +133,6 @@ export default function Signup() {
           </div>
         </div>
 
-        <div className="pt-2">
-          <label className="block text-[10px] font-black text-text-muted uppercase tracking-widest mb-4 opacity-60">
-            Account Type
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setRole('fan')}
-              className={`flex flex-col items-start p-6 rounded-xl border-2 text-left transition-all duration-500 ${
-                role === 'fan' 
-                  ? 'border-brand bg-brand/5' 
-                  : 'border-border bg-surface-2/30 hover:border-text-muted'
-              }`}
-            >
-              <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${role === 'fan' ? 'text-brand' : 'text-text-primary'}`}>
-                FAN HUB
-              </span>
-              <span className="text-[8px] font-bold text-text-muted uppercase tracking-widest opacity-60 italic">LISTS & RATES</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRole('professional')}
-              className={`flex flex-col items-start p-6 rounded-xl border-2 text-left transition-all duration-500 ${
-                role === 'professional' 
-                  ? 'border-brand bg-brand/5' 
-                  : 'border-border bg-surface-2/30 hover:border-text-muted'
-              }`}
-            >
-              <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${role === 'professional' ? 'text-brand' : 'text-text-primary'}`}>
-                INDUSTRY
-              </span>
-              <span className="text-[8px] font-bold text-text-muted uppercase tracking-widest opacity-60 italic">FILMOGRAPHY</span>
-            </button>
-          </div>
-        </div>
-
         <div className="flex items-center gap-3 pt-2">
             <input
               type="checkbox"
@@ -179,7 +142,7 @@ export default function Signup() {
               className="w-4 h-4 border-2 border-border rounded bg-surface-2/50 checked:bg-brand checked:border-brand transition-all cursor-pointer accent-brand"
             />
           <label htmlFor="terms" className="text-[9px] font-black text-text-muted uppercase tracking-widest cursor-pointer opacity-60">
-            I AGREE TO <Link to="#" className="text-brand hover:underline">PROTOCOL</Link> & <Link to="#" className="text-brand hover:underline">PRIVACY</Link>
+            I AGREE TO THE <Link to="/terms" className="text-brand hover:underline">TERMS &amp; CONDITIONS</Link> AND <Link to="/privacy" className="text-brand hover:underline">PRIVACY POLICY</Link>
           </label>
         </div>
 
@@ -205,7 +168,7 @@ export default function Signup() {
       <button
         type="button"
         onClick={() => loginWithGoogle()}
-        className="w-full bg-white text-bg text-[10px] font-black uppercase tracking-widest py-4 rounded-xl flex items-center justify-center gap-3 hover:bg-white/90 active:scale-95 transition-all"
+        className="w-full bg-white text-[#1f1f1f] border border-black/10 shadow-sm text-[10px] font-black uppercase tracking-widest py-4 rounded-xl flex items-center justify-center gap-3 hover:bg-white/90 active:scale-95 transition-all"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

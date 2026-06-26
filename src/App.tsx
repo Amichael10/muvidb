@@ -61,6 +61,7 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import MobileNav from './components/layout/MobileNav';
 import SmoothScroll from './components/layout/SmoothScroll';
+import CookieConsent from './components/CookieConsent';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -144,6 +145,7 @@ export default function App() {
               }} 
               
             />
+            <CookieConsent />
             <Layout>
               <Suspense fallback={<div className="min-h-screen bg-bg" />}>
               <Routes>

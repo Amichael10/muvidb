@@ -8,16 +8,11 @@ export default function Footer() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             {/* Brand */}
             <div className="space-y-6">
-              <Link to="/" className="flex items-center gap-3 group">
-                <img 
-                  src="/images/MuviDB Brand/Logo.png" 
-                  alt="MuviDB Logo" 
-                  className="w-10 h-10 object-contain group-hover:scale-110 transition-transform" 
-                />
-                <img 
-                  src="/images/MuviDB Brand/White Wordmark.png" 
-                  alt="MuviDB" 
-                  className="h-6 object-contain" 
+              <Link to="/" className="flex items-center group">
+                <img
+                  src="/images/MuviDB Brand/White Wordmark.png"
+                  alt="MuviDB"
+                  className="h-8 object-contain group-hover:scale-105 transition-transform"
                 />
               </Link>
               <p className="text-text-muted text-sm leading-relaxed max-w-xs font-medium">
@@ -51,7 +46,6 @@ export default function Footer() {
                 <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
                 <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join MuviDB</Link></li>
                 <li><Link to="/dashboard" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Dashboard</Link></li>
-                <li><Link to="/claim" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Claim Profile (For Filmmakers & Talent)</Link></li>
               </ul>
             </div>
           </div>
@@ -73,6 +67,13 @@ export default function Footer() {
               <div className="flex gap-8">
                 <Link to="/terms" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Terms</Link>
                 <Link to="/privacy" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Privacy</Link>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event('open-cookie-consent'))}
+                  className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest"
+                >
+                  Cookie Settings
+                </button>
               </div>
             </div>
           </div>

@@ -135,29 +135,6 @@ export async function runVideosSync() {
 
       if (!uploadsId) continue;
 
-      // 2. Fetch Latest Videos (max 50)
-      const plData = await ytGet('playlistItems', { 
-        part: 'snippet', 
-        playlistId: uploadsId, 
-        maxResults: '50' 
-      });
-      
-      if (!plData.items?.length) {
-        channelsProcessed++;
-        continue;
-      }
-
-      const videoIds = plData.items.map((i: any) => i.snippet.resourceId.videoId).join(',');
-      const vData = await ytGet('videos', { part: 'contentDetails,statistics', id: videoIds });
-
-      const meta: Record<string, any> = {};
-      for (const v of vData.items ?? []) {
-        meta[v.id] = { 
-          seconds: parseDuration(v.contentDetails?.duration ?? ''), 
-          views: parseInt(v.statistics?.viewCount ?? '0') 
-        };
-      }
-
       // Fetch hidden videos for this channel
       const { data: hiddenVids } = await supabase
         .from('channel_videos')
@@ -167,17 +144,73 @@ export async function runVideosSync() {
       
       const hiddenSet = new Set(hiddenVids?.map((v: any) => v.video_id) || []);
 
-      const videoRows = plData.items.map((item: any) => {
-        const vid = item.snippet.resourceId.videoId;
-        return {
-          channel_id: ch.id,
-          video_id: vid,
-          title: item.snippet.title,
-          thumbnail_url: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? null,
-          published_at: item.snippet.publishedAt,
-          duration_seconds: meta[vid]?.seconds ?? 0
-        };
-      }).filter((row: any) => !hiddenSet.has(row.video_id));
+      // 2. Fetch Latest Videos incrementally (max 250 checked, or until we find no new videos)
+      let nextPageToken = '';
+      let stopFetching = false;
+      let checkedCount = 0;
+      let newVideosFound = 0;
+      const videoRows: any[] = [];
+      const meta: Record<string, any> = {};
+
+      while (!stopFetching && checkedCount < 250 && newVideosFound < 100) {
+        const plData = await ytGet('playlistItems', { 
+          part: 'snippet', 
+          playlistId: uploadsId, 
+          maxResults: '50',
+          pageToken: nextPageToken
+        });
+        
+        if (!plData.items?.length) break;
+
+        const videoIds = plData.items.map((i: any) => i.snippet.resourceId.videoId).join(',');
+        const vData = await ytGet('videos', { part: 'contentDetails,statistics', id: videoIds });
+        
+        if (!vData.items?.length) break;
+
+        // Check which videos are already in the database
+        const batchIds = vData.items.map((v: any) => v.id);
+        const { data: existingVids } = await supabase
+          .from('channel_videos')
+          .select('video_id')
+          .eq('channel_id', ch.id)
+          .in('video_id', batchIds);
+
+        const existingSet = new Set(existingVids?.map(v => v.video_id) || []);
+        const newVideosInBatch = vData.items.filter((v: any) => !existingSet.has(v.id));
+
+        // If a page has NO new videos, it means we have caught up to the already-synced history.
+        // We can stop paging deeper.
+        if (newVideosInBatch.length === 0) {
+          stopFetching = true;
+        }
+
+        newVideosFound += newVideosInBatch.length;
+        checkedCount += vData.items.length;
+
+        for (const v of vData.items ?? []) {
+          meta[v.id] = { 
+            seconds: parseDuration(v.contentDetails?.duration ?? ''), 
+            views: parseInt(v.statistics?.viewCount ?? '0') 
+          };
+        }
+
+        plData.items.forEach((item: any) => {
+          const vid = item.snippet.resourceId.videoId;
+          if (!hiddenSet.has(vid)) {
+            videoRows.push({
+              channel_id: ch.id,
+              video_id: vid,
+              title: item.snippet.title,
+              thumbnail_url: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? null,
+              published_at: item.snippet.publishedAt,
+              duration_seconds: meta[vid]?.seconds ?? 0
+            });
+          }
+        });
+
+        nextPageToken = plData.nextPageToken;
+        if (!nextPageToken) stopFetching = true;
+      }
 
       if (videoRows.length > 0) {
         await supabase.from('channel_videos').upsert(videoRows, { onConflict: 'channel_id,video_id' });
