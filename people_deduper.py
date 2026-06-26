@@ -235,15 +235,17 @@ def merge_person(primary: dict, dup: dict, people_by_id: dict) -> bool:
         return False
 
     primary_credits = credits_for(pid)
-    # Key existing primary credits so we don't create true duplicates.
-    existing = {(c["film_id"], c.get("role"), c.get("character_name")) for c in primary_credits}
+    # Key on (film_id, role) — this is the DB's UNIQUE constraint on credits.
+    # character_name is NOT part of it, so it must NOT be in the key, or re-points
+    # collide with a 409 duplicate-key error and the whole merge aborts.
+    existing = {(c["film_id"], c.get("role")) for c in primary_credits}
 
     dup_credits = credits_for(did)
     repoint, collide = [], []
     for c in dup_credits:
-        key = (c["film_id"], c.get("role"), c.get("character_name"))
+        key = (c["film_id"], c.get("role"))
         if key in existing:
-            collide.append(c)      # primary already has it — dup copy is redundant
+            collide.append(c)      # primary already has this film+role — dup copy is redundant
         else:
             repoint.append(c)
             existing.add(key)
