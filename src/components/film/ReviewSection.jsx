@@ -39,14 +39,15 @@ const ReviewCard = ({
 }) => {
     const [timeRemaining, setTimeRemaining] = useState(null);
     
-    // Check if the review is still editable (within 2 minutes of creation)
+    // Check if the review is still editable (within 5 minutes of creation).
+    // NB: this is UX only — the real enforcement is the RLS policy on the DB.
     const getEditStatus = () => {
         const createdTime = new Date(review.created_at).getTime();
         const now = Date.now();
         const diffMs = now - createdTime;
         const diffMinutes = diffMs / 1000 / 60;
-        const remainingSeconds = Math.max(0, 120 - Math.floor(diffMs / 1000));
-        return { isEditable: diffMinutes < 2, remainingSeconds };
+        const remainingSeconds = Math.max(0, 300 - Math.floor(diffMs / 1000));
+        return { isEditable: diffMinutes < 5, remainingSeconds };
     };
 
     useEffect(() => {
@@ -111,14 +112,14 @@ const ReviewCard = ({
                             <button
                                 onClick={() => onEdit(review)}
                                 className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-brand hover:text-white transition-all shadow-sm"
-                                title="Edit (2 min limit)"
+                                title="Edit (5 min limit)"
                             >
                                 <Icon icon="solar:pen-linear" width="14" />
                             </button>
                             <button
                                 onClick={() => onDelete(review.id)}
                                 className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                                title="Delete (2 min limit)"
+                                title="Delete (5 min limit)"
                             >
                                 <Icon icon="solar:trash-bin-trash-linear" width="14" />
                             </button>
