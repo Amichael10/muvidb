@@ -62,7 +62,7 @@ export const useReviews = (filmId, currentUser) => {
             if (userReview) {
                 const createdTime = new Date(userReview.created_at).getTime();
                 const now = Date.now();
-                if (now - createdTime > 120000) { // 2 minutes
+                if (now - createdTime > 300000) { // 5 minutes
                     console.error('Edit window expired');
                     return false;
                 }
@@ -105,7 +105,7 @@ export const useReviews = (filmId, currentUser) => {
 
             const createdTime = new Date(review.created_at).getTime();
             const now = Date.now();
-            if (now - createdTime > 120000) { // 2 minutes
+            if (now - createdTime > 300000) { // 5 minutes
                 console.error('Delete window expired');
                 return false;
             }
