@@ -6,7 +6,8 @@ export const PLATFORMS = [
   { id: 'netflix',     name: 'Netflix',     icon: 'simple-icons:netflix',    color: '#E50914' },
   { id: 'prime_video', name: 'Prime Video', icon: 'simple-icons:primevideo', color: '#00A8E1' },
   { id: 'youtube',     name: 'YouTube',     icon: 'simple-icons:youtube',    color: '#FF0000' },
-  { id: 'showmax',     name: 'Showmax',     icon: 'solar:tv-bold',           color: '#E10098' },
+  // Showmax removed: the service was discontinued and its catalogue moved to
+  // DSTV Africa, so it's no longer a valid "where to watch" destination.
   { id: 'kava',        name: 'Kava',        icon: 'solar:play-circle-bold',  color: '#FF5C00' },
   { id: 'docuth',      name: 'Docuth',      icon: 'solar:play-stream-bold',  color: '#16A34A' },
   { id: 'ebonylife',   name: 'Ebonylife',   icon: 'solar:play-circle-bold',  color: '#800080' },
