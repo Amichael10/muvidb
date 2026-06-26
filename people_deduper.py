@@ -160,6 +160,21 @@ def is_role_junk(name: str) -> bool:
     return all(_is_role_token(t) for t in n.split())
 
 
+# Stray punctuation to strip from the start/end of a name. Note: parentheses and
+# internal apostrophes/hyphens are NOT stripped (aliases "(Obifax)", "Asa'ah",
+# "Fash-Lanso" are legitimate).
+_STRIP_CHARS = " \t\r\n,.;:!?*|/\\\"'`~^_=+<>[]{}@#$%&"
+
+
+def clean_display_name(name: str) -> str:
+    """Trim stray leading/trailing punctuation and collapse whitespace."""
+    return " ".join(name.strip(_STRIP_CHARS).split())
+
+
+def has_letters(name: str) -> bool:
+    return any(ch.isalpha() for ch in name)
+
+
 class _UnionFind:
     def __init__(self):
         self.parent = {}
@@ -366,6 +381,32 @@ def run_pass() -> int:
     by_id = {p["id"]: p for p in people}
 
     merged_total = 0
+
+    # ── Tier -1: delete pure-symbol "people" and clean stray punctuation ─────
+    # A name with no letters at all ("," "??" "--") is junk -> delete. A name with
+    # stray leading/trailing punctuation ("RASHEED GANIYU,") gets cleaned in place;
+    # cleaning also makes "GANIYU," identical to "GANIYU" so Tier 1 then merges them.
+    symbol_deleted, cleaned_cnt = 0, 0
+    if CLEAN_JUNK:
+        kept = []
+        for p in people:
+            cleaned = clean_display_name(p["name"])
+            if not has_letters(cleaned):
+                print(f"  🗑 SYMBOL '{p['name']}'")
+                if not DRY_RUN:
+                    sb_delete(f"credits?person_id=eq.{p['id']}")
+                    if sb_delete(f"people?id=eq.{p['id']}"):
+                        symbol_deleted += 1
+                continue
+            if cleaned != p["name"]:
+                print(f"  ✦ CLEAN '{p['name']}' -> '{cleaned}'")
+                if not DRY_RUN:
+                    sb_patch(f"people?id=eq.{p['id']}", {"name": cleaned})
+                cleaned_cnt += 1
+                p["name"] = cleaned   # update in-memory so later tiers see the clean name
+            kept.append(p)
+        people = kept
+        print(f"  Tier -1: {symbol_deleted} symbol-only deleted, {cleaned_cnt} names cleaned.")
 
     # ── Tier 0: delete role-label junk "people" (no real name attached) ──────
     removed_junk = 0
