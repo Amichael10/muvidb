@@ -52,7 +52,11 @@ export default function PlatformRail({ films = [], counts = {} }) {
             >
               <Link
                 to={`/watch/${platform.id}`}
-                className="group relative flex flex-col justify-end w-full h-36 md:h-40 rounded-2xl border border-border overflow-hidden bg-surface hover:border-brand/50 hover:shadow-2xl hover:shadow-brand/10 hover:-translate-y-1 transition-all duration-500"
+                style={{
+                  '--platform-color': platform.color,
+                  '--platform-glow': `${platform.color}26` // 15% opacity hex
+                }}
+                className="group relative flex flex-col justify-end w-full h-36 md:h-40 rounded-2xl border border-border overflow-hidden bg-surface transition-all duration-500 hover:-translate-y-1 hover:border-[var(--platform-color)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.4),0_0_20px_var(--platform-glow)]"
               >
                 {/* Cover art */}
                 {platform.coverImage ? (

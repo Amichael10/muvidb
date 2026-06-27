@@ -1,11 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkRateLimit } from './_lib/rateLimit';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+import { handleCors } from './_lib/cors.js';
 
 const YOUTUBE_BASE = 'https://www.googleapis.com/youtube/v3';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -14,8 +10,7 @@ const YT_ALLOWED = new Set(['search', 'channels', 'videos', 'playlistItems', 'co
 const TMDB_ALLOWED = [ /^\/search\/movie$/, /^\/discover\/movie$/, /^\/movie\/\d+$/, /^\/person\/\d+$/ ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
-  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (handleCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   console.log(`[API] ${req.method} ${req.url}`);

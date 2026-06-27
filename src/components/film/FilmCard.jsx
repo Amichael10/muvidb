@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { useReactions } from '../../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
+import { useQuickView } from '../../context/QuickViewContext';
 
 const formatDeltaViews = (views) => {
   if (!views) return null;
@@ -35,6 +36,7 @@ export default function FilmCard({
   const [isHovered, setIsHovered] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { openQuickView } = useQuickView();
   const { userReaction, likesCount, dislikesCount, loading: reactionLoading, toggleReaction } = useReactions(film.id, user, isHovered);
 
   if (variant === 'top10') {
@@ -424,6 +426,20 @@ export default function FilmCard({
                 )}
               </button>
             </div>
+
+            {/* Quick View Button (right aligned) */}
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openQuickView(film);
+              }}
+              className="w-9 h-9 rounded-full border border-white/30 hover:border-white hover:text-brand hover:border-brand/40 flex items-center justify-center text-white bg-transparent hover:bg-white/10 transition hover:scale-105 active:scale-95 shrink-0"
+              title="Quick View"
+              aria-label={`Quick View ${film.title}`}
+            >
+              <Icon icon="solar:info-circle-linear" className="text-lg" />
+            </button>
           </div>
 
           {/* Metadata Row */}

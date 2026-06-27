@@ -153,7 +153,8 @@ export async function mirrorIfExternal(
   if (isOwnUrl(externalUrl)) return externalUrl;
 
   const mirrored = await mirrorImageToStorage(externalUrl, bucket, filename);
+  
   // Fall back to original URL if mirroring fails — better to show the image
-  // than to lose it entirely. The batch job will retry later.
+  // than to lose it entirely.
   return mirrored ?? externalUrl;
 }

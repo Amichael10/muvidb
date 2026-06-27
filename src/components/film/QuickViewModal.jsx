@@ -102,16 +102,15 @@ export default function QuickViewModal() {
     fetchData();
   }, [selectedFilm]);
 
-  if (!selectedFilm) return null;
-
-  const durationLabel = formatRuntimeHours(selectedFilm.runtime_minutes || selectedFilm.runtime);
+  const durationLabel = selectedFilm ? formatRuntimeHours(selectedFilm.runtime_minutes || selectedFilm.runtime) : null;
 
   return (
     <AnimatePresence>
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      {selectedFilm && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
         className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 pointer-events-auto"
       >
@@ -286,6 +285,7 @@ export default function QuickViewModal() {
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }
