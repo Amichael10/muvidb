@@ -47,7 +47,7 @@ export default function Search() {
       const { data: filmData, error: filmError } = await supabase
         .from('films')
         .select(`
-          id, title, poster_url, backdrop_url, year, language, 
+          id, slug, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
           film_genres!left(genres(name))
         `)
