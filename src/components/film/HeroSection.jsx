@@ -12,6 +12,8 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
+  const [isPaused, setIsPaused] = useState(false);
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -20,14 +22,14 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
   };
 
   useEffect(() => {
-    if (featuredFilms.length <= 1) return;
+    if (featuredFilms.length <= 1 || isPaused) return;
 
     const interval = setInterval(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % featuredFilms.length);
     }, 15000); // Rotate every 15 seconds
 
     return () => clearInterval(interval);
-  }, [featuredFilms.length]);
+  }, [featuredFilms.length, isPaused]);
 
   if (isLoading) {
     return (
@@ -66,7 +68,11 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
 
   return (
-    <section className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg group/hero">
+    <section 
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg group/hero"
+    >
       {/* initial={false} skips the enter fade on first render so the LCP backdrop
           paints instantly; slide-to-slide crossfades still animate. */}
       <AnimatePresence mode="wait" initial={false}>
@@ -252,6 +258,22 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
             <Icon icon="solar:alt-arrow-right-linear" width="24" height="24" />
           </button>
         </>
+      )}
+
+      {/* Progress bar indicator */}
+      {featuredFilms.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 z-30">
+          <motion.div
+            key={currentIndex + (isPaused ? '-paused' : '-active')}
+            initial={{ width: '0%' }}
+            animate={isPaused ? { width: '0%' } : { width: '100%' }}
+            transition={{ 
+              duration: isPaused ? 0 : 15, 
+              ease: 'linear' 
+            }}
+            className="h-full bg-brand"
+          />
+        </div>
       )}
     </section>
   );
