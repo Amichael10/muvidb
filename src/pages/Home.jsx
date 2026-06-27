@@ -11,13 +11,18 @@ import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
 
+// Platforms shown in the homepage "New to Stream" tabbed rail.
+const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth'].includes(p.id));
+const NEW_STREAM_IDS = NEW_STREAM.map(p => p.id);
+
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isHeroLoading, setIsHeroLoading] = useState(true);
   const [inCinemas, setInCinemas] = useState([]);
   const [leavingCinemas, setLeavingCinemas] = useState([]);
-  const [netflixNew, setNetflixNew] = useState([]);
+  const [newToStream, setNewToStream] = useState({}); // { netflix: [...], prime_video: [...], ... }
+  const [streamTab, setStreamTab] = useState('netflix');
   const [youtubeFeed, setYoutubeFeed] = useState([]);
   const [youtubeFilter, setYoutubeFilter] = useState('All');
   const [spotlightPerson, setSpotlightPerson] = useState(null);
@@ -80,7 +85,7 @@ export default function Home() {
       await Promise.all([
         fetchFeaturedSeries().catch(e => console.error('Error fetching series:', e)),
         fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
-        fetchNetflixNew().catch(e => console.error('Error fetching netflix new:', e)),
+        fetchNewToStream().catch(e => console.error('Error fetching new to stream:', e)),
         fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e)),
         fetchYoutubeFeed().catch(e => console.error('Error fetching youtube feed:', e)),
         fetchPeople().catch(e => console.error('Error fetching people:', e)),
@@ -157,7 +162,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from('films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language, 
+        id, slug, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating, 
         is_featured, is_trending, release_type, streaming_links, source,
         content_type, season_count, episode_count,
@@ -182,7 +187,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from('films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language,
+        id, slug, title, poster_url, backdrop_url, year, language,
         runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
@@ -201,35 +206,51 @@ export default function Home() {
     }
   };
 
-  const fetchNetflixNew = async () => {
-    // New on Netflix = the most recently discovered Netflix titles, newest first.
-    // Ordered by the Netflix-specific `netflix_added_at` stamp (set by the Netflix
-    // sync) so titles that were already in the catalogue but were *newly* found on
-    // Netflix surface too — their old `created_at` would otherwise hide them.
-    // Queried directly (not derived from the view-count-capped film list) so fresh
-    // low-view titles still appear; no hard year cutoff, recency ordering handles it.
-    const { data, error } = await supabase
-      .from('films')
-      .select(`
-        id, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, nfvcb_rating,
-        is_featured, is_trending, release_type, streaming_links, source,
-        created_at, release_date,
-        film_genres(genres(name))
-      `)
-      .or('release_type.eq.netflix,source.eq.netflix,streaming_links->>netflix.not.is.null')
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .gte('year', 2026)
-      .order('streaming_links->>netflix_added_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(20);
+  const fetchNewToStream = async () => {
+    // "New to Stream" tabbed rail. Admins hand-pick titles per platform in
+    // /admin/new-releases (platform_new_releases). Where a platform hasn't been
+    // curated yet, we fall back to that platform's most-recently-added titles so
+    // the tab is never empty during the catalogue backfill.
+    const cols = `
+      id, slug, title, poster_url, backdrop_url, year, language,
+      runtime_minutes, view_count, average_rating, nfvcb_rating,
+      is_featured, is_trending, release_type, streaming_links, source,
+      created_at, release_date,
+      film_genres(genres(name))
+    `;
+    const withGenres = (f) => ({
+      ...f,
+      genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+    });
 
-    if (!error && data) {
-      setNetflixNew(data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
-    }
+    const map = {};
+    NEW_STREAM_IDS.forEach(id => { map[id] = []; });
+
+    // 1. Curated entries for all platforms in one query.
+    const { data: curated } = await supabase
+      .from('platform_new_releases')
+      .select(`platform, films(${cols})`)
+      .in('platform', NEW_STREAM_IDS)
+      .order('created_at', { ascending: false });
+
+    (curated || []).forEach(row => {
+      if (row.films && map[row.platform]) map[row.platform].push(withGenres(row.films));
+    });
+
+    // 2. Recency fallback for any platform with no curation yet.
+    await Promise.all(NEW_STREAM_IDS.map(async (id) => {
+      if (map[id].length > 0) return;
+      const { data } = await supabase
+        .from('films')
+        .select(cols)
+        .or(platformFilter(id))
+        .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+        .order('created_at', { ascending: false })
+        .limit(12);
+      map[id] = (data || []).map(withGenres);
+    }));
+
+    setNewToStream(map);
   };
 
   const fetchInCinemasData = async () => {
@@ -301,7 +322,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from('films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language,
+        id, slug, title, poster_url, backdrop_url, year, language,
         runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
@@ -378,7 +399,7 @@ export default function Home() {
       if (data.featured_film_ids && data.featured_film_ids.length > 0) {
         const { data: filmsData, error: filmsErr } = await supabase
           .from('films')
-          .select('id, title, poster_url, release_type, source, year')
+          .select('id, slug, title, poster_url, release_type, source, year')
           .in('id', data.featured_film_ids);
         
         if (!filmsErr && filmsData) {
@@ -413,7 +434,7 @@ export default function Home() {
       .select(`
         rank,
         films (
-          id, title, poster_url, backdrop_url, year, language, 
+          id, slug, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating, 
           is_featured, is_trending, release_type, created_at, release_date,
           film_genres(genres(name))
@@ -463,7 +484,7 @@ export default function Home() {
     const { data } = await supabase
       .from('films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language, 
+        id, slug, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating, 
         is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
@@ -488,7 +509,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from('films')
       .select(`
-        id, title, poster_url, backdrop_url, year, language,
+        id, slug, title, poster_url, backdrop_url, year, language,
         runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
         film_genres(genres(name))
@@ -567,7 +588,7 @@ export default function Home() {
   const platformCoverPool = [
     ...featuredFilms,
     ...recentlyAdded,
-    ...netflixNew,
+    ...(newToStream.netflix || []),
     ...newReleases,
     ...top10Films,
   ];
@@ -580,15 +601,15 @@ export default function Home() {
         isLoading={isHeroLoading}
       />
 
-      <div className="max-w-7xl mx-auto border-x border-border">
+      <div className="max-w-7xl mx-auto border-x border-hairline">
         {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
-        <div className="border-b border-border">
+        <div className="border-b border-hairline">
           <PlatformRail films={platformCoverPool} counts={platformCounts} />
         </div>
 
         {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
         {(isLoading || inCinemas.length > 0) && (
-          <div className="border-b border-border py-12">
+          <div className="border-b border-hairline py-12">
             <FilmRow
               title="In Cinemas Now"
               subtitle="On the big screen this week — find showtimes near you"
@@ -601,19 +622,49 @@ export default function Home() {
         )}
 
         {/* 4. STREAMING RAILS (turn watch-link data into a browse axis) */}
-        {(isLoading || netflixNew.length > 0) && (
-          <div className="border-b border-border py-12 bg-surface-2/5">
+        {(isLoading || NEW_STREAM_IDS.some(id => (newToStream[id] || []).length > 0)) && (
+          <div className="border-b border-hairline py-12 bg-surface-2/5">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
+              <div className="flex items-end justify-between gap-4 mb-6">
+                <div className="space-y-1.5">
+                  <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.25em]">Just added — stream tonight</p>
+                  <h2 className="font-heading text-3xl md:text-[2.5rem] font-bold text-text-primary tracking-tight leading-none">New to Stream</h2>
+                </div>
+                <Link
+                  to={`/watch/${streamTab}`}
+                  className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap pb-1"
+                >
+                  See all
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
+                </Link>
+              </div>
+              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+                {NEW_STREAM.map(p => {
+                  const active = streamTab === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setStreamTab(p.id)}
+                      className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 ${
+                        active ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-text-secondary hover:border-brand/40 hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon icon={p.icon} className="text-sm" style={{ color: active ? '#fff' : p.color }} />
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <FilmRow
-              title="New on Netflix Naija"
-              subtitle="Just added — stream tonight"
-              films={netflixNew}
+              films={newToStream[streamTab] || []}
               isLoading={isLoading}
-              linkTo="/watch/netflix"
+              noHeader
             />
           </div>
         )}
         {(isLoading || featuredSeries.length > 0) && (
-          <div className="border-b border-border py-12 bg-surface-2/5">
+          <div className="border-b border-hairline py-12 bg-surface-2/5">
             <FilmRow
               title="Popular TV Shows & Series"
               subtitle="Must-watch African series and episodes"
@@ -624,7 +675,7 @@ export default function Home() {
           </div>
         )}
         {(isLoading || youtubeFeed.length > 0) && (
-          <div className="border-b border-border py-12">
+          <div className="border-b border-hairline py-12">
             <FilmRow
               title="Free on YouTube"
               subtitle="No subscription needed"
@@ -635,7 +686,7 @@ export default function Home() {
           </div>
         )}
         {leavingCinemas.length > 0 && (
-          <div className="border-b border-border py-12 bg-surface-2/5">
+          <div className="border-b border-hairline py-12 bg-surface-2/5">
             <FilmRow
               title="Leaving Cinemas Soon"
               subtitle="Catch them before they go"
@@ -648,7 +699,7 @@ export default function Home() {
 
         {/* 5. TOP 10 THIS WEEK */}
         {(isLoading || top10Films.length > 0) && (
-          <div className="border-b border-border py-12">
+          <div className="border-b border-hairline py-12">
             <FilmRow
               title="Top 10 This Week"
               subtitle="The most-watched Nollywood stories right now"
@@ -661,13 +712,13 @@ export default function Home() {
 
         {/* 6. WHAT'S NEW (three redundant rows consolidated into tabs) */}
         {(isLoading || comingSoon.length > 0 || newReleases.length > 0 || recentlyAdded.length > 0) && (
-          <div className="border-b border-border py-12">
+          <div className="border-b border-hairline py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
               <div className="space-y-1 mb-6">
                 <h2 className="text-2xl font-bold text-text-primary tracking-tight">What&apos;s New</h2>
                 <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest opacity-70">Fresh on MuviDB</p>
               </div>
-              <div className="flex gap-6 border-b border-border mb-2">
+              <div className="flex gap-6 border-b border-hairline mb-2">
                 {[
                   { key: 'coming', label: 'Coming Soon' },
                   { key: 'new', label: 'New Releases' },
@@ -696,13 +747,13 @@ export default function Home() {
         )}
 
         {/* 7. GENRE MOODS (compact chip strip) */}
-        <div className="border-b border-border">
+        <div className="border-b border-hairline">
           <GenreRail variant="chips" />
         </div>
 
         {/* 8. CURATED PICK (editorial film row — discovery) */}
         {curatedCollection && curatedCollection.films.length > 0 && (
-          <div className="border-b border-border py-16 bg-brand/5 relative overflow-hidden">
+          <div className="border-b border-hairline py-16 bg-brand/5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
             <FilmRow
               title={curatedCollection.name}
@@ -724,7 +775,7 @@ export default function Home() {
 
         {/* 9. SPOTLIGHT (Editorial) */}
         {(isLoading || spotlightContent) && (
-          <div className="border-b border-border py-16 bg-surface-2/10">
+          <div className="border-b border-hairline py-16 bg-surface-2/10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-2 mb-10">
                 <Icon icon="solar:star-linear" className="text-brand text-xl" />
@@ -733,7 +784,7 @@ export default function Home() {
                 </h2>
               </div>
 
-              <div className="relative bg-surface rounded-xl overflow-hidden border border-border shadow-sm">
+              <div className="relative bg-surface rounded-xl overflow-hidden border border-hairline shadow-sm">
                 {isLoading ? (
                   <div className="h-[400px] animate-pulse bg-surface-2" />
                 ) : spotlightContent && spotlightContent.people && (
@@ -774,7 +825,7 @@ export default function Home() {
                       <div>
                         <Link
                           to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface-2 hover:bg-brand/10 hover:text-brand border border-border rounded-lg text-[10px] font-black uppercase tracking-widest text-text-primary transition-all"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface-2 hover:bg-brand/10 hover:text-brand border border-hairline rounded-lg text-[10px] font-black uppercase tracking-widest text-text-primary transition-all"
                         >
                           Explore More
                           <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
@@ -795,11 +846,11 @@ export default function Home() {
                           {spotlightContent.featured_films.map((film) => (
                             <Link
                               key={film.id}
-                              to={`/film/${film.id}`}
+                              to={`/films/${film.slug || film.id}`}
                               className="group flex flex-col gap-1.5 transition-all"
                               title={film.title}
                             >
-                              <div className="aspect-[2/3] w-full rounded-lg overflow-hidden border border-border bg-surface-2 relative shadow-md">
+                              <div className="aspect-[2/3] w-full rounded-lg overflow-hidden border border-hairline bg-surface-2 relative shadow-md">
                                 <img
                                   src={film.poster_url || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'}
                                   alt={film.title}
@@ -816,7 +867,7 @@ export default function Home() {
                           ))}
                         </div>
                       ) : (
-                        <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-text-muted py-8">
+                        <div className="rounded-lg border border-dashed border-hairline p-6 text-center text-xs text-text-muted py-8">
                           No featured works curated.
                         </div>
                       )}
@@ -830,7 +881,7 @@ export default function Home() {
 
         {/* 10. FEATURED ARTIST */}
         {(isLoading || spotlightPerson) && (
-          <div className="border-b border-border">
+          <div className="border-b border-hairline">
             <section className="py-16">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-end justify-between mb-10">
@@ -848,7 +899,7 @@ export default function Home() {
                   </Link>
                 </div>
 
-                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-border shadow-sm">
+                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-hairline shadow-sm">
                   <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
                   <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
                     <div className="xl:flex-1">
@@ -875,7 +926,7 @@ export default function Home() {
 
         {/* 11. BEHIND THE MAGIC (Crew Spotlights) */}
         {(isLoading || crewMembers.length > 0) && (
-          <div className="border-b border-border py-16">
+          <div className="border-b border-hairline py-16">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-end justify-between mb-12">
                 <div className="space-y-1">
@@ -894,7 +945,7 @@ export default function Home() {
               <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x">
                 {isLoading ? (
                   [...Array(6)].map((_, i) => (
-                    <div key={i} className="shrink-0 w-44 bg-surface border border-border rounded-2xl p-5 text-center flex flex-col items-center gap-4">
+                    <div key={i} className="shrink-0 w-44 bg-surface border border-hairline rounded-2xl p-5 text-center flex flex-col items-center gap-4">
                       <div className="w-24 h-24 rounded-full bg-surface-2 animate-pulse" />
                       <div className="w-24 h-4 bg-surface-2 animate-pulse rounded" />
                       <div className="w-16 h-3 bg-surface-2 animate-pulse rounded" />
@@ -905,7 +956,7 @@ export default function Home() {
                     <Link
                       key={crew.id}
                       to={`/people/${crew.slug || crew.id}`}
-                      className="shrink-0 w-44 bg-surface border border-border hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
+                      className="shrink-0 w-44 bg-surface border border-hairline hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
                     >
                       <div className="relative">
                         <img
@@ -939,7 +990,7 @@ export default function Home() {
 
         {/* 12. NOLLYWOOD STUDIOS (Production Companies) */}
         {(isLoading || productionCompanies.length > 0) && (
-          <div className="border-b border-border py-16 bg-surface-2/5">
+          <div className="border-b border-hairline py-16 bg-surface-2/5">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-end justify-between mb-12">
                 <div className="space-y-1">
@@ -958,7 +1009,7 @@ export default function Home() {
               <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x">
                 {isLoading ? (
                   [...Array(4)].map((_, i) => (
-                    <div key={i} className="shrink-0 w-64 bg-surface border border-border rounded-2xl p-6 flex flex-col gap-4">
+                    <div key={i} className="shrink-0 w-64 bg-surface border border-hairline rounded-2xl p-6 flex flex-col gap-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-surface-2 animate-pulse shrink-0" />
                         <div className="space-y-2 flex-1">
@@ -977,11 +1028,11 @@ export default function Home() {
                       <Link 
                         key={company.id}
                         to={`/companies/${company.slug || company.id}`}
-                        className="shrink-0 w-64 bg-surface border border-border hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
+                        className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">
                           {company.logo_url ? (
-                            <div className="w-12 h-12 rounded-xl bg-white p-1 border border-border flex items-center justify-center overflow-hidden shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-white p-1 border border-hairline flex items-center justify-center overflow-hidden shrink-0">
                               <img 
                                 src={company.logo_url} 
                                 alt={company.name}
@@ -989,7 +1040,7 @@ export default function Home() {
                               />
                             </div>
                           ) : (
-                            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-lg font-bold text-brand font-heading border border-border shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-lg font-bold text-brand font-heading border border-hairline shrink-0">
                               {initial}
                             </div>
                           )}
@@ -1004,7 +1055,7 @@ export default function Home() {
                             )}
                           </div>
                         </div>
-                        <div className="pt-2 border-t border-border flex items-center gap-1.5">
+                        <div className="pt-2 border-t border-hairline flex items-center gap-1.5">
                           <Icon icon="solar:clapperboard-play-linear" className="text-text-muted text-xs" />
                           <span className="text-text-muted text-[8px] font-black uppercase tracking-widest">
                             {filmCount} {filmCount === 1 ? 'Film' : 'Films'} Produced
@@ -1021,7 +1072,7 @@ export default function Home() {
 
         {/* 13. FEATURED CHANNELS */}
         {(isLoading || creators.length > 0) && (
-          <div className="border-b border-border bg-surface-2/10 relative overflow-hidden">
+          <div className="border-b border-hairline bg-surface-2/10 relative overflow-hidden">
              <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
             <section className="py-16 relative z-10">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1035,10 +1086,10 @@ export default function Home() {
                   <Link to="/channels" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline">View all</Link>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-border rounded-xl overflow-hidden shadow-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-hairline rounded-xl overflow-hidden shadow-sm">
                   {isLoading ? (
                     [...Array(6)].map((_, i) => (
-                      <div key={i} className="bg-surface p-8 border-r border-b border-border flex items-center gap-5">
+                      <div key={i} className="bg-surface p-8 border-r border-b border-hairline flex items-center gap-5">
                         <div className="w-16 h-16 rounded-lg bg-surface-2 animate-shimmer shrink-0"></div>
                         <div className="flex-1 space-y-3">
                           <div className="w-2/3 h-5 bg-surface-2 animate-shimmer rounded"></div>
@@ -1057,13 +1108,13 @@ export default function Home() {
                           onClick={(e) => handleExternalClick(e, channelUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="group bg-surface p-8 hover:bg-surface-2/50 transition-all duration-500 flex flex-col gap-6 border-r border-b border-border animate-in fade-in"
+                          className="group bg-surface p-8 hover:bg-surface-2/50 transition-all duration-500 flex flex-col gap-6 border-r border-b border-hairline animate-in fade-in"
                         >
                           <div className="flex items-center gap-5">
                             <img 
                               src={stats.thumbnail || creator.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
                               alt={creator.name} 
-                              className="w-16 h-16 rounded-lg object-cover shadow-sm border border-border group-hover:scale-105 transition-transform" 
+                              className="w-16 h-16 rounded-lg object-cover shadow-sm border border-hairline group-hover:scale-105 transition-transform" 
                               onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
                             />
                             <div>
@@ -1097,8 +1148,8 @@ export default function Home() {
 
         {/* 14. NEW MEMBER CTA BANNER (Issue 29) */}
         {!isAuthenticated && (
-          <div className="px-4 sm:px-6 lg:px-8 py-16 border-t border-border/40">
-            <div className="relative bg-gradient-to-br from-brand/20 via-surface-2 to-surface border border-border rounded-3xl p-8 md:p-16 overflow-hidden shadow-2xl text-center max-w-5xl mx-auto group">
+          <div className="px-4 sm:px-6 lg:px-8 py-16 border-t border-hairline/40">
+            <div className="relative bg-gradient-to-br from-brand/20 via-surface-2 to-surface border border-hairline rounded-3xl p-8 md:p-16 overflow-hidden shadow-2xl text-center max-w-5xl mx-auto group">
               {/* Decorative Glow */}
               <div className="absolute -top-32 -left-32 w-96 h-96 bg-brand/10 rounded-full blur-[120px] transition-all group-hover:bg-brand/20 pointer-events-none"></div>
               <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-[120px] transition-all group-hover:bg-brand/20 pointer-events-none"></div>
@@ -1120,7 +1171,7 @@ export default function Home() {
                   </Link>
                   <Link 
                     to="/browse" 
-                    className="bg-white/5 hover:bg-white/10 text-text-primary border border-border px-8 py-4 rounded-xl font-bold text-[11px] uppercase tracking-widest transition-all active:scale-95 shrink-0"
+                    className="bg-white/5 hover:bg-white/10 text-text-primary border border-hairline px-8 py-4 rounded-xl font-bold text-[11px] uppercase tracking-widest transition-all active:scale-95 shrink-0"
                   >
                     Browse Database
                   </Link>
@@ -1142,7 +1193,7 @@ export default function Home() {
           />
           
           {/* Modal Content Card */}
-          <div className="relative bg-surface border border-border rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl z-10 space-y-6 animate-in zoom-in-95 duration-200">
+          <div className="relative bg-surface border border-hairline rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl z-10 space-y-6 animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-4 text-brand">
               <div className="w-12 h-12 rounded-2xl bg-brand/10 flex items-center justify-center text-brand">
                 <Icon icon="solar:danger-triangle-linear" width="28" height="28" />
@@ -1164,7 +1215,7 @@ export default function Home() {
                 onChange={(e) => setDontShowAgain(e.target.checked)}
                 className="hidden"
               />
-              <div className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${dontShowAgain ? 'bg-brand border-brand' : 'border-border bg-surface-2 group-hover:border-brand/50'}`}>
+              <div className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${dontShowAgain ? 'bg-brand border-brand' : 'border-hairline bg-surface-2 group-hover:border-brand/50'}`}>
                 {dontShowAgain && <Icon icon="solar:check-read-linear" className="text-white text-xs" />}
               </div>
               <span className="text-xs text-text-muted font-bold group-hover:text-text-secondary transition-colors uppercase tracking-wider">
@@ -1175,7 +1226,7 @@ export default function Home() {
             <div className="flex gap-4 pt-2">
               <button 
                 onClick={() => setIsWarningModalOpen(false)}
-                className="flex-1 bg-white/5 hover:bg-white/10 text-text-primary py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all active:scale-95 border border-border"
+                className="flex-1 bg-white/5 hover:bg-white/10 text-text-primary py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all active:scale-95 border border-hairline"
               >
                 Cancel
               </button>

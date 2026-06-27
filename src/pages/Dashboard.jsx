@@ -257,7 +257,7 @@ export default function Dashboard() {
                             <img src={person.photo_url || person.photo} alt={person.name} className="w-full h-full object-cover" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <Link to={`/people/${person.id}`} className="font-bold text-text-primary hover:text-brand transition-colors tracking-tight truncate block">
+                            <Link to={`/people/${person.slug || person.id}`} className="font-bold text-text-primary hover:text-brand transition-colors tracking-tight truncate block">
                               {person.name}
                             </Link>
                             <p className="text-[10px] font-bold text-text-muted opacity-60 mt-1">{person.role || 'Filmmaker'}</p>

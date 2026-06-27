@@ -44,6 +44,9 @@
   --color-surface-3: #2E2E2E;
   /* 0.24 (not 0.08) so control/card boundaries meet WCAG 1.4.11 non-text 3:1 */
   --color-border: rgba(255, 255, 255, 0.24);
+  /* Decorative-only divider — kept whisper-faint for a premium, borderless feel.
+     Use border-hairline for section dividers/grids; border-border for controls. */
+  --color-hairline: rgba(255, 255, 255, 0.05);
   --color-text-primary: #FFFFFF;
   --color-text-secondary: #B0B0B0;
   --color-text-muted: #707070;
@@ -69,6 +72,7 @@
   --color-surface-2: #F3F4F6;
   --color-surface-3: #E5E7EB;
   --color-border: rgba(34, 42, 53, 0.30);
+  --color-hairline: rgba(34, 42, 53, 0.07);
   --color-text-primary: #111827;
   --color-text-secondary: #4B5563;
   --color-text-muted: #9CA3AF;
@@ -93,6 +97,7 @@
   --color-surface-2: var(--color-surface-2);
   --color-surface-3: var(--color-surface-3);
   --color-border: var(--color-border);
+  --color-hairline: var(--color-hairline);
   --color-brand: var(--color-brand);
   --color-brand-hover: var(--color-brand-hover);
   --color-brand-muted: var(--color-brand-muted);
@@ -182,10 +187,32 @@
   }
 
   .grid-bg {
-    background-image: 
-      linear-gradient(var(--color-border) 1px, transparent 1px),
-      linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
+    background-image:
+      linear-gradient(var(--color-hairline) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-hairline) 1px, transparent 1px);
     background-size: 40px 40px;
+  }
+
+  /* Slow cinematic zoom for hero backdrops */
+  @keyframes kenburns {
+    from { transform: scale(1.02); }
+    to   { transform: scale(1.12); }
+  }
+  .animate-kenburns {
+    animation: kenburns 18s ease-out forwards;
+    will-change: transform;
+  }
+
+  /* Signature: a barely-there film grain over the whole app for a tactile,
+     cinematic finish. Fixed + pointer-events-none so it never interferes. */
+  .film-grain {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   /* Premium interactions */

@@ -70,7 +70,7 @@ export default function Browse() {
     setLoading(true);
     try {
       let query = supabase.from('films').select(`
-        id, title, poster_url, backdrop_url, year, language, 
+        id, slug, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating,
         release_type, streaming_links, source,
         film_genres!left(genres(name)),
@@ -79,7 +79,7 @@ export default function Browse() {
 
       if (selectedGenres.length > 0 && selectedCountries.length > 0) {
          query = supabase.from('films').select(`
-          id, title, poster_url, backdrop_url, year, language, 
+          id, slug, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
           release_type, streaming_links, source,
           film_genres!inner(genres!inner(name)),
@@ -89,7 +89,7 @@ export default function Browse() {
         query = query.in('film_countries.countries.name', selectedCountries);
       } else if (selectedGenres.length > 0) {
         query = supabase.from('films').select(`
-          id, title, poster_url, backdrop_url, year, language, 
+          id, slug, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
           release_type, streaming_links, source,
           film_genres!inner(genres!inner(name)),
@@ -98,7 +98,7 @@ export default function Browse() {
         query = query.in('film_genres.genres.name', selectedGenres);
       } else if (selectedCountries.length > 0) {
         query = supabase.from('films').select(`
-          id, title, poster_url, backdrop_url, year, language, 
+          id, slug, title, poster_url, backdrop_url, year, language, 
           runtime_minutes, view_count, average_rating, nfvcb_rating,
           release_type, streaming_links, source,
           film_genres!left(genres(name)),

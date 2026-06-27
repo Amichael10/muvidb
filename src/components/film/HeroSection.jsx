@@ -86,29 +86,29 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
         >
           {/* Background Image & Overlays */}
           <div className="absolute inset-0 z-0">
-            <ImageWithFallback
-              src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster}
-              alt={featuredFilm.title}
-              className="w-full h-full object-cover"
-              fallbackType="banner"
-              name={featuredFilm.title}
-              width={1280}
-              loading="eager"
-              fetchPriority="high"
-            />
-            
-            {/* Gradient Overlay: Consistently dark on the left for text readability across themes (Issue 8) */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/75 to-transparent z-10"></div>
-            
-            {/* Subtle animated gradient shimmer */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-brand/5 via-transparent to-brand/5 animate-pulse mix-blend-overlay z-10"></div>
-            
-            {/* Bottom fade into page background */}
-            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-bg to-transparent z-10"></div>
+            {/* Slow Ken Burns zoom — restarts each slide (keyed motion.div remounts) */}
+            <div className="absolute inset-0 animate-kenburns">
+              <ImageWithFallback
+                src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster}
+                alt={featuredFilm.title}
+                className="w-full h-full object-cover"
+                fallbackType="banner"
+                name={featuredFilm.title}
+                width={1280}
+                loading="eager"
+                fetchPriority="high"
+              />
+            </div>
+
+            {/* Cinematic scrim — calm + directional, no animation. Bottom-up for the
+                title, a soft left wash for readability, fade into the page below. */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10 z-10" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/25 to-transparent z-10" />
+            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg to-transparent z-10" />
           </div>
 
           {/* Content Container */}
-          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-32 pt-32 border-x border-white/5">
+          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-32 pt-32">
             <div className="flex justify-between items-end w-full">
               
               {/* Left Content */}
@@ -118,27 +118,27 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
                 className="max-w-2xl"
               >
-                {/* Tagline */}
-                <motion.p 
+                {/* Tagline — a quiet eyebrow, not a billboard */}
+                <motion.p
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.8, delay: 0.2 }}
-                  className="text-brand text-xs font-bold tracking-[0.3em] uppercase mb-4 drop-shadow-md"
+                  className="text-white/50 text-[11px] font-semibold tracking-[0.38em] uppercase mb-5"
                 >
-                  The home of Nollywood — discover, explore, obsess.
+                  The home of Nollywood
                 </motion.p>
 
                 {/* Genre Pills */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                  {(featuredFilm.genres || []).map((genre) => (
-                    <span key={genre} className="px-3 py-1 text-[10px] font-bold bg-white/5 backdrop-blur-md text-white/80 rounded-lg border border-white/10 hover:border-brand/40 transition-colors cursor-default">
+                  {(featuredFilm.genres || []).slice(0, 3).map((genre) => (
+                    <span key={genre} className="px-3 py-1 text-[10px] font-semibold tracking-wide bg-white/5 backdrop-blur-md text-white/70 rounded-full border border-white/10">
                       {genre}
                     </span>
                   ))}
                 </div>
 
                 {/* Title */}
-                <h1 className="font-heading font-bold text-5xl md:text-7xl text-white mb-6 leading-[1.1] tracking-tighter drop-shadow-2xl">
+                <h1 className="font-heading font-bold text-6xl md:text-8xl text-white mb-6 leading-[0.92] tracking-tight [text-shadow:0_2px_40px_rgba(0,0,0,0.55)]">
                   {featuredFilm.title}
                 </h1>
 
@@ -183,8 +183,8 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 </div>
 
 
-                {/* Synopsis */}
-                <p className="text-white/90 text-base md:text-lg mb-10 line-clamp-3 max-w-xl border-l-2 border-brand pl-6 leading-relaxed drop-shadow-lg opacity-90">
+                {/* Synopsis — two lines, no decorative rule */}
+                <p className="text-white/65 text-base md:text-lg mb-10 line-clamp-2 max-w-xl leading-relaxed">
                   {featuredFilm.synopsis}
                 </p>
 

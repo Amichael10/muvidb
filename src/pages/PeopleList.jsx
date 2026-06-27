@@ -53,7 +53,7 @@ const PersonCard = ({ person, currentUser }) => {
 
   return (
     <Link
-      to={`/people/${person.id}`}
+      to={`/people/${person.slug || person.id}`}
       className="group block bg-surface rounded-xl overflow-hidden border border-border hover:border-brand transition-all shadow-sm"
     >
       <div className="relative aspect-[4/5] overflow-hidden">
@@ -158,7 +158,7 @@ const PeopleList = () => {
     let query = supabase
       .from('people')
       .select(`
-        id, name, photo_url,
+        id, slug, name, photo_url,
         popularity_score, is_verified,
         known_for_department,
         credits(id)
