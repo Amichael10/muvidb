@@ -136,7 +136,8 @@ export default function AdminPeople() {
       setPeople(data || []);
     } catch (error) {
       console.error('Error fetching people:', error);
-      toast.error(getFriendlyErrorMessage(error));
+      // Fixed id so a flurry of failed searches/filters shows ONE snackbar, not a stack.
+      toast.error(getFriendlyErrorMessage(error), { id: 'admin-people-fetch' });
     } finally {
       setIsLoading(false);
     }
