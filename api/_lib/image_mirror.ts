@@ -28,6 +28,18 @@ const SKIP_DOMAINS = [
   'fbcdn.net',
 ];
 
+// Detect a real image by its leading bytes (magic numbers), regardless of the
+// (often wrong) content-type header the origin server sends.
+export function sniffImageType(buf: Buffer): string | null {
+  if (buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif';
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+      buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp';
+  return null;
+}
+
 export function isOwnUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
@@ -77,7 +89,10 @@ export async function mirrorImageToStorage(
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://muvidb.com/',
+          // Pretend we're hotlinking from the source site itself, NOT muvidb.com.
+          // Most hotlink protection allows a same-origin Referer and blocks foreign
+          // ones — sending 'https://muvidb.com/' is exactly what got us blocked.
+          'Referer': (() => { try { return new URL(externalUrl).origin + '/'; } catch { return ''; } })(),
         },
       });
     } finally {
@@ -89,26 +104,31 @@ export async function mirrorImageToStorage(
       return null;
     }
 
-    // 2. Validate content type
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
-    if (!contentType.startsWith('image/')) {
-      console.warn(`[image_mirror] Non-image content-type "${contentType}" for ${externalUrl}`);
-      return null;
-    }
-
-    // 3. Derive a clean filename
-    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
-    const storageName = filename
-      ? `${filename.replace(/\.[^.]+$/, '')}.${ext}`
-      : `${crypto.randomUUID()}.${ext}`;
-
-    // 4. Get image bytes
-    const buffer = await response.arrayBuffer();
+    // 2. Read the bytes first — we trust the actual file signature over the
+    //    content-type header, because many origin servers mislabel valid images
+    //    as application/octet-stream (which previously caused them to be skipped).
+    const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength < 500) {
       // Suspiciously small — likely a 1x1 tracking pixel or error page
       console.warn(`[image_mirror] Image too small (${buffer.byteLength}B) for ${externalUrl}`);
       return null;
     }
+
+    // 3. Determine the real type from magic bytes; fall back to a sane header.
+    const headerCt = response.headers.get('content-type') || '';
+    const contentType = sniffImageType(buffer) || (headerCt.startsWith('image/') ? headerCt : null);
+    if (!contentType) {
+      console.warn(`[image_mirror] Not an image (ct="${headerCt}") for ${externalUrl}`);
+      return null;
+    }
+
+    // 4. Derive a clean filename
+    const ext = contentType.includes('png') ? 'png'
+      : contentType.includes('webp') ? 'webp'
+      : contentType.includes('gif') ? 'gif' : 'jpg';
+    const storageName = filename
+      ? `${filename.replace(/\.[^.]+$/, '')}.${ext}`
+      : `${crypto.randomUUID()}.${ext}`;
 
     // 5. Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage

@@ -9,6 +9,11 @@
 
 const SUPABASE_DOMAIN = 'https://pkenrmorywmuvnzfoylp.supabase.co';
 
+// Hosts that serve images hotlink-friendly (or are ours) — leave them untouched.
+// Everything else external gets routed through our /api/media proxy so the
+// origin is hidden and hotlink-protected images still render from muvidb.com.
+const FRIENDLY_HOST = /(^|\.)(tmdb\.org|ytimg\.com|youtube\.com|ggpht\.com|googleusercontent\.com|ui-avatars\.com|muvidb\.com)$/i;
+
 // Vite dev server doesn't serve /_vercel/image, and the storage reverse-proxy
 // (see vercel.json routes / vite.config proxy) only exists outside localhost,
 // so skip optimization in local development.
@@ -35,14 +40,22 @@ export function getProxiedImageUrl(originalUrl, opts = {}) {
     url = url.replace(SUPABASE_DOMAIN, '');
   }
 
-  // In dev, or with no width, or for non-Supabase URLs (e.g. YouTube/TMDB
-  // thumbnails which live on other origins and have their own fallback logic),
-  // return the path untouched. We only optimize same-origin storage paths so we
-  // don't need to whitelist external domains and don't disturb other components.
-  if (isLocalhost || !width || !url.startsWith('/')) {
-    return url;
+  // Same-origin Supabase storage path: optimize via Vercel (prod, width given).
+  if (url.startsWith('/')) {
+    if (isLocalhost || !width) return url;
+    return `/_vercel/image?url=${encodeURIComponent(url)}&w=${width}&q=${quality}`;
   }
 
-  // Vercel's optimizer needs the source as a root-relative URL.
-  return `/_vercel/image?url=${encodeURIComponent(url)}&w=${width}&q=${quality}`;
+  // External absolute URL. Friendly hosts (TMDB/YouTube/ours) render directly;
+  // everything else goes through the /api/media proxy to dodge hotlink blocks
+  // and keep the origin hidden. Skip the proxy on localhost (route not served by Vite).
+  if (/^https?:\/\//i.test(url) && !isLocalhost) {
+    let host = '';
+    try { host = new URL(url).hostname; } catch { /* leave host empty */ }
+    if (host && !FRIENDLY_HOST.test(host)) {
+      return `/api/media?url=${encodeURIComponent(originalUrl)}`;
+    }
+  }
+
+  return url;
 }
