@@ -9,13 +9,15 @@ import { veeziAdapter } from './veezi.js';
 import { cinesyncAdapter } from './cinesync.js';
 import { bluepicturesAdapter } from './bluepictures.js';
 import { firecrawlAdapter } from './firecrawl.js';
+import { genesisAdapter } from './genesis.js';
 
 export const ADAPTERS: Record<string, CinemaAdapter> = {
   reach_cinema: reachCinemaAdapter,   // Viva / Ozone / KADA (Reach Cinema / Fusion Intel)
   veezi:        veeziAdapter,         // Silverbird
   cinesync:     cinesyncAdapter,      // Filmhouse (needs DevTools recon — see cinesync.ts)
   bluepictures: bluepicturesAdapter,  // Blue Pictures
-  firecrawl:    firecrawlAdapter,     // Genesis + any geo-blocked sites
+  firecrawl:    firecrawlAdapter,
+  genesis:      genesisAdapter,    // Genesis Cinemas (Jacro WP plugin — deterministic HTML, no AI)     // Genesis + any geo-blocked sites
 };
 
 export * from './types.js';
