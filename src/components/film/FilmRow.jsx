@@ -40,25 +40,25 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
   };
 
   return (
-    <section className={`relative group/row ${noHeader ? '' : 'py-8'}`}>
+    <section className={`relative group/row ${noHeader ? '' : 'py-10'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
+        {/* Section Header — editorial: kicker + display title + sliding ghost link */}
         {!noHeader && (
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-bold text-text-primary tracking-tight">
+          <div className="flex items-end justify-between gap-4 mb-7">
+            <div className="space-y-1.5">
+              {subtitle && (
+                <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.25em]">{subtitle}</p>
+              )}
+              <h2 className="font-heading text-3xl md:text-[2.5rem] font-bold text-text-primary tracking-tight leading-none">
                 {title}
               </h2>
-              {subtitle && (
-                <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-70">{subtitle}</p>
-              )}
             </div>
-            <Link 
-              to={linkTo || `/browse${sortKey ? `?sort=${sortKey}` : ''}`} 
-              className="text-text-primary font-bold text-xs px-5 py-2.5 border border-border rounded-lg hover:border-brand hover:text-brand transition-all duration-300 flex items-center gap-2 w-fit bg-surface/50 backdrop-blur-sm"
+            <Link
+              to={linkTo || `/browse${sortKey ? `?sort=${sortKey}` : ''}`}
+              className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap pb-1"
             >
               {linkTo ? 'See all' : 'Browse all'}
-              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5" />
+              <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
             </Link>
           </div>
         )}

@@ -211,7 +211,7 @@ const CinemaDetail = () => {
       .select(`
         *,
         films(
-          id, title, year, poster_url,
+          id, slug, title, year, poster_url,
           backdrop_url, average_rating,
           synopsis,
           film_genres(genres(name))

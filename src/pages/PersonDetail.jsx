@@ -323,7 +323,7 @@ const PersonDetail = () => {
       const { data: matchedFilms } = await supabase
         .from('films')
         .select(`
-          id, title, year, poster_url, trailer_youtube_id,
+          id, slug, title, year, poster_url, trailer_youtube_id,
           view_count, average_rating, release_type, youtube_watch_url,
           film_genres(genres(name))
         `)

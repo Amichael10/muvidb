@@ -82,7 +82,7 @@ export default function GenreRail({ variant = 'grid' }) {
       const { data, error } = await supabase
         .from('films')
         .select(`
-          id, title, poster_url, backdrop_url, year, language,
+          id, slug, title, poster_url, backdrop_url, year, language,
           runtime_minutes, view_count, average_rating, nfvcb_rating,
           is_featured, is_trending, release_type, streaming_links, source,
           content_type, season_count, created_at, release_date,

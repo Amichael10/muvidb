@@ -205,7 +205,7 @@ const Showtimes = () => {
             .select(`
         *,
         films(
-          id, title, year, poster_url,
+          id, slug, title, year, poster_url,
           backdrop_url, average_rating,
           film_genres(genres(name))
         ),

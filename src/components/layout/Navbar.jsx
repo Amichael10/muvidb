@@ -135,27 +135,33 @@ export default function Navbar() {
                 )}
               </button>
 
-              {/* User Avatar & Dropdown */}
-              <div className="relative">
-                <button 
+              {/* User Avatar & Dropdown — avatar only; name + role revealed on hover */}
+              <div className="relative group/user">
+                <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-3 p-1 pl-3 pr-3 bg-surface-2 hover:bg-surface-3 border border-border rounded-full transition-all active:scale-95 shadow-sm group"
+                  aria-label="Account menu"
+                  className="w-9 h-9 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden transition-all active:scale-95 hover:ring-2 hover:ring-brand/40"
                 >
-                  <div className="text-right hidden sm:block">
-                    <p className="text-[10px] font-bold tracking-tight text-text-primary group-hover:text-brand transition-colors">{user.name}</p>
-                    <p className="text-[8px] font-bold text-brand tracking-wider">
-                      {user.role === 'user' ? 'Member' : user.role === 'professional' ? 'Pro' : user.role}
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    user.name?.charAt(0) || 'U'
+                  )}
+                </button>
+
+                {/* Hover tooltip (suppressed while the click menu is open) */}
+                {!isUserMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 px-3.5 py-2 rounded-xl bg-surface border border-border shadow-xl whitespace-nowrap opacity-0 translate-y-1 pointer-events-none group-hover/user:opacity-100 group-hover/user:translate-y-0 transition-all duration-200 z-[105]">
+                    <p className="text-xs font-bold text-text-primary">{user.name}</p>
+                    <p className="text-[10px] font-bold text-brand tracking-wide">
+                      {user.role === 'user' ? 'Member'
+                        : user.role === 'professional' ? 'Pro'
+                        : user.role === 'admin' ? 'Admin'
+                        : user.role === 'admin_limited' ? 'Sub-Admin'
+                        : user.role}
                     </p>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden">
-                    {user.avatar_url ? (
-                      <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      user.name?.charAt(0) || 'U'
-                    )}
-                  </div>
-                  <Icon icon="solar:alt-arrow-down-linear" width="14" height="14" className={`text-text-muted transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
+                )}
 
                 {/* User Dropdown Menu */}
                 {isUserMenuOpen && (

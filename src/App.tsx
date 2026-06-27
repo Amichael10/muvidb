@@ -42,6 +42,7 @@ const AdminCredits = lazy(() => import('./pages/admin/AdminCredits'));
 const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies'));
 const AdminClaims = lazy(() => import('./pages/admin/AdminClaims'));
 const AdminContributions = lazy(() => import('./pages/admin/AdminContributions'));
+const AdminNewReleases = lazy(() => import('./pages/admin/AdminNewReleases'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminCinemas = lazy(() => import('./pages/admin/AdminCinemas'));
 const AdminChannels = lazy(() => import('./pages/admin/AdminChannels'));
@@ -149,6 +150,8 @@ export default function App() {
             />
             <CookieConsent />
             <QuickViewModal />
+            {/* Signature: subtle film grain over the whole app */}
+            <div className="film-grain" aria-hidden="true" />
             <Layout>
               <Suspense fallback={<div className="min-h-screen bg-bg" />}>
               <Routes>
@@ -193,6 +196,7 @@ export default function App() {
                   <Route path="companies" element={<AdminCompanies />} />
                   <Route path="claims" element={<AdminClaims />} />
                   <Route path="contributions" element={<AdminContributions />} />
+                  <Route path="new-releases" element={<AdminNewReleases />} />
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="cinemas" element={<AdminCinemas />} />
                   <Route path="channels" element={<AdminChannels />} />
