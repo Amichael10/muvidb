@@ -3,11 +3,7 @@ import { supabase } from './_lib/supabase';
 import { checkRateLimit } from './_lib/rateLimit';
 import { isValidAuth } from './_lib/auth';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+import { handleCors } from './_lib/cors.js';
 
 const YT_KEY = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
@@ -22,8 +18,7 @@ async function ytGet(endpoint: string, params: Record<string, string>) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
-  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (handleCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   if (checkRateLimit(req as unknown as Request)) {

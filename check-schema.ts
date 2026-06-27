@@ -13,6 +13,10 @@ async function main() {
     const { data: films, error } = await supabase.from('films').select('*').limit(1);
     console.log("Films columns:", Object.keys(films?.[0] || {}));
     
+    // try to query 1 row from people
+    const { data: people } = await supabase.from('people').select('*').limit(1);
+    console.log("People columns:", Object.keys(people?.[0] || {}));
+    
     // try to query credits
     const { data: credits } = await supabase.from('credits').select('*').limit(1);
     console.log("Credits columns:", Object.keys(credits?.[0] || {}));

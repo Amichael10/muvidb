@@ -2,11 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from './_lib/supabase';
 import { checkRateLimit } from './_lib/rateLimit';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+import { handleCors } from './_lib/cors.js';
 
 const FIELDS = [
   'id',
@@ -30,9 +26,7 @@ const FIELDS = [
 ].join(', ');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  Object.entries(CORS_HEADERS).forEach(([k, v]) => res.setHeader(k, v));
-
-  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (handleCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   if (checkRateLimit(req as unknown as Request)) {
