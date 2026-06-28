@@ -232,44 +232,42 @@ export default function FilmDetail() {
         .single();
 
       if (error) throw error;
-      
+
       const mappedFilm = {
         ...data,
         genres: data.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
       };
-      
+
       setFilm(mappedFilm);
       setFilmId(data.id);
-      fetchCredits(data.id);
+      document.title = `MuviDB | ${data.title}`;
+      // Render the page as soon as the main film row is in — everything below
+      // (credits, episodes, related) loads in the background instead of blocking.
+      setLoading(false);
 
+      fetchCredits(data.id);
       if (data.content_type === 'series') {
-        const showName = getShowName(data.title);
-        fetchEpisodes(data.id, showName);
+        fetchEpisodes(data.id, getShowName(data.title));
       } else if (data.series_id) {
         fetchParentSeries(data.series_id);
       }
-
-      if (data) {
-        document.title = `MuviDB | ${data.title}`;
-        const { data: related } = await supabase
-          .from('films')
-          .select(`
-            id, title, year, poster_url, backdrop_url, slug,
-            film_genres(genres(name))
-          `)
-          .neq('id', data.id)
-          .limit(3);
-          
-        setRelatedFilms((related || []).map(f => ({
-          ...f,
-          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-        })));
-      }
+      fetchRelated(data);
     } catch (error) {
       console.error('Error fetching film:', error);
-    } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRelated = async (film) => {
+    const { data: related } = await supabase
+      .from('films')
+      .select(`id, title, year, poster_url, backdrop_url, slug, film_genres(genres(name))`)
+      .neq('id', film.id)
+      .limit(3);
+    setRelatedFilms((related || []).map(f => ({
+      ...f,
+      genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+    })));
   };
 
   const handleWatchlist = async () => {

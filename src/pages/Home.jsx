@@ -255,37 +255,41 @@ export default function Home() {
 
   const fetchInCinemasData = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const notYoutube = (f) => !(f.source === 'youtube' || (f.youtube_watch_url && String(f.youtube_watch_url).length > 5));
     const withGenres = (f) => ({
       ...f,
       genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
     });
 
-    // 1. "In Cinemas Now" = titles with a live, upcoming showtime. This is the
-    //    freshness source of truth — once a film's schedule lapses it falls out.
-    const { data: showtimesData } = await supabase
+    // 1. Build the FULL set of film_ids that have a live upcoming showtime.
+    //    (Lightweight — just film_id. Previously we joined films + limited 200
+    //    showtime ROWS, which collapsed to a few films and pushed everyone else
+    //    wrongly into "Leaving".)
+    const { data: stRows } = await supabase
       .from('showtimes')
-      .select(`
-        film_id,
-        films!inner(*, film_genres(genres(name)))
-      `)
+      .select('film_id')
       .gte('show_date', today)
       .eq('is_available', true)
-      .neq('films.source', 'youtube')
-      .or('youtube_watch_url.is.null,youtube_watch_url.eq.""', { foreignTable: 'films' })
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}', { foreignTable: 'films' })
-      .order('show_date', { ascending: true })
-      .limit(200);
+      .limit(5000);
+    const nowIds = new Set((stRows || []).map(r => r.film_id).filter(Boolean));
 
-    const nowMap = new Map();
-    (showtimesData || []).forEach(s => {
-      const f = s.films;
-      if (f && notYoutube(f) && !nowMap.has(f.id)) nowMap.set(f.id, withGenres(f));
-    });
+    // 2. "In Cinemas Now" = those films (Nollywood, non-YouTube), for display.
+    let nowFilms = [];
+    if (nowIds.size > 0) {
+      const { data } = await supabase
+        .from('films')
+        .select(`*, film_genres(genres(name))`)
+        .in('id', Array.from(nowIds))
+        .neq('source', 'youtube')
+        .or('youtube_watch_url.is.null,youtube_watch_url.eq.""')
+        .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+        .order('view_count', { ascending: false })
+        .limit(60);
+      nowFilms = (data || []).map(withGenres);
+    }
 
-    // 2. "Leaving Cinemas Soon" = still flagged is_in_cinemas but no live showtime
-    //    left, i.e. the sync stopped finding it on screen. The weekly sweep clears
-    //    the flag entirely once a title has been gone past the grace window.
+    // 3. "Leaving Cinemas Soon" = still flagged is_in_cinemas but with NO live
+    //    upcoming showtime (excluded against the full nowIds set, not the
+    //    display-limited list, so a film with showtimes never lands here).
     const { data: flagged } = await supabase
       .from('films')
       .select(`*, film_genres(genres(name))`)
@@ -295,21 +299,12 @@ export default function Home() {
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('release_date', { ascending: false })
       .limit(40);
+    const leavingFilms = (flagged || [])
+      .filter(f => !nowIds.has(f.id))
+      .map(withGenres);
 
-    const leavingMap = new Map();
-    (flagged || []).forEach(f => {
-      if (notYoutube(f) && !nowMap.has(f.id)) leavingMap.set(f.id, withGenres(f));
-    });
-
-    // Fallback: if no live showtimes exist at all (e.g. scraper hasn't run yet
-    // today), surface flagged titles as "now" so the rail isn't blank.
-    if (nowMap.size === 0 && leavingMap.size > 0) {
-      leavingMap.forEach((v, k) => nowMap.set(k, v));
-      leavingMap.clear();
-    }
-
-    setInCinemas(Array.from(nowMap.values()));
-    setLeavingCinemas(Array.from(leavingMap.values()).slice(0, 20));
+    setInCinemas(nowFilms);
+    setLeavingCinemas(leavingFilms.slice(0, 20));
   };
 
   const fetchComingSoon = async (attempt = 0) => {
