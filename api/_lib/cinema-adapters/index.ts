@@ -10,6 +10,7 @@ import { cinesyncAdapter } from './cinesync.js';
 import { bluepicturesAdapter } from './bluepictures.js';
 import { firecrawlAdapter } from './firecrawl.js';
 import { genesisAdapter } from './genesis.js';
+import { filmhouseAdapter } from './filmhouse.js';
 
 export const ADAPTERS: Record<string, CinemaAdapter> = {
   reach_cinema: reachCinemaAdapter,   // Viva / Ozone / KADA (Reach Cinema / Fusion Intel)
@@ -18,6 +19,7 @@ export const ADAPTERS: Record<string, CinemaAdapter> = {
   bluepictures: bluepicturesAdapter,  // Blue Pictures
   firecrawl:    firecrawlAdapter,
   genesis:      genesisAdapter,    // Genesis Cinemas (Jacro WP plugin — deterministic HTML, no AI)     // Genesis + any geo-blocked sites
+  filmhouse:    filmhouseAdapter,  // Filmhouse (Next.js server-rendered — run from a Nigerian IP)
 };
 
 export * from './types.js';
