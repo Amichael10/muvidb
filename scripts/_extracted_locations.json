@@ -1,0 +1,62 @@
+[
+  {
+    "id": "14",
+    "name": "Akure",
+    "slug": "akure"
+  },
+  {
+    "id": "12",
+    "name": "Benin",
+    "slug": "benin"
+  },
+  {
+    "id": "8",
+    "name": "Circle Mall",
+    "slug": "circlemall"
+  },
+  {
+    "id": "4",
+    "name": "Dugbe",
+    "slug": "dugbe"
+  },
+  {
+    "id": "9",
+    "name": "Ikota",
+    "slug": "ikota"
+  },
+  {
+    "id": "19",
+    "name": "Ilorin",
+    "slug": "ilorin"
+  },
+  {
+    "id": "5",
+    "name": "Landmark",
+    "slug": "landmark"
+  },
+  {
+    "id": "6",
+    "name": "Lekki IMAX",
+    "slug": "lekki"
+  },
+  {
+    "id": "10",
+    "name": "Oniru",
+    "slug": "oniru"
+  },
+  {
+    "id": "11",
+    "name": "Palms Lekki",
+    "slug": "palmslekki"
+  },
+  {
+    "id": "13",
+    "name": "Samonda",
+    "slug": "samonda"
+  },
+  {
+    "id": "7",
+    "name": "Surulere",
+    "slug": "surulere"
+  }
+]

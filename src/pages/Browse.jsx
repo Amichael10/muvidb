@@ -369,7 +369,7 @@ export default function Browse() {
           </div>
 
           {/* Films Grid */}
-          <div className="flex-1 p-8 md:p-12">
+          <div className="flex-1 p-4 md:p-8 lg:p-12">
             {/* Search Bar */}
             <div className="mb-8 relative max-w-md">
               <input
@@ -391,7 +391,7 @@ export default function Browse() {
             </div>
 
             {loading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="flex justify-center">
                     <SkeletonCard size="md" />
@@ -399,7 +399,7 @@ export default function Browse() {
                 ))}
               </div>
             ) : films.length > 0 ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
                 {films.map(film => (
                   <div key={film.id} className="flex justify-center">
                     <FilmCard film={film} />

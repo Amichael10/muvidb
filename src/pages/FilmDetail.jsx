@@ -24,7 +24,7 @@ const FilmDetailSkeleton = () => (
             <div className="absolute inset-0 bg-surface-2 animate-shimmer opacity-20" />
             <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/40 to-transparent"></div>
             <div className="absolute bottom-0 left-0 w-full">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-end gap-8 pb-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-start md:items-end gap-6 md:gap-8 pb-8">
                     <div className="hidden md:block w-64 h-96 bg-surface-2 rounded-xl animate-shimmer shrink-0 shadow-2xl border border-white/10"></div>
                     <div className="flex-1 space-y-6 w-full pb-4">
                         <div className="space-y-4">
@@ -43,7 +43,7 @@ const FilmDetailSkeleton = () => (
         </div>
 
         <div className="max-w-7xl mx-auto border-x border-border min-h-[600px]">
-            <div className="grid grid-cols-1 lg:grid-cols-3 divide-x divide-border">
+            <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border">
                 <div className="lg:col-span-2">
                     <div className="p-8 md:p-12 border-b border-border space-y-6">
                         <div className="h-8 w-48 bg-surface-2 rounded-md animate-shimmer" />
@@ -332,7 +332,7 @@ export default function FilmDetail() {
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg to-transparent"></div>
 
         <div className="absolute bottom-0 left-0 w-full">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-end gap-8 pb-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-start md:items-end gap-6 md:gap-8 pb-8">
             <div className="hidden md:block w-64 shrink-0 translate-y-16 z-10">
               <ImageWithFallback
                 src={film.poster_url || film.poster} 
@@ -353,7 +353,7 @@ export default function FilmDetail() {
                   <span>Part of Series: {parentSeries.title}</span>
                 </Link>
               )}
-              <h1 className="font-heading font-bold text-4xl md:text-6xl text-white mb-4 leading-tight tracking-tighter drop-shadow-2xl">
+              <h1 className="font-heading font-bold text-3xl sm:text-4xl md:text-6xl text-white mb-4 leading-tight tracking-tighter drop-shadow-2xl">
                 {film.title}
               </h1>
 
@@ -436,7 +436,7 @@ export default function FilmDetail() {
 
       {/* 2. CONTENT SECTION */}
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px]">
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-x divide-border">
+        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border">
 
           {/* MAIN CONTENT (70%) */}
           <div className="lg:col-span-2">

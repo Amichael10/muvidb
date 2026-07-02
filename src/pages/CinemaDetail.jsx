@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -387,19 +387,19 @@ const CinemaDetail = () => {
           <div className="lg:col-span-1 p-8 md:p-12 space-y-12">
              <div>
                 <h3 className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-6">Select Date</h3>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-row overflow-x-auto lg:flex-col gap-2 pb-2 scrollbar-hide shrink-0">
                   {availableDates.map(date => (
                     <button
                       key={date}
                       onClick={() => setSelectedDate(date)}
-                      className={`w-full flex items-center justify-between p-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                      className={`w-auto shrink-0 lg:w-full flex items-center justify-between gap-4 p-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                         selectedDate === date
                           ? 'bg-brand text-white shadow-lg shadow-brand/20 border-brand'
                           : 'bg-surface border border-border text-text-muted hover:text-text-primary'
                       }`}
                     >
                       <span>{formatDate(date)}</span>
-                      {selectedDate === date && <span className="text-white/60">→</span>}
+                      {selectedDate === date && <span className="text-white/60 hidden lg:inline">→</span>}
                     </button>
                   ))}
                 </div>

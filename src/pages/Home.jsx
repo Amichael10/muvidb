@@ -785,7 +785,7 @@ export default function Home() {
                 ) : spotlightContent && spotlightContent.people && (
                   <div className="flex flex-col md:flex-row items-stretch min-h-[400px]">
                     {/* 1. Artist Photo Cover (Left Pane) */}
-                    <div className="md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
+                    <div className="w-full md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
                       {!spotlightImgError && (spotlightContent.photo_url || spotlightContent.people.photo_url) ? (
                         <img
                           src={spotlightContent.photo_url || spotlightContent.people.photo_url}
@@ -804,7 +804,7 @@ export default function Home() {
                     </div>
 
                     {/* 2. Editorial Story & Info (Middle Pane) */}
-                    <div className="md:w-[42%] p-8 flex flex-col justify-center shrink-0">
+                    <div className="w-full md:w-[42%] p-6 md:p-8 flex flex-col justify-center shrink-0">
                       <span className="text-brand text-[9px] font-black uppercase tracking-widest mb-2 block">
                         Spotlight
                       </span>
@@ -832,12 +832,12 @@ export default function Home() {
                     <div className="hidden md:block w-px bg-border my-8 shrink-0" />
 
                     {/* 4. Featured Works (Right Pane) */}
-                    <div className="md:w-[30%] p-8 flex flex-col justify-center flex-1">
+                    <div className="w-full md:w-[30%] p-6 md:p-8 flex flex-col justify-center flex-1">
                       <h3 className="text-text-muted text-[10px] font-black uppercase tracking-widest mb-6">
                         Featured Works
                       </h3>
                       {spotlightContent.featured_films && spotlightContent.featured_films.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                           {spotlightContent.featured_films.map((film) => (
                             <Link
                               key={film.id}
@@ -901,7 +901,7 @@ export default function Home() {
                       <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
                     </div>
                     <div className="h-px xl:w-px xl:h-64 bg-border"></div>
-                    <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
+                    <div className="w-full xl:w-80 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-2 gap-4">
                       {isLoading ? (
                         [...Array(4)].map((_, i) => (
                           <PersonCard key={i} variant="compact" isLoading={true} />

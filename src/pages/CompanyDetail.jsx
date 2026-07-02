@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatViewCount } from '../utils/youtube'
@@ -277,7 +277,7 @@ const CompanyDetail = () => {
       {/* Films Section */}
       <div className="max-w-7xl mx-auto border-x border-border pb-20 min-h-[400px]">
         {/* Section Header */}
-        <div className="p-8 md:p-12 border-b border-border bg-surface-2/5 relative overflow-hidden">
+        <div className="p-4 md:p-8 lg:p-12 border-b border-border bg-surface-2/5 relative overflow-hidden">
            <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <h2 className="text-text-primary text-2xl font-bold font-heading tracking-tighter">
@@ -306,11 +306,11 @@ const CompanyDetail = () => {
         </div>
 
         {/* Films grid */}
-        <div className="p-8 md:p-12">
+        <div className="p-4 md:p-8 lg:p-12">
           {activeTab === 'production' && (
             <>
               {productionFilms.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
                   {productionFilms.map(film => (
                     <FilmCard key={film.id} film={film} />
                   ))}
@@ -327,7 +327,7 @@ const CompanyDetail = () => {
           {activeTab === 'distribution' && (
             <>
               {distributionFilms.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
                   {distributionFilms.map(film => (
                     <FilmCard key={film.id} film={film} />
                   ))}

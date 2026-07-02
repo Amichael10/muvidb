@@ -108,7 +108,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
           </div>
 
           {/* Content Container */}
-          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-32 pt-32">
+          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-20 pt-24 md:pb-32 md:pt-32">
             <div className="flex justify-between items-end w-full">
               
               {/* Left Content */}
@@ -138,7 +138,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 </div>
 
                 {/* Title */}
-                <h1 className="font-heading font-bold text-6xl md:text-8xl text-white mb-6 leading-[0.92] tracking-tight [text-shadow:0_2px_40px_rgba(0,0,0,0.55)]">
+                <h1 className="font-heading font-bold text-3xl sm:text-4xl md:text-6xl lg:text-8xl text-white mb-6 leading-[0.92] tracking-tight [text-shadow:0_2px_40px_rgba(0,0,0,0.55)]">
                   {featuredFilm.title}
                 </h1>
 

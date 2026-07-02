@@ -5,7 +5,7 @@ const envLocal = fs.existsSync('.env.local') ? dotenv.parse(fs.readFileSync('.en
 const envDefault = fs.existsSync('.env') ? dotenv.parse(fs.readFileSync('.env')) : {};
 const env = { ...envDefault, ...envLocal, ...process.env };
 
-const TMDB_KEY = env.TMDB_API_KEY;
+const TMDB_KEY = env.TMDB_API_KEY || env.VITE_TMDB_API_KEY;
 
 export async function findAndInsertMissingFilm(supabase: any, title: string) {
   if (!TMDB_KEY) {

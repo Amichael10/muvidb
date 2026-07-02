@@ -131,9 +131,9 @@ export default function FilmCard({
 
   // Define dimensions based on size prop (Portrait 2:3 aspect ratio)
   const sizeClasses = {
-    sm: 'w-36 h-56 min-w-[9rem]',
-    md: 'w-48 h-72 min-w-[12rem]', // Naturally fits exactly 5.5 cards in standard viewports
-    lg: 'w-64 h-96 min-w-[16rem]'
+    sm: 'w-28 sm:w-36 h-44 sm:h-56 min-w-[7rem] sm:min-w-[9rem]',
+    md: 'w-[140px] sm:w-48 h-[210px] sm:h-72 min-w-[8.75rem] sm:min-w-[12rem]',
+    lg: 'w-full sm:w-64 aspect-[2/3] min-w-[12rem] sm:min-w-[16rem]'
   };
 
   const filmRating = Number(film.tmdb_rating || film.average_rating || film.rating || 0);
@@ -304,9 +304,9 @@ export default function FilmCard({
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left z-30" />
       </Link>
 
-      {/* Hover Landscape Popup Overlay */}
+      {/* Hover Landscape Popup Overlay (Desktop only) */}
       <div 
-        className={`absolute w-[280px] bg-[#181818] rounded-2xl overflow-hidden border border-white/10 shadow-2xl transition-all duration-300 ease-out opacity-0 scale-90 pointer-events-none group-hover:opacity-100 group-hover:scale-[1.08] group-hover:pointer-events-auto group-hover:delay-300 delay-100 z-50 flex flex-col ${getHoverClasses()}`}
+        className={`absolute w-[280px] bg-[#181818] rounded-2xl overflow-hidden border border-white/10 shadow-2xl transition-all duration-300 ease-out opacity-0 scale-90 pointer-events-none group-hover:opacity-100 group-hover:scale-[1.08] group-hover:pointer-events-auto group-hover:delay-300 delay-100 z-50 hidden md:flex flex-col ${getHoverClasses()}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Aspect-Video Preview Header */}

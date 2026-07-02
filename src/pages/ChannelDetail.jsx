@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -316,7 +316,7 @@ export default function ChannelDetail() {
         </div>
 
         <div className="max-w-7xl mx-auto border-x border-border relative z-10 px-4 sm:px-6 lg:px-8 -mt-12 pb-12">
-          <div className="flex flex-col md:flex-row gap-8 items-end md:items-start">
+          <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
             <div className="flex-shrink-0 relative">
               <div className="absolute -inset-1 bg-brand/20 blur-xl rounded-full"></div>
               <ImageWithFallback
@@ -331,7 +331,7 @@ export default function ChannelDetail() {
             <div className="flex-1 pt-4 md:pt-16">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div>
-                  <div className="flex items-center gap-3 flex-wrap mb-2">
+                  <div className="flex items-center justify-center lg:justify-start gap-3 flex-wrap mb-2">
                     <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">{channel.name}</h1>
                     {channel.is_featured && (
                       <span className="text-[10px] font-bold text-brand bg-brand/10 px-3 py-1 rounded-lg border border-brand/20">
@@ -339,7 +339,7 @@ export default function ChannelDetail() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center justify-center lg:justify-start gap-4 flex-wrap">
                     {channel.channel_handle && (
                       <span className="text-text-muted text-xs font-bold uppercase tracking-widest">{channel.channel_handle}</span>
                     )}
@@ -358,7 +358,7 @@ export default function ChannelDetail() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center justify-center lg:justify-start gap-4 flex-wrap">
                   <a href={channel.channel_url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 bg-[#FF0000] hover:bg-[#FF0000]/90 text-white font-bold text-xs px-8 py-4 rounded-lg transition-all shadow-xl hover:scale-[1.02]">
                     Subscribe
@@ -386,7 +386,7 @@ export default function ChannelDetail() {
       <div className="max-w-7xl mx-auto border-x border-border">
         <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-border">
           <div className="lg:col-span-3">
-            <div className="p-8 md:p-12 border-b border-border bg-surface-2/5 relative overflow-hidden">
+            <div className="p-4 md:p-8 lg:p-12 border-b border-border bg-surface-2/5 relative overflow-hidden">
                <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <h2 className="text-text-primary font-bold text-2xl font-heading tracking-tighter">
@@ -421,7 +421,7 @@ export default function ChannelDetail() {
                </div>
             </div>
 
-            <div className="p-8 md:p-12 min-h-[400px]">
+            <div className="p-4 md:p-8 lg:p-12 min-h-[400px]">
               {filteredVideos.length === 0 ? (
                 <div className="text-center py-24 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
                   <Icon icon="solar:clapperboard-play-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
