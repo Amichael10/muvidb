@@ -25,13 +25,14 @@ const Showtimes = lazy(() => import('./pages/Showtimes'));
 const Cinemas = lazy(() => import('./pages/Cinemas'));
 const CinemaDetail = lazy(() => import('./pages/CinemaDetail'));
 const Companies = lazy(() => import('./pages/Companies'));
-const CompanyDetail = lazy(() => import('./pages/CompanyDetail'));
 const PeopleList = lazy(() => import('./pages/PeopleList'));
 const Channels = lazy(() => import('./pages/Channels'));
 const ChannelDetail = lazy(() => import('./pages/ChannelDetail'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const Waitlist = lazy(() => import('./pages/Waitlist'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
@@ -173,9 +174,10 @@ export default function App() {
                 <Route path="/channels" element={<Channels />} />
                 <Route path="/channels/:slug" element={<ChannelDetail />} />
                 <Route path="/companies" element={<Companies />} />
-                <Route path="/companies/:slug" element={<CompanyDetail />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />

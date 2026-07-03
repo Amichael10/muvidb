@@ -105,7 +105,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (task) {
       case 'showtimes':      result = await runShowtimesSync(); break;
       case 'cinema_cleanup': result = { task: 'cinema_cleanup', ...(await sweepStaleCinemas()) }; break;
-      case 'videos':         result = await runVideosSync(); break;
+      case 'videos':      
+        return res.status(200).json({ 
+          task: 'videos', 
+          status: 'moved_to_github_actions',
+          message: 'YouTube sync now runs directly in GitHub Actions to bypass Vercel timeout limits.' 
+        });
       case 'tmdb':           result = await runTMDBSync(); break;
       case 'ai_maintenance': result = await runAIMaintenance(); break;
       case 'refresh_videos': return await refreshVideosHandler(req, res);

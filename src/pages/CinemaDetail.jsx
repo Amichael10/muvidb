@@ -312,10 +312,10 @@ const CinemaDetail = () => {
                   </span>
                 </div>
 
-                {cinema.address && (
+                {cinema.address && cinema.address.toLowerCase() !== 'unknown' && (
                   <p className="text-text-muted text-xs font-bold flex items-center justify-center md:justify-start gap-2">
                     <Icon icon="solar:map-point-linear" className="text-brand" width="14" />
-                    {cinema.address}, {cinema.city}, {cinema.state}
+                    {cinema.address}{cinema.city && cinema.city.toLowerCase() !== 'unknown' ? `, ${cinema.city}` : ''}{cinema.state ? `, ${cinema.state}` : ''}
                   </p>
                 )}
               </div>

@@ -486,6 +486,7 @@ export default function Home() {
       `)
       .eq('source', 'youtube')
       .eq('content_type', 'movie')
+      .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -1020,9 +1021,8 @@ export default function Home() {
                     const initial = company.name?.charAt(0);
                     const filmCount = company.film_companies?.length || 0;
                     return (
-                      <Link 
+                      <div 
                         key={company.id}
-                        to={`/companies/${company.slug || company.id}`}
                         className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">
@@ -1056,7 +1056,7 @@ export default function Home() {
                             {filmCount} {filmCount === 1 ? 'Film' : 'Films'} Produced
                           </span>
                         </div>
-                      </Link>
+                      </div>
                     );
                   })
                 )}

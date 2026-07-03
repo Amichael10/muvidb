@@ -91,10 +91,14 @@ export default function GenreRail({ variant = 'grid' }) {
         .eq('film_genres.genres.name', selectedGenre)
         .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
         .order('view_count', { ascending: false })
-        .limit(20);
+        .limit(50);
       if (!active) return;
       if (!error && data) {
-        setFilteredFilms(data.map(f => ({
+        // Shuffle the array and take the first 20
+        const shuffled = [...data].sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, 20);
+
+        setFilteredFilms(selected.map(f => ({
           ...f,
           genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
         })));

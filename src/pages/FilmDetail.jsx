@@ -180,7 +180,22 @@ export default function FilmDetail() {
 
       if (error) throw error;
       
-      const castMembers = data
+      const deduplicateAndMerge = (members) => {
+        const map = new Map();
+        members.forEach(m => {
+          if (!map.has(m.id)) {
+            map.set(m.id, { ...m });
+          } else {
+            const existing = map.get(m.id);
+            if (m.role && !existing.role.includes(m.role)) {
+              existing.role = `${existing.role}, ${m.role}`;
+            }
+          }
+        });
+        return Array.from(map.values());
+      };
+
+      const castMembersRaw = data
         .filter(c => {
           const role = (c.role || '').trim().toLowerCase();
           return role === 'actor' || role === 'cast';
@@ -191,7 +206,7 @@ export default function FilmDetail() {
         })
         .filter(Boolean);
         
-      const crewMembers = data
+      const crewMembersRaw = data
         .filter(c => {
           const role = (c.role || '').trim().toLowerCase();
           return role !== 'actor' && role !== 'cast';
@@ -201,6 +216,9 @@ export default function FilmDetail() {
           return person ? { ...person, role: c.role || 'Crew' } : null;
         })
         .filter(Boolean);
+
+      const castMembers = deduplicateAndMerge(castMembersRaw);
+      const crewMembers = deduplicateAndMerge(crewMembersRaw);
 
       setCast(castMembers);
       setCrew(crewMembers);

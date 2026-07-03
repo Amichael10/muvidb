@@ -55,17 +55,17 @@ async function upsertPerson(name: string, photoUrl?: string) {
   }
 
   const { data: existing } = await supabase.from('people')
-    .select('id, photo_url, biography')
+    .select('id, photo_url, bio')
     .ilike('name', cleanedName);
 
   if (existing && existing.length > 0) {
     const person = existing[0];
     // Update if missing photo or bio
-    if (!person.photo_url || !person.biography) {
+    if (!person.photo_url || !person.bio) {
       const tmdb = await lookupPersonOnTMDB(cleanedName);
       const updates: Record<string, string | number | undefined> = {};
       if (!person.photo_url && (photoUrl || tmdb?.photo_url)) updates.photo_url = photoUrl || tmdb?.photo_url;
-      if (!person.biography && tmdb?.biography) updates.biography = tmdb.biography;
+      if (!person.bio && tmdb?.biography) updates.bio = tmdb.biography;
       if (tmdb?.tmdb_id) updates.tmdb_id = tmdb.tmdb_id;
       if (Object.keys(updates).length > 0) {
         await supabase.from('people').update(updates).eq('id', person.id);
@@ -81,7 +81,7 @@ async function upsertPerson(name: string, photoUrl?: string) {
   const { data: newPerson, error } = await supabase.from('people').insert({
     name: cleanedName,
     photo_url: photoUrl || tmdb?.photo_url || null,
-    biography: tmdb?.biography || null,
+    bio: tmdb?.biography || null,
     tmdb_id: tmdb?.tmdb_id || null,
     source: 'filmflux'
   }).select('id').single();
@@ -191,30 +191,28 @@ async function harvestFilmflux() {
             return { name, role: 'actor', character, photoUrl };
           }).filter(c => c.name && c.name.toLowerCase() !== 'cast');
 
-          const normalizeRole = (role: string) => {
-            const r = role.toLowerCase().trim();
-            if (r.includes('director of photography') || r === 'dop' || r === 'cinematographer') return 'cinematographer';
-            if (r.includes('executive producer')) return 'executive producer';
-            if (r.includes('associate producer')) return 'associate producer';
-            if (r.includes('producer')) return 'producer';
-            if (r.includes('director')) return 'director';
-            if (r.includes('writer') || r.includes('screenplay')) return 'writer';
-            if (r.includes('editor')) return 'editor';
-            if (r.includes('composer') || r.includes('music')) return 'composer';
-            if (r.includes('sound')) return 'sound recordist';
-            if (r.includes('production design')) return 'production designer';
-            if (r.includes('costume')) return 'costume designer';
-            if (r.includes('makeup')) return 'makeup artist';
-            return r;
-          };
-
           const crew = Array.from(document.querySelectorAll('a[href^="/crew/"], section h2 + div > div, .grid-cols-2 > div')).map(item => {
             const nameEl = item.querySelector('span.font-medium, h3.font-semibold, span.text-white, h3');
             const roleEl = item.querySelector('span.text-sm, p.text-gray-400, span.text-xs, p');
             
             const name = nameEl?.textContent?.trim() || '';
             const rawRole = roleEl?.textContent?.trim() || 'crew';
-            const role = normalizeRole(rawRole);
+            
+            const r = rawRole.toLowerCase().trim();
+            let role = r;
+            if (r.includes('director of photography') || r === 'dop' || r === 'cinematographer') role = 'cinematographer';
+            else if (r.includes('executive producer')) role = 'executive producer';
+            else if (r.includes('associate producer')) role = 'associate producer';
+            else if (r.includes('producer')) role = 'producer';
+            else if (r.includes('director')) role = 'director';
+            else if (r.includes('writer') || r.includes('screenplay')) role = 'writer';
+            else if (r.includes('editor')) role = 'editor';
+            else if (r.includes('composer') || r.includes('music')) role = 'composer';
+            else if (r.includes('sound')) role = 'sound recordist';
+            else if (r.includes('production design')) role = 'production designer';
+            else if (r.includes('costume')) role = 'costume designer';
+            else if (r.includes('makeup')) role = 'makeup artist';
+
             const photoUrl = (item.querySelector('img') as HTMLImageElement)?.src || '';
             
             return { name, role, character: '', photoUrl };
