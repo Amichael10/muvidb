@@ -51,6 +51,7 @@ type NetEntry = {
   bodyFile?: string;
   bodyBytes?: number;
   postData?: string;
+  requestHeaders?: Record<string, string>;
 };
 
 async function run() {
@@ -81,6 +82,10 @@ async function run() {
 
     const isJson = (entry.contentType || '').includes('json');
     const isDataCall = ['xhr', 'fetch'].includes(entry.type) || isJson;
+    if (['xhr', 'fetch'].includes(entry.type)) {
+      // auth headers matter for replaying hidden APIs
+      entry.requestHeaders = req.headers();
+    }
     const passesFilter = !filter || entry.url.includes(filter);
     if (isDataCall && isJson && passesFilter && entry.status === 200) {
       try {
