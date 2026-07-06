@@ -228,14 +228,19 @@ export async function runVideosSync() {
                   let parentId = seriesParentCache.get(cleanedBase);
 
                   if (!parentId) {
-                    // Look for existing series in DB
-                    const { data: existingSeries } = await supabase
+                    // Look for existing series in DB. Use limit(1) instead of
+                    // maybeSingle(): maybeSingle() returns an ERROR (null data)
+                    // when duplicates already exist, which made this fall through
+                    // and create yet another duplicate parent on every run.
+                    const { data: existingList } = await supabase
                       .from('films')
                       .select('id, poster_url')
                       .ilike('title', cleanedBase)
                       .eq('content_type', 'series')
                       .eq('source', 'youtube')
-                      .maybeSingle();
+                      .order('created_at', { ascending: true })
+                      .limit(1);
+                    const existingSeries = existingList?.[0];
 
                     if (existingSeries) {
                       parentId = existingSeries.id;
@@ -340,7 +345,16 @@ export async function runVideosSync() {
             }
 
             if (filmsToInsert.length > 0) {
-              const { data: newInsertedFilms } = await supabase.from('films').insert(filmsToInsert).select();
+              // Strip the `_videoId` temp mapping key — it is NOT a films column,
+              // and leaving it in makes PostgREST reject the whole batch (PGRST204),
+              // which silently blocked ALL episode/movie creation. Map by
+              // source_video_id after insert instead.
+              const cleanFilms = filmsToInsert.map(({ _videoId, ...rest }: any) => rest);
+              const { data: newInsertedFilms, error: insertErr } = await supabase
+                .from('films').insert(cleanFilms).select();
+              if (insertErr) {
+                console.error(`[runVideosSync] film insert failed for channel ${ch.name}:`, insertErr.message);
+              }
               if (newInsertedFilms) {
                 newInsertedFilms.forEach((f: any) => {
                   existingFilmsMap.set(f.source_video_id, f.id);
