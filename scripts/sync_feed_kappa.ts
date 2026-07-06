@@ -43,8 +43,8 @@ const decodeHtmlEntities = (text: string) => {
              .replace(/&amp;/g, '&');
 };
 
-async function syncKava() {
-  console.log('🚀 Starting Kava Sync via Sitemap + Playwright...');
+async function syncFeedKappa() {
+  console.log('🚀 Starting Feed Kappa Sync via Sitemap + Playwright...');
   let logId;
   const startTime = Date.now();
   
@@ -59,8 +59,11 @@ async function syncKava() {
 
   let browser;
   try {
-    console.log('Fetching Kava.tv sitemap...');
-    const sitemapUrl = 'https://kava.tv/sitemap.xml';
+    const sitemapUrl = process.env.FEED_KAPPA_SITEMAP_URL;
+    if (!sitemapUrl) {
+      throw new Error('FEED_KAPPA_SITEMAP_URL is not configured in environment variables');
+    }
+    console.log('Fetching sitemap...');
     const sitemapRes = await fetch(sitemapUrl);
     const xml = await sitemapRes.text();
     const sitemapDoc = cheerio.load(xml, { xmlMode: true });
@@ -88,7 +91,8 @@ async function syncKava() {
       let apiCast: any[] = [];
       
       page.on('response', async response => {
-        if (response.url().includes('kavaapi.muvi.com/content') && response.request().method() === 'POST') {
+        const apiHost = process.env.FEED_KAPPA_API_HOST || 'kavaapi.muvi.com';
+        if (response.url().includes(apiHost + '/content') && response.request().method() === 'POST') {
           try {
             const json = await response.json();
             if (json?.data?.contentList?.content_list && json.data.contentList.content_list.length > 0) {
@@ -239,7 +243,7 @@ async function syncKava() {
     if (logId) {
       await supabase.from('sync_logs').update({
         status: errors === 0 ? 'success' : 'partial',
-        message: `Kava sync complete. Synced ${inserted} films.`,
+        message: `Kappa sync complete. Synced ${inserted} films.`,
         details: { total_scraped: urls.length, inserted, errors },
         duration_ms: Date.now() - startTime,
         items_processed: urls.length,
@@ -249,7 +253,7 @@ async function syncKava() {
     }
 
   } catch (err: any) {
-    console.error('❌ Kava Sync Failed:', err.message);
+    console.error('❌ Feed Kappa Sync Failed:', err.message);
     if (logId) {
       await supabase.from('sync_logs').update({
         status: 'error',
@@ -263,4 +267,4 @@ async function syncKava() {
   }
 }
 
-syncKava();
+syncFeedKappa();

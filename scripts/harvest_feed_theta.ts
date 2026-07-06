@@ -13,17 +13,25 @@
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 // ─────────────────────────────────────────────
 // Config
 // ─────────────────────────────────────────────
-const SUPABASE_URL = 'https://pkenrmorywmuvnzfoylp.supabase.co';
-const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrZW5ybW9yeXdtdXZuemZveWxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTIyODE1NCwiZXhwIjoyMDkwODA0MTU0fQ.yy7yeue7zZe6nsa-UmZUiPtw0tjF_6QgdA4rsLBLYEE';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const PROXY_USER = 'smart-n84gqsupfojn';
-const PROXY_PASS = 'cumaxLcBt96dj0Wp';
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ Missing Supabase credentials in environment');
+  process.exit(1);
+}
 
-const PJ_BASE    = 'https://www.partyjolloftv.com';
-const PJ_IMG     = 'https://www.partyjolloftv.com';   // poster URLs are relative
+const PROXY_USER = process.env.SMARTPROXY_USER;
+const PROXY_PASS = process.env.SMARTPROXY_PASS;
+
+const PJ_BASE    = process.env.FEED_THETA_BASE_URL || 'https://www.partyjolloftv.com';
+const PJ_IMG     = process.env.FEED_THETA_BASE_URL || 'https://www.partyjolloftv.com';   // poster URLs are relative
 
 // African country codes to target
 const AFRICAN_COUNTRIES = ['NG', 'GH', 'ZA', 'KE', 'TZ', 'CM', 'ET', 'SN', 'CI', 'EG', 'RW', 'UG'];
@@ -41,21 +49,26 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSessi
 // ─────────────────────────────────────────────
 // HTTP helpers
 // ─────────────────────────────────────────────
-const proxyAuth = Buffer.from(`${PROXY_USER}:${PROXY_PASS}`).toString('base64');
+const proxyAuth = (PROXY_USER && PROXY_PASS)
+  ? Buffer.from(`${PROXY_USER}:${PROXY_PASS}`).toString('base64')
+  : '';
 
 async function fetchText(url, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 25000);
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+      };
+      if (proxyAuth) {
+        headers['Proxy-Authorization'] = `Basic ${proxyAuth}`;
+      }
       const res = await fetch(url, {
         signal: ctrl.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Proxy-Authorization': `Basic ${proxyAuth}`,
-        },
+        headers,
       });
       clearTimeout(t);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -95,7 +108,7 @@ function makeSlug(text) {
 // PHASE 1 — Collect African film IDs from API
 // ─────────────────────────────────────────────
 async function collectAfricanFilms() {
-  console.log('\n📋 Fetching African films from PartyJollof API...');
+  console.log('\n📋 Fetching African films from Feed Theta API...');
   const seen = new Set();
   const films = [];
 
@@ -388,7 +401,7 @@ async function upsertCredit(filmId, personId, role) {
 // Main
 // ─────────────────────────────────────────────
 async function main() {
-  console.log('🚀 MuviDB ← PartyJollof TV Enrichment Scraper v2');
+  console.log('🚀 MuviDB ← Feed Theta Enrichment Scraper v2');
   console.log('═'.repeat(55));
   console.log(`📡 SmartProxy active`);
   console.log(`🌍 Countries: ${AFRICAN_COUNTRIES.join(', ')}`);

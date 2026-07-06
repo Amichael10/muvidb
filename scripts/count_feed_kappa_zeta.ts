@@ -19,11 +19,11 @@ async function run() {
     .or('release_type.eq.docuth,source.eq.docuth_sync');
 
   console.log(`📊 Films in database:`);
-  console.log(`   - Kava.tv source count: ${kavaCount}`);
-  console.log(`   - Docuth source count: ${docuthFilms?.length || 0}`);
+  console.log(`   - Feed Kappa source count: ${kavaCount}`);
+  console.log(`   - Feed Zeta source count: ${docuthFilms?.length || 0}`);
   
   if (docuthFilms && docuthFilms.length > 0) {
-    console.log('\n📄 Docuth films:');
+    console.log('\n📄 Feed Zeta films:');
     docuthFilms.forEach((f, idx) => {
       console.log(`     ${idx + 1}. ${f.title}`);
     });

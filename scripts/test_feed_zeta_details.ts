@@ -1,4 +1,7 @@
 import { chromium } from 'playwright';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 async function run() {
   console.log("Launching browser...");
@@ -19,7 +22,8 @@ async function run() {
   });
 
   console.log("Navigating to movie detail page...");
-  await page.goto('https://web.docuth.com/movies/last-call-ipe-ikeyin-2', { waitUntil: 'networkidle', timeout: 60000 });
+  const targetUrl = process.env.FEED_ZETA_TEST_URL || 'https://web.docuth.com/movies/last-call-ipe-ikeyin-2';
+  await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
 
   console.log("Extracting details via DOM evaluation...");
   const pageData = await page.evaluate(() => {

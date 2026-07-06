@@ -93,7 +93,7 @@ async function upsertPerson(name: string, photoUrl?: string) {
   return newPerson.id;
 }
 
-async function harvestFilmflux() {
+async function harvestFeedDelta() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -101,11 +101,15 @@ async function harvestFilmflux() {
   const page = await context.newPage();
 
   try {
-    console.log('🚀 Starting Filmflux Content Harvest...');
+    console.log('🚀 Starting Feed Delta Content Harvest...');
 
     // 1. Discovery Phase
-    console.log('Navigating to Filmflux Movies...');
-    await page.goto('https://filmflux.app/movies', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    const targetUrl = process.env.FEED_DELTA_URL;
+    if (!targetUrl) {
+      throw new Error('FEED_DELTA_URL is not configured in environment variables');
+    }
+    console.log('Navigating to movies...');
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     try {
       await page.waitForSelector('a[href^="/movie/"]', { timeout: 15000 });
@@ -145,7 +149,7 @@ async function harvestFilmflux() {
     // 2. Extraction Phase
     for (const link of uniqueLinks) {
       try {
-        console.log(`Processing Filmflux: ${link}`);
+        console.log(`Processing Feed Delta: ${link}`);
         await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 60000 });
         
         // Wait for specific title selector that isn't the generic h1
@@ -158,7 +162,7 @@ async function harvestFilmflux() {
         const data = await page.evaluate(() => {
           // Use og:title meta tag — this is always the actual movie title, never the brand name
           const ogTitle = (document.querySelector('meta[property="og:title"]') as HTMLMetaElement)?.content?.trim() || '';
-          // Strip " - Filmflux" suffix if present
+          // Strip site brand suffix if present
           const title = ogTitle.replace(/\s*[-|]\s*Filmflux.*$/i, '').trim() ||
             document.querySelector('h1.text-3xl, h1.text-4xl, h2.font-bold, [class*="movie-title"], [class*="film-title"]')?.textContent?.trim() || '';
 
@@ -308,7 +312,7 @@ async function harvestFilmflux() {
       }
     }
 
-    console.log(`\n✅ Filmflux Harvest Complete!`);
+    console.log(`\n✅ Feed Delta Harvest Complete!`);
     console.log(`✨ New: ${inserted}, Updated: ${updated}, Errors: ${errors}`);
 
   } catch (error) {
@@ -318,4 +322,4 @@ async function harvestFilmflux() {
   }
 }
 
-harvestFilmflux();
+harvestFeedDelta();

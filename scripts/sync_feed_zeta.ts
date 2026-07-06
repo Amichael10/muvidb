@@ -21,7 +21,10 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const DOCUTH_HOME_URL = 'https://web.docuth.com/home';
+const DOCUTH_HOME_URL = process.env.FEED_ZETA_URL;
+if (!DOCUTH_HOME_URL) {
+  throw new Error('FEED_ZETA_URL is not configured in environment variables');
+}
 
 function parseDocuthDuration(durationStr: string | null): number | null {
   if (!durationStr) return null;
@@ -59,10 +62,10 @@ async function safeGoto(page: any, url: string, options: any = {}, retries: numb
   }
 }
 
-async function scrapeDocuth() {
+async function scrapeFeedZeta() {
   console.log('🚀 Launching browser...');
   
-  const isNoProxy = process.env.DOCUTH_NO_PROXY === 'true' || process.env.NO_PROXY === 'true';
+  const isNoProxy = process.env.DOCUTH_NO_PROXY === 'true' || process.env.NO_PROXY === 'true' || process.env.FEED_ZETA_NO_PROXY === 'true';
   const proxyServer = !isNoProxy && process.env.SMARTPROXY_HOST && process.env.SMARTPROXY_PORT
     ? `http://${process.env.SMARTPROXY_HOST}:${process.env.SMARTPROXY_PORT}`
     : null;
@@ -87,7 +90,7 @@ async function scrapeDocuth() {
   });
   const page = await context.newPage();
 
-  console.log(`🚀 Navigating to Docuth Home: ${DOCUTH_HOME_URL}`);
+  console.log(`🚀 Navigating to feed target: ${DOCUTH_HOME_URL}`);
   await safeGoto(page, DOCUTH_HOME_URL, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(3500); // Allow initial content to load
 
@@ -108,7 +111,7 @@ async function scrapeDocuth() {
     return [...new Set(urls)];
   });
 
-  console.log(`📽️ Discovered ${movieUrls.length} unique movie URLs on Docuth. Crawling details...`);
+  console.log(`📽️ Discovered ${movieUrls.length} unique movie URLs on Zeta. Crawling details...`);
   const scrapedMovies: any[] = [];
 
   for (const url of movieUrls) {
@@ -344,7 +347,7 @@ async function syncToDatabase(movies: any[]) {
     const movieYear = movie.year || new Date().getFullYear();
     const runtimeMinutes = parseDocuthDuration(movie.durationStr);
 
-    console.log(`🔄 Processing Docuth Movie: "${cleanedTitle}" (Year: ${movieYear})`);
+    console.log(`🔄 Processing Zeta Movie: "${cleanedTitle}" (Year: ${movieYear})`);
 
     try {
       // 1. Check for existing film by exact cleaned title and year
@@ -464,7 +467,7 @@ async function syncToDatabase(movies: any[]) {
     }
   }
 
-  console.log(`\n📊 Docuth Sync complete:`);
+  console.log(`\n📊 Feed Zeta Sync complete:`);
   console.log(`   - Updated: ${updatedCount}`);
   console.log(`   - New: ${newCount}`);
   console.log(`   - Errors: ${errorCount}`);
@@ -472,7 +475,7 @@ async function syncToDatabase(movies: any[]) {
 
 async function run() {
   try {
-    const movies = await scrapeDocuth();
+    const movies = await scrapeFeedZeta();
     await syncToDatabase(movies);
   } catch (e) {
     console.error('💀 Fatal error:', e);

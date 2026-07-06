@@ -27,7 +27,7 @@ const isDryRun = process.argv.includes('--dry-run');
 function decodeNextImageUrl(src: string): string {
   if (!src) return '';
   try {
-    const urlObj = new URL(src, 'https://filmflux.app');
+    const urlObj = new URL(src, process.env.FEED_DELTA_BASE_URL || 'https://filmflux.app');
     const originalUrl = urlObj.searchParams.get('url');
     return originalUrl ? decodeURIComponent(originalUrl) : src;
   } catch {
@@ -128,11 +128,16 @@ async function harvestActors() {
   let page = await context.newPage();
 
   try {
-    console.log(`\n🚀 Starting Filmflux Alphabetical Actors Scraper${isDryRun ? ' (DRY RUN)' : ''}...`);
+    console.log(`\n🚀 Starting Feed Delta Alphabetical Actors Scraper${isDryRun ? ' (DRY RUN)' : ''}...`);
 
     // 1. Discovery Phase
-    console.log('Navigating to Filmflux Actors list...');
-    await page.goto('https://filmflux.app/actors', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    const baseUrl = process.env.FEED_DELTA_BASE_URL;
+    if (!baseUrl) {
+      throw new Error('FEED_DELTA_BASE_URL is not configured in environment variables');
+    }
+    const actorsUrl = `${baseUrl}/actors`;
+    console.log('Navigating to Actors list...');
+    await page.goto(actorsUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     const uniqueLinks: string[] = [];
@@ -159,6 +164,20 @@ async function harvestActors() {
         continue;
       }
 
+      // Inject CSS override to force window scrolling and trigger infinite scroll observers
+      await page.evaluate(() => {
+        const style = document.createElement('style');
+        style.textContent = `
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+            position: static !important;
+          }
+        `;
+        document.head.appendChild(style);
+      });
+      await page.waitForTimeout(1000);
+
       console.log(`Paginating / Scrolling to load all actors starting with "${letter}"...`);
       let previousHeight = 0;
       let scrollAttempts = 0;
@@ -168,9 +187,9 @@ async function harvestActors() {
         try {
           const currentHeight = await page.evaluate(() => document.body.scrollHeight);
           
-          // Scroll to the bottom of the page
+          // Scroll window to bottom
           await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-          await page.waitForTimeout(2500); // Wait for items to fetch and render
+          await page.waitForTimeout(3000); // Wait for RSC data fetch and DOM update
 
           const newHeight = await page.evaluate(() => document.body.scrollHeight);
           
@@ -187,7 +206,12 @@ async function harvestActors() {
           previousHeight = newHeight;
           scrollAttempts++;
           if (scrollAttempts % 5 === 0) {
-            console.log(`  [${letter}] Scrolled ${scrollAttempts} times (height: ${newHeight})...`);
+            const currentLinksCount = await page.evaluate(() => {
+              return Array.from(document.querySelectorAll('a'))
+                .map(a => a.href)
+                .filter(href => href.includes('/actor/')).length;
+            });
+            console.log(`  [${letter}] Scrolled ${scrollAttempts} times (height: ${newHeight}, links: ${currentLinksCount})...`);
           }
         } catch (scrollError) {
           break;

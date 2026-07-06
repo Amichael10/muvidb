@@ -55,7 +55,7 @@ async function upsertPerson(name: string, photoUrl?: string) {
   return newPerson.id;
 }
 
-async function syncIroko() {
+async function syncFeedGamma() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -63,25 +63,34 @@ async function syncIroko() {
   const page = await context.newPage();
 
   try {
-    console.log('🚀 Starting IrokoTV Sync via Playwright...');
+    console.log('🚀 Starting Feed Gamma Sync via Playwright...');
 
     // 1. Discovery Phase
-    const CHANNEL_HANDLE = '@irokotv';
+    const CHANNEL_HANDLE = process.env.FEED_GAMMA_CHANNEL_HANDLE;
+    const CHANNEL_NAME = process.env.FEED_GAMMA_CHANNEL_NAME || 'Gamma Feed';
+    const BASE_URL = process.env.FEED_GAMMA_BASE_URL;
+    if (!CHANNEL_HANDLE || !BASE_URL) {
+      throw new Error('FEED_GAMMA_CHANNEL_HANDLE or FEED_GAMMA_BASE_URL is not configured');
+    }
     let { data: channel } = await supabase.from('channels').select('id').eq('channel_handle', CHANNEL_HANDLE).maybeSingle();
     
     if (!channel) {
       const { data: newChannel, error } = await supabase.from('channels').insert([{
-        name: 'IrokoTV',
+        name: CHANNEL_NAME,
         channel_handle: CHANNEL_HANDLE,
-        channel_url: 'https://irokotv.com'
+        channel_url: BASE_URL
       }]).select('id').single();
       
       if (error) throw error;
       channel = newChannel;
     }
 
-    console.log('Navigating to IrokoTV...');
-    await page.goto('https://irokotv.com/category/video', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    const targetUrl = process.env.FEED_GAMMA_URL;
+    if (!targetUrl) {
+      throw new Error('FEED_GAMMA_URL is not configured');
+    }
+    console.log('Navigating to feed...');
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     try {
       await page.waitForSelector('a.callByAjax[href^="/content/"]', { timeout: 15000 });
@@ -112,7 +121,7 @@ async function syncIroko() {
     // 2. Extraction Phase
     for (const link of uniqueLinks) { 
       try {
-        console.log(`Processing IrokoTV: ${link}`);
+        console.log(`Processing Feed Gamma: ${link}`);
         await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 60000 });
         
         // Wait for content to stabilize
@@ -151,7 +160,7 @@ async function syncIroko() {
           return { title, synopsis, backdrop, slug, cast: castItems };
         });
 
-        if (!data.title || data.title.toLowerCase().includes('irokotv')) {
+        if (!data.title || data.title.toLowerCase().includes('irokotv') || data.title.toLowerCase().includes('iroko')) {
           console.log(`  ⚠️ Skipping invalid title: ${data.title}`);
           continue;
         }
@@ -232,7 +241,7 @@ async function syncIroko() {
       }
     }
 
-    console.log(`\n✅ IrokoTV Sync Complete!`);
+    console.log(`\n✅ Feed Gamma Sync Complete!`);
     console.log(`✨ New: ${inserted}, Updated: ${updated}, Errors: ${errors}`);
 
   } catch (error) {
@@ -242,4 +251,4 @@ async function syncIroko() {
   }
 }
 
-syncIroko();
+syncFeedGamma();

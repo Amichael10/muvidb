@@ -1,12 +1,14 @@
 const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth');
+require('dotenv').config();
 chromium.use(stealth());
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ userAgent: 'Mozilla/5.0' });
   const page = await context.newPage();
-  await page.goto('https://filmflux.app/movies', { waitUntil: 'domcontentloaded' });
+  const targetUrl = process.env.FEED_DELTA_URL || 'https://filmflux.app/movies';
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(5000);
   
   const movieLinks = await page.evaluate(() => {
