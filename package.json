@@ -20,7 +20,9 @@
     "sync:ugandan": "tsx scripts/ugandan_sync.ts",
     "sync:nollymeter": "tsx scripts/nollymeter_sync.ts",
     "cleanup:cinemas": "tsx scripts/cleanup-cinemas.ts",
-    "fix-db": "tsx scripts/fix_db.ts"
+    "fix-db": "tsx scripts/fix_db.ts",
+    "db": "tsx scripts/query.ts",
+    "recon": "tsx scripts/recon.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
