@@ -19,12 +19,13 @@ const Signup = lazy(() => import('./pages/Signup'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProDashboard = lazy(() => import('./pages/ProDashboard'));
-const ClaimProfile = lazy(() => import('./pages/ClaimProfile'));
+
 const PersonDetail = lazy(() => import('./pages/PersonDetail'));
 const Showtimes = lazy(() => import('./pages/Showtimes'));
 const Cinemas = lazy(() => import('./pages/Cinemas'));
 const CinemaDetail = lazy(() => import('./pages/CinemaDetail'));
 const Companies = lazy(() => import('./pages/Companies'));
+const CompanyDetail = lazy(() => import('./pages/CompanyDetail'));
 const PeopleList = lazy(() => import('./pages/PeopleList'));
 const Channels = lazy(() => import('./pages/Channels'));
 const ChannelDetail = lazy(() => import('./pages/ChannelDetail'));
@@ -41,7 +42,7 @@ const AdminFilms = lazy(() => import('./pages/admin/AdminFilms'));
 const AdminPeople = lazy(() => import('./pages/admin/AdminPeople'));
 const AdminCredits = lazy(() => import('./pages/admin/AdminCredits'));
 const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies'));
-const AdminClaims = lazy(() => import('./pages/admin/AdminClaims'));
+
 const AdminContributions = lazy(() => import('./pages/admin/AdminContributions'));
 const AdminNewReleases = lazy(() => import('./pages/admin/AdminNewReleases'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
@@ -174,6 +175,7 @@ export default function App() {
                 <Route path="/channels" element={<Channels />} />
                 <Route path="/channels/:slug" element={<ChannelDetail />} />
                 <Route path="/companies" element={<Companies />} />
+                <Route path="/companies/:id" element={<CompanyDetail />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/about" element={<About />} />
@@ -186,7 +188,7 @@ export default function App() {
                 {/* Protected Routes */}
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/pro-dashboard" element={<ProtectedRoute allowedRoles={['professional', 'admin']}><ProDashboard /></ProtectedRoute>} />
-                <Route path="/claim" element={<ProtectedRoute><ClaimProfile /></ProtectedRoute>} />
+
 
                 {/* Admin Routes */}
                 <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'admin_limited']}><AdminLayout /></ProtectedRoute>}>
@@ -196,7 +198,7 @@ export default function App() {
                   <Route path="credits" element={<AdminCredits />} />
                   <Route path="credits/extractor" element={<AdminCreditsExtractor />} />
                   <Route path="companies" element={<AdminCompanies />} />
-                  <Route path="claims" element={<AdminClaims />} />
+
                   <Route path="contributions" element={<AdminContributions />} />
                   <Route path="new-releases" element={<AdminNewReleases />} />
                   <Route path="users" element={<AdminUsers />} />

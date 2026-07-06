@@ -35,7 +35,7 @@ export default function AdminLayout() {
     { path: '/admin/people', label: 'People', icon: 'solar:user-linear' },
     { path: '/admin/credits', label: 'Credits', icon: 'solar:case-linear' },
     { path: '/admin/companies', label: 'Companies', icon: 'solar:buildings-linear' },
-    { path: '/admin/claims', label: 'Pending Claims', icon: 'solar:clipboard-list-linear' },
+
     { path: '/admin/contributions', label: 'Contributions', icon: 'solar:users-group-rounded-linear' },
     { path: '/admin/users', label: 'Users', icon: 'solar:users-group-two-rounded-linear' },
     { path: '/admin/cinemas', label: 'Cinemas', icon: 'solar:buildings-2-linear' },

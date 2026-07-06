@@ -16,8 +16,8 @@
   --space-16: 64px;
 
   /* Typography */
-  --font-heading: 'Syne', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-heading: 'Inter', 'Open Sans', sans-serif;
+  --font-body: 'Inter', 'Open Sans', sans-serif;
 }
 
 /* Theme Variables (Cal + Orange Inspired) */
@@ -26,7 +26,7 @@
   --color-brand-hover: #E64A19;
   --color-gold: #FF5A1F;
   
-  /* Shared Defaults */
+  /* Shared Defaults (Sharper IMDb-style geometry) */
   --radius-sm: 2px;
   --radius-md: 4px;
   --radius-lg: 8px;
@@ -35,15 +35,15 @@
   --radius-pill: 9999px;
 }
 
-/* Dark Theme (Default) */
+/* Dark Theme (African Cinematic) */
 .dark, :root:not(.light) {
   color-scheme: dark;
-  --color-bg: #0F0F0F;
-  --color-surface: #1A1A1A;
+  --color-bg: #0B0B0B; /* Deep cinematic black */
+  --color-surface: #1A1A1A; /* Charcoal */
   --color-surface-2: #242424;
   --color-surface-3: #2E2E2E;
-  /* 0.24 (not 0.08) so control/card boundaries meet WCAG 1.4.11 non-text 3:1 */
-  --color-border: rgba(255, 255, 255, 0.24);
+  /* Sharp dividers */
+  --color-border: rgba(255, 255, 255, 0.10);
   /* Decorative-only divider — kept whisper-faint for a premium, borderless feel.
      Use border-hairline for section dividers/grids; border-border for controls. */
   --color-hairline: rgba(255, 255, 255, 0.05);
@@ -53,8 +53,8 @@
   --color-brand-muted: rgba(255, 90, 31, 0.15);
   --color-overlay: rgba(0, 0, 0, 0.85);
   
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.8);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.9);
 
   --color-sidebar: #1A1A1A;
   --color-sidebar-text: #B0B0B0;
@@ -71,8 +71,8 @@
   --color-surface: #FFFFFF;
   --color-surface-2: #F3F4F6;
   --color-surface-3: #E5E7EB;
-  --color-border: rgba(34, 42, 53, 0.30);
-  --color-hairline: rgba(34, 42, 53, 0.07);
+  --color-border: rgba(34, 42, 53, 0.15);
+  --color-hairline: rgba(34, 42, 53, 0.05);
   --color-text-primary: #111827;
   --color-text-secondary: #4B5563;
   --color-text-muted: #9CA3AF;
@@ -81,7 +81,7 @@
   --color-brand-muted: rgba(255, 90, 31, 0.1);
   --color-overlay: rgba(255, 255, 255, 0.85);
 
-  --shadow-md: rgba(19, 19, 22, 0.05) 0px 1px 5px -4px, rgba(34, 42, 53, 0.08) 0px 0px 0px 1px, rgba(34, 42, 53, 0.04) 0px 4px 8px 0px;
+  --shadow-md: 0 6px 16px rgba(0,0,0,0.12);
 
   --color-sidebar: #FFFFFF;
   --color-sidebar-text: #4B5563;

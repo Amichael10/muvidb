@@ -4,22 +4,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import WatchOptions from './WatchOptions';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../ui/ImageWithFallback';
+import { formatFilmTitle } from '../../utils/format';
 
 export default function HeroSection({ featuredFilms: featuredFilmsProp, featuredFilm: singleFilmProp, isLoading }) {
   // Handle both array and single object props for backward compatibility and slice to 6 items
   const featuredFilms = (featuredFilmsProp || (singleFilmProp ? [singleFilmProp] : [])).slice(0, 6);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
-  const navigate = useNavigate();
-
   const [isPaused, setIsPaused] = useState(false);
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (featuredFilms.length <= 1 || isPaused) return;
@@ -33,28 +25,23 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
   if (isLoading) {
     return (
-      <section className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg">
-        <div className="absolute inset-0 z-0 bg-surface animate-shimmer"></div>
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-32 pt-32">
-          <div className="flex justify-between items-end w-full">
-            <div className="max-w-2xl space-y-6">
-              <div className="flex gap-2">
-                <div className="w-16 h-6 bg-white/10 rounded-lg animate-pulse"></div>
-                <div className="w-16 h-6 bg-white/10 rounded-lg animate-pulse"></div>
-              </div>
-              <div className="w-full h-16 md:h-24 bg-white/10 rounded-xl animate-pulse"></div>
-              <div className="flex gap-4">
-                <div className="w-20 h-4 bg-white/10 rounded animate-pulse"></div>
-                <div className="w-20 h-4 bg-white/10 rounded animate-pulse"></div>
-                <div className="w-20 h-4 bg-white/10 rounded animate-pulse"></div>
-              </div>
-              <div className="w-full h-20 bg-white/10 rounded-xl animate-pulse"></div>
-              <div className="flex gap-4">
-                <div className="w-32 h-12 bg-white/10 rounded-xl animate-pulse"></div>
-                <div className="w-32 h-12 bg-white/10 rounded-xl animate-pulse"></div>
-              </div>
+      <section className="w-full bg-[#000000] py-4 md:py-8 lg:py-10">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[600px]">
+            <div className="relative w-full lg:flex-1 h-[50vh] min-h-[400px] lg:h-full rounded-2xl bg-surface animate-pulse border border-white/5"></div>
+            <div className="hidden lg:flex flex-col w-[350px] xl:w-[400px] shrink-0 h-full gap-4">
+              <div className="w-24 h-6 bg-surface animate-pulse rounded mb-2"></div>
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex gap-4 h-1/3 max-h-[180px]">
+                  <div className="w-28 shrink-0 h-full bg-surface animate-pulse rounded-lg border border-white/5"></div>
+                  <div className="flex flex-col gap-2 flex-1 pt-2">
+                    <div className="w-16 h-3 bg-surface animate-pulse rounded"></div>
+                    <div className="w-full h-4 bg-surface animate-pulse rounded"></div>
+                    <div className="w-3/4 h-4 bg-surface animate-pulse rounded"></div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="hidden lg:block w-64 h-96 bg-white/10 rounded-2xl animate-pulse"></div>
           </div>
         </div>
       </section>
@@ -65,216 +52,240 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
   const featuredFilm = featuredFilms[currentIndex];
 
-
+  // Helper to get next 3 films for the "Up next" list
+  const getUpNextFilms = () => {
+    if (featuredFilms.length <= 1) return [];
+    const upNext = [];
+    for (let i = 1; i <= 3; i++) {
+      if (featuredFilms.length > i) {
+        upNext.push(featuredFilms[(currentIndex + i) % featuredFilms.length]);
+      }
+    }
+    return upNext;
+  };
+  
+  const upNextFilms = getUpNextFilms();
 
   return (
     <section 
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="relative h-screen min-h-[600px] w-full flex items-center justify-center overflow-hidden bg-bg group/hero"
+      className="w-full bg-[#000000] py-4 md:py-8 lg:py-10"
     >
-      {/* initial={false} skips the enter fade on first render so the LCP backdrop
-          paints instantly; slide-to-slide crossfades still animate. */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={featuredFilm.id || currentIndex}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
-          className="absolute inset-0 z-0"
-        >
-          {/* Background Image & Overlays */}
-          <div className="absolute inset-0 z-0">
-            {/* Slow Ken Burns zoom — restarts each slide (keyed motion.div remounts) */}
-            <div className="absolute inset-0 animate-kenburns">
-              <ImageWithFallback
-                src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster}
-                alt={featuredFilm.title}
-                className="w-full h-full object-cover"
-                fallbackType="banner"
-                name={featuredFilm.title}
-                width={1280}
-                loading="eager"
-                fetchPriority="high"
-              />
-            </div>
-
-            {/* Cinematic scrim — calm + directional, no animation. Bottom-up for the
-                title, a soft left wash for readability, fade into the page below. */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10 z-10" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/25 to-transparent z-10" />
-            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg to-transparent z-10" />
-          </div>
-
-          {/* Content Container */}
-          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full h-full flex flex-col justify-end pb-20 pt-24 md:pb-32 md:pt-32">
-            <div className="flex justify-between items-end w-full">
-              
-              {/* Left Content */}
-              <motion.div 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-                className="max-w-2xl"
-              >
-                {/* Tagline — a quiet eyebrow, not a billboard */}
-                <motion.p
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.8, delay: 0.2 }}
-                  className="text-white/50 text-[11px] font-semibold tracking-[0.38em] uppercase mb-5"
-                >
-                  The home of Nollywood
-                </motion.p>
-
-                {/* Genre Pills */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {(featuredFilm.genres || []).slice(0, 3).map((genre) => (
-                    <span key={genre} className="px-3 py-1 text-[10px] font-semibold tracking-wide bg-white/5 backdrop-blur-md text-white/70 rounded-full border border-white/10">
-                      {genre}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Title */}
-                <h1 className="font-heading font-bold text-3xl sm:text-4xl md:text-6xl lg:text-8xl text-white mb-6 leading-[0.92] tracking-tight [text-shadow:0_2px_40px_rgba(0,0,0,0.55)]">
-                  {featuredFilm.title}
-                </h1>
-
-                {/* Meta Info */}
-                <div className="flex flex-wrap items-center gap-6 mb-8 text-[11px] font-bold text-white/80">
-                  {/* Rating - Only shown if > 0 (Issue 4) */}
-                  {Number(featuredFilm.tmdb_rating || featuredFilm.rating || 0) > 0 && (
-                    <div className="flex items-center gap-2 text-brand">
-                      <Icon icon="solar:star-bold" className="text-base" />
-                      <span>{Number(featuredFilm.tmdb_rating || featuredFilm.rating || 0).toFixed(1)}</span>
-                    </div>
-                  )}
-                  
-                  {/* Status / Popularity Icon */}
-                  {featuredFilm.is_in_cinemas ? (
-                    <div className="flex items-center gap-2 bg-brand/20 text-brand px-2.5 py-0.5 rounded border border-brand/30">
-                      <Icon icon="solar:ticket-bold" className="text-base" />
-                      <span className="uppercase tracking-widest text-[9px]">In Cinemas Now</span>
-                    </div>
-                  ) : (featuredFilm.is_trending || featuredFilm.view_count > 100) ? (
-                    <div className="flex items-center gap-2">
-                      <Icon icon="solar:fire-bold" className="text-base text-orange-500" />
-                      <span>Trending</span>
-                    </div>
-                  ) : null}
-                  
-                  {/* Year */}
-                  {featuredFilm.year && (
-                    <div className="flex items-center gap-2">
-                      <Icon icon="solar:calendar-linear" className="text-base" />
-                      <span>{featuredFilm.year}</span>
-                    </div>
-                  )}
-                  
-                  {/* Runtime - Only show if value exists (Issue 23) */}
-                  {(featuredFilm.runtime_minutes || featuredFilm.runtime) && (
-                    <div className="flex items-center gap-2">
-                      <Icon icon="solar:clock-circle-linear" className="text-base" />
-                      <span>{featuredFilm.runtime_minutes || featuredFilm.runtime} min</span>
-                    </div>
-                  )}
-                </div>
-
-
-                {/* Synopsis — two lines, no decorative rule */}
-                <p className="text-white/65 text-base md:text-lg mb-10 line-clamp-2 max-w-xl leading-relaxed">
-                  {featuredFilm.synopsis}
-                </p>
-
-                {/* Buttons */}
-                <div className="flex flex-wrap items-center gap-4">
-                  <WatchOptions film={featuredFilm} />
-                  <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-xl font-bold text-[10px] tracking-widest hover:bg-white hover:text-black transition-all duration-500 active:scale-95 shadow-xl">
-                    <Icon icon="solar:info-circle-linear" width="16" />
-                    More Info
-                  </Link>
-                </div>
-              </motion.div>
-
-              {/* Right Content (Poster) */}
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9, x: 20 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
-                className="hidden lg:block relative group cursor-pointer"
-              >
-                <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="block relative">
-                  <div className="absolute inset-0 bg-brand rounded-2xl blur-2xl opacity-0 group-hover:opacity-20 transition-opacity duration-700"></div>
-                  <ImageWithFallback
-                    src={featuredFilm.poster_url || featuredFilm.poster}
-                    alt={`${featuredFilm.title} Poster`}
-                    className="relative w-64 aspect-[2/3] rounded-2xl border border-white/10 shadow-2xl object-cover transform transition-all duration-700 group-hover:scale-105 group-hover:rotate-2"
-                    fallbackType="banner"
-                    name={featuredFilm.title}
-                    width={384}
-                  />
-                </Link>
-              </motion.div>
-
-            </div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Slider Indicators */}
-      {featuredFilms.length > 1 && (
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20">
-          {featuredFilms.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`h-1 rounded-full transition-all duration-500 ${
-                index === currentIndex ? 'w-12 bg-brand' : 'w-4 bg-white/20 hover:bg-white/40'
-              }`}
-              aria-label={`Go to slide ${index + 1}`}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Slider Controls (Chevron Arrows - visible on desktop hover) (Issue 5) */}
-      {featuredFilms.length > 1 && (
-        <>
-          <button 
-            onClick={() => setCurrentIndex(prev => (prev - 1 + featuredFilms.length) % featuredFilms.length)}
-            className="absolute left-6 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 hover:bg-brand hover:scale-110 active:scale-95 text-white backdrop-blur-md border border-white/10 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex cursor-pointer shadow-2xl"
-            aria-label="Previous featured movie"
-          >
-            <Icon icon="solar:alt-arrow-left-linear" width="24" height="24" />
-          </button>
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[600px]">
           
-          <button 
-            onClick={() => setCurrentIndex(prev => (prev + 1) % featuredFilms.length)}
-            className="absolute right-6 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/40 hover:bg-brand hover:scale-110 active:scale-95 text-white backdrop-blur-md border border-white/10 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex cursor-pointer shadow-2xl"
-            aria-label="Next featured movie"
-          >
-            <Icon icon="solar:alt-arrow-right-linear" width="24" height="24" />
-          </button>
-        </>
-      )}
+          {/* Main Banner (Left) */}
+          <div className="relative w-full lg:flex-1 h-[55vh] min-h-[450px] lg:h-full rounded-2xl overflow-hidden group/hero bg-[#111] shadow-2xl flex border border-white/10">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={featuredFilm.id || currentIndex}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4 }}
+                className="absolute inset-0 z-0"
+              >
+                {/* Background Backdrop */}
+                <div className="absolute inset-0">
+                  <ImageWithFallback
+                    src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster}
+                    alt={formatFilmTitle(featuredFilm.title)}
+                    className="w-full h-full object-cover animate-kenburns"
+                    fallbackType="banner"
+                    name={formatFilmTitle(featuredFilm.title)}
+                    width={1280}
+                    loading="eager"
+                    fetchPriority="high"
+                  />
+                  {/* Gradients */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 inset-x-0 h-2/3 bg-gradient-to-t from-[#000000] to-transparent opacity-95" />
+                </div>
 
-      {/* Progress bar indicator */}
-      {featuredFilms.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 z-30">
-          <motion.div
-            key={currentIndex + (isPaused ? '-paused' : '-active')}
-            initial={{ width: '0%' }}
-            animate={isPaused ? { width: '0%' } : { width: '100%' }}
-            transition={{ 
-              duration: isPaused ? 0 : 15, 
-              ease: 'linear' 
-            }}
-            className="h-full bg-brand"
-          />
+                {/* Bottom Overlay Content */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 md:p-8 flex items-end gap-6 z-20">
+                  
+                  {/* Small Embedded Poster */}
+                  <Link 
+                    to={`/films/${featuredFilm.slug || featuredFilm.id}`} 
+                    className="hidden md:block shrink-0 relative group/poster shadow-2xl rounded-lg overflow-hidden border border-white/20 hover:border-white/50 transition-colors w-[150px] aspect-[2/3] transform hover:scale-105 duration-300"
+                  >
+                    <ImageWithFallback
+                      src={featuredFilm.poster_url || featuredFilm.poster}
+                      alt={formatFilmTitle(featuredFilm.title)}
+                      className="w-full h-full object-cover"
+                      fallbackType="banner"
+                      name={formatFilmTitle(featuredFilm.title)}
+                    />
+                    {/* Hover Play button on poster */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/poster:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full border-2 border-white text-white flex items-center justify-center backdrop-blur-sm">
+                        <Icon icon="solar:play-bold" className="text-xl ml-1" />
+                      </div>
+                    </div>
+                  </Link>
+                  
+                  {/* Title and Play Section */}
+                  <div className="flex flex-col flex-1 pb-1">
+                    {/* Tags / Meta */}
+                    <div className="flex items-center gap-3 mb-2.5 flex-wrap">
+                      {(featuredFilm.is_trending || featuredFilm.view_count > 100) && (
+                        <span className="flex items-center gap-1.5 bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">
+                          <Icon icon="solar:fire-bold" />
+                          Trending
+                        </span>
+                      )}
+                      {featuredFilm.is_in_cinemas && (
+                        <span className="flex items-center gap-1.5 bg-white/10 text-white border border-white/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">
+                          <Icon icon="solar:ticket-bold" className="text-brand" />
+                          In Cinemas
+                        </span>
+                      )}
+                      {(featuredFilm.genres || []).slice(0, 2).map((genre) => (
+                        <span key={genre} className="text-white/70 text-xs font-semibold">
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+
+                    <h2 className="text-white text-3xl md:text-4xl lg:text-[42px] font-heading font-black tracking-tight mb-3 line-clamp-2 shadow-sm leading-[1.1]">
+                      {formatFilmTitle(featuredFilm.title)}
+                    </h2>
+                    
+                    <p className="text-white/70 text-sm line-clamp-2 mb-6 max-w-2xl font-medium">
+                      {featuredFilm.synopsis}
+                    </p>
+                    
+                    <div className="flex items-center gap-4">
+                      {/* Large Play/Watch Options */}
+                      <WatchOptions film={featuredFilm} />
+                      
+                      <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3.5 rounded-full font-bold text-sm tracking-wide transition-all duration-300 active:scale-95 border border-white/10">
+                        <Icon icon="solar:info-circle-bold" className="text-xl" />
+                        Details
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Main Banner Nav Arrows */}
+            {featuredFilms.length > 1 && (
+              <>
+                <button 
+                  onClick={(e) => { e.preventDefault(); setCurrentIndex(prev => (prev - 1 + featuredFilms.length) % featuredFilms.length); }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 hover:scale-110 text-white border border-white/20 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex backdrop-blur-sm"
+                  aria-label="Previous"
+                >
+                  <Icon icon="solar:alt-arrow-left-linear" width="24" />
+                </button>
+                <button 
+                  onClick={(e) => { e.preventDefault(); setCurrentIndex(prev => (prev + 1) % featuredFilms.length); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 hover:scale-110 text-white border border-white/20 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex backdrop-blur-sm"
+                  aria-label="Next"
+                >
+                  <Icon icon="solar:alt-arrow-right-linear" width="24" />
+                </button>
+              </>
+            )}
+
+            {/* Progress bar indicator for desktop banner */}
+            {featuredFilms.length > 1 && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 z-30 hidden md:block">
+                <motion.div
+                  key={currentIndex + (isPaused ? '-paused' : '-active')}
+                  initial={{ width: '0%' }}
+                  animate={isPaused ? { width: '0%' } : { width: '100%' }}
+                  transition={{ 
+                    duration: isPaused ? 0 : 15, 
+                    ease: 'linear' 
+                  }}
+                  className="h-full bg-brand"
+                />
+              </div>
+            )}
+
+            {/* Mobile Slider Indicators (dots) */}
+            {featuredFilms.length > 1 && (
+              <div className="absolute bottom-4 right-4 flex items-center gap-1.5 z-20 md:hidden">
+                {featuredFilms.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentIndex(index)}
+                    className={`h-1.5 rounded-full transition-all duration-500 ${
+                      index === currentIndex ? 'w-6 bg-brand' : 'w-1.5 bg-white/40'
+                    }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Up Next List (Right) */}
+          {upNextFilms.length > 0 && (
+            <div className="hidden lg:flex flex-col w-[350px] xl:w-[420px] shrink-0 h-full">
+              <div className="flex items-center justify-between mb-4 px-2">
+                <h3 className="text-brand font-black text-xl flex items-center gap-2">
+                  Up next
+                </h3>
+              </div>
+              
+              <div className="flex flex-col gap-3 flex-1 overflow-hidden">
+                {upNextFilms.map((film) => {
+                  const actualIndex = featuredFilms.findIndex(f => f.id === film.id);
+                  return (
+                    <button 
+                      key={film.id}
+                      onClick={() => setCurrentIndex(actualIndex)}
+                      className="group flex gap-4 items-start text-left hover:bg-white/5 p-2 rounded-xl transition-colors h-1/3 max-h-[190px]"
+                    >
+                      {/* Small Thumbnail */}
+                      <div className="relative h-full shrink-0 aspect-[2/3] rounded-lg overflow-hidden border border-white/5 group-hover:border-white/20 transition-colors shadow-lg">
+                        <ImageWithFallback
+                          src={film.poster_url || film.poster}
+                          alt={formatFilmTitle(film.title)}
+                          className="w-full h-full object-cover"
+                          fallbackType="banner"
+                          name={formatFilmTitle(film.title)}
+                        />
+                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                          <Icon icon="solar:play-bold" className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-transform transform group-hover:scale-110 duration-300" />
+                        </div>
+                      </div>
+                      
+                      {/* Info */}
+                      <div className="flex flex-col pt-1.5 justify-start h-full">
+                        <div className="flex items-center gap-2 text-white/50 text-xs font-bold uppercase tracking-widest mb-1.5">
+                          <Icon icon="solar:play-circle-bold" className="text-base text-brand" />
+                          <span>{(film.runtime_minutes || film.runtime) ? `${film.runtime_minutes || film.runtime} min` : 'Watch Now'}</span>
+                        </div>
+                        <h4 className="text-white font-bold text-lg line-clamp-2 leading-snug group-hover:text-brand transition-colors mb-1">
+                          {formatFilmTitle(film.title)}
+                        </h4>
+                        <p className="text-white/40 text-xs line-clamp-2 font-medium">
+                          {film.synopsis || "Tap to play this title"}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Browse All Link */}
+              <div className="mt-auto pt-3 px-2">
+                <Link to="/browse" className="text-white font-bold text-base hover:text-brand transition-colors flex items-center gap-1.5 w-fit">
+                  Browse all titles <Icon icon="solar:alt-arrow-right-linear" className="text-xl" />
+                </Link>
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
+      </div>
     </section>
   );
 }

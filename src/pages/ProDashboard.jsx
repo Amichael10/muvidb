@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -77,19 +77,6 @@ export default function ProDashboard() {
         if (createdPerson) {
           setSelectedPerson(createdPerson);
           setClaimState('pending');
-        } else {
-          // Check for traditional claims
-          const { data: claim } = await supabase
-            .from('profile_claims')
-            .select('*, people(*)')
-            .eq('user_id', user.id)
-            .eq('status', 'pending')
-            .single();
-          
-          if (claim) {
-            setSelectedPerson(claim.people);
-            setClaimState('pending');
-          }
         }
       }
     } catch (err) {

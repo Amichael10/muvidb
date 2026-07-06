@@ -17,6 +17,7 @@ import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
 import { getShowName } from '../utils/series';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import { formatFilmTitle } from '../utils/format';
 
 const FilmDetailSkeleton = () => (
     <div className="w-full bg-bg min-h-screen">
@@ -258,7 +259,7 @@ export default function FilmDetail() {
 
       setFilm(mappedFilm);
       setFilmId(data.id);
-      document.title = `MuviDB | ${data.title}`;
+      document.title = `MuviDB | ${formatFilmTitle(data.title)}`;
       // Render the page as soon as the main film row is in — everything below
       // (credits, episodes, related) loads in the background instead of blocking.
       setLoading(false);
@@ -331,20 +332,20 @@ export default function FilmDetail() {
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
       <Helmet>
-        <title>{`MuviDB | ${film.title}`}</title>
-        <meta name="description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on MuviDB.`} />
-        <meta property="og:title" content={`MuviDB | ${film.title}`} />
-        <meta property="og:description" content={film.synopsis?.slice(0, 150) || `Watch ${film.title} on MuviDB.`} />
+        <title>{`MuviDB | ${formatFilmTitle(film.title)}`}</title>
+        <meta name="description" content={film.synopsis?.slice(0, 150) || `Watch ${formatFilmTitle(film.title)} on MuviDB.`} />
+        <meta property="og:title" content={`MuviDB | ${formatFilmTitle(film.title)}`} />
+        <meta property="og:description" content={film.synopsis?.slice(0, 150) || `Watch ${formatFilmTitle(film.title)} on MuviDB.`} />
         {(film.poster_url || film.poster) && <meta property="og:image" content={film.poster_url || film.poster} />}
       </Helmet>
       {/* 1. CINEMATIC HEADER */}
       <div className="relative w-full h-[60vh] min-h-[500px] border-b border-border overflow-hidden">
         <ImageWithFallback
           src={film.backdrop_url || film.backdrop} 
-          alt={`${film.title} Backdrop`} 
+          alt={`${formatFilmTitle(film.title)} Backdrop`} 
           className="absolute inset-0 w-full h-full object-cover"
           fallbackType="banner"
-          name={film.title}
+          name={formatFilmTitle(film.title)}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent w-full md:w-1/2"></div>
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg to-transparent"></div>
@@ -354,10 +355,10 @@ export default function FilmDetail() {
             <div className="hidden md:block w-64 shrink-0 translate-y-16 z-10">
               <ImageWithFallback
                 src={film.poster_url || film.poster} 
-                alt={`${film.title} Poster`} 
+                alt={`${formatFilmTitle(film.title)} Poster`} 
                 className="w-full rounded-xl shadow-2xl border border-white/10 object-cover aspect-[2/3]"
                 fallbackType="banner"
-                name={film.title}
+                name={formatFilmTitle(film.title)}
               />
             </div>
 
@@ -372,7 +373,7 @@ export default function FilmDetail() {
                 </Link>
               )}
               <h1 className="font-heading font-bold text-3xl sm:text-4xl md:text-6xl text-white mb-4 leading-tight tracking-tighter drop-shadow-2xl">
-                {film.title}
+                {formatFilmTitle(film.title)}
               </h1>
 
               <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-white/80 font-bold mb-4">
@@ -481,10 +482,10 @@ export default function FilmDetail() {
                 </button>
               </div>
               {showFilmEdit && (
-                <SuggestEditModal target="film" targetId={filmId} targetName={film.title} onClose={() => setShowFilmEdit(false)} />
+                <SuggestEditModal target="film" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowFilmEdit(false)} />
               )}
               {showReport && (
-                <ReportModal kind="link" targetId={filmId} targetName={film.title} onClose={() => setShowReport(false)} />
+                <ReportModal kind="link" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowReport(false)} />
               )}
             </section>
 
@@ -577,7 +578,7 @@ export default function FilmDetail() {
                   <iframe
                     className="w-full h-full"
                     src={`https://www.youtube.com/embed/${film.trailer_youtube_id}?autoplay=0&rel=0&modestbranding=1`}
-                    title={`${film.title} Trailer`}
+                    title={`${formatFilmTitle(film.title)} Trailer`}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   ></iframe>
@@ -772,8 +773,8 @@ export default function FilmDetail() {
               </div>
 
               <ShareAction
-                title={film.title}
-                text={`Check out ${film.title} on MuviDB`}
+                title={formatFilmTitle(film.title)}
+                text={`Check out ${formatFilmTitle(film.title)} on MuviDB`}
               />
             </div>
 
