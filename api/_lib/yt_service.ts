@@ -3,31 +3,62 @@
  * Shared YouTube API utilities for muvidb sync tasks.
  */
 
-const YT_KEY = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 
+// Collect every configured YouTube API key. Supports a comma-separated list in
+// YOUTUBE_API_KEY and numbered fallbacks (YOUTUBE_API_KEY_2, _3, ...). Each key
+// carries its own daily quota, so rotating across them multiplies the ceiling.
+function collectYtKeys(): string[] {
+  const raw = [
+    process.env.YOUTUBE_API_KEY,
+    process.env.YOUTUBE_API_KEY_2,
+    process.env.YOUTUBE_API_KEY_3,
+    process.env.YOUTUBE_API_KEY_4,
+    process.env.VITE_YOUTUBE_API_KEY,
+  ];
+  return [
+    ...new Set(
+      raw.filter(Boolean).flatMap((k) => k!.split(',')).map((k) => k.trim()).filter(Boolean)
+    ),
+  ];
+}
+
+const YT_KEYS = collectYtKeys();
+let ytKeyIdx = 0; // persists across calls so we stay on a working key
+
+function isYtQuotaError(status: number, body: string): boolean {
+  return status === 403 && /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|userRateLimitExceeded/i.test(body);
+}
+
 /**
- * Generic YouTube API fetcher
+ * Generic YouTube API fetcher with automatic key rotation on quota exhaustion.
  */
-export async function ytGet(endpoint: string, params: Record<string, string>) {
-  if (!YT_KEY) throw new Error('YOUTUBE_API_KEY is missing in environment');
-  
-  const url = new URL(`${YT_BASE}/${endpoint}`);
-  Object.entries({ ...params, key: YT_KEY }).forEach(([k, v]) => url.searchParams.set(k, v));
-  
-  const res = await fetch(url.toString(), {
-    signal: AbortSignal.timeout(30000)
-  });
-  if (!res.ok) {
-    const errorBody = await res.text();
-    let detail = errorBody;
-    try {
-      const json = JSON.parse(errorBody);
-      detail = json.error?.message || errorBody;
-    } catch (e) {}
+export async function ytGet(endpoint: string, params: Record<string, string>): Promise<any> {
+  if (!YT_KEYS.length) throw new Error('No YouTube API key configured (YOUTUBE_API_KEY)');
+
+  let lastDetail = '';
+  // Try each key at most once per call, starting from the current one.
+  for (let attempt = 0; attempt < YT_KEYS.length; attempt++) {
+    const url = new URL(`${YT_BASE}/${endpoint}`);
+    Object.entries({ ...params, key: YT_KEYS[ytKeyIdx] }).forEach(([k, v]) => url.searchParams.set(k, v));
+
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(30000) });
+    if (res.ok) return res.json();
+
+    const body = await res.text();
+    let detail = body;
+    try { detail = JSON.parse(body).error?.message || body; } catch (e) {}
+
+    if (isYtQuotaError(res.status, body) && YT_KEYS.length > 1) {
+      console.warn(`[ytGet] key #${ytKeyIdx + 1}/${YT_KEYS.length} quota exhausted, rotating…`);
+      ytKeyIdx = (ytKeyIdx + 1) % YT_KEYS.length;
+      lastDetail = detail;
+      continue; // retry with the next key
+    }
+    // Non-quota error (404/400/etc.) — fail immediately, no point rotating.
     throw new Error(`YouTube /${endpoint} ${res.status}: ${detail}`);
   }
-  return res.json();
+  throw new Error(`YouTube /${endpoint}: all ${YT_KEYS.length} API keys hit quota (${lastDetail})`);
 }
 
 /**

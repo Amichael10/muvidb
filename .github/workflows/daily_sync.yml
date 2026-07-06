@@ -73,6 +73,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: Sync Filmhouse (6 AM Local)
@@ -98,8 +99,14 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
           VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
+          # Backup YouTube keys for quota rotation (add these secrets to enable)
+          YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
+          YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
           TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          # Gemini keys (rotation) for TMDB-miss title enrichment during sync
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
 
       - name: Sync TMDB & Feed Kappa (10 AM Local)
         if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'tmdb' || github.event.inputs.task == 'feed_kappa'))
@@ -165,6 +172,7 @@ jobs:
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
@@ -190,5 +198,6 @@ jobs:
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
