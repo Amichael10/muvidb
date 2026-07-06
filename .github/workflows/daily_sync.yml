@@ -75,10 +75,6 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SMARTPROXY_USER: ${{ secrets.SMARTPROXY_USER }}
-          SMARTPROXY_PASS: ${{ secrets.SMARTPROXY_PASS }}
-          SMARTPROXY_HOST: ${{ secrets.SMARTPROXY_HOST }}
-          SMARTPROXY_PORT: ${{ secrets.SMARTPROXY_PORT }}
 
       - name: Sync Filmhouse (6 AM Local)
         if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'showtimes'))
@@ -146,10 +142,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SMARTPROXY_USER: ${{ secrets.SMARTPROXY_USER }}
-          SMARTPROXY_PASS: ${{ secrets.SMARTPROXY_PASS }}
-          SMARTPROXY_HOST: ${{ secrets.SMARTPROXY_HOST }}
-          SMARTPROXY_PORT: ${{ secrets.SMARTPROXY_PORT }}
+          # SmartProxy account disabled (billing) — feed zeta runs direct now
           FEED_ZETA_URL: ${{ secrets.FEED_ZETA_URL }}
 
       - name: Harvest Feed Delta (Daily)
@@ -200,7 +193,3 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SMARTPROXY_USER: ${{ secrets.SMARTPROXY_USER }}
-          SMARTPROXY_PASS: ${{ secrets.SMARTPROXY_PASS }}
-          SMARTPROXY_HOST: ${{ secrets.SMARTPROXY_HOST }}
-          SMARTPROXY_PORT: ${{ secrets.SMARTPROXY_PORT }}

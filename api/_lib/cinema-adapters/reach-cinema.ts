@@ -46,57 +46,88 @@ interface ReachShowtimeDTO {
   };
 }
 
-// Browser UA for the proxied retry — Cloudflare challenges the plain sync UA.
+// Browser-like UA — Cloudflare scores the plain sync UA much more aggressively.
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-/** Build a SmartProxy dispatcher if SMARTPROXY_* env is present, else null. */
-async function proxyDispatcher(): Promise<unknown | null> {
-  const { SMARTPROXY_HOST, SMARTPROXY_PORT, SMARTPROXY_USER, SMARTPROXY_PASS } = process.env;
-  if (!SMARTPROXY_HOST || !SMARTPROXY_PORT || !SMARTPROXY_USER || !SMARTPROXY_PASS) return null;
-  const { ProxyAgent } = await import('undici');
-  return new ProxyAgent({
-    uri: `http://${SMARTPROXY_HOST}:${SMARTPROXY_PORT}`,
-    token: 'Basic ' + Buffer.from(`${SMARTPROXY_USER}:${SMARTPROXY_PASS}`).toString('base64'),
-  });
-}
 
 // Cloudflare interstitial ("Just a moment…") comes back as 403/503 with an HTML body.
 function isCloudflareChallenge(status: number, body: string): boolean {
   return (status === 403 || status === 503) && /Just a moment|challenge-platform|cf-mitigated/i.test(body);
 }
 
-async function fetchJson<T = any>(url: string, jwt: string): Promise<T> {
-  const direct = await fetch(url, {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Last-ditch free fallback: solve the Cloudflare challenge with stealth
+ * headless Chromium (already installed in the GH Actions sync job — no paid
+ * proxy needed). Navigates to the JSON endpoint as a document so the
+ * challenge JS can run, then reads the JSON body.
+ */
+async function fetchViaBrowser<T>(url: string, jwt: string): Promise<T> {
+  const { chromium } = await import('playwright-extra');
+  const stealth = (await import('puppeteer-extra-plugin-stealth')).default;
+  chromium.use(stealth());
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({
+      userAgent: BROWSER_UA,
+      extraHTTPHeaders: { Authorization: `Bearer ${jwt}`, Accept: 'application/json' },
+    });
+    const page = await context.newPage();
+    let resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    if (resp && resp.status() !== 200) {
+      // give the challenge time to solve, then re-request with clearance cookies
+      await page.waitForTimeout(8000);
+      resp = await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 });
+    }
+    const status = resp?.status() ?? 0;
+    const text = resp ? await resp.text() : '';
+    if (status !== 200) {
+      throw new Error(`browser fallback got ${status} :: ${text.slice(0, 150)}`);
+    }
+    return JSON.parse(text) as T;
+  } finally {
+    await browser.close();
+  }
+}
+
+async function fetchDirect(url: string, jwt: string): Promise<Response> {
+  return fetch(url, {
     headers: {
       Authorization: `Bearer ${jwt}`,
       Accept: 'application/json',
-      'User-Agent': 'MuviDB-Cinema-Sync/1.0',
+      'User-Agent': BROWSER_UA,
+      'Accept-Language': 'en-US,en;q=0.9',
     },
   });
-  if (direct.ok) return direct.json() as Promise<T>;
+}
 
-  const body = await direct.text().catch(() => '');
+async function fetchJson<T = any>(url: string, jwt: string): Promise<T> {
+  // 1. direct call (browser-like headers keep Cloudflare's bot score low)
+  let res = await fetchDirect(url, jwt);
+  if (res.ok) return res.json() as Promise<T>;
+  let body = await res.text().catch(() => '');
 
-  // Retry through SmartProxy on a Cloudflare challenge (datacenter IPs get blocked).
-  if (isCloudflareChallenge(direct.status, body)) {
-    const dispatcher = await proxyDispatcher();
-    if (dispatcher) {
-      const proxied = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-          Accept: 'application/json',
-          'User-Agent': BROWSER_UA,
-        },
-        dispatcher,
-      } as RequestInit & { dispatcher: unknown });
-      if (proxied.ok) return proxied.json() as Promise<T>;
-      const pBody = await proxied.text().catch(() => '');
-      throw new Error(`Reach Cinema ${proxied.status} (via proxy) @ ${url} :: ${pBody.slice(0, 200)}`);
+  // 2. challenges from CI IPs are often transient — one cheap retry
+  if (isCloudflareChallenge(res.status, body)) {
+    await sleep(2500);
+    res = await fetchDirect(url, jwt);
+    if (res.ok) return res.json() as Promise<T>;
+    body = await res.text().catch(() => '');
+  }
+
+  // 3. still challenged → solve it with stealth Chromium (free, no proxy)
+  if (isCloudflareChallenge(res.status, body)) {
+    try {
+      return await fetchViaBrowser<T>(url, jwt);
+    } catch (e: any) {
+      throw new Error(
+        `Reach Cinema ${res.status} @ ${url} :: CF challenge; browser fallback failed: ${e.message}`,
+      );
     }
   }
 
-  throw new Error(`Reach Cinema ${direct.status} @ ${url} :: ${body.slice(0, 200)}`);
+  throw new Error(`Reach Cinema ${res.status} @ ${url} :: ${body.slice(0, 200)}`);
 }
 
 /** Find the lowest adult/standard ticket price in a priceCard. */
