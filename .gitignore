@@ -8,7 +8,16 @@ coverage/
 !.env.example
 .vercel
 .env*.local
-.claude
+
+# .claude: ignore local settings and downloaded skill packs, but commit our own project skills
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/db-check/
+!.claude/skills/db-migration/
+!.claude/skills/scraper-recon/
+!.claude/skills/db-fix/
+!.claude/skills/new-adapter/
 
 # Temporary task/run directories
 temp_lumi_*/
