@@ -135,7 +135,6 @@ export default function Home() {
     );
     setGenreSections(results.filter(s => s.films.length > 0));
   };
-
   const fetchPlatformCounts = async () => {
     // Count one platform, retrying once on a statement timeout (57014). Returns
     // null (unknown) only if it genuinely keeps failing, so a transient timeout
@@ -1034,6 +1033,7 @@ export default function Home() {
           </div>
         )}
 
+
           {/* — Zone label: The Industry — */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
             <span className="font-heading font-black text-xs tracking-[0.2em] uppercase text-brand whitespace-nowrap">The Industry</span>
@@ -1079,6 +1079,7 @@ export default function Home() {
                     return (
                       <div 
                         key={company.id}
+
                         className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">

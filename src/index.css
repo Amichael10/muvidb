@@ -42,8 +42,8 @@
   --color-surface: #1A1A1A; /* Charcoal */
   --color-surface-2: #242424;
   --color-surface-3: #2E2E2E;
-  /* Sharp dividers */
-  --color-border: rgba(255, 255, 255, 0.10);
+  /* Sharp dividers (0.24 so control/card boundaries meet WCAG 1.4.11 non-text 3:1) */
+  --color-border: rgba(255, 255, 255, 0.24);
   /* Decorative-only divider — kept whisper-faint for a premium, borderless feel.
      Use border-hairline for section dividers/grids; border-border for controls. */
   --color-hairline: rgba(255, 255, 255, 0.05);
@@ -71,8 +71,8 @@
   --color-surface: #FFFFFF;
   --color-surface-2: #F3F4F6;
   --color-surface-3: #E5E7EB;
-  --color-border: rgba(34, 42, 53, 0.15);
-  --color-hairline: rgba(34, 42, 53, 0.05);
+  --color-border: rgba(34, 42, 53, 0.30);
+  --color-hairline: rgba(34, 42, 53, 0.07);
   --color-text-primary: #111827;
   --color-text-secondary: #4B5563;
   --color-text-muted: #9CA3AF;

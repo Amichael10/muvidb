@@ -126,6 +126,7 @@ export default function FilmCard({
     );
   }
 
+
   // Get active watch platform icons representing all available platforms
   const getPlatforms = () => {
     const list = [];

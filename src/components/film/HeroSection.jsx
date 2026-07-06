@@ -13,6 +13,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
   const [isPaused, setIsPaused] = useState(false);
   const navigate = useNavigate();
 
+
   useEffect(() => {
     if (featuredFilms.length <= 1 || isPaused) return;
 
