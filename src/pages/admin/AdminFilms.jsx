@@ -55,6 +55,7 @@ export default function AdminFilms() {
   const [sourceFilter, setSourceFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [cinemaFilter, setCinemaFilter] = useState('all'); // all, in_cinemas, not_in_cinemas
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState('library'); // library, youtube_buffer
   const [youtubeVideos, setYoutubeVideos] = useState([]);
@@ -140,6 +141,7 @@ export default function AdminFilms() {
     youtube_watch_url: '',
     source_video_id: '',
     content_type: 'movie',
+    is_in_cinemas: false,
     streaming_links: {}
   };
 
@@ -166,7 +168,7 @@ export default function AdminFilms() {
   useEffect(() => {
     setPage(1);
     setSelectedFilmIds([]);
-  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, sortBy]);
+  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -177,7 +179,7 @@ export default function AdminFilms() {
       }
     }, searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, sortBy, viewMode]);
+  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, sortBy, viewMode]);
 
   useEffect(() => {
     const handleDeepLink = async () => {
@@ -243,6 +245,8 @@ export default function AdminFilms() {
       if (featuredFilter === 'regular') countQuery = countQuery.eq('is_featured', false);
       if (sourceFilter !== 'all') countQuery = countQuery.eq('source', sourceFilter);
       if (typeFilter !== 'all') countQuery = countQuery.eq('content_type', typeFilter);
+      if (cinemaFilter === 'in_cinemas') countQuery = countQuery.eq('is_in_cinemas', true);
+      if (cinemaFilter === 'not_in_cinemas') countQuery = countQuery.eq('is_in_cinemas', false);
       if (platformFilter !== 'all') {
         if (platformFilter === 'youtube') countQuery = countQuery.not('youtube_watch_url', 'is', null);
         else countQuery = countQuery.not(`streaming_links->${platformFilter}`, 'is', null);
@@ -269,6 +273,8 @@ export default function AdminFilms() {
       if (trendingFilter === 'regular') query = query.eq('is_trending', false);
       if (sourceFilter !== 'all') query = query.eq('source', sourceFilter);
       if (typeFilter !== 'all') query = query.eq('content_type', typeFilter);
+      if (cinemaFilter === 'in_cinemas') query = query.eq('is_in_cinemas', true);
+      if (cinemaFilter === 'not_in_cinemas') query = query.eq('is_in_cinemas', false);
       if (platformFilter !== 'all') {
         if (platformFilter === 'youtube') query = query.not('youtube_watch_url', 'is', null);
         else query = query.not(`streaming_links->${platformFilter}`, 'is', null);
@@ -732,6 +738,7 @@ export default function AdminFilms() {
         tmdb_rating: formData.tmdb_rating && !isNaN(parseFloat(formData.tmdb_rating)) ? parseFloat(formData.tmdb_rating) : null,
         is_trending: Boolean(formData.is_trending),
         is_featured: Boolean(formData.is_featured),
+        is_in_cinemas: Boolean(formData.is_in_cinemas),
         slug: formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         mubi_slug: formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
@@ -1114,6 +1121,16 @@ export default function AdminFilms() {
             <option value="all">All Types</option>
             <option value="movie">Movies</option>
             <option value="series">Series</option>
+          </select>
+
+          <select
+            value={cinemaFilter}
+            onChange={(e) => setCinemaFilter(e.target.value)}
+            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
+          >
+            <option value="all">All Cinema Status</option>
+            <option value="in_cinemas">In Cinemas</option>
+            <option value="not_in_cinemas">Not In Cinemas</option>
           </select>
 
           <select
@@ -1905,6 +1922,21 @@ export default function AdminFilms() {
                         <div className={`absolute top-1 w-3 h-3 rounded-full transition-all ${formData.is_trending ? 'left-6 bg-white' : 'left-1 bg-text-muted'}`} />
                       </div>
                       <span className="text-xs font-bold text-text uppercase tracking-wider group-hover:text-orange-500 transition-colors">Trending</span>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <div className="relative">
+                        <input 
+                          type="checkbox" 
+                          name="is_in_cinemas" 
+                          checked={formData.is_in_cinemas} 
+                          onChange={(e) => setFormData({ ...formData, is_in_cinemas: e.target.checked })}
+                          className="sr-only" 
+                        />
+                        <div className={`w-10 h-5 rounded-full transition-all ${formData.is_in_cinemas ? 'bg-blue-500' : 'bg-surface-muted border border-border'}`} />
+                        <div className={`absolute top-1 w-3 h-3 rounded-full transition-all ${formData.is_in_cinemas ? 'left-6 bg-white' : 'left-1 bg-text-muted'}`} />
+                      </div>
+                      <span className="text-xs font-bold text-text uppercase tracking-wider group-hover:text-blue-500 transition-colors">In Cinemas</span>
                     </label>
                   </div>
                 </div>

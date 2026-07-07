@@ -40,9 +40,10 @@ jobs:
           PRIME_EMAIL: ${{ secrets.PRIME_EMAIL }}
           PRIME_PASSWORD: ${{ secrets.PRIME_PASSWORD }}
           
-      - name: Run Docuth Sync
-        run: npm run scrape:docuth
+      - name: Run Feed Zeta Sync
+        run: npm run scrape:feed_zeta
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FEED_ZETA_URL: ${{ secrets.FEED_ZETA_URL }}
 

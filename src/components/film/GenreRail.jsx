@@ -29,10 +29,12 @@ const GENRES = [
 
 export default function GenreRail({ variant = 'grid' }) {
   const isChips = variant === 'chips';
+  const isPosterGrid = variant === 'poster-grid';
   const [selectedGenre, setSelectedGenre] = useState('');
   // genreCounts: null = still loading; {} or map = loaded. Replaces the old
   // dependency on a 1,000-film array passed down from the homepage.
   const [genreCounts, setGenreCounts] = useState(null);
+  const [genreCovers, setGenreCovers] = useState({});
   const [filteredFilms, setFilteredFilms] = useState([]);
 
   // Ref and state for scrollable lineup row
@@ -60,9 +62,42 @@ export default function GenreRail({ variant = 'grid' }) {
     return () => { active = false; };
   }, []);
 
+  // Fetch cover images for poster-grid variant once genre counts are available.
+  useEffect(() => {
+    if (!isPosterGrid || !genreCounts) return;
+    let active = true;
+    (async () => {
+      // Get the top genre names that have films
+      const topGenreNames = GENRES
+        .filter(g => (genreCounts[g.name] || 0) > 0)
+        .sort((a, b) => (genreCounts[b.name] || 0) - (genreCounts[a.name] || 0))
+        .slice(0, 10)
+        .map(g => g.name);
+      if (topGenreNames.length === 0) return;
+
+      // Fetch one top film per genre in parallel for cover images
+      const coverPromises = topGenreNames.map(async (genreName) => {
+        const { data } = await supabase
+          .from('films')
+          .select('poster_url, film_genres!inner(genres!inner(name))')
+          .eq('film_genres.genres.name', genreName)
+          .not('poster_url', 'is', null)
+          .order('view_count', { ascending: false })
+          .limit(1);
+        return { genre: genreName, poster: data?.[0]?.poster_url || '' };
+      });
+      const results = await Promise.all(coverPromises);
+      if (!active) return;
+      const covers = {};
+      results.forEach(r => { if (r.poster) covers[r.genre] = r.poster; });
+      setGenreCovers(covers);
+    })();
+    return () => { active = false; };
+  }, [genreCounts, isPosterGrid]);
+
   // Compute active genres from the curated list + fetched counts.
   const activeGenres = GENRES
-    .map(genre => ({ ...genre, count: genreCounts?.[genre.name] || 0, coverImage: '' }))
+    .map(genre => ({ ...genre, count: genreCounts?.[genre.name] || 0, coverImage: genreCovers[genre.name] || '' }))
     .filter(g => g.count > 0);
 
   // Auto-select top genre with most films once counts arrive.
@@ -85,16 +120,20 @@ export default function GenreRail({ variant = 'grid' }) {
           id, slug, title, poster_url, backdrop_url, year, language,
           runtime_minutes, view_count, average_rating, nfvcb_rating,
           is_featured, is_trending, release_type, streaming_links, source,
-          content_type, season_count, created_at, release_date,
+          youtube_watch_url, content_type, season_count, created_at, release_date,
           film_genres!inner(genres!inner(name))
         `)
         .eq('film_genres.genres.name', selectedGenre)
         .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
         .order('view_count', { ascending: false })
-        .limit(20);
+        .limit(50);
       if (!active) return;
       if (!error && data) {
-        setFilteredFilms(data.map(f => ({
+        // Shuffle the array and take the first 20
+        const shuffled = [...data].sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, 20);
+
+        setFilteredFilms(selected.map(f => ({
           ...f,
           genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
         })));
@@ -128,9 +167,26 @@ export default function GenreRail({ variant = 'grid' }) {
     }
   };
 
-  // While counts load, reserve the chip strip's height so it doesn't shift the
+  // While counts load, reserve the section height so it doesn't shift the
   // page in (CLS) once it appears.
   if (genreCounts === null) {
+    if (isPosterGrid) {
+      return (
+        <section className="py-16 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-end justify-between mb-10">
+              <div className="h-7 w-48 bg-surface-2 rounded animate-pulse" />
+              <div className="h-4 w-24 bg-surface-2 rounded animate-pulse" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="rounded-lg overflow-hidden bg-surface-2 animate-pulse aspect-[4/3]" />
+              ))}
+            </div>
+          </div>
+        </section>
+      );
+    }
     if (!isChips) return null;
     return (
       <section className="py-16 overflow-hidden bg-surface-2/5">
@@ -149,6 +205,70 @@ export default function GenreRail({ variant = 'grid' }) {
   }
 
   if (activeGenres.length === 0) return null;
+
+  // ──── Poster Grid variant (homepage) ────
+  if (isPosterGrid) {
+    const topGenres = [...activeGenres]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    return (
+      <section className="py-16 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.25em] mb-1">Explore by category</p>
+              <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
+                Browse by Genre
+              </h2>
+            </div>
+            <Link
+              to="/browse"
+              className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap"
+            >
+              All genres
+              <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
+            </Link>
+          </div>
+
+          {/* Genre poster grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {topGenres.map((genre) => (
+              <Link
+                key={genre.name}
+                to={`/browse?genre=${encodeURIComponent(genre.name)}`}
+                className="group relative rounded-lg overflow-hidden bg-surface-2 aspect-[4/3] block"
+              >
+                {/* Cover poster */}
+                {genre.coverImage ? (
+                  <img
+                    src={genre.coverImage}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-surface-3 to-surface-2" />
+                )}
+                {/* Dark overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                {/* Text */}
+                <div className="absolute bottom-0 left-0 right-0 p-4">
+                  <h3 className="font-heading font-bold text-white text-sm md:text-base tracking-tight group-hover:text-brand transition-colors">
+                    {genre.name}
+                  </h3>
+                  <p className="text-white/60 text-[11px] font-semibold mt-0.5">
+                    {genre.count.toLocaleString()} {genre.count === 1 ? 'movie' : 'movies'}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-16 overflow-hidden bg-surface-2/5">

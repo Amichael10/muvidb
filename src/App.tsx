@@ -19,7 +19,7 @@ const Signup = lazy(() => import('./pages/Signup'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProDashboard = lazy(() => import('./pages/ProDashboard'));
-const ClaimProfile = lazy(() => import('./pages/ClaimProfile'));
+
 const PersonDetail = lazy(() => import('./pages/PersonDetail'));
 const Showtimes = lazy(() => import('./pages/Showtimes'));
 const Cinemas = lazy(() => import('./pages/Cinemas'));
@@ -32,6 +32,8 @@ const ChannelDetail = lazy(() => import('./pages/ChannelDetail'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const Waitlist = lazy(() => import('./pages/Waitlist'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
@@ -173,9 +175,11 @@ export default function App() {
                 <Route path="/channels" element={<Channels />} />
                 <Route path="/channels/:slug" element={<ChannelDetail />} />
                 <Route path="/companies" element={<Companies />} />
-                <Route path="/companies/:slug" element={<CompanyDetail />} />
+                <Route path="/companies/:id" element={<CompanyDetail />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />
@@ -184,7 +188,7 @@ export default function App() {
                 {/* Protected Routes */}
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/pro-dashboard" element={<ProtectedRoute allowedRoles={['professional', 'admin']}><ProDashboard /></ProtectedRoute>} />
-                <Route path="/claim" element={<ProtectedRoute><ClaimProfile /></ProtectedRoute>} />
+
 
                 {/* Admin Routes */}
                 <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 'admin_limited']}><AdminLayout /></ProtectedRoute>}>

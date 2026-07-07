@@ -22,10 +22,10 @@ on:
           - showtimes
           - videos
           - tmdb
-          - kava
-          - iroko
-          - filmflux
-          - docuth
+          - feed_kappa
+          - feed_gamma
+          - feed_delta
+          - feed_zeta
           - ai_maintenance
           - credits_enrichment
 
@@ -73,62 +73,95 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Sync Filmhouse (6 AM Local)
+        if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'showtimes'))
+        run: |
+          echo "Syncing Filmhouse (Local API Script)..."
+          npx tsx scripts/sync-filmhouse.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
 
       - name: Sync YouTube Videos (Every 8 Hours)
         if: github.event.schedule == '0 */8 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
         run: |
-          echo "Syncing YouTube Videos (Vercel API)..."
-          curl -v -X GET "$BASE_URL/api/cron/sync?task=videos" \
-          -H "x-cron-secret: $CRON_SECRET"
+          echo "Syncing YouTube Videos (Local Action Script)..."
+          npx tsx scripts/sync-youtube.ts
         continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
+          VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
+          # Backup YouTube keys for quota rotation (add these secrets to enable)
+          YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
+          YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
+          TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          # Gemini keys (rotation) for TMDB-miss title enrichment during sync
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
 
-      - name: Sync TMDB & Kava (10 AM Local)
-        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'tmdb' || github.event.inputs.task == 'kava'))
+      - name: Sync TMDB & Feed Kappa (10 AM Local)
+        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'tmdb' || github.event.inputs.task == 'feed_kappa'))
         run: |
           echo "Syncing TMDB (Vercel API)..."
           curl -v -X GET "$BASE_URL/api/cron/sync?task=tmdb" \
           -H "x-cron-secret: $CRON_SECRET"
           
-          echo "Syncing Kava (Local Playwright Script)..."
-          npx tsx scripts/sync-kava.ts
+          echo "Syncing Feed Kappa (Local Playwright Script)..."
+          npx tsx scripts/sync_feed_kappa.ts
         continue-on-error: true
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FEED_KAPPA_SITEMAP_URL: ${{ secrets.FEED_KAPPA_SITEMAP_URL }}
+          FEED_KAPPA_BASE_URL: ${{ secrets.FEED_KAPPA_BASE_URL }}
 
-      - name: Sync IrokoTV (10 AM Local)
-        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'iroko'))
+      - name: Sync Feed Gamma (10 AM Local)
+        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'feed_gamma'))
         run: |
-          echo "Syncing IrokoTV (Local Playwright Script)..."
-          npx tsx scripts/iroko_sync.ts
+          echo "Syncing Feed Gamma (Local Playwright Script)..."
+          npx tsx scripts/sync_feed_gamma.ts
         continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FEED_GAMMA_URL: ${{ secrets.FEED_GAMMA_URL }}
+          FEED_GAMMA_BASE_URL: ${{ secrets.FEED_GAMMA_BASE_URL }}
+          FEED_GAMMA_CHANNEL_HANDLE: ${{ secrets.FEED_GAMMA_CHANNEL_HANDLE }}
+          FEED_GAMMA_CHANNEL_NAME: ${{ secrets.FEED_GAMMA_CHANNEL_NAME }}
 
-      - name: Sync Docuth (10 AM Local)
-        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'docuth'))
+      - name: Sync Feed Zeta (10 AM Local)
+        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'feed_zeta'))
         run: |
-          echo "Syncing Docuth (Local Playwright Script)..."
-          npx tsx scripts/docuth_sync.ts
+          echo "Syncing Feed Zeta (Local Playwright Script)..."
+          npx tsx scripts/sync_feed_zeta.ts
         continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # SmartProxy account disabled (billing) — runs direct now
+          # SmartProxy account disabled (billing) — feed zeta runs direct now
+          FEED_ZETA_URL: ${{ secrets.FEED_ZETA_URL }}
 
-      - name: Harvest Filmflux (Daily)
-        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'filmflux'))
+      - name: Harvest Feed Delta (Daily)
+        if: github.event.schedule == '0 9 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'feed_delta'))
         run: |
-          echo "Harvesting Filmflux (Competitor Data)..."
-          npx tsx scripts/filmflux_harvester.ts
+          echo "Harvesting Feed Delta..."
+          npx tsx scripts/harvest_feed_delta.ts
         continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FEED_DELTA_URL: ${{ secrets.FEED_DELTA_URL }}
+          FEED_DELTA_BASE_URL: ${{ secrets.FEED_DELTA_BASE_URL }}
 
       - name: AI Maintenance (Extract Cast + Title Cleanup)
         if: github.event.schedule == '0 2,14 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'ai_maintenance'))
@@ -139,6 +172,7 @@ jobs:
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
@@ -164,5 +198,6 @@ jobs:
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

@@ -1,10 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { useReactions } from '../../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
 import { useQuickView } from '../../context/QuickViewContext';
+import { formatFilmTitle } from '../../utils/format';
 
 const formatDeltaViews = (views) => {
   if (!views) return null;
@@ -12,6 +13,14 @@ const formatDeltaViews = (views) => {
   if (v >= 1000000) return `+${(v / 1000000).toFixed(1)}M this week`;
   if (v >= 1000) return `+${(v / 1000).toFixed(0)}K this week`;
   return `+${v} views`;
+};
+
+const formatTotalViews = (views) => {
+  if (!views) return null;
+  const v = Number(views);
+  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M Views`;
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}K Views`;
+  return `${v} Views`;
 };
 
 const formatRuntimeHours = (minutes) => {
@@ -23,6 +32,44 @@ const formatRuntimeHours = (minutes) => {
   return `${m}m`;
 };
 
+const getYoutubeId = (url) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
+const fetchYoutubeViews = async (videoId) => {
+  const cacheKey = `yt_views_${videoId}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) {
+    try {
+      const { views, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < 21600000) {
+        return views;
+      }
+    } catch (e) {}
+  }
+  
+  const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoId}&key=${apiKey}`
+    );
+    const data = await response.json();
+    const views = data.items?.[0]?.statistics?.viewCount;
+    if (views) {
+      localStorage.setItem(cacheKey, JSON.stringify({ views, timestamp: Date.now() }));
+      return views;
+    }
+  } catch (error) {
+    console.error('Error fetching YouTube views:', error);
+  }
+  return null;
+};
+
 export default function FilmCard({ 
   film, 
   size = 'md', 
@@ -31,13 +78,30 @@ export default function FilmCard({
   showWatchedToggle = false,
   isWatched = false,
   onToggleWatched,
-  variant = 'portrait' // Reverted to portrait as default layout
+  variant = 'portrait', // Reverted to portrait as default layout
+  fullWidth = false
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { openQuickView } = useQuickView();
   const { userReaction, likesCount, dislikesCount, loading: reactionLoading, toggleReaction } = useReactions(film.id, user, isHovered);
+  const [ytViews, setYtViews] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    const videoId = getYoutubeId(film.youtube_watch_url);
+    if (videoId) {
+      fetchYoutubeViews(videoId).then(views => {
+        if (active && views) {
+          setYtViews(views);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [film.youtube_watch_url]);
 
   if (variant === 'top10') {
     return (
@@ -62,81 +126,6 @@ export default function FilmCard({
     );
   }
 
-  if (variant === 'landscape') {
-    const formattedViews = formatDeltaViews(film.view_count);
-    const durationLabel = (film.content_type === 'series' || film.is_series_group)
-      ? (film.episodes_count > 1 ? `${film.episodes_count} Episodes` : (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series'))
-      : formatRuntimeHours(film.runtime_minutes || film.runtime);
-    
-    return (
-      <div className="relative flex flex-col gap-2 w-72 sm:w-80 group">
-        <Link 
-          to={`/films/${film.slug || film.id}`}
-          title={film.title}
-          className="relative block aspect-video w-full rounded-2xl overflow-hidden bg-surface-2/60 border border-white/5 group-hover:border-brand/40 shadow-xl group-hover:shadow-2xl group-hover:shadow-brand/5 transition-all duration-500 z-0 hover:z-10"
-        >
-          {/* Poster Image (Landscape aspect-video) */}
-          <ImageWithFallback
-            src={film.backdrop_url || film.poster_url || film.poster}
-            alt={film.title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            fallbackType="banner"
-            name={film.title}
-            loading="lazy"
-            width={640}
-          />
-
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-
-          {/* Views badge */}
-          {formattedViews && (
-            <div className="absolute top-2.5 left-2.5 bg-[#00A651] text-white text-[9px] font-bold px-2 py-1 rounded-md shadow-lg flex items-center gap-1 tracking-wide">
-              {formattedViews}
-            </div>
-          )}
-
-          {/* Duration Label */}
-          {durationLabel && (
-            <div className="absolute bottom-2.5 right-2.5 bg-black/85 backdrop-blur-md text-white text-[9px] font-bold px-1.5 py-0.5 rounded border border-white/10 shadow-md">
-              {durationLabel}
-            </div>
-          )}
-
-          {/* Channel Brand */}
-          {film.channel_name && (
-            <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white/95 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-white/5">
-              <Icon icon="simple-icons:youtube" className="text-[#FF0000] text-[10px]" />
-              <span>ON {film.channel_name}</span>
-            </div>
-          )}
-        </Link>
-
-        {/* Info below image */}
-        <div className="flex flex-col text-left px-1 mt-1">
-          <Link 
-            to={`/films/${film.slug || film.id}`}
-            className="font-bold text-text-primary text-sm tracking-tight leading-snug group-hover:text-brand transition-colors line-clamp-1"
-            title={film.title}
-          >
-            {film.title}
-          </Link>
-          <span className="text-xs text-text-muted mt-0.5 tracking-wide line-clamp-1">
-            {film.channel_name || 'MuviDB Network'}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // Define dimensions based on size prop (Portrait 2:3 aspect ratio)
-  const sizeClasses = {
-    sm: 'w-36 h-56 min-w-[9rem]',
-    md: 'w-48 h-72 min-w-[12rem]', // Naturally fits exactly 5.5 cards in standard viewports
-    lg: 'w-64 h-96 min-w-[16rem]'
-  };
-
-  const filmRating = Number(film.tmdb_rating || film.average_rating || film.rating || 0);
 
   // Get active watch platform icons representing all available platforms
   const getPlatforms = () => {
@@ -173,12 +162,21 @@ export default function FilmCard({
     
     return list.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
   };
-  
+
   const activePlatforms = getPlatforms();
-  const durationLabel = film.content_type === 'series'
-    ? (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series')
+  const durationLabel = (film.content_type === 'series' || film.is_series_group)
+    ? (film.episodes_count > 1 ? `${film.episodes_count} Episodes` : (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series'))
     : (formatRuntimeHours(film.runtime_minutes || film.runtime) || '2h 5m');
-  const matchScore = 75 + ((film.id ? Number(String(film.id).charCodeAt(0) || 0) : 0) % 24);
+  const formattedTotalViews = formatTotalViews(film.view_count);
+  const formattedViews = formatDeltaViews(film.view_count);
+
+  const sizeClasses = {
+    sm: 'w-28 sm:w-36 h-44 sm:h-56 min-w-[7rem] sm:min-w-[9rem]',
+    md: 'w-[140px] sm:w-48 h-[210px] sm:h-72 min-w-[8.75rem] sm:min-w-[12rem]',
+    lg: 'w-full sm:w-64 aspect-[2/3] min-w-[12rem] sm:min-w-[16rem]'
+  };
+
+  const filmRating = Number(film.tmdb_rating || film.average_rating || film.rating || 0);
 
   const [hoverPosition, setHoverPosition] = useState('center');
 
@@ -207,106 +205,166 @@ export default function FilmCard({
 
   return (
     <div 
-      className="relative group flex flex-col gap-3"
+      className={`relative group flex flex-col gap-3 ${variant === 'landscape' ? (fullWidth ? 'w-full' : 'w-72 sm:w-80 shrink-0') : ''}`}
       onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Base Portrait Card Link */}
-      <Link 
-        to={`/films/${film.slug || film.id}`}
-        title={film.title}
-        className={`relative block rounded-xl overflow-hidden transition-all duration-500 hover:shadow-2xl z-0 bg-surface-2/60 hover:border-brand/40 border border-white/5 ${sizeClasses[size]}`}
-      >
-        {/* Poster Image */}
-        <ImageWithFallback
-          src={film.poster_url || film.poster}
-          alt={film.title}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-          fallbackType="banner"
-          name={film.title}
-          loading="lazy"
-          width={384}
-        />
-
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
-
-        {/* Rating Badge (Top Left) */}
-        {filmRating > 0 && (
-          <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-md text-white px-1.5 py-0.5 rounded-md border border-white/10 shadow-lg z-20">
-            <Icon icon="solar:star-bold" className="text-brand text-[10px]" />
-            <span className="text-[10px] font-bold">
-              {filmRating.toFixed(1)}
-            </span>
-          </div>
-        )}
-
-        {/* Series Badge */}
-        {(film.content_type === 'series' || film.is_series_group) && (
-          <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-14' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
-            <Icon icon={film.episodes_count > 1 ? "solar:folder-bold" : "solar:tv-bold"} className="text-white text-[9px]" />
-            <span>{film.episodes_count > 1 ? `${film.episodes_count} EPS` : 'TV'}</span>
-          </div>
-        )}
-
-        {/* Action Button (Hover State) */}
-        <div className="absolute top-2.5 right-2.5 transition-all duration-500 z-20 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0">
-          <button
-            className="bg-brand hover:bg-white text-white hover:text-brand w-7 h-7 rounded-lg transition-all duration-300 active:scale-90 shadow-xl flex items-center justify-center border border-white/10"
-            onClick={(e) => {
-              e.preventDefault();
-              if (onAction) onAction(film);
-            }}
-            aria-label={actionType === 'add' ? `Add ${film.title} to watchlist` : `Remove ${film.title} from watchlist`}
+      {variant === 'landscape' ? (
+        <div className="relative flex flex-col gap-2 w-full">
+          <Link 
+            to={`/films/${film.slug || film.id}`}
+            title={formatFilmTitle(film.title)}
+            className="relative block aspect-video w-full rounded-2xl overflow-hidden bg-surface-2/60 border border-white/5 group-hover:border-brand/40 shadow-xl group-hover:shadow-2xl group-hover:shadow-brand/5 transition-all duration-500 z-0 hover:z-10"
           >
-            <Icon icon={actionType === 'add' ? "solar:add-circle-linear" : "solar:close-circle-linear"} width="14" />
-          </button>
-        </div>
+            {/* Poster Image (Landscape aspect-video) */}
+            <ImageWithFallback
+              src={film.backdrop_url || film.poster_url || film.poster}
+              alt={formatFilmTitle(film.title)}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              fallbackType="banner"
+              name={formatFilmTitle(film.title)}
+              loading="lazy"
+              width={640}
+            />
 
-        {/* Bottom Content Overlay */}
-        <div className="absolute inset-x-0 bottom-0 p-3.5 z-20 bg-gradient-to-t from-black/95 via-black/40 to-transparent pt-10">
-          <h3 className="text-white text-xs font-bold leading-tight mb-1 line-clamp-2 group-hover:text-brand transition-colors" title={film.title}>
-            {film.title}
-          </h3>
-          <div className="flex items-center justify-between gap-2 mt-1">
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/70">
-              <span className="text-brand/90 font-bold">{film.year || film.release_date?.split('-')[0] || 'N/A'}</span>
-              {film.genres && film.genres.length > 0 && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="truncate max-w-[80px]">{film.genres[0]}</span>
-                </>
-              )}
-            </div>
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-            {/* Watch Platform Icons */}
-            {activePlatforms.length > 0 && (
-              <div className="flex items-center gap-1 shrink-0">
-                {activePlatforms.slice(0, 3).map(platform => (
-                  <span 
-                    key={platform.id} 
-                    className={`${platform.color} bg-black/40 backdrop-blur-sm w-5 h-5 rounded-full flex items-center justify-center border border-white/5`} 
-                    title={platform.label}
-                  >
-                    <Icon icon={platform.icon} className="text-[10px]" />
-                  </span>
-                ))}
-                {activePlatforms.length > 3 && (
-                  <span className="text-[8px] font-black text-white bg-black/60 px-1 rounded-full border border-white/10 shrink-0">
-                    +{activePlatforms.length - 3}
-                  </span>
-                )}
+            {/* Views badge */}
+            {formattedViews && (
+              <div className="absolute top-2.5 left-2.5 bg-[#00A651] text-white text-[9px] font-bold px-2 py-1 rounded-md shadow-lg flex items-center gap-1 tracking-wide">
+                {formattedViews}
               </div>
             )}
+
+            {/* Channel Brand */}
+            {film.channel_name && (
+              <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white/95 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-white/5">
+                <Icon icon="simple-icons:youtube" className="text-[#FF0000] text-[10px]" />
+                <span>ON {film.channel_name}</span>
+              </div>
+            )}
+          </Link>
+
+          {/* Info below image */}
+          <div className="flex flex-col text-left px-1 mt-1">
+            <Link 
+              to={`/films/${film.slug || film.id}`}
+              className="font-bold text-text-primary text-sm tracking-tight leading-snug group-hover:text-brand transition-colors line-clamp-1"
+              title={formatFilmTitle(film.title)}
+            >
+              {formatFilmTitle(film.title)}
+            </Link>
+            <span className="text-xs text-text-muted mt-0.5 tracking-wide line-clamp-1">
+              {durationLabel}
+              {!!(ytViews || film.view_count) && (
+                <>
+                  <span className="mx-1.5 opacity-45">•</span>
+                  <span>{formatTotalViews(ytViews || film.view_count)}</span>
+                </>
+              )}
+            </span>
           </div>
         </div>
+      ) : (
+        /* Base Portrait Card Link */
+        <Link 
+          to={`/films/${film.slug || film.id}`}
+          title={formatFilmTitle(film.title)}
+          className={`relative block rounded-xl overflow-hidden transition-all duration-500 hover:shadow-2xl z-0 bg-surface-2/60 hover:border-brand/40 border border-white/5 ${sizeClasses[size]}`}
+        >
+          {/* Poster Image */}
+          <ImageWithFallback
+            src={film.poster_url || film.poster}
+            alt={formatFilmTitle(film.title)}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+            fallbackType="banner"
+            name={formatFilmTitle(film.title)}
+            loading="lazy"
+            width={384}
+          />
 
-        {/* Bottom Line Accent (Brand Orange) */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left z-30" />
-      </Link>
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
-      {/* Hover Landscape Popup Overlay */}
+          {/* Rating Badge (Top Left) */}
+          {filmRating > 0 && (
+            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-md text-white px-1.5 py-0.5 rounded-md border border-white/10 shadow-lg z-20">
+              <Icon icon="solar:star-bold" className="text-brand text-[10px]" />
+              <span className="text-[10px] font-bold">
+                {filmRating.toFixed(1)}
+              </span>
+            </div>
+          )}
+
+          {/* Series Badge */}
+          {(film.content_type === 'series' || film.is_series_group) && (
+            <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-14' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
+              <Icon icon={film.episodes_count > 1 ? "solar:folder-bold" : "solar:tv-bold"} className="text-white text-[9px]" />
+              <span>{film.episodes_count > 1 ? `${film.episodes_count} EPS` : 'TV'}</span>
+            </div>
+          )}
+
+          {/* Action Button (Hover State) */}
+          <div className="absolute top-2.5 right-2.5 transition-all duration-500 z-20 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0">
+            <button
+              className="bg-brand hover:bg-white text-white hover:text-brand w-7 h-7 rounded-lg transition-all duration-300 active:scale-90 shadow-xl flex items-center justify-center border border-white/10"
+              onClick={(e) => {
+                e.preventDefault();
+                if (onAction) onAction(film);
+              }}
+              aria-label={actionType === 'add' ? `Add ${formatFilmTitle(film.title)} to watchlist` : `Remove ${formatFilmTitle(film.title)} from watchlist`}
+            >
+              <Icon icon={actionType === 'add' ? "solar:add-circle-linear" : "solar:close-circle-linear"} width="14" />
+            </button>
+          </div>
+
+          {/* Bottom Content Overlay */}
+          <div className="absolute inset-x-0 bottom-0 p-3.5 z-20 bg-gradient-to-t from-black/95 via-black/40 to-transparent pt-10">
+            <h3 className="text-white text-xs font-bold leading-tight mb-1 line-clamp-2 group-hover:text-brand transition-colors" title={formatFilmTitle(film.title)}>
+              {formatFilmTitle(film.title)}
+            </h3>
+            <div className="flex items-center justify-between gap-2 mt-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/70">
+                <span className="text-brand/90 font-bold">{film.year || film.release_date?.split('-')[0] || 'N/A'}</span>
+                {film.genres && film.genres.length > 0 && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/20" />
+                    <span className="truncate max-w-[80px]">{film.genres[0]}</span>
+                  </>
+                )}
+              </div>
+
+              {/* Watch Platform Icons */}
+              {activePlatforms.length > 0 && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {activePlatforms.slice(0, 3).map(platform => (
+                    <span 
+                      key={platform.id} 
+                      className={`${platform.color} bg-black/40 backdrop-blur-sm w-5 h-5 rounded-full flex items-center justify-center border border-white/5`} 
+                      title={platform.label}
+                    >
+                      <Icon icon={platform.icon} className="text-[10px]" />
+                    </span>
+                  ))}
+                  {activePlatforms.length > 3 && (
+                    <span className="text-[8px] font-black text-white bg-black/60 px-1 rounded-full border border-white/10 shrink-0">
+                      +{activePlatforms.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Line Accent (Brand Orange) */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left z-30" />
+        </Link>
+      )}
+
+      {/* Hover Landscape Popup Overlay (Desktop only) */}
       <div 
-        className={`absolute w-[280px] bg-[#181818] rounded-2xl overflow-hidden border border-white/10 shadow-2xl transition-all duration-300 ease-out opacity-0 scale-90 pointer-events-none group-hover:opacity-100 group-hover:scale-[1.08] group-hover:pointer-events-auto group-hover:delay-300 delay-100 z-50 flex flex-col ${getHoverClasses()}`}
+        className={`absolute w-[280px] bg-[#181818] rounded-2xl overflow-hidden border border-white/10 shadow-2xl transition-all duration-300 ease-out opacity-0 scale-90 pointer-events-none group-hover:opacity-100 group-hover:scale-[1.08] group-hover:pointer-events-auto group-hover:delay-300 delay-100 z-50 hidden md:flex flex-col ${getHoverClasses()}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Aspect-Video Preview Header */}
@@ -314,10 +372,10 @@ export default function FilmCard({
           {film.backdrop_url ? (
             <ImageWithFallback
               src={film.backdrop_url}
-              alt={film.title}
+              alt={formatFilmTitle(film.title)}
               className="w-full h-full object-cover transition-transform duration-700 group-hover/image:scale-105"
               fallbackType="banner"
-              name={film.title}
+              name={formatFilmTitle(film.title)}
               loading="lazy"
               width={640}
             />
@@ -334,7 +392,7 @@ export default function FilmCard({
               <div className="relative w-full h-full flex items-center justify-center bg-black/20">
                 <img 
                   src={film.poster_url || film.poster} 
-                  alt={film.title} 
+                  alt={formatFilmTitle(film.title)} 
                   className="h-full object-contain transition-transform duration-700 group-hover/image:scale-105" 
                 />
               </div>
@@ -354,7 +412,7 @@ export default function FilmCard({
           {/* Title on backdrop (bottom left) */}
           <div className="absolute bottom-3 left-4 right-4 z-20">
             <h4 className="text-white font-heading font-black text-sm tracking-tight drop-shadow-md truncate">
-              {film.title}
+              {formatFilmTitle(film.title)}
             </h4>
           </div>
         </Link>
@@ -378,7 +436,7 @@ export default function FilmCard({
                 disabled={reactionLoading}
                 className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'dislike' ? 'bg-red-500/20 border-red-500 text-red-500' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
                 title="Dislike"
-                aria-label={`Dislike ${film.title}`}
+                aria-label={`Dislike ${formatFilmTitle(film.title)}`}
               >
                 <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-lg" />
                 {dislikesCount > 0 && (
@@ -397,7 +455,7 @@ export default function FilmCard({
                 }}
                 className="w-9 h-9 rounded-full border border-white/30 hover:border-white flex items-center justify-center text-white bg-transparent hover:bg-white/10 transition hover:scale-105 active:scale-95 shrink-0"
                 title={actionType === 'add' ? "Add to Watchlist" : "Remove from Watchlist"}
-                aria-label={actionType === 'add' ? `Add ${film.title} to watchlist` : `Remove ${film.title} from watchlist`}
+                aria-label={actionType === 'add' ? `Add ${formatFilmTitle(film.title)} to watchlist` : `Remove ${formatFilmTitle(film.title)} from watchlist`}
               >
                 <Icon icon={actionType === 'add' ? "solar:plus-linear" : "solar:close-circle-linear"} className="text-lg" />
               </button>
@@ -416,7 +474,7 @@ export default function FilmCard({
                 disabled={reactionLoading}
                 className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'like' ? 'bg-brand/20 border-brand text-brand' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
                 title="Like"
-                aria-label={`Like ${film.title}`}
+                aria-label={`Like ${formatFilmTitle(film.title)}`}
               >
                 <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-lg" />
                 {likesCount > 0 && (
@@ -436,7 +494,7 @@ export default function FilmCard({
               }}
               className="w-9 h-9 rounded-full border border-white/30 hover:border-white hover:text-brand hover:border-brand/40 flex items-center justify-center text-white bg-transparent hover:bg-white/10 transition hover:scale-105 active:scale-95 shrink-0"
               title="Quick View"
-              aria-label={`Quick View ${film.title}`}
+              aria-label={`Quick View ${formatFilmTitle(film.title)}`}
             >
               <Icon icon="solar:info-circle-linear" className="text-lg" />
             </button>
@@ -444,7 +502,7 @@ export default function FilmCard({
 
           {/* Metadata Row */}
           <div className="flex items-center gap-2.5 text-xs text-white/90 mb-3 flex-wrap font-medium">
-            <span className="text-brand font-bold">{matchScore}% Match</span>
+            {formattedTotalViews && <span className="text-brand font-bold">{formattedTotalViews}</span>}
             <span>{film.year || film.release_date?.split('-')[0]}</span>
             <span className="px-1.5 py-0.5 border border-white/30 rounded text-[9px] font-black tracking-wide leading-none uppercase bg-white/5">
               {film.maturity_rating || '18+'}

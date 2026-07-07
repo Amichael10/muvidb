@@ -1,0 +1,13 @@
+Matches for 'api:':
+
+Match: api:"dates"
+ocale:c}=(0,I.useParams)(),{data:d}=(0,D.a)({queryKey:["private_theatre_showtime_date_prefetch_list",s?.id,c],queryFn:async()=>{let e=await (0,a.OH)({api:"dates",cinema_location_id:s?.id,page_number:1,sales_channel_id:1,widget_id:"private_theatre_calender",has_limit:1,per_page:100});return e?.data},staleTime:1e4,gcTime:3e5});return(0,t.jsxs)(t.Fragment,{children:[(0,t.jsx)(l.default,{classString:(
+
+Match: api:"dates"
+ading:Y,isSuccess:L}=(0,w.a)({queryKey:["movieCalendarDates",x,c,P,`widget-ctype-${u?.calendar_option_type}`],queryFn:async()=>{let e=await (0,l.OH)({api:"dates",sales_channel_id:1,cinema_location_id:x,page_number:"1",url_key:"",widget_id:s,calendar_date_picker_option:u&&u.calendar_option_type});return e?.data},enabled:!!x,gcTime:9e5,staleTime:9e5});(0,a.useEffect)(()=>{N([]),A([]),k(void 0),Z([])
+
+Match: api:"list"
+)({queryKey:["movieCalendarMovies",`location_${p}`,i,_,a],queryFn:async()=>{let e=await (0,l.OH)({sales_channel_id:1,cinema_location_id:p,widget_id:s,api:"list",session_date:a,has_limit:0,per_page:100,page_number:1,url_key:"",theater_experiance:"",group_to_theater_experiance:!1,sort_by:c?.sort_by??""});return e?.data},enabled:!!(p&&a),gcTime:3e5,staleTime:3e5}),y=Array.isArray(j?.movies)&&j.movies
+
+Match: api:"list"
+ding:_}=(0,r.a)({queryKey:["movieWeekMovies",h?.id,n],queryFn:async()=>{let e=await (0,a.OH)({sales_channel_id:1,cinema_location_id:h?.id,widget_id:s,api:"list",has_limit:0,per_page:100,page_number:1,url_key:"",theater_experiance:"",group_to_theater_experiance:!1});return e?.data},gcTime:3e5,staleTime:3e5});return _?(0,t.jsx)(u,{}):(0,t.jsx)("div",{className:"pc-column-left",children:(0,t.jsxs)("d

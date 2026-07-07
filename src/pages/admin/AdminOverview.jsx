@@ -8,7 +8,7 @@ export default function AdminOverview() {
   const { user } = useAuth();
   const [counts, setCounts] = useState({
     films: 0, people: 0, credits: 0,
-    users: 0, reviews: 0, pendingClaims: 0,
+    users: 0, reviews: 0,
     myFilms: 0, myPeople: 0, myCredits: 0, myCompanies: 0, myUpdates: 0, myTotalActions: 0
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -56,8 +56,7 @@ export default function AdminOverview() {
             people: people.count || 0,
             credits: credits.count || 0,
             users: 1,
-            reviews: reviews.count || 0,
-            pendingClaims: 0
+            reviews: reviews.count || 0
           }));
         }
       } catch (error) {
@@ -210,7 +209,6 @@ export default function AdminOverview() {
       case 'person': return 'solar:user-linear';
       case 'credit': return 'solar:document-text-linear';
       case 'company': return 'solar:buildings-linear';
-      case 'claim': return 'solar:clipboard-list-linear';
       case 'user': return 'solar:user-linear';
       case 'review': return 'solar:star-linear';
       case 'sync': return 'solar:refresh-linear';
@@ -261,8 +259,7 @@ export default function AdminOverview() {
     { label: 'People', value: counts.people, icon: 'solar:user-linear' },
     { label: 'Credits', value: counts.credits, icon: 'solar:document-text-linear' },
     { label: 'AI status', value: 'Active', icon: 'solar:cpu-linear', isStatic: true },
-    { label: 'Reviews', value: counts.reviews, icon: 'solar:star-linear' },
-    { label: 'Claims', value: counts.pendingClaims, icon: 'solar:clipboard-list-linear', warning: counts.pendingClaims > 0 }
+    { label: 'Reviews', value: counts.reviews, icon: 'solar:star-linear' }
   ];
 
   const quickActions = isLimitedAdmin ? [

@@ -1,6 +1,6 @@
 -- RPC to get people with filmography counts inclusive of qualifying YouTube videos
 -- THRESHOLDS: Actor >= 35m (2100s), Skit Maker >= 15m (900s)
-CREATE OR REPLACE FUNCTION get_people_with_counts(
+CREATE OR REPLACE FUNCTION public.get_people_with_counts(
   p_search TEXT DEFAULT '',
   p_verified TEXT DEFAULT 'all',
   p_spotlight TEXT DEFAULT 'all',
@@ -31,26 +31,26 @@ BEGIN
     p.photo_url,
     p.is_verified,
     p.is_spotlight,
-    p.popularity_score,
+    p.popularity_score::FLOAT,
     p.known_for_department,
-    (SELECT COUNT(*) FROM credits WHERE person_id = p.id) as traditional_credits_count,
+    (SELECT COUNT(*) FROM public.credits WHERE person_id = p.id)::BIGINT as traditional_credits_count,
     (
       SELECT COALESCE(COUNT(*), 0)
-      FROM channel_videos cv
-      JOIN channels ch ON ch.id = cv.channel_id
+      FROM public.channel_videos cv
+      JOIN public.channels ch ON ch.id = cv.channel_id
       WHERE ch.owner_person_id = p.id
       AND (
         (p.known_for_department = 'Actor' AND cv.duration_seconds >= 2100) OR -- 35 mins
         (p.known_for_department = 'Skit Maker' AND cv.duration_seconds >= 900) OR -- 15 mins
         (p.known_for_department NOT IN ('Actor', 'Skit Maker') AND cv.duration_seconds >= 900) -- Default to 15 mins
       )
-    ) as youtube_filmography_count,
+    )::BIGINT as youtube_filmography_count,
     (
-      (SELECT COUNT(*) FROM credits WHERE person_id = p.id) +
+      (SELECT COUNT(*) FROM public.credits WHERE person_id = p.id) +
       (
         SELECT COALESCE(COUNT(*), 0)
-        FROM channel_videos cv
-        JOIN channels ch ON ch.id = cv.channel_id
+        FROM public.channel_videos cv
+        JOIN public.channels ch ON ch.id = cv.channel_id
         WHERE ch.owner_person_id = p.id
         AND (
           (p.known_for_department = 'Actor' AND cv.duration_seconds >= 2100) OR -- 35 mins
@@ -58,9 +58,9 @@ BEGIN
           (p.known_for_department NOT IN ('Actor', 'Skit Maker') AND cv.duration_seconds >= 900)
         )
       )
-    ) as total_filmography_count,
+    )::BIGINT as total_filmography_count,
     p.created_at
-  FROM people p
+  FROM public.people p
   WHERE (p_search = '' OR p.name ILIKE '%' || p_search || '%')
     AND (p_verified = 'all' OR p.is_verified = (p_verified = 'verified'))
     AND (p_spotlight = 'all' OR p.is_spotlight = (p_spotlight = 'spotlight'))
@@ -77,4 +77,4 @@ BEGIN
     CASE WHEN p_sort_col = 'created_at' AND p_sort_asc = TRUE THEN p.created_at END ASC
   LIMIT p_limit OFFSET p_offset;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;

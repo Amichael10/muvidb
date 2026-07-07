@@ -284,7 +284,7 @@ const PeopleList = () => {
         </div>
 
         {/* Content Grid */}
-        <div className="p-8 md:p-12">
+        <div className="p-4 md:p-8 lg:p-12">
           {loading && people.length === 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => <PersonSkeleton key={i} />)}
