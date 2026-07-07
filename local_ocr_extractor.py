@@ -106,7 +106,9 @@ except ImportError:
     pass
 
 # ── Config ────────────────────────────────────────────────────────────────────
-OUTRO_DURATION  = 600   # Last 10 minutes (outro-only strategy — avoids double-download bot detection)
+OUTRO_DURATION  = 600   # Last 10 minutes — where end-credit rolls live
+INTRO_DURATION  = 180   # First 3 minutes — many Nollywood films list cast here instead of an end-roll
+SCAN_INTRO      = os.getenv("SCAN_INTRO", "1").strip().lower() in ("1", "true", "yes")
 FRAME_INTERVAL  = 2     # Fallback sample rate (seconds) if mpdecimate yields nothing
 HASH_THRESHOLD  = 4     # Hamming distance threshold for duplicate frame detection
 FRAME_MAX_EDGE  = 1024  # Downscale long edge — keeps credit text legible, cuts VLM vision tokens 3-4x
@@ -140,6 +142,17 @@ YT_BASE_FLAGS   = [
     "--socket-timeout", "60",
     "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 ]
+
+# YouTube bot-detection ("Sign in to confirm you're not a bot") blocks shared
+# datacenter IPs like Kaggle's after a burst of requests. Authenticated cookies
+# are the most reliable bypass. Export a logged-in YouTube cookies.txt, upload it
+# to Kaggle, and set YT_COOKIES_FILE to its path (e.g. /kaggle/input/yt/cookies.txt).
+YT_COOKIES_FILE = os.getenv("YT_COOKIES_FILE", "").strip() or None
+if YT_COOKIES_FILE and os.path.exists(YT_COOKIES_FILE):
+    YT_BASE_FLAGS.extend(["--cookies", YT_COOKIES_FILE])
+    print(f"  🍪 Using YouTube cookies: {YT_COOKIES_FILE}")
+elif YT_COOKIES_FILE:
+    print(f"  ⚠️ YT_COOKIES_FILE set but not found: {YT_COOKIES_FILE}")
 
 # Configure SmartProxy if credentials exist
 PROXY_USER = os.getenv("SMARTPROXY_USER", "").strip() or None
@@ -482,9 +495,14 @@ def get_video_info(url: str) -> tuple[str, float]:
                     stdout=f, stderr=subprocess.PIPE, text=True, timeout=120
                 )
             if result.returncode != 0:
+                err = (result.stderr or "").strip().splitlines()
+                reason = err[-1] if err else "no stderr"
                 if attempt < 3:
                     time.sleep(5)
                     continue
+                # Surface WHY so we can tell "video unavailable" (skip is correct)
+                # from "Sign in to confirm you're not a bot" (IP rate-limited).
+                print(f"     yt-dlp info failed: {reason[:200]}")
                 return "unknown_movie", 0.0
                 
             lines = info_file.read_text(encoding="utf-8").strip().splitlines()
@@ -595,44 +613,91 @@ Below is raw text extracted via Local OCR from the credit cards of a movie calle
 Some characters may be garbled, misspelled, duplicated, or out of order due to video background noise.
 Clean it up using Nollywood industry knowledge. Deduplicate entries. Separate cast from crew.
 
-Return ONLY a markdown document with these sections (skip empty sections):
-# Cast
-Format EXACTLY like this:
-- Actor Name - Character Name (e.g. - Maurice Sam - Prince Caleb)
-If NO character name is visible, write only:
-- Actor Name
+CRITICAL RULES:
+- Use ONLY real names that actually appear in the RAW OCR TEXT below. Never invent names.
+- If the OCR text contains no usable names for a section, OMIT that entire section
+  (header and all). An empty database is better than a wrong one.
+- NEVER output the literal words "Name", "Specific Role", or any example placeholder.
+  If you would write "Director Name" or "Crew Name", that means you have no real name —
+  so omit the section instead.
 
-# Director
-Format EXACTLY:
-- Director Name - Director
+CAST PAIRING (important): credit rolls list the CHARACTER and the ACTOR next to
+each other — usually the character name on one line and the actor's real name on
+the adjacent line (or separated by "/", "as", or "-"). Combine each such pair
+into ONE entry as "- Actor Real Name - Character Name". The actor is the real
+person's name (e.g. "Deza The Great"); the character is the role they play (e.g.
+"Odogwu"). Never list a character name on its own line as if it were an actor.
 
-# Producers
-Format EXACTLY:
-- Producer Name - Specific Role (e.g. - Jane Producer - Executive Producer)
+Return ONLY a markdown document, using whichever of these sections you have REAL names for:
+# Cast  -> "- Actor Name - Character Name", or just "- Actor Name" if no character shown
+# Director  -> "- <name> - Director"
+# Producers  -> "- <name> - <their producer role>"
+# Cinematography  -> "- <name> - Cinematographer"
+# Editor  -> "- <name> - Editor"
+# Music  -> "- <name> - Composer"
+# Costume & Makeup  -> "- <name> - <their role>"
+# Crew  -> "- <name> - <their role>"  (Gaffer, Sound, PM, Continuity, etc.)
 
-# Cinematography
-Format EXACTLY:
-- Cinematographer Name - Cinematographer
-
-# Editor
-Format EXACTLY:
-- Editor Name - Editor
-
-# Music
-Format EXACTLY:
-- Composer Name - Composer
-
-# Costume & Makeup
-Format EXACTLY:
-- Crew Name - Specific Role (e.g. - Mary Makeup - Makeup Artist, Wardrobe Designer - Costumier)
-
-# Crew
-(All other roles like Gaffer, Sound, PM, Continuity, etc.)
-Format EXACTLY:
-- Crew Name - Specific Role (e.g. - John Gaf - Gaffer)
+Example of the FORMAT only (do not copy these names): "- Maurice Sam - Prince Caleb"
 
 RAW OCR TEXT:
 {raw}"""
+
+# Tokens that only appear in the prompt's format examples, never in real credits.
+# A weak model with thin OCR input tends to echo these placeholders verbatim; we
+# strip any line containing one so garbage never reaches the DB.
+_PLACEHOLDER_TOKENS = (
+    "actor name", "character name", "director name", "producer name",
+    "cinematographer name", "editor name", "composer name", "crew name",
+    "specific role", "e.g.",
+)
+
+# Phrases that mark a "name" as model commentary/notes rather than a real person.
+_JUNK_NAME_TOKENS = (
+    "omitted", "not listed", "not a person", "note:", "appreciation",
+    "n/a", "unknown", "no character", "misreading", "error", "see ocr",
+)
+
+def _looks_like_junk_name(name: str) -> bool:
+    """True if this 'name' is really prose/commentary, not a person to save."""
+    low = name.lower()
+    if any(tok in low for tok in _JUNK_NAME_TOKENS):
+        return True
+    # Real credit names are short; a 7+ word 'name' is a sentence, not a person.
+    if len(name.split()) > 6:
+        return True
+    return False
+
+def strip_template_placeholders(markdown: str) -> str:
+    """Drop lines that echo the prompt's example placeholders, then drop any
+    section header left with no real entries under it."""
+    kept = []
+    for line in markdown.splitlines():
+        low = line.lower()
+        if line.lstrip().startswith("-") and any(tok in low for tok in _PLACEHOLDER_TOKENS):
+            continue
+        kept.append(line)
+    # Remove headers that now have no bullet lines before the next header/EOF.
+    out = []
+    for i, line in enumerate(kept):
+        if line.startswith("#"):
+            has_entry = any(
+                kept[j].lstrip().startswith("-")
+                for j in range(i + 1, len(kept))
+                if not (j > i + 1 and kept[j].startswith("#"))
+            )
+            # look ahead only until the next header
+            has_entry = False
+            for j in range(i + 1, len(kept)):
+                if kept[j].startswith("#"):
+                    break
+                if kept[j].lstrip().startswith("-"):
+                    has_entry = True
+                    break
+            if not has_entry:
+                continue
+        out.append(line)
+    return "\n".join(out).strip()
 
 def local_regex_fallback(title: str, raw_text: str) -> str:
     """Failsafe regex-based parser when all LLM API tokens are exhausted."""
@@ -956,6 +1021,8 @@ class SupabaseSync:
                     
                     name = name.strip()
                     if not name: continue
+                    if _looks_like_junk_name(name):
+                        continue
                     person_id = self.upsert_person(name)
                     if person_id:
                         self.link_credit(film_id, person_id, specific_role, char, idx)
@@ -968,7 +1035,9 @@ class SupabaseSync:
 def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
     """Process one queue of films. Returns the count successfully enriched."""
     print(f"\n🚀 Starting batch OCR extraction for {len(incomplete_queue)} films...")
-    print(f"   Strategy: Outro-only (last {OUTRO_DURATION//60} min). No intro download.")
+    seg_desc = (f"intro (first {INTRO_DURATION//60} min) + outro (last {OUTRO_DURATION//60} min)"
+                if SCAN_INTRO else f"outro-only (last {OUTRO_DURATION//60} min)")
+    print(f"   Strategy: scanning {seg_desc}.")
 
     # Report tracking
     skipped_log: list[str] = []
@@ -997,42 +1066,37 @@ def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
                 skipped_log.append(f"| {title} | {url} | {skip_reason} |")
                 continue
 
-            # ── Step 2: Download outro only (last 10 min) ─────────────────────
-            print(f"  -> Downloading outro (last {OUTRO_DURATION//60} min)...")
-            outro_path = BASE_TEMP_DIR / f"lumi_outro_{safe_title[:20].strip()}.mkv"
-            temp_files.append(outro_path)
+            # ── Step 2-4: Download + extract frames from each segment ─────────
+            # Credits vary: some films roll them at the end, others list cast in
+            # the intro. Scan both (intro optional via SCAN_INTRO) and pool frames.
+            segments = []
+            if SCAN_INTRO:
+                segments.append(("intro", 0.0, min(INTRO_DURATION, duration)))
+            segments.append(("outro", max(0, duration - OUTRO_DURATION), min(OUTRO_DURATION, duration)))
 
-            outro_start = max(0, duration - OUTRO_DURATION)
-            outro_dur = min(OUTRO_DURATION, duration)
-            outro_ok = download_segment(url, outro_start, outro_dur, outro_path)
-
-            if not outro_ok or not outro_path.exists():
-                skip_reason = "Outro download failed (bot detection or stream error)"
-                print(f"  ❌ {skip_reason}. Skipping.")
-                skipped_log.append(f"| {title} | {url} | {skip_reason} |")
-                continue
-
-            # Validate file is not corrupt/partial (moov atom missing etc.)
-            file_size_kb = outro_path.stat().st_size // 1024
-            if file_size_kb < 200:
-                skip_reason = f"Downloaded file too small ({file_size_kb} KB) — likely corrupt or partial"
-                print(f"  ❌ {skip_reason}. Skipping.")
-                skipped_log.append(f"| {title} | {url} | {skip_reason} |")
-                continue
-
-            # ── Step 3: Frame extraction ──────────────────────────────────────
-            print("  -> Capturing frames from outro...")
-            outro_dir = FRAMES_DIR / "outro"
-            temp_files.append(outro_dir)
-            raw_frames = extract_frames(outro_path, outro_dir, "outro")
+            raw_frames = []
+            for seg_label, seg_start, seg_dur in segments:
+                seg_path = BASE_TEMP_DIR / f"lumi_{seg_label}_{safe_title[:20].strip()}.mkv"
+                temp_files.append(seg_path)
+                print(f"  -> Downloading {seg_label} ({int(seg_dur//60)} min from {int(seg_start//60)}m)...")
+                if not download_segment(url, seg_start, seg_dur, seg_path) or not seg_path.exists():
+                    print(f"  ⚠️ {seg_label} download failed — skipping this segment.")
+                    continue
+                if seg_path.stat().st_size // 1024 < 200:
+                    print(f"  ⚠️ {seg_label} file too small — likely corrupt, skipping segment.")
+                    continue
+                print(f"  -> Capturing frames from {seg_label}...")
+                seg_dir = FRAMES_DIR / seg_label
+                temp_files.append(seg_dir)
+                raw_frames.extend(extract_frames(seg_path, seg_dir, seg_label))
 
             if not raw_frames:
-                skip_reason = "No frames extracted from outro video"
+                skip_reason = "No frames extracted from intro or outro"
                 print(f"  ❌ {skip_reason}. Skipping.")
                 skipped_log.append(f"| {title} | {url} | {skip_reason} |")
                 continue
 
-            # ── Step 4: Deduplication ─────────────────────────────────────────
+            # ── Deduplication ─────────────────────────────────────────────────
             # mpdecimate already dropped near-identical frames at extraction time;
             # imagehash is a cheap second pass to catch any residual repeats.
             unique_frames = filter_unique_frames(raw_frames)
@@ -1066,6 +1130,9 @@ def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
 
             # ── Step 6: AI Cleanup ────────────────────────────────────────────
             structured_markdown = run_ai_cleanup(title, combined_ocr_text)
+            # Drop any placeholder lines the model echoed from the prompt examples
+            # (and now-empty sections) so fake "Director Name" credits never save.
+            structured_markdown = strip_template_placeholders(structured_markdown)
 
             if not structured_markdown.strip():
                 skip_reason = "AI formatting returned empty result"
@@ -1084,6 +1151,12 @@ def process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode):
             out_file = output_dir / f"ocr_{safe_title[:40]}.md"
             out_file.write_text(header + structured_markdown, encoding="utf-8")
             print(f"  ✓ Saved: {out_file.name}")
+
+            # Sidecar with the raw OCR text — lets us see what the readers actually
+            # captured when the structured names look thin.
+            raw_file = output_dir / f"ocr_{safe_title[:40]}.raw.txt"
+            raw_file.write_text(combined_ocr_text, encoding="utf-8")
+            print(f"  ✓ Raw OCR text: {raw_file.name} ({len(combined_ocr_text)} chars)")
 
             sync.process(url, structured_markdown)
             success_count += 1
@@ -1209,15 +1282,23 @@ def main():
         return
 
     # DB-driven mode: sweep the incomplete-films queue (page 1 → backward).
+    # `attempted` remembers every URL we've already tried THIS session so a film
+    # that yields no credits (creditless title) isn't re-downloaded every sweep —
+    # otherwise the loop would spin forever on the same unextractable films.
+    # (On a fresh session/restart this resets, giving each film one more attempt.)
+    attempted: set[str] = set()
     sweep = 0
     while True:
         sweep += 1
         if loop_mode:
             print(f"\n🔁 Sweep #{sweep} — scanning DB for incomplete films...")
         incomplete_queue = sync.fetch_incomplete_youtube_films()
+        if loop_mode:
+            incomplete_queue = [f for f in incomplete_queue
+                                if f.get("youtube_watch_url") not in attempted]
 
         if not incomplete_queue:
-            print("✅ No incomplete YouTube films with 0 to 10 credits found.")
+            print("✅ No further incomplete films to attempt this session.")
             if not loop_mode:
                 return
             print(f"   Sleeping {LOOP_SLEEP_SECS}s before next sweep...")
@@ -1225,10 +1306,14 @@ def main():
             continue
 
         process_sweep(incomplete_queue, sync, ocr, paddle, output_dir, single_mode=False)
+        for f in incomplete_queue:
+            if f.get("youtube_watch_url"):
+                attempted.add(f["youtube_watch_url"])
 
         if not loop_mode:
             return
-        print(f"\n😴 Sweep #{sweep} done. Sleeping {LOOP_SLEEP_SECS}s before re-scanning...")
+        print(f"\n😴 Sweep #{sweep} done ({len(attempted)} films attempted this session). "
+              f"Sleeping {LOOP_SLEEP_SECS}s before re-scanning...")
         time.sleep(LOOP_SLEEP_SECS)
 
 

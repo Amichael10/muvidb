@@ -5,9 +5,52 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+// Initialize Gemini with multi-key rotation. Supports a comma-separated list
+// in GEMINI_API_KEY plus numbered fallbacks (GEMINI_API_KEY_2, _3). Each key
+// has its own free-tier quota, so rotating on 429/RESOURCE_EXHAUSTED multiplies
+// the daily ceiling before we fall back to OpenAI/Groq.
+function collectGeminiKeys(): string[] {
+  const raw = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+  ];
+  return [
+    ...new Set(
+      raw.filter(Boolean).flatMap((k) => k!.split(',')).map((k) => k.trim()).filter(Boolean)
+    ),
+  ];
+}
+const GEMINI_KEYS = collectGeminiKeys();
+let geminiKeyIdx = 0;
+
+function geminiModelFor(model: string) {
+  return new GoogleGenerativeAI(GEMINI_KEYS[geminiKeyIdx] || '').getGenerativeModel({ model });
+}
+
+function isGeminiQuotaError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 429 || /quota|resource_exhausted|rate limit|too many requests|\b429\b/.test(msg);
+}
+
+/** Run a Gemini call, rotating to the next key on quota errors. */
+async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): Promise<any> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < Math.max(1, GEMINI_KEYS.length); attempt++) {
+    try {
+      return await fn(geminiModelFor(model));
+    } catch (err: any) {
+      lastErr = err;
+      if (isGeminiQuotaError(err) && GEMINI_KEYS.length > 1) {
+        console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} quota hit, rotating…`);
+        geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
 
 // Initialize Groq (if key exists)
 const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
@@ -54,11 +97,11 @@ export function parseJSON(text: string) {
 export async function generateAIContent(prompt: string) {
   const providers = [];
   
-  if (process.env.GEMINI_API_KEY) {
+  if (GEMINI_KEYS.length) {
     providers.push({
       name: 'gemini',
       execute: async () => {
-        const result = await geminiModel.generateContent(prompt);
+        const result = await withGeminiRotation('gemini-2.5-flash', (m) => m.generateContent(prompt));
         return { text: result.response.text(), engine: 'gemini', headers: null };
       }
     });
@@ -140,7 +183,7 @@ export async function generateAIContent(prompt: string) {
  * Vision Content Generator (Gemini Flash Vision)
  */
 export async function generateAIVisionContent(prompt: string, base64Data: string, mimeType: string) {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!GEMINI_KEYS.length) {
     throw new Error('GEMINI_API_KEY is not set. Vision AI requires Gemini.');
   }
   
@@ -152,9 +195,9 @@ export async function generateAIVisionContent(prompt: string, base64Data: string
     }
   };
 
-  // Attempt 1: Gemini 2.5 Flash (primary)
+  // Attempt 1: Gemini 2.5 Flash (primary), rotating keys on quota
   try {
-    const result = await geminiModel.generateContent([prompt, imagePart]);
+    const result = await withGeminiRotation('gemini-2.5-flash', (m) => m.generateContent([prompt, imagePart]));
     return {
       text: result.response.text(),
       telemetry: { engine: 'gemini-vision-2.5', status: 'ok' }
@@ -165,8 +208,7 @@ export async function generateAIVisionContent(prompt: string, base64Data: string
     // Attempt 2: Gemini 2.0 Flash Lite (free tier fallback)
     try {
       console.log('[AI Service] Trying Gemini 2.0 Flash Lite fallback...');
-      const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
-      const result = await fallbackModel.generateContent([prompt, imagePart]);
+      const result = await withGeminiRotation('gemini-2.0-flash-lite', (m) => m.generateContent([prompt, imagePart]));
       return {
         text: result.response.text(),
         telemetry: { engine: 'gemini-vision-2.0-lite', status: 'ok' }
