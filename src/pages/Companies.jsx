@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -9,7 +9,7 @@ const CompanyCard = ({ company, filmCount }) => {
 
   return (
     <Link
-      to={`/companies/${company.slug || company.id}`}
+      to={`/companies/${company.id}`}
       className="group block bg-surface rounded-xl overflow-hidden border border-border hover:border-brand transition-all shadow-sm"
     >
       <div className="p-6">
@@ -56,12 +56,18 @@ const CompanyCard = ({ company, filmCount }) => {
           </span>
         </div>
         {company.website && (
-          <span className="text-brand text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
+          <a
+            href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-brand text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:underline"
+          >
             WEBSITE
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
-          </span>
+          </a>
         )}
       </div>
     </Link>

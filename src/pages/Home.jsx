@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
+import FilmCard from '../components/film/FilmCard';
 import GenreRail from '../components/film/GenreRail';
 import PlatformRail from '../components/film/PlatformRail';
 import PersonCard from '../components/person/PersonCard';
@@ -39,9 +40,13 @@ export default function Home() {
   const [crewMembers, setCrewMembers] = useState([]);
   const [productionCompanies, setProductionCompanies] = useState([]);
   const [featuredSeries, setFeaturedSeries] = useState([]);
+  const [genreSections, setGenreSections] = useState([]);
 
   // What's New consolidated tabs (Coming Soon / New Releases / Recently Added)
   const [whatsNewTab, setWhatsNewTab] = useState('coming');
+
+  // Featured Talent consolidated tabs (Artist / Crew)
+  const [featuredTalentTab, setFeaturedTalentTab] = useState('artist');
 
   // Accurate per-platform title counts (counted at the DB level — the client film
   // list is capped at 1000 rows and undercounts the 19k+ catalogue).
@@ -95,7 +100,8 @@ export default function Home() {
         fetchTop10Films().catch(e => console.error('Error fetching top 10:', e)),
         fetchCrewMembers().catch(e => console.error('Error fetching crew:', e)),
         fetchCompanies().catch(e => console.error('Error fetching companies:', e)),
-        fetchRecentlyAdded().catch(e => console.error('Error fetching recently added:', e))
+        fetchRecentlyAdded().catch(e => console.error('Error fetching recently added:', e)),
+        fetchGenreSections().catch(e => console.error('Error fetching genre sections:', e))
       ]);
     } catch (error) {
       console.error('Error in progressive fetches:', error);
@@ -104,6 +110,31 @@ export default function Home() {
     }
   };
 
+  // Fetch films for the top genre sections at the bottom of the page.
+  const GENRE_SECTION_NAMES = ['Romance', 'Crime', 'Thriller', 'Comedy', 'Family'];
+  const fetchGenreSections = async () => {
+    const results = await Promise.all(
+      GENRE_SECTION_NAMES.map(async (genreName) => {
+        const { data } = await supabase
+          .from('films')
+          .select(`
+            id, slug, title, poster_url, backdrop_url, year, source,
+            content_type, streaming_links, view_count,
+            film_genres!inner(genres!inner(name))
+          `)
+          .eq('film_genres.genres.name', genreName)
+          .not('poster_url', 'is', null)
+          .order('view_count', { ascending: false })
+          .limit(8);
+        const films = (data || []).map(f => ({
+          ...f,
+          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
+        }));
+        return { genre: genreName, films };
+      })
+    );
+    setGenreSections(results.filter(s => s.films.length > 0));
+  };
   const fetchPlatformCounts = async () => {
     // Count one platform, retrying once on a statement timeout (57014). Returns
     // null (unknown) only if it genuinely keeps failing, so a transient timeout
@@ -165,7 +196,7 @@ export default function Home() {
         id, slug, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating, 
         is_featured, is_trending, release_type, streaming_links, source,
-        content_type, season_count, episode_count,
+        youtube_watch_url, content_type, season_count, episode_count,
         film_genres(genres(name))
       `)
       .eq('content_type', 'series')
@@ -190,6 +221,7 @@ export default function Home() {
         id, slug, title, poster_url, backdrop_url, year, language,
         runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
+        youtube_watch_url,
         film_genres(genres(name))
       `)
       .eq('content_type', 'movie')
@@ -215,7 +247,7 @@ export default function Home() {
       id, slug, title, poster_url, backdrop_url, year, language,
       runtime_minutes, view_count, average_rating, nfvcb_rating,
       is_featured, is_trending, release_type, streaming_links, source,
-      created_at, release_date,
+      youtube_watch_url, created_at, release_date,
       film_genres(genres(name))
     `;
     const withGenres = (f) => ({
@@ -320,6 +352,7 @@ export default function Home() {
         id, slug, title, poster_url, backdrop_url, year, language,
         runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
+        youtube_watch_url,
         film_genres(genres(name))
       `)
       .in('status', ['upcoming', 'in_production', 'post-production'])
@@ -482,10 +515,12 @@ export default function Home() {
         id, slug, title, poster_url, backdrop_url, year, language, 
         runtime_minutes, view_count, average_rating, nfvcb_rating, 
         is_featured, is_trending, release_type, created_at, release_date,
+        youtube_watch_url,
         film_genres(genres(name))
       `)
       .eq('source', 'youtube')
       .eq('content_type', 'movie')
+      .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -507,6 +542,7 @@ export default function Home() {
         id, slug, title, poster_url, backdrop_url, year, language,
         runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
+        youtube_watch_url,
         film_genres(genres(name))
       `)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
@@ -616,6 +652,20 @@ export default function Home() {
           </div>
         )}
 
+        {/* 6b. NEW RELEASES (landscape single slideable row) */}
+        {(isLoading || newReleases.length > 0) && (
+          <div className="border-b border-hairline py-12 bg-surface-2/5">
+            <FilmRow
+              title="New Releases"
+              subtitle="Just dropped — the latest additions"
+              films={newReleases}
+              isLoading={isLoading}
+              linkTo="/browse?sort=newest"
+              cardVariant="landscape"
+            />
+          </div>
+        )}
+
         {/* 4. STREAMING RAILS (turn watch-link data into a browse axis) */}
         {(isLoading || NEW_STREAM_IDS.some(id => (newToStream[id] || []).length > 0)) && (
           <div className="border-b border-hairline py-12 bg-surface-2/5">
@@ -705,45 +755,36 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6. WHAT'S NEW (three redundant rows consolidated into tabs) */}
-        {(isLoading || comingSoon.length > 0 || newReleases.length > 0 || recentlyAdded.length > 0) && (
+        {/* 6a. COMING SOON (keep existing horizontal scroll cards) */}
+        {(isLoading || comingSoon.length > 0) && (
           <div className="border-b border-hairline py-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
-              <div className="space-y-1 mb-6">
-                <h2 className="text-2xl font-bold text-text-primary tracking-tight">What&apos;s New</h2>
-                <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest opacity-70">Fresh on MuviDB</p>
-              </div>
-              <div className="flex gap-6 border-b border-hairline mb-2">
-                {[
-                  { key: 'coming', label: 'Coming Soon' },
-                  { key: 'new', label: 'New Releases' },
-                  { key: 'recent', label: 'Recently Added' },
-                ].map((t) => (
-                  <button
-                    key={t.key}
-                    onClick={() => setWhatsNewTab(t.key)}
-                    className={`pb-3 -mb-px text-sm font-bold border-b-2 transition-colors cursor-pointer ${
-                      whatsNewTab === t.key
-                        ? 'text-text-primary border-brand'
-                        : 'text-text-muted border-transparent hover:text-text-secondary'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
             <FilmRow
-              films={whatsNewMap[whatsNewTab] || []}
+              title="Coming Soon"
+              subtitle="Upcoming releases to look forward to"
+              films={comingSoon}
               isLoading={isLoading}
-              noHeader
+              linkTo="/browse?sort=upcoming"
             />
           </div>
         )}
 
-        {/* 7. GENRE MOODS (compact chip strip) */}
+        {/* 6c. RECENTLY ADDED (landscape single slideable row) */}
+        {(isLoading || recentlyAdded.length > 0) && (
+          <div className="border-b border-hairline py-12">
+            <FilmRow
+              title="Recently Added"
+              subtitle="Fresh to the database — explore new additions"
+              films={recentlyAdded}
+              isLoading={isLoading}
+              linkTo="/browse?sort=recent"
+              cardVariant="landscape"
+            />
+          </div>
+        )}
+
+        {/* 7. GENRE MOODS (visual poster grid) */}
         <div className="border-b border-hairline">
-          <GenreRail variant="chips" />
+          <GenreRail variant="poster-grid" />
         </div>
 
         {/* 8. CURATED PICK (editorial film row — discovery) */}
@@ -785,7 +826,7 @@ export default function Home() {
                 ) : spotlightContent && spotlightContent.people && (
                   <div className="flex flex-col md:flex-row items-stretch min-h-[400px]">
                     {/* 1. Artist Photo Cover (Left Pane) */}
-                    <div className="md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
+                    <div className="w-full md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
                       {!spotlightImgError && (spotlightContent.photo_url || spotlightContent.people.photo_url) ? (
                         <img
                           src={spotlightContent.photo_url || spotlightContent.people.photo_url}
@@ -804,7 +845,7 @@ export default function Home() {
                     </div>
 
                     {/* 2. Editorial Story & Info (Middle Pane) */}
-                    <div className="md:w-[42%] p-8 flex flex-col justify-center shrink-0">
+                    <div className="w-full md:w-[42%] p-6 md:p-8 flex flex-col justify-center shrink-0">
                       <span className="text-brand text-[9px] font-black uppercase tracking-widest mb-2 block">
                         Spotlight
                       </span>
@@ -832,12 +873,12 @@ export default function Home() {
                     <div className="hidden md:block w-px bg-border my-8 shrink-0" />
 
                     {/* 4. Featured Works (Right Pane) */}
-                    <div className="md:w-[30%] p-8 flex flex-col justify-center flex-1">
+                    <div className="w-full md:w-[30%] p-6 md:p-8 flex flex-col justify-center flex-1">
                       <h3 className="text-text-muted text-[10px] font-black uppercase tracking-widest mb-6">
                         Featured Works
                       </h3>
                       {spotlightContent.featured_films && spotlightContent.featured_films.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                           {spotlightContent.featured_films.map((film) => (
                             <Link
                               key={film.id}
@@ -874,108 +915,124 @@ export default function Home() {
           </div>
         )}
 
-        {/* 10. FEATURED ARTIST */}
-        {(isLoading || spotlightPerson) && (
+        {/* 10. & 11. FEATURED TALENT (Artist & Crew Tabs) */}
+        {(isLoading || spotlightPerson || crewMembers.length > 0) && (
           <div className="border-b border-hairline">
             <section className="py-16">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-end justify-between mb-10">
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
                   <div className="space-y-1">
                     <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                      Featured Artist
+                      Featured Talent
                     </h2>
-                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The talent behind the camera</p>
+                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The creative force of Nollywood</p>
                   </div>
+                  
+                  {/* Talent Tabs */}
+                  <div className="flex items-center gap-6 border-b border-hairline pb-2 self-start md:self-auto">
+                    <button
+                      onClick={() => setFeaturedTalentTab('artist')}
+                      className={`text-[11px] font-bold uppercase tracking-widest pb-2 -mb-[9px] transition-colors relative ${featuredTalentTab === 'artist' ? 'text-brand' : 'text-text-muted hover:text-text-primary'}`}
+                    >
+                      Featured Artist
+                      {featuredTalentTab === 'artist' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-brand"></span>}
+                    </button>
+                    <button
+                      onClick={() => setFeaturedTalentTab('crew')}
+                      className={`text-[11px] font-bold uppercase tracking-widest pb-2 -mb-[9px] transition-colors relative ${featuredTalentTab === 'crew' ? 'text-brand' : 'text-text-muted hover:text-text-primary'}`}
+                    >
+                      Behind the Magic
+                      {featuredTalentTab === 'crew' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-brand"></span>}
+                    </button>
+                  </div>
+
                   <Link
-                    to="/people"
-                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline"
+                    to={featuredTalentTab === 'artist' ? "/people" : "/people?craft=crew"}
+                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline hidden md:block"
                   >
-                    View all
+                    View all {featuredTalentTab === 'artist' ? 'Artists' : 'Crew'}
                   </Link>
                 </div>
 
-                <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-hairline shadow-sm">
-                  <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-                  <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
-                    <div className="xl:flex-1">
-                      <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
-                    </div>
-                    <div className="h-px xl:w-px xl:h-64 bg-border"></div>
-                    <div className="xl:w-80 flex justify-around xl:grid xl:grid-cols-2 gap-4">
-                      {isLoading ? (
-                        [...Array(4)].map((_, i) => (
-                          <PersonCard key={i} variant="compact" isLoading={true} />
-                        ))
-                      ) : (
-                        otherPeople.map(person => (
-                          <PersonCard key={person.id} person={person} variant="compact" />
-                        ))
-                      )}
+                {/* Tab Content: Featured Artist */}
+                {featuredTalentTab === 'artist' && (
+                  <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-hairline shadow-sm page-fade-in">
+                    <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
+                    <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
+                      <div className="xl:flex-1">
+                        <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
+                      </div>
+                      <div className="h-px xl:w-px xl:h-64 bg-border"></div>
+                      <div className="w-full xl:w-80 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-2 gap-4">
+                        {isLoading ? (
+                          [...Array(4)].map((_, i) => (
+                            <PersonCard key={i} variant="compact" isLoading={true} />
+                          ))
+                        ) : (
+                          otherPeople.map(person => (
+                            <PersonCard key={person.id} person={person} variant="compact" />
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
+                )}
+
+                {/* Tab Content: Behind the Magic (Crew) */}
+                {featuredTalentTab === 'crew' && (
+                  <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x page-fade-in">
+                    {isLoading ? (
+                      [...Array(6)].map((_, i) => (
+                        <div key={i} className="shrink-0 w-44 bg-surface border border-hairline rounded-2xl p-5 text-center flex flex-col items-center gap-4">
+                          <div className="w-24 h-24 rounded-full bg-surface-2 animate-pulse" />
+                          <div className="w-24 h-4 bg-surface-2 animate-pulse rounded" />
+                          <div className="w-16 h-3 bg-surface-2 animate-pulse rounded" />
+                        </div>
+                      ))
+                    ) : (
+                      crewMembers.map((crew) => (
+                        <Link
+                          key={crew.id}
+                          to={`/people/${crew.slug || crew.id}`}
+                          className="shrink-0 w-44 bg-surface border border-hairline hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
+                        >
+                          <div className="relative">
+                            <img
+                              src={crew.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'}
+                              alt={crew.name}
+                              className="w-24 h-24 rounded-full object-cover border-2 border-transparent group-hover:border-brand transition-all duration-300"
+                              onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
+                            />
+                          </div>
+                          <div className="space-y-2 w-full">
+                            <h3 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-1">
+                              {crew.name}
+                            </h3>
+                            <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+                              {crew.known_for_department || 'Crew'}
+                            </span>
+                          </div>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                )}
+                
+                {/* Mobile View All Link */}
+                <div className="mt-6 md:hidden">
+                  <Link
+                    to={featuredTalentTab === 'artist' ? "/people" : "/people?craft=crew"}
+                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline"
+                  >
+                    View all {featuredTalentTab === 'artist' ? 'Artists' : 'Crew'}
+                  </Link>
                 </div>
+
               </div>
             </section>
           </div>
         )}
 
-        {/* 11. BEHIND THE MAGIC (Crew Spotlights) */}
-        {(isLoading || crewMembers.length > 0) && (
-          <div className="border-b border-hairline py-16">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-end justify-between mb-12">
-                <div className="space-y-1">
-                  <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                    Behind the Magic
-                  </h2>
-                  <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-65">
-                    The creative crew crafting Nollywood's best stories
-                  </p>
-                </div>
-                <Link to="/people?craft=crew" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline">
-                  Explore Crew
-                </Link>
-              </div>
-
-              <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x">
-                {isLoading ? (
-                  [...Array(6)].map((_, i) => (
-                    <div key={i} className="shrink-0 w-44 bg-surface border border-hairline rounded-2xl p-5 text-center flex flex-col items-center gap-4">
-                      <div className="w-24 h-24 rounded-full bg-surface-2 animate-pulse" />
-                      <div className="w-24 h-4 bg-surface-2 animate-pulse rounded" />
-                      <div className="w-16 h-3 bg-surface-2 animate-pulse rounded" />
-                    </div>
-                  ))
-                ) : (
-                  crewMembers.map((crew) => (
-                    <Link
-                      key={crew.id}
-                      to={`/people/${crew.slug || crew.id}`}
-                      className="shrink-0 w-44 bg-surface border border-hairline hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
-                    >
-                      <div className="relative">
-                        <img
-                          src={crew.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'}
-                          alt={crew.name}
-                          className="w-24 h-24 rounded-full object-cover border-2 border-transparent group-hover:border-brand transition-all duration-300"
-                          onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
-                        />
-                      </div>
-                      <div className="space-y-2 w-full">
-                        <h3 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-1">
-                          {crew.name}
-                        </h3>
-                        <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
-                          {crew.known_for_department || 'Crew'}
-                        </span>
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
           {/* — Zone label: The Industry — */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
@@ -1020,9 +1077,9 @@ export default function Home() {
                     const initial = company.name?.charAt(0);
                     const filmCount = company.film_companies?.length || 0;
                     return (
-                      <Link 
+                      <div 
                         key={company.id}
-                        to={`/companies/${company.slug || company.id}`}
+
                         className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">
@@ -1056,7 +1113,7 @@ export default function Home() {
                             {filmCount} {filmCount === 1 ? 'Film' : 'Films'} Produced
                           </span>
                         </div>
-                      </Link>
+                      </div>
                     );
                   })
                 )}
@@ -1140,6 +1197,46 @@ export default function Home() {
         )}
 
         </div>{/* ===================== end editorial zone ===================== */}
+
+        {/* 15. GENRE-SPECIFIC FILM SECTIONS */}
+        {genreSections.length > 0 && (
+          <div className="border-t border-hairline">
+            {/* Zone label */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
+              <span className="font-heading font-black text-xs tracking-[0.2em] uppercase text-brand whitespace-nowrap">Browse by Genre</span>
+              <span className="flex-1 h-px bg-border" />
+            </div>
+
+            {genreSections.map((section) => (
+              <div key={section.genre} className="border-b border-hairline py-12">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  {/* Section header */}
+                  <div className="flex items-end justify-between mb-6">
+                    <h2 className="font-heading font-bold text-brand text-sm uppercase tracking-widest">
+                      {section.genre}
+                    </h2>
+                    <Link
+                      to={`/browse?genre=${encodeURIComponent(section.genre)}`}
+                      className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap"
+                    >
+                      See all
+                      <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
+                    </Link>
+                  </div>
+
+                  {/* Film grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
+                    {section.films.slice(0, 4).map((film) => (
+                      <div key={film.id}>
+                        <FilmCard film={film} variant="landscape" fullWidth={true} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 14. NEW MEMBER CTA BANNER (Issue 29) */}
         {!isAuthenticated && (

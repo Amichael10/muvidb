@@ -1,0 +1,210 @@
+[
+  {
+    "id": "1",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [
+        {
+          "date": "2026-07-02"
+        }
+      ],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "2",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [
+        {
+          "date": "2026-07-02"
+        }
+      ],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "3",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [
+        {
+          "date": "2026-07-02"
+        }
+      ],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "4",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "5",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [
+        {
+          "date": "2026-07-03"
+        }
+      ],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "6",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "7",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "8",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "9",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "10",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [
+        {
+          "date": "2026-07-06"
+        }
+      ],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "11",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "12",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "13",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "14",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "15",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "16",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "17",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [
+        {
+          "date": "2026-07-02"
+        }
+      ],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "18",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "19",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-09",
+      "date_disabled": [],
+      "hide_closed_booking_showtimes": "1"
+    }
+  },
+  {
+    "id": "20",
+    "dates": {
+      "date_start": "2026-07-02",
+      "date_end": "2026-07-02",
+      "date_disabled": [
+        {
+          "date": "2026-07-02"
+        }
+      ],
+      "hide_closed_booking_showtimes": "1"
+    }
+  }
+]

@@ -498,6 +498,15 @@ export default function AdminYouTubeVideos() {
   const [channelFilter,setChannelFilter]= useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery,  setSearchQuery]  = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, searchQuery ? 400 : 0);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const [editFilm,     setEditFilm]     = useState(null);
   const [creditsFilm,  setCreditsFilm]  = useState(null);
   const [showLogs,     setShowLogs]     = useState(false);
@@ -554,7 +563,7 @@ export default function AdminYouTubeVideos() {
       .order('published_at', { ascending: false });
 
     if (channelFilter !== 'all') query = query.eq('channel_id', channelFilter);
-    if (searchQuery.trim()) query = query.ilike('title', `%${searchQuery}%`);
+    if (debouncedSearchQuery.trim()) query = query.ilike('title', `%${debouncedSearchQuery}%`);
     
     // Apply Status Filter at Database Level
     if (statusFilter === 'needs_review') {
@@ -576,7 +585,7 @@ export default function AdminYouTubeVideos() {
     setVideos(data || []);
     setTotalCount(count || 0);
     setLoading(false);
-  }, [channelFilter, searchQuery, statusFilter, page, pageSize]);
+  }, [channelFilter, debouncedSearchQuery, statusFilter, page, pageSize]);
 
   useEffect(() => { 
     fetchVideos(); 
@@ -585,7 +594,7 @@ export default function AdminYouTubeVideos() {
   }, [fetchVideos, fetchGlobalStats]);
   
   // Reset to page 0 when filters change
-  useEffect(() => { setPage(0); }, [channelFilter, searchQuery, statusFilter]);
+  useEffect(() => { setPage(0); }, [channelFilter, debouncedSearchQuery, statusFilter]);
 
   const toggleSelect = id => {
     setSelectedIds(prev => {

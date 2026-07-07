@@ -1,4 +1,4 @@
-﻿import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
@@ -43,6 +43,8 @@ export default function Footer() {
             <div>
               <h3 className="text-xs font-bold text-text-primary mb-6 uppercase tracking-widest">Platform</h3>
               <ul className="space-y-4">
+                <li><Link to="/about" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">About Us</Link></li>
+                <li><Link to="/contact" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Contact</Link></li>
                 <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
                 <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join MuviDB</Link></li>
                 <li><Link to="/dashboard" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Dashboard</Link></li>
@@ -64,13 +66,15 @@ export default function Footer() {
               <p className="text-[10px] font-bold text-text-muted opacity-40 uppercase tracking-widest">
                 © {new Date().getFullYear()} MuviDB Database. All rights reserved.
               </p>
-              <div className="flex gap-8">
-                <Link to="/terms" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Terms</Link>
-                <Link to="/privacy" className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest">Privacy</Link>
+              <div className="flex flex-wrap gap-4 items-center justify-center text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                <Link to="/terms" className="hover:text-brand transition-colors">Terms</Link>
+                <span className="opacity-30">|</span>
+                <Link to="/privacy" className="hover:text-brand transition-colors">Privacy</Link>
+                <span className="opacity-30">|</span>
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event('open-cookie-consent'))}
-                  className="text-[10px] font-bold text-text-muted hover:text-brand transition-colors uppercase tracking-widest"
+                  className="hover:text-brand transition-colors uppercase tracking-widest"
                 >
                   Cookie Settings
                 </button>

@@ -6,6 +6,7 @@ import { useQuickView } from '../../context/QuickViewContext';
 import ImageWithFallback from '../ui/ImageWithFallback';
 import FilmCard from './FilmCard';
 import { supabase } from '../../lib/supabase';
+import { formatFilmTitle } from '../../utils/format';
 
 const formatRuntimeHours = (minutes) => {
   if (!minutes) return null;
@@ -140,10 +141,10 @@ export default function QuickViewModal() {
           <div className="relative w-full h-[450px] shrink-0 bg-black">
             <ImageWithFallback 
               src={selectedFilm.backdrop_url || selectedFilm.poster_url || selectedFilm.poster} 
-              alt={selectedFilm.title} 
+              alt={formatFilmTitle(selectedFilm.title)} 
               className="w-full h-full object-cover"
               fallbackType="banner"
-              name={selectedFilm.title}
+              name={formatFilmTitle(selectedFilm.title)}
             />
             {/* Gradients */}
             <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/40 to-transparent" />
@@ -152,7 +153,7 @@ export default function QuickViewModal() {
             {/* Title and Controls */}
             <div className="absolute bottom-6 left-10 right-10">
               <h2 className="text-white text-5xl sm:text-6xl font-heading font-black tracking-tighter leading-tight drop-shadow-xl mb-6 max-w-2xl">
-                {selectedFilm.title}
+                {formatFilmTitle(selectedFilm.title)}
               </h2>
               
               <div className="flex items-center gap-3">
@@ -240,7 +241,7 @@ export default function QuickViewModal() {
                     <div className="relative aspect-video">
                       <ImageWithFallback 
                         src={film.backdrop_url || film.poster_url} 
-                        alt={film.title} 
+                        alt={formatFilmTitle(film.title)} 
                         className="w-full h-full object-cover"
                       />
                       {/* Play overlay on hover */}
@@ -257,7 +258,7 @@ export default function QuickViewModal() {
                           <Icon icon="solar:add-linear" />
                         </button>
                       </div>
-                      <p className="text-white text-sm font-bold line-clamp-1">{film.title}</p>
+                      <p className="text-white text-sm font-bold line-clamp-1">{formatFilmTitle(film.title)}</p>
                       <p className="text-white/60 text-xs mt-1 line-clamp-3">
                         {film.synopsis || film.overview || film.description || ""}
                       </p>
@@ -270,7 +271,7 @@ export default function QuickViewModal() {
 
           {/* About Section */}
           <div className="px-10 pb-16 pt-4 border-t border-white/10 mt-8">
-            <h3 className="text-2xl font-bold text-white mb-6">About <span className="font-medium">{selectedFilm.title}</span></h3>
+            <h3 className="text-2xl font-bold text-white mb-6">About <span className="font-medium">{formatFilmTitle(selectedFilm.title)}</span></h3>
             <div className="space-y-2 text-sm text-white/90">
                <p><span className="text-white/50">Director: </span> {crew.find(c => (c.role || '').toLowerCase().includes('director'))?.name || selectedFilm.director || 'Not Available'}</p>
                <p><span className="text-white/50">Cast: </span> {cast.length > 0 ? cast.map(c => c.name).join(', ') : 'Not Available'}</p>

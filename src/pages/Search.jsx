@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
@@ -141,7 +141,7 @@ export default function Search() {
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-screen pb-20">
         {/* Categories Tabs */}
-        <div className="flex justify-center border-b border-border bg-surface-2/5 divide-x divide-border overflow-x-auto">
+        <div className="flex justify-start md:justify-center border-b border-border bg-surface-2/5 divide-x divide-border overflow-x-auto scrollbar-hide">
           {[
             { id: 'films', label: 'Movies', count: films.length },
             { id: 'people', label: 'People', count: people.length },
@@ -165,22 +165,22 @@ export default function Search() {
         </div>
 
         {/* Results Body */}
-        <div className="p-8 md:p-12">
+        <div className="p-4 md:p-8 lg:p-12">
           {loading ? (
             activeTab === 'films' ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6 md:gap-8">
                 {[...Array(10)].map((_, i) => (
                   <SkeletonCard key={i} />
                 ))}
               </div>
             ) : activeTab === 'people' ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 md:gap-8">
                 {[...Array(12)].map((_, i) => (
                   <PersonCard key={i} isLoading variant="compact" />
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 animate-shimmer shadow-sm">
                     <div className="w-14 h-14 bg-surface-2 rounded-lg shrink-0 border border-border/50"></div>
@@ -196,7 +196,7 @@ export default function Search() {
             <>
               {activeTab === 'films' && (
                 films.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-8">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6 md:gap-8">
                     {films.map(film => <FilmCard key={film.id} film={film} />)}
                   </div>
                 ) : <EmptyState query={initialQuery} />
@@ -204,7 +204,7 @@ export default function Search() {
 
               {activeTab === 'people' && (
                 people.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-8">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 md:gap-8">
                     {people.map(person => <PersonCard key={person.id} person={person} variant="compact" />)}
                   </div>
                 ) : <EmptyState query={initialQuery} />
@@ -212,9 +212,9 @@ export default function Search() {
 
               {activeTab === 'companies' && (
                 companies.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                     {companies.map(company => (
-                      <Link key={company.id} to={`/companies/${company.slug || company.id}`} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
+                      <div key={company.id} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
                         <div className="w-14 h-14 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-heading font-bold text-xl shrink-0 group-hover:scale-110 transition-transform border border-border/50">
                            {company.logo_url ? <img src={company.logo_url} className="w-full h-full object-contain p-2" /> : company.name.charAt(0)}
                         </div>
@@ -222,7 +222,7 @@ export default function Search() {
                             <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors tracking-tight truncate leading-tight">{company.name}</h3>
                             <p className="text-[10px] font-bold text-text-muted mt-1 opacity-60">{company.country || 'International'}</p>
                         </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 ) : <EmptyState query={initialQuery} />

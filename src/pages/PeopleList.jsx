@@ -137,6 +137,15 @@ const PeopleList = () => {
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, search ? 400 : 0)
+    return () => clearTimeout(timer)
+  }, [search])
+
   const [roleFilter, setRoleFilter] = useState('All')
   const [sortBy, setSortBy] = useState('popularity')
   const [page, setPage] = useState(0)
@@ -150,7 +159,7 @@ const PeopleList = () => {
     setPage(0)
     setHasMore(true)
     fetchPeople(0, true)
-  }, [search, roleFilter, sortBy])
+  }, [debouncedSearch, roleFilter, sortBy])
 
   const fetchPeople = async (pageNum, reset = false) => {
     setLoading(true)
@@ -164,8 +173,8 @@ const PeopleList = () => {
         credits(id)
       `)
 
-    if (search) {
-      query = query.ilike('name', `%${search}%`)
+    if (debouncedSearch) {
+      query = query.ilike('name', `%${debouncedSearch}%`)
     }
 
     if (sortBy === 'popularity') {
@@ -275,7 +284,7 @@ const PeopleList = () => {
         </div>
 
         {/* Content Grid */}
-        <div className="p-8 md:p-12">
+        <div className="p-4 md:p-8 lg:p-12">
           {loading && people.length === 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => <PersonSkeleton key={i} />)}

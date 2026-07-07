@@ -1,0 +1,1414 @@
+{
+  "status": true,
+  "data": {
+    "movies": [
+      {
+        "movie_id": "136",
+        "type": "movie",
+        "movie_name": "MINIONS AND MONSTERS",
+        "date_release_date": "2026-06-26",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Animation"
+          }
+        ],
+        "synopsis": "<p>Follows the Minions in 1920s Hollywood as they search for frightening creatures for their monster movie, partner with a green creature, and must save the planet after unleashing monsters.</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1782213370MV5BYjEwNTczNzUtODczZi00YjQzLTlhYzMtMDZlOGRkNTk5NmViXkEyXkFqcGc@__V1_.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1782213369MV5BYzBjMDg4YjctYzg3ZS00ZDFmLWI1YjctM2RkZGVjZWEyYWQ0XkEyXkFqcGc@__V1_.webp",
+        "url_key": "minionsandmonsters-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=V-O-uBaHk3c",
+        "trailer_type": "1",
+        "trailer_id": "V-O-uBaHk3c",
+        "duration": "1h 25m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Zoey Deutch"
+          },
+          {
+            "actor": "Allison Janney"
+          },
+          {
+            "actor": "Bobby Moynihan"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Pierre Coffin"
+          },
+          {
+            "name": "Patrick Delage"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65303",
+            "show_time_uuid": "Y0FnZ1MxdkdhaXpoV2ZFUjFXNjRMdz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "65",
+            "screen_name": "Premium screen 1",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "12:00PM",
+            "show_time_hours": "12.00",
+            "time_sorting": 1783076400,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65298",
+            "show_time_uuid": "SzYwaUNnZGVrUVZMY2ludTkxWk0xQT09",
+            "theater_experience_id": "1",
+            "theater_experience_name": "IMAX 3D",
+            "theater_experience_image": "imax-3d-logo-png_seeklogo-193306.png",
+            "session_type_id": "67",
+            "screen_name": "IMAX Screen",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "12:30PM",
+            "show_time_hours": "12.30",
+            "time_sorting": 1783078200,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "134",
+        "type": "movie",
+        "movie_name": "TOY STORY 5",
+        "date_release_date": "2026-06-19",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Adventure"
+          },
+          {
+            "name": "Animation"
+          },
+          {
+            "name": "Comedy"
+          }
+        ],
+        "synopsis": "<p>Woody, Buzz, Jessie and the rest of the gang's jobs are challenged when they're introduced to electronics, a new threat to playtime.</p>\r\n<p>&nbsp;</p>\r\n<p>&nbsp;</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1781631992MV5BZTI1YTBiNmEtYWUxZi00YzFkLWIzNjMtMmZjMmY2NzM0ZWMzXkEyXkFqcGc@__V1_.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1781631991MV5BZGRlY2M0NmMtZjk3Yy00YzRmLWFiM2YtMWNlNTMwYmE3ODRmXkEyXkFqcGc@__V1_.webp",
+        "url_key": "toystory5-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "",
+        "trailer_type": "1",
+        "trailer_id": false,
+        "duration": "1h 42m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Tom Hanks"
+          },
+          {
+            "actor": "Tim Allen"
+          },
+          {
+            "actor": "Joan Cusack"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "McKenna Harris"
+          },
+          {
+            "name": "Andrew Stanton"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65308",
+            "show_time_uuid": "cDZwQXJxVWlKUnR0YjB0b05vcnY1Zz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "65",
+            "screen_name": "Premium screen 2",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "12:10PM",
+            "show_time_hours": "12.10",
+            "time_sorting": 1783077000,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65314",
+            "show_time_uuid": "L0FtS0tzVWVTUFZPbmJrUnFpcjN5dz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "65",
+            "screen_name": "Premium screen 3",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "3:45PM",
+            "show_time_hours": "15.45",
+            "time_sorting": 1783089900,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "131",
+        "type": "movie",
+        "movie_name": "IWE ALA: AN OJUDE OBA STORY",
+        "date_release_date": "2026-06-12",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Drama"
+          }
+        ],
+        "synopsis": "<p>A renowned but shrewd master tailor faces a crisis of reputation-damage when his staff abandons him with bales of unfinished clothes ahead of the fast-approaching Ojude Oba festival. He is forced to turn to his family for help even though he has emotionally-alienated</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1781118965SaveClip_App_702625537_18062141441695434_4419150129231132018_n.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1781118964SaveClip_App_702625537_18062141441695434_4419150129231132018_n.webp",
+        "url_key": "iwealaanojudeobastory-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=_pbmtPHS05Q",
+        "trailer_type": "1",
+        "trailer_id": "_pbmtPHS05Q",
+        "duration": "2h 6m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Owobo Ogunde"
+          },
+          {
+            "actor": "Mercy Aigbe"
+          },
+          {
+            "actor": "Dele Odule"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Adeoluwa Owu"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65313",
+            "show_time_uuid": "VHM0Mlo3QS9qeVBEUzRoOFIvbDRyZz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 3",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "1:10PM",
+            "show_time_hours": "13.10",
+            "time_sorting": 1783080600,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "143",
+        "type": "movie",
+        "movie_name": "YOUNG WASHINGTON",
+        "date_release_date": "2026-07-03",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Adventure"
+          },
+          {
+            "name": "Biographical"
+          },
+          {
+            "name": "Historical period drama"
+          }
+        ],
+        "synopsis": "<p>A young George Washington faces war, betrayal, and impossible choices that will forge a leader.</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1782913507MV5BNTE3NDY5OWUtZmM5Ny00NDJiLTlkZDQtN2E5MWFjZWUyMDZkXkEyXkFqcGc@__V1_.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1782913507MV5BZjBiNWM1M2UtMjVlYi00NzgxLThiMjktOTg0NDFkOWZmZTAxXkEyXkFqcGc@__V1_.webp",
+        "url_key": "youngwashington-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=LJek-kc384w",
+        "trailer_type": "1",
+        "trailer_id": "LJek-kc384w",
+        "duration": "2h 5m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Andy Serkis"
+          },
+          {
+            "actor": "Ben Kingsley"
+          },
+          {
+            "actor": " Mary-Louise Parker"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Jon Erwin"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65304",
+            "show_time_uuid": "VXhlY3d6TldKQktGdHBNU2U0blc1Zz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "6",
+            "screen_name": "Premium screen 1",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "2:00PM",
+            "show_time_hours": "14.00",
+            "time_sorting": 1783083600,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65315",
+            "show_time_uuid": "bE1qZ1ZrcUcrTTc0S3NoSVJNaUJRdz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "6",
+            "screen_name": "Premium screen 3",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "6:00PM",
+            "show_time_hours": "18.00",
+            "time_sorting": 1783098000,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "137",
+        "type": "movie",
+        "movie_name": "REMI AND NNEOMA",
+        "date_release_date": "2026-06-26",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Drama"
+          },
+          {
+            "name": "Family"
+          }
+        ],
+        "synopsis": "<p>\"After losing their loved ones, Remi insists on staying with her mother-in-law, Nneoma. <br />Together, they navigate emotional pain, societal expectations of widows, <br />and the process of rebuilding their lives, during which Remi discovers new love.\"</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1782214102Remi_and_Nneoma_450x665.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1782214101Remi_and_Nneoma_450x665.webp",
+        "url_key": "remiandnneoma-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=gVbo9RxZPSw",
+        "trailer_type": "1",
+        "trailer_id": "gVbo9RxZPSw",
+        "duration": "1h 45m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Bisola Aiyeola"
+          },
+          {
+            "actor": "Liz Benson-Ameye"
+          },
+          {
+            "actor": "Uche Montana"
+          },
+          {
+            "actor": "Ifeanyi Kalu"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Lyndsey Efejuku"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65309",
+            "show_time_uuid": "MXlXSnVqOUpJRkxIbVN6UG1VeU1Xdz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "6",
+            "screen_name": "Premium screen 2",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "2:20PM",
+            "show_time_hours": "14.20",
+            "time_sorting": 1783084800,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "135",
+        "type": "movie",
+        "movie_name": "SUPERGIRL",
+        "date_release_date": "2026-06-24",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Action"
+          },
+          {
+            "name": "Adventure"
+          },
+          {
+            "name": "Superhero"
+          }
+        ],
+        "synopsis": "<p>Kara Zor-El, aka Supergirl, joins forces with an unlikely companion on an interstellar journey of vengeance and justice when an unexpected adversary strikes too close to home.</p>\r\n<p>&nbsp;</p>\r\n<p>&nbsp;</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1781632603MV5BNjlhMTdmODYtOGE0ZC00YzAwLWI1NDMtMTIzZDQzZGVkNDMwXkEyXkFqcGc@__V1_.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1781632602MV5BNjlhMTdmODYtOGE0ZC00YzAwLWI1NDMtMTIzZDQzZGVkNDMwXkEyXkFqcGc@__V1_.webp",
+        "url_key": "supergirl-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=s1-pfiVMKAs",
+        "trailer_type": "1",
+        "trailer_id": "s1-pfiVMKAs",
+        "duration": "1h 50m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Mily Alcock"
+          },
+          {
+            "actor": "David Corenswet"
+          },
+          {
+            "actor": "Eve Ridley"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Craig Gillespie"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "5",
+        "movie_certification_logo": "https://filmhouseng.static.cinesync.io/images/movie_certificate/Frame42731973711764674377.svg",
+        "movie_certification_name": "PG 12",
+        "movie_certification_description": "",
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65299",
+            "show_time_uuid": "TEUreGpxeWd3Q29qZFA2bjM4S0xVZz09",
+            "theater_experience_id": "1",
+            "theater_experience_name": "IMAX 3D",
+            "theater_experience_image": "imax-3d-logo-png_seeklogo-193306.png",
+            "session_type_id": "16",
+            "screen_name": "IMAX Screen",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "2:30PM",
+            "show_time_hours": "14.30",
+            "time_sorting": 1783085400,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65300",
+            "show_time_uuid": "cVVMSi83Z1RkdVNvbS9IR0N0Z3hyZz09",
+            "theater_experience_id": "1",
+            "theater_experience_name": "IMAX 3D",
+            "theater_experience_image": "imax-3d-logo-png_seeklogo-193306.png",
+            "session_type_id": "16",
+            "screen_name": "IMAX Screen",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "5:00PM",
+            "show_time_hours": "17.00",
+            "time_sorting": 1783094400,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65301",
+            "show_time_uuid": "eWlrSktpdW1qeW5TdGtiYlVSbUo3QT09",
+            "theater_experience_id": "1",
+            "theater_experience_name": "IMAX 3D",
+            "theater_experience_image": "imax-3d-logo-png_seeklogo-193306.png",
+            "session_type_id": "16",
+            "screen_name": "IMAX Screen",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "7:30PM",
+            "show_time_hours": "19.30",
+            "time_sorting": 1783103400,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65302",
+            "show_time_uuid": "eTBmdmNqUGhmc2FCZGxKMzZ3ckVTdz09",
+            "theater_experience_id": "1",
+            "theater_experience_name": "IMAX 3D",
+            "theater_experience_image": "imax-3d-logo-png_seeklogo-193306.png",
+            "session_type_id": "16",
+            "screen_name": "IMAX Screen",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "9:50PM",
+            "show_time_hours": "21.50",
+            "time_sorting": 1783111800,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65317",
+            "show_time_uuid": "UFdGVzVOd2dpTWtxb0FORjgvenZ6QT09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 3",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "10:50PM",
+            "show_time_hours": "22.50",
+            "time_sorting": 1783115400,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "130",
+        "type": "movie",
+        "movie_name": "DISCLOSURE DAY",
+        "date_release_date": "2026-06-09",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Sci-Fi"
+          }
+        ],
+        "synopsis": "<p>If you found out we weren't alone, if someone showed you, <br />proved it to you, would that frighten you?<br /><br /></p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1781011817MV5BNzQ5YTRjMmQtMTE5OC00YmNlLThlZjgtMTQ3ZTdiZThiODJjXkEyXkFqcGc@__V1_.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1781011882MV5BNzQ5YTRjMmQtMTE5OC00YmNlLThlZjgtMTQ3ZTdiZThiODJjXkEyXkFqcGc@__V1_.webp",
+        "url_key": "disclosureday-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=icDuEHSxE-w",
+        "trailer_type": "1",
+        "trailer_id": "icDuEHSxE-w",
+        "duration": "2h 25m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Emily Blunt"
+          },
+          {
+            "actor": "Josh O'Connor"
+          },
+          {
+            "actor": "Colin FIrth"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Steven Spielberg"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65305",
+            "show_time_uuid": "VzBXdEliMm1zR3liK3owYUxZQ29IQT09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 1",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "4:30PM",
+            "show_time_hours": "16.30",
+            "time_sorting": 1783092600,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65306",
+            "show_time_uuid": "b0pmd0UwWnBvWko2dDZPMk5Sa0tkUT09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 1",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "7:20PM",
+            "show_time_hours": "19.20",
+            "time_sorting": 1783102800,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65307",
+            "show_time_uuid": "WTgvMGJSbVpFSzdpdkJqMDk0RnhLdz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 1",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "10:15PM",
+            "show_time_hours": "22.15",
+            "time_sorting": 1783113300,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "114",
+        "type": "movie",
+        "movie_name": "Call Of My Life",
+        "date_release_date": "2026-05-02",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Drama"
+          }
+        ],
+        "synopsis": "<p>The romantic comedy follows Soluchi, a hopeless romantic still healing from being jilted by her former lover, Kalu. When a regular work call puts her in touch with the charming Eli, Soluchi begins to see the possibility of the love story she has always wanted.</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1777756271VIEW_ONLY_DO_NOT_PRINT.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1777756268VIEW_ONLY_DO_NOT_PRINT.webp",
+        "url_key": "callofmylife-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=G1cu4QOJmj4",
+        "trailer_type": "1",
+        "trailer_id": "G1cu4QOJmj4",
+        "duration": "1h 47m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Andrew Yaw Buting"
+          },
+          {
+            "actor": "Zubby Michael"
+          },
+          {
+            "actor": "Beverly Osu"
+          },
+          {
+            "actor": "Uzoamaka Power"
+          }
+        ],
+        "directed_by": [],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65310",
+            "show_time_uuid": "d3RKVmxIRE40M2hnRG1uRmlhbVlOZz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 2",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "4:40PM",
+            "show_time_hours": "16.40",
+            "time_sorting": 1783093200,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65311",
+            "show_time_uuid": "VUF4WjVJeWJXbWhoUmo1OXd4bWpBZz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 2",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "7:00PM",
+            "show_time_hours": "19.00",
+            "time_sorting": 1783101600,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          },
+          {
+            "show_time_id": "65312",
+            "show_time_uuid": "cGxnMlpRTjZPaVlqU1Z0K25tM1F6Zz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "92",
+            "screen_name": "Premium screen 2",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "9:15PM",
+            "show_time_hours": "21.15",
+            "time_sorting": 1783109700,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "142",
+        "type": "movie",
+        "movie_name": "ALECHENU",
+        "date_release_date": "2026-07-03",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Drama"
+          },
+          {
+            "name": "Family"
+          }
+        ],
+        "synopsis": "<p>Alechenu, an autistic teenager journeys from Oyo to Lagos <br />in search of the mother he has never known, only to uncover a web of <br />buried secrets that will forever change the lives of the family that takes <br />him in.</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1782913032SaveClip_App_714085039_18133809475596663_5582206057000194739_n.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1782913031SaveClip_App_714085039_18133809475596663_5582206057000194739_n.webp",
+        "url_key": "alechenu-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=G0kh2YYZtL0",
+        "trailer_type": "1",
+        "trailer_id": "G0kh2YYZtL0",
+        "duration": "1h 44m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Bimbo Ademoye"
+          },
+          {
+            "actor": "Mike Ezunroye"
+          },
+          {
+            "actor": "Blessing Obasi"
+          },
+          {
+            "actor": "Femi Adebayo"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Biodun Stephen"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65316",
+            "show_time_uuid": "a1o4NjcyVERURExBMjdwcmF6TzBSdz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "6",
+            "screen_name": "Premium screen 3",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "8:35PM",
+            "show_time_hours": "20.35",
+            "time_sorting": 1783107300,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:38:22",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      },
+      {
+        "movie_id": "128",
+        "type": "movie",
+        "movie_name": "Deep Water",
+        "date_release_date": "2026-06-05",
+        "movie_end_date": null,
+        "movie_countries": "",
+        "genre": [
+          {
+            "name": "Action"
+          },
+          {
+            "name": "Disaster"
+          },
+          {
+            "name": "Drama"
+          },
+          {
+            "name": "Thriller"
+          }
+        ],
+        "synopsis": "<p>A group of international passengers en route from Los Angeles to Shanghai are forced to make an emergency landing in shark-infested waters. Now they must work together in hopes to overcome the frenzy of sharks drawn to the wreckage.</p>",
+        "portrait_image": "https://filmhouseng.static.cinesync.io/images/movie/1780477726MV5BN2RjZWRiMDgtOTZiMy00M2MxLWI2M2MtMDU4ODc3MGNhM2E0XkEyXkFqcGc@__V1_.webp",
+        "landscape_image": "https://filmhouseng.static.cinesync.io/images/movie/1780477726MV5BODI2YzFlYjItYzNiNS00ZDZhLTk5MTEtN2ViY2U1OWUwNjE3XkEyXkFqcGc@__V1_.webp",
+        "url_key": "deepwater-2026",
+        "session_start_date": "2026-07-03",
+        "imdb_rate": "0.0",
+        "trailer": "https://www.youtube.com/watch?v=f0ptq0Lzdh8",
+        "trailer_type": "1",
+        "trailer_id": "f0ptq0Lzdh8",
+        "duration": "1h 46m",
+        "movie_year": "2026",
+        "cast": [
+          {
+            "actor": "Aaron Eckart"
+          },
+          {
+            "actor": "Ben Kingsley"
+          },
+          {
+            "actor": "Angus Sampson"
+          }
+        ],
+        "directed_by": [
+          {
+            "name": "Renny Harlin"
+          }
+        ],
+        "movie_tags": [],
+        "movie_language": [],
+        "movie_certification_type_id": "0",
+        "movie_certification_logo": null,
+        "movie_certification_name": null,
+        "movie_certification_description": null,
+        "is_restricted_mode": false,
+        "is_booking_open": true,
+        "is_coming_soon": false,
+        "is_this_sold_by_third_party_system": "-1",
+        "third_party_system_url": "",
+        "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+        "theater_experiences": [],
+        "show_times": [
+          {
+            "show_time_id": "65338",
+            "show_time_uuid": "SE1UU0hQcytSc1hOV2MyVDd5RVFXZz09",
+            "theater_experience_id": "5",
+            "theater_experience_name": "2D",
+            "theater_experience_image": null,
+            "session_type_id": "6",
+            "screen_name": "Premium screen 2",
+            "session_start_date": "2026-07-03",
+            "show_time_slots": "11:30PM",
+            "show_time_hours": "23.30",
+            "time_sorting": 1783117800,
+            "sold_out": false,
+            "sold_out_text": "Closed",
+            "screen_tags": [],
+            "show_times_tags": [],
+            "movie_language": {
+              "name": null,
+              "short_name": null
+            },
+            "member_only": false,
+            "member_priority_access": false,
+            "member_priority_hour": "0",
+            "member_priority_hour_with_text": "Member priority access till 0. Please login to get access.",
+            "member_priority_till": "",
+            "subscriber_only": false,
+            "subscriber_priority_access": false,
+            "subscriber_priority_hour": "0",
+            "subscriber_priority_hour_with_text": "",
+            "subscriber_priority_till": "",
+            "subscriber_restrict_free_access": false,
+            "subscriber_restrict_message": null,
+            "show_time_created_at": "2026-07-01 16:41:38",
+            "third_party_system_message": "Sorry, this screening isn’t available for reservation. Please contact the theater directly to reserve your tickets. Thank you for understanding!",
+            "third_party_system_url": "",
+            "is_this_sold_by_third_party_system": "-1",
+            "seat_plan_status": "0"
+          }
+        ],
+        "nearest_show_times_date": "2026-07-03"
+      }
+    ],
+    "page_number": 1,
+    "per_page": 100,
+    "total_pages": 1
+  },
+  "x_signature": "gDZjfcGkQtMGnx61Py5GVMssfwhD7qNdk9ZG1FFbINhXeR12yXWB5dmAH5n+QosSa3zhyd8KRK+mUum9IxDqXVgwstdv5hSOllJTLuR9lgqnWvtuK9+37tq047MHOQSi8XRtmq54Blq0Ng2V1ceId8qWoXbVyQPRslJMwOUqtv+tTrKMiT1YJOrEbbKDaJSiOKhe22DZJ0M4bUUnIGIoYa8J4cPm1fycjeyc80Tl26cbc5VDmaEIuEgtifd3hZU3JJrfe2FKB2OrHrKU4KiaEXBoeyjYqvFAEP4bvBTt7S+AglvCWeMDcBjnTRr4QE/AQ4SEMGdDBkiuBQp7/NotIQ==",
+  "timestamp": "1783028995"
+}

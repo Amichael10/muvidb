@@ -1,0 +1,13 @@
+{
+  "status": false,
+  "data": {},
+  "message": "The Widget Id field is required.\n",
+  "error": [
+    {
+      "field": "widget_id",
+      "messsage": "The Widget Id field is required."
+    }
+  ],
+  "x_signature": "dP/UTAhmnFDDGkcic9aC41TBDUm0ZqFbTnQQPiMqzIDZgTB4ZzUoTK6AcYorGdxBmjcJxyJAAGxMIJ3SfPLSWh7bMdCVKzjZWY3pZGjXZ/3RgY9WOUIuao6AnqJDbN2lnc5sHjKXDHuGsBO54CHJIcNOWmIs6GjJus0niYRLyAbTq5skMr0lpwGMGvh9K8AD1/I8Jo4ggf7HvegENOQ75Ra41LgIR+uji60kXs9zswhe+mHBrm4gq3zHyp28l31a9tbZhMfz1ld/d1kvhlXonADWx0vnK2gIo1WIbezcaT5AvLrbwnbIbdf2UXoAvRW67EbXvIuHKBSbpgIZA9CoNQ==",
+  "timestamp": "1783028865"
+}

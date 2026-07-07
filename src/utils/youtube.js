@@ -303,6 +303,8 @@ export const resolveChannelId = async (handleOrUrl) => {
       thumbnail: channel.snippet.thumbnails.default?.url,
       subscriberCount: channel.statistics.subscriberCount,
       videoCount: channel.statistics.videoCount,
+      viewCount: channel.statistics.viewCount,
+      publishedAt: channel.snippet.publishedAt,
       resolvedFrom: channelId ? 'url' : 'search'
     }
   } catch (error) {

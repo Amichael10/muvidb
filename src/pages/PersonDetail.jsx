@@ -605,7 +605,7 @@ const PersonDetail = () => {
       </div>
 
       <div className="max-w-7xl mx-auto border-x border-border pb-20">
-        <div className="p-8 md:p-12">
+        <div className="p-4 md:p-8 lg:p-12">
           <h2 className="text-text-primary text-3xl font-bold font-heading mb-8 tracking-tighter">
             Filmography
           </h2>
@@ -629,7 +629,7 @@ const PersonDetail = () => {
           )}
 
           {creditsByRole(activeRole).length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
               {creditsByRole(activeRole).map(credit => {
                 const film = credit.films
                 const video = credit.video

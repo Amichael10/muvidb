@@ -273,6 +273,15 @@ export type Database = {
           tmdb_id: number | null
           updated_at: string
           website: string | null
+          headquarters: string | null
+          focus: string | null
+          years_active: string | null
+          employees: string | null
+          languages: string | null
+          instagram_url: string | null
+          twitter_url: string | null
+          youtube_url: string | null
+          company_type: string | null
         }
         Insert: {
           created_at?: string
@@ -284,6 +293,15 @@ export type Database = {
           tmdb_id?: number | null
           updated_at?: string
           website?: string | null
+          headquarters?: string | null
+          focus?: string | null
+          years_active?: string | null
+          employees?: string | null
+          languages?: string | null
+          instagram_url?: string | null
+          twitter_url?: string | null
+          youtube_url?: string | null
+          company_type?: string | null
         }
         Update: {
           created_at?: string
@@ -295,6 +313,15 @@ export type Database = {
           tmdb_id?: number | null
           updated_at?: string
           website?: string | null
+          headquarters?: string | null
+          focus?: string | null
+          years_active?: string | null
+          employees?: string | null
+          languages?: string | null
+          instagram_url?: string | null
+          twitter_url?: string | null
+          youtube_url?: string | null
+          company_type?: string | null
         }
         Relationships: []
       }
