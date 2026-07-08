@@ -16,7 +16,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import ShareAction from '../components/ui/ShareAction'
 import ImageWithFallback from '../components/ui/ImageWithFallback'
 import { slugOrId } from '../utils/slug'
-import { formatPersonName, toTitleCase, toSentenceCase } from '../utils/format'
+import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle } from '../utils/format'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
