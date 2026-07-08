@@ -164,17 +164,13 @@ const ExternalReviewCard = ({ review }) => {
                         </span>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    {review.likes > 0 && (
-                        <span className="text-text-muted text-[11px] font-bold flex items-center gap-1">
-                            <Icon icon="solar:like-bold" className="text-xs" /> {review.likes.toLocaleString()}
-                        </span>
-                    )}
-                    <div className="text-brand font-black text-lg tracking-tighter flex items-center gap-1">
-                        <Icon icon="solar:star-bold" className="text-sm" />
-                        {review.rating}<span className="text-[10px] text-text-muted">/10</span>
-                    </div>
-                </div>
+                {/* No per-comment score — the commenter never rated the film.
+                    Their sentiment only feeds the movie's aggregate rating. */}
+                {review.likes > 0 && (
+                    <span className="text-text-muted text-[11px] font-bold flex items-center gap-1 shrink-0">
+                        <Icon icon="solar:like-bold" className="text-xs" /> {review.likes.toLocaleString()}
+                    </span>
+                )}
             </div>
             {review.body && (
                 <div className="mt-5 relative">
@@ -333,6 +329,20 @@ const ReviewSection = ({ filmId, currentUser }) => {
         ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
         : null
 
+    // Movie's audience rating = likes-weighted mean of comment sentiment.
+    // (Same formula the sync stores on the film; recomputed here so the header
+    // reflects exactly what's shown.)
+    const audienceRating = (() => {
+        if (!externalReviews.length) return null
+        let num = 0, den = 0
+        for (const r of externalReviews) {
+            const w = 1 + Math.log10(1 + Math.max(0, r.likes || 0))
+            num += (Number(r.sentiment_score) || 0) * w
+            den += w
+        }
+        return den ? (num / den).toFixed(1) : null
+    })()
+
     return (
         <div className="space-y-10 pt-6">
             {/* Header Section */}
@@ -423,11 +433,17 @@ const ReviewSection = ({ filmId, currentUser }) => {
             {/* What viewers are saying — mined from YouTube comments */}
             {externalReviews.length > 0 && (
                 <div className="space-y-6 pt-4">
-                    <div className="flex items-center gap-2 border-b border-border pb-4">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border pb-4">
                         <Icon icon="mdi:youtube" className="text-red-500 text-xl" />
                         <h3 className="text-text-primary text-lg font-bold tracking-tight">What viewers are saying</h3>
+                        {audienceRating && (
+                            <span className="text-brand flex items-center gap-1 text-sm font-black">
+                                <Icon icon="solar:star-bold" className="text-sm" />
+                                {audienceRating}<span className="text-[10px] text-text-muted">/10</span>
+                            </span>
+                        )}
                         <span className="text-text-muted text-[10px] font-black uppercase tracking-widest">
-                            {externalReviews.length} from YouTube
+                            · from {externalReviews.length} YouTube comment{externalReviews.length !== 1 ? 's' : ''}
                         </span>
                     </div>
                     <div className="grid grid-cols-1 gap-6">
