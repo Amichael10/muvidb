@@ -26,12 +26,19 @@ function collectYtKeys(): string[] {
 const YT_KEYS = collectYtKeys();
 let ytKeyIdx = 0; // persists across calls so we stay on a working key
 
-function isYtQuotaError(status: number, body: string): boolean {
-  return status === 403 && /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|userRateLimitExceeded/i.test(body);
+// A key is "dead" (rotate to the next one) when it's quota-exhausted (403) OR
+// rejected as invalid (400). Both mean this key can't serve the request, so we
+// should fall through to the next configured key — restoring the old
+// `YOUTUBE_API_KEY || VITE_YOUTUBE_API_KEY` fallback behaviour.
+function isDeadKeyError(status: number, body: string): boolean {
+  if (status === 403 && /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|userRateLimitExceeded/i.test(body)) return true;
+  if (status === 400 && /API key not valid|API_KEY_INVALID|keyInvalid/i.test(body)) return true;
+  return false;
 }
 
 /**
- * Generic YouTube API fetcher with automatic key rotation on quota exhaustion.
+ * Generic YouTube API fetcher with automatic key rotation. Rotates to the next
+ * configured key when the current one is quota-exhausted or invalid.
  */
 export async function ytGet(endpoint: string, params: Record<string, string>): Promise<any> {
   if (!YT_KEYS.length) throw new Error('No YouTube API key configured (YOUTUBE_API_KEY)');
@@ -49,16 +56,16 @@ export async function ytGet(endpoint: string, params: Record<string, string>): P
     let detail = body;
     try { detail = JSON.parse(body).error?.message || body; } catch (e) {}
 
-    if (isYtQuotaError(res.status, body) && YT_KEYS.length > 1) {
-      console.warn(`[ytGet] key #${ytKeyIdx + 1}/${YT_KEYS.length} quota exhausted, rotating…`);
+    if (isDeadKeyError(res.status, body) && YT_KEYS.length > 1) {
+      console.warn(`[ytGet] key #${ytKeyIdx + 1}/${YT_KEYS.length} unusable (${res.status}), rotating…`);
       ytKeyIdx = (ytKeyIdx + 1) % YT_KEYS.length;
       lastDetail = detail;
       continue; // retry with the next key
     }
-    // Non-quota error (404/400/etc.) — fail immediately, no point rotating.
+    // Genuine request error (404/bad params/etc.) — fail fast, rotating won't help.
     throw new Error(`YouTube /${endpoint} ${res.status}: ${detail}`);
   }
-  throw new Error(`YouTube /${endpoint}: all ${YT_KEYS.length} API keys hit quota (${lastDetail})`);
+  throw new Error(`YouTube /${endpoint}: all ${YT_KEYS.length} API keys unusable (${lastDetail})`);
 }
 
 /**
