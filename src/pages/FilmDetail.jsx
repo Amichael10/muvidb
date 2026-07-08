@@ -17,7 +17,7 @@ import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
 import { getShowName } from '../utils/series';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
-import { formatFilmTitle, toSentenceCase } from '../utils/format';
+import { formatFilmTitle, toSentenceCase, formatPersonName } from '../utils/format';
 
 const FilmDetailSkeleton = () => (
     <div className="w-full bg-bg min-h-screen">
