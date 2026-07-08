@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import { toTitleCase } from '../utils/format';
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -214,15 +215,15 @@ export default function Search() {
                 companies.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                     {companies.map(company => (
-                      <div key={company.id} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
-                        <div className="w-14 h-14 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-heading font-bold text-xl shrink-0 group-hover:scale-110 transition-transform border border-border/50">
-                           {company.logo_url ? <img src={company.logo_url} className="w-full h-full object-contain p-2" /> : company.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors tracking-tight truncate leading-tight">{company.name}</h3>
-                            <p className="text-[10px] font-bold text-text-muted mt-1 opacity-60">{company.country || 'International'}</p>
-                        </div>
-                      </div>
+                       <div key={company.id} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
+                         <div className="w-14 h-14 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-heading font-bold text-xl shrink-0 group-hover:scale-110 transition-transform border border-border/50">
+                            {company.logo_url ? <img src={company.logo_url} className="w-full h-full object-contain p-2" /> : toTitleCase(company.name).charAt(0)}
+                         </div>
+                         <div className="min-w-0">
+                             <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors tracking-tight truncate leading-tight">{toTitleCase(company.name)}</h3>
+                             <p className="text-[10px] font-bold text-text-muted mt-1 opacity-60">{company.country || 'International'}</p>
+                         </div>
+                       </div>
                     ))}
                   </div>
                 ) : <EmptyState query={initialQuery} />

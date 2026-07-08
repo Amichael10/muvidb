@@ -8,7 +8,7 @@ import MergeModal from '../../components/admin/MergeModal';
 import { extractYoutubeId } from '../../lib/youtube';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
-import { toTitleCase } from '../../utils/format';
+import { toTitleCase, toSentenceCase } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { authHeaders } from '../../lib/apiAuth';
@@ -732,6 +732,8 @@ export default function AdminFilms() {
     try {
       const filmPayload = {
         ...formData,
+        title: formData.title ? toSentenceCase(formData.title.trim()) : '',
+        synopsis: formData.synopsis ? toSentenceCase(formData.synopsis.trim()) : '',
         year: formData.year && !isNaN(parseInt(formData.year)) ? parseInt(formData.year) : null,
         runtime_minutes: formData.runtime_minutes && !isNaN(parseInt(formData.runtime_minutes)) ? parseInt(formData.runtime_minutes) : null,
         tmdb_id: formData.tmdb_id && !isNaN(parseInt(formData.tmdb_id)) ? parseInt(formData.tmdb_id) : null,

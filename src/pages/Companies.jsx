@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
+import { toTitleCase, toSentenceCase } from '../utils/format'
 
 const CompanyCard = ({ company, filmCount }) => {
-  const initial = company.name?.charAt(0)
+  const initial = toTitleCase(company.name)?.charAt(0)
 
   return (
     <Link
@@ -19,7 +20,7 @@ const CompanyCard = ({ company, filmCount }) => {
               <div className="w-16 h-16 rounded-xl bg-white p-2 border border-border flex items-center justify-center overflow-hidden">
                 <img
                     src={company.logo_url}
-                    alt={company.name}
+                    alt={toTitleCase(company.name)}
                     className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                 />
               </div>
@@ -31,8 +32,8 @@ const CompanyCard = ({ company, filmCount }) => {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-text-primary font-bold text-sm uppercase tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
-              {company.name}
+            <h3 className="text-text-primary font-bold text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
+              {toTitleCase(company.name)}
             </h3>
             {company.founded_year && (
               <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-1 opacity-60">
@@ -41,7 +42,7 @@ const CompanyCard = ({ company, filmCount }) => {
             )}
             {company.description && (
               <p className="text-text-muted text-[11px] mt-3 line-clamp-2 italic leading-relaxed opacity-80">
-                {company.description}
+                {toSentenceCase(company.description)}
               </p>
             )}
           </div>

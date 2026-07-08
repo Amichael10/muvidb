@@ -17,7 +17,7 @@ import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
 import { getShowName } from '../utils/series';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
-import { formatFilmTitle } from '../utils/format';
+import { formatFilmTitle, toSentenceCase } from '../utils/format';
 
 const FilmDetailSkeleton = () => (
     <div className="w-full bg-bg min-h-screen">
@@ -463,7 +463,7 @@ export default function FilmDetail() {
             <section className="p-8 md:p-12 border-b border-border">
               <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Synopsis</h2>
               <p className="text-text-muted text-lg leading-relaxed opacity-80 border-l-2 border-brand pl-6">
-                {film.synopsis}
+                {toSentenceCase(film.synopsis)}
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-6">
                 <button
@@ -542,10 +542,10 @@ export default function FilmDetail() {
                             )}
                           </div>
                           <h3 className="font-heading font-bold text-base text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors mb-2">
-                            {episode.title}
+                            {formatFilmTitle(episode.title)}
                           </h3>
                           <p className="text-xs text-text-muted line-clamp-2 leading-relaxed font-medium">
-                            {episode.synopsis || film.synopsis}
+                            {toSentenceCase(episode.synopsis || film.synopsis)}
                           </p>
                         </div>
                         
@@ -601,22 +601,22 @@ export default function FilmDetail() {
                         {person.photo_url ? (
                           <img 
                             src={person.photo_url} 
-                            alt={person.name} 
+                            alt={formatPersonName(person.name)} 
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
                         ) : (
                           <div className="w-full h-full bg-surface-2 flex items-center justify-center text-text-muted text-4xl font-extrabold uppercase select-none transition-colors group-hover:bg-surface-3">
-                            {person.name.charAt(0)}
+                            {formatPersonName(person.name).charAt(0)}
                           </div>
                         )}
                       </div>
                       <div className="mt-3 flex flex-col text-left">
                         <span className="font-bold text-text-primary text-sm tracking-tight leading-snug line-clamp-1 group-hover:text-gold transition-colors">
-                          {person.name}
+                          {formatPersonName(person.name)}
                         </span>
                         <span className="text-xs text-text-muted font-medium mt-0.5 line-clamp-1">
-                          {person.role}
+                          {toTitleCase(person.role)}
                         </span>
                       </div>
                     </Link>
@@ -647,10 +647,10 @@ export default function FilmDetail() {
                       to={`/people/${member.slug || member.id}`}
                       className="flex items-center gap-4 bg-surface p-4 border-r border-b border-border last:border-r-0 last:border-b-0 hover:bg-surface-2 transition-colors group"
                     >
-                      <img src={member.photo_url || `https://placehold.co/150x150/1A1A1A/FF5C00?text=${member.name.split(' ').map(n => n[0]).join('')}`} alt={member.name} className="w-10 h-10 rounded-lg object-cover border border-border group-hover:border-gold transition-colors" />
+                      <img src={member.photo_url || `https://placehold.co/150x150/1A1A1A/FF5C00?text=${formatPersonName(member.name).split(' ').map(n => n[0]).join('')}`} alt={formatPersonName(member.name)} className="w-10 h-10 rounded-lg object-cover border border-border group-hover:border-gold transition-colors" />
                       <div>
-                        <div className="font-bold text-text-primary text-xs line-clamp-1 tracking-tight group-hover:text-gold transition-colors">{member.name}</div>
-                        <div className="text-text-muted text-[10px] font-bold">{member.role}</div>
+                        <div className="font-bold text-text-primary text-xs line-clamp-1 tracking-tight group-hover:text-gold transition-colors">{formatPersonName(member.name)}</div>
+                        <div className="text-text-muted text-[10px] font-bold">{toTitleCase(member.role)}</div>
                       </div>
                     </Link>
                   ))}

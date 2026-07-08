@@ -7,6 +7,7 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
+import { toTitleCase, toSentenceCase } from '../../utils/format';
 
 export default function AdminCompanies() {
   const { user } = useAuth();
@@ -100,8 +101,8 @@ export default function AdminCompanies() {
     setIsSaving(true);
     try {
       const dataToSave = {
-        name: formData.name,
-        description: formData.description || null,
+        name: toTitleCase(formData.name),
+        description: formData.description ? toSentenceCase(formData.description) : null,
         logo_url: formData.logo_url || null,
         website: formData.website_url || null,
         founded_year: formData.founded_year ? parseInt(formData.founded_year, 10) : null,

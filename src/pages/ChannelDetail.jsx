@@ -7,6 +7,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import ShareAction from '../components/ui/ShareAction';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import { toTitleCase, toSentenceCase } from '../utils/format';
 
 const CATEGORY_LABELS = {
   skit_maker: 'Skit Makers', movie_channel: 'Movie Channel',
@@ -49,9 +50,9 @@ function VideoCard({ video, variant = 'default' }) {
         className="group relative block rounded-xl overflow-hidden border border-border hover:border-brand transition-all duration-500 shadow-sm shrink-0 w-[280px] sm:w-[320px] aspect-[16/9]">
         <ImageWithFallback
           src={video.thumbnail}
-          alt={video.title}
+          alt={toSentenceCase(video.title)}
           fallbackType="video"
-          name={video.title}
+          name={toSentenceCase(video.title)}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
@@ -62,7 +63,7 @@ function VideoCard({ video, variant = 'default' }) {
            </span>
         )}
         <div className="absolute bottom-3 left-3 right-3">
-           <h3 className="text-white font-bold text-sm sm:text-base leading-tight mb-1 line-clamp-2">{video.title}</h3>
+           <h3 className="text-white font-bold text-sm sm:text-base leading-tight mb-1 line-clamp-2">{toSentenceCase(video.title)}</h3>
            <div className="flex items-center gap-2 text-white/70 text-[10px] font-bold">
               {video.film_genres && <span>{video.film_genres}</span>}
               {video.film_genres && <span>•</span>}
@@ -84,9 +85,9 @@ function VideoCard({ video, variant = 'default' }) {
       <div className="relative aspect-video bg-surface-2 overflow-hidden rounded-xl border border-border group-hover:border-brand transition-all duration-500 shadow-sm mb-3">
         <ImageWithFallback
           src={video.thumbnail}
-          alt={video.title}
+          alt={toSentenceCase(video.title)}
           fallbackType="video"
-          name={video.title}
+          name={toSentenceCase(video.title)}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
         {video.duration && (
@@ -104,7 +105,7 @@ function VideoCard({ video, variant = 'default' }) {
       </div>
       <div>
         <h3 className="text-text-primary text-xs font-bold leading-tight group-hover:text-brand transition-colors line-clamp-2 mb-1.5">
-          {video.title}
+          {toSentenceCase(video.title)}
         </h3>
         <div className="flex items-center gap-2 text-[10px] text-text-muted font-bold">
           <span>{formatViewCount(video.viewCount)} views</span>
@@ -190,7 +191,7 @@ export default function ChannelDetail() {
       
       if (chErr || !ch) throw new Error('Channel not found');
       setChannel(ch);
-      document.title = `MuviDB | ${ch.name}`;
+      document.title = `MuviDB | ${toTitleCase(ch.name)}`;
 
       // 2. Fetch owner if exists
       if (ch.owner_person_id) {
@@ -301,7 +302,7 @@ export default function ChannelDetail() {
             src={channel.banner_url}
             alt=""
             fallbackType="banner"
-            name={channel.name}
+            name={toTitleCase(channel.name)}
             className="w-full h-full object-cover opacity-40"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent" />
@@ -315,14 +316,14 @@ export default function ChannelDetail() {
             <div className="flex gap-6 items-start">
               <ImageWithFallback
                 src={channel.thumbnail_url}
-                alt={channel.name}
+                alt={toTitleCase(channel.name)}
                 fallbackType="avatar"
-                name={channel.name}
+                name={toTitleCase(channel.name)}
                 className="w-24 h-24 md:w-32 md:h-32 rounded-full border border-border/50 object-cover shadow-2xl shrink-0"
               />
               <div className="pt-2">
                 <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-2xl md:text-4xl font-heading font-bold text-white tracking-tight">{channel.name}</h1>
+                  <h1 className="text-2xl md:text-4xl font-heading font-bold text-white tracking-tight">{toTitleCase(channel.name)}</h1>
                   <Icon icon="solar:verified-check-bold" className="text-[#FFD700] text-xl" />
                 </div>
                 
@@ -337,7 +338,7 @@ export default function ChannelDetail() {
                   </div>
                 </div>
 
-                <Description text={channel.description} />
+                <Description text={toSentenceCase(channel.description)} />
 
                 <div className="flex items-center gap-3 mt-5">
                   <a href={channel.channel_url} target="_blank" rel="noopener noreferrer"

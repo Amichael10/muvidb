@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
 import ShareAction from '../components/ui/ShareAction'
+import { toTitleCase, toSentenceCase } from '../utils/format'
 
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
@@ -356,13 +357,13 @@ const CinemaDetail = () => {
               <span>/</span>
               <Link to="/cinemas" className="hover:text-brand transition-colors">Cinemas</Link>
               <span>/</span>
-              <span className="text-white/70">{cinema.name}</span>
+              <span className="text-white/70">{toTitleCase(cinema.name)}</span>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-3xl md:text-5xl font-heading font-black tracking-tight text-white leading-none">
-                  {cinema.name}
+                  {toTitleCase(cinema.name)}
                 </h1>
                 <Icon icon="solar:verified-check-bold" className="text-brand text-xl md:text-2xl shrink-0" />
               </div>
@@ -375,7 +376,7 @@ const CinemaDetail = () => {
 
               <p className="text-white/70 text-xs flex items-center gap-2 max-w-xl font-medium">
                 <Icon icon="solar:map-point-linear" className="text-brand shrink-0" width="16" />
-                {cinema.address || `${cinema.city}, Nigeria`}
+                {cinema.address ? toSentenceCase(cinema.address) : `${toTitleCase(cinema.city)}, Nigeria`}
               </p>
             </div>
           </div>
@@ -529,7 +530,7 @@ const CinemaDetail = () => {
             <div className="space-y-4">
               <h3 className="font-heading font-black text-text-primary text-lg">About this cinema</h3>
               <p className="text-text-muted text-sm leading-relaxed">
-                {cinema.description || `${cinema.name} offers premium cinema experiences in ${cinema.city} with state-of-the-art projection systems, immersive surround sound, and comfortable seating options for movie-goers.`}
+                {cinema.description ? toSentenceCase(cinema.description) : `${toTitleCase(cinema.name)} offers premium cinema experiences in ${toTitleCase(cinema.city)} with state-of-the-art projection systems, immersive surround sound, and comfortable seating options for movie-goers.`}
               </p>
             </div>
             
