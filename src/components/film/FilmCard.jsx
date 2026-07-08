@@ -32,6 +32,27 @@ const formatRuntimeHours = (minutes) => {
   return `${m}m`;
 };
 
+// Surface where a title is from (esp. non-Nigerian African titles). Handles
+// both full names ("Nigeria") and ISO-2 codes ("NG") since the data has both.
+const NAME_TO_ISO = {
+  nigeria: 'NG', ghana: 'GH', kenya: 'KE', 'south africa': 'ZA', tanzania: 'TZ',
+  uganda: 'UG', cameroon: 'CM', "cote d'ivoire": 'CI', "côte d'ivoire": 'CI',
+  'ivory coast': 'CI', zambia: 'ZM', zimbabwe: 'ZW', rwanda: 'RW', ethiopia: 'ET',
+  senegal: 'SN', mali: 'ML', benin: 'BJ', togo: 'TG', 'sierra leone': 'SL',
+  liberia: 'LR', gambia: 'GM', malawi: 'MW', mozambique: 'MZ', angola: 'AO',
+  botswana: 'BW', namibia: 'NA', 'democratic republic of the congo': 'CD',
+  'united states': 'US', 'united states of america': 'US', usa: 'US',
+  'united kingdom': 'GB', uk: 'GB',
+};
+const iso2ToFlag = (code) =>
+  String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+const countryFlag = (country) => {
+  if (!country) return null;
+  const c = country.trim();
+  const iso = /^[a-z]{2}$/i.test(c) ? c.toUpperCase() : NAME_TO_ISO[c.toLowerCase()];
+  return iso ? iso2ToFlag(iso) : '🌍';
+};
+
 const getYoutubeId = (url) => {
   if (!url) return null;
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -176,7 +197,12 @@ export default function FilmCard({
     lg: 'w-full sm:w-64 aspect-[2/3] min-w-[12rem] sm:min-w-[16rem]'
   };
 
-  const filmRating = Number(film.tmdb_rating || film.average_rating || film.rating || 0);
+  // Prefer a real TMDB score, then our YouTube-derived audience rating, then
+  // user reviews. Capped at 9.7 — nothing should ever look "perfect".
+  const filmRating = Math.min(9.7, Number(film.tmdb_rating || film.audience_rating || film.average_rating || film.rating || 0));
+  // `countries` is an array; fall back to legacy singular `country` if present.
+  const primaryCountry = (Array.isArray(film.countries) ? film.countries[0] : null) || film.country || null;
+  const flag = countryFlag(primaryCountry);
 
   const [hoverPosition, setHoverPosition] = useState('center');
 
@@ -326,6 +352,7 @@ export default function FilmCard({
             </h3>
             <div className="flex items-center justify-between gap-2 mt-1">
               <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/70">
+                {flag && <span title={primaryCountry} className="text-[11px] leading-none">{flag}</span>}
                 <span className="text-brand/90 font-bold">{film.year || film.release_date?.split('-')[0] || 'N/A'}</span>
                 {film.genres && film.genres.length > 0 && (
                   <>
@@ -504,6 +531,12 @@ export default function FilmCard({
           <div className="flex items-center gap-2.5 text-xs text-white/90 mb-3 flex-wrap font-medium">
             {formattedTotalViews && <span className="text-brand font-bold">{formattedTotalViews}</span>}
             <span>{film.year || film.release_date?.split('-')[0]}</span>
+            {primaryCountry && <span className="flex items-center gap-1">{flag} {primaryCountry}</span>}
+            {filmRating > 0 && (
+              <span className="flex items-center gap-1 text-brand font-bold">
+                <Icon icon="solar:star-bold" className="text-[11px]" /> {filmRating.toFixed(1)}
+              </span>
+            )}
             <span className="px-1.5 py-0.5 border border-white/30 rounded text-[9px] font-black tracking-wide leading-none uppercase bg-white/5">
               {film.maturity_rating || '18+'}
             </span>
