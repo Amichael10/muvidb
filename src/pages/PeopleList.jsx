@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { formatViewCount } from '../utils/youtube'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
+import { formatPersonName, toTitleCase } from '../utils/format'
 
 const PersonCard = ({ person, currentUser }) => {
   const navigate = useNavigate()
@@ -81,19 +82,19 @@ const PersonCard = ({ person, currentUser }) => {
       </div>
 
       <div className="p-4">
-        <h3 className="text-text-primary font-bold text-sm uppercase tracking-tight group-hover:text-brand transition-colors line-clamp-1">
-          {person.name}
+        <h3 className="text-text-primary font-bold text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1">
+          {formatPersonName(person.name)}
         </h3>
 
-        <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-1 opacity-60">
-          {primaryRole}
+        <p className="text-text-muted text-[10px] font-black tracking-widest mt-1 opacity-60">
+          {toTitleCase(roleLabels[primaryRole] || primaryRole)}
         </p>
 
         <div className="flex items-center justify-between mt-4">
           <div className="flex items-center gap-2">
             <Icon icon="solar:clapperboard-play-linear" className="text-text-muted" width="14" />
-            <span className="text-text-muted text-[9px] font-black uppercase tracking-widest">
-              {creditCount} FILMS
+            <span className="text-text-muted text-[9px] font-black tracking-widest">
+              {creditCount} Films
             </span>
           </div>
         </div>

@@ -1,8 +1,9 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
+import { toTitleCase, toSentenceCase } from '../utils/format'
 
 // Extract chain name from the cinema's display name
 function extractChain(name = '') {
@@ -22,7 +23,7 @@ const chainStyles = {
 
 const CinemaCard = ({ cinema, showCount }) => {
   const chain = extractChain(cinema.name)
-  const initials = cinema.name?.charAt(0) || '?'
+  const initials = formatPersonName(cinema.name)?.charAt(0) || '?'
 
   return (
     <Link
@@ -38,8 +39,8 @@ const CinemaCard = ({ cinema, showCount }) => {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-text-primary font-bold text-sm uppercase tracking-tight group-hover:text-brand transition-colors line-clamp-2 leading-tight">
-              {cinema.name}
+            <h3 className="text-text-primary font-bold text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-2 leading-tight">
+              {toTitleCase(cinema.name)}
             </h3>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {chain && (
@@ -57,9 +58,9 @@ const CinemaCard = ({ cinema, showCount }) => {
         </div>
 
         {(cinema.address || cinema.city) && (
-          <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-4 line-clamp-1 opacity-60 flex items-center gap-2">
+          <p className="text-text-muted text-[10px] font-black tracking-widest mt-4 line-clamp-1 opacity-60 flex items-center gap-2">
              <Icon icon="solar:map-point-linear" className="text-brand/50" width="12" />
-             {[cinema.city, cinema.state].filter(Boolean).join(', ')}
+             {[toTitleCase(cinema.city), toTitleCase(cinema.state)].filter(Boolean).join(', ')}
           </p>
         )}
 
@@ -74,8 +75,8 @@ const CinemaCard = ({ cinema, showCount }) => {
       </div>
 
       <div className="px-6 py-4 bg-surface-2/30 border-t border-border flex items-center justify-between">
-        <span className="text-text-muted text-[9px] font-black uppercase tracking-widest truncate max-w-[120px]">
-          {cinema.address || 'VIEW LOCATION'}
+        <span className="text-text-muted text-[9px] font-black tracking-widest truncate max-w-[120px]">
+          {cinema.address ? toSentenceCase(cinema.address) : 'VIEW LOCATION'}
         </span>
         <div className="flex items-center gap-4 flex-shrink-0">
           {cinema.booking_url && (

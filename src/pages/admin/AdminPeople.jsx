@@ -10,7 +10,7 @@ import MergeModal from '../../components/admin/MergeModal';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
-import { toTitleCase } from '../../utils/format';
+import { toTitleCase, toSentenceCase, formatPersonName } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { useMemo } from 'react';
 import { getFriendlyErrorMessage } from '../../utils/errors';
@@ -385,7 +385,7 @@ export default function AdminPeople() {
       const dataToSave = {
         ...restFormData,
         name: toTitleCase(formData.name),
-        bio: formData.biography || null,
+        bio: formData.biography ? toSentenceCase(formData.biography) : null,
         date_of_birth: formData.date_of_birth || null,
         photo_url: formData.photo_url || null,
         popularity_score: parseInt(formData.popularity_score) || 0,
@@ -629,7 +629,7 @@ export default function AdminPeople() {
                     {p.photo_url ? <img src={p.photo_url} className="w-10 h-10 rounded object-cover shadow-sm grayscale group-hover:grayscale-0 transition-all" /> : <div className="w-10 h-10 rounded bg-surface-2 flex items-center justify-center text-[10px] font-bold text-text-muted">?</div>}
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-text-primary block leading-tight">{p.name}</span>
+                        <span className="font-bold text-text-primary block leading-tight">{formatPersonName(p.name)}</span>
                         {p.is_spotlight && (
                           <Icon icon="solar:star-bold" className="w-3 h-3 text-brand" />
                         )}
@@ -1137,7 +1137,7 @@ export default function AdminPeople() {
           onCancel={() => !isDeleting && setDeletingPerson(null)}
           onConfirm={handleDelete}
           title="Delete Person"
-          message={`Are you sure you want to delete "${deletingPerson.name}"? This will permanently remove them from the database.`}
+          message={`Are you sure you want to delete "${formatPersonName(deletingPerson.name)}"? This will permanently remove them from the database.`}
           confirmLabel="Delete Person"
           isProcessing={isDeleting}
         />

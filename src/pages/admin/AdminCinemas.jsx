@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
+import { toTitleCase, toSentenceCase } from '../../utils/format';
 
 export default function AdminCinemas() {
   const [cinemas, setCinemas] = useState([]);
@@ -131,6 +132,12 @@ export default function AdminCinemas() {
     try {
       const payload = {
         ...formData,
+        name: formData.name ? toTitleCase(formData.name.trim()) : '',
+        chain: formData.chain ? toTitleCase(formData.chain.trim()) : '',
+        city: formData.city ? toTitleCase(formData.city.trim()) : '',
+        state: formData.state ? toTitleCase(formData.state.trim()) : '',
+        address: formData.address ? toSentenceCase(formData.address.trim()) : '',
+        description: formData.description ? toSentenceCase(formData.description.trim()) : '',
         screens_count: formData.screens_count ? parseInt(formData.screens_count) : null,
         seating_capacity: formData.seating_capacity ? parseInt(formData.seating_capacity) : null,
       };

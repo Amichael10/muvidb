@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { formatViewCount } from '../utils/youtube'
 import { Icon } from '@iconify/react'
 import ShareAction from '../components/ui/ShareAction'
+import { toTitleCase, toSentenceCase } from '../utils/format'
 
 const FilmCard = ({ film }) => (
   <Link
@@ -36,7 +37,7 @@ const FilmCard = ({ film }) => (
       {/* Info */}
       <div className="absolute bottom-0 left-0 right-0 p-3">
         <p className="text-[#F5F0E8] text-xs font-semibold line-clamp-2">
-          {film.title}
+          {toSentenceCase(film.title)}
         </p>
         <p className="text-[#7A8099] text-xs mt-0.5 flex items-center gap-1">
           {film.film_genres?.[0]?.genres?.name && <span>{film.film_genres[0].genres.name} &bull;</span>}
@@ -67,12 +68,12 @@ const PartnerCard = ({ company }) => (
   <Link to={`/companies/${company.slug || company.id}`} className="block group text-center w-[120px] shrink-0">
     <div className="w-24 h-24 mx-auto rounded-xl bg-white p-3 shadow-sm border-2 border-transparent group-hover:border-brand transition-colors mb-3 flex items-center justify-center overflow-hidden">
       {company.logo_url ? (
-        <img src={company.logo_url} alt={company.name} className="max-w-full max-h-full object-contain" />
+        <img src={company.logo_url} alt={toTitleCase(company.name)} className="max-w-full max-h-full object-contain" />
       ) : (
-        <span className="text-2xl font-heading font-bold text-black">{company.name.charAt(0)}</span>
+        <span className="text-2xl font-heading font-bold text-black">{toTitleCase(company.name).charAt(0)}</span>
       )}
     </div>
-    <p className="text-sm font-semibold text-text-primary line-clamp-2">{company.name}</p>
+    <p className="text-sm font-semibold text-text-primary line-clamp-2">{toTitleCase(company.name)}</p>
   </Link>
 )
 
@@ -256,9 +257,9 @@ const CompanyDetail = () => {
             <div className="shrink-0">
               <div className="w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border border-brand/30 bg-black/40 flex items-center justify-center p-6 shadow-2xl relative">
                 {company.logo_url ? (
-                  <img src={company.logo_url} alt={company.name} className="max-w-full max-h-full object-contain" />
+                  <img src={company.logo_url} alt={toTitleCase(company.name)} className="max-w-full max-h-full object-contain" />
                 ) : (
-                  <span className="text-6xl font-heading font-bold text-brand">{company.name.charAt(0)}</span>
+                  <span className="text-6xl font-heading font-bold text-brand">{toTitleCase(company.name).charAt(0)}</span>
                 )}
                 {/* Glow behind logo */}
                 <div className="absolute inset-0 bg-brand/10 blur-2xl -z-10 mix-blend-screen" />
@@ -268,25 +269,25 @@ const CompanyDetail = () => {
             <div className="space-y-4 max-w-xl pt-4">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
                 <h1 className="text-4xl md:text-5xl font-heading font-bold text-white tracking-tight">
-                  {company.name}
+                  {toTitleCase(company.name)}
                 </h1>
                 <Icon icon="solar:verified-check-bold" className="text-brand text-2xl shrink-0" />
               </div>
               
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-text-muted text-sm font-medium">
-                {company.company_type && <span>{company.company_type}</span>}
+                {company.company_type && <span>{toTitleCase(company.company_type)}</span>}
                 {company.company_type && company.headquarters && <span className="w-1 h-1 rounded-full bg-border" />}
                 {company.headquarters && (
                   <span className="flex items-center gap-1">
                     <Icon icon="solar:map-point-linear" className="text-lg" />
-                    {company.headquarters}
+                    {toTitleCase(company.headquarters)}
                   </span>
                 )}
               </div>
 
               {company.description && (
                 <div className="pt-2 text-left">
-                  <Description text={company.description} />
+                  <Description text={toSentenceCase(company.description)} />
                 </div>
               )}
 
@@ -298,7 +299,7 @@ const CompanyDetail = () => {
                   </a>
                 )}
 
-                <ShareAction title={company.name} text={`Check out ${company.name} on MuviDB`} className="!w-auto !bg-transparent border border-border !px-4 !rounded-lg" />
+                <ShareAction title={toTitleCase(company.name)} text={`Check out ${toTitleCase(company.name)} on MuviDB`} className="!w-auto !bg-transparent border border-border !px-4 !rounded-lg" />
               </div>
             </div>
           </div>
@@ -477,10 +478,10 @@ const CompanyDetail = () => {
 
           {/* About */}
           <div className="md:col-span-1">
-            <h3 className="text-lg font-heading font-bold text-white mb-6">About {company.name}</h3>
+            <h3 className="text-lg font-heading font-bold text-white mb-6">About {toTitleCase(company.name)}</h3>
             {company.description ? (
               <div className="text-sm text-text-muted leading-relaxed space-y-4">
-                <p>{company.description}</p>
+                <p>{toSentenceCase(company.description)}</p>
                 <p>We believe in nurturing talent, elevating industry standards and building timeless stories for generations to come.</p>
               </div>
             ) : (
@@ -502,19 +503,19 @@ const CompanyDetail = () => {
                 {company.company_type && (
                   <div className="flex gap-4">
                     <span className="text-text-muted w-32 shrink-0">&middot; Company Type</span>
-                    <span className="text-white font-medium">{company.company_type}</span>
+                    <span className="text-white font-medium">{toTitleCase(company.company_type)}</span>
                   </div>
                 )}
                 {company.headquarters && (
                   <div className="flex gap-4">
                     <span className="text-text-muted w-32 shrink-0">&middot; Headquarters</span>
-                    <span className="text-white font-medium">{company.headquarters}</span>
+                    <span className="text-white font-medium">{toTitleCase(company.headquarters)}</span>
                   </div>
                 )}
                 {company.focus && (
                   <div className="flex gap-4">
                     <span className="text-text-muted w-32 shrink-0">&middot; Focus</span>
-                    <span className="text-white font-medium">{company.focus}</span>
+                    <span className="text-white font-medium">{toSentenceCase(company.focus)}</span>
                   </div>
                 )}
                 {company.years_active && (

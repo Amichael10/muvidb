@@ -5,6 +5,7 @@ import { formatViewCount } from '../utils/youtube';
 import { Skeleton } from '../components/ui/Skeleton';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import { toTitleCase, toSentenceCase, formatPersonName } from '../utils/format';
 
 const CATEGORIES = [
   'All', 'Movies', 'Comedy', 'Series', 'Yoruba', 'Faith',
@@ -39,7 +40,7 @@ function ChannelCard({ channel }) {
           src={channel.banner_url}
           alt=""
           fallbackType="banner"
-          name={channel.name}
+          name={toTitleCase(channel.name)}
           className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-700"
         />
       </div>
@@ -52,9 +53,9 @@ function ChannelCard({ channel }) {
              <div className="absolute -inset-1 bg-brand/20 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
              <ImageWithFallback
                src={channel.thumbnail_url}
-               alt={channel.name}
+               alt={toTitleCase(channel.name)}
                fallbackType="avatar"
-               name={channel.name}
+               name={toTitleCase(channel.name)}
                className="relative w-16 h-16 rounded-xl border-4 border-surface object-cover shadow-xl group-hover:scale-105 transition-transform duration-500"
              />
           </div>
@@ -63,7 +64,7 @@ function ChannelCard({ channel }) {
         <div className="pt-10">
           <div className="flex items-start justify-between gap-2 mb-2">
             <h3 className="text-text-primary font-bold text-sm leading-tight line-clamp-1 group-hover:text-brand transition-colors font-heading">
-              {channel.name}
+              {toTitleCase(channel.name)}
             </h3>
             {channel.is_featured && (
                <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse shadow-[0_0_8px_var(--brand)]"></div>
@@ -90,13 +91,13 @@ function ChannelCard({ channel }) {
 
           {channel.description && (
             <p className="text-text-muted text-[10px] mt-3 line-clamp-2 leading-relaxed italic opacity-80">
-              {channel.description}
+              {toSentenceCase(channel.description)}
             </p>
           )}
 
           {channel.owner_name && (
             <p className="text-brand text-[10px] font-bold mt-3 truncate">
-              {channel.owner_name}
+              {formatPersonName(channel.owner_name)}
             </p>
           )}
         </div>

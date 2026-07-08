@@ -16,6 +16,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import ShareAction from '../components/ui/ShareAction'
 import ImageWithFallback from '../components/ui/ImageWithFallback'
 import { slugOrId } from '../utils/slug'
+import { formatPersonName, toTitleCase, toSentenceCase } from '../utils/format'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -414,10 +415,10 @@ const PersonDetail = () => {
   return (
     <div className="min-h-screen bg-bg">
       <Helmet>
-        <title>{`MuviDB | ${person.name}`}</title>
-        <meta name="description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on MuviDB.`} />
-        <meta property="og:title" content={`MuviDB | ${person.name}`} />
-        <meta property="og:description" content={person.biography?.slice(0, 150) || `Discover ${person.name}'s filmography and videos on MuviDB.`} />
+        <title>{`MuviDB | ${formatPersonName(person.name)}`}</title>
+        <meta name="description" content={toSentenceCase(person.biography)?.slice(0, 150) || `Discover ${formatPersonName(person.name)}'s filmography and videos on MuviDB.`} />
+        <meta property="og:title" content={`MuviDB | ${formatPersonName(person.name)}`} />
+        <meta property="og:description" content={toSentenceCase(person.biography)?.slice(0, 150) || `Discover ${formatPersonName(person.name)}'s filmography and videos on MuviDB.`} />
         {person.photo_url && <meta property="og:image" content={person.photo_url} />}
       </Helmet>
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
@@ -429,13 +430,13 @@ const PersonDetail = () => {
               {person.photo_url ? (
                 <img
                   src={person.photo_url}
-                  alt={person.name}
+                  alt={formatPersonName(person.name)}
                   className="relative w-48 h-48 md:w-56 md:h-56 rounded-xl object-cover shadow-2xl border border-border"
                 />
               ) : (
                 <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-xl bg-surface flex items-center justify-center shadow-2xl border border-border">
                   <span className="text-6xl font-bold text-brand font-heading">
-                    {person.name?.charAt(0)}
+                    {formatPersonName(person.name)?.charAt(0)}
                   </span>
                 </div>
               )}
@@ -445,7 +446,7 @@ const PersonDetail = () => {
               <div>
                 <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start mb-2">
                   <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">
-                    {person.name}
+                    {formatPersonName(person.name)}
                   </h1>
                   {person.is_verified && (
                     <span className="bg-brand/10 text-brand text-[10px] font-bold px-3 py-1 rounded-lg border border-brand/20">
@@ -478,7 +479,7 @@ const PersonDetail = () => {
                   <SuggestEditModal
                     target="person"
                     targetId={personId}
-                    targetName={person.name}
+                    targetName={formatPersonName(person.name)}
                     onClose={() => setShowEdit(false)}
                   />
                 )}
@@ -508,14 +509,14 @@ const PersonDetail = () => {
               {(person.biography || person.bio) && (
                 <div className="space-y-4">
                   <p className="text-text-muted text-sm leading-relaxed max-w-2xl">
-                    {person.biography || person.bio}
+                    {toSentenceCase(person.biography || person.bio)}
                   </p>
                 </div>
               )}
 
               <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
                 {person.nationality && (
-                  <span className="text-text-muted">Nationality: {person.nationality}</span>
+                  <span className="text-text-muted">Nationality: {toTitleCase(person.nationality)}</span>
                 )}
                 {person.date_of_birth && (
                   <span className="text-text-muted">
@@ -666,16 +667,16 @@ const PersonDetail = () => {
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-80" />
                       <div className="absolute bottom-0 left-0 right-0 p-4">
-                        <p className="text-text-primary text-[11px] font-bold uppercase tracking-tight line-clamp-2 leading-tight group-hover:text-brand transition-colors">
-                          {title}
+                        <p className="text-text-primary text-[11px] font-bold tracking-tight line-clamp-2 leading-tight group-hover:text-brand transition-colors">
+                          {formatFilmTitle(title)}
                         </p>
                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                           <p className="text-text-muted text-[9px] font-black tracking-widest uppercase">
                             {film?.year || (video?.published_at && new Date(video.published_at).getFullYear())}
                           </p>
                           {credit.character_name && (
-                          <p className="text-brand text-[9px] font-bold truncate">
-                              as {credit.character_name}
+                            <p className="text-brand text-[9px] font-bold truncate">
+                              as {toTitleCase(credit.character_name)}
                             </p>
                           )}
                         </div>
@@ -718,20 +719,20 @@ const PersonDetail = () => {
 
               <div className="flex-1 min-w-0 text-center sm:text-left">
                 <div className="flex items-center gap-3 justify-center sm:justify-start mb-2">
-                  <p className="text-text-primary font-bold text-xl uppercase tracking-tighter group-hover:text-brand transition-colors truncate">
-                    {channel.name}
+                  <p className="text-text-primary font-bold text-xl tracking-tighter group-hover:text-brand transition-colors truncate">
+                    {toTitleCase(channel.name)}
                   </p>
                   <span className="bg-[#FF0000]/10 text-[#FF0000] text-[8px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded border border-[#FF0000]/20">CHANNEL</span>
                 </div>
                 
                 {channel.subscriber_count > 0 && (
-                  <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mb-4">
-                    {formatViewCount(channel.subscriber_count)} SUBSCRIBERS • {channel.category || 'OFFICIAL'}
+                  <p className="text-text-muted text-[10px] font-black tracking-widest mb-4">
+                    {formatViewCount(channel.subscriber_count)} Subscribers • {toTitleCase(channel.category || 'Official')}
                   </p>
                 )}
                 {channel.description && (
                   <p className="text-text-muted text-xs line-clamp-2 leading-relaxed italic opacity-80">
-                    {channel.description}
+                    {toSentenceCase(channel.description)}
                   </p>
                 )}
               </div>

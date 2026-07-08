@@ -1,4 +1,5 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, Component } from 'react';
+import type { ReactNode, ComponentType } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -8,57 +9,76 @@ import { QuickViewProvider } from './context/QuickViewContext';
 // Eager: landing page only (keeps first paint / LCP fast)
 import Home from './pages/Home';
 
-// Lazy public pages — code-split out of the initial bundle
-const FilmDetail = lazy(() => import('./pages/FilmDetail'));
-const Search = lazy(() => import('./pages/Search'));
-const Browse = lazy(() => import('./pages/Browse'));
-const TVShows = lazy(() => import('./pages/TVShows'));
-const WatchPlatform = lazy(() => import('./pages/WatchPlatform'));
-const Login = lazy(() => import('./pages/Login'));
-const Signup = lazy(() => import('./pages/Signup'));
-const Onboarding = lazy(() => import('./pages/Onboarding'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const ProDashboard = lazy(() => import('./pages/ProDashboard'));
+// Retry a lazy import once by hard-reloading when the chunk fails to load. A
+// stale chunk reference after a deploy (or a dropped mobile request) is the
+// classic cause of a blank page that a manual reload "fixes" — this does that
+// reload automatically, guarded so it can never loop.
+function lazyWithRetry(factory: () => Promise<{ default: ComponentType<any> }>) {
+  return lazy(() =>
+    factory().catch((err) => {
+      const key = 'chunk-reload-ts';
+      const last = Number(sessionStorage.getItem(key) || 0);
+      if (Date.now() - last > 10000) {
+        sessionStorage.setItem(key, String(Date.now()));
+        window.location.reload();
+        return new Promise<never>(() => {}); // stay suspended through the reload
+      }
+      throw err; // reloaded recently already — let the error boundary show
+    })
+  );
+}
 
-const PersonDetail = lazy(() => import('./pages/PersonDetail'));
-const Showtimes = lazy(() => import('./pages/Showtimes'));
-const Cinemas = lazy(() => import('./pages/Cinemas'));
-const CinemaDetail = lazy(() => import('./pages/CinemaDetail'));
-const Companies = lazy(() => import('./pages/Companies'));
-const CompanyDetail = lazy(() => import('./pages/CompanyDetail'));
-const PeopleList = lazy(() => import('./pages/PeopleList'));
-const Channels = lazy(() => import('./pages/Channels'));
-const ChannelDetail = lazy(() => import('./pages/ChannelDetail'));
-const Terms = lazy(() => import('./pages/Terms'));
-const Privacy = lazy(() => import('./pages/Privacy'));
-const Waitlist = lazy(() => import('./pages/Waitlist'));
-const About = lazy(() => import('./pages/About'));
-const Contact = lazy(() => import('./pages/Contact'));
+// Lazy public pages — code-split out of the initial bundle
+const FilmDetail = lazyWithRetry(() => import('./pages/FilmDetail'));
+const Search = lazyWithRetry(() => import('./pages/Search'));
+const Browse = lazyWithRetry(() => import('./pages/Browse'));
+const TVShows = lazyWithRetry(() => import('./pages/TVShows'));
+const WatchPlatform = lazyWithRetry(() => import('./pages/WatchPlatform'));
+const Login = lazyWithRetry(() => import('./pages/Login'));
+const Signup = lazyWithRetry(() => import('./pages/Signup'));
+const Onboarding = lazyWithRetry(() => import('./pages/Onboarding'));
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const ProDashboard = lazyWithRetry(() => import('./pages/ProDashboard'));
+
+const PersonDetail = lazyWithRetry(() => import('./pages/PersonDetail'));
+const Showtimes = lazyWithRetry(() => import('./pages/Showtimes'));
+const Cinemas = lazyWithRetry(() => import('./pages/Cinemas'));
+const CinemaDetail = lazyWithRetry(() => import('./pages/CinemaDetail'));
+const Companies = lazyWithRetry(() => import('./pages/Companies'));
+const CompanyDetail = lazyWithRetry(() => import('./pages/CompanyDetail'));
+const PeopleList = lazyWithRetry(() => import('./pages/PeopleList'));
+const Channels = lazyWithRetry(() => import('./pages/Channels'));
+const ChannelDetail = lazyWithRetry(() => import('./pages/ChannelDetail'));
+const Terms = lazyWithRetry(() => import('./pages/Terms'));
+const Privacy = lazyWithRetry(() => import('./pages/Privacy'));
+const Waitlist = lazyWithRetry(() => import('./pages/Waitlist'));
+const About = lazyWithRetry(() => import('./pages/About'));
+const Contact = lazyWithRetry(() => import('./pages/Contact'));
 
 // Lazy admin pages — kept entirely out of the public bundle
-const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
-const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
-const AdminFilms = lazy(() => import('./pages/admin/AdminFilms'));
-const AdminPeople = lazy(() => import('./pages/admin/AdminPeople'));
-const AdminCredits = lazy(() => import('./pages/admin/AdminCredits'));
-const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies'));
-const AdminClaims = lazy(() => import('./pages/admin/AdminClaims'));
-const AdminContributions = lazy(() => import('./pages/admin/AdminContributions'));
-const AdminNewReleases = lazy(() => import('./pages/admin/AdminNewReleases'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
-const AdminCinemas = lazy(() => import('./pages/admin/AdminCinemas'));
-const AdminChannels = lazy(() => import('./pages/admin/AdminChannels'));
-const AdminCinemaFilms = lazy(() => import('./pages/admin/AdminCinemaFilms'));
-const AdminCinemaScraping = lazy(() => import('./pages/admin/AdminCinemaScraping'));
-const AdminCreditsExtractor = lazy(() => import('./pages/admin/AdminCreditsExtractor'));
-const AdminChannelDetail = lazy(() => import('./pages/admin/AdminChannelDetail'));
-const AdminImport = lazy(() => import('./pages/admin/AdminImport'));
-const AdminAI = lazy(() => import('./pages/admin/AdminAI'));
-const AdminSpotlight = lazy(() => import('./pages/admin/AdminSpotlight'));
-const AdminTop10 = lazy(() => import('./pages/admin/AdminTop10'));
-const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
-const AdminAutomation = lazy(() => import('./pages/admin/AdminAutomation'));
-const AdminCountries = lazy(() => import('./pages/admin/AdminCountries'));
+const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
+const AdminOverview = lazyWithRetry(() => import('./pages/admin/AdminOverview'));
+const AdminFilms = lazyWithRetry(() => import('./pages/admin/AdminFilms'));
+const AdminPeople = lazyWithRetry(() => import('./pages/admin/AdminPeople'));
+const AdminCredits = lazyWithRetry(() => import('./pages/admin/AdminCredits'));
+const AdminCompanies = lazyWithRetry(() => import('./pages/admin/AdminCompanies'));
+const AdminClaims = lazyWithRetry(() => import('./pages/admin/AdminClaims'));
+const AdminContributions = lazyWithRetry(() => import('./pages/admin/AdminContributions'));
+const AdminNewReleases = lazyWithRetry(() => import('./pages/admin/AdminNewReleases'));
+const AdminUsers = lazyWithRetry(() => import('./pages/admin/AdminUsers'));
+const AdminCinemas = lazyWithRetry(() => import('./pages/admin/AdminCinemas'));
+const AdminChannels = lazyWithRetry(() => import('./pages/admin/AdminChannels'));
+const AdminCinemaFilms = lazyWithRetry(() => import('./pages/admin/AdminCinemaFilms'));
+const AdminCinemaScraping = lazyWithRetry(() => import('./pages/admin/AdminCinemaScraping'));
+const AdminCreditsExtractor = lazyWithRetry(() => import('./pages/admin/AdminCreditsExtractor'));
+const AdminChannelDetail = lazyWithRetry(() => import('./pages/admin/AdminChannelDetail'));
+const AdminImport = lazyWithRetry(() => import('./pages/admin/AdminImport'));
+const AdminAI = lazyWithRetry(() => import('./pages/admin/AdminAI'));
+const AdminSpotlight = lazyWithRetry(() => import('./pages/admin/AdminSpotlight'));
+const AdminTop10 = lazyWithRetry(() => import('./pages/admin/AdminTop10'));
+const AdminLogs = lazyWithRetry(() => import('./pages/admin/AdminLogs'));
+const AdminAutomation = lazyWithRetry(() => import('./pages/admin/AdminAutomation'));
+const AdminCountries = lazyWithRetry(() => import('./pages/admin/AdminCountries'));
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -132,6 +152,45 @@ function Layout({ children }) {
   );
 }
 
+// Visible loading state for lazy pages — a spinner, not a blank black screen,
+// so a slow chunk load never looks like a crash.
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bg">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-brand" />
+    </div>
+  );
+}
+
+// Catches render errors (including a genuinely failed chunk after we've already
+// tried reloading) and offers a recovery action instead of a black void.
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  declare props: { children: ReactNode };
+  state: { hasError: boolean } = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error('App error boundary caught:', error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-5 bg-bg text-text-primary px-6 text-center">
+          <p className="text-text-secondary text-sm max-w-xs">Something went wrong loading this page.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-brand text-white font-bold px-6 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity"
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -155,7 +214,8 @@ export default function App() {
             {/* Signature: subtle film grain over the whole app */}
             <div className="film-grain" aria-hidden="true" />
             <Layout>
-              <Suspense fallback={<div className="min-h-screen bg-bg" />}>
+              <ErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
@@ -219,6 +279,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
               </Suspense>
+              </ErrorBoundary>
             </Layout>
           </SmoothScroll>
         </Router>

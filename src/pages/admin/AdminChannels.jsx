@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 import SyncStatusOverlay from '../../components/admin/SyncStatusOverlay';
 import ImageWithFallback from '../../components/ui/ImageWithFallback';
+import { toTitleCase, toSentenceCase } from '../../utils/format';
 
 const CATEGORIES = [
   'Movies', 'Comedy', 'Series', 'Yoruba', 'Faith',
@@ -243,6 +244,8 @@ function ChannelModal({ channel, onSave, onClose }) {
 
     const payload = {
       ...form,
+      name: form.name ? toTitleCase(form.name.trim()) : '',
+      description: form.description ? toSentenceCase(form.description.trim()) : '',
       subscriber_count: form.subscriber_count === '' ? null : Number(form.subscriber_count),
       owner_person_id: owner?.id ?? null,
       owner_name:      owner?.name ?? null,

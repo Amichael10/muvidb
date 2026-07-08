@@ -57,27 +57,46 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    // Initial session check
+    let settled = false;
+    const stopLoading = () => {
+      if (settled) return;
+      settled = true;
+      setAuthState(prev => ({ ...prev, loading: false }));
+    };
+
+    // Initial session check. Must ALWAYS resolve the loading gate — otherwise a
+    // slow/failed getSession() or profile query leaves the whole app on a blank
+    // screen until the user reloads.
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await fetchUserProfile(session.user);
-      } else {
-        setAuthState(prev => ({ ...prev, loading: false }));
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetchUserProfile(session.user);
+        }
+      } catch (err) {
+        console.error('Session check failed:', err);
+      } finally {
+        stopLoading();
       }
     };
 
     checkSession();
 
+    // Safety net: never hang the app on a blank screen. If auth hasn't settled
+    // within 5s (slow network, DB timeout), render anyway in a logged-out state;
+    // onAuthStateChange will fill in the user once it eventually resolves.
+    const safety = setTimeout(stopLoading, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         fetchUserProfile(session.user);
       } else {
+        settled = true;
         setAuthState({ user: null, role: null, loading: false });
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(safety); subscription.unsubscribe(); };
   }, []);
 
   const login = async (email, password) => {

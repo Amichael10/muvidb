@@ -16,7 +16,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         workbox: {
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 // 5MB
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+          cleanupOutdatedCaches: true, // purge old precaches so stale chunks don't linger
         },
         manifest: {
           name: 'MuviDB | African Cinema Database',

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { formatPersonName, toTitleCase, toSentenceCase } from '../../utils/format';
 
 export default function PersonCard({ person, variant = 'compact', isLoading }) {
   if (isLoading) {
@@ -47,7 +48,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
         <div className="relative mb-3">
           <img 
             src={person.photo_url || person.photo} 
-            alt={person.name} 
+            alt={formatPersonName(person.name)} 
             className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
           />
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-surface-2 border border-border text-text-primary text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
@@ -55,10 +56,10 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
           </div>
         </div>
         <h4 className="font-bold text-text-primary text-sm md:text-base group-hover:text-gold transition-colors line-clamp-1">
-          {person.name}
+          {formatPersonName(person.name)}
         </h4>
         <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
-          {person.role}
+          {toTitleCase(person.role)}
         </p>
       </Link>
     );
@@ -70,7 +71,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
       <Link to={`/people/${person.slug || person.id}`} className="shrink-0 group">
         <img 
           src={person.photo_url || person.photo} 
-          alt={person.name} 
+          alt={formatPersonName(person.name)} 
           className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
         />
       </Link>
@@ -79,7 +80,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
         <div className="flex items-center gap-2 mb-1">
           <Link to={`/people/${person.slug || person.id}`}>
             <h3 className="font-heading font-bold text-2xl text-text-primary hover:text-gold transition-colors">
-              {person.name}
+              {formatPersonName(person.name)}
             </h3>
           </Link>
           {person.is_verified && (
@@ -91,11 +92,11 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
         </div>
         
         <p className="text-gold font-medium text-sm mb-3">
-          {person.role}
+          {toTitleCase(person.role)}
         </p>
         
         <p className="text-text-muted text-sm line-clamp-2 mb-4 max-w-xl">
-          {person.bio}
+          {toSentenceCase(person.bio)}
         </p>
         
         <div className="flex flex-wrap items-center gap-4 sm:gap-6">

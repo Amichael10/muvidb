@@ -11,6 +11,7 @@ import PersonCard from '../components/person/PersonCard';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
+import { toTitleCase } from '../utils/format';
 
 // Platforms shown in the homepage "New to Stream" tabbed rail.
 const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth'].includes(p.id));
@@ -1097,8 +1098,8 @@ export default function Home() {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <h3 className="font-bold text-text-primary text-xs uppercase tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
-                              {company.name}
+                            <h3 className="font-bold text-text-primary text-xs tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
+                              {toTitleCase(company.name)}
                             </h3>
                             {company.founded_year && (
                               <p className="text-text-muted text-[8px] font-black uppercase tracking-widest mt-0.5 opacity-60">
