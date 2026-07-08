@@ -12,6 +12,9 @@ import { getPlatform, platformFilter } from '../lib/platforms';
 export default function WatchPlatform() {
   const { platform: platformId } = useParams();
   const platform = getPlatform(platformId);
+  // YouTube thumbnails are 16:9, so those cards look best landscape (like the
+  // homepage feed). Cinema/streaming posters are portrait and stay that way.
+  const isYoutube = platformId === 'youtube';
 
   const [films, setFilms] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -196,17 +199,34 @@ export default function WatchPlatform() {
         {/* Grid */}
         <div className="p-8 md:p-12">
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="flex justify-center"><SkeletonCard size="md" /></div>
-              ))}
-            </div>
+            isYoutube ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="w-full aspect-video rounded-2xl bg-surface-2 animate-shimmer" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="flex justify-center"><SkeletonCard size="md" /></div>
+                ))}
+              </div>
+            )
           ) : filtered.length > 0 ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {filtered.map((film) => (
-                <div key={film.id} className="flex justify-center"><FilmCard film={film} /></div>
-              ))}
-            </div>
+            isYoutube ? (
+              // Landscape (rectangle) cards — backdrop + runtime + live views, like home.
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
+                {filtered.map((film) => (
+                  <FilmCard key={film.id} film={film} variant="landscape" fullWidth />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {filtered.map((film) => (
+                  <div key={film.id} className="flex justify-center"><FilmCard film={film} /></div>
+                ))}
+              </div>
+            )
           ) : (
             <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-24 text-center">
               <p className="text-text-muted text-xs font-bold mb-6">
