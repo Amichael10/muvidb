@@ -264,6 +264,7 @@ export default function Home() {
       .from('platform_new_releases')
       .select(`platform, films(${cols})`)
       .in('platform', NEW_STREAM_IDS)
+      .order('display_order', { ascending: true })
       .order('created_at', { ascending: false });
 
     (curated || []).forEach(row => {
