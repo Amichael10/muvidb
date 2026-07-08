@@ -42,7 +42,8 @@ export default function WatchPlatform() {
           .from('films')
           .select(`
             id, title, slug, poster_url, backdrop_url, year, language,
-            runtime_minutes, view_count, average_rating, nfvcb_rating,
+            runtime_minutes, view_count, average_rating, audience_rating,
+            tmdb_rating, nfvcb_rating, countries, content_type, youtube_watch_url,
             release_type, streaming_links, source, is_in_cinemas, created_at,
             film_genres(genres(name))
           `)
