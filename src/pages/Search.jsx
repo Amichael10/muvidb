@@ -5,6 +5,7 @@ import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { toTitleCase } from '../utils/format';
+import { searchAll } from '../lib/search';
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,53 +45,28 @@ export default function Search() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Films
-      const { data: filmData, error: filmError } = await supabase
-        .from('films')
-        .select(`
-          id, slug, title, poster_url, backdrop_url, year, language, 
-          runtime_minutes, view_count, average_rating, nfvcb_rating,
-          film_genres!left(genres(name))
-        `)
-        .ilike('title', `%${initialQuery}%`)
-        .or('source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}')
-        .limit(40);
+      // Ranked, forgiving search: matches by word (any order), finds films by
+      // cast, and ranks exact matches above "similar" ones. See lib/search.js.
+      const { films: filmResults, people: peopleResults, companies: companyResults } =
+        await searchAll(initialQuery);
 
-      if (filmError) throw filmError;
-      
+      // De-dupe films by title so re-uploads don't clutter results.
       const uniqueFilms = [];
       const titles = new Set();
-      (filmData || []).forEach(f => {
-        if (!titles.has(f.title?.toLowerCase())) {
-          uniqueFilms.push({
-            ...f,
-            genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-          });
-          titles.add(f.title?.toLowerCase());
-        }
+      filmResults.forEach((f) => {
+        const key = f.title?.toLowerCase();
+        if (!titles.has(key)) { uniqueFilms.push(f); titles.add(key); }
       });
+
       setFilms(uniqueFilms);
+      setPeople(peopleResults);
+      setCompanies(companyResults);
 
-      // 2. Fetch People
-      const { data: peopleData, error: peopleError } = await supabase
-        .from('people')
-        .select('*')
-        .ilike('name', `%${initialQuery}%`)
-        .limit(20);
-
-      if (peopleError) throw peopleError;
-      setPeople(peopleData || []);
-
-      // 3. Fetch Companies
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('*')
-        .ilike('name', `%${initialQuery}%`)
-        .limit(20);
-      
-      if (companyError) throw companyError;
-      setCompanies(companyData || []);
-
+      // Jump to whichever category actually has results so a valid search never
+      // looks empty (e.g. searching an actor lands on People, not empty Movies).
+      const counts = { films: uniqueFilms.length, people: peopleResults.length, companies: companyResults.length };
+      const best = ['films', 'people', 'companies'].reduce((a, b) => (counts[b] > counts[a] ? b : a), 'films');
+      if (counts[best] > 0) setActiveTab(best);
     } catch (error) {
       console.error('Error searching:', error);
     } finally {
