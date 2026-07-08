@@ -21,10 +21,12 @@ ALTER TABLE public.reviews
   ADD COLUMN IF NOT EXISTS sentiment_score   numeric,     -- AI 1-10 score for this single comment
   ADD COLUMN IF NOT EXISTS likes             integer NOT NULL DEFAULT 0;
 
--- Dedup: never import the same external comment twice for a film.
+-- Dedup: never import the same external comment twice for a film. Non-partial
+-- so PostgREST upsert(onConflict: 'film_id,external_id') can target it. User
+-- reviews have external_id NULL, and Postgres treats NULLs as DISTINCT, so this
+-- never blocks multiple user reviews on the same film.
 CREATE UNIQUE INDEX IF NOT EXISTS reviews_film_external_uidx
-  ON public.reviews (film_id, external_id)
-  WHERE external_id IS NOT NULL;
+  ON public.reviews (film_id, external_id);
 
 -- Fast fetch of external reviews per film, best (most-liked) first.
 CREATE INDEX IF NOT EXISTS reviews_film_source_likes_idx
