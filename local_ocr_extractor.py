@@ -101,6 +101,7 @@ if python_bin_dir and python_bin_dir not in os.environ["PATH"]:
 # Load .env variables
 try:
     from dotenv import load_dotenv
+    load_dotenv(".env.local")
     load_dotenv()
 except ImportError:
     pass
@@ -258,8 +259,9 @@ def filter_unique_frames(frames: list[Path]) -> list[Path]:
 # Point OLLAMA_VISION_MODEL at a Q4_K_M tag (e.g. "qwen3-vl-4b:q4_K_M") for ~1.7x
 # faster CPU prefill — with downscaled frames the legibility loss on clean credits
 # is negligible. Falls back to the default Q8 tag if unset.
-OLLAMA_MODEL   = os.getenv("OLLAMA_VISION_MODEL", "").strip() or "qwen3-vl:4b-instruct"
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL   = os.getenv("OLLAMA_VISION_MODEL", "").strip() or "qwen3-vl-4b:latest"
+OLLAMA_HOST    = os.getenv("OLLAMA_HOST", "http://localhost:11434").strip().rstrip("/")
+OLLAMA_API_URL = f"{OLLAMA_HOST}/api/generate"
 
 OLLAMA_PROMPT = """You are analysing a frame from a Nollywood movie.
 Look carefully at the image. If you see ANY cast or crew credits — actor names, 
@@ -287,9 +289,9 @@ class OllamaVisionOCR:
         We do a cheap text-only call here so the batch doesn't time out on frame 1.
         """
         try:
-            urllib.request.urlopen("http://localhost:11434", timeout=5)
+            urllib.request.urlopen(OLLAMA_HOST, timeout=5)
         except Exception:
-            print("  ⚠️ Ollama server not reachable at localhost:11434.")
+            print(f"  ⚠️ Ollama server not reachable at {OLLAMA_HOST}.")
             print("    Start it with:  ollama serve")
             raise RuntimeError("Ollama server not running — start it with: ollama serve")
 
@@ -850,6 +852,23 @@ def run_ai_cleanup(title: str, raw_text: str) -> str:
     return local_regex_fallback(title, raw_text)
 
 # ── Supabase Integration ──────────────────────────────────────────────────────
+def _looks_like_jwt(key: str) -> bool:
+    return key.count(".") == 2
+
+
+def supabase_headers(key: str) -> dict:
+    """Support both legacy JWT service-role keys and new sb_secret_* API keys."""
+    headers = {
+        "apikey": key,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+        "User-Agent": "lumi-cast-enricher/1.0",
+    }
+    if _looks_like_jwt(key):
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
+
+
 class SupabaseSync:
     def __init__(self):
         self.url = os.getenv("VITE_SUPABASE_URL", "").strip() or None
@@ -858,11 +877,7 @@ class SupabaseSync:
             self.enabled = False
         else:
             self.enabled = True
-            self.headers = {
-                "apikey": self.key,
-                "Content-Type": "application/json",
-                "Prefer": "return=representation"
-            }
+            self.headers = supabase_headers(self.key)
             # Configure persistent session with automatic retries for robust proxy tunneling
             self.session = requests.Session()
             self.session.trust_env = False
