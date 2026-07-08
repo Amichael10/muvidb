@@ -30,7 +30,28 @@ import os
 import sys
 import json
 import time
+import re
+import unicodedata
 import requests
+
+
+def load_dotenv_file(path: str) -> None:
+    """Tiny .env loader so the standalone script works locally without deps."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k = k.strip()
+            if k and k not in os.environ:
+                os.environ[k] = v.strip().strip("\"'")
+
+
+load_dotenv_file(".env.local")
+load_dotenv_file(".env")
 
 SB_URL   = os.getenv("VITE_SUPABASE_URL", "").strip().rstrip("/")
 SB_KEY   = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
@@ -39,7 +60,10 @@ MODEL    = os.getenv("OLLAMA_TEXT_MODEL", "qwen3-vl:8b-instruct").strip()
 DRY_RUN  = os.getenv("DEDUPE_DRY_RUN", "1").strip().lower() in ("1", "true", "yes")
 LOOP     = os.getenv("DEDUPE_LOOP", "0").strip().lower() in ("1", "true", "yes")
 SLEEP    = int(os.getenv("DEDUPE_SLEEP_SECS", "1800"))
-FUZZ_MIN = int(os.getenv("DEDUPE_FUZZ_MIN", "93"))  # stricter default — avoids merging different surnames
+FUZZ_MIN = int(os.getenv("DEDUPE_FUZZ_MIN", "88"))
+TOKEN_FUZZ_MIN = int(os.getenv("DEDUPE_TOKEN_FUZZ_MIN", "82"))
+GIVEN_ALIAS_MIN = int(os.getenv("DEDUPE_GIVEN_ALIAS_MIN", "88"))
+TWO_TOKEN_FUZZ_MIN = int(os.getenv("DEDUPE_TWO_TOKEN_FUZZ_MIN", "84"))
 CLEAN_JUNK = os.getenv("DEDUPE_CLEAN_JUNK", "1").strip().lower() in ("1", "true", "yes")
 
 # Fields we never touch when merging metadata onto the primary.
@@ -55,12 +79,24 @@ except ImportError:
     print("❌ rapidfuzz not installed. pip install rapidfuzz")
     sys.exit(1)
 
-H = {
-    "apikey": SB_KEY,
-    "Authorization": f"Bearer {SB_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=representation",
-}
+def _looks_like_jwt(key: str) -> bool:
+    return key.count(".") == 2
+
+
+def supabase_headers() -> dict:
+    """Support both legacy JWT service-role keys and new sb_secret_* API keys."""
+    h = {
+        "apikey": SB_KEY,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+        "User-Agent": "lumi-people-deduper/1.0",
+    }
+    if _looks_like_jwt(SB_KEY):
+        h["Authorization"] = f"Bearer {SB_KEY}"
+    return h
+
+
+H = supabase_headers()
 
 
 # ── Supabase helpers ──────────────────────────────────────────────────────────
@@ -104,7 +140,100 @@ def credits_for(person_id: str) -> list:
 
 # ── Candidate clustering (cheap, narrows what the LLM sees) ────────────────────
 def _norm(name: str) -> str:
-    return " ".join(name.lower().replace(".", " ").replace("-", " ").split())
+    text = unicodedata.normalize("NFKD", name or "")
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.lower()
+    text = re.sub(r"[\u200b\u200c\u200d\ufeff]", " ", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return " ".join(text.split())
+
+
+def _name_score(a: str, b: str) -> float:
+    return max(fuzz.token_sort_ratio(a, b), fuzz.ratio(a, b))
+
+
+def _token_skeleton(token: str) -> str:
+    return "".join(ch for ch in token if ch not in "aeiou")
+
+
+def _tokens_match(a: str, b: str, min_score: int = TOKEN_FUZZ_MIN) -> bool:
+    if fuzz.ratio(a, b) >= min_score:
+        return True
+    sa, sb = _token_skeleton(a), _token_skeleton(b)
+    return len(sa) >= 3 and sa == sb
+
+
+def _token_match_stats(a_tokens: list, b_tokens: list, min_score: int = TOKEN_FUZZ_MIN) -> dict:
+    used = set()
+    stats = {"total": 0, "exact": 0, "near": 0}
+    for a in a_tokens:
+        best_i, best_score = None, 0
+        for i, b in enumerate(b_tokens):
+            if i in used:
+                continue
+            score = fuzz.ratio(a, b)
+            if score > best_score:
+                best_i, best_score = i, score
+        if best_i is not None and _tokens_match(a, b_tokens[best_i], min_score):
+            used.add(best_i)
+            stats["total"] += 1
+            if a == b_tokens[best_i]:
+                stats["exact"] += 1
+            else:
+                stats["near"] += 1
+    return stats
+
+
+def _contained_tokens(a_tokens: list, b_tokens: list) -> bool:
+    a, b = set(a_tokens), set(b_tokens)
+    return (len(a) >= 2 and a < b) or (len(b) >= 2 and b < a)
+
+
+def _near_given_name_alias(a_tokens: list, b_tokens: list) -> bool:
+    """Catch likely stage/name-change aliases, then let the LLM decide.
+
+    Example: "Faithia Balogun" vs "Fathia Williams" has a strong given-name
+    match but a different surname, so pure fuzzy scoring never surfaces it.
+    """
+    if len(a_tokens) < 2 or len(b_tokens) < 2:
+        return False
+    if len(a_tokens) > 3 or len(b_tokens) > 3:
+        return False
+    a, b = a_tokens[0], b_tokens[0]
+    if a == b or min(len(a), len(b)) < 5:
+        return False
+    return fuzz.ratio(a, b) >= GIVEN_ALIAS_MIN
+
+
+def _candidate_match_reason(a_norm: str, b_norm: str):
+    a_tokens, b_tokens = a_norm.split(), b_norm.split()
+    if not a_tokens or not b_tokens:
+        return None
+
+    score = _name_score(a_norm, b_norm)
+    if score >= FUZZ_MIN:
+        return f"fuzzy score {score:.1f}"
+
+    if _contained_tokens(a_tokens, b_tokens):
+        return "token containment"
+
+    surname_ok = (
+        len(a_tokens) >= 2 and len(b_tokens) >= 2
+        and fuzz.ratio(a_tokens[-1], b_tokens[-1]) >= 90
+    )
+    if surname_ok and score >= max(80, FUZZ_MIN - 8):
+        return f"same surname + fuzzy score {score:.1f}"
+
+    token_stats = _token_match_stats(a_tokens, b_tokens)
+    if token_stats["total"] >= 3:
+        return "three matching/near-matching tokens"
+    if token_stats["total"] >= 2 and score >= TWO_TOKEN_FUZZ_MIN:
+        return f"two token matches + fuzzy score {score:.1f}"
+
+    if _near_given_name_alias(a_tokens, b_tokens):
+        return "near given-name alias"
+
+    return None
 
 
 # ── Role-label junk detection ─────────────────────────────────────────────────
@@ -196,7 +325,16 @@ def _block_keys(norm_name: str) -> set:
     """Cheap blocking keys: the first 3 chars of each token. A name only needs to
     share ONE key with another to become a comparison candidate, so word-order
     swaps and most misspellings still land in a common block."""
-    return {t[:3] for t in norm_name.split() if len(t) >= 3}
+    keys = set()
+    for t in norm_name.split():
+        if len(t) >= 3:
+            keys.add(f"p3:{t[:3]}")
+        if len(t) >= 5:
+            keys.add(f"p2:{t[:2]}")
+            consonants = _token_skeleton(t)
+            if len(consonants) >= 3:
+                keys.add(f"cs:{consonants[:4]}")
+    return keys
 
 
 def build_candidate_clusters(people: list) -> list:
@@ -226,21 +364,10 @@ def build_candidate_clusters(people: list) -> list:
             continue
         for a in range(len(ids)):
             ni = norms[ids[a]]
-            ti = set(ni.split())
             for b in range(a + 1, len(ids)):
                 nj = norms[ids[b]]
                 comparisons += 1
-                score = max(fuzz.token_sort_ratio(ni, nj), fuzz.ratio(ni, nj))
-                if score >= FUZZ_MIN:
-                    uf.union(ids[a], ids[b])
-                    continue
-                # Containment: one full name sits inside the other ("Linda Adedeji"
-                # ⊂ "Linda Adedeji Landlord" — same person + a character/role word).
-                # Require the smaller to have >=2 tokens so single first names don't
-                # over-merge ("John" ⊄ "John Paul Mbah").
-                tj = set(nj.split())
-                small, big_set = (ti, tj) if len(ti) <= len(tj) else (tj, ti)
-                if len(small) >= 2 and small < big_set:
+                if _candidate_match_reason(ni, nj):
                     uf.union(ids[a], ids[b])
 
     # Collect connected components of size >= 2.
@@ -268,6 +395,9 @@ vs "Linda Adedeji Landlord"), that extra word is the CHARACTER they played, not
 part of their name — choose the SHORTER name as primary and merge the longer one in.
 Do NOT merge people you are not confident are the same. When unsure, leave them
 separate (omit them from the output).
+Do NOT merge relatives, family members, or people who only share a surname/household
+name. A shared last name, shared parent/child relationship, or shared production
+family is not a duplicate-person signal.
 
 Return ONLY valid JSON, no prose, in exactly this shape:
 {{"merges": [{{"primary_id": "<id>", "duplicate_ids": ["<id>", "..."], "canonical_name": "<best spelling>"}}]}}
@@ -306,18 +436,14 @@ def merge_person(primary: dict, dup: dict, people_by_id: dict) -> bool:
         return False
 
     # Deterministic safety net: even if the LLM said "same person", refuse to merge
-    # two names that don't actually clear the fuzzy bar AND don't share a surname.
-    # This blocks over-eager merges like "Emmanuel Oduneye" vs "Emmanuel Odunyemi".
+    # names with no fuzzy/token/alias evidence at all. This still blocks over-eager
+    # merges like "Emmanuel Oduneye" vs "Emmanuel Odunyemi".
     np, nd = _norm(primary["name"]), _norm(dup["name"])
-    score = max(fuzz.token_sort_ratio(np, nd), fuzz.ratio(np, nd))
-    surname_ok = fuzz.ratio(np.split()[-1], nd.split()[-1]) >= 90 if np and nd else False
-    # Containment ("Linda Adedeji" ⊂ "Linda Adedeji Landlord") is a strong same-person
-    # signal even though the trailing word differs — exempt it from the surname guard.
-    tp, td = set(np.split()), set(nd.split())
-    contained = (len(tp) >= 2 and tp < td) or (len(td) >= 2 and td < tp)
-    if score < FUZZ_MIN and not surname_ok and not contained:
+    reason = _candidate_match_reason(np, nd)
+    if not reason:
+        score = _name_score(np, nd)
         print(f"  ↯ SKIP merge '{dup['name']}' -> '{primary['name']}' "
-              f"(similarity {score} < {FUZZ_MIN}, surnames differ).")
+              f"(similarity {score:.1f}; no deterministic alias signal).")
         return False
 
     primary_credits = credits_for(pid)
