@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
-import { toTitleCase, toSentenceCase } from '../utils/format'
+import { toTitleCase, toSentenceCase, formatPersonName } from '../utils/format'
 
 // Extract chain name from the cinema's display name
 function extractChain(name = '') {
