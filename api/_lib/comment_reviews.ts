@@ -42,6 +42,11 @@ const isNoise = (t: string) => t.length < 60 || NOISE.some((re) => re.test(t.tri
  *  comment can't dominate). weight(0 likes)=1, weight(2000)≈4.3. */
 const likeWeight = (likes: number) => 1 + Math.log10(1 + Math.max(0, likes));
 
+// Never let a film show a near-perfect score — it reads as fake. Hard-cap the
+// audience rating so nothing ever reaches 9.8/9.9/10.
+const MAX_AUDIENCE_RATING = 9.7;
+const capRating = (r: number) => Math.min(MAX_AUDIENCE_RATING, Math.round(r * 10) / 10);
+
 async function fetchComments(videoId: string, max = 60): Promise<RawComment[]> {
   const data = await ytGet('commentThreads', {
     part: 'snippet',
@@ -144,7 +149,7 @@ export async function mineFilmComments(
     return {
       status: 'ok',
       kept: kept.length,
-      rating: d ? Math.round((n / d) * 10) / 10 : null,
+      rating: d ? capRating(n / d) : null,
       samples: kept.map(({ c, score }) => ({ author: c.author, likes: c.likes, score, text: c.text.slice(0, 140) })),
     };
   }
@@ -182,7 +187,7 @@ export async function mineFilmComments(
       num += (Number(r.sentiment_score) || 0) * w;
       den += w;
     }
-    rating = den ? Math.round((num / den) * 10) / 10 : null;
+    rating = den ? capRating(num / den) : null;
   }
   const { error: filmErr } = await supabase
     .from('films')

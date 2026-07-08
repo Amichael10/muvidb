@@ -418,7 +418,8 @@ export default function FilmDetail() {
               <div className="flex flex-wrap items-end gap-6">
                 {Number(film.tmdb_rating || film.rating || film.audience_rating || 0) > 0 ? (() => {
                   const isTmdb = Number(film.tmdb_rating || film.rating || 0) > 0;
-                  const displayRating = isTmdb ? (film.tmdb_rating || film.rating) : film.audience_rating;
+                  // Never show a "perfect" score — cap at 9.7 (no 9.8/9.9/10).
+                  const displayRating = Math.min(9.7, isTmdb ? (film.tmdb_rating || film.rating) : film.audience_rating);
                   return (
                   <div className="flex items-center gap-3">
                     <span className="text-brand text-4xl md:text-5xl font-bold font-heading leading-none tracking-tighter drop-shadow-lg">{displayRating}</span>

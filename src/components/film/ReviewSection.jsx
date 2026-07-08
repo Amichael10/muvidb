@@ -340,7 +340,8 @@ const ReviewSection = ({ filmId, currentUser }) => {
             num += (Number(r.sentiment_score) || 0) * w
             den += w
         }
-        return den ? (num / den).toFixed(1) : null
+        // Hard-cap at 9.7 — no film should ever look "perfect" (9.8/9.9/10).
+        return den ? Math.min(9.7, num / den).toFixed(1) : null
     })()
 
     return (

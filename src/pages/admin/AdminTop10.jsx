@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
@@ -6,12 +6,16 @@ import toast from 'react-hot-toast';
 export default function AdminTop10() {
   const [top10, setTop10] = useState(Array(10).fill(null));
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Search state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentRank, setCurrentRank] = useState(null);
   const [filmSearch, setFilmSearch] = useState('');
   const [filmResults, setFilmResults] = useState([]);
+
+  // Drag-to-reorder state
+  const dragIndex = useRef(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   useEffect(() => {
     fetchTop10();
@@ -108,6 +112,45 @@ export default function AdminTop10() {
     }
   };
 
+  // Rewrite the whole list atomically-ish (rank has a UNIQUE constraint, so we
+  // can't swap two rows in place). Delete all + re-insert with fresh ranks;
+  // restore the snapshot if anything fails.
+  const rewriteRanks = async (slots) => {
+    const rows = slots
+      .map((it, i) => (it ? { film_id: it.film_id, rank: i + 1 } : null))
+      .filter(Boolean);
+    await supabase.from('top_10_films').delete().gte('rank', 1);
+    if (rows.length) {
+      const { error } = await supabase.from('top_10_films').insert(rows);
+      if (error) throw error;
+    }
+  };
+
+  const handleDrop = async () => {
+    const from = dragIndex.current;
+    const to = dragOverIndex;
+    dragIndex.current = null;
+    setDragOverIndex(null);
+    if (from === null || to === null || from === to) return;
+    if (!top10[from]) return; // can't drag an empty slot
+
+    const snapshot = top10;
+    const next = [...top10];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setTop10(next); // optimistic
+
+    try {
+      await rewriteRanks(next);
+      toast.success('Order updated');
+    } catch (err) {
+      toast.error('Failed to save order: ' + err.message);
+      try { await rewriteRanks(snapshot); } catch (e) { /* best effort */ }
+    } finally {
+      fetchTop10();
+    }
+  };
+
   const handleRemove = async (id) => {
     if (!window.confirm('Are you sure you want to remove this film from the Top 10?')) return;
     try {
@@ -125,7 +168,7 @@ export default function AdminTop10() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Top 10 Management</h1>
-          <p className="text-text-muted text-sm mt-1">Manage the Top 10 films displayed on the home page.</p>
+          <p className="text-text-muted text-sm mt-1">Manage the Top 10 films on the home page. Drag cards to reorder their rank.</p>
         </div>
       </div>
 
@@ -139,9 +182,22 @@ export default function AdminTop10() {
           top10.map((item, index) => {
             const rank = index + 1;
             return (
-              <div key={rank} className="bg-surface rounded-xl border border-border overflow-hidden flex flex-col">
+              <div
+                key={rank}
+                draggable={!!item}
+                onDragStart={() => { if (item) dragIndex.current = index; }}
+                onDragEnter={() => setDragOverIndex(index)}
+                onDragOver={(e) => e.preventDefault()}
+                onDragEnd={handleDrop}
+                className={`bg-surface rounded-xl border overflow-hidden flex flex-col transition-all ${item ? 'cursor-grab active:cursor-grabbing' : ''} ${
+                  dragOverIndex === index ? 'border-brand ring-2 ring-brand/50' : 'border-border'
+                }`}
+              >
                 <div className="bg-surface-2/50 border-b border-border p-3 flex justify-between items-center">
-                  <span className="font-bold text-lg text-text-primary">#{rank}</span>
+                  <span className="font-bold text-lg text-text-primary flex items-center gap-1.5">
+                    {item && <Icon icon="solar:hamburger-menu-linear" className="text-text-muted" width="16" />}
+                    #{rank}
+                  </span>
                   {item && (
                     <button
                       onClick={() => handleRemove(item.id)}
@@ -156,10 +212,11 @@ export default function AdminTop10() {
                 <div className="p-4 flex-1 flex flex-col justify-center items-center relative group min-h-[200px]">
                   {item && item.films ? (
                     <>
-                      <img 
-                        src={item.films.poster_url || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'} 
+                      <img
+                        src={item.films.poster_url || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'}
                         alt={item.films.title}
-                        className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity"
+                        draggable={false}
+                        className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity pointer-events-none"
                       />
                       <div className="relative z-10 flex flex-col items-center text-center">
                         <h3 className="font-bold text-white text-lg drop-shadow-md mb-1">{item.films.title}</h3>
