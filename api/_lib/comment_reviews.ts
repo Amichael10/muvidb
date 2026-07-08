@@ -184,7 +184,7 @@ export async function mineFilmComments(
     }
     rating = den ? Math.round((num / den) * 10) / 10 : null;
   }
-  await supabase
+  const { error: filmErr } = await supabase
     .from('films')
     .update({
       audience_rating: rating,
@@ -192,6 +192,7 @@ export async function mineFilmComments(
       comments_synced_at: new Date().toISOString(),
     })
     .eq('id', filmId);
+  if (filmErr) console.warn(`[mine] film rating update failed for ${filmId}: ${filmErr.message}`);
 
   return { status: 'ok', kept: kept.length, rating };
 }
