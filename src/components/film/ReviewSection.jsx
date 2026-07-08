@@ -139,6 +139,59 @@ const ReviewCard = ({
     )
 }
 
+// Third-party review (YouTube comment) — clearly badged, author NOT clickable
+// (they're not our users), no edit/delete, links out to the original comment.
+const ExternalReviewCard = ({ review }) => {
+    const name = review.author_name || 'YouTube viewer';
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return (
+        <div className="bg-surface border border-border rounded-xl p-6 transition-all duration-300 hover:shadow-md relative overflow-hidden">
+            <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                    {review.author_avatar_url ? (
+                        <img src={review.author_avatar_url} alt="" referrerPolicy="no-referrer"
+                            className="w-12 h-12 rounded-full object-cover border-2 border-surface-2" />
+                    ) : (
+                        <div className="w-12 h-12 rounded-full bg-red-500/5 border-2 border-red-500/10 flex items-center justify-center text-red-500 font-black text-xs">
+                            {initials}
+                        </div>
+                    )}
+                    <div>
+                        {/* plain text — deliberately not a link */}
+                        <p className="text-text-primary font-bold text-sm tracking-tight">{name}</p>
+                        <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-widest text-red-500/90 bg-red-500/5 border border-red-500/10 px-2 py-0.5 rounded-full">
+                            <Icon icon="mdi:youtube" className="text-xs" /> via YouTube
+                        </span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    {review.likes > 0 && (
+                        <span className="text-text-muted text-[11px] font-bold flex items-center gap-1">
+                            <Icon icon="solar:like-bold" className="text-xs" /> {review.likes.toLocaleString()}
+                        </span>
+                    )}
+                    <div className="text-brand font-black text-lg tracking-tighter flex items-center gap-1">
+                        <Icon icon="solar:star-bold" className="text-sm" />
+                        {review.rating}<span className="text-[10px] text-text-muted">/10</span>
+                    </div>
+                </div>
+            </div>
+            {review.body && (
+                <div className="mt-5 relative">
+                    <div className="absolute -left-1.5 top-0 w-0.5 h-full bg-red-500/10 rounded-full" />
+                    <p className="text-text-secondary text-sm leading-[1.6] pl-4 opacity-90">{review.body}</p>
+                </div>
+            )}
+            {review.source_url && (
+                <a href={review.source_url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-4 text-[10px] font-bold text-text-muted hover:text-red-500 transition-colors">
+                    View on YouTube <Icon icon="solar:arrow-right-up-linear" />
+                </a>
+            )}
+        </div>
+    );
+};
+
 const ReviewForm = ({
     onSubmit,
     onCancel,
@@ -246,6 +299,7 @@ const ReviewSection = ({ filmId, currentUser }) => {
     const navigate = useNavigate()
     const {
         reviews,
+        externalReviews,
         userReview,
         loading,
         submitReview,
@@ -348,7 +402,7 @@ const ReviewSection = ({ filmId, currentUser }) => {
                             )
                         ))}
                     </div>
-                ) : (
+                ) : externalReviews.length === 0 ? (
                     <div className="bg-surface-2/50 border-2 border-dashed border-border rounded-3xl py-16 text-center">
                         <Icon icon="solar:clapperboard-play-linear" className="text-5xl mx-auto mb-4 opacity-20 text-brand" />
                         <h4 className="text-text-primary text-xl font-bold tracking-tight">No reviews yet.</h4>
@@ -363,8 +417,28 @@ const ReviewSection = ({ filmId, currentUser }) => {
                             </button>
                         )}
                     </div>
-                )}
+                ) : null}
             </div>
+
+            {/* What viewers are saying — mined from YouTube comments */}
+            {externalReviews.length > 0 && (
+                <div className="space-y-6 pt-4">
+                    <div className="flex items-center gap-2 border-b border-border pb-4">
+                        <Icon icon="mdi:youtube" className="text-red-500 text-xl" />
+                        <h3 className="text-text-primary text-lg font-bold tracking-tight">What viewers are saying</h3>
+                        <span className="text-text-muted text-[10px] font-black uppercase tracking-widest">
+                            {externalReviews.length} from YouTube
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-6">
+                        {externalReviews.map(r => (
+                            <div key={r.id} className="page-fade-in">
+                                <ExternalReviewCard review={r} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

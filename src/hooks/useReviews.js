@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 export const useReviews = (filmId, currentUser) => {
-    const [reviews, setReviews] = useState([])
+    const [reviews, setReviews] = useState([])            // real user reviews
+    const [externalReviews, setExternalReviews] = useState([]) // youtube/tmdb, badged
     const [userReview, setUserReview] = useState(null)
     const [loading, setLoading] = useState(true)
 
@@ -11,10 +12,26 @@ export const useReviews = (filmId, currentUser) => {
         fetchReviews()
     }, [filmId])
 
+    // Split a raw row set into real user reviews vs. third-party (badged) ones.
+    const applyRows = (rows) => {
+        const all = rows || []
+        const isExternal = (r) => r.source && r.source !== 'user'
+        const users = all.filter((r) => !isExternal(r))
+        // External reviews: most-liked first (most helpful), not newest.
+        const external = all
+            .filter(isExternal)
+            .sort((a, b) => (b.likes || 0) - (a.likes || 0))
+        setReviews(users)
+        setExternalReviews(external)
+        if (currentUser?.id) {
+            setUserReview(users.find((r) => r.user_id === currentUser.id) || null)
+        }
+    }
+
     const fetchReviews = async () => {
         setLoading(true)
         try {
-            // Attempt to fetch with users join. 
+            // Attempt to fetch with users join.
             // If it fails, fallback to simple select.
             const { data, error } = await supabase
                 .from('reviews')
@@ -24,7 +41,7 @@ export const useReviews = (filmId, currentUser) => {
                         name,
                         avatar_url
                     )
-                `) 
+                `)
                 .eq('film_id', filmId)
                 .order('created_at', { ascending: false })
 
@@ -35,17 +52,11 @@ export const useReviews = (filmId, currentUser) => {
                     .select('*')
                     .eq('film_id', filmId)
                     .order('created_at', { ascending: false });
-                
+
                 if (fallbackError) throw fallbackError;
-                setReviews(fallbackData || []);
-                if (currentUser?.id) {
-                    setUserReview(fallbackData?.find(r => r.user_id === currentUser.id) || null);
-                }
+                applyRows(fallbackData);
             } else {
-                setReviews(data || [])
-                if (currentUser?.id) {
-                    setUserReview(data?.find(r => r.user_id === currentUser.id) || null)
-                }
+                applyRows(data);
             }
         } catch (error) {
             console.error('Critical Fetch Fail:', error);
@@ -126,6 +137,7 @@ export const useReviews = (filmId, currentUser) => {
 
     return {
         reviews,
+        externalReviews,
         userReview,
         loading,
         submitReview,

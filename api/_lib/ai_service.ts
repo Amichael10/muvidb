@@ -5,23 +5,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize Gemini with multi-key rotation. Supports a comma-separated list
-// in GEMINI_API_KEY plus numbered fallbacks (GEMINI_API_KEY_2, _3). Each key
-// has its own free-tier quota, so rotating on 429/RESOURCE_EXHAUSTED multiplies
-// the daily ceiling before we fall back to OpenAI/Groq.
-function collectGeminiKeys(): string[] {
-  const raw = [
-    process.env.GEMINI_API_KEY,
-    process.env.GEMINI_API_KEY_2,
-    process.env.GEMINI_API_KEY_3,
-  ];
+// Collect all keys for an env prefix: BASE, BASE_2 … BASE_10, plus a
+// comma-separated list inside BASE. De-duped. Each free-tier key has its own
+// quota, so rotating across them multiplies the daily ceiling.
+function collectKeys(base: string): string[] {
+  const raw: (string | undefined)[] = [process.env[base]];
+  for (let i = 2; i <= 10; i++) raw.push(process.env[`${base}_${i}`]);
   return [
     ...new Set(
       raw.filter(Boolean).flatMap((k) => k!.split(',')).map((k) => k.trim()).filter(Boolean)
     ),
   ];
 }
-const GEMINI_KEYS = collectGeminiKeys();
+
+// Gemini: rotate on 429/RESOURCE_EXHAUSTED before falling back to OpenAI/Groq.
+const GEMINI_KEYS = collectKeys('GEMINI_API_KEY');
 let geminiKeyIdx = 0;
 
 function geminiModelFor(model: string) {
@@ -52,8 +50,34 @@ async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): 
   throw lastErr;
 }
 
-// Initialize Groq (if key exists)
-const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+// Groq: same multi-key rotation as Gemini.
+const GROQ_KEYS = collectKeys('GROQ_API_KEY');
+let groqKeyIdx = 0;
+const groqClientFor = () => new Groq({ apiKey: GROQ_KEYS[groqKeyIdx] || '' });
+
+function isGroqQuotaError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 429 || /quota|rate limit|rate_limit|too many requests|\b429\b/.test(msg);
+}
+
+/** Run a Groq call, rotating to the next key on quota errors. */
+async function withGroqRotation(fn: (client: Groq) => Promise<any>): Promise<any> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < Math.max(1, GROQ_KEYS.length); attempt++) {
+    try {
+      return await fn(groqClientFor());
+    } catch (err: any) {
+      lastErr = err;
+      if (isGroqQuotaError(err) && GROQ_KEYS.length > 1) {
+        console.warn(`[groq] key #${groqKeyIdx + 1}/${GROQ_KEYS.length} quota hit, rotating…`);
+        groqKeyIdx = (groqKeyIdx + 1) % GROQ_KEYS.length;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
 
 // Initialize OpenAI (if key exists)
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
@@ -122,13 +146,13 @@ export async function generateAIContent(prompt: string) {
     });
   }
 
-  if (groq) {
+  if (GROQ_KEYS.length) {
     providers.push({
       name: 'groq',
-      execute: async () => {
+      execute: async () => withGroqRotation(async (client) => {
         // Primary Groq Model
         try {
-          const response = await groq.chat.completions.create({
+          const response = await client.chat.completions.create({
             messages: [{ role: 'user', content: prompt }],
             model: 'llama-3.3-70b-versatile',
           }).asResponse();
@@ -136,16 +160,17 @@ export async function generateAIContent(prompt: string) {
           if (data.error) throw new Error(data.error.message);
           return { text: data.choices[0]?.message?.content || '', engine: 'groq', headers: response.headers };
         } catch (err: any) {
-          // If 70b is limited, try the smaller 8b model as a sub-fallback
+          if (isGroqQuotaError(err)) throw err; // let rotation handle quota
+          // If 70b is otherwise limited, try the smaller 8b model as a sub-fallback
           console.warn('Groq 70b limited, trying 8b instant...');
-          const response = await groq.chat.completions.create({
+          const response = await client.chat.completions.create({
             messages: [{ role: 'user', content: prompt }],
             model: 'llama-3.1-8b-instant',
           }).asResponse();
           const data = await response.json();
           return { text: data.choices[0]?.message?.content || '', engine: 'groq-8b', headers: response.headers };
         }
-      }
+      })
     });
   }
 
