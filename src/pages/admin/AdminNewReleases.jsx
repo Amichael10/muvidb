@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
@@ -18,6 +18,10 @@ export default function AdminNewReleases() {
   const [filmSearch, setFilmSearch] = useState('');
   const [filmResults, setFilmResults] = useState([]);
 
+  // Drag-to-reorder state
+  const dragIndex = useRef(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
   useEffect(() => { fetchItems(); }, [platform]);
 
   useEffect(() => {
@@ -33,8 +37,9 @@ export default function AdminNewReleases() {
     try {
       const { data, error } = await supabase
         .from('platform_new_releases')
-        .select('id, film_id, created_at, films(id, title, poster_url, year, release_type)')
+        .select('id, film_id, display_order, created_at, films(id, title, poster_url, year, release_type)')
         .eq('platform', platform)
+        .order('display_order', { ascending: true })
         .order('created_at', { ascending: false });
       if (error) throw error;
       setItems(data || []);
@@ -91,6 +96,36 @@ export default function AdminNewReleases() {
     }
   };
 
+  // Commit a new order: persist display_order for every row (0-based index).
+  const persistOrder = async (ordered) => {
+    const prev = items;
+    setItems(ordered); // optimistic
+    try {
+      const { error } = await supabase
+        .from('platform_new_releases')
+        .upsert(
+          ordered.map((it, i) => ({ id: it.id, platform, film_id: it.film_id, display_order: i })),
+          { onConflict: 'id' }
+        );
+      if (error) throw error;
+    } catch (err) {
+      setItems(prev); // rollback on failure
+      toast.error('Failed to save order: ' + err.message);
+    }
+  };
+
+  const handleDrop = () => {
+    const from = dragIndex.current;
+    const to = dragOverIndex;
+    dragIndex.current = null;
+    setDragOverIndex(null);
+    if (from === null || to === null || from === to) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    persistOrder(next);
+  };
+
   const platformLabel = STREAM_PLATFORMS.find((p) => p.id === platform)?.name || platform;
 
   return (
@@ -98,7 +133,7 @@ export default function AdminNewReleases() {
       <div>
         <h1 className="text-2xl font-bold text-text-primary">New to Stream</h1>
         <p className="text-text-muted text-sm mt-1">
-          Hand-pick the films shown under each platform tab on the homepage. Search is limited to titles already tagged with that platform.
+          Hand-pick the films shown under each platform tab on the homepage. Drag posters to reorder. Search is limited to titles already tagged with that platform.
         </p>
       </div>
 
@@ -144,12 +179,25 @@ export default function AdminNewReleases() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {items.map((item) => (
-            <div key={item.id} className="bg-surface rounded-xl border border-border overflow-hidden group relative">
+          {items.map((item, index) => (
+            <div
+              key={item.id}
+              draggable
+              onDragStart={() => { dragIndex.current = index; }}
+              onDragEnter={() => setDragOverIndex(index)}
+              onDragOver={(e) => e.preventDefault()}
+              onDragEnd={handleDrop}
+              className={`bg-surface rounded-xl border overflow-hidden group relative cursor-grab active:cursor-grabbing transition-all ${
+                dragOverIndex === index ? 'border-brand ring-2 ring-brand/50' : 'border-border'
+              }`}
+            >
               <div className="aspect-[2/3] bg-surface-2 relative">
                 {item.films?.poster_url && (
-                  <img src={item.films.poster_url} alt="" className="w-full h-full object-cover" />
+                  <img src={item.films.poster_url} alt="" className="w-full h-full object-cover pointer-events-none" />
                 )}
+                <span className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/70 text-white text-xs font-black flex items-center justify-center">
+                  {index + 1}
+                </span>
                 <button
                   onClick={() => removeFilm(item.id)}
                   className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 text-white hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
