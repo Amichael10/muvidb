@@ -222,22 +222,26 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
   // first — those are the ones surfaced on the site. Retry on a statement
   // timeout (57014) so a transient slow query doesn't abort the whole run.
   const selectFilms = async (attempt = 0): Promise<any[] | null> => {
-    const { data, error } = await supabase
-      .from('films')
-      .select('id, source_video_id, comments_synced_at')
-      .not('source_video_id', 'is', null)
-      .or(`comments_synced_at.is.null,comments_synced_at.lt.${staleBefore}`)
-      .order('created_at', { ascending: false })
-      .limit(scan);
-    if (error) {
-      if (attempt < 3 && error.code === '57014') {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    try {
+      const { data, error } = await supabase
+        .from('films')
+        .select('id, source_video_id, comments_synced_at')
+        .not('source_video_id', 'is', null)
+        .or(`comments_synced_at.is.null,comments_synced_at.lt.${staleBefore}`)
+        .order('created_at', { ascending: false })
+        .limit(scan);
+      if (error) throw error;
+      return data;
+    } catch (e: any) {
+      // Retry on ANY transient failure — statement timeout (57014) or a network
+      // blip ("fetch failed"/socket hang up) — so the whole run doesn't abort.
+      if (attempt < 4) {
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
         return selectFilms(attempt + 1);
       }
-      console.error(`[comment-mining] film selection failed: ${error.code} ${error.message}`);
+      console.error(`[comment-mining] film selection failed after retries: ${e.code || ''} ${e.message}`);
       return null;
     }
-    return data;
   };
   const films = await selectFilms();
   if (!films?.length) return { checked: 0, mined: 0, skipped: 0, message: 'nothing to mine' };
