@@ -33,6 +33,29 @@ function tokenize(q) {
     .filter((t) => t.length >= 2);
 }
 
+// Word-padded trigram set, mirroring how pg_trgm tokenises. Lets us rank typo'd
+// queries client-side: "weding party" is far closer to "The Wedding Party" than
+// to "The Party", even though neither contains the substring "weding".
+function trigrams(s) {
+  const set = new Set();
+  const words = (s || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+  for (const w of words) {
+    const padded = `  ${w} `;
+    for (let i = 0; i < padded.length - 2; i++) set.add(padded.slice(i, i + 3));
+  }
+  return set;
+}
+
+// Jaccard overlap of trigram sets, 0..1.
+function trigramSimilarity(a, b) {
+  const A = trigrams(a);
+  const B = trigrams(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  return inter / (A.size + B.size - inter);
+}
+
 // Relevance score for a candidate's text against the query.
 function scoreText(text, fullQ, terms) {
   const t = (text || '').toLowerCase();
@@ -44,15 +67,20 @@ function scoreText(text, fullQ, terms) {
   for (const term of terms) if (t.includes(term)) { s += 60; matched++; }
   if (matched === terms.length) s += 120; // every word present
   if (t.startsWith(terms[0])) s += 25;    // prefix of first word
+  // Fuzzy closeness — the only signal that can rank a typo'd match, since a
+  // misspelt term never substring-matches.
+  s += trigramSimilarity(fullQ, t) * 400;
   s -= Math.min(t.length, 80) * 0.15;     // gently prefer tighter matches
   return s;
 }
 
-// The most selective (longest) term, used for the single cheap DB filter.
-// A leading-wildcard `ilike '%term%'` already seq-scans; ORing several of them
-// blows the statement timeout on big tables, so we filter by ONE term and do
-// the multi-word ranking/filtering client-side.
-const pickTerm = (terms) => [...terms].sort((a, b) => b.length - a.length)[0];
+// Match ANY term. This used to filter on a single term because a leading-wildcard
+// `ilike '%term%'` seq-scanned and blew the statement timeout — but the pg_trgm
+// GIN indexes turn each one into a bitmap index scan (~6ms), so ORing them is
+// cheap now and catches names where only the surname matches ("…Adekola").
+// Terms are already stripped to letters/digits by tokenize(), so they're safe to
+// interpolate into a PostgREST `.or()` string (which uses `*` as the wildcard).
+const orIlike = (field, terms) => terms.map((t) => `${field}.ilike.*${t}*`).join(',');
 
 // Best-effort pg_trgm fuzzy top-up (typo tolerance). No-ops if the RPC or the
 // extension isn't installed yet.
@@ -71,26 +99,33 @@ export async function searchAll(query) {
   const terms = tokenize(query);
   if (!terms.length) return { films: [], people: [], companies: [] };
 
-  // Filter the DB by the single most-selective term (cheap); rank by all terms
-  // client-side below. Run the three categories in parallel.
-  const term = pickTerm(terms);
-  const [peopleRes, titleFilmRes, companyRes] = await Promise.all([
-    supabase.from('people').select('*').ilike('name', `%${term}%`).limit(60),
-    supabase.from('films').select(FILM_FIELDS).ilike('title', `%${term}%`).or(NOLLYWOOD_FILTER).limit(80),
-    supabase.from('companies').select('*').ilike('name', `%${term}%`).limit(40),
+  // Match any term at the DB level (index-backed), then rank by all terms
+  // client-side below. The fuzzy RPCs run alongside — they're the only way a
+  // misspelt term finds anything, and a common word ("party") would otherwise
+  // flood the results and hide the intended match. Parallel, so no extra wait.
+  const [peopleRes, titleFilmRes, companyRes, peopleFz, filmsFz] = await Promise.all([
+    supabase.from('people').select('*').or(orIlike('name', terms)).limit(60),
+    supabase.from('films').select(FILM_FIELDS).or(orIlike('title', terms)).or(NOLLYWOOD_FILTER).limit(80),
+    supabase.from('companies').select('*').or(orIlike('name', terms)).limit(40),
+    fuzzy('search_people_fuzzy', fullQ),
+    fuzzy('search_films_fuzzy', fullQ),
   ]);
 
-  // People (+ fuzzy top-up), ranked.
-  let peopleRaw = peopleRes.data || [];
-  if (peopleRaw.length < 5) {
-    const fz = await fuzzy('search_people_fuzzy', fullQ);
-    const seen = new Set(peopleRaw.map((p) => p.id));
-    peopleRaw = [...peopleRaw, ...fz.filter((p) => !seen.has(p.id))];
-  }
-  const people = peopleRaw
+  // Merge a fuzzy result set into the exact one, skipping ids we already have.
+  const mergeFuzzy = (rows, fz) => {
+    const seen = new Set(rows.map((r) => r.id));
+    return [...rows, ...fz.filter((r) => r?.id && !seen.has(r.id))];
+  };
+
+  const people = mergeFuzzy(peopleRes.data || [], peopleFz)
     .map((p) => ({ ...p, _score: scoreText(p.name, fullQ, terms) }))
     .sort((a, b) => b._score - a._score)
     .slice(0, 24);
+
+  // Films by title, plus fuzzy matches so a typo'd title still lands
+  // ("weding party" -> The Wedding Party). Fuzzy rows come straight from the
+  // films table with no genres join, which the mapping below tolerates.
+  const titleFilms = mergeFuzzy(titleFilmRes.data || [], filmsFz);
 
   // Films by cast — every film the top matched people appear in.
   let castFilms = [];
@@ -109,7 +144,7 @@ export async function searchAll(query) {
 
   // Merge title + cast films, dedupe, score (cast match gets a baseline), sort.
   const byId = new Map();
-  for (const f of [...(titleFilmRes.data || []), ...castFilms]) if (!byId.has(f.id)) byId.set(f.id, f);
+  for (const f of [...titleFilms, ...castFilms]) if (!byId.has(f.id)) byId.set(f.id, f);
   const films = [...byId.values()]
     .map((f) => ({
       ...f,
