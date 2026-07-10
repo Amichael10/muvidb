@@ -218,63 +218,140 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
   const minComments = opts.minComments ?? 20;
   const staleBefore = new Date(Date.now() - 21 * 86400_000).toISOString();
 
-  // Films needing a (re)check: never mined, or mined > 21 days ago. Recent
-  // first — those are the ones surfaced on the site. Retry on a statement
-  // timeout (57014) so a transient slow query doesn't abort the whole run.
-  const selectFilms = async (attempt = 0): Promise<any[] | null> => {
+  // Retry any selection on a transient failure — statement timeout (57014) or a
+  // network blip ("fetch failed" / socket hang up) — so one hiccup doesn't
+  // abort the whole run.
+  const withRetry = async <T>(
+    run: () => Promise<{ data: T | null; error: any }>,
+    label: string,
+    attempt = 0,
+  ): Promise<T | null> => {
     try {
-      const { data, error } = await supabase
-        .from('films')
-        .select('id, source_video_id, comments_synced_at')
-        .not('source_video_id', 'is', null)
-        .or(`comments_synced_at.is.null,comments_synced_at.lt.${staleBefore}`)
-        .order('created_at', { ascending: false })
-        .limit(scan);
+      const { data, error } = await run();
       if (error) throw error;
       return data;
     } catch (e: any) {
-      // Retry on ANY transient failure — statement timeout (57014) or a network
-      // blip ("fetch failed"/socket hang up) — so the whole run doesn't abort.
       if (attempt < 4) {
         await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-        return selectFilms(attempt + 1);
+        return withRetry(run, label, attempt + 1);
       }
-      console.error(`[comment-mining] film selection failed after retries: ${e.code || ''} ${e.message}`);
+      console.error(`[comment-mining] ${label} failed after retries: ${e.code || ''} ${e.message}`);
       return null;
     }
   };
-  const films = await selectFilms();
-  if (!films?.length) return { checked: 0, mined: 0, skipped: 0, message: 'nothing to mine' };
+
+  const COLS = 'id, source_video_id, comments_synced_at';
+  // Needs a (re)check: never mined, or mined > 21 days ago.
+  const needsMining = (q: any) =>
+    q.not('source_video_id', 'is', null)
+      .or(`comments_synced_at.is.null,comments_synced_at.lt.${staleBefore}`);
+
+  // 1. Mine the films the site actually surfaces FIRST (Top 10 / trending /
+  //    featured). Newest-first alone buries ratings on obscure fresh uploads
+  //    that have no comments yet and that nobody browses.
+  const priorityFilms: any[] = [];
+  const top10 = await withRetry<any[]>(
+    () => supabase.from('top_10_films').select('film_id'),
+    'top-10 lookup',
+  );
+  const top10Ids = [...new Set((top10 || []).map((t: any) => t.film_id).filter(Boolean))];
+  if (top10Ids.length) {
+    const rows = await withRetry<any[]>(
+      () => needsMining(supabase.from('films').select(COLS)).in('id', top10Ids).limit(50),
+      'top-10 films',
+    );
+    if (rows) priorityFilms.push(...rows);
+  }
+  const flagged = await withRetry<any[]>(
+    () =>
+      needsMining(supabase.from('films').select(COLS))
+        .or('is_trending.eq.true,is_featured.eq.true')
+        .limit(Math.min(scan, 200)),
+    'trending/featured films',
+  );
+  if (flagged) priorityFilms.push(...flagged);
+
+  // 2. Then the most-watched unmined films (view_count is backfilled below as
+  //    we go, so this gets better every run). These are what users browse.
+  const popular = await withRetry<any[]>(
+    () =>
+      needsMining(supabase.from('films').select(COLS))
+        .gt('view_count', 0)
+        .order('view_count', { ascending: false })
+        .limit(scan),
+    'popular films',
+  );
+
+  // 3. Fill the remaining budget with the most recently added films.
+  const recent = await withRetry<any[]>(
+    () =>
+      needsMining(supabase.from('films').select(COLS))
+        .order('created_at', { ascending: false })
+        .limit(scan),
+    'recent films',
+  );
+
+  // Priority, then popular, then recent; dedupe and cap at the scan budget.
+  const byId = new Map<string, any>();
+  for (const f of [...priorityFilms, ...(popular || []), ...(recent || [])]) {
+    if (f?.id && !byId.has(f.id)) byId.set(f.id, f);
+  }
+  const films = [...byId.values()].slice(0, scan);
+  if (!films.length) return { checked: 0, mined: 0, skipped: 0, message: 'nothing to mine' };
 
   let mined = 0, skipped = 0, aiUsed = 0;
   const nowIso = new Date().toISOString();
 
-  // Process in chunks of 50 so we can batch the cheap comment-count lookup.
+  // Process in chunks of 50 so we can batch the cheap stats lookup (1 quota
+  // unit per 50 films) — it gives us BOTH the comment count and the view count.
+  let viewsBackfilled = 0;
   for (let i = 0; i < films.length; i += 50) {
     const chunk = films.slice(i, i + 50);
-    let counts = new Map<string, number>();
+    const counts = new Map<string, number>();
+    const views = new Map<string, number>();
     try {
       const stats: any = await ytGet('videos', { part: 'statistics', id: chunk.map((f) => f.source_video_id).join(',') });
-      counts = new Map((stats.items ?? []).map((v: any) => [v.id, Number(v.statistics?.commentCount ?? 0)]));
+      for (const v of stats.items ?? []) {
+        counts.set(v.id, Number(v.statistics?.commentCount ?? 0));
+        views.set(v.id, Number(v.statistics?.viewCount ?? 0));
+      }
     } catch (e: any) {
       if (/quota|unusable/i.test(e.message)) { console.warn('[comment-mining] YouTube quota exhausted, stopping.'); break; }
       continue; // transient stats error — try next chunk
     }
 
-    for (const f of chunk) {
+    // Spend the AI budget on the most-watched comment-rich films first — those
+    // are the ones users actually browse.
+    const ordered = [...chunk].sort(
+      (a, b) => (views.get(b.source_video_id) ?? 0) - (views.get(a.source_video_id) ?? 0),
+    );
+
+    for (const f of ordered) {
       const c = counts.get(f.source_video_id) ?? 0;
+      const v = views.get(f.source_video_id);
+      // Backfill the real YouTube view count while we're here — it's free, and
+      // the rest of the app (rails, ranking) has been flying blind without it.
+      const patch: Record<string, unknown> = { comments_synced_at: nowIso };
+      if (typeof v === 'number' && v > 0) { patch.view_count = v; viewsBackfilled++; }
+
       if (c >= minComments && aiUsed < aiCap) {
         aiUsed++;
         const res = await mineFilmComments(f.id, f.source_video_id);
-        if (res.status === 'ok') { mined++; continue; }
-        if (res.reason === 'quota') { console.warn('[comment-mining] quota hit during mine, stopping.'); return { checked: i, mined, skipped, aiUsed }; }
+        if (res.status === 'ok') {
+          mined++;
+          // mineFilmComments already stamped comments_synced_at + rating; just
+          // persist the view count.
+          if (patch.view_count) await supabase.from('films').update({ view_count: patch.view_count }).eq('id', f.id);
+          continue;
+        }
+        if (res.reason === 'quota') { console.warn('[comment-mining] quota hit during mine, stopping.'); return { checked: i, mined, skipped, aiUsed, viewsBackfilled }; }
       }
-      // checked but nothing to mine (or AI cap reached): stamp so we don't
+      // Checked but nothing to mine (or AI cap reached): stamp so we don't
       // recheck every run, but it'll be revisited after the 21-day window.
       skipped++;
-      await supabase.from('films').update({ comments_synced_at: nowIso }).eq('id', f.id);
+      await supabase.from('films').update(patch).eq('id', f.id);
     }
   }
 
-  return { checked: films.length, mined, skipped, aiUsed };
+  return { checked: films.length, mined, skipped, aiUsed, viewsBackfilled };
 }
