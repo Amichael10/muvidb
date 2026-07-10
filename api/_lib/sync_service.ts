@@ -3,6 +3,7 @@ import { ADAPTERS, upsertShowtimes, sweepStaleCinemas } from './cinema-adapters/
 import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
 import { mirrorIfExternal } from './image_mirror.js';
+import { enrichFilmsFromAI, attachCreditsBatch, type EnrichedFilm } from './film_enrichment.js';
 
 /** Try to find a TMDB movie match and return enriched metadata */
 async function enrichFromTMDB(title: string, year?: number | null): Promise<{
@@ -187,6 +188,9 @@ export async function runVideosSync() {
           channel_id: ch.id,
           video_id: vid,
           title: item.snippet.title,
+          // Kept out of the channel_videos insert below (not a column); used
+          // only to feed AI enrichment (synopsis cleaning) at film-creation.
+          _description: item.snippet.description ?? '',
           thumbnail_url: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? null,
           published_at: item.snippet.publishedAt,
           duration_seconds: meta[vid]?.seconds ?? 0
@@ -194,7 +198,11 @@ export async function runVideosSync() {
       }).filter((row: any) => !hiddenSet.has(row.video_id));
 
       if (videoRows.length > 0) {
-        await supabase.from('channel_videos').upsert(videoRows, { onConflict: 'channel_id,video_id' });
+        // Strip the _description helper — it's not a channel_videos column and
+        // would fail the whole upsert (PGRST204). It stays on the in-memory rows
+        // for AI enrichment below.
+        const cleanVideoRows = videoRows.map(({ _description, ...rest }: any) => rest);
+        await supabase.from('channel_videos').upsert(cleanVideoRows, { onConflict: 'channel_id,video_id' });
         totalUpserted += videoRows.length;
       }
       
@@ -215,6 +223,20 @@ export async function runVideosSync() {
 
           const videosToProcess = longVideos.filter((v: any) => !cvMap.get(v.video_id));
 
+          // AI enrichment (title cleanup + cast extraction + synopsis de-spam)
+          // for this batch. Best-effort: an empty map means the AI was
+          // unavailable and we fall back to the regex cleaner / TMDB below.
+          let aiMap = new Map<string, EnrichedFilm>();
+          if (videosToProcess.length > 0) {
+            try {
+              aiMap = await enrichFilmsFromAI(
+                videosToProcess.map((v: any) => ({ videoId: v.video_id, title: v.title, description: v._description })),
+              );
+            } catch (e: any) {
+              console.warn(`[runVideosSync] AI enrichment skipped for ${ch.name}: ${e.message}`);
+            }
+          }
+
           if (videosToProcess.length > 0) {
             const processVids = videosToProcess.map((v: any) => v.video_id);
             const { data: existingFilms } = await supabase
@@ -230,7 +252,9 @@ export async function runVideosSync() {
             for (const v of videosToProcess) {
               if (!existingFilmsMap.has(v.video_id)) {
                 const rawTitle = v.title;
-                const cleanedTitle = cleanTitle(rawTitle);
+                const ai = aiMap.get(v.video_id);
+                // AI title if we got one, else the regex cleaner.
+                const cleanedTitle = ai?.title || cleanTitle(rawTitle);
                 const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
 
                 // ── Detect if this is an episode of a series ──────────────────────────────
@@ -284,7 +308,7 @@ export async function runVideosSync() {
                         youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
                         poster_url: mirroredPoster,
                         backdrop_url: mirroredBackdrop,
-                        synopsis: tmdb?.synopsis || null,
+                        synopsis: ai?.synopsis || tmdb?.synopsis || null,
                         tmdb_id: tmdb?.tmdb_id || null,
                         tmdb_rating: tmdb?.tmdb_rating || null,
                         needs_review: true,
@@ -356,10 +380,10 @@ export async function runVideosSync() {
                       trailer_youtube_id: v.video_id,
                       poster_url: mirroredMoviePoster,
                       backdrop_url: mirroredMovieBackdrop,
-                      synopsis: tmdb?.synopsis || null,
+                      synopsis: ai?.synopsis || tmdb?.synopsis || null,
                       tmdb_id: tmdb?.tmdb_id || null,
                       tmdb_rating: tmdb?.tmdb_rating || null,
-                      needs_review: !tmdb?.synopsis,
+                      needs_review: !(ai?.synopsis || tmdb?.synopsis),
                       status: 'released',
                       runtime_minutes: Math.round(v.duration_seconds / 60),
                       language: ch.primary_language || 'English',
@@ -418,6 +442,27 @@ export async function runVideosSync() {
                 );
 
               await Promise.all(updatePromises);
+
+              // Attach AI-extracted cast + director to each film (creates the
+              // people if needed). Best-effort — a failure never blocks the sync.
+              const creditEntries = videosToProcess
+                .map((v: any) => {
+                  const ai = aiMap.get(v.video_id);
+                  const people = [
+                    ...(ai?.cast || []).map((name: string) => ({ name, role: 'actor' })),
+                    ...(ai?.director ? [{ name: ai.director, role: 'director' }] : []),
+                  ];
+                  return { filmId: existingFilmsMap.get(v.video_id), people };
+                })
+                .filter((e: any) => e.filmId && e.people.length);
+              if (creditEntries.length) {
+                try {
+                  const added = await attachCreditsBatch(creditEntries);
+                  if (added) console.log(`  🎭 Linked ${added} cast/crew credits from AI enrichment`);
+                } catch (e: any) {
+                  console.warn(`[runVideosSync] credit attach failed: ${e.message}`);
+                }
+              }
             }
           }
         }
