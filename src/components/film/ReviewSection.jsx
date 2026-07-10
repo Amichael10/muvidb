@@ -340,8 +340,13 @@ const ReviewSection = ({ filmId, currentUser }) => {
             num += (Number(r.sentiment_score) || 0) * w
             den += w
         }
-        // Hard-cap at 9.7 — no film should ever look "perfect" (9.8/9.9/10).
-        return den ? Math.min(9.7, num / den).toFixed(1) : null
+        if (!den) return null
+        // Bayesian shrinkage toward the global mean so a few glowing comments
+        // don't read as near-perfect, then hard-cap at 9.7. Must match the
+        // formula the sync stores (comment_reviews.ts scoreRating).
+        const n = externalReviews.length
+        const adjusted = (n * (num / den) + 10 * 8.0) / (n + 10)
+        return Math.min(9.7, adjusted).toFixed(1)
     })()
 
     return (
