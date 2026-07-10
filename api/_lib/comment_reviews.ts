@@ -42,10 +42,21 @@ const isNoise = (t: string) => t.length < 60 || NOISE.some((re) => re.test(t.tri
  *  comment can't dominate). weight(0 likes)=1, weight(2000)≈4.3. */
 const likeWeight = (likes: number) => 1 + Math.log10(1 + Math.max(0, likes));
 
-// Never let a film show a near-perfect score — it reads as fake. Hard-cap the
-// audience rating so nothing ever reaches 9.8/9.9/10.
+// Turn a likes-weighted sentiment mean into the stored rating.
+//
+// Bayesian shrinkage first: a handful of glowing comments must NOT yield a 9.7
+// — 3 happy commenters aren't evidence a film is near-perfect. We blend the
+// film's own mean with a global prior, weighted by how many comments backed it,
+// so low-sample ratings pull toward the average and only genuine volume earns an
+// extreme score. Then a hard cap so nothing ever reads as a fake 9.8/9.9/10.
 const MAX_AUDIENCE_RATING = 9.7;
-const capRating = (r: number) => Math.min(MAX_AUDIENCE_RATING, Math.round(r * 10) / 10);
+const PRIOR_MEAN = 8.0;    // global average audience rating (comments skew positive)
+const PRIOR_WEIGHT = 10;   // the prior is worth ~10 comments of evidence
+function scoreRating(weightedMean: number, count: number): number {
+  const n = Math.max(0, count);
+  const adjusted = (n * weightedMean + PRIOR_WEIGHT * PRIOR_MEAN) / (n + PRIOR_WEIGHT);
+  return Math.min(MAX_AUDIENCE_RATING, Math.round(adjusted * 10) / 10);
+}
 
 async function fetchComments(videoId: string, max = 60): Promise<RawComment[]> {
   const data = await ytGet('commentThreads', {
@@ -149,7 +160,7 @@ export async function mineFilmComments(
     return {
       status: 'ok',
       kept: kept.length,
-      rating: d ? capRating(n / d) : null,
+      rating: d ? scoreRating(n / d, kept.length) : null,
       samples: kept.map(({ c, score }) => ({ author: c.author, likes: c.likes, score, text: c.text.slice(0, 140) })),
     };
   }
@@ -187,7 +198,7 @@ export async function mineFilmComments(
       num += (Number(r.sentiment_score) || 0) * w;
       den += w;
     }
-    rating = den ? capRating(num / den) : null;
+    rating = den ? scoreRating(num / den, allYt.length) : null;
   }
   const { error: filmErr } = await supabase
     .from('films')
