@@ -103,11 +103,20 @@ jobs:
           # Backup YouTube keys for quota rotation (add these secrets to enable)
           YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
           YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
+          YOUTUBE_API_KEY_4: ${{ secrets.YOUTUBE_API_KEY_4 }}
           TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
-          # Gemini keys (rotation) for TMDB-miss title enrichment during sync
+          # AI keys (rotation) for inline film enrichment: title cleanup, cast +
+          # director extraction, and synopsis de-spam at scrape time.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+          GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Mine YouTube Comment Reviews (Every 8 Hours)
         if: github.event.schedule == '0 */8 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'comments'))
