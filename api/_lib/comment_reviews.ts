@@ -226,7 +226,7 @@ export async function mineFilmComments(
 export async function runCommentMining(opts: { scan?: number; aiCap?: number; minComments?: number } = {}) {
   const scan = opts.scan ?? Number(process.env.COMMENT_MINE_SCAN || 300);
   const aiCap = opts.aiCap ?? Number(process.env.COMMENT_MINE_AICAP || 150);
-  const minComments = opts.minComments ?? 20;
+  const minComments = opts.minComments ?? Number(process.env.COMMENT_MINE_MINCOMMENTS || 20);
   const staleBefore = new Date(Date.now() - 21 * 86400_000).toISOString();
 
   // Retry any selection on a transient failure — statement timeout (57014) or a
