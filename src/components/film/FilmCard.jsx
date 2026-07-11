@@ -391,11 +391,11 @@ export default function FilmCard({
 
       {/* Hover Landscape Popup Overlay (Desktop only) */}
       <div 
-        className={`absolute w-[280px] bg-[#181818] rounded-2xl overflow-hidden border border-white/10 shadow-2xl transition-all duration-300 ease-out opacity-0 scale-90 pointer-events-none group-hover:opacity-100 group-hover:scale-[1.08] group-hover:pointer-events-auto group-hover:delay-300 delay-100 z-50 hidden md:flex flex-col ${getHoverClasses()}`}
+        className={`absolute w-[280px] bg-surface rounded-2xl overflow-hidden border border-border shadow-2xl transition-all duration-300 ease-out opacity-0 scale-90 pointer-events-none group-hover:opacity-100 group-hover:scale-[1.08] group-hover:pointer-events-auto group-hover:delay-300 delay-100 z-50 hidden md:flex flex-col ${getHoverClasses()}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Aspect-Video Preview Header */}
-        <Link to={`/films/${film.slug || film.id}`} className="relative aspect-video w-full overflow-hidden block group/image bg-black">
+        <Link to={`/films/${film.slug || film.id}`} className="relative aspect-video w-full overflow-hidden block group/image bg-surface-2">
           {film.backdrop_url ? (
             <ImageWithFallback
               src={film.backdrop_url}
@@ -427,7 +427,7 @@ export default function FilmCard({
           )}
           
           {/* Gradient Overlay */}
-          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#181818] to-transparent z-10" />
+          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-surface to-transparent z-10" />
 
           {/* Center Play Button Overlay */}
           <div className="absolute inset-0 bg-black/35 flex items-center justify-center opacity-0 group-hover/image:opacity-100 transition-opacity duration-300 z-20">
@@ -438,14 +438,14 @@ export default function FilmCard({
 
           {/* Title on backdrop (bottom left) */}
           <div className="absolute bottom-3 left-4 right-4 z-20">
-            <h4 className="text-white font-heading font-black text-sm tracking-tight drop-shadow-md truncate">
+            <h4 className="text-text-primary font-heading font-black text-sm tracking-tight drop-shadow-md truncate">
               {formatFilmTitle(film.title)}
             </h4>
           </div>
         </Link>
 
         {/* Details Box */}
-        <div className="bg-[#181818] p-4 flex flex-col text-left">
+        <div className="bg-surface p-4 flex flex-col text-left">
           {/* Buttons Row */}
           <div className="flex items-center justify-between mb-3.5">
             <div className="flex items-center gap-2">
@@ -461,7 +461,7 @@ export default function FilmCard({
                   toggleReaction('dislike');
                 }}
                 disabled={reactionLoading}
-                className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'dislike' ? 'bg-red-500/20 border-red-500 text-red-500' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'dislike' ? 'bg-red-500/20 border-red-500 text-red-500' : 'border-border hover:border-text-primary text-text-primary bg-transparent hover:bg-surface-2'}`}
                 title="Dislike"
                 aria-label={`Dislike ${formatFilmTitle(film.title)}`}
               >
@@ -499,7 +499,7 @@ export default function FilmCard({
                   toggleReaction('like');
                 }}
                 disabled={reactionLoading}
-                className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'like' ? 'bg-brand/20 border-brand text-brand' : 'border-white/30 hover:border-white text-white bg-transparent hover:bg-white/10'}`}
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition hover:scale-105 active:scale-95 shrink-0 group/btn relative ${userReaction === 'like' ? 'bg-brand/20 border-brand text-brand' : 'border-border hover:border-text-primary text-text-primary bg-transparent hover:bg-surface-2'}`}
                 title="Like"
                 aria-label={`Like ${formatFilmTitle(film.title)}`}
               >
@@ -519,7 +519,7 @@ export default function FilmCard({
                 e.stopPropagation();
                 openQuickView(film);
               }}
-              className="w-9 h-9 rounded-full border border-white/30 hover:border-white hover:text-brand hover:border-brand/40 flex items-center justify-center text-white bg-transparent hover:bg-white/10 transition hover:scale-105 active:scale-95 shrink-0"
+              className="w-9 h-9 rounded-full border border-border hover:text-brand hover:border-brand/40 flex items-center justify-center text-text-primary bg-transparent hover:bg-surface-2 transition hover:scale-105 active:scale-95 shrink-0"
               title="Quick View"
               aria-label={`Quick View ${formatFilmTitle(film.title)}`}
             >
@@ -528,31 +528,31 @@ export default function FilmCard({
           </div>
 
           {/* Metadata Row */}
-          <div className="flex items-center gap-2.5 text-xs text-white/90 mb-3 flex-wrap font-medium">
+          <div className="flex items-center gap-2.5 text-xs text-text-secondary mb-3 flex-wrap font-medium">
             {formattedTotalViews && <span className="text-brand font-bold">{formattedTotalViews}</span>}
             <span>{film.year || film.release_date?.split('-')[0]}</span>
             {primaryCountry && <span className="flex items-center gap-1">{flag} {primaryCountry}</span>}
             {filmRating > 0 && (
-              <span className="flex items-center gap-1 text-white font-bold">
-                <Icon icon="solar:star-bold" className="text-[#F5C518] text-[11px]" /> {filmRating.toFixed(1)}<span className="text-white/50 font-semibold">/10</span>
+              <span className="flex items-center gap-1 text-text-primary font-bold">
+                <Icon icon="solar:star-bold" className="text-[#F5C518] text-[11px]" /> {filmRating.toFixed(1)}<span className="text-text-muted font-semibold">/10</span>
               </span>
             )}
-            <span className="px-1.5 py-0.5 border border-white/30 rounded text-[9px] font-black tracking-wide leading-none uppercase bg-white/5">
+            <span className="px-1.5 py-0.5 border border-border rounded text-[9px] font-black tracking-wide leading-none uppercase bg-surface-2">
               {film.maturity_rating || '18+'}
             </span>
             <span>{durationLabel}</span>
-            <span className="px-1 py-0.5 border border-white/30 rounded text-[8px] font-black tracking-wide leading-none uppercase bg-white/5">
+            <span className="px-1 py-0.5 border border-border rounded text-[8px] font-black tracking-wide leading-none uppercase bg-surface-2">
               HD
             </span>
           </div>
 
           {/* Genre Tags */}
           {film.genres && film.genres.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-semibold text-white/60">
+            <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-semibold text-text-muted">
               {film.genres.slice(0, 3).map((g, idx) => (
                 <span key={g} className="flex items-center gap-1.5">
-                  {idx > 0 && <span className="w-1 h-1 rounded-full bg-white/20" />}
-                  <span className="hover:text-white transition-colors">{g}</span>
+                  {idx > 0 && <span className="w-1 h-1 rounded-full bg-border" />}
+                  <span className="hover:text-text-primary transition-colors">{g}</span>
                 </span>
               ))}
             </div>
@@ -560,13 +560,13 @@ export default function FilmCard({
 
           {/* Platforms / Watch Badge */}
           {activePlatforms.length > 0 && (
-            <div className="mt-3.5 pt-3 border-t border-white/5 flex flex-col gap-1.5">
-              <span className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Available on</span>
+            <div className="mt-3.5 pt-3 border-t border-hairline flex flex-col gap-1.5">
+              <span className="text-[9px] text-text-muted font-bold uppercase tracking-wider">Available on</span>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {activePlatforms.map(platform => (
-                  <span 
-                    key={platform.id} 
-                    className={`${platform.color} bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-md flex items-center gap-1 border border-white/5 text-[9px] font-bold transition-all`} 
+                  <span
+                    key={platform.id}
+                    className={`${platform.color} bg-surface-2 hover:bg-surface-3 px-2 py-0.5 rounded-md flex items-center gap-1 border border-border text-[9px] font-bold transition-all`}
                     title={platform.label}
                   >
                     <Icon icon={platform.icon} className="text-[10px]" />
