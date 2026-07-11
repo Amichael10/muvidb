@@ -26,10 +26,10 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
   if (isLoading) {
     return (
-      <section className="w-full bg-[#000000] py-4 md:py-8 lg:py-10">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="w-full bg-bg py-4 md:py-8 lg:py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[600px]">
-            <div className="relative w-full lg:flex-1 h-[50vh] min-h-[400px] lg:h-full rounded-2xl bg-surface animate-pulse border border-white/5"></div>
+            <div className="relative w-full lg:flex-1 h-[50vh] min-h-[400px] lg:h-full rounded-2xl bg-surface animate-pulse border border-hairline"></div>
             <div className="hidden lg:flex flex-col w-[350px] xl:w-[400px] shrink-0 h-full gap-4">
               <div className="w-24 h-6 bg-surface animate-pulse rounded mb-2"></div>
               {[1, 2, 3].map(i => (
@@ -71,9 +71,9 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
     <section 
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="w-full bg-[#000000] py-4 md:py-8 lg:py-10"
+      className="w-full bg-bg py-4 md:py-8 lg:py-10"
     >
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[600px]">
           
           {/* Main Banner (Left) */}
@@ -242,10 +242,10 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     <button 
                       key={film.id}
                       onClick={() => setCurrentIndex(actualIndex)}
-                      className="group flex gap-4 items-start text-left hover:bg-white/5 p-2 rounded-xl transition-colors h-1/3 max-h-[190px]"
+                      className="group flex gap-4 items-start text-left hover:bg-surface-2 p-2 rounded-xl transition-colors h-1/3 max-h-[190px]"
                     >
                       {/* Small Thumbnail */}
-                      <div className="relative h-full shrink-0 aspect-[2/3] rounded-lg overflow-hidden border border-white/5 group-hover:border-white/20 transition-colors shadow-lg">
+                      <div className="relative h-full shrink-0 aspect-[2/3] rounded-lg overflow-hidden border border-hairline group-hover:border-border transition-colors shadow-lg">
                         <ImageWithFallback
                           src={film.poster_url || film.poster}
                           alt={formatFilmTitle(film.title)}
@@ -260,14 +260,14 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       
                       {/* Info */}
                       <div className="flex flex-col pt-1.5 justify-start h-full">
-                        <div className="flex items-center gap-2 text-white/50 text-xs font-bold uppercase tracking-widest mb-1.5">
+                        <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-widest mb-1.5">
                           <Icon icon="solar:play-circle-bold" className="text-base text-brand" />
                           <span>{(film.runtime_minutes || film.runtime) ? `${film.runtime_minutes || film.runtime} min` : 'Watch Now'}</span>
                         </div>
-                        <h4 className="text-white font-bold text-lg line-clamp-2 leading-snug group-hover:text-brand transition-colors mb-1">
+                        <h4 className="text-text-primary font-bold text-lg line-clamp-2 leading-snug group-hover:text-brand transition-colors mb-1">
                           {formatFilmTitle(film.title)}
                         </h4>
-                        <p className="text-white/40 text-xs line-clamp-2 font-medium">
+                        <p className="text-text-muted text-xs line-clamp-2 font-medium">
                           {film.synopsis || "Tap to play this title"}
                         </p>
                       </div>
@@ -278,7 +278,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
               
               {/* Browse All Link */}
               <div className="mt-auto pt-3 px-2">
-                <Link to="/browse" className="text-white font-bold text-base hover:text-brand transition-colors flex items-center gap-1.5 w-fit">
+                <Link to="/browse" className="text-text-primary font-bold text-base hover:text-brand transition-colors flex items-center gap-1.5 w-fit">
                   Browse all titles <Icon icon="solar:alt-arrow-right-linear" className="text-xl" />
                 </Link>
               </div>
