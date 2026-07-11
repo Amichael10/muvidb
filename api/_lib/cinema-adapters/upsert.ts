@@ -256,9 +256,17 @@ export async function upsertShowtimes(
   // Flag every film we just scheduled as currently in cinemas. The weekly
   // sweep (sweepStaleCinemas) later clears this flag once a title stops
   // appearing in scrapes, moving it to "Leaving Cinemas Soon" and eventually off.
+  //
+  // A title that is physically screening in cinemas is, by definition, released
+  // and no longer "coming soon" — so we also flip status='released' and clear
+  // coming_soon. Without this a film added as upcoming/coming-soon would keep
+  // showing in the Coming Soon rail *and* In Cinemas at the same time.
   const matchedFilmIds = Array.from(new Set(rows.map(r => r.film_id as string)));
   if (matchedFilmIds.length) {
-    await supabase.from('films').update({ is_in_cinemas: true }).in('id', matchedFilmIds);
+    await supabase
+      .from('films')
+      .update({ is_in_cinemas: true, coming_soon: false, status: 'released' })
+      .in('id', matchedFilmIds);
   }
 
   return {
