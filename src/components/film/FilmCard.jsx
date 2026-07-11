@@ -313,19 +313,19 @@ export default function FilmCard({
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
-          {/* Rating Badge (Top Left) */}
+          {/* Rating Badge (Top Left) — IMDb-style gold star + N/10 */}
           {filmRating > 0 && (
-            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-black/60 backdrop-blur-md text-white px-1.5 py-0.5 rounded-md border border-white/10 shadow-lg z-20">
-              <Icon icon="solar:star-bold" className="text-brand text-[10px]" />
-              <span className="text-[10px] font-bold">
-                {filmRating.toFixed(1)}
+            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded-md border border-white/10 shadow-lg z-20">
+              <Icon icon="solar:star-bold" className="text-[#F5C518] text-[10px]" />
+              <span className="text-[10px] font-bold text-white leading-none">
+                {filmRating.toFixed(1)}<span className="text-white/50 font-semibold">/10</span>
               </span>
             </div>
           )}
 
           {/* Series Badge */}
           {(film.content_type === 'series' || film.is_series_group) && (
-            <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-14' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
+            <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-[4.75rem]' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
               <Icon icon={film.episodes_count > 1 ? "solar:folder-bold" : "solar:tv-bold"} className="text-white text-[9px]" />
               <span>{film.episodes_count > 1 ? `${film.episodes_count} EPS` : 'TV'}</span>
             </div>
@@ -533,8 +533,8 @@ export default function FilmCard({
             <span>{film.year || film.release_date?.split('-')[0]}</span>
             {primaryCountry && <span className="flex items-center gap-1">{flag} {primaryCountry}</span>}
             {filmRating > 0 && (
-              <span className="flex items-center gap-1 text-brand font-bold">
-                <Icon icon="solar:star-bold" className="text-[11px]" /> {filmRating.toFixed(1)}
+              <span className="flex items-center gap-1 text-white font-bold">
+                <Icon icon="solar:star-bold" className="text-[#F5C518] text-[11px]" /> {filmRating.toFixed(1)}<span className="text-white/50 font-semibold">/10</span>
               </span>
             )}
             <span className="px-1.5 py-0.5 border border-white/30 rounded text-[9px] font-black tracking-wide leading-none uppercase bg-white/5">
