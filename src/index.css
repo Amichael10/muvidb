@@ -76,9 +76,9 @@
   --color-surface-3: #E5E7EB;
   --color-border: rgba(34, 42, 53, 0.30);
   --color-hairline: rgba(34, 42, 53, 0.07);
-  /* Visible-but-subtle grid (~neutral-200), matching the dub.co architect grid.
+  /* Visible-but-subtle grid (~neutral-300), matching the dub.co architect grid.
      0.07 hairline is invisible on a near-white bg; the grid needs its own value. */
-  --color-grid: rgba(17, 24, 39, 0.10);
+  --color-grid: rgba(17, 24, 39, 0.16);
   --color-text-primary: #111827;
   --color-text-secondary: #4B5563;
   /* gray-500 not gray-400 — #9CA3AF is only 2.47:1 on #F9FAFB (fails WCAG AA);
@@ -198,7 +198,7 @@
     background-image:
       linear-gradient(var(--color-grid) 1px, transparent 1px),
       linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
-    background-size: 40px 40px;
+    background-size: 36px 36px;
   }
 
   /* Slow cinematic zoom for hero backdrops */
