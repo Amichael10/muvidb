@@ -21,10 +21,9 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const DOCUTH_HOME_URL = process.env.FEED_ZETA_URL;
-if (!DOCUTH_HOME_URL) {
-  throw new Error('FEED_ZETA_URL is not configured in environment variables');
-}
+// Public source URL — the FEED_ZETA_URL env var is an optional override; fall
+// back to the Docuth home so the sync never hard-fails when the secret is unset.
+const DOCUTH_HOME_URL = process.env.FEED_ZETA_URL || 'https://web.docuth.com/home';
 
 function parseDocuthDuration(durationStr: string | null): number | null {
   if (!durationStr) return null;
