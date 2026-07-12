@@ -56,6 +56,12 @@ export default function AdminFilms() {
   const [platformFilter, setPlatformFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [cinemaFilter, setCinemaFilter] = useState('all'); // all, in_cinemas, not_in_cinemas
+  const [channelFilter, setChannelFilter] = useState(null); // { id, name } — films from a YouTube channel (via channel_videos)
+  const [channelSearch, setChannelSearch] = useState('');
+  const [channelResults, setChannelResults] = useState([]);
+  const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
+  const channelSearchTimeout = useRef(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState('library'); // library, youtube_buffer
   const [youtubeVideos, setYoutubeVideos] = useState([]);
@@ -168,7 +174,7 @@ export default function AdminFilms() {
   useEffect(() => {
     setPage(1);
     setSelectedFilmIds([]);
-  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, sortBy]);
+  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, channelFilter, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -179,7 +185,7 @@ export default function AdminFilms() {
       }
     }, searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, sortBy, viewMode]);
+  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, channelFilter, sortBy, viewMode]);
 
   useEffect(() => {
     const handleDeepLink = async () => {
@@ -233,11 +239,73 @@ export default function AdminFilms() {
     setAllGenres(data || []);
   };
 
+  // Debounced channel search for the "by channel" filter (1.6k+ channels, so a
+  // searchable combobox rather than a giant dropdown).
+  const handleChannelSearch = (q) => {
+    setChannelSearch(q);
+    setIsChannelDropdownOpen(true);
+    if (channelSearchTimeout.current) clearTimeout(channelSearchTimeout.current);
+    if (!q.trim()) { setChannelResults([]); return; }
+    channelSearchTimeout.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('channels')
+        .select('id, name, thumbnail_url')
+        .ilike('name', `%${q}%`)
+        .order('name')
+        .limit(10);
+      setChannelResults(data || []);
+    }, 250);
+  };
+
+  const selectChannel = (ch) => {
+    setChannelFilter({ id: ch.id, name: ch.name });
+    setChannelSearch('');
+    setChannelResults([]);
+    setIsChannelDropdownOpen(false);
+  };
+
+  const anyFilterActive =
+    statusFilter !== 'all' || yearFilter !== 'all' || featuredFilter !== 'all' ||
+    trendingFilter !== 'all' || sourceFilter !== 'all' || platformFilter !== 'all' ||
+    typeFilter !== 'all' || cinemaFilter !== 'all' || channelFilter || duplicateFilter || searchTerm;
+
+  // Count only the filters that live in the collapsible "More filters" panel, so
+  // the toggle can show how many are active while it's closed.
+  const advancedFilterCount =
+    (typeFilter !== 'all' ? 1 : 0) + (cinemaFilter !== 'all' ? 1 : 0) +
+    (platformFilter !== 'all' ? 1 : 0) + (sourceFilter !== 'all' ? 1 : 0) +
+    (featuredFilter !== 'all' ? 1 : 0) + (trendingFilter !== 'all' ? 1 : 0) +
+    (channelFilter ? 1 : 0);
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all'); setYearFilter('all'); setFeaturedFilter('all');
+    setTrendingFilter('all'); setSourceFilter('all'); setPlatformFilter('all');
+    setTypeFilter('all'); setCinemaFilter('all'); setDuplicateFilter(false);
+    setChannelFilter(null); setChannelSearch(''); setChannelResults([]);
+  };
+
   const fetchFilms = async () => {
     setLoading(true);
     try {
+      // Channel filter: resolve the films linked to this channel via channel_videos.
+      // If the channel has no linked films, short-circuit to an empty result.
+      let channelFilmIds = null;
+      if (channelFilter) {
+        const { data: cvs } = await supabase
+          .from('channel_videos')
+          .select('film_id')
+          .eq('channel_id', channelFilter.id)
+          .not('film_id', 'is', null);
+        channelFilmIds = [...new Set((cvs || []).map((c) => c.film_id))];
+        if (channelFilmIds.length === 0) {
+          setFilms([]); setTotalCount(0); setLoading(false); return;
+        }
+      }
+
       // 1. Get total count
       let countQuery = supabase.from('films').select('*', { count: 'exact', head: true });
+      if (channelFilmIds) countQuery = countQuery.in('id', channelFilmIds);
       if (searchTerm) countQuery = countQuery.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') countQuery = countQuery.eq('status', statusFilter);
       if (yearFilter !== 'all') countQuery = countQuery.eq('year', parseInt(yearFilter));
@@ -264,6 +332,7 @@ export default function AdminFilms() {
         query = supabase.from('films').select('*');
       }
       
+      if (!duplicateFilter && channelFilmIds) query = query.in('id', channelFilmIds);
       if (!duplicateFilter && searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
       if (yearFilter !== 'all') query = query.eq('year', parseInt(yearFilter));
@@ -1109,12 +1178,69 @@ export default function AdminFilms() {
               <Icon icon="solar:copy-bold" className="w-4 h-4" />
               {duplicateFilter ? 'Showing Duplicates' : 'Filter Duplicates'}
             </button>
+            <button
+              onClick={() => setShowAdvancedFilters(v => !v)}
+              className={`px-4 py-3 rounded-md text-xs font-bold transition-all border flex items-center gap-2 ${showAdvancedFilters || advancedFilterCount > 0 ? 'bg-brand/10 text-brand border-brand/20' : 'bg-surface border-border text-text-muted hover:text-text-primary'}`}
+              title="Show more filters"
+            >
+              <Icon icon="solar:tuning-2-linear" className="w-4 h-4" />
+              More filters
+              {advancedFilterCount > 0 && (
+                <span className="bg-brand text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-black">{advancedFilterCount}</span>
+              )}
+              <Icon icon={showAdvancedFilters ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'} className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
-        
-        {/* Advanced Filters */}
+
+        {/* Advanced Filters (collapsible) */}
+        {showAdvancedFilters && (
         <div className="flex flex-wrap items-center gap-3 p-4 bg-surface-2/50 rounded-lg border border-border">
           <div className="text-xs font-bold text-text-muted uppercase tracking-widest mr-2">Filters:</div>
+
+          {/* Channel filter (searchable) */}
+          <div className="relative">
+            {channelFilter ? (
+              <span className="flex items-center gap-2 bg-brand/10 border border-brand/30 text-brand rounded-md px-3 py-2 text-xs font-bold">
+                <Icon icon="solar:videocamera-record-bold" className="w-4 h-4" />
+                <span className="max-w-[160px] truncate">{channelFilter.name}</span>
+                <button type="button" onClick={() => setChannelFilter(null)} title="Clear channel filter" className="hover:text-text-primary">
+                  <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                </button>
+              </span>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="Filter by channel…"
+                  value={channelSearch}
+                  onChange={(e) => handleChannelSearch(e.target.value)}
+                  onFocus={() => setIsChannelDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setIsChannelDropdownOpen(false), 200)}
+                  className="bg-surface border border-border rounded-md pl-8 pr-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all w-[180px]"
+                />
+                <Icon icon="solar:videocamera-record-linear" className="absolute left-2.5 top-2.5 w-4 h-4 text-text-muted" />
+                {isChannelDropdownOpen && channelResults.length > 0 && (
+                  <div className="absolute z-30 mt-1 w-64 max-h-64 overflow-y-auto bg-surface border border-border rounded-lg shadow-xl py-1">
+                    {channelResults.map((ch) => (
+                      <button
+                        key={ch.id}
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); selectChannel(ch); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-2 transition-colors"
+                      >
+                        {ch.thumbnail_url
+                          ? <img src={ch.thumbnail_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                          : <span className="w-6 h-6 rounded-full bg-surface-3 shrink-0" />}
+                        <span className="text-xs text-text-primary truncate">{ch.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -1183,7 +1309,20 @@ export default function AdminFilms() {
             <option value="trending">Trending Now</option>
             <option value="regular">Normal Feed</option>
           </select>
+
+          {anyFilterActive && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-bold text-text-muted hover:text-brand hover:bg-brand/5 border border-transparent hover:border-brand/20 transition-all"
+              title="Reset all filters"
+            >
+              <Icon icon="solar:restart-linear" className="w-4 h-4" />
+              Clear all
+            </button>
+          )}
         </div>
+        )}
       </div>
 
       {selectedFilmIds.length > 0 && (
