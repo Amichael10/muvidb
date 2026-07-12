@@ -77,7 +77,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
         <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[600px]">
           
           {/* Main Banner (Left) */}
-          <div className="relative w-full lg:flex-1 h-[55vh] min-h-[450px] lg:h-full rounded-2xl overflow-hidden group/hero bg-[#111] shadow-2xl flex border border-white/10">
+          <div className="relative w-full lg:flex-1 h-[55vh] min-h-[450px] lg:h-full rounded-2xl overflow-hidden group/hero bg-surface dark:bg-[#111] shadow-2xl flex border border-border dark:border-white/10">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={featuredFilm.id || currentIndex}
@@ -100,9 +100,9 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     fetchPriority="high"
                   />
                   {/* Gradients */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 inset-x-0 h-2/3 bg-gradient-to-t from-[#000000] to-transparent opacity-95" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-white/60 to-transparent dark:from-black dark:via-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/40 to-transparent dark:from-black/80 dark:via-black/20" />
+                  <div className="absolute bottom-0 inset-x-0 h-2/3 bg-gradient-to-t from-white via-white/40 to-transparent opacity-95 dark:from-[#000000] dark:via-transparent" />
                 </div>
 
                 {/* Bottom Overlay Content */}
@@ -111,7 +111,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                   {/* Small Embedded Poster */}
                   <Link 
                     to={`/films/${featuredFilm.slug || featuredFilm.id}`} 
-                    className="hidden md:block shrink-0 relative group/poster shadow-2xl rounded-lg overflow-hidden border border-white/20 hover:border-white/50 transition-colors w-[150px] aspect-[2/3] transform hover:scale-105 duration-300"
+                    className="hidden md:block shrink-0 relative group/poster shadow-2xl rounded-lg overflow-hidden border border-black/10 hover:border-black/30 dark:border-white/20 dark:hover:border-white/50 transition-colors w-[150px] aspect-[2/3] transform hover:scale-105 duration-300"
                   >
                     <ImageWithFallback
                       src={featuredFilm.poster_url || featuredFilm.poster}
@@ -139,31 +139,31 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                         </span>
                       )}
                       {featuredFilm.is_in_cinemas && (
-                        <span className="flex items-center gap-1.5 bg-white/10 text-white border border-white/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">
+                        <span className="flex items-center gap-1.5 bg-black/5 text-gray-800 border border-black/10 dark:bg-white/10 dark:text-white dark:border-white/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">
                           <Icon icon="solar:ticket-bold" className="text-brand" />
                           In Cinemas
                         </span>
                       )}
                       {(featuredFilm.genres || []).slice(0, 2).map((genre) => (
-                        <span key={genre} className="text-white/70 text-xs font-semibold">
+                        <span key={genre} className="text-gray-600 dark:text-white/70 text-xs font-semibold">
                           {genre}
                         </span>
                       ))}
                     </div>
 
-                    <h2 className="text-white text-3xl md:text-4xl lg:text-[42px] font-heading font-black tracking-tight mb-3 line-clamp-2 shadow-sm leading-[1.1]">
+                    <h2 className="text-gray-900 dark:text-white text-3xl md:text-4xl lg:text-[42px] font-heading font-black tracking-tight mb-3 line-clamp-2 shadow-sm leading-[1.1]">
                       {formatFilmTitle(featuredFilm.title)}
                     </h2>
-                    
-                    <p className="text-white/70 text-sm line-clamp-2 mb-6 max-w-2xl font-medium">
+
+                    <p className="text-gray-700 dark:text-white/70 text-sm line-clamp-2 mb-6 max-w-2xl font-medium">
                       {featuredFilm.synopsis}
                     </p>
-                    
+
                     <div className="flex items-center gap-4">
                       {/* Large Play/Watch Options */}
                       <WatchOptions film={featuredFilm} />
-                      
-                      <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3.5 rounded-full font-bold text-sm tracking-wide transition-all duration-300 active:scale-95 border border-white/10">
+
+                      <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="flex items-center gap-2 bg-black/5 hover:bg-black/10 text-gray-900 border border-black/10 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white dark:border-white/10 px-6 py-3.5 rounded-full font-bold text-sm tracking-wide transition-all duration-300 active:scale-95">
                         <Icon icon="solar:info-circle-bold" className="text-xl" />
                         Details
                       </Link>
@@ -178,14 +178,14 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
               <>
                 <button 
                   onClick={(e) => { e.preventDefault(); setCurrentIndex(prev => (prev - 1 + featuredFilms.length) % featuredFilms.length); }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 hover:scale-110 text-white border border-white/20 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex backdrop-blur-sm"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-white/70 hover:bg-white text-gray-900 border border-black/10 dark:bg-black/50 dark:hover:bg-black/80 dark:text-white dark:border-white/20 hover:scale-110 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex backdrop-blur-sm"
                   aria-label="Previous"
                 >
                   <Icon icon="solar:alt-arrow-left-linear" width="24" />
                 </button>
                 <button 
                   onClick={(e) => { e.preventDefault(); setCurrentIndex(prev => (prev + 1) % featuredFilms.length); }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 hover:scale-110 text-white border border-white/20 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex backdrop-blur-sm"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-white/70 hover:bg-white text-gray-900 border border-black/10 dark:bg-black/50 dark:hover:bg-black/80 dark:text-white dark:border-white/20 hover:scale-110 flex items-center justify-center transition-all duration-300 opacity-0 group-hover/hero:opacity-100 hidden md:flex backdrop-blur-sm"
                   aria-label="Next"
                 >
                   <Icon icon="solar:alt-arrow-right-linear" width="24" />
@@ -195,7 +195,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
             {/* Progress bar indicator for desktop banner */}
             {featuredFilms.length > 1 && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 z-30 hidden md:block">
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/10 dark:bg-white/10 z-30 hidden md:block">
                 <motion.div
                   key={currentIndex + (isPaused ? '-paused' : '-active')}
                   initial={{ width: '0%' }}
@@ -217,7 +217,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     key={index}
                     onClick={() => setCurrentIndex(index)}
                     className={`h-1.5 rounded-full transition-all duration-500 ${
-                      index === currentIndex ? 'w-6 bg-brand' : 'w-1.5 bg-white/40'
+                      index === currentIndex ? 'w-6 bg-brand' : 'w-1.5 bg-black/25 dark:bg-white/40'
                     }`}
                     aria-label={`Go to slide ${index + 1}`}
                   />
