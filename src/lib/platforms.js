@@ -12,7 +12,7 @@ export const PLATFORMS = [
   // Showmax removed: the service was discontinued and its catalogue moved to
   // DSTV Africa, so it's no longer a valid "where to watch" destination.
   { id: 'kava',        name: 'Kava',        icon: 'solar:play-circle-bold',  color: '#FF5C00', logo: '/images/platforms/kava.png' },
-  { id: 'docuth',      name: 'Docuth',      icon: 'solar:play-stream-bold',  color: '#16A34A', logo: '/images/platforms/docuth.svg' },
+  { id: 'docuth',      name: 'Docuth',      icon: 'solar:play-stream-bold',  color: '#16A34A', logo: '/images/platforms/docuth.png' },
   { id: 'ebonylife',   name: 'Ebonylife',   icon: 'solar:play-circle-bold',  color: '#800080', logo: '/images/platforms/ebonylife.png' },
   { id: 'circuits',    name: 'Circuits.tv', icon: 'solar:clapperboard-play-bold', color: '#F0532B', logo: '/images/platforms/circuits.png' },
   { id: 'cinema',      name: 'In Cinemas',  icon: 'solar:ticket-bold',       color: '#FF5A1F', isCinema: true },
