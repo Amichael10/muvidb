@@ -86,10 +86,14 @@ export default function PlatformRail({ films = [], counts = {} }) {
 
                 <div className="relative z-10 p-4">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 border border-white/10"
-                    style={{ background: `${platform.color}22`, color: platform.color }}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 border border-white/10 overflow-hidden"
+                    style={platform.logo ? { background: '#fff' } : { background: `${platform.color}22`, color: platform.color }}
                   >
-                    <Icon icon={platform.icon} className="text-lg" />
+                    {platform.logo ? (
+                      <img src={platform.logo} alt={platform.name} className="w-full h-full object-contain p-1" loading="lazy" />
+                    ) : (
+                      <Icon icon={platform.icon} className="text-lg" />
+                    )}
                   </div>
                   <span className="block text-white font-heading font-bold text-sm md:text-base tracking-tight group-hover:text-brand transition-colors">
                     {platform.name}
