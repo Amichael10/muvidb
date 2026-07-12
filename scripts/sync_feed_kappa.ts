@@ -59,10 +59,9 @@ async function syncFeedKappa() {
 
   let browser;
   try {
-    const sitemapUrl = process.env.FEED_KAPPA_SITEMAP_URL;
-    if (!sitemapUrl) {
-      throw new Error('FEED_KAPPA_SITEMAP_URL is not configured in environment variables');
-    }
+    // Public sitemap — FEED_KAPPA_SITEMAP_URL is an optional override; fall back
+    // to Kava's sitemap so the sync never hard-fails when the secret is unset.
+    const sitemapUrl = process.env.FEED_KAPPA_SITEMAP_URL || 'https://kava.tv/sitemap.xml';
     console.log('Fetching sitemap...');
     const sitemapRes = await fetch(sitemapUrl);
     const xml = await sitemapRes.text();
