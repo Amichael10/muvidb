@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Icon } from '@iconify/react';
+import { getPlatform } from '../../lib/platforms';
 
 const WatchOptions = ({ film, isFullWidth = false }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -96,7 +97,9 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
                   className="flex items-center justify-between px-4 py-4 hover:bg-surface-2 transition-colors border-b border-border last:border-0 group"
                 >
                   <div className="flex items-center gap-3">
-                    <Icon icon={link.icon} className="text-sm text-text-muted group-hover:text-brand transition-colors" />
+                    {getPlatform(link.id)?.logo
+                      ? <img src={getPlatform(link.id).logo} alt="" className="w-4 h-4 object-contain rounded-sm" loading="lazy" />
+                      : <Icon icon={link.icon} className="text-sm text-text-muted group-hover:text-brand transition-colors" />}
                     <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">{link.label}</span>
                   </div>
                   {!link.isDirect && <span className="text-[8px] font-black bg-surface-2 px-2 py-0.5 rounded text-text-muted border border-border uppercase tracking-widest">Site</span>}

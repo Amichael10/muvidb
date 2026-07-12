@@ -6,6 +6,7 @@ import { useReactions } from '../../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
 import { useQuickView } from '../../context/QuickViewContext';
 import { formatFilmTitle } from '../../utils/format';
+import { getPlatform } from '../../lib/platforms';
 
 const formatDeltaViews = (views) => {
   if (!views) return null;
@@ -181,7 +182,9 @@ export default function FilmCard({
       }
     });
     
-    return list.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+    return list
+      .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+      .map((p) => ({ ...p, logo: getPlatform(p.id)?.logo || null }));
   };
 
   const activePlatforms = getPlatforms();
@@ -366,12 +369,14 @@ export default function FilmCard({
               {activePlatforms.length > 0 && (
                 <div className="flex items-center gap-1 shrink-0">
                   {activePlatforms.slice(0, 3).map(platform => (
-                    <span 
-                      key={platform.id} 
-                      className={`${platform.color} bg-black/40 backdrop-blur-sm w-5 h-5 rounded-full flex items-center justify-center border border-white/5`} 
+                    <span
+                      key={platform.id}
+                      className={`${platform.logo ? 'bg-white' : `${platform.color} bg-black/40`} backdrop-blur-sm w-5 h-5 rounded-full flex items-center justify-center border border-white/5 overflow-hidden`}
                       title={platform.label}
                     >
-                      <Icon icon={platform.icon} className="text-[10px]" />
+                      {platform.logo
+                        ? <img src={platform.logo} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
+                        : <Icon icon={platform.icon} className="text-[10px]" />}
                     </span>
                   ))}
                   {activePlatforms.length > 3 && (
@@ -569,7 +574,9 @@ export default function FilmCard({
                     className={`${platform.color} bg-surface-2 hover:bg-surface-3 px-2 py-0.5 rounded-md flex items-center gap-1 border border-border text-[9px] font-bold transition-all`}
                     title={platform.label}
                   >
-                    <Icon icon={platform.icon} className="text-[10px]" />
+                    {platform.logo
+                      ? <img src={platform.logo} alt="" className="w-3 h-3 object-contain rounded-sm bg-white" loading="lazy" />
+                      : <Icon icon={platform.icon} className="text-[10px]" />}
                     <span>{platform.label.replace('Watch on ', '').replace('In ', '')}</span>
                   </span>
                 ))}
