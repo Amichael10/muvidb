@@ -41,7 +41,7 @@ jobs:
           PRIME_PASSWORD: ${{ secrets.PRIME_PASSWORD }}
           
       - name: Run Feed Zeta Sync
-        run: npm run scrape:feed_zeta
+        run: npm run scrape:docuth
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
