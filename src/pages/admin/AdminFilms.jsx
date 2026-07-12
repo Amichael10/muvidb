@@ -61,6 +61,7 @@ export default function AdminFilms() {
   const [channelResults, setChannelResults] = useState([]);
   const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
   const channelSearchTimeout = useRef(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState('library'); // library, youtube_buffer
   const [youtubeVideos, setYoutubeVideos] = useState([]);
@@ -267,6 +268,14 @@ export default function AdminFilms() {
     statusFilter !== 'all' || yearFilter !== 'all' || featuredFilter !== 'all' ||
     trendingFilter !== 'all' || sourceFilter !== 'all' || platformFilter !== 'all' ||
     typeFilter !== 'all' || cinemaFilter !== 'all' || channelFilter || duplicateFilter || searchTerm;
+
+  // Count only the filters that live in the collapsible "More filters" panel, so
+  // the toggle can show how many are active while it's closed.
+  const advancedFilterCount =
+    (typeFilter !== 'all' ? 1 : 0) + (cinemaFilter !== 'all' ? 1 : 0) +
+    (platformFilter !== 'all' ? 1 : 0) + (sourceFilter !== 'all' ? 1 : 0) +
+    (featuredFilter !== 'all' ? 1 : 0) + (trendingFilter !== 'all' ? 1 : 0) +
+    (channelFilter ? 1 : 0);
 
   const clearAllFilters = () => {
     setSearchTerm('');
@@ -1169,10 +1178,23 @@ export default function AdminFilms() {
               <Icon icon="solar:copy-bold" className="w-4 h-4" />
               {duplicateFilter ? 'Showing Duplicates' : 'Filter Duplicates'}
             </button>
+            <button
+              onClick={() => setShowAdvancedFilters(v => !v)}
+              className={`px-4 py-3 rounded-md text-xs font-bold transition-all border flex items-center gap-2 ${showAdvancedFilters || advancedFilterCount > 0 ? 'bg-brand/10 text-brand border-brand/20' : 'bg-surface border-border text-text-muted hover:text-text-primary'}`}
+              title="Show more filters"
+            >
+              <Icon icon="solar:tuning-2-linear" className="w-4 h-4" />
+              More filters
+              {advancedFilterCount > 0 && (
+                <span className="bg-brand text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-black">{advancedFilterCount}</span>
+              )}
+              <Icon icon={showAdvancedFilters ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'} className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
-        
-        {/* Advanced Filters */}
+
+        {/* Advanced Filters (collapsible) */}
+        {showAdvancedFilters && (
         <div className="flex flex-wrap items-center gap-3 p-4 bg-surface-2/50 rounded-lg border border-border">
           <div className="text-xs font-bold text-text-muted uppercase tracking-widest mr-2">Filters:</div>
 
@@ -1300,6 +1322,7 @@ export default function AdminFilms() {
             </button>
           )}
         </div>
+        )}
       </div>
 
       {selectedFilmIds.length > 0 && (
