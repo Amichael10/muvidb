@@ -76,10 +76,13 @@ export async function runShowtimesSync() {
  * Syncs latest videos from YouTube channels and auto-promotes long videos to films
  */
 export async function runVideosSync() {
-  // Only fetch channels that haven't been fetched in the last 3.5 hours
+  // Only fetch channels that (a) are enabled for sync and (b) haven't been
+  // fetched in the last 3.5 hours. Admins can pause a channel via the
+  // sync_enabled toggle to keep the daily sync from pulling its videos.
   const { data: channels } = await supabase
     .from('channels')
     .select('*')
+    .eq('sync_enabled', true)
     .or('videos_last_fetched_at.is.null,videos_last_fetched_at.lt.' + new Date(Date.now() - 3.5*3600*1000).toISOString())
     .order('videos_last_fetched_at', { ascending: true, nullsFirst: true });
     

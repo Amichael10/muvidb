@@ -12,8 +12,95 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      admin_actions: {
+        Row: {
+          action_type: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_name: string | null
+          entity_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_actions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_jobs: {
+        Row: {
+          id: string
+          last_message: string | null
+          last_run: string | null
+          status: string
+        }
+        Insert: {
+          id: string
+          last_message?: string | null
+          last_run?: string | null
+          status?: string
+        }
+        Update: {
+          id?: string
+          last_message?: string | null
+          last_run?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       channel_flags: {
         Row: {
           channel_id: string
@@ -127,11 +214,14 @@ export type Database = {
           description: string | null
           id: string
           is_featured: boolean | null
+          mubi_slug: string | null
           name: string
           owner_company_id: string | null
           owner_name: string | null
           owner_person_id: string | null
+          slug: string | null
           subscriber_count: number | null
+          sync_enabled: boolean
           thumbnail_url: string | null
           videos_last_fetched_at: string | null
         }
@@ -146,11 +236,14 @@ export type Database = {
           description?: string | null
           id?: string
           is_featured?: boolean | null
+          mubi_slug?: string | null
           name: string
           owner_company_id?: string | null
           owner_name?: string | null
           owner_person_id?: string | null
+          slug?: string | null
           subscriber_count?: number | null
+          sync_enabled?: boolean
           thumbnail_url?: string | null
           videos_last_fetched_at?: string | null
         }
@@ -165,11 +258,14 @@ export type Database = {
           description?: string | null
           id?: string
           is_featured?: boolean | null
+          mubi_slug?: string | null
           name?: string
           owner_company_id?: string | null
           owner_name?: string | null
           owner_person_id?: string | null
+          slug?: string | null
           subscriber_count?: number | null
+          sync_enabled?: boolean
           thumbnail_url?: string | null
           videos_last_fetched_at?: string | null
         }
@@ -262,6 +358,78 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_films: {
+        Row: {
+          collection_id: string | null
+          created_at: string | null
+          display_order: number | null
+          film_id: string | null
+          id: string
+        }
+        Insert: {
+          collection_id?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          film_id?: string | null
+          id?: string
+        }
+        Update: {
+          collection_id?: string | null
+          created_at?: string | null
+          display_order?: number | null
+          film_id?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_films_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_films_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collections: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_featured: boolean | null
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_featured?: boolean | null
+          name?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string
@@ -269,19 +437,12 @@ export type Database = {
           founded_year: number | null
           id: string
           logo_url: string | null
+          mubi_slug: string | null
           name: string
+          slug: string | null
           tmdb_id: number | null
           updated_at: string
           website: string | null
-          headquarters: string | null
-          focus: string | null
-          years_active: string | null
-          employees: string | null
-          languages: string | null
-          instagram_url: string | null
-          twitter_url: string | null
-          youtube_url: string | null
-          company_type: string | null
         }
         Insert: {
           created_at?: string
@@ -289,19 +450,12 @@ export type Database = {
           founded_year?: number | null
           id?: string
           logo_url?: string | null
+          mubi_slug?: string | null
           name: string
+          slug?: string | null
           tmdb_id?: number | null
           updated_at?: string
           website?: string | null
-          headquarters?: string | null
-          focus?: string | null
-          years_active?: string | null
-          employees?: string | null
-          languages?: string | null
-          instagram_url?: string | null
-          twitter_url?: string | null
-          youtube_url?: string | null
-          company_type?: string | null
         }
         Update: {
           created_at?: string
@@ -309,19 +463,117 @@ export type Database = {
           founded_year?: number | null
           id?: string
           logo_url?: string | null
+          mubi_slug?: string | null
           name?: string
+          slug?: string | null
           tmdb_id?: number | null
           updated_at?: string
           website?: string | null
-          headquarters?: string | null
-          focus?: string | null
-          years_active?: string | null
-          employees?: string | null
-          languages?: string | null
-          instagram_url?: string | null
-          twitter_url?: string | null
-          youtube_url?: string | null
-          company_type?: string | null
+        }
+        Relationships: []
+      }
+      contributions: {
+        Row: {
+          created_at: string
+          id: string
+          image_path: string | null
+          image_url: string | null
+          note: string | null
+          payload: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_by: string | null
+          target_id: string | null
+          target_table: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_path?: string | null
+          image_url?: string | null
+          note?: string | null
+          payload?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_by?: string | null
+          target_id?: string | null
+          target_table?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_path?: string | null
+          image_url?: string | null
+          note?: string | null
+          payload?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_by?: string | null
+          target_id?: string | null
+          target_table?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      countries: {
+        Row: {
+          channels_visible: boolean | null
+          code: string | null
+          continent: string | null
+          created_at: string | null
+          films_visible: boolean | null
+          id: string
+          is_active: boolean | null
+          name: string
+          nationality: string | null
+          people_visible: boolean | null
+          slug: string
+        }
+        Insert: {
+          channels_visible?: boolean | null
+          code?: string | null
+          continent?: string | null
+          created_at?: string | null
+          films_visible?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          nationality?: string | null
+          people_visible?: boolean | null
+          slug: string
+        }
+        Update: {
+          channels_visible?: boolean | null
+          code?: string | null
+          continent?: string | null
+          created_at?: string | null
+          films_visible?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          nationality?: string | null
+          people_visible?: boolean | null
+          slug?: string
         }
         Relationships: []
       }
@@ -403,6 +655,36 @@ export type Database = {
           },
         ]
       }
+      film_countries: {
+        Row: {
+          country_id: string
+          film_id: string
+        }
+        Insert: {
+          country_id: string
+          film_id: string
+        }
+        Update: {
+          country_id?: string
+          film_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "film_countries_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "film_countries_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       film_genres: {
         Row: {
           film_id: string
@@ -429,6 +711,38 @@ export type Database = {
             columns: ["genre_id"]
             isOneToOne: false
             referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      film_reactions: {
+        Row: {
+          created_at: string
+          film_id: string | null
+          id: string
+          reaction_type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          film_id?: string | null
+          id?: string
+          reaction_type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          film_id?: string | null
+          id?: string
+          reaction_type?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "film_reactions_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
             referencedColumns: ["id"]
           },
         ]
@@ -467,20 +781,39 @@ export type Database = {
       }
       films: {
         Row: {
+          audience_rating: number | null
+          audience_rating_count: number
           average_rating: number
           backdrop: string | null
           backdrop_url: string | null
+          coming_soon: boolean | null
+          comments_synced_at: string | null
+          content_type: string | null
+          countries: string[] | null
           created_at: string
+          duration: number | null
+          episode_count: number | null
+          episode_number: number | null
+          genres: string[] | null
           id: string
           is_featured: boolean | null
+          is_in_cinemas: boolean | null
           is_nollywood: boolean | null
+          is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
+          mubi_id: number | null
+          mubi_slug: string | null
           needs_review: boolean | null
           nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
           poster_url: string | null
+          release_date: string | null
           release_type: string | null
           runtime_minutes: number | null
+          season_count: number | null
+          season_number: number | null
+          series_id: string | null
+          slug: string | null
           source: string | null
           source_video_id: string | null
           status: Database["public"]["Enums"]["film_status"]
@@ -497,28 +830,41 @@ export type Database = {
           view_count: number
           year: number | null
           youtube_watch_url: string | null
-          content_type: string | null
-          season_count: number | null
-          episode_count: number | null
-          series_id: string | null
-          episode_number: number | null
-          season_number: number | null
         }
         Insert: {
+          audience_rating?: number | null
+          audience_rating_count?: number
           average_rating?: number
           backdrop?: string | null
           backdrop_url?: string | null
+          coming_soon?: boolean | null
+          comments_synced_at?: string | null
+          content_type?: string | null
+          countries?: string[] | null
           created_at?: string
+          duration?: number | null
+          episode_count?: number | null
+          episode_number?: number | null
+          genres?: string[] | null
           id?: string
           is_featured?: boolean | null
+          is_in_cinemas?: boolean | null
           is_nollywood?: boolean | null
+          is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
+          mubi_id?: number | null
+          mubi_slug?: string | null
           needs_review?: boolean | null
           nfvcb_rating?: Database["public"]["Enums"]["nfvcb_rating"] | null
           poster_url?: string | null
+          release_date?: string | null
           release_type?: string | null
           runtime_minutes?: number | null
+          season_count?: number | null
+          season_number?: number | null
+          series_id?: string | null
+          slug?: string | null
           source?: string | null
           source_video_id?: string | null
           status?: Database["public"]["Enums"]["film_status"]
@@ -535,28 +881,41 @@ export type Database = {
           view_count?: number
           year?: number | null
           youtube_watch_url?: string | null
-          content_type?: string | null
-          season_count?: number | null
-          episode_count?: number | null
-          series_id?: string | null
-          episode_number?: number | null
-          season_number?: number | null
         }
         Update: {
+          audience_rating?: number | null
+          audience_rating_count?: number
           average_rating?: number
           backdrop?: string | null
           backdrop_url?: string | null
+          coming_soon?: boolean | null
+          comments_synced_at?: string | null
+          content_type?: string | null
+          countries?: string[] | null
           created_at?: string
+          duration?: number | null
+          episode_count?: number | null
+          episode_number?: number | null
+          genres?: string[] | null
           id?: string
           is_featured?: boolean | null
+          is_in_cinemas?: boolean | null
           is_nollywood?: boolean | null
+          is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
+          mubi_id?: number | null
+          mubi_slug?: string | null
           needs_review?: boolean | null
           nfvcb_rating?: Database["public"]["Enums"]["nfvcb_rating"] | null
           poster_url?: string | null
+          release_date?: string | null
           release_type?: string | null
           runtime_minutes?: number | null
+          season_count?: number | null
+          season_number?: number | null
+          series_id?: string | null
+          slug?: string | null
           source?: string | null
           source_video_id?: string | null
           status?: Database["public"]["Enums"]["film_status"]
@@ -573,14 +932,16 @@ export type Database = {
           view_count?: number
           year?: number | null
           youtube_watch_url?: string | null
-          content_type?: string | null
-          season_count?: number | null
-          episode_count?: number | null
-          series_id?: string | null
-          episode_number?: number | null
-          season_number?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "films_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       follows: {
         Row: {
@@ -699,89 +1060,133 @@ export type Database = {
       people: {
         Row: {
           bio: string | null
-          biography: string | null
           birthplace: string | null
           claimed_by: string | null
           created_at: string
           date_of_birth: string | null
+          facebook_url: string | null
+          film_count: number | null
           gender: string | null
           id: string
+          instagram_url: string | null
           is_spotlight: boolean | null
           is_verified: boolean
           known_for_department: string | null
+          mubi_id: number | null
+          mubi_slug: string | null
           name: string
           nationality: string | null
           needs_review: boolean | null
           photo_url: string | null
           popularity_score: number
+          profile_views: number | null
+          slug: string | null
           source: string | null
           status: string | null
           tmdb_id: number | null
+          twitter_url: string | null
           updated_at: string
           youtube_channel_id: string | null
           youtube_handle: string | null
           youtube_stats: Json | null
-          instagram_url: string | null
-          facebook_url: string | null
-          twitter_url: string | null
         }
         Insert: {
           bio?: string | null
-          biography?: string | null
           birthplace?: string | null
           claimed_by?: string | null
           created_at?: string
           date_of_birth?: string | null
+          facebook_url?: string | null
+          film_count?: number | null
           gender?: string | null
           id?: string
+          instagram_url?: string | null
           is_spotlight?: boolean | null
           is_verified?: boolean
           known_for_department?: string | null
+          mubi_id?: number | null
+          mubi_slug?: string | null
           name: string
           nationality?: string | null
           needs_review?: boolean | null
           photo_url?: string | null
           popularity_score?: number
+          profile_views?: number | null
+          slug?: string | null
           source?: string | null
           status?: string | null
           tmdb_id?: number | null
+          twitter_url?: string | null
           updated_at?: string
           youtube_channel_id?: string | null
           youtube_handle?: string | null
           youtube_stats?: Json | null
-          instagram_url?: string | null
-          facebook_url?: string | null
-          twitter_url?: string | null
         }
         Update: {
           bio?: string | null
-          biography?: string | null
           birthplace?: string | null
           claimed_by?: string | null
           created_at?: string
           date_of_birth?: string | null
+          facebook_url?: string | null
+          film_count?: number | null
           gender?: string | null
           id?: string
+          instagram_url?: string | null
           is_spotlight?: boolean | null
           is_verified?: boolean
           known_for_department?: string | null
+          mubi_id?: number | null
+          mubi_slug?: string | null
           name?: string
           nationality?: string | null
           needs_review?: boolean | null
           photo_url?: string | null
           popularity_score?: number
+          profile_views?: number | null
+          slug?: string | null
           source?: string | null
           status?: string | null
           tmdb_id?: number | null
+          twitter_url?: string | null
           updated_at?: string
           youtube_channel_id?: string | null
           youtube_handle?: string | null
           youtube_stats?: Json | null
-          instagram_url?: string | null
-          facebook_url?: string | null
-          twitter_url?: string | null
         }
         Relationships: []
+      }
+      platform_new_releases: {
+        Row: {
+          created_at: string
+          display_order: number
+          film_id: string
+          id: string
+          platform: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          film_id: string
+          id?: string
+          platform: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          film_id?: string
+          id?: string
+          platform?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_new_releases_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_claims: {
         Row: {
@@ -840,31 +1245,52 @@ export type Database = {
       }
       reviews: {
         Row: {
+          author_avatar_url: string | null
+          author_name: string | null
           body: string | null
           created_at: string
+          external_id: string | null
           film_id: string
           id: string
+          likes: number
           rating: number
+          sentiment_score: number | null
+          source: string
+          source_url: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
+          author_avatar_url?: string | null
+          author_name?: string | null
           body?: string | null
           created_at?: string
+          external_id?: string | null
           film_id: string
           id?: string
+          likes?: number
           rating: number
+          sentiment_score?: number | null
+          source?: string
+          source_url?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
+          author_avatar_url?: string | null
+          author_name?: string | null
           body?: string | null
           created_at?: string
+          external_id?: string | null
           film_id?: string
           id?: string
+          likes?: number
           rating?: number
+          sentiment_score?: number | null
+          source?: string
+          source_url?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -946,6 +1372,118 @@ export type Database = {
           },
         ]
       }
+      spotlights: {
+        Row: {
+          created_at: string | null
+          featured_film_ids: string[] | null
+          id: string
+          is_active: boolean | null
+          person_id: string
+          photo_url: string | null
+          story: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          featured_film_ids?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          person_id: string
+          photo_url?: string | null
+          story: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          featured_film_ids?: string[] | null
+          id?: string
+          is_active?: boolean | null
+          person_id?: string
+          photo_url?: string | null
+          story?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spotlights_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          duration_ms: number | null
+          id: string
+          items_created: number | null
+          items_failed: number | null
+          items_processed: number | null
+          items_updated: number | null
+          message: string | null
+          source: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          id?: string
+          items_created?: number | null
+          items_failed?: number | null
+          items_processed?: number | null
+          items_updated?: number | null
+          message?: string | null
+          source: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          id?: string
+          items_created?: number | null
+          items_failed?: number | null
+          items_processed?: number | null
+          items_updated?: number | null
+          message?: string | null
+          source?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      top_10_films: {
+        Row: {
+          created_at: string | null
+          film_id: string
+          id: string
+          rank: number
+        }
+        Insert: {
+          created_at?: string | null
+          film_id: string
+          id?: string
+          rank: number
+        }
+        Update: {
+          created_at?: string | null
+          film_id?: string
+          id?: string
+          rank?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "top_10_films_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trailer_review_queue: {
         Row: {
           channel_name: string | null
@@ -1016,6 +1554,7 @@ export type Database = {
           email: string
           id: string
           is_banned: boolean | null
+          last_sign_in_at: string | null
           linked_profile_id: string | null
           name: string
           role: Database["public"]["Enums"]["user_role"]
@@ -1027,6 +1566,7 @@ export type Database = {
           email: string
           id?: string
           is_banned?: boolean | null
+          last_sign_in_at?: string | null
           linked_profile_id?: string | null
           name: string
           role?: Database["public"]["Enums"]["user_role"]
@@ -1038,6 +1578,7 @@ export type Database = {
           email?: string
           id?: string
           is_banned?: boolean | null
+          last_sign_in_at?: string | null
           linked_profile_id?: string | null
           name?: string
           role?: Database["public"]["Enums"]["user_role"]
@@ -1052,6 +1593,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
       }
       watchlist: {
         Row: {
@@ -1212,6 +1771,71 @@ export type Database = {
         }
         Returns: string
       }
+      force_promote_to_admin: {
+        Args: { user_email: string }
+        Returns: undefined
+      }
+      generate_slug: { Args: { input: string }; Returns: string }
+      get_duplicate_films: {
+        Args: never
+        Returns: {
+          audience_rating: number | null
+          audience_rating_count: number
+          average_rating: number
+          backdrop: string | null
+          backdrop_url: string | null
+          coming_soon: boolean | null
+          comments_synced_at: string | null
+          content_type: string | null
+          countries: string[] | null
+          created_at: string
+          duration: number | null
+          episode_count: number | null
+          episode_number: number | null
+          genres: string[] | null
+          id: string
+          is_featured: boolean | null
+          is_in_cinemas: boolean | null
+          is_nollywood: boolean | null
+          is_top_10: boolean | null
+          is_trending: boolean | null
+          language: string | null
+          mubi_id: number | null
+          mubi_slug: string | null
+          needs_review: boolean | null
+          nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          poster_url: string | null
+          release_date: string | null
+          release_type: string | null
+          runtime_minutes: number | null
+          season_count: number | null
+          season_number: number | null
+          series_id: string | null
+          slug: string | null
+          source: string | null
+          source_video_id: string | null
+          status: Database["public"]["Enums"]["film_status"]
+          streaming_links: Json | null
+          synopsis: string | null
+          tagline: string | null
+          title: string
+          tmdb_id: number | null
+          tmdb_rating: number | null
+          trailer_external_url: string | null
+          trailer_source: string
+          trailer_youtube_id: string | null
+          updated_at: string
+          view_count: number
+          year: number | null
+          youtube_watch_url: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "films"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_my_role: { Args: never; Returns: string }
       get_people_with_counts: {
         Args: {
@@ -1238,17 +1862,150 @@ export type Database = {
           youtube_filmography_count: number
         }[]
       }
+      increment_profile_views: {
+        Args: { person_uuid: string }
+        Returns: undefined
+      }
+      is_admin: { Args: never; Returns: boolean }
+      match_film_fuzzy: {
+        Args: { query_title: string; threshold?: number }
+        Returns: {
+          id: string
+          sim: number
+          title: string
+        }[]
+      }
+      match_person_fuzzy: {
+        Args: { query_name: string; threshold?: number }
+        Returns: {
+          id: string
+          name: string
+          sim: number
+        }[]
+      }
       merge_films: {
-        Args: { primary_id: string; secondary_id: string }
+        Args: {
+          p_metadata?: Json
+          p_primary_id: string
+          p_secondary_id: string
+        }
         Returns: undefined
       }
-      merge_people: {
-        Args: { primary_id: string; secondary_id: string }
-        Returns: undefined
-      }
+      merge_people:
+        | {
+            Args: { p_duplicate_ids: string[]; p_master_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_metadata?: Json
+              p_primary_id: string
+              p_secondary_id: string
+            }
+            Returns: undefined
+          }
       refresh_all_popularity_scores: { Args: never; Returns: undefined }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
+      search_films_fuzzy: {
+        Args: { lim?: number; q: string }
+        Returns: {
+          audience_rating: number | null
+          audience_rating_count: number
+          average_rating: number
+          backdrop: string | null
+          backdrop_url: string | null
+          coming_soon: boolean | null
+          comments_synced_at: string | null
+          content_type: string | null
+          countries: string[] | null
+          created_at: string
+          duration: number | null
+          episode_count: number | null
+          episode_number: number | null
+          genres: string[] | null
+          id: string
+          is_featured: boolean | null
+          is_in_cinemas: boolean | null
+          is_nollywood: boolean | null
+          is_top_10: boolean | null
+          is_trending: boolean | null
+          language: string | null
+          mubi_id: number | null
+          mubi_slug: string | null
+          needs_review: boolean | null
+          nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          poster_url: string | null
+          release_date: string | null
+          release_type: string | null
+          runtime_minutes: number | null
+          season_count: number | null
+          season_number: number | null
+          series_id: string | null
+          slug: string | null
+          source: string | null
+          source_video_id: string | null
+          status: Database["public"]["Enums"]["film_status"]
+          streaming_links: Json | null
+          synopsis: string | null
+          tagline: string | null
+          title: string
+          tmdb_id: number | null
+          tmdb_rating: number | null
+          trailer_external_url: string | null
+          trailer_source: string
+          trailer_youtube_id: string | null
+          updated_at: string
+          view_count: number
+          year: number | null
+          youtube_watch_url: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "films"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      search_people_fuzzy: {
+        Args: { lim?: number; q: string }
+        Returns: {
+          bio: string | null
+          birthplace: string | null
+          claimed_by: string | null
+          created_at: string
+          date_of_birth: string | null
+          facebook_url: string | null
+          film_count: number | null
+          gender: string | null
+          id: string
+          instagram_url: string | null
+          is_spotlight: boolean | null
+          is_verified: boolean
+          known_for_department: string | null
+          mubi_id: number | null
+          mubi_slug: string | null
+          name: string
+          nationality: string | null
+          needs_review: boolean | null
+          photo_url: string | null
+          popularity_score: number
+          profile_views: number | null
+          slug: string | null
+          source: string | null
+          status: string | null
+          tmdb_id: number | null
+          twitter_url: string | null
+          updated_at: string
+          youtube_channel_id: string | null
+          youtube_handle: string | null
+          youtube_stats: Json | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "people"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       claim_status: "pending" | "approved" | "rejected"
@@ -1262,7 +2019,15 @@ export type Database = {
         | "editor"
         | "composer"
         | "costume_designer"
-      film_status: "released" | "upcoming" | "in_production" | "post-production"
+      film_status:
+        | "released"
+        | "upcoming"
+        | "in_production"
+        | "post-production"
+        | "announced"
+        | "filming"
+        | "completed"
+        | "cancelled"
       nfvcb_rating: "G" | "PG" | "PG-13" | "15" | "18"
       user_role: "fan" | "professional" | "admin" | "admin_limited"
     }
@@ -1390,6 +2155,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       claim_status: ["pending", "approved", "rejected"],
@@ -1404,7 +2172,16 @@ export const Constants = {
         "composer",
         "costume_designer",
       ],
-      film_status: ["released", "upcoming", "in_production", "post-production"],
+      film_status: [
+        "released",
+        "upcoming",
+        "in_production",
+        "post-production",
+        "announced",
+        "filming",
+        "completed",
+        "cancelled",
+      ],
       nfvcb_rating: ["G", "PG", "PG-13", "15", "18"],
       user_role: ["fan", "professional", "admin", "admin_limited"],
     },
