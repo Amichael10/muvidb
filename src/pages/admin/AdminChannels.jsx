@@ -477,10 +477,37 @@ export default function AdminChannels() {
   const [syncingId, setSyncingId] = useState(null);
   const [syncProgress, setSyncProgress] = useState(null);
   const [syncReport, setSyncReport] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkWorking, setBulkWorking] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'monitored') fetchChannels();
   }, [debouncedSearch, filterTab, activeTab]);
+
+  // Clear selection when the visible set changes (search/filter/tab switch).
+  useEffect(() => { setSelectedIds([]); }, [debouncedSearch, filterTab, activeTab]);
+
+  const toggleSelect = (id) =>
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+
+  const allVisibleSelected = channels.length > 0 && channels.every((c) => selectedIds.includes(c.id));
+  const toggleSelectAll = () =>
+    setSelectedIds(allVisibleSelected ? [] : channels.map((c) => c.id));
+
+  // Bulk enable/disable the daily sync for the selected channels.
+  const bulkSetSync = async (enabled) => {
+    if (!selectedIds.length) return;
+    setBulkWorking(true);
+    const { error } = await supabase.from('channels').update({ sync_enabled: enabled }).in('id', selectedIds);
+    if (error) {
+      toast.error('Bulk update failed');
+    } else {
+      toast.success(`${enabled ? 'Resumed' : 'Paused'} daily sync for ${selectedIds.length} channel${selectedIds.length === 1 ? '' : 's'}`);
+      setChannels((prev) => prev.map((c) => selectedIds.includes(c.id) ? { ...c, sync_enabled: enabled } : c));
+      setSelectedIds([]);
+    }
+    setBulkWorking(false);
+  };
 
   const fetchChannels = async () => {
     setLoading(true);
@@ -648,13 +675,55 @@ export default function AdminChannels() {
         <DiscoveryHub onMonitor={startMonitoring} />
       ) : (
         <div className="space-y-8">
+           {/* Selection / bulk action bar */}
+           {!loading && channels.length > 0 && (
+             <div className="flex flex-wrap items-center gap-3 -mb-2">
+               <button
+                 onClick={toggleSelectAll}
+                 className="flex items-center gap-2 text-xs font-bold text-text-muted hover:text-text-primary transition-colors"
+               >
+                 <span className={`w-4 h-4 rounded border flex items-center justify-center ${allVisibleSelected ? 'bg-brand border-brand text-white' : 'border-border bg-surface-2'}`}>
+                   {allVisibleSelected && <Icon icon="solar:check-read-linear" width="11" />}
+                 </span>
+                 {allVisibleSelected ? 'Deselect all' : `Select all (${channels.length})`}
+               </button>
+
+               {selectedIds.length > 0 && (
+                 <>
+                   <span className="text-xs font-black text-brand">{selectedIds.length} selected</span>
+                   <button
+                     onClick={() => bulkSetSync(false)}
+                     disabled={bulkWorking}
+                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                   >
+                     <Icon icon="solar:pause-bold" width="14" /> Pause selected
+                   </button>
+                   <button
+                     onClick={() => bulkSetSync(true)}
+                     disabled={bulkWorking}
+                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-500/10 text-green-500 border border-green-500/30 hover:bg-green-500/20 transition-all disabled:opacity-50"
+                   >
+                     <Icon icon="solar:refresh-circle-bold" width="14" /> Resume selected
+                   </button>
+                   <button onClick={() => setSelectedIds([])} className="text-xs font-bold text-text-muted hover:text-text-primary transition-colors">Clear</button>
+                 </>
+               )}
+             </div>
+           )}
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-64 bg-surface-2 rounded-2xl animate-pulse" />)
               ) : channels.map(ch => (
-                <div key={ch.id} className="bg-surface border border-border rounded-2xl p-6 group hover:border-brand/30 transition-all shadow-xl">
+                <div key={ch.id} className={`bg-surface border rounded-2xl p-6 group transition-all shadow-xl ${selectedIds.includes(ch.id) ? 'border-brand ring-2 ring-brand/30' : 'border-border hover:border-brand/30'}`}>
                   <div className="flex items-start justify-between mb-4">
                     <div className="relative">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleSelect(ch.id); }}
+                        title="Select"
+                        className={`absolute -top-2 -left-2 z-10 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all shadow ${selectedIds.includes(ch.id) ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-transparent hover:border-brand'}`}
+                      >
+                        <Icon icon="solar:check-read-linear" width="14" />
+                      </button>
                       <ImageWithFallback
                         src={ch.thumbnail_url}
                         alt=""
