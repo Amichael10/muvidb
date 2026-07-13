@@ -667,7 +667,20 @@ export default function AdminChannels() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                       <button 
+                       <button
+                         onClick={async (e) => {
+                           e.stopPropagation();
+                           const next = ch.sync_enabled === false; // currently paused -> re-enable
+                           const { error } = await supabase.from('channels').update({ sync_enabled: next }).eq('id', ch.id);
+                           if (!error) { fetchChannels(); toast.success(next ? 'Daily sync resumed' : 'Daily sync paused for this channel'); }
+                           else { toast.error('Failed to update sync setting'); }
+                         }}
+                         title={ch.sync_enabled === false ? 'Daily sync paused — click to resume' : 'Daily sync active — click to pause'}
+                         className={`p-2 border rounded-lg transition-all ${ch.sync_enabled === false ? 'bg-amber-500/10 border-amber-500/40 text-amber-500' : 'bg-green-500/10 border-green-500/30 text-green-500'}`}
+                       >
+                          <Icon icon={ch.sync_enabled === false ? "solar:pause-bold" : "solar:refresh-circle-bold"} width="16" />
+                       </button>
+                       <button
                          onClick={async (e) => {
                            e.stopPropagation();
                            const { error } = await supabase.from('channels').update({ is_featured: !ch.is_featured }).eq('id', ch.id);
@@ -685,7 +698,14 @@ export default function AdminChannels() {
                        </button>
                     </div>
                   </div>
-                  <h3 className="text-sm font-bold text-text-primary mb-1">{ch.name}</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-bold text-text-primary">{ch.name}</h3>
+                    {ch.sync_enabled === false && (
+                      <span className="shrink-0 inline-flex items-center gap-1 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider">
+                        <Icon icon="solar:pause-bold" width="9" /> Paused
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[10px] text-brand font-black uppercase tracking-widest mb-4">{ch.category || 'Uncategorized'} • {ch.country || 'Nigeria'}</p>
                   
                   <div className="space-y-3 bg-surface-2/50 rounded-xl p-4 mb-4">
