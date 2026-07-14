@@ -89,6 +89,37 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
 
+      - name: Sync All Cinemas (multi-adapter — Reach / Silverbird / Genesis / etc.)
+        if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'showtimes'))
+        run: |
+          echo "Syncing ALL enabled cinemas via the multi-adapter pipeline..."
+          npx tsx scripts/sync-showtimes.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          # AI extraction for scraped pages (Gemini primary + rotation, OpenAI/Groq fallback)
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+          GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # Residential proxy for anti-bot cinema sites (reach_cinema / veezi)
+          SMARTPROXY_HOST: ${{ secrets.SMARTPROXY_HOST }}
+          SMARTPROXY_PORT: ${{ secrets.SMARTPROXY_PORT }}
+          SMARTPROXY_USER: ${{ secrets.SMARTPROXY_USER }}
+          SMARTPROXY_PASS: ${{ secrets.SMARTPROXY_PASS }}
+          # Firecrawl (search/enrichment) with key rotation — add _2.._5 as you get them
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          FIRECRAWL_API_KEY_2: ${{ secrets.FIRECRAWL_API_KEY_2 }}
+          FIRECRAWL_API_KEY_3: ${{ secrets.FIRECRAWL_API_KEY_3 }}
+          FIRECRAWL_API_KEY_4: ${{ secrets.FIRECRAWL_API_KEY_4 }}
+          FIRECRAWL_API_KEY_5: ${{ secrets.FIRECRAWL_API_KEY_5 }}
+
       - name: Sync YouTube Videos (Every 8 Hours)
         if: github.event.schedule == '0 */8 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
         run: |

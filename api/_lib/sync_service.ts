@@ -43,7 +43,9 @@ async function enrichFromTMDB(title: string, year?: number | null): Promise<{
  * Syncs cinema showtimes from various adapters
  */
 export async function runShowtimesSync() {
-  const { data: cinemas } = await supabase.from('cinemas').select('*').eq('scrape_enabled', true).limit(15);
+  // Scrape every enabled cinema (was capped at 15 with no ordering, so ~50 of 65
+  // never ran). Ordered by name for deterministic, resumable passes.
+  const { data: cinemas } = await supabase.from('cinemas').select('*').eq('scrape_enabled', true).order('name');
   if (!cinemas) return { message: 'No cinemas to scrape' };
 
   const results = [];
