@@ -316,7 +316,9 @@ export default function Home() {
         .neq('source', 'youtube')
         .or('youtube_watch_url.is.null,youtube_watch_url.eq.""')
         .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-        .order('view_count', { ascending: false })
+        // Newest cinema arrivals first: a freshly-fetched title leads the slider
+        // so viewers slide right to reach the ones already showing.
+        .order('created_at', { ascending: false })
         .limit(60);
       nowFilms = (data || []).map(withGenres);
     }
