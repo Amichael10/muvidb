@@ -695,6 +695,25 @@ const PersonDetail = () => {
           )}
         </div>
 
+        {/* Awards — coming soon (backend field: people.awards jsonb) */}
+        <div className="p-4 md:p-8 lg:p-12 border-t border-border">
+          <div className="flex items-center gap-3 mb-8">
+            <h2 className="text-text-primary text-3xl font-bold font-heading tracking-tighter">
+              Awards
+            </h2>
+            <span className="text-[9px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-full px-2.5 py-1">
+              Coming soon
+            </span>
+          </div>
+          <div className="rounded-2xl border-2 border-dashed border-border bg-surface-2/20 py-16 flex flex-col items-center justify-center text-center gap-3">
+            <Icon icon="solar:cup-star-bold" className="text-5xl text-text-muted/40" />
+            <p className="text-text-secondary text-sm font-bold">Awards &amp; recognitions coming soon</p>
+            <p className="text-text-muted text-xs max-w-md px-4">
+              We&apos;re compiling {person.name}&apos;s awards, nominations and honours. Check back shortly.
+            </p>
+          </div>
+        </div>
+
         {channel && (
           <div className="p-8 md:p-12 border-t border-border bg-surface-2/5 relative overflow-hidden">
             <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
