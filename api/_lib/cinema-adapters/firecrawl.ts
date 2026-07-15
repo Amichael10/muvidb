@@ -56,7 +56,8 @@ interface ExtractedSchedule {
 }
 
 /** Normalize times like "6:00pm", "18:00", "6pm", "18:00:00" → "HH:MM:SS" */
-function normalizeTime(raw: string): string | null {
+function normalizeTime(raw: string | null | undefined): string | null {
+  if (!raw) return null; // AI sometimes emits a null time — don't crash the whole cinema
   const s = raw.trim();
 
   // 12-hour: "6:00pm", "6:00 PM", "6pm"
@@ -241,7 +242,14 @@ export const firecrawlAdapter: CinemaAdapter = async (cinema: CinemaRow): Promis
       });
 
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      
+
+      // Many cinema sites are React/Next.js SPAs that fetch their movie list via
+      // XHR after load, so the initial DOM is an empty shell. Wait for the network
+      // to settle (then a short beat) so client-rendered showtimes are present
+      // before we read the text — otherwise innerText is blank and we get 0 films.
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(cfg.wait ?? 3000);
+
       // Retrieve page text content
       pageText = await page.evaluate(() => document.body.innerText);
     } catch (err: any) {
