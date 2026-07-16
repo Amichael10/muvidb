@@ -81,14 +81,27 @@ export async function runVideosSync() {
   // Only fetch channels that (a) are enabled for sync and (b) haven't been
   // fetched in the last 3.5 hours. Admins can pause a channel via the
   // sync_enabled toggle to keep the daily sync from pulling its videos.
-  const { data: channels } = await supabase
-    .from('channels')
-    .select('*')
-    .eq('sync_enabled', true)
-    .or('videos_last_fetched_at.is.null,videos_last_fetched_at.lt.' + new Date(Date.now() - 3.5*3600*1000).toISOString())
-    .order('videos_last_fetched_at', { ascending: true, nullsFirst: true });
-    
-  if (!channels || channels.length === 0) return { message: 'No channels need syncing right now' };
+  //
+  // Paginated in 1000-row pages so this never depends on the PostgREST max-rows
+  // cap. That lets max-rows be lowered (anti-scraping) without truncating the
+  // channel list — previously this relied on max-rows=5000 to see all channels.
+  const staleCutoff = new Date(Date.now() - 3.5 * 3600 * 1000).toISOString();
+  const channels: any[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('channels')
+      .select('*')
+      .eq('sync_enabled', true)
+      .or('videos_last_fetched_at.is.null,videos_last_fetched_at.lt.' + staleCutoff)
+      .order('videos_last_fetched_at', { ascending: true, nullsFirst: true })
+      .range(from, from + PAGE - 1);
+    if (error || !data?.length) break;
+    channels.push(...data);
+    if (data.length < PAGE) break;
+  }
+
+  if (channels.length === 0) return { message: 'No channels need syncing right now' };
 
   console.log(`[runVideosSync] Starting sync for ${channels.length} channels`);
   let totalUpserted = 0;
