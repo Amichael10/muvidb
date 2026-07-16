@@ -132,9 +132,16 @@ export async function searchAll(query) {
   const castFilmIds = new Set();
   if (people.length) {
     const ids = people.slice(0, 8).map((p) => p.id);
-    const { data: credits } = await supabase
-      .from('credits').select('film_id').in('person_id', ids).limit(100);
-    const filmIds = [...new Set((credits || []).map((c) => c.film_id).filter(Boolean))];
+    // Via our own endpoint rather than a direct `credits` read — see
+    // api/person-films.ts (keeps the cast graph from being bulk-scraped).
+    let filmIds = [];
+    try {
+      const res = await fetch(`/api/person-films?personIds=${encodeURIComponent(ids.join(','))}`);
+      if (res.ok) filmIds = (await res.json()).filmIds || [];
+    } catch (e) {
+      // Search still works on title matches alone if the cast lookup fails.
+      console.warn('cast film lookup failed:', e);
+    }
     if (filmIds.length) {
       const { data } = await supabase.from('films').select(FILM_FIELDS).in('id', filmIds).limit(48);
       castFilms = data || [];
