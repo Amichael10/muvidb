@@ -58,15 +58,12 @@ export default function QuickViewModal() {
           
         setSimilarFilms(related || []);
 
-        const { data: creditsData } = await supabase
-          .from('credits')
-          .select(`
-            id, role, character_name, billing_order,
-            people(id, name, photo_url, popularity_score, slug)
-          `)
-          .eq('film_id', selectedFilm.id)
-          .order('billing_order', { ascending: true });
-          
+        // Served by our own endpoint rather than a direct table read — see
+        // api/film-credits.ts (keeps `credits` from being bulk-scraped).
+        const creditsRes = await fetch(`/api/film-credits?filmId=${encodeURIComponent(selectedFilm.id)}`);
+        const creditsData = creditsRes.ok ? (await creditsRes.json()).credits : null;
+
+
         if (creditsData) {
           const castMembers = creditsData
             .filter(c => {

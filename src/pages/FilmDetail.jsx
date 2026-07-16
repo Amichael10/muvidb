@@ -170,17 +170,13 @@ export default function FilmDetail() {
 
   const fetchCredits = async (uuid) => {
     try {
-      const { data, error } = await supabase
-        .from('credits')
-        .select(`
-          id, role, character_name, billing_order,
-          people(id, name, photo_url, popularity_score, slug)
-        `)
-        .eq('film_id', uuid)
-        .order('billing_order', { ascending: true });
+      // Served by our own endpoint instead of a direct table read: `credits` is
+      // our most expensive data, and a direct anon read lets the whole table be
+      // paged out in bulk. See api/film-credits.ts.
+      const res = await fetch(`/api/film-credits?filmId=${encodeURIComponent(uuid)}`);
+      if (!res.ok) throw new Error(`Credits request failed (${res.status})`);
+      const { credits: data } = await res.json();
 
-      if (error) throw error;
-      
       const deduplicateAndMerge = (members) => {
         const map = new Map();
         members.forEach(m => {
