@@ -59,8 +59,8 @@ export default function QuickViewModal() {
         setSimilarFilms(related || []);
 
         // Served by our own endpoint rather than a direct table read — see
-        // api/film-credits.ts (keeps `credits` from being bulk-scraped).
-        const creditsRes = await fetch(`/api/film-credits?filmId=${encodeURIComponent(selectedFilm.id)}`);
+        // api/content.ts (keeps credits from being bulk-scraped).
+        const creditsRes = await fetch(`/api/content?resource=film-credits&filmId=${encodeURIComponent(selectedFilm.id)}`);
         const creditsData = creditsRes.ok ? (await creditsRes.json()).credits : null;
 
 
