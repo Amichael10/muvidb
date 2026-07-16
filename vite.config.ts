@@ -141,6 +141,16 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: true,
         },
+        '/api/person-films': {
+          target: 'https://muvidb.com',
+          changeOrigin: true,
+          secure: true,
+        },
+        '/api/person-credits': {
+          target: 'https://muvidb.com',
+          changeOrigin: true,
+          secure: true,
+        },
         '/api': {
           target: 'http://localhost:3001',
           bypass: (req, res) => {

@@ -88,11 +88,12 @@ export default function ProDashboard() {
 
   const fetchProStats = async (personId) => {
     try {
-      const { data: credits } = await supabase
-        .from('credits')
-        .select('*, films(*)')
-        .eq('person_id', personId);
-      
+      // Via our own endpoint rather than a direct `credits` read — see
+      // api/person-credits.ts (keeps the cast graph from being bulk-scraped).
+      const res = await fetch(`/api/person-credits?personId=${encodeURIComponent(personId)}`);
+      const credits = res.ok ? (await res.json()).credits : null;
+
+
       if (credits) {
         const filmsList = credits.map(c => c.films).filter(Boolean);
         setStats({
