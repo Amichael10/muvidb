@@ -133,10 +133,10 @@ export async function searchAll(query) {
   if (people.length) {
     const ids = people.slice(0, 8).map((p) => p.id);
     // Via our own endpoint rather than a direct `credits` read — see
-    // api/person-films.ts (keeps the cast graph from being bulk-scraped).
+    // api/content.ts (keeps the cast graph from being bulk-scraped).
     let filmIds = [];
     try {
-      const res = await fetch(`/api/person-films?personIds=${encodeURIComponent(ids.join(','))}`);
+      const res = await fetch(`/api/content?resource=person-films&personIds=${encodeURIComponent(ids.join(','))}`);
       if (res.ok) filmIds = (await res.json()).filmIds || [];
     } catch (e) {
       // Search still works on title matches alone if the cast lookup fails.

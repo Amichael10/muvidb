@@ -89,8 +89,8 @@ export default function ProDashboard() {
   const fetchProStats = async (personId) => {
     try {
       // Via our own endpoint rather than a direct `credits` read — see
-      // api/person-credits.ts (keeps the cast graph from being bulk-scraped).
-      const res = await fetch(`/api/person-credits?personId=${encodeURIComponent(personId)}`);
+      // api/content.ts (keeps the cast graph from being bulk-scraped).
+      const res = await fetch(`/api/content?resource=person-credits&personId=${encodeURIComponent(personId)}`);
       const credits = res.ok ? (await res.json()).credits : null;
 
 

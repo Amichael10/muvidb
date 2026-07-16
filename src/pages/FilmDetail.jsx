@@ -172,8 +172,8 @@ export default function FilmDetail() {
     try {
       // Served by our own endpoint instead of a direct table read: `credits` is
       // our most expensive data, and a direct anon read lets the whole table be
-      // paged out in bulk. See api/film-credits.ts.
-      const res = await fetch(`/api/film-credits?filmId=${encodeURIComponent(uuid)}`);
+      // paged out in bulk. See api/content.ts.
+      const res = await fetch(`/api/content?resource=film-credits&filmId=${encodeURIComponent(uuid)}`);
       if (!res.ok) throw new Error(`Credits request failed (${res.status})`);
       const { credits: data } = await res.json();
 
