@@ -31,33 +31,13 @@ export const useReviews = (filmId, currentUser) => {
     const fetchReviews = async () => {
         setLoading(true)
         try {
-            // Attempt to fetch with users join.
-            // If it fails, fallback to simple select.
-            const { data, error } = await supabase
-                .from('reviews')
-                .select(`
-                    *,
-                    users:user_id (
-                        name,
-                        avatar_url
-                    )
-                `)
-                .eq('film_id', filmId)
-                .order('created_at', { ascending: false })
-
-            if (error) {
-                console.warn('Profile join failed, falling back to basic review fetch:', error);
-                const { data: fallbackData, error: fallbackError } = await supabase
-                    .from('reviews')
-                    .select('*')
-                    .eq('film_id', filmId)
-                    .order('created_at', { ascending: false });
-
-                if (fallbackError) throw fallbackError;
-                applyRows(fallbackData);
-            } else {
-                applyRows(data);
-            }
+            // Served by our own endpoint instead of a direct table read: the
+            // mined audience reviews are expensive data, and a direct anon read
+            // lets the whole table be paged out in bulk. See api/content.ts.
+            const res = await fetch(`/api/content?resource=film-reviews&filmId=${encodeURIComponent(filmId)}`)
+            if (!res.ok) throw new Error(`Reviews request failed (${res.status})`)
+            const { reviews: rows } = await res.json()
+            applyRows(rows)
         } catch (error) {
             console.error('Critical Fetch Fail:', error);
         } finally {

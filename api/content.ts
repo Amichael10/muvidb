@@ -62,6 +62,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ credits: data ?? [] });
     }
 
+    // ---- one film's reviews (user-written + mined external) ---------------
+    if (resource === 'film-reviews') {
+      const filmId = one(req.query.filmId);
+      if (!filmId) return res.status(400).json({ error: 'Missing filmId' });
+      if (!UUID_RE.test(filmId)) return res.status(400).json({ error: 'Invalid filmId' });
+
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*, users:user_id (name, avatar_url)')
+        .eq('film_id', filmId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      // Not edge-cached: a user must see their own review immediately after
+      // posting, and a stale cache would hide it. Cheap at our traffic, and
+      // scrapers are throttled by the edge rate limit regardless.
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ reviews: data ?? [] });
+    }
+
     // ---- search-by-cast: person ids -> film ids ---------------------------
     // Ids only (no roles/character names) and hard-capped, so it can't be
     // turned into a credits dump.
