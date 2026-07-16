@@ -136,17 +136,7 @@ export default defineConfig(({ mode }) => {
         // Vercel functions don't run under `vite dev`, and once anon SELECT is
         // revoked on `credits` (anti-scraping) the browser can't read the table
         // directly either — so local dev talks to the deployed endpoint.
-        '/api/film-credits': {
-          target: 'https://muvidb.com',
-          changeOrigin: true,
-          secure: true,
-        },
-        '/api/person-films': {
-          target: 'https://muvidb.com',
-          changeOrigin: true,
-          secure: true,
-        },
-        '/api/person-credits': {
+        '/api/content': {
           target: 'https://muvidb.com',
           changeOrigin: true,
           secure: true,
