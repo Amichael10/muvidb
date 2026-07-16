@@ -56,13 +56,15 @@ function fmtDuration(secs) {
   return `${m}:${String(s).padStart(2,'0')}`
 }
 
+const normalizeRole = (role) => String(role || '').trim().toLowerCase()
+
 const PersonDetailSkeleton = () => (
   <div className="min-h-screen bg-bg">
     <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
       <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
       <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
         <div className="flex flex-col md:flex-row gap-10 items-center md:items-start">
-          <div className="w-48 h-48 md:w-56 md:h-56 rounded-xl bg-surface-2 animate-shimmer shrink-0 shadow-2xl"></div>
+          <div className="w-48 md:w-56 aspect-[3/4] rounded-lg bg-surface-2 animate-shimmer shrink-0 shadow-2xl"></div>
           <div className="flex-1 space-y-6 w-full">
             <div className="space-y-3">
               <div className="h-12 w-2/3 bg-surface-2 rounded-lg animate-shimmer mx-auto md:mx-0"></div>
@@ -129,6 +131,7 @@ const PersonDetail = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [person, setPerson] = useState(null)
+  const [awardFilms, setAwardFilms] = useState({}) // film_id -> { slug, title, poster_url }
   const [personId, setPersonId] = useState(null) // actual UUID
   const [channel, setChannel] = useState(null)
   const [channelVideos, setChannelVideos] = useState([])
@@ -138,6 +141,7 @@ const PersonDetail = () => {
   const [activeRole, setActiveRole] = useState('actor')
   const [youtubeVideoIds, setYoutubeVideoIds] = useState([])
   const [youtubeLoading, setYoutubeLoading] = useState(false)
+  const [visibleCreditsCount, setVisibleCreditsCount] = useState(20)
 
   const {
     isFollowing,
@@ -150,10 +154,16 @@ const PersonDetail = () => {
     fetchPerson()
   }, [slug])
 
+  useEffect(() => {
+    setVisibleCreditsCount(20)
+  }, [activeRole])
+
   const fetchPerson = async () => {
     setLoading(true)
     setError(null)
     setYoutubeVideoIds([])
+    setChannel(null)
+    setChannelVideos([])
 
     const { col, val } = slugOrId(slug);
     const { data, error } = await supabase
@@ -179,12 +189,49 @@ const PersonDetail = () => {
       return
     }
 
+    const basePerson = {
+      ...data,
+      credits: (data.credits || []).map((credit) => ({
+        ...credit,
+        role: normalizeRole(credit.role),
+      })),
+    }
+
     // Increment profile views in the background
     supabase.rpc('increment_profile_views', { person_uuid: data.id }).then(() => {});
 
-    setPerson(data)
+    setPerson(basePerson)
     setPersonId(data.id)
     document.title = `MuviDB | ${data.name}`
+
+    // Posters/slugs for the films an award was won/nominated for. They aren't
+    // always in this person's credits (you can win for a film we don't credit
+    // them on), so fetch them by the film_id stored on each award entry.
+    const awardFilmIds = [...new Set(
+      (Array.isArray(basePerson.awards) ? basePerson.awards : [])
+        .map((a) => a?.film_id)
+        .filter(Boolean)
+    )]
+    if (awardFilmIds.length) {
+      supabase
+        .from('films')
+        .select('id, slug, title, poster_url')
+        .in('id', awardFilmIds)
+        .then(({ data: films }) => {
+          setAwardFilms(Object.fromEntries((films || []).map((f) => [f.id, f])))
+        })
+    } else {
+      setAwardFilms({})
+    }
+
+    const rolesOrder = ['actor', 'director', 'writer', 'producer']
+    const initialRole = rolesOrder.find((role) =>
+      basePerson.credits.some((credit) => normalizeRole(credit.role) === role)
+    ) || normalizeRole(basePerson.credits[0]?.role)
+    if (initialRole) setActiveRole(initialRole)
+
+    // Channel enrichment is optional; render the core profile immediately.
+    setLoading(false)
 
     // Fetch linked YouTube channel
     const { data: ch } = await supabase
@@ -214,8 +261,9 @@ const PersonDetail = () => {
     }
 
     // Merge YouTube films into credits if not already there
-    const mergedCredits = [...(data.credits || [])]
+    const mergedCredits = [...basePerson.credits]
     const existingFilmIds = new Set(mergedCredits.map(c => c.films?.id))
+    const existingVideoIds = new Set()
 
     // 1. Matched films
     for (const yf of ytFilms) {
@@ -235,6 +283,10 @@ const PersonDetail = () => {
     for (const vid of vids) {
       if (vid.duration_seconds < 60) continue
       if (vid.is_hidden) continue
+      if (vid.film_id && existingFilmIds.has(vid.film_id)) continue
+      if (existingVideoIds.has(vid.video_id)) continue
+
+      existingVideoIds.add(vid.video_id)
 
       mergedCredits.push({
         id: `vid-${vid.video_id}`,
@@ -244,16 +296,8 @@ const PersonDetail = () => {
       })
     }
 
-    const updatedPerson = { ...data, credits: mergedCredits }
+    const updatedPerson = { ...basePerson, credits: mergedCredits }
     setPerson(updatedPerson)
-
-    const rolesOrder = ['actor', 'director', 'writer', 'producer']
-    const firstRole = rolesOrder.find(r =>
-      updatedPerson.credits?.some(c => c.role === r)
-    )
-    if (firstRole) setActiveRole(firstRole)
-
-    setLoading(false)
   }
 
   const fetchYoutubeFilms = async (personData, linkedChannel) => {
@@ -357,7 +401,7 @@ const PersonDetail = () => {
 
   const creditsByRole = (role) => {
     return person?.credits
-      ?.filter(c => c.role === role)
+      ?.filter(c => normalizeRole(c.role) === normalizeRole(role))
       ?.sort((a, b) => {
         const yearA = a.films?.year || (a.video?.published_at && new Date(a.video.published_at).getFullYear()) || 0
         const yearB = b.films?.year || (b.video?.published_at && new Date(b.video.published_at).getFullYear()) || 0
@@ -371,11 +415,13 @@ const PersonDetail = () => {
 
   const getAvailableRoles = () => {
     if (!person?.credits) return [];
-    const roles = person.credits.map(c => c.role?.toLowerCase()?.trim()).filter(Boolean);
+    const roles = person.credits.map(c => normalizeRole(c.role)).filter(Boolean);
     return [...new Set(roles)];
   };
 
   const availableRoles = getAvailableRoles();
+  const primaryRoleOrder = ['actor', 'director', 'producer', 'writer'];
+  const heroRoles = primaryRoleOrder.filter((role) => availableRoles.includes(role));
 
   const getRoleLabel = (role) => {
     if (!role) return '';
@@ -411,6 +457,20 @@ const PersonDetail = () => {
   const totalViews = person.credits?.reduce(
     (sum, c) => sum + (c.films?.view_count || 0), 0
   ) || 0
+  const activeCredits = creditsByRole(activeRole)
+  const knownFor = [...new Map(
+    (person.credits || [])
+      .filter((credit) => credit.films?.id)
+      .map((credit) => [credit.films.id, credit])
+  ).values()]
+    .sort((a, b) => {
+      const views = (b.films?.view_count || 0) - (a.films?.view_count || 0)
+      if (views !== 0) return views
+      const ratings = (b.films?.average_rating || 0) - (a.films?.average_rating || 0)
+      if (ratings !== 0) return ratings
+      return (b.films?.year || 0) - (a.films?.year || 0)
+    })
+    .slice(0, 6)
 
   return (
     <div className="min-h-screen bg-bg">
@@ -426,15 +486,14 @@ const PersonDetail = () => {
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
           <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
             <div className="flex-shrink-0 relative">
-              <div className="absolute -inset-1 bg-brand/20 blur-xl rounded-full"></div>
               {person.photo_url ? (
                 <img
                   src={person.photo_url}
                   alt={formatPersonName(person.name)}
-                  className="relative w-48 h-48 md:w-56 md:h-56 rounded-xl object-cover shadow-2xl border border-border"
+                  className="relative w-48 md:w-56 aspect-[3/4] rounded-lg object-cover shadow-2xl border border-border"
                 />
               ) : (
-                <div className="relative w-48 h-48 md:w-56 md:h-56 rounded-xl bg-surface flex items-center justify-center shadow-2xl border border-border">
+                <div className="relative w-48 md:w-56 aspect-[3/4] rounded-lg bg-surface flex items-center justify-center shadow-2xl border border-border">
                   <span className="text-6xl font-bold text-brand font-heading">
                     {formatPersonName(person.name)?.charAt(0)}
                   </span>
@@ -455,15 +514,13 @@ const PersonDetail = () => {
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                  {availableRoles.map(role => (
-                     <span
+                <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center md:justify-start max-w-full">
+                  {heroRoles.map(role => (
+                    <span
                       key={role}
-                      className="text-text-muted text-[10px] font-bold tracking-wider"
+                      className="text-text-muted text-[10px] font-bold"
                     >
                       {getRoleLabel(role)}
-                      {availableRoles.indexOf(role) <
-                        availableRoles.length - 1 && ' ·'}
                     </span>
                   ))}
                 </div>
@@ -507,11 +564,7 @@ const PersonDetail = () => {
               </div>
 
               {(person.biography || person.bio) && (
-                <div className="space-y-4">
-                  <p className="text-text-muted text-sm leading-relaxed max-w-2xl">
-                    {toSentenceCase(person.biography || person.bio)}
-                  </p>
-                </div>
+                <Biography text={toSentenceCase(person.biography || person.bio)} />
               )}
 
               <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
@@ -606,6 +659,39 @@ const PersonDetail = () => {
       </div>
 
       <div className="max-w-7xl mx-auto border-x border-border pb-20">
+        {knownFor.length > 0 && (
+          <section className="p-4 md:p-8 lg:p-12 border-b border-border">
+            <p className="text-brand text-[10px] font-bold uppercase tracking-widest mb-2">Career highlights</p>
+            <h2 className="text-text-primary text-3xl font-bold font-heading tracking-tighter mb-6">Known For</h2>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2">
+              {knownFor.map((credit) => (
+                <Link
+                  key={`known-${credit.films.id}`}
+                  to={`/films/${credit.films.slug || credit.films.id}`}
+                  className="group w-36 sm:w-40 md:w-44 shrink-0 snap-start"
+                >
+                  <div className="aspect-[2/3] overflow-hidden rounded-lg border border-border bg-surface-2 group-hover:border-brand transition-colors">
+                    <ImageWithFallback
+                      src={credit.films.poster_url}
+                      alt={credit.films.title}
+                      fallbackType="poster"
+                      name={credit.films.title}
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                    />
+                  </div>
+                  <p className="mt-3 text-sm font-bold text-text-primary line-clamp-2 group-hover:text-brand transition-colors">
+                    {formatFilmTitle(credit.films.title)}
+                  </p>
+                  <p className="mt-1 text-xs text-text-muted line-clamp-1">
+                    {[credit.films.year, credit.character_name ? `as ${toTitleCase(credit.character_name)}` : getRoleLabel(credit.role)]
+                      .filter(Boolean)
+                      .join(' / ')}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="p-4 md:p-8 lg:p-12">
           <h2 className="text-text-primary text-3xl font-bold font-heading mb-8 tracking-tighter">
             Filmography
@@ -629,9 +715,10 @@ const PersonDetail = () => {
             </div>
           )}
 
-          {creditsByRole(activeRole).length > 0 ? (
+          {activeCredits.length > 0 ? (
+            <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-              {creditsByRole(activeRole).map(credit => {
+              {activeCredits.slice(0, visibleCreditsCount).map(credit => {
                 const film = credit.films
                 const video = credit.video
                 const title = film?.title || video?.title
@@ -686,6 +773,19 @@ const PersonDetail = () => {
                 )
               })}
             </div>
+            {activeCredits.length > visibleCreditsCount && (
+              <div className="flex justify-center mt-10">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCreditsCount((count) => count + 20)}
+                  className="inline-flex items-center gap-2 min-h-[44px] px-6 py-3 rounded-lg border border-border bg-surface text-sm font-bold text-text-primary hover:border-brand hover:text-brand transition-colors"
+                >
+                  <Icon icon="solar:add-circle-linear" width="18" />
+                  Show more credits
+                </button>
+              </div>
+            )}
+            </>
           ) : (
             <div className="text-center py-20 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
               <p className="text-text-muted font-bold text-xs">
@@ -695,24 +795,123 @@ const PersonDetail = () => {
           )}
         </div>
 
-        {/* Awards — coming soon (backend field: people.awards jsonb) */}
+        {/* Awards (people.awards jsonb) */}
+        {Array.isArray(person.awards) && person.awards.length > 0 && (
         <div className="p-4 md:p-8 lg:p-12 border-t border-border">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-8">
             <h2 className="text-text-primary text-3xl font-bold font-heading tracking-tighter">
               Awards
             </h2>
-            <span className="text-[9px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-full px-2.5 py-1">
-              Coming soon
-            </span>
+            {Array.isArray(person.awards) && person.awards.length > 0 && (() => {
+              // IMDb-style tally: wins counted separately from nominations.
+              const wins = person.awards.filter((a) => a.won !== false).length
+              const noms = person.awards.filter((a) => a.won === false).length
+              const parts = []
+              if (wins) parts.push(`${wins} ${wins === 1 ? 'win' : 'wins'}`)
+              if (noms) parts.push(`${noms} ${noms === 1 ? 'nomination' : 'nominations'}`)
+              return (
+                <span className="text-[10px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-full px-3 py-1">
+                  {parts.join(' & ')} total
+                </span>
+              )
+            })()}
           </div>
-          <div className="rounded-2xl border-2 border-dashed border-border bg-surface-2/20 py-16 flex flex-col items-center justify-center text-center gap-3">
-            <Icon icon="solar:cup-star-bold" className="text-5xl text-text-muted/40" />
-            <p className="text-text-secondary text-sm font-bold">Awards &amp; recognitions coming soon</p>
-            <p className="text-text-muted text-xs max-w-md px-4">
-              We&apos;re compiling {person.name}&apos;s awards, nominations and honours. Check back shortly.
-            </p>
-          </div>
+
+          {Array.isArray(person.awards) && person.awards.length > 0 ? (
+            <div className="space-y-8 max-w-3xl">
+              {Object.entries(
+                // Group by awarding body (IMDb lists a block per organisation).
+                person.awards.reduce((acc, a) => {
+                  const org = a.organization || 'Awards'
+                  ;(acc[org] = acc[org] || []).push(a)
+                  return acc
+                }, {})
+              ).map(([org, entries]) => (
+                <div key={org}>
+                  {/* Org heading with the brand accent bar */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="w-1 h-6 bg-brand rounded-full shrink-0" />
+                    <h3 className="text-text-primary text-xl font-bold font-heading tracking-tight">
+                      {org}
+                    </h3>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-surface divide-y divide-border overflow-hidden">
+                    {[...entries]
+                      .sort((a, b) => (b.year || 0) - (a.year || 0) || (b.season || 0) - (a.season || 0))
+                      .map((award, idx) => {
+                        const film = award.film_id ? awardFilms[award.film_id] : null
+                        const workTitle = award.work || award.title
+                        return (
+                          <div
+                            key={`${org}-${award.season}-${award.category}-${idx}`}
+                            className="flex items-start gap-4 px-4 py-4"
+                          >
+                            {/* Poster thumb (IMDb shows the work's art) */}
+                            <div className="w-[46px] shrink-0 aspect-[2/3] rounded overflow-hidden bg-surface-2 border border-border">
+                              {film?.poster_url ? (
+                                <ImageWithFallback
+                                  src={film.poster_url}
+                                  alt={workTitle || ''}
+                                  fallbackType="banner"
+                                  name={workTitle || ''}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Icon icon="solar:cup-star-bold" className="text-base text-text-muted/40" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              {/* "2025 Nominee" / "2024 Winner" */}
+                              <p className="text-sm">
+                                <span className="text-text-primary font-bold">
+                                  {award.year || (award.season ? `Season ${award.season}` : '')}{' '}
+                                  {award.won === false ? 'Nominee' : 'Winner'}
+                                </span>
+                                <span className="text-text-muted ml-2">
+                                  {org}
+                                  {award.season ? ` ${award.season}` : ''}
+                                </span>
+                              </p>
+                              {award.category && (
+                                <p className="text-text-secondary text-sm mt-0.5">
+                                  {toTitleCase(award.category)}
+                                </p>
+                              )}
+                              {workTitle && (
+                                film?.slug || film?.id ? (
+                                  <Link
+                                    to={`/films/${film.slug || film.id}`}
+                                    className="text-brand text-sm hover:underline mt-0.5 inline-block"
+                                  >
+                                    {formatFilmTitle(workTitle)}
+                                  </Link>
+                                ) : (
+                                  <p className="text-text-muted text-sm mt-0.5">{formatFilmTitle(workTitle)}</p>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border-2 border-dashed border-border bg-surface-2/20 py-16 flex flex-col items-center justify-center text-center gap-3">
+              <Icon icon="solar:cup-star-bold" className="text-5xl text-text-muted/40" />
+              <p className="text-text-secondary text-sm font-bold">No awards listed yet</p>
+              <p className="text-text-muted text-xs max-w-md px-4">
+                We&apos;re still compiling {formatPersonName(person.name)}&apos;s awards and honours.
+              </p>
+            </div>
+          )}
         </div>
+        )}
 
         {channel && (
           <div className="p-8 md:p-12 border-t border-border bg-surface-2/5 relative overflow-hidden">

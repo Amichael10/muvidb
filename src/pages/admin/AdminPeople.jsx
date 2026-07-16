@@ -68,7 +68,8 @@ export default function AdminPeople() {
     youtube_stats: { subscribers: '0', videos: '0', thumbnail: null, banner: null },
     instagram_url: '',
     facebook_url: '',
-    twitter_url: ''
+    twitter_url: '',
+    awards: [] // [{ organization, year, season, category, work, film_id, won }]
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -255,7 +256,8 @@ export default function AdminPeople() {
       youtube_stats: { subscribers: '0', videos: '0', thumbnail: null, banner: null },
       instagram_url: '',
       facebook_url: '',
-      twitter_url: ''
+      twitter_url: '',
+      awards: []
     });
     setIsDrawerOpen(true);
   };
@@ -281,7 +283,7 @@ export default function AdminPeople() {
     
     const p = fullPerson || person;
 
-    setFormData(draft || {
+    const baseForm = {
       name: p.name || '',
       biography: p.biography || p.bio || '',
       photo_url: p.photo_url || '',
@@ -297,8 +299,13 @@ export default function AdminPeople() {
       youtube_stats: p.youtube_stats || { subscribers: '0', videos: '0', thumbnail: null, banner: null },
       instagram_url: p.instagram_url || '',
       facebook_url: p.facebook_url || '',
-      twitter_url: p.twitter_url || ''
-    });
+      twitter_url: p.twitter_url || '',
+      awards: Array.isArray(p.awards) ? p.awards : []
+    };
+    // Merge over the base rather than replacing it: a draft saved before a field
+    // existed on this form has no key for it, and save would then write the
+    // empty default over real data (awards would be wiped).
+    setFormData(draft ? { ...baseForm, ...draft, awards: Array.isArray(draft.awards) ? draft.awards : baseForm.awards } : baseForm);
     setYoutubeChannelInput(draft?.youtube_channel_id || draft?.youtube_handle || getPersonYoutubeChannelUrl(p) || '');
     
     // Fetch credits for this person
@@ -397,7 +404,20 @@ export default function AdminPeople() {
         youtube_stats,
         instagram_url: formData.instagram_url?.trim() || null,
         facebook_url: formData.facebook_url?.trim() || null,
-        twitter_url: formData.twitter_url?.trim() || null
+        twitter_url: formData.twitter_url?.trim() || null,
+        // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
+        // the person page's sorting and "N wins & N nominations" tally stay sane.
+        awards: (formData.awards || [])
+          .filter((a) => (a.organization || '').trim() || (a.category || '').trim())
+          .map((a) => ({
+            organization: (a.organization || '').trim() || 'AMVCA',
+            year: a.year ? parseInt(a.year, 10) : null,
+            season: a.season ? parseInt(a.season, 10) : null,
+            category: (a.category || '').trim() || null,
+            work: (a.work || '').trim() || null,
+            film_id: a.film_id || null,
+            won: a.won === true,
+          }))
       };
 
       if (editingPerson) {
@@ -1053,6 +1073,122 @@ export default function AdminPeople() {
                 />
               </div>
             </div>
+          </section>
+
+          {/* Awards & nominations -> people.awards (jsonb). Renders on the
+              person page grouped by organisation, IMDb-style. */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏆</span>
+                <h4 className="text-xs font-bold text-text-muted">Awards &amp; Nominations</h4>
+                {(formData.awards || []).length > 0 && (
+                  <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-full px-2 py-0.5">
+                    {(formData.awards || []).length}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData({
+                  ...formData,
+                  awards: [...(formData.awards || []), { organization: 'AMVCA', year: '', season: '', category: '', work: '', won: false }]
+                })}
+                className="flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+              >
+                <Icon icon="solar:add-circle-linear" width="16" /> Add award
+              </button>
+            </div>
+
+            {(formData.awards || []).length === 0 ? (
+              <p className="text-xs text-text-muted italic">
+                No awards yet. Click &quot;Add award&quot; to record a win or nomination.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {(formData.awards || []).map((award, idx) => {
+                  const update = (patch) => {
+                    const next = [...formData.awards];
+                    next[idx] = { ...next[idx], ...patch };
+                    setFormData({ ...formData, awards: next });
+                  };
+                  return (
+                    <div key={idx} className="rounded-lg border border-border bg-surface-2/30 p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Winner / Nominee is the key distinction on the public page */}
+                        <div className="flex items-center gap-1 p-1 bg-surface rounded-lg border border-border">
+                          <button
+                            type="button"
+                            onClick={() => update({ won: true })}
+                            className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all ${award.won ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary'}`}
+                          >
+                            Winner
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => update({ won: false })}
+                            className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all ${!award.won ? 'bg-amber-500 text-white' : 'text-text-muted hover:text-text-primary'}`}
+                          >
+                            Nominee
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, awards: formData.awards.filter((_, i) => i !== idx) })}
+                          className="text-text-muted hover:text-red-500 transition-colors"
+                          title="Remove this award"
+                        >
+                          <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Organization"
+                          value={award.organization || ''}
+                          onChange={(e) => update({ organization: e.target.value })}
+                          className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Year"
+                          value={award.year || ''}
+                          onChange={(e) => update({ year: e.target.value })}
+                          className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Season"
+                          value={award.season || ''}
+                          onChange={(e) => update({ season: e.target.value })}
+                          className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Category (e.g. Best Lead Actress)"
+                        value={award.category || ''}
+                        onChange={(e) => update({ category: e.target.value })}
+                        className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Film / work title (must match the film exactly to link it)"
+                        value={award.work || ''}
+                        onChange={(e) => update({ work: e.target.value, film_id: null })}
+                        className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                      />
+                      {award.film_id && (
+                        <p className="text-[10px] text-green-500 font-bold flex items-center gap-1">
+                          <Icon icon="solar:link-linear" width="12" /> Linked to a film — will show its poster
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section className="space-y-6">
