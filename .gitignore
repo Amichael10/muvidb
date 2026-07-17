@@ -69,3 +69,13 @@ project.tar.gz
 *.jpg
 *.jpeg
 *.bak
+
+# Playwright storageState — holds live login cookies (NetflixId/SecureNetflixId
+# are a full Netflix session). Never commit these.
+netflix_playwright_state.json
+*_playwright_state.json
+.playwright-cli/
+
+# Local agent tooling + throwaway repair/inspection scripts.
+.agents/
+scratch/
