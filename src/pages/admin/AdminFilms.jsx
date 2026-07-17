@@ -5,6 +5,9 @@ import { Icon } from '@iconify/react';
 import Drawer from '../../components/admin/Drawer';
 import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
+import ImageField from '../../components/admin/ImageField';
+import AwardsEditor from '../../components/admin/AwardsEditor';
+import { ALL_ROLES } from '../../lib/creditRoles';
 import { extractYoutubeId } from '../../lib/youtube';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
@@ -131,6 +134,7 @@ export default function AdminFilms() {
     synopsis: '',
     poster_url: '',
     backdrop_url: '',
+    awards: [],
     genres: [],
     runtime_minutes: '',
     language: 'English',
@@ -143,6 +147,7 @@ export default function AdminFilms() {
     tagline: '',
     is_featured: false,
     is_trending: false,
+    release_date: '',
     release_type: '',
     youtube_watch_url: '',
     source_video_id: '',
@@ -541,8 +546,8 @@ export default function AdminFilms() {
     ]);
     
     if (creditData) {
-      const standardRoles = ['actor', 'director', 'producer', 'executive producer', 'writer', 'cinematographer', 'editor', 'composer', 'sound recordist', 'production designer', 'art director', 'makeup artist', 'costume designer', 'gaffer', 'continuity', 'production manager', 'assistant director', 'colorist', 'vfx', 'stunts', 'casting director', 'location manager'];
-      
+      const standardRoles = ALL_ROLES.map(r => r.value);
+
       const existingCustomRoles = [...new Set(creditData
         .map(c => c.role ? c.role.toLowerCase() : '')
         .filter(role => role && !standardRoles.includes(role)))];
@@ -597,7 +602,7 @@ export default function AdminFilms() {
 
     if (film) {
       setEditingFilm(film);
-      setFormData(draft?.formData || {
+      const baseForm = {
         ...initialFormState,
         ...film,
         genres: film.genres || [],
@@ -606,7 +611,20 @@ export default function AdminFilms() {
         release_type: film.release_type || 'cinema',
         youtube_watch_url: film.youtube_watch_url || '',
         streaming_links: film.streaming_links || {},
-      });
+        awards: Array.isArray(film.awards) ? film.awards : [],
+      };
+      // Merge over the base rather than replacing it: a draft saved before a
+      // field existed on this form has no key for it, and save would then write
+      // the empty default over real data (awards would be wiped).
+      setFormData(
+        draft?.formData
+          ? {
+              ...baseForm,
+              ...draft.formData,
+              awards: Array.isArray(draft.formData.awards) ? draft.formData.awards : baseForm.awards,
+            }
+          : baseForm,
+      );
       
       if (draft) {
         setCredits(draft.credits || []);
@@ -817,7 +835,20 @@ export default function AdminFilms() {
         poster_url: (formData.poster_url || '').trim() || null,
         backdrop_url: (formData.backdrop_url || '').trim() || null,
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
+        release_date: formData.release_date || null,
         release_type: formData.release_type || null,
+        // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
+        // the film page's sorting and win/nomination tally stay sane.
+        awards: (formData.awards || [])
+          .filter((a) => (a.organization || '').trim() || (a.category || '').trim())
+          .map((a) => ({
+            organization: (a.organization || '').trim() || 'AMVCA',
+            year: a.year ? parseInt(a.year, 10) : null,
+            season: a.season ? parseInt(a.season, 10) : null,
+            category: (a.category || '').trim() || null,
+            recipients: Array.isArray(a.recipients) ? a.recipients.filter(Boolean) : [],
+            won: a.won === true,
+          })),
       };
 
       const { genres: selectedGenreIds, channel_video_id, ...cleanFilmPayload } = filmPayload;
@@ -1863,7 +1894,7 @@ export default function AdminFilms() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-text-primary mb-2">Release Year</label>
                     <input 
@@ -1894,11 +1925,21 @@ export default function AdminFilms() {
                       onChange={handleChange} 
                       className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all appearance-none cursor-pointer"
                     >
-                      <option value="upcoming">Upcoming / Announced</option>
+                      <option value="upcoming">Coming Soon / Announced</option>
                       <option value="in_production">In Production / Filming</option>
                       <option value="post-production">Post-Production</option>
                       <option value="released">Released</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-2">Release Date</label>
+                    <input
+                      type="date"
+                      name="release_date"
+                      value={formData.release_date || ''}
+                      onChange={handleChange}
+                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all"
+                    />
                   </div>
                 </div>
                 <div>
@@ -1994,15 +2035,21 @@ export default function AdminFilms() {
             <section className="space-y-8">
               <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest pb-2 border-b border-border">Media & Presentation</h4>
               
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-text-primary mb-2">Poster Asset URL</label>
-                  <input name="poster_url" value={formData.poster_url} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" placeholder="https://" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-text-primary mb-2">Landscape Backdrop URL</label>
-                  <input name="backdrop_url" value={formData.backdrop_url} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all" placeholder="https://" />
-                </div>
+              <div className="space-y-5">
+                <ImageField
+                  label="Poster Asset"
+                  value={formData.poster_url}
+                  onChange={(url) => setFormData((prev) => ({ ...prev, poster_url: url }))}
+                  bucket="posters"
+                  aspect="poster"
+                />
+                <ImageField
+                  label="Landscape Backdrop"
+                  value={formData.backdrop_url}
+                  onChange={(url) => setFormData((prev) => ({ ...prev, backdrop_url: url }))}
+                  bucket="backdrops"
+                  aspect="backdrop"
+                />
               </div>
 
               <div className="p-5 bg-surface-2 border border-border rounded-lg space-y-5">
@@ -2281,6 +2328,16 @@ export default function AdminFilms() {
               </div>
             </section>
           </div>
+
+          <hr className="border-border" />
+
+          {/* Awards & nominations -> films.awards (jsonb). Same editor as the
+              person drawer; here the award points at its recipients. */}
+          <AwardsEditor
+            variant="film"
+            value={formData.awards}
+            onChange={(awards) => setFormData({ ...formData, awards })}
+          />
 
           <hr className="border-border" />
 
