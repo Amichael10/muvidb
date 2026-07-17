@@ -70,8 +70,8 @@ export default function Browse() {
     setLoading(true);
     try {
       let query = supabase.from('films').select(`
-        id, slug, title, poster_url, backdrop_url, year, language, 
-        runtime_minutes, view_count, average_rating, nfvcb_rating,
+        id, slug, title, poster_url, backdrop_url, year, language, genres,
+        runtime_minutes, view_count, average_rating, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
         release_type, streaming_links, source, youtube_watch_url,
         film_genres!left(genres(name)),
         film_countries!left(countries(name))
@@ -79,8 +79,8 @@ export default function Browse() {
 
       if (selectedGenres.length > 0 && selectedCountries.length > 0) {
          query = supabase.from('films').select(`
-          id, slug, title, poster_url, backdrop_url, year, language, 
-          runtime_minutes, view_count, average_rating, nfvcb_rating,
+          id, slug, title, poster_url, backdrop_url, year, language, genres,
+          runtime_minutes, view_count, average_rating, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!inner(genres!inner(name)),
           film_countries!inner(countries!inner(name))
@@ -89,8 +89,8 @@ export default function Browse() {
         query = query.in('film_countries.countries.name', selectedCountries);
       } else if (selectedGenres.length > 0) {
         query = supabase.from('films').select(`
-          id, slug, title, poster_url, backdrop_url, year, language, 
-          runtime_minutes, view_count, average_rating, nfvcb_rating,
+          id, slug, title, poster_url, backdrop_url, year, language, genres,
+          runtime_minutes, view_count, average_rating, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!inner(genres!inner(name)),
           film_countries!left(countries(name))
@@ -98,8 +98,8 @@ export default function Browse() {
         query = query.in('film_genres.genres.name', selectedGenres);
       } else if (selectedCountries.length > 0) {
         query = supabase.from('films').select(`
-          id, slug, title, poster_url, backdrop_url, year, language, 
-          runtime_minutes, view_count, average_rating, nfvcb_rating,
+          id, slug, title, poster_url, backdrop_url, year, language, genres,
+          runtime_minutes, view_count, average_rating, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!left(genres(name)),
           film_countries!inner(countries!inner(name))
@@ -135,11 +135,14 @@ export default function Browse() {
       
       if (dbError) throw dbError;
 
-      let transformed = (data || []).map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [],
-        countries: f.film_countries?.map(fc => fc.countries?.name).filter(Boolean) || []
-      }));
+      let transformed = (data || []).map(f => {
+        const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
+        return {
+          ...f,
+          genres: relatedGenres.length > 0 ? relatedGenres : (Array.isArray(f.genres) ? f.genres.filter(Boolean) : []),
+          countries: f.film_countries?.map(fc => fc.countries?.name).filter(Boolean) || []
+        };
+      });
 
       // Filter by platform client-side to handle json checks easily
       if (selectedPlatform) {
@@ -391,18 +394,18 @@ export default function Browse() {
             </div>
 
             {loading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
+              <div className={`grid gap-4 sm:gap-6 md:gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="flex justify-center">
-                    <SkeletonCard size="md" />
+                    <SkeletonCard size="md" variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
                   </div>
                 ))}
               </div>
             ) : films.length > 0 ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
+              <div className={`grid gap-4 sm:gap-6 md:gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 {films.map(film => (
-                  <div key={film.id} className="flex justify-center">
-                    <FilmCard film={film} />
+                  <div key={film.id} className={selectedPlatform === 'youtube' ? '' : 'flex justify-center'}>
+                    <FilmCard film={film} variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
                   </div>
                 ))}
               </div>

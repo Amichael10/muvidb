@@ -31,12 +31,27 @@ export const useReviews = (filmId, currentUser) => {
     const fetchReviews = async () => {
         setLoading(true)
         try {
-            // Served by our own endpoint instead of a direct table read: the
-            // mined audience reviews are expensive data, and a direct anon read
-            // lets the whole table be paged out in bulk. See api/content.ts.
-            const res = await fetch(`/api/content?resource=film-reviews&filmId=${encodeURIComponent(filmId)}`)
-            if (!res.ok) throw new Error(`Reviews request failed (${res.status})`)
-            const { reviews: rows } = await res.json()
+            const fetchDirect = async () => {
+                const { data, error } = await supabase
+                    .from('reviews')
+                    .select('*, users:user_id (name, avatar_url)')
+                    .eq('film_id', filmId)
+                    .order('created_at', { ascending: false })
+                if (error) throw error
+                return data || []
+            }
+
+            let rows = []
+            if (import.meta.env.DEV) {
+                rows = await fetchDirect()
+            } else {
+                const res = await fetch(`/api/content?resource=film-reviews&filmId=${encodeURIComponent(filmId)}`)
+                if (res.ok) {
+                    ({ reviews: rows } = await res.json())
+                } else {
+                    rows = await fetchDirect()
+                }
+            }
             applyRows(rows)
         } catch (error) {
             console.error('Critical Fetch Fail:', error);

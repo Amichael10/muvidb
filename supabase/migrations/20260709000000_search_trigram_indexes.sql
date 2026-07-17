@@ -14,9 +14,9 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-CREATE INDEX IF NOT EXISTS films_title_trgm     ON public.films     USING gin (title gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS people_name_trgm     ON public.people    USING gin (name  gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS companies_name_trgm  ON public.companies USING gin (name  gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS films_title_trgm     ON public.films     USING gin (title extensions.gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS people_name_trgm     ON public.people    USING gin (name  extensions.gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS companies_name_trgm  ON public.companies USING gin (name  extensions.gin_trgm_ops);
 
 -- Fuzzy (typo-tolerant) lookups, ranked by trigram similarity. The client calls
 -- these only to top up thin results, so they degrade gracefully if absent.

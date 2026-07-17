@@ -5,6 +5,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
 import ShareAction from '../components/ui/ShareAction'
 import { toTitleCase, toSentenceCase } from '../utils/format'
+import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isFutureShowtime } from '../utils/showtimes'
 
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
@@ -16,15 +17,14 @@ const formatTime = (timeStr) => {
 }
 
 const formatDate = (dateStr) => {
-  const today = new Date().toISOString().split('T')[0]
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().split('T')[0]
+  const today = getZonedClock().date
+  const tomorrowStr = getNextDate(today)
 
   if (dateStr === today) return 'Today'
   if (dateStr === tomorrowStr) return 'Tomorrow'
 
-  return new Date(dateStr).toLocaleDateString('en-NG', {
+  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString('en-NG', {
+    timeZone: CINEMA_TIME_ZONE,
     weekday: 'short',
     day: 'numeric',
     month: 'short'
@@ -202,13 +202,18 @@ const CinemaDetail = () => {
   const [nearbyCinemas, setNearbyCinemas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
-  )
+  const [currentTime, setCurrentTime] = useState(() => new Date())
+  const [selectedDate, setSelectedDate] = useState(() => getZonedClock().date)
 
   useEffect(() => {
     fetchCinema()
     fetchShowtimes()
+
+    const clockRefresh = window.setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60_000)
+
+    return () => window.clearInterval(clockRefresh)
   }, [id])
 
   useEffect(() => {
@@ -233,7 +238,7 @@ const CinemaDetail = () => {
   }
 
   const fetchShowtimes = async () => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getZonedClock().date
 
     const { data } = await supabase
       .from('showtimes')
@@ -277,26 +282,20 @@ const CinemaDetail = () => {
     setNearbyCinemas(data || [])
   }
 
-  const getNext7Days = () => {
-    const days = []
-    for (let i = 0; i < 7; i++) {
-      const date = new Date()
-      date.setDate(date.getDate() + i)
-      days.push(date.toISOString().split('T')[0])
-    }
-    return days
-  }
+  const cinemaClock = getZonedClock(currentTime)
 
   // Get unique dates
   const uniqueDates = [...new Set(
-    showtimes.map(s => s.show_date)
+    showtimes
+      .filter(showtime => isFutureShowtime(showtime, cinemaClock))
+      .map(s => s.show_date)
   )].slice(0, 7)
 
-  const availableDates = uniqueDates.length > 0 ? uniqueDates : getNext7Days()
+  const availableDates = uniqueDates.length > 0 ? uniqueDates : getNext7Dates(currentTime)
 
   // Filter by selected date
   const todayShowtimes = showtimes.filter(
-    s => s.show_date === selectedDate
+    s => s.show_date === selectedDate && isFutureShowtime(s, cinemaClock)
   )
 
   // Group by film

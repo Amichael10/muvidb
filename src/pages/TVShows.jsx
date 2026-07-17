@@ -57,9 +57,11 @@ export default function TVShows() {
       let query = supabase
         .from('films')
         .select(`
-          id, title, poster_url, backdrop_url, year, source, release_type,
-          streaming_links, youtube_watch_url, view_count, average_rating,
-          season_count, episode_count, content_type, slug
+          id, title, poster_url, backdrop_url, year, source, release_type, genres,
+          streaming_links, youtube_watch_url, view_count, average_rating, audience_rating,
+          tmdb_rating, runtime_minutes, synopsis, tagline,
+          season_count, episode_count, content_type, slug,
+          film_genres(genres(name))
         `, { count: 'exact' })
         .eq('content_type', 'series')
         .is('series_id', null); // Only parent series records, not individual episodes
@@ -89,7 +91,13 @@ export default function TVShows() {
       const { data, error: dbError, count } = await query;
       if (dbError) throw dbError;
 
-      let rawData = data || [];
+      let rawData = (data || []).map(film => ({
+        ...film,
+        genres: (() => {
+          const relatedGenres = film.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
+          return relatedGenres.length > 0 ? relatedGenres : (Array.isArray(film.genres) ? film.genres.filter(Boolean) : []);
+        })()
+      }));
       
       // Grouping Logic
       const groupedShows = {};
@@ -290,10 +298,10 @@ export default function TVShows() {
             </div>
 
             {loading && shows.length === 0 ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              <div className={`grid gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 {[...Array(12)].map((_, i) => (
                   <div key={i} className="flex justify-center">
-                    <SkeletonCard size="md" />
+                    <SkeletonCard size="md" variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
                   </div>
                 ))}
               </div>
@@ -304,10 +312,10 @@ export default function TVShows() {
               </div>
             ) : shows.length > 0 ? (
               <>
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <div className={`grid gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                   {shows.map(show => (
-                    <div key={show.id} className="flex justify-center">
-                      <FilmCard film={show} />
+                    <div key={show.id} className={selectedPlatform === 'youtube' ? '' : 'flex justify-center'}>
+                      <FilmCard film={show} variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
                     </div>
                   ))}
                 </div>

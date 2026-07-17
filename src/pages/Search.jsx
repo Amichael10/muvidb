@@ -65,7 +65,15 @@ export default function Search() {
       // Jump to whichever category actually has results so a valid search never
       // looks empty (e.g. searching an actor lands on People, not empty Movies).
       const counts = { films: uniqueFilms.length, people: peopleResults.length, companies: companyResults.length };
-      const best = ['films', 'people', 'companies'].reduce((a, b) => (counts[b] > counts[a] ? b : a), 'films');
+      const topScores = {
+        films: uniqueFilms[0]?._score || 0,
+        people: peopleResults[0]?._score || 0,
+        companies: companyResults[0]?._score || 0,
+      };
+      const best = ['films', 'people', 'companies'].reduce((a, b) => {
+        if (topScores[b] !== topScores[a]) return topScores[b] > topScores[a] ? b : a;
+        return counts[b] > counts[a] ? b : a;
+      }, 'films');
       if (counts[best] > 0) setActiveTab(best);
     } catch (error) {
       console.error('Error searching:', error);

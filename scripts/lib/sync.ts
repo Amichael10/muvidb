@@ -10,11 +10,11 @@
 //   }
 import { supabase } from './db';
 
-export type SyncCounters = { processed: number; updated: number; failed: number };
+export type SyncCounters = { processed: number; created: number; updated: number; failed: number };
 
 export async function startSyncLog(source: string, message: string) {
   const startTime = Date.now();
-  const counters: SyncCounters = { processed: 0, updated: 0, failed: 0 };
+  const counters: SyncCounters = { processed: 0, created: 0, updated: 0, failed: 0 };
 
   const { data: entry, error } = await supabase
     .from('sync_logs')
@@ -36,6 +36,7 @@ export async function startSyncLog(source: string, message: string) {
       .update({
         duration_ms: Date.now() - startTime,
         items_processed: counters.processed,
+        items_created: counters.created,
         items_updated: counters.updated,
         items_failed: counters.failed,
         ...fields,

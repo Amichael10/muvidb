@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
 import { toTitleCase, toSentenceCase, formatPersonName } from '../utils/format'
+import { getZonedClock, isFutureShowtime } from '../utils/showtimes'
 
 // Extract chain name from the cinema's display name
 function extractChain(name = '') {
@@ -142,18 +143,21 @@ const Cinemas = () => {
     setCinemas(data || [])
 
     if (data?.length) {
-      const today = new Date().toISOString().split('T')[0]
+      const cinemaClock = getZonedClock()
       const { data: showtimes } = await supabase
         .from('showtimes')
-        .select('cinema_id, film_id')
-        .gte('show_date', today)
+        .select('cinema_id, film_id, show_date, show_time')
+        .gte('show_date', cinemaClock.date)
+        .eq('is_available', true)
 
       if (showtimes) {
         const counts = {}
-        showtimes.forEach(s => {
+        showtimes
+          .filter(showtime => isFutureShowtime(showtime, cinemaClock))
+          .forEach(s => {
           if (!counts[s.cinema_id]) counts[s.cinema_id] = new Set()
           counts[s.cinema_id].add(s.film_id)
-        })
+          })
         Object.keys(counts).forEach(cid => { counts[cid] = counts[cid].size })
         setShowCounts(counts)
       }

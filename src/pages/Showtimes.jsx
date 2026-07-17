@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
+import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isFutureShowtime } from '../utils/showtimes'
 
 const formatTime = (timeStr) => {
     if (!timeStr) return ''
@@ -14,32 +15,22 @@ const formatTime = (timeStr) => {
 }
 
 const formatDate = (dateStr) => {
-    const date = new Date(dateStr)
-    const today = new Date()
-    const tomorrow = new Date()
-    tomorrow.setDate(today.getDate() + 1)
+    const date = new Date(`${dateStr}T00:00:00Z`)
+    const today = getZonedClock().date
+    const tomorrow = getNextDate(today)
 
-    if (dateStr === today.toISOString().split('T')[0]) {
+    if (dateStr === today) {
         return 'Today'
     }
-    if (dateStr === tomorrow.toISOString().split('T')[0]) {
+    if (dateStr === tomorrow) {
         return 'Tomorrow'
     }
     return date.toLocaleDateString('en-NG', {
+        timeZone: CINEMA_TIME_ZONE,
         weekday: 'short',
         day: 'numeric',
         month: 'short'
     })
-}
-
-const getNext7Days = () => {
-    const days = []
-    for (let i = 0; i < 7; i++) {
-        const date = new Date()
-        date.setDate(date.getDate() + i)
-        days.push(date.toISOString().split('T')[0])
-    }
-    return days
 }
 
 const ShowtimeSkeleton = () => (
@@ -170,21 +161,27 @@ const Showtimes = () => {
 
     const [showtimes, setShowtimes] = useState([])
     const [loading, setLoading] = useState(true)
+    const [currentTime, setCurrentTime] = useState(() => new Date())
     const [selectedCity, setSelectedCity] = useState('All')
-    const [selectedDate, setSelectedDate] = useState(
-        new Date().toISOString().split('T')[0]
-    )
+    const [selectedDate, setSelectedDate] = useState(() => getZonedClock().date)
     const [selectedCinema, setSelectedCinema] = useState('All')
     const [selectedFormat, setSelectedFormat] = useState('All')
     const [cinemas, setCinemas] = useState([])
 
     const cities = ['All', 'Lagos', 'Abuja', 'Port Harcourt']
     const formats = ['All', 'Standard', 'IMAX', '3D', '4DX', 'Dolby']
-    const next7Days = getNext7Days()
+    const cinemaClock = getZonedClock(currentTime)
+    const next7Days = getNext7Dates(currentTime)
 
     useEffect(() => {
         fetchShowtimes()
         fetchCinemas()
+
+        const clockRefresh = window.setInterval(() => {
+            setCurrentTime(new Date())
+        }, 60_000)
+
+        return () => window.clearInterval(clockRefresh)
     }, [])
 
     const fetchCinemas = async () => {
@@ -198,7 +195,7 @@ const Showtimes = () => {
 
     const fetchShowtimes = async () => {
         setLoading(true)
-        const today = new Date().toISOString().split('T')[0]
+        const today = getZonedClock().date
 
         const { data, error } = await supabase
             .from('showtimes')
@@ -231,7 +228,8 @@ const Showtimes = () => {
             s.cinema_id === selectedCinema
         const matchFormat = selectedFormat === 'All' ||
             s.format === selectedFormat
-        return matchCity && matchDate && matchCinema && matchFormat
+        const isUpcoming = isFutureShowtime(s, cinemaClock)
+        return matchCity && matchDate && matchCinema && matchFormat && isUpcoming
     })
 
     const groupedByFilm = filtered.reduce((acc, showtime) => {

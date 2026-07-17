@@ -12,8 +12,8 @@ import { getPlatform, platformFilter } from '../lib/platforms';
 export default function WatchPlatform() {
   const { platform: platformId } = useParams();
   const platform = getPlatform(platformId);
-  // YouTube thumbnails are 16:9, so those cards look best landscape (like the
-  // homepage feed). Cinema/streaming posters are portrait and stay that way.
+  // YouTube thumbnails are 16:9, so those cards use the richer landscape layout
+  // shared with the homepage feed. Cinema/streaming posters stay portrait.
   const isYoutube = platformId === 'youtube';
 
   const [films, setFilms] = useState([]);
@@ -44,8 +44,8 @@ export default function WatchPlatform() {
         const res = await supabase
           .from('films')
           .select(`
-            id, title, slug, poster_url, backdrop_url, year, language,
-            runtime_minutes, view_count, average_rating, audience_rating,
+            id, title, slug, poster_url, backdrop_url, year, language, genres,
+            runtime_minutes, view_count, average_rating, audience_rating, synopsis, tagline,
             tmdb_rating, nfvcb_rating, countries, content_type, youtube_watch_url,
             release_type, streaming_links, source, is_in_cinemas, created_at,
             film_genres(genres(name))
@@ -63,10 +63,13 @@ export default function WatchPlatform() {
       const { data, error } = await runQuery();
       if (error) throw error;
 
-      const mapped = (data || []).map((f) => ({
-        ...f,
-        genres: f.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || [],
-      }));
+      const mapped = (data || []).map((f) => {
+        const relatedGenres = f.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || [];
+        return {
+          ...f,
+          genres: relatedGenres.length > 0 ? relatedGenres : (Array.isArray(f.genres) ? f.genres.filter(Boolean) : []),
+        };
+      });
 
       setFilms(mapped);
       setTotalCount(mapped.length); // provisional; refined by the count query below
@@ -202,7 +205,7 @@ export default function WatchPlatform() {
             isYoutube ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="w-full aspect-video rounded-2xl bg-surface-2 animate-shimmer" />
+                  <SkeletonCard key={i} variant="youtube" fullWidth />
                 ))}
               </div>
             ) : (
@@ -217,7 +220,7 @@ export default function WatchPlatform() {
               // Landscape (rectangle) cards — backdrop + runtime + live views, like home.
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
                 {filtered.map((film) => (
-                  <FilmCard key={film.id} film={film} variant="landscape" fullWidth />
+                  <FilmCard key={film.id} film={film} variant="youtube" fullWidth />
                 ))}
               </div>
             ) : (

@@ -47,3 +47,11 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FEED_ZETA_URL: ${{ secrets.FEED_ZETA_URL }}
 
+      - name: Run Circuits Sync
+        run: npm run sync:circuits
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CIRCUITS_EMAIL: ${{ secrets.CIRCUITS_EMAIL }}
+          CIRCUITS_PASSWORD: ${{ secrets.CIRCUITS_PASSWORD }}
+

@@ -6,7 +6,7 @@ import { PLATFORMS, platformFilter } from '../../lib/platforms';
 
 // Platforms that get a "New to Stream" tab on the homepage.
 const STREAM_PLATFORMS = PLATFORMS.filter((p) =>
-  ['netflix', 'prime_video', 'kava', 'docuth'].includes(p.id)
+  ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits'].includes(p.id)
 );
 
 export default function AdminNewReleases() {
@@ -37,12 +37,17 @@ export default function AdminNewReleases() {
     try {
       const { data, error } = await supabase
         .from('platform_new_releases')
-        .select('id, film_id, display_order, created_at, films(id, title, poster_url, year, release_type)')
+        .select('id, film_id, display_order, created_at, entry_source, is_hidden, films(id, title, poster_url, year, release_type, created_at, updated_at)')
         .eq('platform', platform)
+        .eq('is_hidden', false)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setItems(data || []);
+      setItems((data || []).sort((a, b) => {
+        if (a.display_order !== b.display_order) return a.display_order - b.display_order;
+        const dateField = platform === 'circuits' ? 'updated_at' : 'created_at';
+        return new Date(b.films?.[dateField] || b.created_at) - new Date(a.films?.[dateField] || a.created_at);
+      }));
     } catch (err) {
       toast.error('Failed to load list: ' + err.message);
     } finally {
@@ -74,7 +79,14 @@ export default function AdminNewReleases() {
     try {
       const { error } = await supabase
         .from('platform_new_releases')
-        .insert({ platform, film_id: film.id });
+        .upsert({
+          platform,
+          film_id: film.id,
+          display_order: -2,
+          entry_source: 'manual',
+          is_hidden: false,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'platform,film_id' });
       if (error) throw error;
       toast.success(`Added to New on ${platformLabel}`);
       setIsModalOpen(false);
@@ -85,12 +97,15 @@ export default function AdminNewReleases() {
     }
   };
 
-  const removeFilm = async (id) => {
+  const removeFilm = async (item) => {
     try {
-      const { error } = await supabase.from('platform_new_releases').delete().eq('id', id);
+      const { error } = await supabase
+        .from('platform_new_releases')
+        .update({ is_hidden: true, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
       if (error) throw error;
-      setItems((prev) => prev.filter((i) => i.id !== id));
-      toast.success('Removed');
+      await fetchItems();
+      toast.success(`${item.films?.title || 'Title'} removed from the homepage queue`);
     } catch (err) {
       toast.error('Failed to remove: ' + err.message);
     }
@@ -104,7 +119,15 @@ export default function AdminNewReleases() {
       const { error } = await supabase
         .from('platform_new_releases')
         .upsert(
-          ordered.map((it, i) => ({ id: it.id, platform, film_id: it.film_id, display_order: i })),
+          ordered.map((it, i) => ({
+            id: it.id,
+            platform,
+            film_id: it.film_id,
+            display_order: i,
+            entry_source: it.entry_source,
+            is_hidden: false,
+            updated_at: new Date().toISOString()
+          })),
           { onConflict: 'id' }
         );
       if (error) throw error;
@@ -133,7 +156,7 @@ export default function AdminNewReleases() {
       <div>
         <h1 className="text-2xl font-bold text-text-primary">New to Stream</h1>
         <p className="text-text-muted text-sm mt-1">
-          Hand-pick the films shown under each platform tab on the homepage. Drag posters to reorder. Search is limited to titles already tagged with that platform.
+          The latest 10 synced titles are added automatically. Reorder, replace, or remove them here; removals stay excluded after future syncs.
         </p>
       </div>
 
@@ -156,9 +179,14 @@ export default function AdminNewReleases() {
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-text-muted text-xs font-bold uppercase tracking-widest">
-          {items.length} curated for {platformLabel}
-        </p>
+        <div>
+          <p className="text-text-muted text-xs font-bold uppercase tracking-widest">
+            {items.length} active for {platformLabel}
+          </p>
+          <p className="mt-1 text-[10px] text-text-muted">
+            {items.filter(item => item.entry_source === 'auto').length} auto / {items.filter(item => item.entry_source === 'manual').length} manual
+          </p>
+        </div>
         <button
           onClick={() => { setFilmSearch(''); setFilmResults([]); setIsModalOpen(true); }}
           className="bg-brand text-white font-bold px-5 py-2.5 rounded-lg text-xs hover:opacity-90 flex items-center gap-2"
@@ -175,7 +203,7 @@ export default function AdminNewReleases() {
         </div>
       ) : items.length === 0 ? (
         <div className="py-16 text-center border border-dashed border-border rounded-2xl text-text-muted text-sm">
-          Nothing curated for {platformLabel} yet. The homepage tab falls back to most-recent titles until you add some.
+          No active titles for {platformLabel}. The next platform sync will populate this queue automatically.
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -199,7 +227,7 @@ export default function AdminNewReleases() {
                   {index + 1}
                 </span>
                 <button
-                  onClick={() => removeFilm(item.id)}
+                  onClick={() => removeFilm(item)}
                   className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 text-white hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
                   title="Remove"
                 >
@@ -207,6 +235,9 @@ export default function AdminNewReleases() {
                 </button>
               </div>
               <div className="p-2.5">
+                <span className={`mb-1.5 inline-flex rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider ${item.entry_source === 'auto' ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted'}`}>
+                  {item.entry_source === 'auto' ? 'Auto from sync' : 'Manual'}
+                </span>
                 <p className="text-text-primary text-xs font-bold line-clamp-1">{item.films?.title}</p>
                 <p className="text-text-muted text-[10px]">{item.films?.year}</p>
               </div>

@@ -12,6 +12,7 @@ import {
   resolveChannelId
 } from '../utils/youtube'
 import { getPersonYoutubeChannelUrl } from '../lib/youtube'
+import { normalizeRole, formatRole } from '../lib/creditRoles'
 import { Skeleton } from '../components/ui/Skeleton'
 import ShareAction from '../components/ui/ShareAction'
 import ImageWithFallback from '../components/ui/ImageWithFallback'
@@ -55,8 +56,6 @@ function fmtDuration(secs) {
   if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
   return `${m}:${String(s).padStart(2,'0')}`
 }
-
-const normalizeRole = (role) => String(role || '').trim().toLowerCase()
 
 const PersonDetailSkeleton = () => (
   <div className="min-h-screen bg-bg">
@@ -423,14 +422,6 @@ const PersonDetail = () => {
   const primaryRoleOrder = ['actor', 'director', 'producer', 'writer'];
   const heroRoles = primaryRoleOrder.filter((role) => availableRoles.includes(role));
 
-  const getRoleLabel = (role) => {
-    if (!role) return '';
-    return role
-      .split(/[-_\s]+/)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ');
-  };
-
   if (loading) {
     return <PersonDetailSkeleton />
   }
@@ -520,7 +511,7 @@ const PersonDetail = () => {
                       key={role}
                       className="text-text-muted text-[10px] font-bold"
                     >
-                      {getRoleLabel(role)}
+                      {formatRole(role)}
                     </span>
                   ))}
                 </div>
@@ -683,7 +674,7 @@ const PersonDetail = () => {
                     {formatFilmTitle(credit.films.title)}
                   </p>
                   <p className="mt-1 text-xs text-text-muted line-clamp-1">
-                    {[credit.films.year, credit.character_name ? `as ${toTitleCase(credit.character_name)}` : getRoleLabel(credit.role)]
+                    {[credit.films.year, credit.character_name ? `as ${toTitleCase(credit.character_name)}` : formatRole(credit.role)]
                       .filter(Boolean)
                       .join(' / ')}
                   </p>
@@ -709,7 +700,7 @@ const PersonDetail = () => {
                       : 'text-text-muted hover:text-text-primary'
                   }`}
                 >
-                  {getRoleLabel(role)} ({creditsByRole(role).length})
+                  {formatRole(role)} ({creditsByRole(role).length})
                 </button>
               ))}
             </div>

@@ -238,7 +238,7 @@ export default function GenreRail({ variant = 'grid' }) {
               <Link
                 key={genre.name}
                 to={`/browse?genre=${encodeURIComponent(genre.name)}`}
-                className="group relative rounded-lg overflow-hidden bg-surface-2 aspect-[4/3] block"
+                className="group relative rounded-lg overflow-hidden bg-surface-2 aspect-[4/3] block border border-border shadow-sm"
               >
                 {/* Cover poster */}
                 {genre.coverImage ? (

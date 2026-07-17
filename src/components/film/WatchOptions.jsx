@@ -38,8 +38,13 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
 
   // Filter to only show platforms that have direct links OR the primary platform
   const activeLinks = availableLinks.filter(l => l.isDirect || l.id === film.release_type);
+  const trailerValue = String(film.trailer_youtube_id || '').trim();
+  const hasTrailer = /^[\w-]{11}$/.test(trailerValue)
+    || /(?:youtu\.be\/|youtube\.com\/(?:embed\/|shorts\/|watch\?v=))[\w-]{11}/.test(trailerValue);
   
   if (activeLinks.length === 0) {
+    if (!hasTrailer) return null;
+
     return (
       <button 
         onClick={() => {

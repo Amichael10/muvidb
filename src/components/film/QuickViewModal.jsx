@@ -7,6 +7,7 @@ import ImageWithFallback from '../ui/ImageWithFallback';
 import FilmCard from './FilmCard';
 import { supabase } from '../../lib/supabase';
 import { formatFilmTitle } from '../../utils/format';
+import { formatRole } from '../../lib/creditRoles';
 
 const formatRuntimeHours = (minutes) => {
   if (!minutes) return null;
@@ -83,7 +84,7 @@ export default function QuickViewModal() {
             })
             .map(c => {
               const person = Array.isArray(c.people) ? c.people[0] : c.people;
-              return person ? { ...person, role: c.role || 'Crew' } : null;
+              return person ? { ...person, role: formatRole(c.role) || 'Crew' } : null;
             })
             .filter(Boolean);
 

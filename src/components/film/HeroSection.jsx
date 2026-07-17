@@ -26,10 +26,10 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
   if (isLoading) {
     return (
-      <section className="w-full bg-bg py-4 md:py-8 lg:py-10">
+      <section className="relative w-full py-4 md:py-8 lg:py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[600px]">
-            <div className="relative w-full lg:flex-1 h-[50vh] min-h-[400px] lg:h-full rounded-2xl bg-surface animate-pulse border border-hairline"></div>
+          <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[620px]">
+            <div className="landing-module relative w-full lg:flex-1 h-[50vh] min-h-[400px] lg:h-full rounded-lg animate-pulse"></div>
             <div className="hidden lg:flex flex-col w-[350px] xl:w-[400px] shrink-0 h-full gap-4">
               <div className="w-24 h-6 bg-surface animate-pulse rounded mb-2"></div>
               {[1, 2, 3].map(i => (
@@ -71,13 +71,13 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
     <section 
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="w-full bg-bg py-4 md:py-8 lg:py-10"
+      className="relative w-full py-4 md:py-8 lg:py-10"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[600px]">
+        <div className="flex flex-col lg:flex-row gap-4 h-auto lg:h-[620px]">
           
           {/* Main Banner (Left) */}
-          <div className="relative w-full lg:flex-1 h-[55vh] min-h-[450px] lg:h-full rounded-2xl overflow-hidden group/hero bg-surface dark:bg-[#111] shadow-2xl flex border border-border dark:border-white/10">
+          <div className="landing-module relative w-full lg:flex-1 h-[55vh] min-h-[450px] lg:h-full rounded-lg overflow-hidden group/hero flex">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={featuredFilm.id || currentIndex}
@@ -111,7 +111,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                   {/* Small Embedded Poster */}
                   <Link 
                     to={`/films/${featuredFilm.slug || featuredFilm.id}`} 
-                    className="hidden md:block shrink-0 relative group/poster shadow-2xl rounded-lg overflow-hidden border border-black/10 hover:border-black/30 dark:border-white/20 dark:hover:border-white/50 transition-colors w-[150px] aspect-[2/3] transform hover:scale-105 duration-300"
+                    className="hidden md:block shrink-0 relative group/poster shadow-2xl rounded-md overflow-hidden border border-black/10 hover:border-black/30 dark:border-white/20 dark:hover:border-white/50 transition-colors w-[150px] aspect-[2/3] transform hover:scale-105 duration-300"
                   >
                     <ImageWithFallback
                       src={featuredFilm.poster_url || featuredFilm.poster}
@@ -151,7 +151,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       ))}
                     </div>
 
-                    <h2 className="text-gray-900 dark:text-white text-3xl md:text-4xl lg:text-[42px] font-heading font-black tracking-tight mb-3 line-clamp-2 shadow-sm leading-[1.1]">
+                    <h2 className="text-gray-900 dark:text-white text-3xl md:text-4xl lg:text-[42px] font-heading font-black tracking-tight mb-3 line-clamp-2 leading-[1.1]">
                       {formatFilmTitle(featuredFilm.title)}
                     </h2>
 
@@ -228,8 +228,8 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
 
           {/* Up Next List (Right) */}
           {upNextFilms.length > 0 && (
-            <div className="hidden lg:flex flex-col w-[350px] xl:w-[420px] shrink-0 h-full">
-              <div className="flex items-center justify-between mb-4 px-2">
+            <div className="landing-module hidden lg:flex flex-col w-[350px] xl:w-[420px] shrink-0 h-full rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4 px-1">
                 <h3 className="text-brand font-black text-xl flex items-center gap-2">
                   Up next
                 </h3>
@@ -242,10 +242,10 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     <button 
                       key={film.id}
                       onClick={() => setCurrentIndex(actualIndex)}
-                      className="group flex gap-4 items-start text-left hover:bg-surface-2 p-2 rounded-xl transition-colors h-1/3 max-h-[190px]"
+                      className="group flex gap-4 items-start text-left hover:bg-surface-2/80 p-2 rounded-lg transition-colors h-1/3 max-h-[190px]"
                     >
                       {/* Small Thumbnail */}
-                      <div className="relative h-full shrink-0 aspect-[2/3] rounded-lg overflow-hidden border border-hairline group-hover:border-border transition-colors shadow-lg">
+                        <div className="relative h-full shrink-0 aspect-[2/3] rounded-md overflow-hidden border border-hairline group-hover:border-border transition-colors shadow-lg">
                         <ImageWithFallback
                           src={film.poster_url || film.poster}
                           alt={formatFilmTitle(film.title)}

@@ -51,41 +51,39 @@ const MobileNav = () => {
       )}
 
       {/* Slide-up Bottom Drawer Sheet */}
-      <div 
-        className={`fixed bottom-0 left-0 right-0 z-[99] bg-black/85 backdrop-blur-2xl border-t border-border rounded-t-3xl px-6 pt-4 pb-28 transition-transform duration-300 ease-out transform ${
-          isDrawerOpen ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        {/* Native Grab Handle */}
-        <div className="w-12 h-1.5 bg-border rounded-full mx-auto mb-6 opacity-60" />
-        
-        <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-center mb-6">
-          Explore MuviDB
-        </h3>
+      {isDrawerOpen && (
+        <div className="fixed bottom-0 left-0 right-0 z-[99] lg:hidden bg-black/85 backdrop-blur-2xl border-t border-border rounded-t-3xl px-6 pt-4 pb-28 animate-in slide-in-from-bottom-8 duration-300 ease-out">
+          {/* Native Grab Handle */}
+          <div className="w-12 h-1.5 bg-border rounded-full mx-auto mb-6 opacity-60" />
+          
+          <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-center mb-6">
+            Explore MuviDB
+          </h3>
 
-        {/* 2-Column Responsive Grid */}
-        <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
-          {drawerItems.map((item) => {
-            const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`flex items-center gap-3 p-4 border rounded-2xl transition-all duration-200 active:scale-95 ${
-                  isItemActive 
-                    ? 'bg-brand/10 border-brand/40 text-brand shadow-lg shadow-brand/5' 
-                    : 'bg-white/5 border-border/40 hover:border-brand/40 text-text-primary hover:bg-white/10'
-                }`}
-              >
-                <div className={`p-2 rounded-xl ${isItemActive ? 'bg-brand/20 text-brand' : 'bg-surface-2 text-text-muted'}`}>
-                  <Icon icon={item.icon} width="20" height="20" />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-wider">{item.name}</span>
-              </Link>
-            );
-          })}
+          {/* 2-Column Responsive Grid */}
+          <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
+            {drawerItems.map((item) => {
+              const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+              return (
+                <Link
+                  key={item.name}
+                  to={item.path}
+                  className={`flex items-center gap-3 p-4 border rounded-2xl transition-all duration-200 active:scale-95 ${
+                    isItemActive 
+                      ? 'bg-brand/10 border-brand/40 text-brand shadow-lg shadow-brand/5' 
+                      : 'bg-white/5 border-border/40 hover:border-brand/40 text-text-primary hover:bg-white/10'
+                  }`}
+                >
+                  <div className={`p-2 rounded-xl ${isItemActive ? 'bg-brand/20 text-brand' : 'bg-surface-2 text-text-muted'}`}>
+                    <Icon icon={item.icon} width="20" height="20" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider">{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Bottom Bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-[100] lg:hidden bg-surface/80 backdrop-blur-xl border-t border-border px-4 pb-safe pt-2 shadow-2xl">

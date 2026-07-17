@@ -74,7 +74,7 @@ export default function Navbar() {
           ${isScrolled ? 'bg-surface/80 backdrop-blur-xl border-border h-[64px]' : 'bg-transparent h-[80px] md:h-[90px]'}
         `}
       >
-        <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-x border-white/5">
+        <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-x border-hairline">
         {/* Left: Logo */}
         <Link to="/" className="flex items-center group shrink-0">
           <img 
@@ -95,7 +95,7 @@ export default function Navbar() {
                 className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 whitespace-nowrap
                   ${isActive 
                     ? 'bg-brand text-white shadow-md' 
-                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
                   }
                 `}
               >

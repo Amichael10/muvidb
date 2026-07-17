@@ -20,8 +20,6 @@ const FILM_FIELDS = `
   countries, film_genres!left(genres(name))
 `;
 
-const NOLLYWOOD_FILTER = 'source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}';
-
 // Clean, lowercase, keep words of length >= 2. Strip characters that would
 // break a PostgREST `.or()` filter string (comma, parens, star, dot).
 function tokenize(q) {
@@ -103,13 +101,28 @@ export async function searchAll(query) {
   // client-side below. The fuzzy RPCs run alongside — they're the only way a
   // misspelt term finds anything, and a common word ("party") would otherwise
   // flood the results and hide the intended match. Parallel, so no extra wait.
-  const [peopleRes, titleFilmRes, companyRes, peopleFz, filmsFz] = await Promise.all([
+  const [peopleRes, companyRes] = await Promise.all([
     supabase.from('people').select('*').or(orIlike('name', terms)).limit(60),
-    supabase.from('films').select(FILM_FIELDS).or(orIlike('title', terms)).or(NOLLYWOOD_FILTER).limit(80),
     supabase.from('companies').select('*').or(orIlike('name', terms)).limit(40),
-    fuzzy('search_people_fuzzy', fullQ),
-    fuzzy('search_films_fuzzy', fullQ),
   ]);
+
+  // A strong person-name match means the useful film results are that person's
+  // credits. Skip the full film-title lookup in that case; it is both less
+  // relevant and unnecessarily expensive on a large catalogue.
+  const confidentPersonMatch = (peopleRes.data || [])
+    .some((person) => scoreText(person.name, fullQ, terms) >= 180);
+  const titleFilmRes = confidentPersonMatch
+    ? { data: [], error: null }
+    : await supabase.from('films').select(FILM_FIELDS).ilike('title', `%${fullQ}%`).limit(80);
+
+  // Fuzzy RPCs are more expensive than indexed substring lookups. Only call
+  // them when exact matching is genuinely thin, rather than on every search.
+  const peopleFz = (peopleRes.data || []).length === 0
+    ? await fuzzy('search_people_fuzzy', fullQ)
+    : [];
+  const filmsFz = (titleFilmRes.data || []).length === 0 && (peopleRes.data || []).length === 0
+    ? await fuzzy('search_films_fuzzy', fullQ)
+    : [];
 
   // Merge a fuzzy result set into the exact one, skipping ids we already have.
   const mergeFuzzy = (rows, fz) => {
@@ -125,7 +138,8 @@ export async function searchAll(query) {
   // Films by title, plus fuzzy matches so a typo'd title still lands
   // ("weding party" -> The Wedding Party). Fuzzy rows come straight from the
   // films table with no genres join, which the mapping below tolerates.
-  const titleFilms = mergeFuzzy(titleFilmRes.data || [], filmsFz);
+  const titleFilms = mergeFuzzy(titleFilmRes.data || [], filmsFz)
+    .filter((film) => film.source !== 'mubi' || film.countries?.includes('Nigeria'));
 
   // Films by cast — every film the top matched people appear in.
   let castFilms = [];
@@ -136,8 +150,17 @@ export async function searchAll(query) {
     // api/content.ts (keeps the cast graph from being bulk-scraped).
     let filmIds = [];
     try {
-      const res = await fetch(`/api/content?resource=person-films&personIds=${encodeURIComponent(ids.join(','))}`);
-      if (res.ok) filmIds = (await res.json()).filmIds || [];
+      const fetchDirect = async () => {
+        const { data } = await supabase.from('credits').select('film_id').in('person_id', ids).limit(100);
+        return [...new Set((data || []).map((credit) => credit.film_id).filter(Boolean))];
+      };
+
+      if (import.meta.env.DEV) {
+        filmIds = await fetchDirect();
+      } else {
+        const res = await fetch(`/api/content?resource=person-films&personIds=${encodeURIComponent(ids.join(','))}`);
+        filmIds = res.ok ? (await res.json()).filmIds || [] : await fetchDirect();
+      }
     } catch (e) {
       // Search still works on title matches alone if the cast lookup fails.
       console.warn('cast film lookup failed:', e);
