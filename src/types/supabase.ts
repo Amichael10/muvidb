@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -432,43 +432,70 @@ export type Database = {
       }
       companies: {
         Row: {
+          company_type: string | null
           created_at: string
           description: string | null
+          employees: string | null
+          focus: string | null
           founded_year: number | null
+          headquarters: string | null
           id: string
+          instagram_url: string | null
+          languages: string | null
           logo_url: string | null
           mubi_slug: string | null
           name: string
           slug: string | null
           tmdb_id: number | null
+          twitter_url: string | null
           updated_at: string
           website: string | null
+          years_active: string | null
+          youtube_url: string | null
         }
         Insert: {
+          company_type?: string | null
           created_at?: string
           description?: string | null
+          employees?: string | null
+          focus?: string | null
           founded_year?: number | null
+          headquarters?: string | null
           id?: string
+          instagram_url?: string | null
+          languages?: string | null
           logo_url?: string | null
           mubi_slug?: string | null
           name: string
           slug?: string | null
           tmdb_id?: number | null
+          twitter_url?: string | null
           updated_at?: string
           website?: string | null
+          years_active?: string | null
+          youtube_url?: string | null
         }
         Update: {
+          company_type?: string | null
           created_at?: string
           description?: string | null
+          employees?: string | null
+          focus?: string | null
           founded_year?: number | null
+          headquarters?: string | null
           id?: string
+          instagram_url?: string | null
+          languages?: string | null
           logo_url?: string | null
           mubi_slug?: string | null
           name?: string
           slug?: string | null
           tmdb_id?: number | null
+          twitter_url?: string | null
           updated_at?: string
           website?: string | null
+          years_active?: string | null
+          youtube_url?: string | null
         }
         Relationships: []
       }
@@ -784,6 +811,7 @@ export type Database = {
           audience_rating: number | null
           audience_rating_count: number
           average_rating: number
+          awards: Json
           backdrop: string | null
           backdrop_url: string | null
           coming_soon: boolean | null
@@ -835,6 +863,7 @@ export type Database = {
           audience_rating?: number | null
           audience_rating_count?: number
           average_rating?: number
+          awards?: Json
           backdrop?: string | null
           backdrop_url?: string | null
           coming_soon?: boolean | null
@@ -886,6 +915,7 @@ export type Database = {
           audience_rating?: number | null
           audience_rating_count?: number
           average_rating?: number
+          awards?: Json
           backdrop?: string | null
           backdrop_url?: string | null
           coming_soon?: boolean | null
@@ -1059,6 +1089,7 @@ export type Database = {
       }
       people: {
         Row: {
+          awards: Json
           bio: string | null
           birthplace: string | null
           claimed_by: string | null
@@ -1091,6 +1122,7 @@ export type Database = {
           youtube_stats: Json | null
         }
         Insert: {
+          awards?: Json
           bio?: string | null
           birthplace?: string | null
           claimed_by?: string | null
@@ -1123,6 +1155,7 @@ export type Database = {
           youtube_stats?: Json | null
         }
         Update: {
+          awards?: Json
           bio?: string | null
           birthplace?: string | null
           claimed_by?: string | null
@@ -1160,23 +1193,32 @@ export type Database = {
         Row: {
           created_at: string
           display_order: number
+          entry_source: string
           film_id: string
           id: string
+          is_hidden: boolean
           platform: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
           display_order?: number
+          entry_source?: string
           film_id: string
           id?: string
+          is_hidden?: boolean
           platform: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
           display_order?: number
+          entry_source?: string
           film_id?: string
           id?: string
+          is_hidden?: boolean
           platform?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1776,12 +1818,14 @@ export type Database = {
         Returns: undefined
       }
       generate_slug: { Args: { input: string }; Returns: string }
+      get_coming_soon_films: { Args: { p_limit?: number }; Returns: Json[] }
       get_duplicate_films: {
         Args: never
         Returns: {
           audience_rating: number | null
           audience_rating_count: number
           average_rating: number
+          awards: Json
           backdrop: string | null
           backdrop_url: string | null
           coming_soon: boolean | null
@@ -1862,6 +1906,16 @@ export type Database = {
           youtube_filmography_count: number
         }[]
       }
+      get_platform_new_releases: {
+        Args: { p_platforms?: string[] }
+        Returns: {
+          display_order: number
+          entry_source: string
+          film: Json
+          platform: string
+          queue_created_at: string
+        }[]
+      }
       increment_profile_views: {
         Args: { person_uuid: string }
         Returns: undefined
@@ -1905,12 +1959,17 @@ export type Database = {
             Returns: undefined
           }
       refresh_all_popularity_scores: { Args: never; Returns: undefined }
+      refresh_platform_new_releases: {
+        Args: { p_platform: string }
+        Returns: undefined
+      }
       search_films_fuzzy: {
         Args: { lim?: number; q: string }
         Returns: {
           audience_rating: number | null
           audience_rating_count: number
           average_rating: number
+          awards: Json
           backdrop: string | null
           backdrop_url: string | null
           coming_soon: boolean | null
@@ -1968,6 +2027,7 @@ export type Database = {
       search_people_fuzzy: {
         Args: { lim?: number; q: string }
         Returns: {
+          awards: Json
           bio: string | null
           birthplace: string | null
           claimed_by: string | null

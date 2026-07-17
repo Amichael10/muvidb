@@ -17,7 +17,7 @@ const formatDeltaViews = (views) => {
 };
 
 const formatTotalViews = (views) => {
-  if (!views) return null;
+  if (views === null || views === undefined || views === '') return null;
   const v = Number(views);
   if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M Views`;
   if (v >= 1000) return `${(v / 1000).toFixed(1)}K Views`;
@@ -129,7 +129,7 @@ export default function FilmCard({
     return (
       <div className="relative flex items-end pl-14 sm:pl-16 h-72 sm:h-80 group select-none">
         {/* Giant Translucent Number */}
-        <span className="text-[140px] sm:text-[160px] font-black text-white/10 select-none absolute left-0 bottom-[-24px] z-0 font-heading leading-none -translate-x-3 tracking-tighter">
+        <span className="text-[140px] sm:text-[160px] font-black text-brand/15 dark:text-white/10 select-none absolute left-0 bottom-[-24px] z-0 font-heading leading-none -translate-x-3 tracking-tighter">
           {film.rank || 1}
         </span>
         <div className="relative z-10 shrink-0">
@@ -188,9 +188,11 @@ export default function FilmCard({
   };
 
   const activePlatforms = getPlatforms();
+  const runtimeLabel = formatRuntimeHours(film.runtime_minutes || film.runtime);
   const durationLabel = (film.content_type === 'series' || film.is_series_group)
     ? (film.episodes_count > 1 ? `${film.episodes_count} Episodes` : (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series'))
-    : (formatRuntimeHours(film.runtime_minutes || film.runtime) || '2h 5m');
+    : (runtimeLabel || '2h 5m');
+  const youtubeRuntimeLabel = (film.content_type === 'series' || film.is_series_group) ? durationLabel : runtimeLabel;
   const formattedTotalViews = formatTotalViews(film.view_count);
   const formattedViews = formatDeltaViews(film.view_count);
 
@@ -202,10 +204,18 @@ export default function FilmCard({
 
   // Prefer a real TMDB score, then our YouTube-derived audience rating, then
   // user reviews. Capped at 9.7 — nothing should ever look "perfect".
-  const filmRating = Math.min(9.7, Number(film.tmdb_rating || film.audience_rating || film.average_rating || film.rating || 0));
+  const filmRating = Math.min(9.7, Number(film.tmdb_rating || film.rating || film.audience_rating || film.average_rating || 0));
   // `countries` is an array; fall back to legacy singular `country` if present.
   const primaryCountry = (Array.isArray(film.countries) ? film.countries[0] : null) || film.country || null;
   const flag = countryFlag(primaryCountry);
+  const isYoutubeVariant = variant === 'youtube';
+  const isLandscapeVariant = variant === 'landscape' || isYoutubeVariant;
+  const youtubeGenreLabel = film.genres?.slice(0, 2).join(' / ') || 'Genre unavailable';
+  const youtubeSynopsis = film.synopsis || film.tagline;
+  const youtubeViews = ytViews || film.view_count;
+  const formattedYoutubeViews = formatTotalViews(youtubeViews);
+  const youtubeRatingLabel = filmRating > 0 ? filmRating.toFixed(1) : 'Not rated';
+  const youtubeCardHeight = fullWidth ? 'h-[360px] sm:h-[430px] lg:h-[390px]' : 'h-[350px] sm:h-[370px]';
 
   const [hoverPosition, setHoverPosition] = useState('center');
 
@@ -234,16 +244,16 @@ export default function FilmCard({
 
   return (
     <div 
-      className={`relative group flex flex-col gap-3 ${variant === 'landscape' ? (fullWidth ? 'w-full' : 'w-72 sm:w-80 shrink-0') : ''}`}
+      className={`relative group flex flex-col gap-3 ${isLandscapeVariant ? (fullWidth ? 'w-full' : 'w-72 sm:w-80 shrink-0') : ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {variant === 'landscape' ? (
-        <div className="relative flex flex-col gap-2 w-full">
+      {isLandscapeVariant ? (
+        <div className={`relative flex w-full flex-col ${isYoutubeVariant ? `${youtubeCardHeight} overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-xl` : 'gap-2'}`}>
           <Link 
             to={`/films/${film.slug || film.id}`}
             title={formatFilmTitle(film.title)}
-            className="relative block aspect-video w-full rounded-2xl overflow-hidden bg-surface-2/60 border border-white/5 group-hover:border-brand/40 shadow-xl group-hover:shadow-2xl group-hover:shadow-brand/5 transition-all duration-500 z-0 hover:z-10"
+            className={`relative z-0 block aspect-video w-full shrink-0 overflow-hidden bg-surface-2/60 transition-all duration-500 hover:z-10 ${isYoutubeVariant ? 'border-b border-border' : 'rounded-lg border border-border shadow-sm group-hover:border-brand/40 group-hover:shadow-xl group-hover:shadow-brand/5'}`}
           >
             {/* Poster Image (Landscape aspect-video) */}
             <ImageWithFallback
@@ -260,8 +270,8 @@ export default function FilmCard({
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
             {/* Views badge */}
-            {formattedViews && (
-              <div className="absolute top-2.5 left-2.5 bg-[#00A651] text-white text-[9px] font-bold px-2 py-1 rounded-md shadow-lg flex items-center gap-1 tracking-wide">
+            {!isYoutubeVariant && formattedViews && (
+              <div className="absolute top-2.5 left-2.5 bg-brand text-white text-[9px] font-bold px-2 py-1 rounded-md shadow-lg flex items-center gap-1 tracking-wide">
                 {formattedViews}
               </div>
             )}
@@ -276,23 +286,48 @@ export default function FilmCard({
           </Link>
 
           {/* Info below image */}
-          <div className="flex flex-col text-left px-1 mt-1">
+          <div className={isYoutubeVariant ? 'flex min-h-0 flex-1 flex-col p-3 text-left' : 'mt-1 flex flex-col px-1 text-left'}>
             <Link 
               to={`/films/${film.slug || film.id}`}
-              className="font-bold text-text-primary text-sm tracking-tight leading-snug group-hover:text-brand transition-colors line-clamp-1"
+              className={`font-bold text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors ${isYoutubeVariant ? 'min-h-10 text-base line-clamp-2' : 'text-sm line-clamp-1'}`}
               title={formatFilmTitle(film.title)}
             >
               {formatFilmTitle(film.title)}
             </Link>
-            <span className="text-xs text-text-muted mt-0.5 tracking-wide line-clamp-1">
-              {durationLabel}
-              {!!(ytViews || film.view_count) && (
-                <>
-                  <span className="mx-1.5 opacity-45">•</span>
-                  <span>{formatTotalViews(ytViews || film.view_count)}</span>
-                </>
-              )}
-            </span>
+            {isYoutubeVariant ? (
+              <>
+                <p className="mt-1 min-h-4 line-clamp-1 text-[11px] font-semibold text-brand">
+                  {youtubeGenreLabel}
+                </p>
+                <p className="mt-2 min-h-10 line-clamp-2 text-xs leading-relaxed text-text-secondary">
+                  {youtubeSynopsis || 'Synopsis unavailable.'}
+                </p>
+                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border pt-3 text-[11px] font-medium text-text-muted">
+                  <span className="inline-flex items-center gap-1 font-semibold text-text-primary">
+                    <Icon icon="solar:star-bold" className="text-[12px] text-[#F5C518]" />
+                    {youtubeRatingLabel}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Icon icon="solar:clock-circle-linear" className="text-[12px]" />
+                    {youtubeRuntimeLabel || 'Runtime TBA'}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Icon icon="solar:eye-linear" className="text-[12px]" />
+                    {formattedYoutubeViews || 'Views unavailable'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <span className="text-xs text-text-muted mt-0.5 tracking-wide line-clamp-1">
+                {durationLabel}
+                {!!(ytViews || film.view_count) && (
+                  <>
+                    <span className="mx-1.5 opacity-45">•</span>
+                    <span>{formatTotalViews(ytViews || film.view_count)}</span>
+                  </>
+                )}
+              </span>
+            )}
           </div>
         </div>
       ) : (
@@ -300,7 +335,7 @@ export default function FilmCard({
         <Link 
           to={`/films/${film.slug || film.id}`}
           title={formatFilmTitle(film.title)}
-          className={`relative block rounded-xl overflow-hidden transition-all duration-500 hover:shadow-2xl z-0 bg-surface-2/60 hover:border-brand/40 border border-white/5 ${sizeClasses[size]}`}
+          className={`relative block rounded-lg overflow-hidden transition-all duration-500 hover:shadow-2xl z-0 bg-surface-2/60 hover:border-brand/40 border border-border ${sizeClasses[size]}`}
         >
           {/* Poster Image */}
           <ImageWithFallback

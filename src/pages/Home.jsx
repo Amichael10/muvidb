@@ -5,6 +5,7 @@ import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
 import FilmCard from '../components/film/FilmCard';
+import TopTenSection from '../components/film/TopTenSection';
 import GenreRail from '../components/film/GenreRail';
 import PlatformRail from '../components/film/PlatformRail';
 import PersonCard from '../components/person/PersonCard';
@@ -12,9 +13,10 @@ import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { toTitleCase } from '../utils/format';
+import { getZonedClock, getNextDate, isFutureShowtime, compareShowtimes } from '../utils/showtimes';
 
 // Platforms shown in the homepage "New to Stream" tabbed rail.
-const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth'].includes(p.id));
+const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits'].includes(p.id));
 const NEW_STREAM_IDS = NEW_STREAM.map(p => p.id);
 
 export default function Home() {
@@ -22,7 +24,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [isHeroLoading, setIsHeroLoading] = useState(true);
   const [inCinemas, setInCinemas] = useState([]);
-  const [leavingCinemas, setLeavingCinemas] = useState([]);
   const [newToStream, setNewToStream] = useState({}); // { netflix: [...], prime_video: [...], ... }
   const [streamTab, setStreamTab] = useState('netflix');
   const [youtubeFeed, setYoutubeFeed] = useState([]);
@@ -31,6 +32,7 @@ export default function Home() {
   const [otherPeople, setOtherPeople] = useState([]);
   const [creators, setCreators] = useState([]);
   const [newReleases, setNewReleases] = useState([]);
+  const [isComingSoonLoading, setIsComingSoonLoading] = useState(true);
 
   const [featuredFilms, setFeaturedFilms] = useState([]);
   const [comingSoon, setComingSoon] = useState([]);
@@ -68,6 +70,12 @@ export default function Home() {
     // ~13 other queries hammered the DB, leaving tiles stuck on "Browse". The tiles
     // render immediately regardless; this just makes their labels reliable.
     fetchAllData().finally(() => fetchPlatformCounts());
+
+    const cinemaRefresh = window.setInterval(() => {
+      fetchInCinemasData().catch(error => console.error('Error refreshing cinema data:', error));
+    }, 60_000);
+
+    return () => window.clearInterval(cinemaRefresh);
   }, []);
 
   const fetchAllData = async () => {
@@ -92,7 +100,6 @@ export default function Home() {
         fetchFeaturedSeries().catch(e => console.error('Error fetching series:', e)),
         fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
         fetchNewToStream().catch(e => console.error('Error fetching new to stream:', e)),
-        fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e)),
         fetchYoutubeFeed().catch(e => console.error('Error fetching youtube feed:', e)),
         fetchPeople().catch(e => console.error('Error fetching people:', e)),
         fetchCreators().catch(e => console.error('Error fetching creators:', e)),
@@ -109,6 +116,10 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+
+    // Load this curated rail after the main homepage burst. Its status query is
+    // indexed, but deferring it avoids competing with the heavier discovery rails.
+    await fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e));
   };
 
   // Fetch films for the top genre sections at the bottom of the page.
@@ -194,8 +205,8 @@ export default function Home() {
     const { data, error } = await supabase
       .from('films')
       .select(`
-        id, slug, title, poster_url, backdrop_url, year, language, 
-        runtime_minutes, view_count, average_rating, nfvcb_rating, 
+        id, slug, title, poster_url, backdrop_url, year, language,
+        runtime_minutes, view_count, average_rating, nfvcb_rating,
         is_featured, is_trending, release_type, streaming_links, source,
         youtube_watch_url, content_type, season_count, episode_count,
         film_genres(genres(name))
@@ -240,38 +251,43 @@ export default function Home() {
   };
 
   const fetchNewToStream = async () => {
-    // "New to Stream" tabbed rail. Admins hand-pick titles per platform in
-    // /admin/new-releases (platform_new_releases). Where a platform hasn't been
-    // curated yet, we fall back to that platform's most-recently-added titles so
-    // the tab is never empty during the catalogue backfill.
+    // Automatic sync entries and admin overrides share one ordered queue.
     const cols = `
-      id, slug, title, poster_url, backdrop_url, year, language,
-      runtime_minutes, view_count, average_rating, nfvcb_rating,
+      id, slug, title, poster_url, backdrop_url, year, language, genres,
+      synopsis, tagline, runtime_minutes, view_count, average_rating,
+      audience_rating, tmdb_rating, nfvcb_rating, content_type,
       is_featured, is_trending, release_type, streaming_links, source,
       youtube_watch_url, created_at, release_date,
       film_genres(genres(name))
     `;
-    const withGenres = (f) => ({
-      ...f,
-      genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-    });
+    const withGenres = (f) => {
+      const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
+      return {
+        ...f,
+        genres: relatedGenres.length > 0 ? relatedGenres : (Array.isArray(f.genres) ? f.genres.filter(Boolean) : [])
+      };
+    };
 
     const map = {};
     NEW_STREAM_IDS.forEach(id => { map[id] = []; });
 
-    // 1. Curated entries for all platforms in one query.
-    const { data: curated } = await supabase
-      .from('platform_new_releases')
-      .select(`platform, films(${cols})`)
-      .in('platform', NEW_STREAM_IDS)
-      .order('display_order', { ascending: true })
-      .order('created_at', { ascending: false });
+    const { data: queued, error: queueError } = await supabase
+      .rpc('get_platform_new_releases', { p_platforms: NEW_STREAM_IDS });
 
-    (curated || []).forEach(row => {
-      if (row.films && map[row.platform]) map[row.platform].push(withGenres(row.films));
+    if (queueError) console.error('Error fetching New to Stream queue:', queueError);
+
+    const orderedQueue = [...(queued || [])].sort((a, b) => {
+      if (a.platform !== b.platform) return a.platform.localeCompare(b.platform);
+      if (a.display_order !== b.display_order) return a.display_order - b.display_order;
+      return new Date(b.film?.created_at || b.queue_created_at) - new Date(a.film?.created_at || a.queue_created_at);
     });
 
-    // 2. Recency fallback for any platform with no curation yet.
+    orderedQueue.forEach(row => {
+      if (row.film && map[row.platform]) map[row.platform].push(withGenres(row.film));
+    });
+
+    // Keep a resilient read-only fallback while a migration is deploying or a
+    // newly added platform has not completed its first queue refresh.
     await Promise.all(NEW_STREAM_IDS.map(async (id) => {
       if (map[id].length > 0) return;
       const { data } = await supabase
@@ -280,33 +296,61 @@ export default function Home() {
         .or(platformFilter(id))
         .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
         .order('created_at', { ascending: false })
-        .limit(12);
-      map[id] = (data || []).map(withGenres);
+        .limit(10);
+      map[id] = (data || []).map(withGenres).slice(0, 10);
     }));
+
+    NEW_STREAM_IDS.forEach(id => { map[id] = map[id].slice(0, 10); });
 
     setNewToStream(map);
   };
 
   const fetchInCinemasData = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    const cinemaClock = getZonedClock();
+    const tomorrow = getNextDate(cinemaClock.date);
     const withGenres = (f) => ({
       ...f,
       genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
     });
 
-    // 1. Build the FULL set of film_ids that have a live upcoming showtime.
-    //    (Lightweight — just film_id. Previously we joined films + limited 200
-    //    showtime ROWS, which collapsed to a few films and pushed everyone else
-    //    wrongly into "Leaving".)
-    const { data: stRows } = await supabase
+    // Build the complete set of films that still have an upcoming showtime.
+    const { data: stRows, error: showtimeError } = await supabase
       .from('showtimes')
-      .select('film_id')
-      .gte('show_date', today)
+      .select('film_id, cinema_id, show_date, show_time, cinemas(id, name, city, chain)')
+      .gte('show_date', cinemaClock.date)
       .eq('is_available', true)
+      .order('show_date', { ascending: true })
+      .order('show_time', { ascending: true })
       .limit(5000);
-    const nowIds = new Set((stRows || []).map(r => r.film_id).filter(Boolean));
 
-    // 2. "In Cinemas Now" = those films (Nollywood, non-YouTube), for display.
+    if (showtimeError) {
+      console.error('Error fetching cinema showtimes:', showtimeError);
+      return;
+    }
+
+    // Showtimes are stored as local cinema dates/times. Compare them with the
+    // current WAT clock, then find the earliest remaining show across cinemas.
+    const futureShowtimes = (stRows || []).filter(showtime => isFutureShowtime(showtime, cinemaClock));
+    const nowIds = new Set(futureShowtimes.map(r => r.film_id).filter(Boolean));
+    const nextShowByFilm = {};
+    const todayShowtimesByFilm = {};
+    futureShowtimes.forEach(showtime => {
+      if (showtime.show_date === cinemaClock.date) {
+        if (!todayShowtimesByFilm[showtime.film_id]) todayShowtimesByFilm[showtime.film_id] = new Set();
+        todayShowtimesByFilm[showtime.film_id].add(`${showtime.cinema_id}:${showtime.show_time}`);
+      }
+
+      const current = nextShowByFilm[showtime.film_id];
+      if (!current || compareShowtimes(showtime, current) < 0) {
+        nextShowByFilm[showtime.film_id] = {
+          ...showtime,
+          is_today: showtime.show_date === cinemaClock.date,
+          is_tomorrow: showtime.show_date === tomorrow
+        };
+      }
+    });
+
+    // A future date keeps the film visible after today's last show has passed.
     let nowFilms = [];
     if (nowIds.size > 0) {
       const { data } = await supabase
@@ -318,51 +362,19 @@ export default function Home() {
         .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
         // Newest cinema arrivals first: a freshly-fetched title leads the slider
         // so viewers slide right to reach the ones already showing.
-        .order('created_at', { ascending: false })
-        .limit(60);
-      nowFilms = (data || []).map(withGenres);
+        .order('created_at', { ascending: false });
+      nowFilms = (data || []).map(film => ({
+        ...withGenres(film),
+        next_showtime: nextShowByFilm[film.id] || null,
+        remaining_today_showtime_count: todayShowtimesByFilm[film.id]?.size || 0
+      }));
     }
 
-    // 3. "Leaving Cinemas Soon" = still flagged is_in_cinemas but with NO live
-    //    upcoming showtime (excluded against the full nowIds set, not the
-    //    display-limited list, so a film with showtimes never lands here).
-    const { data: flagged } = await supabase
-      .from('films')
-      .select(`*, film_genres(genres(name))`)
-      .eq('is_in_cinemas', true)
-      .neq('source', 'youtube')
-      .or('youtube_watch_url.is.null,youtube_watch_url.eq.""')
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('release_date', { ascending: false })
-      .limit(40);
-    const leavingFilms = (flagged || [])
-      .filter(f => !nowIds.has(f.id))
-      .map(withGenres);
-
     setInCinemas(nowFilms);
-    setLeavingCinemas(leavingFilms.slice(0, 20));
   };
 
   const fetchComingSoon = async (attempt = 0) => {
-    // Explicit columns instead of `*`: the wide select made this query take ~3.7s,
-    // which tipped over Postgres' statement timeout (57014). The lean column set
-    // returns the same rows in ~1s. There is no index on films.status, so under the
-    // burst of concurrent homepage queries it can still occasionally exceed the
-    // anon-role timeout — when that happens we retry once after the burst clears,
-    // at which point the query runs (near) alone and completes comfortably.
-    const { data, error } = await supabase
-      .from('films')
-      .select(`
-        id, slug, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, nfvcb_rating,
-        is_featured, is_trending, release_type, created_at, release_date,
-        youtube_watch_url,
-        film_genres(genres(name))
-      `)
-      .in('status', ['upcoming', 'in_production', 'post-production'])
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('release_date', { ascending: true })
-      .limit(20);
+    const { data, error } = await supabase.rpc('get_coming_soon_films', { p_limit: 20 });
 
     if (error) {
       if (attempt === 0 && error.code === '57014') {
@@ -370,15 +382,19 @@ export default function Home() {
         return fetchComingSoon(attempt + 1);
       }
       console.error('Error fetching coming soon:', error);
+      setIsComingSoonLoading(false);
       return;
     }
 
     if (data) {
-      setComingSoon(data.map(f => ({
+      const normalizedFilms = data.map(f => ({
         ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
+        genres: Array.isArray(f.genres) ? f.genres.filter(Boolean) : []
+      }));
+      setComingSoon(normalizedFilms);
+      setIsComingSoonLoading(false);
     }
+    setIsComingSoonLoading(false);
   };
 
   const fetchCuratedCollection = async () => {
@@ -466,9 +482,10 @@ export default function Home() {
       .select(`
         rank,
         films (
-          id, slug, title, poster_url, backdrop_url, year, language, 
-          runtime_minutes, view_count, average_rating, nfvcb_rating, 
-          is_featured, is_trending, release_type, created_at, release_date,
+          id, slug, title, poster_url, backdrop_url, year, language, synopsis,
+          runtime_minutes, view_count, average_rating, audience_rating, audience_rating_count,
+          tmdb_rating, nfvcb_rating, content_type, episode_count, season_count, release_date,
+          is_featured, is_trending, release_type, created_at,
           film_genres(genres(name))
         )
       `)
@@ -516,8 +533,8 @@ export default function Home() {
     const { data } = await supabase
       .from('films')
       .select(`
-        id, slug, title, poster_url, backdrop_url, year, language, 
-        runtime_minutes, view_count, average_rating, nfvcb_rating, 
+        id, slug, title, poster_url, backdrop_url, year, language, genres,
+        runtime_minutes, view_count, average_rating, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
         is_featured, is_trending, release_type, created_at, release_date,
         youtube_watch_url,
         film_genres(genres(name))
@@ -529,11 +546,14 @@ export default function Home() {
       .limit(20);
 
     if (data) {
-      const mapped = data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [],
-        channel_name: 'YouTube Featured'
-      }));
+      const mapped = data.map(f => {
+        const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
+        return {
+          ...f,
+          genres: relatedGenres.length > 0 ? relatedGenres : (Array.isArray(f.genres) ? f.genres.filter(Boolean) : []),
+          channel_name: 'YouTube Featured'
+        };
+      });
       setYoutubeFeed(mapped);
     }
   };
@@ -629,36 +649,36 @@ export default function Home() {
   ];
 
   return (
-    <div className="w-full pb-20 bg-bg min-h-screen">
+    <div className="muvi-landing w-full pb-20 min-h-screen">
       {/* 1. HERO (Progressive Above-the-Fold Loading) (Issue 1) */}
       <HeroSection
         featuredFilms={featuredFilms}
         isLoading={isHeroLoading}
       />
 
-      <div className="max-w-7xl mx-auto border-x border-hairline">
+      <div className="muvi-landing-shell max-w-7xl mx-auto">
         {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
-        <div className="border-b border-hairline">
+        <div className="landing-band grided watch-platform-band">
           <PlatformRail films={platformCoverPool} counts={platformCounts} />
         </div>
 
         {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
         {(isLoading || inCinemas.length > 0) && (
-          <div className="border-b border-hairline py-12">
+          <div className="landing-band panel py-8 md:py-10">
             <FilmRow
-              title="In Cinemas Now"
-              subtitle="On the big screen this week — find showtimes near you"
+              title="In Cinemas"
+              subtitle="Upcoming screenings across cinemas near you"
               films={inCinemas}
               isLoading={isLoading}
               linkTo="/showtimes"
-              cardVariant="landscape"
+              cardVariant="cinema"
             />
           </div>
         )}
 
         {/* 6b. NEW RELEASES (landscape single slideable row) */}
         {(isLoading || newReleases.length > 0) && (
-          <div className="border-b border-hairline py-12 bg-surface-2/5">
+          <div className="landing-band alt py-8 md:py-10">
             <FilmRow
               title="New Releases"
               subtitle="Just dropped — the latest additions"
@@ -672,7 +692,7 @@ export default function Home() {
 
         {/* 4. STREAMING RAILS (turn watch-link data into a browse axis) */}
         {(isLoading || NEW_STREAM_IDS.some(id => (newToStream[id] || []).length > 0)) && (
-          <div className="border-b border-hairline py-12 bg-surface-2/5">
+          <div className="landing-band alt grided py-8 md:py-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
               <div className="flex items-end justify-between gap-4 mb-6">
                 <div className="space-y-1.5">
@@ -705,15 +725,19 @@ export default function Home() {
                 })}
               </div>
             </div>
-            <FilmRow
-              films={newToStream[streamTab] || []}
-              isLoading={isLoading}
-              noHeader
-            />
+            <div className="mt-6 md:mt-7">
+              <FilmRow
+                films={newToStream[streamTab] || []}
+                isLoading={isLoading}
+                noHeader
+                cardVariant="streaming"
+                platform={streamTab}
+              />
+            </div>
           </div>
         )}
         {(isLoading || featuredSeries.length > 0) && (
-          <div className="border-b border-hairline py-12 bg-surface-2/5">
+          <div className="landing-band alt py-8 md:py-10">
             <FilmRow
               title="Popular TV Shows & Series"
               subtitle="Must-watch African series and episodes"
@@ -724,57 +748,46 @@ export default function Home() {
           </div>
         )}
         {(isLoading || youtubeFeed.length > 0) && (
-          <div className="border-b border-hairline py-12">
+          <div className="landing-band panel py-8 md:py-10">
             <FilmRow
               title="Free on YouTube"
               subtitle="No subscription needed"
               films={youtubeFeed}
               isLoading={isLoading}
               linkTo="/watch/youtube"
+              cardVariant="youtube"
             />
           </div>
         )}
-        {leavingCinemas.length > 0 && (
-          <div className="border-b border-hairline py-12 bg-surface-2/5">
-            <FilmRow
-              title="Leaving Cinemas Soon"
-              subtitle="Catch them before they go"
-              films={leavingCinemas}
-              isLoading={isLoading}
-              linkTo="/showtimes"
-            />
-          </div>
-        )}
-
         {/* 5. TOP 10 THIS WEEK */}
         {(isLoading || top10Films.length > 0) && (
-          <div className="border-b border-hairline py-12">
-            <FilmRow
+          <div className="landing-band panel py-8 md:py-10">
+            <TopTenSection
               title="Top 10 This Week"
               subtitle="The most-watched Nollywood stories right now"
               films={top10Films}
               isLoading={isLoading}
-              cardVariant="top10"
             />
           </div>
         )}
 
         {/* 6a. COMING SOON (keep existing horizontal scroll cards) */}
-        {(isLoading || comingSoon.length > 0) && (
-          <div className="border-b border-hairline py-12">
+        {(isLoading || isComingSoonLoading || comingSoon.length > 0) && (
+          <div className="landing-band panel py-8 md:py-10">
             <FilmRow
               title="Coming Soon"
               subtitle="Upcoming releases to look forward to"
               films={comingSoon}
-              isLoading={isLoading}
+              isLoading={isLoading || isComingSoonLoading}
               linkTo="/browse?sort=upcoming"
+              cardVariant="coming-soon"
             />
           </div>
         )}
 
         {/* 6c. RECENTLY ADDED (landscape single slideable row) */}
         {(isLoading || recentlyAdded.length > 0) && (
-          <div className="border-b border-hairline py-12">
+          <div className="landing-band panel py-8 md:py-10">
             <FilmRow
               title="Recently Added"
               subtitle="Fresh to the database — explore new additions"
@@ -787,13 +800,13 @@ export default function Home() {
         )}
 
         {/* 7. GENRE MOODS (visual poster grid) */}
-        <div className="border-b border-hairline">
+        <div className="landing-band alt grided">
           <GenreRail variant="poster-grid" />
         </div>
 
         {/* 8. CURATED PICK (editorial film row — discovery) */}
         {curatedCollection && curatedCollection.films.length > 0 && (
-          <div className="border-b border-hairline py-16 bg-brand/5 relative overflow-hidden">
+          <div className="landing-band alt py-14 md:py-16 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
             <FilmRow
               title={curatedCollection.name}
@@ -805,17 +818,17 @@ export default function Home() {
         )}
 
         {/* ===================== EDITORIAL ZONE (the Nollywood moat — magazine treatment) ===================== */}
-        <div className="bg-brand/[0.03]">
+        <div className="landing-band alt grided">
 
           {/* — Zone label: People of Nollywood — */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
-            <span className="font-heading font-black text-xs tracking-[0.2em] uppercase text-brand whitespace-nowrap">People of Nollywood</span>
-            <span className="flex-1 h-px bg-border" />
+          <div className="landing-zone-label max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <span>People of Nollywood</span>
+            <span />
           </div>
 
         {/* 9. SPOTLIGHT (Editorial) */}
         {(isLoading || spotlightContent) && (
-          <div className="border-b border-hairline py-16 bg-surface-2/10">
+          <div className="relative z-10 border-b border-hairline py-14 md:py-16 bg-surface/40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-2 mb-10">
                 <Icon icon="solar:star-linear" className="text-brand text-xl" />
@@ -824,7 +837,7 @@ export default function Home() {
                 </h2>
               </div>
 
-              <div className="relative bg-surface rounded-xl overflow-hidden border border-hairline shadow-sm">
+              <div className="landing-module relative rounded-lg overflow-hidden">
                 {isLoading ? (
                   <div className="h-[400px] animate-pulse bg-surface-2" />
                 ) : spotlightContent && spotlightContent.people && (
@@ -921,7 +934,7 @@ export default function Home() {
 
         {/* 10. & 11. FEATURED TALENT (Artist & Crew Tabs) */}
         {(isLoading || spotlightPerson || crewMembers.length > 0) && (
-          <div className="border-b border-hairline">
+          <div className="relative z-10 border-b border-hairline">
             <section className="py-16">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
@@ -960,7 +973,7 @@ export default function Home() {
 
                 {/* Tab Content: Featured Artist */}
                 {featuredTalentTab === 'artist' && (
-                  <div className="relative bg-surface rounded-xl p-8 md:p-12 overflow-hidden border border-hairline shadow-sm page-fade-in">
+                  <div className="landing-module relative rounded-lg p-8 md:p-12 overflow-hidden page-fade-in">
                     <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
                     <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
                       <div className="xl:flex-1">
@@ -1039,14 +1052,14 @@ export default function Home() {
 
 
           {/* — Zone label: The Industry — */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
-            <span className="font-heading font-black text-xs tracking-[0.2em] uppercase text-brand whitespace-nowrap">The Industry</span>
-            <span className="flex-1 h-px bg-border" />
+          <div className="landing-zone-label max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <span>The Industry</span>
+            <span />
           </div>
 
         {/* 12. NOLLYWOOD STUDIOS (Production Companies) */}
         {(isLoading || productionCompanies.length > 0) && (
-          <div className="border-b border-hairline py-16 bg-surface-2/5">
+          <div className="relative z-10 border-b border-hairline py-14 md:py-16 bg-surface/30">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-end justify-between mb-12">
                 <div className="space-y-1">
@@ -1128,7 +1141,7 @@ export default function Home() {
 
         {/* 13. FEATURED CHANNELS */}
         {(isLoading || creators.length > 0) && (
-          <div className="border-b border-hairline bg-surface-2/10 relative overflow-hidden">
+          <div className="relative z-10 border-b border-hairline bg-surface/40 overflow-hidden">
              <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
             <section className="py-16 relative z-10">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1204,15 +1217,15 @@ export default function Home() {
 
         {/* 15. GENRE-SPECIFIC FILM SECTIONS */}
         {genreSections.length > 0 && (
-          <div className="border-t border-hairline">
+          <div className="landing-band panel">
             {/* Zone label */}
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 pt-16 pb-2">
-              <span className="font-heading font-black text-xs tracking-[0.2em] uppercase text-brand whitespace-nowrap">Browse by Genre</span>
-              <span className="flex-1 h-px bg-border" />
+            <div className="landing-zone-label max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <span>Browse by Genre</span>
+              <span />
             </div>
 
             {genreSections.map((section) => (
-              <div key={section.genre} className="border-b border-hairline py-12">
+              <div key={section.genre} className="border-b border-hairline py-10 md:py-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                   {/* Section header */}
                   <div className="flex items-end justify-between mb-6">
@@ -1244,8 +1257,8 @@ export default function Home() {
 
         {/* 14. NEW MEMBER CTA BANNER (Issue 29) */}
         {!isAuthenticated && (
-          <div className="px-4 sm:px-6 lg:px-8 py-16 border-t border-hairline/40">
-            <div className="relative bg-gradient-to-br from-brand/20 via-surface-2 to-surface border border-hairline rounded-3xl p-8 md:p-16 overflow-hidden shadow-2xl text-center max-w-5xl mx-auto group">
+          <div className="landing-band alt grided px-4 sm:px-6 lg:px-8 py-14 md:py-16 border-t border-hairline/40">
+            <div className="landing-module relative rounded-lg p-8 md:p-16 overflow-hidden text-center max-w-5xl mx-auto group">
               {/* Decorative Glow */}
               <div className="absolute -top-32 -left-32 w-96 h-96 bg-brand/10 rounded-full blur-[120px] transition-all group-hover:bg-brand/20 pointer-events-none"></div>
               <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-[120px] transition-all group-hover:bg-brand/20 pointer-events-none"></div>

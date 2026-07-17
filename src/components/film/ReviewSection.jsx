@@ -350,9 +350,9 @@ const ReviewSection = ({ filmId, currentUser }) => {
     })()
 
     return (
-        <div className="space-y-10 pt-6">
+        <div className="space-y-8 pt-2">
             {/* Header Section */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-border pb-8">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-6">
                 <div>
                     <h3 className="text-text-primary text-2xl font-bold tracking-tight">
                         User Reviews
@@ -398,9 +398,9 @@ const ReviewSection = ({ filmId, currentUser }) => {
             {/* Feed Context */}
             <div className="space-y-6">
                 {loading ? (
-                    <div className="space-y-4">
-                        {[1, 2].map(i => (
-                            <div key={i} className="bg-surface-2 rounded-2xl h-40 animate-pulse border border-border" />
+                    <div className="space-y-3">
+                        {[1].map(i => (
+                            <div key={i} className="bg-surface-2 rounded-lg h-28 animate-pulse border border-border" />
                         ))}
                     </div>
                 ) : reviews.length > 0 ? (
@@ -419,14 +419,14 @@ const ReviewSection = ({ filmId, currentUser }) => {
                         ))}
                     </div>
                 ) : externalReviews.length === 0 ? (
-                    <div className="bg-surface-2/50 border-2 border-dashed border-border rounded-3xl py-16 text-center">
-                        <Icon icon="solar:clapperboard-play-linear" className="text-5xl mx-auto mb-4 opacity-20 text-brand" />
-                        <h4 className="text-text-primary text-xl font-bold tracking-tight">No reviews yet.</h4>
-                        <p className="text-text-muted text-sm mt-1 max-w-xs mx-auto">Be the first to review this movie and share your thoughts with the community.</p>
+                    <div className="bg-surface-2/40 border border-dashed border-border rounded-lg py-8 px-4 text-center">
+                        <Icon icon="solar:clapperboard-play-linear" className="text-3xl mx-auto mb-3 opacity-25 text-brand" />
+                        <h4 className="text-text-primary text-base font-bold tracking-tight">No reviews yet</h4>
+                        <p className="text-text-muted text-xs mt-1 max-w-xs mx-auto">Be the first to share your thoughts.</p>
                         {!showForm && (
                             <button
                                 onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
-                                className="mt-8 text-brand font-bold text-xs tracking-widest hover:scale-105 transition-all flex items-center justify-center gap-2 mx-auto"
+                                className="mt-5 text-brand font-bold text-xs hover:text-brand/80 transition-colors flex items-center justify-center gap-2 mx-auto"
                             >
                                 <Icon icon="solar:add-circle-linear" width="16" />
                                 Write a Review

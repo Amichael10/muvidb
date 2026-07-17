@@ -7,6 +7,10 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import SkeletonRow from '../../components/admin/SkeletonRow';
 import { extractChannelIdentifier, fetchChannelData, getPersonYoutubeChannelUrl } from '../../lib/youtube';
 import MergeModal from '../../components/admin/MergeModal';
+import ImageField from '../../components/admin/ImageField';
+import AddCreditModal from '../../components/admin/AddCreditModal';
+import AwardsEditor from '../../components/admin/AwardsEditor';
+import { formatRole } from '../../lib/creditRoles';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
@@ -47,6 +51,21 @@ export default function AdminPeople() {
   const [personBatchDeleteIds, setPersonBatchDeleteIds] = useState(null);
   const [isBatchDeletingPeople, setIsBatchDeletingPeople] = useState(false);
   const [personCredits, setPersonCredits] = useState([]);
+  const [showAddCredit, setShowAddCredit] = useState(false);
+
+  // Shared by the drawer's initial load and the add-credit modal's save.
+  const refetchCredits = async (personId) => {
+    const { data } = await supabase
+      .from('credits')
+      .select(`
+        id, role, character_name, billing_order,
+        films(id, title, year, poster_url)
+      `)
+      .eq('person_id', personId)
+      .order('billing_order');
+
+    setPersonCredits(data || []);
+  };
   const [youtubeFilmography, setYoutubeFilmography] = useState([]);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
@@ -68,7 +87,8 @@ export default function AdminPeople() {
     youtube_stats: { subscribers: '0', videos: '0', thumbnail: null, banner: null },
     instagram_url: '',
     facebook_url: '',
-    twitter_url: ''
+    twitter_url: '',
+    awards: [] // [{ organization, year, season, category, work, film_id, won }]
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -255,7 +275,8 @@ export default function AdminPeople() {
       youtube_stats: { subscribers: '0', videos: '0', thumbnail: null, banner: null },
       instagram_url: '',
       facebook_url: '',
-      twitter_url: ''
+      twitter_url: '',
+      awards: []
     });
     setIsDrawerOpen(true);
   };
@@ -281,7 +302,7 @@ export default function AdminPeople() {
     
     const p = fullPerson || person;
 
-    setFormData(draft || {
+    const baseForm = {
       name: p.name || '',
       biography: p.biography || p.bio || '',
       photo_url: p.photo_url || '',
@@ -297,21 +318,16 @@ export default function AdminPeople() {
       youtube_stats: p.youtube_stats || { subscribers: '0', videos: '0', thumbnail: null, banner: null },
       instagram_url: p.instagram_url || '',
       facebook_url: p.facebook_url || '',
-      twitter_url: p.twitter_url || ''
-    });
+      twitter_url: p.twitter_url || '',
+      awards: Array.isArray(p.awards) ? p.awards : []
+    };
+    // Merge over the base rather than replacing it: a draft saved before a field
+    // existed on this form has no key for it, and save would then write the
+    // empty default over real data (awards would be wiped).
+    setFormData(draft ? { ...baseForm, ...draft, awards: Array.isArray(draft.awards) ? draft.awards : baseForm.awards } : baseForm);
     setYoutubeChannelInput(draft?.youtube_channel_id || draft?.youtube_handle || getPersonYoutubeChannelUrl(p) || '');
     
-    // Fetch credits for this person
-    const { data: credits } = await supabase
-      .from('credits')
-      .select(`
-        id, role, character_name, billing_order,
-        films(id, title, year, poster_url)
-      `)
-      .eq('person_id', person.id)
-      .order('billing_order');
-      
-    setPersonCredits(credits || []);
+    await refetchCredits(person.id);
 
     // Fetch qualifying YT videos
     if (person.youtube_channel_id) {
@@ -397,7 +413,20 @@ export default function AdminPeople() {
         youtube_stats,
         instagram_url: formData.instagram_url?.trim() || null,
         facebook_url: formData.facebook_url?.trim() || null,
-        twitter_url: formData.twitter_url?.trim() || null
+        twitter_url: formData.twitter_url?.trim() || null,
+        // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
+        // the person page's sorting and "N wins & N nominations" tally stay sane.
+        awards: (formData.awards || [])
+          .filter((a) => (a.organization || '').trim() || (a.category || '').trim())
+          .map((a) => ({
+            organization: (a.organization || '').trim() || 'AMVCA',
+            year: a.year ? parseInt(a.year, 10) : null,
+            season: a.season ? parseInt(a.season, 10) : null,
+            category: (a.category || '').trim() || null,
+            work: (a.work || '').trim() || null,
+            film_id: a.film_id || null,
+            won: a.won === true,
+          }))
       };
 
       if (editingPerson) {
@@ -902,12 +931,12 @@ export default function AdminPeople() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-text-primary mb-2">Profile Image Link</label>
-                <input 
-                  value={formData.photo_url} 
-                  onChange={e => setFormData({...formData, photo_url: e.target.value})} 
-                  className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
-                  placeholder="https://..." 
+                <ImageField
+                  label="Profile Image"
+                  value={formData.photo_url}
+                  onChange={url => setFormData({ ...formData, photo_url: url })}
+                  bucket="people"
+                  aspect="square"
                 />
               </div>
               <div>
@@ -961,12 +990,33 @@ export default function AdminPeople() {
             </div>
           </section>
 
-          {editingPerson && personCredits.length > 0 && (
+          {editingPerson && (
             <section className="space-y-6">
-              <div className="flex items-center gap-2 pb-2 border-b border-border">
-                <span className="text-xl">🎞️</span>
-                <h4 className="text-xs font-bold text-text-muted">Film Credits</h4>
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎞️</span>
+                  <h4 className="text-xs font-bold text-text-muted">Film Credits</h4>
+                  {personCredits.length > 0 && (
+                    <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-full px-2 py-0.5">
+                      {personCredits.length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCredit(true)}
+                  className="flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+                >
+                  <Icon icon="solar:add-circle-linear" width="16" /> Add credit
+                </button>
               </div>
+
+              {personCredits.length === 0 && (
+                <p className="text-xs text-text-muted italic">
+                  No credits yet. Click &quot;Add credit&quot; to attach this person to a film.
+                </p>
+              )}
+
               <div className="space-y-3">
                 {personCredits.map(credit => (
                   <div key={credit.id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
@@ -980,7 +1030,7 @@ export default function AdminPeople() {
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
                       <div className="text-[10px] text-text-muted mt-0.5 font-medium">
-                        <span className="capitalize">{credit.role}</span>
+                        <span>{formatRole(credit.role)}</span>
                         {credit.character_name && ` as ${credit.character_name}`}
                         {credit.films?.year && ` (${credit.films.year})`}
                       </div>
@@ -1054,6 +1104,14 @@ export default function AdminPeople() {
               </div>
             </div>
           </section>
+
+          {/* Awards & nominations -> people.awards (jsonb). Renders on the
+              person page grouped by organisation, IMDb-style. */}
+          <AwardsEditor
+            variant="person"
+            value={formData.awards}
+            onChange={(awards) => setFormData({ ...formData, awards })}
+          />
 
           <section className="space-y-6">
             <div className="flex items-center gap-2 pb-2 border-b border-border">
@@ -1132,6 +1190,14 @@ export default function AdminPeople() {
         </ErrorBoundary>
         </div>
       </Drawer>
+      {showAddCredit && editingPerson && (
+        <AddCreditModal
+          person={editingPerson}
+          existingCredits={personCredits}
+          onClose={() => setShowAddCredit(false)}
+          onSaved={() => refetchCredits(editingPerson.id)}
+        />
+      )}
       {deletingPerson && (
         <ConfirmModal
           onCancel={() => !isDeleting && setDeletingPerson(null)}

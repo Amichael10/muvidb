@@ -4,6 +4,11 @@ import { Icon } from '@iconify/react';
 import { PLATFORMS, isFilmOnPlatform } from '../../lib/platforms';
 import { getProxiedImageUrl } from '../../lib/imageUrl';
 
+const compactCount = new Intl.NumberFormat('en', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
 // "Where to Watch" — the signature top-level entry point answering the #1
 // Nollywood query: "where can I watch it?". Each tile links to /watch/:platform.
 export default function PlatformRail({ films = [], counts = {} }) {
@@ -27,21 +32,21 @@ export default function PlatformRail({ films = [], counts = {} }) {
     });
 
   return (
-    <section className="relative overflow-hidden py-16 bg-gradient-to-b from-surface-2/20 to-bg">
-      {/* Brand radial glow (mockup .watch treatment) */}
-      <div className="absolute top-0 left-[12%] w-[700px] h-[300px] bg-brand/10 blur-[120px] rounded-full pointer-events-none" />
-
+    <section className="relative overflow-hidden py-12 md:py-16">
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-10">
-          <h2 className="font-heading font-black text-2xl md:text-4xl text-text-primary tracking-tighter">
+        <div className="mb-8 md:mb-10">
+          <p className="text-brand text-[10px] font-bold uppercase tracking-[0.25em] mb-2">
+            Explore by platform
+          </p>
+          <h2 className="font-heading font-black text-2xl md:text-4xl text-white tracking-tighter">
             Where can <span className="text-brand">I watch it?</span>
           </h2>
-          <p className="text-text-secondary text-sm mt-2 max-w-xl">
+          <p className="text-white/60 text-sm mt-2 max-w-xl">
             Every Nollywood title, and exactly where it&apos;s streaming right now.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
           {activePlatforms.map((platform, i) => (
             <motion.div
               key={platform.id}
@@ -54,55 +59,61 @@ export default function PlatformRail({ films = [], counts = {} }) {
                 to={`/watch/${platform.id}`}
                 style={{
                   '--platform-color': platform.color,
-                  '--platform-glow': `${platform.color}26` // 15% opacity hex
+                  '--platform-glow': `${platform.color}33`
                 }}
-                className="group relative flex flex-col justify-end w-full h-36 md:h-40 rounded-2xl border border-border overflow-hidden bg-surface transition-all duration-500 hover:-translate-y-1 hover:border-[var(--platform-color)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.4),0_0_20px_var(--platform-glow)]"
+                className="group relative flex flex-col w-full min-h-[220px] rounded-lg border border-white/15 overflow-hidden bg-[#17181b] shadow-[0_10px_28px_rgba(0,0,0,0.24)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--platform-color)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.34),0_0_22px_var(--platform-glow)]"
               >
-                {/* Cover art */}
-                {platform.coverImage ? (
-                  <img
-                    src={getProxiedImageUrl(platform.coverImage, { width: 384 })}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:opacity-40 group-hover:scale-110 transition-all duration-700"
-                    loading="lazy"
-                  />
-                ) : (
+                <div className="relative h-32 overflow-hidden bg-[#0d0e10]">
+                  {platform.coverImage ? (
+                    <img
+                      src={getProxiedImageUrl(platform.coverImage, { width: 640 })}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-95 group-hover:scale-105 transition-all duration-500"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <>
+                      <div
+                        className="absolute inset-0"
+                        style={{ background: `linear-gradient(135deg, ${platform.color}42 0%, #111216 72%)` }}
+                      />
+                      <Icon
+                        icon={platform.icon}
+                        className="absolute right-5 bottom-2 text-7xl opacity-15"
+                        style={{ color: platform.color }}
+                      />
+                    </>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#17181b] via-transparent to-black/10" />
+                  <div className="absolute left-0 right-0 top-0 h-1" style={{ background: platform.color }} />
+                </div>
+
+                <div className="relative flex flex-1 flex-col px-4 pt-7 pb-4 md:px-5">
                   <div
-                    className="absolute inset-0 opacity-20"
-                    style={{ background: `linear-gradient(135deg, ${platform.color}33, transparent)` }}
-                  />
-                )}
-
-                {/* Brand-color left accent (mockup .plat::before) */}
-                <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: platform.color }} />
-
-                {/* Readability overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
-
-                {/* Arrow */}
-                <span className="absolute top-3.5 right-3.5 text-white/40 group-hover:text-brand group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all z-10">
-                  <Icon icon="solar:arrow-right-up-linear" className="text-base" />
-                </span>
-
-                <div className="relative z-10 p-4">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 border border-white/10 overflow-hidden"
-                    style={platform.logo ? { background: '#fff' } : { background: `${platform.color}22`, color: platform.color }}
+                    className="absolute -top-6 left-4 md:left-5 w-12 h-12 rounded-lg flex items-center justify-center border border-white/20 overflow-hidden shadow-[0_8px_20px_rgba(0,0,0,0.45)]"
+                    style={platform.logo ? { background: '#fff' } : { background: `${platform.color}2e`, color: platform.color }}
                   >
                     {platform.logo ? (
-                      <img src={platform.logo} alt={platform.name} className="w-full h-full object-contain p-1" loading="lazy" />
+                      <img src={platform.logo} alt={platform.name} className="w-full h-full object-contain p-1.5" loading="lazy" />
                     ) : (
-                      <Icon icon={platform.icon} className="text-lg" />
+                      <Icon icon={platform.icon} className="text-xl" />
                     )}
                   </div>
-                  <span className="block text-white font-heading font-bold text-sm md:text-base tracking-tight group-hover:text-brand transition-colors">
+
+                  <span className="block text-white font-heading font-bold text-base tracking-tight group-hover:text-brand transition-colors line-clamp-1">
                     {platform.name}
                   </span>
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-0.5">
-                    {platform.count > 0
-                      ? `${platform.count.toLocaleString()} ${platform.count === 1 ? 'title' : 'titles'}`
-                      : 'Browse'}
-                  </p>
+                  <div className="mt-auto pt-3 flex items-center justify-between gap-3 border-t border-white/10">
+                    <p className="text-[10px] font-bold text-white/50 uppercase tracking-wider line-clamp-1">
+                      {platform.count > 0
+                        ? `${compactCount.format(platform.count)} ${platform.count === 1 ? 'title' : 'titles'}`
+                        : 'Catalogue'}
+                    </p>
+                    <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-brand group-hover:text-white transition-colors">
+                      Browse
+                      <Icon icon="solar:arrow-right-linear" className="text-sm group-hover:translate-x-0.5 transition-transform" />
+                    </span>
+                  </div>
                 </div>
               </Link>
             </motion.div>

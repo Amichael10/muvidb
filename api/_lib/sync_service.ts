@@ -274,6 +274,11 @@ export async function runVideosSync() {
                 // AI title if we got one, else the regex cleaner.
                 const cleanedTitle = ai?.title || cleanTitle(rawTitle);
                 const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
+                // Keep the full upload date, not just the year. publishedAt is the
+                // only date YouTube gives us, and for YouTube-native films it IS
+                // the release date. (Re-uploads of older cinema films will read as
+                // their upload date — TMDB is the fix for those, not this.)
+                const vidDate = v.published_at ? new Date(v.published_at).toISOString().slice(0, 10) : null;
 
                 // ── Detect if this is an episode of a series ──────────────────────────────
                 const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(rawTitle);
@@ -320,6 +325,7 @@ export async function runVideosSync() {
                       const { data: newParent } = await supabase.from('films').insert({
                         title: cleanedBase,
                         year: vidYear,
+                        release_date: vidDate,
                         release_type: 'youtube',
                         source: 'youtube',
                         content_type: 'series',
@@ -349,6 +355,7 @@ export async function runVideosSync() {
                   filmsToInsert.push({
                     title: cleanedTitle,
                     year: vidYear,
+                    release_date: vidDate,
                     release_type: 'youtube',
                     source: 'youtube',
                     source_video_id: v.video_id,
@@ -391,6 +398,7 @@ export async function runVideosSync() {
                     filmsToInsert.push({
                       title: cleanedTitle,
                       year: vidYear,
+                      release_date: vidDate,
                       release_type: 'youtube',
                       source: 'youtube',
                       source_video_id: v.video_id,

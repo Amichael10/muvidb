@@ -83,6 +83,45 @@ export async function uploadContributionImage(file) {
 
 // --- Admin side -----------------------------------------------------------
 
+// Hosts whose image URLs are signed and expire (the `oh=`/`oe=` params), so a
+// pasted link renders today and 404s within days. They're also on the server's
+// SKIP_DOMAINS list, meaning the mirror cron will never rescue them.
+const EPHEMERAL_HOST = /(cdninstagram\.com|fbcdn\.net|instagram\.f)/i;
+
+export function isEphemeralImageUrl(url) {
+  return !!url && EPHEMERAL_HOST.test(url);
+}
+
+// Admins are trusted, so their uploads skip the quarantine bucket and land
+// straight in a public one. Validation and the canvas re-encode still run:
+// they cost nothing here and keep a malformed file from being served off our
+// own domain.
+// Returns { url } or { error }.
+export async function uploadAdminImage(file, bucket = 'film-images') {
+  const err = await validateImage(file);
+  if (err) return { error: err };
+
+  let blob;
+  try {
+    blob = await reencodeToWebp(file);
+  } catch {
+    return { error: 'Could not process that image. Try a different file.' };
+  }
+
+  const path = `${crypto.randomUUID()}.webp`;
+  const { error: upErr } = await supabase.storage
+    .from(bucket)
+    .upload(path, blob, {
+      contentType: 'image/webp',
+      upsert: false,
+      cacheControl: '31536000', // 1 year — the UUID name makes it immutable
+    });
+  if (upErr) return { error: upErr.message };
+
+  const base = import.meta.env.VITE_SUPABASE_URL || '';
+  return { url: `${base}/storage/v1/object/public/${bucket}/${path}` };
+}
+
 // Short-lived signed URL so an admin can preview a quarantined image.
 export async function signedContributionUrl(path) {
   if (!path) return null;

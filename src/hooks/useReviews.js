@@ -31,33 +31,28 @@ export const useReviews = (filmId, currentUser) => {
     const fetchReviews = async () => {
         setLoading(true)
         try {
-            // Attempt to fetch with users join.
-            // If it fails, fallback to simple select.
-            const { data, error } = await supabase
-                .from('reviews')
-                .select(`
-                    *,
-                    users:user_id (
-                        name,
-                        avatar_url
-                    )
-                `)
-                .eq('film_id', filmId)
-                .order('created_at', { ascending: false })
-
-            if (error) {
-                console.warn('Profile join failed, falling back to basic review fetch:', error);
-                const { data: fallbackData, error: fallbackError } = await supabase
+            const fetchDirect = async () => {
+                const { data, error } = await supabase
                     .from('reviews')
-                    .select('*')
+                    .select('*, users:user_id (name, avatar_url)')
                     .eq('film_id', filmId)
-                    .order('created_at', { ascending: false });
-
-                if (fallbackError) throw fallbackError;
-                applyRows(fallbackData);
-            } else {
-                applyRows(data);
+                    .order('created_at', { ascending: false })
+                if (error) throw error
+                return data || []
             }
+
+            let rows = []
+            if (import.meta.env.DEV) {
+                rows = await fetchDirect()
+            } else {
+                const res = await fetch(`/api/content?resource=film-reviews&filmId=${encodeURIComponent(filmId)}`)
+                if (res.ok) {
+                    ({ reviews: rows } = await res.json())
+                } else {
+                    rows = await fetchDirect()
+                }
+            }
+            applyRows(rows)
         } catch (error) {
             console.error('Critical Fetch Fail:', error);
         } finally {

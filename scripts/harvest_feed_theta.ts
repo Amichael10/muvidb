@@ -241,9 +241,15 @@ async function scrapePersonPage(slug) {
 // DB: Upsert film
 // ─────────────────────────────────────────────
 async function upsertFilm(apiFilm) {
-  const posterUrl = apiFilm.poster?.sizes?.og?.url 
-    ? `${PJ_IMG}${apiFilm.poster.sizes.og.url}`
-    : apiFilm.poster?.url ? `${PJ_IMG}${apiFilm.poster.url}` : null;
+  // Prefer original Uploadthing asset (_key) — sizes.og is often a 1200x630 landscape crop.
+  const UFS = 'https://1s8yfxw74q.ufs.sh/f';
+  const posterUrl = apiFilm.poster?._key
+    ? `${UFS}/${apiFilm.poster._key}`
+    : apiFilm.poster?.sizes?.og?._key
+      ? `${UFS}/${apiFilm.poster.sizes.og._key}`
+      : apiFilm.poster?.url
+        ? (String(apiFilm.poster.url).startsWith('http') ? apiFilm.poster.url : `${PJ_IMG}${apiFilm.poster.url}`)
+        : null;
 
   const releaseYear = apiFilm.releaseDate
     ? new Date(apiFilm.releaseDate).getFullYear()

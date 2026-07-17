@@ -1,10 +1,13 @@
 import { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import FilmCard from './FilmCard';
+import CinemaCard from './CinemaCard';
+import ComingSoonCard from './ComingSoonCard';
+import StreamingCard from './StreamingCard';
 import SkeletonCard from '../ui/SkeletonCard';
 import { Icon } from '@iconify/react';
 
-export default function FilmRow({ title, subtitle, films, sortKey, isLoading = false, noHeader = false, linkTo, cardVariant }) {
+export default function FilmRow({ title, subtitle, films, sortKey, isLoading = false, noHeader = false, linkTo, cardVariant, platform }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -108,11 +111,19 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
             ) : (
               sortedFilms.map((film, index) => (
                 <div key={film.id} className="shrink-0">
-                  <FilmCard 
-                    film={cardVariant === 'top10' ? { ...film, rank: index + 1 } : film} 
-                    size="md" 
-                    variant={cardVariant} 
-                  />
+                  {cardVariant === 'cinema' ? (
+                    <CinemaCard film={film} />
+                  ) : cardVariant === 'coming-soon' ? (
+                    <ComingSoonCard film={film} />
+                  ) : cardVariant === 'streaming' ? (
+                    <StreamingCard film={film} platformId={platform} />
+                  ) : (
+                    <FilmCard
+                      film={cardVariant === 'top10' ? { ...film, rank: index + 1 } : film}
+                      size="md"
+                      variant={cardVariant === 'landscape' && (film.source === 'youtube' || film.release_type === 'youtube') ? 'youtube' : cardVariant}
+                    />
+                  )}
                 </div>
               ))
             )}

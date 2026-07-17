@@ -13,7 +13,7 @@ export const PLATFORMS = [
   // DSTV Africa, so it's no longer a valid "where to watch" destination.
   { id: 'kava',        name: 'Kava',        icon: 'solar:play-circle-bold',  color: '#FF5C00', logo: '/images/platforms/kava.png' },
   { id: 'docuth',      name: 'Docuth',      icon: 'solar:play-stream-bold',  color: '#16A34A', logo: '/images/platforms/docuth.png' },
-  { id: 'ebonylife',   name: 'Ebonylife',   icon: 'solar:play-circle-bold',  color: '#800080', logo: '/images/platforms/ebonylife.png' },
+  { id: 'ebonylife',   name: 'EbonyLife ON Plus', icon: 'solar:play-circle-bold', color: '#800080', logo: '/images/platforms/ebonylife.png' },
   { id: 'circuits',    name: 'Circuits.tv', icon: 'solar:clapperboard-play-bold', color: '#F0532B', logo: '/images/platforms/circuits.png' },
   { id: 'cinema',      name: 'In Cinemas',  icon: 'solar:ticket-bold',       color: '#FF5A1F', isCinema: true },
 ];
@@ -26,8 +26,10 @@ export const getPlatform = (id) => PLATFORMS.find((p) => p.id === id) || null;
 // film list is capped at Supabase's 1000-row default and undercounts badly).
 export function platformFilter(platformId) {
   if (platformId === 'cinema') return 'is_in_cinemas.eq.true';
+  // YouTube titles are ingested with a dedicated source value. Keeping this
+  // filter direct avoids a slow JSONB OR scan on the catalogue page.
+  if (platformId === 'youtube') return 'source.eq.youtube';
   const parts = [`release_type.eq.${platformId}`, `streaming_links->>${platformId}.not.is.null`];
-  if (platformId === 'youtube') parts.push('source.eq.youtube');
   return parts.join(',');
 }
 
