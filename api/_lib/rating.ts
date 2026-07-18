@@ -3,23 +3,24 @@
  *
  * Everything funnels through ONE calibrated curve, `pctLiked(score10)`, so a
  * TMDB 0-10 average and our comment-derived score land on the same comparable
- * scale. The curve is a logistic centred at 5.5 (a genuinely mixed film) with a
- * gentle slope, tuned against how IMDb/TMDB averages relate to Rotten Tomatoes
- * audience percentages:
+ * scale. The curve is a logistic centred at 7.1 with a steep slope — a
+ * deliberately demanding calibration so scores read honestly low: fan comments
+ * skew positive, so "average" reception should NOT look like acclaim.
  *
- *    5.0 -> 39%   6.0 -> 61%   7.0 -> 79%   7.7 -> 88%   8.5 -> 94%
+ *    5.0 -> 14%   6.0 -> 22%   7.0 -> 47%   7.7 -> 67%   8.5 -> 83%
  *
- * So a classic that reads 7.7 on IMDb shows ~88% here — and an ordinary upload
- * has to genuinely earn its score to beat it, instead of coasting on fan hype.
+ * A genuinely acclaimed, well-voted film still reaches the 80s; an ordinary
+ * upload lands in the 40s-50s and a weak one drops below 40%. Only real,
+ * broad approval earns a high number.
  */
 
 /** Map a 0-10 quality/sentiment score to a 0-100 "% liked". Clamped to
- *  [10, 97] — nothing is universally loved or universally hated, and a "97%"
- *  reads as excellent without the fake-perfect problem the old 9.8s had. */
+ *  [5, 97] — nothing is universally loved, and a "97%" reads as excellent
+ *  without the fake-perfect problem the old 9.8s had. */
 export function pctLiked(score10: number): number {
   const x = Math.max(0, Math.min(10, score10));
-  const p = 100 / (1 + Math.exp(-0.9 * (x - 5.5)));
-  return Math.round(Math.max(10, Math.min(97, p)));
+  const p = 100 / (1 + Math.exp(-1.15 * (x - 7.1)));
+  return Math.round(Math.max(5, Math.min(97, p)));
 }
 
 /**
@@ -48,7 +49,7 @@ export function shrinkCommentScore(weightedMean: number, count: number): number 
  * A raw TMDB average is unreliable at low vote counts (one 10/10 vote reads as
  * a perfect film), so we FIRST Bayesian-shrink it toward the global mean by
  * vote count, THEN map through the shared curve. A film with 2 votes at 10.0
- * lands ~76%; a film with hundreds of votes keeps its real average.
+ * lands ~68%; a film with hundreds of votes keeps its real average.
  *
  *   WR = (v/(v+m))·avg + (m/(v+m))·C     C = 6.5, m = 25 votes
  *
