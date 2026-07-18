@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -649,6 +649,69 @@ export type Database = {
           },
         ]
       }
+      credits_case_dupe_backup: {
+        Row: {
+          billing_order: number | null
+          character_name: string | null
+          created_at: string
+          film_id: string
+          id: string
+          person_id: string
+          role: string
+        }
+        Insert: {
+          billing_order?: number | null
+          character_name?: string | null
+          created_at?: string
+          film_id: string
+          id?: string
+          person_id: string
+          role: string
+        }
+        Update: {
+          billing_order?: number | null
+          character_name?: string | null
+          created_at?: string
+          film_id?: string
+          id?: string
+          person_id?: string
+          role?: string
+        }
+        Relationships: []
+      }
+      credits_role_cleanup_backup: {
+        Row: {
+          backed_up_at: string
+          billing_order: number | null
+          character_name: string | null
+          film_id: string | null
+          id: string
+          person_id: string | null
+          reason: string
+          role: string | null
+        }
+        Insert: {
+          backed_up_at?: string
+          billing_order?: number | null
+          character_name?: string | null
+          film_id?: string | null
+          id: string
+          person_id?: string | null
+          reason: string
+          role?: string | null
+        }
+        Update: {
+          backed_up_at?: string
+          billing_order?: number | null
+          character_name?: string | null
+          film_id?: string | null
+          id?: string
+          person_id?: string | null
+          reason?: string
+          role?: string | null
+        }
+        Relationships: []
+      }
       film_companies: {
         Row: {
           company_id: string
@@ -827,6 +890,7 @@ export type Database = {
           is_featured: boolean | null
           is_in_cinemas: boolean | null
           is_nollywood: boolean | null
+          is_published: boolean
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
@@ -834,6 +898,7 @@ export type Database = {
           mubi_slug: string | null
           needs_review: boolean | null
           nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          original_title: string | null
           poster_url: string | null
           release_date: string | null
           release_type: string | null
@@ -879,6 +944,7 @@ export type Database = {
           is_featured?: boolean | null
           is_in_cinemas?: boolean | null
           is_nollywood?: boolean | null
+          is_published?: boolean
           is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
@@ -886,6 +952,7 @@ export type Database = {
           mubi_slug?: string | null
           needs_review?: boolean | null
           nfvcb_rating?: Database["public"]["Enums"]["nfvcb_rating"] | null
+          original_title?: string | null
           poster_url?: string | null
           release_date?: string | null
           release_type?: string | null
@@ -931,6 +998,7 @@ export type Database = {
           is_featured?: boolean | null
           is_in_cinemas?: boolean | null
           is_nollywood?: boolean | null
+          is_published?: boolean
           is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
@@ -938,6 +1006,7 @@ export type Database = {
           mubi_slug?: string | null
           needs_review?: boolean | null
           nfvcb_rating?: Database["public"]["Enums"]["nfvcb_rating"] | null
+          original_title?: string | null
           poster_url?: string | null
           release_date?: string | null
           release_type?: string | null
@@ -1841,6 +1910,7 @@ export type Database = {
           is_featured: boolean | null
           is_in_cinemas: boolean | null
           is_nollywood: boolean | null
+          is_published: boolean
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
@@ -1848,6 +1918,7 @@ export type Database = {
           mubi_slug: string | null
           needs_review: boolean | null
           nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          original_title: string | null
           poster_url: string | null
           release_date: string | null
           release_type: string | null
@@ -1985,6 +2056,7 @@ export type Database = {
           is_featured: boolean | null
           is_in_cinemas: boolean | null
           is_nollywood: boolean | null
+          is_published: boolean
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
@@ -1992,6 +2064,7 @@ export type Database = {
           mubi_slug: string | null
           needs_review: boolean | null
           nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          original_title: string | null
           poster_url: string | null
           release_date: string | null
           release_type: string | null

@@ -41,6 +41,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('films')
       .select(`${FIELDS}, film_watch_links(id, distributor, url)`)
       .eq('id', id)
+      // Service-role client bypasses the RLS publish gate, so filter here too:
+      // an unpublished film must 404 for the public just like it's hidden in lists.
+      .eq('is_published', true)
       .single();
 
     if (error?.code === 'PGRST116' || !data) return res.status(404).json({ error: 'Film not found' });
@@ -73,6 +76,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } else {
     query = supabase.from('films').select(FIELDS);
   }
+
+  // Public endpoint on the service-role client — enforce the publish gate that
+  // RLS applies to the anon client everywhere else.
+  query = query.eq('is_published', true);
 
   const searchStr = Array.isArray(search) ? search[0] : search;
   if (searchStr) {

@@ -68,7 +68,7 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
       }
 
       if (slug === 'films') {
-        const { data } = await supabase.from('films').select('id, slug, updated_at').limit(50000);
+        const { data } = await supabase.from('films').select('id, slug, updated_at').eq('is_published', true).limit(50000);
         return res.status(200).send(urlset(
           (data || []).map((f: any) => `  <url>
     <loc>${baseUrl}/films/${f.slug || f.id}</loc>
@@ -216,6 +216,7 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
         .from('films')
         .select('*, film_genres(genres(name)), credits(role, character_name, billing_order, people(name, slug, id))')
         .eq(key, slug)
+        .eq('is_published', true)
         .maybeSingle();
 
       if (!data) {
