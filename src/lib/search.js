@@ -15,7 +15,7 @@ import { supabase } from './supabase';
 
 const FILM_FIELDS = `
   id, slug, title, poster_url, backdrop_url, year, language, runtime_minutes,
-  view_count, average_rating, audience_rating, tmdb_rating, nfvcb_rating,
+  view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating,
   content_type, youtube_watch_url, release_type, streaming_links, source,
   countries, film_genres!left(genres(name))
 `;

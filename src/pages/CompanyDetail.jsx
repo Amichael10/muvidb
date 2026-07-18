@@ -28,7 +28,7 @@ const FilmCard = ({ film }) => (
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
       {/* Rating */}
-      {film.average_rating > 0 && (
+      {film.liked_percent != null && (
         <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-bold px-3 py-1 rounded-full shadow-lg shadow-brand/20">
           Official
         </div>
@@ -128,7 +128,7 @@ const CompanyDetail = () => {
           role,
           films(
             id, title, year, poster_url,
-            view_count, average_rating,
+            view_count, average_rating, liked_percent,
             film_genres(genres(name)),
             credits(role, people(id, name, photo_url)),
             film_companies(role, companies(id, name, logo_url))
@@ -160,7 +160,7 @@ const CompanyDetail = () => {
   }, [company])
 
   const topFilms = useMemo(() => {
-    return [...allFilms].sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0)).slice(0, 10);
+    return [...allFilms].sort((a, b) => (b.liked_percent || 0) - (a.liked_percent || 0)).slice(0, 10);
   }, [allFilms])
 
   const recentReleases = useMemo(() => {

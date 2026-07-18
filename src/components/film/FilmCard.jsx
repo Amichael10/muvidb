@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { useReactions } from '../../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
+import LikedScore from './LikedScore';
 import { useQuickView } from '../../context/QuickViewContext';
 import { formatFilmTitle } from '../../utils/format';
 import { getPlatform } from '../../lib/platforms';
@@ -202,9 +203,9 @@ export default function FilmCard({
     lg: 'w-full sm:w-64 aspect-[2/3] min-w-[12rem] sm:min-w-[16rem]'
   };
 
-  // Prefer a real TMDB score, then our YouTube-derived audience rating, then
-  // user reviews. Capped at 9.7 — nothing should ever look "perfect".
-  const filmRating = Math.min(9.7, Number(film.tmdb_rating || film.rating || film.audience_rating || film.average_rating || 0));
+  // Unified "% liked" audience score (see LikedScore / films.liked_percent).
+  // null = not enough signal → no badge, never a fake number.
+  const likedPct = film.liked_percent == null ? null : Math.round(Number(film.liked_percent));
   // `countries` is an array; fall back to legacy singular `country` if present.
   const primaryCountry = (Array.isArray(film.countries) ? film.countries[0] : null) || film.country || null;
   const flag = countryFlag(primaryCountry);
@@ -214,7 +215,7 @@ export default function FilmCard({
   const youtubeSynopsis = film.synopsis || film.tagline;
   const youtubeViews = ytViews || film.view_count;
   const formattedYoutubeViews = formatTotalViews(youtubeViews);
-  const youtubeRatingLabel = filmRating > 0 ? filmRating.toFixed(1) : 'Not rated';
+  const youtubeRatingLabel = likedPct != null ? `${likedPct}% liked` : 'Not rated';
   const youtubeCardHeight = fullWidth ? 'h-[360px] sm:h-[430px] lg:h-[390px]' : 'h-[350px] sm:h-[370px]';
 
   const [hoverPosition, setHoverPosition] = useState('center');
@@ -351,19 +352,14 @@ export default function FilmCard({
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
-          {/* Rating Badge (Top Left) — IMDb-style gold star + N/10 */}
-          {filmRating > 0 && (
-            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded-md border border-white/10 shadow-lg z-20">
-              <Icon icon="solar:star-bold" className="text-[#F5C518] text-[10px]" />
-              <span className="text-[10px] font-bold text-white leading-none">
-                {filmRating.toFixed(1)}<span className="text-white/50 font-semibold">/10</span>
-              </span>
-            </div>
+          {/* Audience score (Top Left) — unified "% liked" popcorn badge */}
+          {likedPct != null && (
+            <LikedScore percent={likedPct} variant="badge" className="absolute top-2.5 left-2.5 z-20" />
           )}
 
           {/* Series Badge */}
           {(film.content_type === 'series' || film.is_series_group) && (
-            <div className={`absolute top-2.5 ${filmRating > 0 ? 'left-[4.75rem]' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
+            <div className={`absolute top-2.5 ${likedPct != null ? 'left-[4.25rem]' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
               <Icon icon={film.episodes_count > 1 ? "solar:folder-bold" : "solar:tv-bold"} className="text-white text-[9px]" />
               <span>{film.episodes_count > 1 ? `${film.episodes_count} EPS` : 'TV'}</span>
             </div>
@@ -572,10 +568,8 @@ export default function FilmCard({
             {formattedTotalViews && <span className="text-brand font-bold">{formattedTotalViews}</span>}
             <span>{film.year || film.release_date?.split('-')[0]}</span>
             {primaryCountry && <span className="flex items-center gap-1">{flag} {primaryCountry}</span>}
-            {filmRating > 0 && (
-              <span className="flex items-center gap-1 text-text-primary font-bold">
-                <Icon icon="solar:star-bold" className="text-[#F5C518] text-[11px]" /> {filmRating.toFixed(1)}<span className="text-text-muted font-semibold">/10</span>
-              </span>
+            {likedPct != null && (
+              <LikedScore percent={likedPct} variant="inline" className="text-text-primary" />
             )}
             <span className="px-1.5 py-0.5 border border-border rounded text-[9px] font-black tracking-wide leading-none uppercase bg-surface-2">
               {film.maturity_rating || '18+'}

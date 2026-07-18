@@ -894,6 +894,7 @@ export type Database = {
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
+          liked_percent: number | null
           mubi_id: number | null
           mubi_slug: string | null
           needs_review: boolean | null
@@ -948,6 +949,7 @@ export type Database = {
           is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
+          liked_percent?: number | null
           mubi_id?: number | null
           mubi_slug?: string | null
           needs_review?: boolean | null
@@ -1002,6 +1004,7 @@ export type Database = {
           is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
+          liked_percent?: number | null
           mubi_id?: number | null
           mubi_slug?: string | null
           needs_review?: boolean | null
@@ -1914,6 +1917,7 @@ export type Database = {
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
+          liked_percent: number | null
           mubi_id: number | null
           mubi_slug: string | null
           needs_review: boolean | null
@@ -2061,6 +2065,7 @@ export type Database = {
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
+          liked_percent: number | null
           mubi_id: number | null
           mubi_slug: string | null
           needs_review: boolean | null

@@ -24,8 +24,7 @@ const formatRelease = (film) => {
 };
 
 const getRating = (film) => {
-  const rating = Number(film.tmdb_rating || film.audience_rating || film.average_rating || 0);
-  return rating > 0 ? Math.min(9.7, rating).toFixed(1) : null;
+  return film.liked_percent == null ? null : Math.round(Number(film.liked_percent));
 };
 
 const getFormat = (film) => {
@@ -129,11 +128,10 @@ function FeatureCard({ film, featured = false }) {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold">
-          {rating ? (
+          {rating != null ? (
             <span className="inline-flex items-center gap-1 text-text-primary">
-              <Icon icon="solar:star-bold" className="text-[#F5C518]" />
-              {rating}
-              <span className="font-medium text-text-muted">({film.audience_rating_count ? `${film.audience_rating_count} ratings` : 'IMDb-style rating'})</span>
+              <Icon icon="mdi:popcorn" className="text-[#FA320A]" />
+              {rating}% <span className="font-medium text-text-muted">liked</span>
             </span>
           ) : (
             <span className="text-text-muted">Not yet rated</span>

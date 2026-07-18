@@ -6,8 +6,7 @@ import ImageWithFallback from '../ui/ImageWithFallback';
 import { formatFilmTitle } from '../../utils/format';
 
 const getRating = (film) => {
-  const rating = Number(film.tmdb_rating || film.audience_rating || film.average_rating || 0);
-  return rating > 0 ? Math.min(9.7, rating).toFixed(1) : null;
+  return film.liked_percent == null ? null : Math.round(Number(film.liked_percent));
 };
 
 const CINEMA_TIME_ZONE = 'Africa/Lagos';
@@ -103,10 +102,10 @@ export default function CinemaCard({ film }) {
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
-          {rating && (
+          {rating != null && (
             <span className="inline-flex items-center gap-1 font-semibold text-text-primary">
-              <Icon icon="solar:star-bold" className="text-[#F5C518]" />
-              {rating}
+              <Icon icon="mdi:popcorn" className="text-[#FA320A]" />
+              {rating}%
             </span>
           )}
           {rating && runtime && <span className="text-text-muted">•</span>}

@@ -12,6 +12,7 @@
 import { supabase } from './supabase.js';
 import { ytGet } from './yt_service.js';
 import { generateAIContent, parseJSON } from './ai_service.js';
+import { pctLiked, shrinkCommentScore } from './rating.js';
 
 interface RawComment {
   id: string;
@@ -36,29 +37,27 @@ const stripHtml = (html: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const isNoise = (t: string) => t.length < 60 || NOISE.some((re) => re.test(t.trim()));
+// Keep it short-but-real: a 20-char floor lets in terse criticism ("acting was
+// wooden", "the story dragged") that the old 60-char floor silently dropped —
+// exactly the commentary we WANT in the denominator, not just gushing praise.
+const isNoise = (t: string) => t.length < 20 || NOISE.some((re) => re.test(t.trim()));
 
 /** More liked = more representative of the crowd (dampened, so one viral
  *  comment can't dominate). weight(0 likes)=1, weight(2000)≈4.3. */
 const likeWeight = (likes: number) => 1 + Math.log10(1 + Math.max(0, likes));
 
-// Turn a likes-weighted sentiment mean into the stored rating.
-//
-// Bayesian shrinkage first: a handful of glowing comments must NOT yield a 9.7
-// — 3 happy commenters aren't evidence a film is near-perfect. We blend the
-// film's own mean with a global prior, weighted by how many comments backed it,
-// so low-sample ratings pull toward the average and only genuine volume earns an
-// extreme score. Then a hard cap so nothing ever reads as a fake 9.8/9.9/10.
-const MAX_AUDIENCE_RATING = 9.7;
-const PRIOR_MEAN = 8.0;    // global average audience rating (comments skew positive)
-const PRIOR_WEIGHT = 10;   // the prior is worth ~10 comments of evidence
-function scoreRating(weightedMean: number, count: number): number {
-  const n = Math.max(0, count);
-  const adjusted = (n * weightedMean + PRIOR_WEIGHT * PRIOR_MEAN) / (n + PRIOR_WEIGHT);
-  return Math.min(MAX_AUDIENCE_RATING, Math.round(adjusted * 10) / 10);
+// Rating math (shrink-to-average + the 0-10 -> % liked curve) lives in
+// ./rating.ts so the comment pipeline and the TMDB mapping stay in lockstep.
+// Likes-weighted mean -> shrinkCommentScore (0-10) -> pctLiked (0-100).
+function ratingFrom(rows: { likes: number; score: number }[]): { pct: number; s10: number } {
+  let num = 0, den = 0;
+  for (const { likes, score } of rows) { const w = likeWeight(likes); num += score * w; den += w; }
+  const mean = den ? num / den : 0;
+  const s10 = shrinkCommentScore(mean, rows.length);
+  return { pct: pctLiked(s10), s10: Math.round(s10 * 10) / 10 };
 }
 
-async function fetchComments(videoId: string, max = 60): Promise<RawComment[]> {
+async function fetchComments(videoId: string, max = 100): Promise<RawComment[]> {
   const data = await ytGet('commentThreads', {
     part: 'snippet',
     videoId,
@@ -82,10 +81,19 @@ async function fetchComments(videoId: string, max = 60): Promise<RawComment[]> {
 // Ask the AI to keep only genuine film opinions and score each 1-10.
 async function classify(comments: RawComment[]): Promise<Map<number, number>> {
   const numbered = comments.map((c, i) => `${i}. ${c.text.replace(/\n/g, ' ').slice(0, 400)}`).join('\n');
-  const prompt = `You are curating viewer comments on a Nollywood/African movie to show as short audience reviews.
-For each numbered comment decide keep=true ONLY if it is a genuine reaction or opinion about the FILM itself — its story, acting, characters, message, production, or emotional impact.
-Reject (keep=false): greetings, "first", "who's watching", requests for where to watch, tagging/mentioning people, self-promotion or channel plugs, pure emoji, spam, and anything not about this film.
-For kept comments also give score = how positively the viewer regards the film, 1-10 (10 = loved it, 5 = mixed, 1 = hated it).
+  const prompt = `You are curating viewer comments on a Nollywood/African movie to (a) show a few as short audience reviews and (b) gauge how the film was ACTUALLY received.
+
+KEEP (keep=true) any comment that gives a genuine opinion or reaction about the FILM ITSELF — its story, acting, characters, pacing, ending, message, production, or emotional impact. This INCLUDES criticism, disappointment and mixed takes ("the story dragged", "the acting was wooden", "great plot but terrible sound"). We specifically WANT these — do NOT keep only praise.
+REJECT (keep=false): greetings, "first"/"who's watching", requests for where to watch, tagging or shout-outs to people, self-promotion or channel plugs, pure emoji, spam, and anything not about this film.
+
+For each kept comment, score 1-10 = how positively that viewer truly regards the film. Be strict and use the WHOLE range — most films are ordinary:
+  9-10 = genuinely exceptional, specific, strong praise
+  7-8  = clearly liked it
+  5-6  = mixed / lukewarm / "it was okay" — THIS IS THE DEFAULT for generic positivity like "nice movie", "wow", "🔥"
+  3-4  = disappointed / notable criticism
+  1-2  = disliked / hated it
+People who bother to comment are mostly fans, so treat vague hype as mild (5-6), not a 10.
+
 Return ONLY a JSON array, no prose: [{"i":<number>,"keep":<true|false>,"score":<1-10>}]
 
 Comments:
@@ -110,7 +118,8 @@ export interface MineResult {
   status: 'ok' | 'skipped';
   reason?: string;
   kept?: number;
-  rating?: number | null;
+  rating?: number | null;        // de-inflated 0-10 (kept for continuity)
+  likedPercent?: number | null;  // unified 0-100 "% liked"
   samples?: { author: string; likes: number; score: number; text: string }[];
 }
 
@@ -130,12 +139,13 @@ export async function mineFilmComments(
   }
   if (!raw.length) return { status: 'skipped', reason: 'no-comments' };
 
-  // 2. cheap pre-filter → best-liked candidates
+  // 2. cheap pre-filter → best-liked candidates (wider pool now, so criticism
+  //    buried below the top praise still reaches the classifier)
   const seen = new Set<string>();
   const candidates = raw
     .filter((c) => !isNoise(c.text) && !seen.has(c.text) && seen.add(c.text))
     .sort((a, b) => b.likes - a.likes)
-    .slice(0, 30);
+    .slice(0, 40);
   if (!candidates.length) return { status: 'skipped', reason: 'no-quality-candidates' };
 
   // 3. AI classify + score (AI down → skip, try again next sync)
@@ -145,27 +155,32 @@ export async function mineFilmComments(
   } catch (e: any) {
     return { status: 'skipped', reason: `ai:${e.message.slice(0, 60)}` };
   }
-  const kept = candidates
+  // EVERY classified opinion (praise AND criticism) feeds the rating — that
+  // honest denominator is the core of the de-inflation.
+  const opinions = candidates
     .map((c, i) => ({ c, score: scores.get(i) }))
-    .filter((x): x is { c: RawComment; score: number } => x.score !== undefined)
-    .sort((a, b) => b.c.likes - a.c.likes)
-    .slice(0, maxKeep);
-  if (!kept.length) return { status: 'skipped', reason: 'nothing-kept' };
+    .filter((x): x is { c: RawComment; score: number } => x.score !== undefined);
+  if (!opinions.length) return { status: 'skipped', reason: 'nothing-kept' };
+  const { pct, s10 } = ratingFrom(opinions.map(({ c, score }) => ({ likes: c.likes, score })));
 
-  // dry run: prove the pipeline without touching the DB (weighted rating from
-  // this batch only).
+  // Display set: most-liked opinions, but force-include up to 2 critical takes
+  // so the shown reviews aren't an all-praise reel.
+  const byLikes = [...opinions].sort((a, b) => b.c.likes - a.c.likes);
+  const critical = byLikes.filter((o) => o.score <= 5).slice(0, 2);
+  const kept = [...new Set([...critical, ...byLikes])].slice(0, maxKeep);
+
+  // dry run: prove the pipeline without touching the DB.
   if (opts.dryRun) {
-    let n = 0, d = 0;
-    for (const { c, score } of kept) { const w = likeWeight(c.likes); n += score * w; d += w; }
     return {
       status: 'ok',
-      kept: kept.length,
-      rating: d ? scoreRating(n / d, kept.length) : null,
+      kept: opinions.length,
+      rating: s10,
+      likedPercent: pct,
       samples: kept.map(({ c, score }) => ({ author: c.author, likes: c.likes, score, text: c.text.slice(0, 140) })),
     };
   }
 
-  // 4. store the kept comments as external reviews (dedup on film+external_id)
+  // 4. store the display comments as external reviews (dedup on film+external_id)
   const rows = kept.map(({ c, score }) => ({
     film_id: filmId,
     user_id: null,
@@ -184,33 +199,21 @@ export async function mineFilmComments(
     .upsert(rows, { onConflict: 'film_id,external_id', ignoreDuplicates: false });
   if (upErr) return { status: 'skipped', reason: `store:${upErr.message.slice(0, 60)}` };
 
-  // 5. likes-weighted audience rating from ALL youtube reviews on this film
-  const { data: allYt } = await supabase
-    .from('reviews')
-    .select('sentiment_score, likes')
-    .eq('film_id', filmId)
-    .eq('source', 'youtube');
-  let rating: number | null = null;
-  if (allYt && allYt.length) {
-    let num = 0, den = 0;
-    for (const r of allYt) {
-      const w = likeWeight(Number(r.likes) || 0);
-      num += (Number(r.sentiment_score) || 0) * w;
-      den += w;
-    }
-    rating = den ? scoreRating(num / den, allYt.length) : null;
-  }
+  // 5. persist the unified rating. liked_percent (0-100) is what the site shows;
+  //    audience_rating keeps the de-inflated 0-10 for continuity. Computed from
+  //    ALL opinions classified this run, criticism included.
   const { error: filmErr } = await supabase
     .from('films')
     .update({
-      audience_rating: rating,
-      audience_rating_count: allYt?.length ?? kept.length,
+      liked_percent: pct,
+      audience_rating: s10,
+      audience_rating_count: opinions.length,
       comments_synced_at: new Date().toISOString(),
     })
     .eq('id', filmId);
   if (filmErr) console.warn(`[mine] film rating update failed for ${filmId}: ${filmErr.message}`);
 
-  return { status: 'ok', kept: kept.length, rating };
+  return { status: 'ok', kept: kept.length, rating: s10, likedPercent: pct };
 }
 
 /**

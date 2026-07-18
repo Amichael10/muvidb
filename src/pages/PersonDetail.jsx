@@ -173,7 +173,7 @@ const PersonDetail = () => {
           id, role, character_name, billing_order,
           films(
             id, title, year, poster_url, trailer_youtube_id,
-            view_count, average_rating, slug,
+            view_count, average_rating, liked_percent, slug,
             release_type, trailer_youtube_id,
             film_genres(genres(name))
           )
@@ -312,7 +312,7 @@ const PersonDetail = () => {
             video_id, film_id,
             films(
               id, title, year, poster_url, trailer_youtube_id,
-              view_count, average_rating, release_type, youtube_watch_url,
+              view_count, average_rating, liked_percent, release_type, youtube_watch_url,
               source, source_video_id,
               film_genres(genres(name))
             )
@@ -368,7 +368,7 @@ const PersonDetail = () => {
         .from('films')
         .select(`
           id, slug, title, year, poster_url, trailer_youtube_id,
-          view_count, average_rating, release_type, youtube_watch_url,
+          view_count, average_rating, liked_percent, release_type, youtube_watch_url,
           film_genres(genres(name))
         `)
         .in('trailer_youtube_id', orderedVideoIds)
@@ -457,7 +457,7 @@ const PersonDetail = () => {
     .sort((a, b) => {
       const views = (b.films?.view_count || 0) - (a.films?.view_count || 0)
       if (views !== 0) return views
-      const ratings = (b.films?.average_rating || 0) - (a.films?.average_rating || 0)
+      const ratings = (b.films?.liked_percent || 0) - (a.films?.liked_percent || 0)
       if (ratings !== 0) return ratings
       return (b.films?.year || 0) - (a.films?.year || 0)
     })

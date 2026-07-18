@@ -265,11 +265,12 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
           ...(data.runtime_minutes ? { duration: `PT${data.runtime_minutes}M` } : {}),
           ...(actors.length ? { actor: actors } : {}),
           ...(directors.length ? { director: directors } : {}),
-          ...(Number(data.tmdb_rating || data.average_rating) > 0 ? {
+          ...((Number(data.tmdb_rating) > 0 || data.liked_percent != null) ? {
             aggregateRating: {
               '@type': 'AggregateRating',
-              ratingValue: Number(data.tmdb_rating || data.average_rating).toFixed(1),
-              bestRating: '10',
+              // Prefer the real TMDB score (/10); otherwise our unified "% liked" (/100).
+              ratingValue: Number(data.tmdb_rating) > 0 ? Number(data.tmdb_rating).toFixed(1) : String(data.liked_percent),
+              bestRating: Number(data.tmdb_rating) > 0 ? '10' : '100',
               ratingCount: Math.max(1, Number(data.view_count) || 1),
             },
           } : {}),

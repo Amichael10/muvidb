@@ -58,7 +58,7 @@ export default function TVShows() {
         .from('films')
         .select(`
           id, title, poster_url, backdrop_url, year, source, release_type, genres,
-          streaming_links, youtube_watch_url, view_count, average_rating, audience_rating,
+          streaming_links, youtube_watch_url, view_count, average_rating, liked_percent, audience_rating,
           tmdb_rating, runtime_minutes, synopsis, tagline,
           season_count, episode_count, content_type, slug,
           film_genres(genres(name))
@@ -81,7 +81,7 @@ export default function TVShows() {
       const sortMap = {
         newest: { column: 'created_at', ascending: false },
         popular: { column: 'view_count', ascending: false },
-        rating: { column: 'average_rating', ascending: false },
+        rating: { column: 'liked_percent', ascending: false },
         year: { column: 'year', ascending: false },
       };
       const sortConfig = sortMap[sortBy] || sortMap.newest;

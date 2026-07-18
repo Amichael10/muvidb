@@ -203,7 +203,7 @@ const Showtimes = () => {
         *,
         films(
           id, slug, title, year, poster_url,
-          backdrop_url, average_rating,
+          backdrop_url, average_rating, liked_percent,
           film_genres(genres(name))
         ),
         cinemas(
@@ -392,7 +392,7 @@ const Showtimes = () => {
                                                                 {film?.title}
                                                             </Link>
                                                             <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-1">
-                                                                RELEASED: {film?.year} • {film?.average_rating} ★ RATING
+                                                                RELEASED: {film?.year}{film?.liked_percent != null ? ` • ${film.liked_percent}% LIKED` : ''}
                                                             </p>
                                                         </div>
                                                         <span className="bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded border border-brand/30">

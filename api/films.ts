@@ -14,6 +14,7 @@ const FIELDS = [
   'runtime_minutes',
   'view_count',
   'average_rating',
+  'liked_percent',
   'nfvcb_rating',
   'status',
   'is_featured',

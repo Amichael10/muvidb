@@ -246,7 +246,7 @@ const CinemaDetail = () => {
         *,
         films(
           id, slug, title, year, poster_url,
-          backdrop_url, average_rating,
+          backdrop_url, average_rating, liked_percent,
           synopsis,
           film_genres(genres(name))
         )

@@ -15,8 +15,7 @@ const formatRuntime = (minutes) => {
 };
 
 const getRating = (film) => {
-  const rating = Number(film.tmdb_rating || film.rating || film.audience_rating || film.average_rating || 0);
-  return rating > 0 ? Math.min(9.7, rating).toFixed(1) : 'Not rated';
+  return film.liked_percent == null ? 'Not rated' : `${Math.round(Number(film.liked_percent))}%`;
 };
 
 export default function StreamingCard({ film, platformId }) {
@@ -101,7 +100,7 @@ export default function StreamingCard({ film, platformId }) {
 
         <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-border pt-3 text-[10px] font-medium text-text-muted sm:text-[11px]">
           <span className="inline-flex items-center gap-1 font-semibold text-text-primary">
-            <Icon icon="solar:star-bold" className="text-[#F5C518]" />
+            <Icon icon="mdi:popcorn" className="text-[#FA320A]" />
             {getRating(film)}
           </span>
           <span>{formatRuntime(film.runtime_minutes || film.runtime)}</span>
