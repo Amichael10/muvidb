@@ -1992,6 +1992,7 @@ export type Database = {
         Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }
+      is_clickbait_title: { Args: { t: string }; Returns: boolean }
       match_film_fuzzy: {
         Args: { query_title: string; threshold?: number }
         Returns: {
