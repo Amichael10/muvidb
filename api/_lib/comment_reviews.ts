@@ -42,40 +42,47 @@ const stripHtml = (html: string) =>
 // exactly the commentary we WANT in the denominator, not just gushing praise.
 const isNoise = (t: string) => t.length < 20 || NOISE.some((re) => re.test(t.trim()));
 
-/** More liked = more representative of the crowd (dampened, so one viral
- *  comment can't dominate). weight(0 likes)=1, weight(2000)≈4.3. */
-const likeWeight = (likes: number) => 1 + Math.log10(1 + Math.max(0, likes));
-
 // Rating math (shrink-to-average + the 0-10 -> % liked curve) lives in
 // ./rating.ts so the comment pipeline and the TMDB mapping stay in lockstep.
-// Likes-weighted mean -> shrinkCommentScore (0-10) -> pctLiked (0-100).
-function ratingFrom(rows: { likes: number; score: number }[]): { pct: number; s10: number } {
-  let num = 0, den = 0;
-  for (const { likes, score } of rows) { const w = likeWeight(likes); num += score * w; den += w; }
-  const mean = den ? num / den : 0;
+// Every kept opinion counts EQUALLY — we deliberately do NOT weight by likes.
+// Likes over-represent the crowd-pleasing (usually positive) comments and bury
+// dissent, which is precisely what inflated the old scores. Plain mean ->
+// shrinkCommentScore (0-10) -> pctLiked (0-100).
+function ratingFrom(rows: { score: number }[]): { pct: number; s10: number } {
+  const mean = rows.length ? rows.reduce((a, r) => a + r.score, 0) / rows.length : 0;
   const s10 = shrinkCommentScore(mean, rows.length);
   return { pct: pctLiked(s10), s10: Math.round(s10 * 10) / 10 };
 }
 
-async function fetchComments(videoId: string, max = 100): Promise<RawComment[]> {
-  const data = await ytGet('commentThreads', {
-    part: 'snippet',
-    videoId,
-    order: 'relevance',
-    maxResults: '100',
-    textFormat: 'plainText',
-  });
-  return (data.items ?? []).slice(0, max).map((it: any) => {
-    const s = it.snippet.topLevelComment.snippet;
-    return {
-      id: it.snippet.topLevelComment.id,
-      text: stripHtml(s.textDisplay ?? s.textOriginal ?? ''),
-      author: s.authorDisplayName ?? 'YouTube viewer',
-      avatar: s.authorProfileImageUrl ?? null,
-      likes: Number(s.likeCount ?? 0),
-      publishedAt: s.publishedAt,
-    };
-  });
+const mapComment = (it: any): RawComment => {
+  const s = it.snippet.topLevelComment.snippet;
+  return {
+    id: it.snippet.topLevelComment.id,
+    text: stripHtml(s.textDisplay ?? s.textOriginal ?? ''),
+    author: s.authorDisplayName ?? 'YouTube viewer',
+    avatar: s.authorProfileImageUrl ?? null,
+    likes: Number(s.likeCount ?? 0),
+    publishedAt: s.publishedAt,
+  };
+};
+
+// Pull BOTH the most-relevant AND the newest comments. Relevance alone is a
+// popularity ranking that surfaces upbeat, heavily-liked comments; adding the
+// newest ones brings in unfiltered voices (including criticism) so the sample
+// reflects the good AND the bad — the point of dropping likes-based selection.
+async function fetchComments(videoId: string, max = 120): Promise<RawComment[]> {
+  const byId = new Map<string, RawComment>();
+  for (const order of ['relevance', 'time'] as const) {
+    try {
+      const data = await ytGet('commentThreads', { part: 'snippet', videoId, order, maxResults: '100', textFormat: 'plainText' });
+      for (const it of data.items ?? []) { const c = mapComment(it); if (!byId.has(c.id)) byId.set(c.id, c); }
+    } catch (e) {
+      // If the first pass fails (quota/comments-off) there's nothing to salvage;
+      // if the second fails, keep what the first returned.
+      if (order === 'relevance') throw e;
+    }
+  }
+  return [...byId.values()].slice(0, max);
 }
 
 // Ask the AI to keep only genuine film opinions and score each 1-10.
@@ -139,13 +146,12 @@ export async function mineFilmComments(
   }
   if (!raw.length) return { status: 'skipped', reason: 'no-comments' };
 
-  // 2. cheap pre-filter → best-liked candidates (wider pool now, so criticism
-  //    buried below the top praise still reaches the classifier)
+  // 2. cheap pre-filter → candidates. NO likes ranking: we keep the natural
+  //    relevance+newest order so criticism isn't sorted out of the sample.
   const seen = new Set<string>();
   const candidates = raw
     .filter((c) => !isNoise(c.text) && !seen.has(c.text) && seen.add(c.text))
-    .sort((a, b) => b.likes - a.likes)
-    .slice(0, 40);
+    .slice(0, 50);
   if (!candidates.length) return { status: 'skipped', reason: 'no-quality-candidates' };
 
   // 3. AI classify + score (AI down → skip, try again next sync)
@@ -161,13 +167,13 @@ export async function mineFilmComments(
     .map((c, i) => ({ c, score: scores.get(i) }))
     .filter((x): x is { c: RawComment; score: number } => x.score !== undefined);
   if (!opinions.length) return { status: 'skipped', reason: 'nothing-kept' };
-  const { pct, s10 } = ratingFrom(opinions.map(({ c, score }) => ({ likes: c.likes, score })));
+  const { pct, s10 } = ratingFrom(opinions.map(({ score }) => ({ score })));
 
-  // Display set: most-liked opinions, but force-include up to 2 critical takes
-  // so the shown reviews aren't an all-praise reel.
-  const byLikes = [...opinions].sort((a, b) => b.c.likes - a.c.likes);
-  const critical = byLikes.filter((o) => o.score <= 5).slice(0, 2);
-  const kept = [...new Set([...critical, ...byLikes])].slice(0, maxKeep);
+  // Display set: a representative spread, not a highlight reel. Order by score
+  // and force-include a few critical takes so the shown reviews span good→bad.
+  const byScore = [...opinions].sort((a, b) => b.score - a.score);
+  const critical = byScore.filter((o) => o.score <= 4).slice(0, 3);
+  const kept = [...new Set([...critical, ...byScore])].slice(0, maxKeep);
 
   // dry run: prove the pipeline without touching the DB.
   if (opts.dryRun) {
