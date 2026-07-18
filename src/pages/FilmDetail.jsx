@@ -11,6 +11,7 @@ import ReviewSection from '../components/film/ReviewSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 import LikedScore from '../components/film/LikedScore';
+import { getFilmLanguages } from '../utils/languages';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -476,7 +477,7 @@ export default function FilmDetail() {
                     : `${film.runtime_minutes || film.runtime || 0} min`}
                 </span>
                 <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                <span>{film.language}</span>
+                <span>{getFilmLanguages(film).join(', ') || film.language}</span>
                 <span className="w-1 h-1 rounded-full bg-white/20"></span>
                 <span className="bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold">
                   {film.nfvcb_rating}
@@ -877,8 +878,12 @@ export default function FilmDetail() {
                   </div>
                 )}
                 <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">Language</span>
-                  <span className="text-text-primary">{film.language}</span>
+                  <span className="text-text-muted tracking-wider">{getFilmLanguages(film).length > 1 ? 'Languages' : 'Language'}</span>
+                  <span className="text-text-primary text-right flex flex-wrap gap-1 justify-end">
+                    {getFilmLanguages(film).map((l) => (
+                      <span key={l} className="bg-surface-2 border border-border rounded px-2 py-0.5 text-xs">{l}</span>
+                    ))}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center border-b border-border pb-3">
                   <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>

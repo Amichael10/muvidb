@@ -894,6 +894,7 @@ export type Database = {
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
+          languages: string[] | null
           liked_percent: number | null
           mubi_id: number | null
           mubi_slug: string | null
@@ -917,6 +918,7 @@ export type Database = {
           title: string
           tmdb_id: number | null
           tmdb_rating: number | null
+          tmdb_vote_count: number | null
           trailer_external_url: string | null
           trailer_source: string
           trailer_youtube_id: string | null
@@ -949,6 +951,7 @@ export type Database = {
           is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
+          languages?: string[] | null
           liked_percent?: number | null
           mubi_id?: number | null
           mubi_slug?: string | null
@@ -972,6 +975,7 @@ export type Database = {
           title: string
           tmdb_id?: number | null
           tmdb_rating?: number | null
+          tmdb_vote_count?: number | null
           trailer_external_url?: string | null
           trailer_source?: string
           trailer_youtube_id?: string | null
@@ -1004,6 +1008,7 @@ export type Database = {
           is_top_10?: boolean | null
           is_trending?: boolean | null
           language?: string | null
+          languages?: string[] | null
           liked_percent?: number | null
           mubi_id?: number | null
           mubi_slug?: string | null
@@ -1027,6 +1032,7 @@ export type Database = {
           title?: string
           tmdb_id?: number | null
           tmdb_rating?: number | null
+          tmdb_vote_count?: number | null
           trailer_external_url?: string | null
           trailer_source?: string
           trailer_youtube_id?: string | null
@@ -1917,6 +1923,7 @@ export type Database = {
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
+          languages: string[] | null
           liked_percent: number | null
           mubi_id: number | null
           mubi_slug: string | null
@@ -1940,6 +1947,7 @@ export type Database = {
           title: string
           tmdb_id: number | null
           tmdb_rating: number | null
+          tmdb_vote_count: number | null
           trailer_external_url: string | null
           trailer_source: string
           trailer_youtube_id: string | null
@@ -2065,6 +2073,7 @@ export type Database = {
           is_top_10: boolean | null
           is_trending: boolean | null
           language: string | null
+          languages: string[] | null
           liked_percent: number | null
           mubi_id: number | null
           mubi_slug: string | null
@@ -2088,6 +2097,7 @@ export type Database = {
           title: string
           tmdb_id: number | null
           tmdb_rating: number | null
+          tmdb_vote_count: number | null
           trailer_external_url: string | null
           trailer_source: string
           trailer_youtube_id: string | null
@@ -2145,6 +2155,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      tmdb_liked_pct: { Args: { avg: number; votes: number }; Returns: number }
     }
     Enums: {
       claim_status: "pending" | "approved" | "rejected"

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useReactions } from '../../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
 import LikedScore from './LikedScore';
+import { getFilmLanguages } from '../../utils/languages';
 import { formatFilmTitle } from '../../utils/format';
 import { getPlatform } from '../../lib/platforms';
 
@@ -207,6 +208,7 @@ export default function FilmCard({
   // `countries` is an array; fall back to legacy singular `country` if present.
   const primaryCountry = (Array.isArray(film.countries) ? film.countries[0] : null) || film.country || null;
   const flag = countryFlag(primaryCountry);
+  const filmLanguages = getFilmLanguages(film);
   const isYoutubeVariant = variant === 'youtube';
   const isLandscapeVariant = variant === 'landscape' || isYoutubeVariant;
   const youtubeGenreLabel = film.genres?.slice(0, 2).join(' / ') || 'Genre unavailable';
@@ -553,6 +555,9 @@ export default function FilmCard({
             {formattedTotalViews && <span className="text-brand font-bold">{formattedTotalViews}</span>}
             <span>{film.year || film.release_date?.split('-')[0]}</span>
             {primaryCountry && <span className="flex items-center gap-1">{flag} {primaryCountry}</span>}
+            {filmLanguages.length > 0 && (
+              <span className="flex items-center gap-1"><Icon icon="solar:global-linear" className="text-[11px]" />{filmLanguages.join('/')}</span>
+            )}
             {likedPct != null && (
               <LikedScore percent={likedPct} variant="inline" className="text-text-primary" />
             )}

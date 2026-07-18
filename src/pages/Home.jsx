@@ -206,7 +206,7 @@ export default function Home() {
       .from('films')
       .select(`
         id, slug, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, liked_percent, nfvcb_rating,
+        runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
         is_featured, is_trending, release_type, streaming_links, source,
         youtube_watch_url, content_type, season_count, episode_count,
         film_genres(genres(name))
@@ -231,7 +231,7 @@ export default function Home() {
       .from('films')
       .select(`
         id, slug, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, liked_percent, nfvcb_rating,
+        runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
         youtube_watch_url,
         film_genres(genres(name))
@@ -254,7 +254,7 @@ export default function Home() {
     // Automatic sync entries and admin overrides share one ordered queue.
     const cols = `
       id, slug, title, poster_url, backdrop_url, year, language, genres,
-      synopsis, tagline, runtime_minutes, view_count, average_rating, liked_percent,
+      synopsis, tagline, runtime_minutes, view_count, average_rating, liked_percent, languages,
       audience_rating, tmdb_rating, nfvcb_rating, content_type,
       is_featured, is_trending, release_type, streaming_links, source,
       youtube_watch_url, created_at, release_date,
@@ -483,7 +483,7 @@ export default function Home() {
         rank,
         films (
           id, slug, title, poster_url, backdrop_url, year, language, synopsis,
-          runtime_minutes, view_count, average_rating, liked_percent, audience_rating, audience_rating_count,
+          runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, audience_rating_count,
           tmdb_rating, nfvcb_rating, content_type, episode_count, season_count, release_date,
           is_featured, is_trending, release_type, created_at,
           film_genres(genres(name))
@@ -534,7 +534,7 @@ export default function Home() {
       .from('films')
       .select(`
         id, slug, title, poster_url, backdrop_url, year, language, genres,
-        runtime_minutes, view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
+        runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
         is_featured, is_trending, release_type, created_at, release_date,
         youtube_watch_url,
         film_genres(genres(name))
@@ -564,7 +564,7 @@ export default function Home() {
       .from('films')
       .select(`
         id, slug, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, liked_percent, nfvcb_rating,
+        runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
         is_featured, is_trending, release_type, created_at, release_date,
         youtube_watch_url,
         film_genres(genres(name))

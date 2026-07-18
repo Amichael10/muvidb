@@ -15,6 +15,7 @@ import { toTitleCase, toSentenceCase } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { authHeaders } from '../../lib/apiAuth';
+import { parseLanguages } from '../../utils/languages';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -837,6 +838,9 @@ export default function AdminFilms() {
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
         release_date: formData.release_date || null,
         release_type: formData.release_type || null,
+        // Multi-language: parse the language field ("English, Yoruba") into the
+        // normalized languages[] array. `language` stays as the primary.
+        languages: parseLanguages(formData.language),
         // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
         // the film page's sorting and win/nomination tally stay sane.
         awards: (formData.awards || [])

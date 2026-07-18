@@ -71,7 +71,7 @@ export default function Browse() {
     try {
       let query = supabase.from('films').select(`
         id, slug, title, poster_url, backdrop_url, year, language, genres,
-        runtime_minutes, view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
+        runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
         release_type, streaming_links, source, youtube_watch_url,
         film_genres!left(genres(name)),
         film_countries!left(countries(name))
@@ -80,7 +80,7 @@ export default function Browse() {
       if (selectedGenres.length > 0 && selectedCountries.length > 0) {
          query = supabase.from('films').select(`
           id, slug, title, poster_url, backdrop_url, year, language, genres,
-          runtime_minutes, view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
+          runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!inner(genres!inner(name)),
           film_countries!inner(countries!inner(name))
@@ -90,7 +90,7 @@ export default function Browse() {
       } else if (selectedGenres.length > 0) {
         query = supabase.from('films').select(`
           id, slug, title, poster_url, backdrop_url, year, language, genres,
-          runtime_minutes, view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
+          runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!inner(genres!inner(name)),
           film_countries!left(countries(name))
@@ -99,7 +99,7 @@ export default function Browse() {
       } else if (selectedCountries.length > 0) {
         query = supabase.from('films').select(`
           id, slug, title, poster_url, backdrop_url, year, language, genres,
-          runtime_minutes, view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
+          runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!left(genres(name)),
           film_countries!inner(countries!inner(name))

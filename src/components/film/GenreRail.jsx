@@ -118,7 +118,7 @@ export default function GenreRail({ variant = 'grid' }) {
         .from('films')
         .select(`
           id, slug, title, poster_url, backdrop_url, year, language,
-          runtime_minutes, view_count, average_rating, liked_percent, nfvcb_rating,
+          runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
           is_featured, is_trending, release_type, streaming_links, source,
           youtube_watch_url, content_type, season_count, created_at, release_date,
           film_genres!inner(genres!inner(name))

@@ -11,6 +11,7 @@ const FIELDS = [
   'backdrop_url',
   'year',
   'language',
+  'languages',
   'runtime_minutes',
   'view_count',
   'average_rating',
