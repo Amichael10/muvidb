@@ -1,4 +1,5 @@
 import { ytGet, parseDuration, cleanTitle } from '../api/_lib/yt_service.js';
+import { pickTmdbMatch } from '../api/_lib/tmdb_match.js';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -36,8 +37,7 @@ async function enrichFromTMDB(title: string, year?: number | null): Promise<{
     );
     if (!res.ok) return null;
     const data = await res.json();
-    let result = data.results?.find((r: any) => r.origin_country?.includes('NG'));
-    if (!result) result = data.results?.[0];
+    const result = pickTmdbMatch(data.results, { title, year });
     if (!result) return null;
     return {
       synopsis: result.overview?.trim() || undefined,

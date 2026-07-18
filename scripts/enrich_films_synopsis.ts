@@ -8,6 +8,7 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
+import { pickTmdbMatch } from '../api/_lib/tmdb_match.js'
 
 dotenv.config({ path: '.env.local' })
 
@@ -75,8 +76,7 @@ async function main() {
       const r = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${query}${yearStr}`)
       if (r.ok) {
         const data = await r.json()
-        // Prefer Nigerian results, then any
-        result = data.results?.find((m: any) => m.origin_country?.includes('NG')) || data.results?.[0]
+        result = pickTmdbMatch(data.results, { title: film.title, year: film.year })
       }
       await sleep(120)
     }

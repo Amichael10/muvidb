@@ -4,6 +4,7 @@ import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
 import { mirrorIfExternal } from './image_mirror.js';
 import { enrichFilmsFromAI, attachCreditsBatch, type EnrichedFilm } from './film_enrichment.js';
+import { pickTmdbMatch } from './tmdb_match.js';
 
 /** Try to find a TMDB movie match and return enriched metadata */
 async function enrichFromTMDB(title: string, year?: number | null): Promise<{
@@ -23,9 +24,9 @@ async function enrichFromTMDB(title: string, year?: number | null): Promise<{
     );
     if (!res.ok) return null;
     const data = await res.json();
-    // Try Nigerian result first, then any result
-    let result = data.results?.find((r: any) => r.origin_country?.includes('NG'));
-    if (!result) result = data.results?.[0];
+    // Defensive match: African-origin only, or a tight obscure year+title hit —
+    // never fall through to results[0] (a same-named Hollywood film).
+    const result = pickTmdbMatch(data.results, { title, year });
     if (!result) return null;
     return {
       synopsis: result.overview?.trim() || undefined,

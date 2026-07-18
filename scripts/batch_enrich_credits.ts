@@ -3,6 +3,7 @@ import * as dns from 'dns';dns.setDefaultResultOrder('ipv4first');
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import { spawn } from 'child_process';
+import { pickTmdbMatch } from '../api/_lib/tmdb_match.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -140,11 +141,10 @@ async function syncFromTMDB(filmId: string, title: string, year: number | null):
       return false; // No matches found on TMDB
     }
 
-    // Match closely by title
-    const match = results.find((r: any) => 
-      r.title.toLowerCase() === title.toLowerCase() || 
-      r.original_title?.toLowerCase() === title.toLowerCase()
-    ) || results[0];
+    // Defensive match: African-origin, or a tight obscure year+title hit —
+    // never a same-named Hollywood film via results[0].
+    const match = pickTmdbMatch(results, { title, year });
+    if (!match) return false;
 
     // Check year difference to prevent false positives
     if (year && match.release_date) {

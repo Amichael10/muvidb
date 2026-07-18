@@ -9,6 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
+import { pickTmdbMatch } from '../api/_lib/tmdb_match.js'
 
 dotenv.config({ path: '.env.local' })
 
@@ -69,7 +70,7 @@ async function fixEmptySynopsis() {
         )
         if (resp.ok) {
           const data = await resp.json()
-          const result = data.results?.[0]
+          const result = pickTmdbMatch(data.results, { title: film.title, year: film.year })
           if (result?.overview && result.overview.trim().length > 20) {
             newSynopsis = result.overview.trim()
           }
