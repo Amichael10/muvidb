@@ -590,7 +590,7 @@ export default function AdminPeopleEnrichment() {
                     <Icon icon="solar:square-top-down-linear" width="16" />
                     Public profile
                   </Link>
-                  <Link to={`/admin/people?search=${encodeURIComponent(person.name)}`} className="inline-flex h-9 items-center gap-2 border border-border px-3 text-xs font-bold text-text-muted hover:border-brand hover:text-brand">
+                  <Link to={`/admin/people?search=${encodeURIComponent(person.name)}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-2 border border-border px-3 text-xs font-bold text-text-muted hover:border-brand hover:text-brand">
                     <Icon icon="solar:pen-linear" width="16" />
                     Edit manually
                   </Link>
