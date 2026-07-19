@@ -5,8 +5,9 @@ export const ENRICHMENT_FIELDS = [
   { key: 'birthplace', label: 'Birthplace', weight: 8 },
   { key: 'known_for_department', label: 'Known for', weight: 8 },
   { key: 'instagram_url', label: 'Instagram', weight: 10, kind: 'link' },
-  { key: 'facebook_url', label: 'Facebook', weight: 5, kind: 'link' },
-  { key: 'twitter_url', label: 'X / Twitter', weight: 5, kind: 'link' },
+  { key: 'facebook_url', label: 'Facebook', weight: 4, kind: 'link' },
+  { key: 'twitter_url', label: 'X / Twitter', weight: 4, kind: 'link' },
+  { key: 'tiktok_url', label: 'TikTok', weight: 2, kind: 'link' },
   { key: 'tmdb_id', label: 'TMDB identity', weight: 12 },
 ];
 

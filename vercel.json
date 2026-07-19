@@ -20,6 +20,8 @@
     { "src": "/api/cron/refresh-videos", "dest": "/api/cron/sync?task=refresh_videos" },
     { "src": "/api/cron/mirror-images", "dest": "/api/cron/sync?task=mirror_images" },
     { "src": "/api/scrape-imdb-actor", "dest": "/api/automation?action=scrape-imdb-actor" },
+    { "src": "/api/deduplicator", "dest": "/api/automation?action=deduplicator" },
+    { "src": "/api/people-enrichment", "dest": "/api/automation?action=people-enrichment" },
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/sitemap\\.xml", "dest": "/api/seo?type=sitemap&slug=index" },
     { "src": "/sitemap-static\\.xml", "dest": "/api/seo?type=sitemap&slug=static" },

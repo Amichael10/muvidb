@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isValidAuth } from './_lib/auth.js';
-import { handleCors } from './_lib/cors.js';
-import { supabase } from './_lib/supabase.js';
-import { scanDuplicateRecords } from '../src/lib/deduplicator.js';
+import { isValidAuth } from './auth.js';
+import { handleCors } from './cors.js';
+import { supabase } from './supabase.js';
+import { scanDuplicateRecords } from '../../src/lib/deduplicator.js';
 
 export const maxDuration = 60;
 

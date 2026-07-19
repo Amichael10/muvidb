@@ -1320,6 +1320,7 @@ export type Database = {
           slug: string | null
           source: string | null
           status: string | null
+          tiktok_url: string | null
           tmdb_id: number | null
           twitter_url: string | null
           updated_at: string
@@ -1353,6 +1354,7 @@ export type Database = {
           slug?: string | null
           source?: string | null
           status?: string | null
+          tiktok_url?: string | null
           tmdb_id?: number | null
           twitter_url?: string | null
           updated_at?: string
@@ -1386,6 +1388,7 @@ export type Database = {
           slug?: string | null
           source?: string | null
           status?: string | null
+          tiktok_url?: string | null
           tmdb_id?: number | null
           twitter_url?: string | null
           updated_at?: string
@@ -1394,6 +1397,72 @@ export type Database = {
           youtube_stats?: Json | null
         }
         Relationships: []
+      }
+      people_enrichment_evidence: {
+        Row: {
+          created_at: string
+          evidence_excerpt: string | null
+          field_name: string
+          id: string
+          identity_anchor: string | null
+          proposed_value: string
+          queue_id: string
+          research_run_id: string | null
+          retrieved_at: string
+          source_domain: string | null
+          source_tier: number
+          source_title: string | null
+          source_url: string
+          verification_status: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_excerpt?: string | null
+          field_name: string
+          id?: string
+          identity_anchor?: string | null
+          proposed_value: string
+          queue_id: string
+          research_run_id?: string | null
+          retrieved_at?: string
+          source_domain?: string | null
+          source_tier?: number
+          source_title?: string | null
+          source_url: string
+          verification_status?: string
+        }
+        Update: {
+          created_at?: string
+          evidence_excerpt?: string | null
+          field_name?: string
+          id?: string
+          identity_anchor?: string | null
+          proposed_value?: string
+          queue_id?: string
+          research_run_id?: string | null
+          retrieved_at?: string
+          source_domain?: string | null
+          source_tier?: number
+          source_title?: string | null
+          source_url?: string
+          verification_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_enrichment_evidence_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "people_enrichment_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_enrichment_evidence_research_run_id_fkey"
+            columns: ["research_run_id"]
+            isOneToOne: false
+            referencedRelation: "people_enrichment_research_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       people_enrichment_history: {
         Row: {
@@ -1542,6 +1611,77 @@ export type Database = {
             columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      people_enrichment_research_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          estimated_cost: number
+          grounding_metadata: Json
+          id: string
+          identity_confidence: number | null
+          identity_reasons: string[]
+          input_fingerprint: string
+          model: string
+          prompt_version: string
+          provider: string
+          queue_id: string
+          raw_response: Json
+          search_queries: string[]
+          started_at: string
+          status: string
+          token_usage: Json
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          estimated_cost?: number
+          grounding_metadata?: Json
+          id?: string
+          identity_confidence?: number | null
+          identity_reasons?: string[]
+          input_fingerprint: string
+          model: string
+          prompt_version: string
+          provider?: string
+          queue_id: string
+          raw_response?: Json
+          search_queries?: string[]
+          started_at?: string
+          status: string
+          token_usage?: Json
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          estimated_cost?: number
+          grounding_metadata?: Json
+          id?: string
+          identity_confidence?: number | null
+          identity_reasons?: string[]
+          input_fingerprint?: string
+          model?: string
+          prompt_version?: string
+          provider?: string
+          queue_id?: string
+          raw_response?: Json
+          search_queries?: string[]
+          started_at?: string
+          status?: string
+          token_usage?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_enrichment_research_runs_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "people_enrichment_queue"
             referencedColumns: ["id"]
           },
         ]
@@ -2458,6 +2598,7 @@ export type Database = {
           slug: string | null
           source: string | null
           status: string | null
+          tiktok_url: string | null
           tmdb_id: number | null
           twitter_url: string | null
           updated_at: string

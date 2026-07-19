@@ -4,6 +4,10 @@ import statusHandler from './_automation/status';
 import fetchChannelsHandler from './_automation/fetch-channels';
 import enrichActorsHandler from './_automation/enrich-actors';
 import scrapeImdbActorHandler from './_lib/scrape_imdb_actor_handler';
+import deduplicatorHandler from './_lib/deduplicator_handler';
+import peopleEnrichmentHandler from './_lib/people_enrichment_handler';
+
+export const maxDuration = 60;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
@@ -15,6 +19,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'scrape-imdb-actor') {
     return scrapeImdbActorHandler(req, res);
+  }
+
+  if (action === 'deduplicator') {
+    return deduplicatorHandler(req, res);
+  }
+
+  if (action === 'people-enrichment') {
+    return peopleEnrichmentHandler(req, res);
   }
 
   // The remaining actions write to the DB and consume paid AI/YouTube
