@@ -3,10 +3,10 @@ import {
   buildTmdbEnrichmentProposal,
   chooseBestTmdbPerson,
 } from '../../src/lib/peopleEnrichment.js';
-import {
-  researchPersonWithGemini,
-  shouldRunGeminiAfterTmdb,
-} from './gemini_people_enrichment.js';
+import { shouldRunGeminiAfterTmdb } from '../../src/lib/geminiPeopleEnrichment.js';
+
+// Lazy-load Gemini so /api/automation stays healthy for TMDB/status routes.
+const loadGeminiResearch = () => import('./gemini_people_enrichment.js');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -158,6 +158,7 @@ export async function buildPeopleEnrichmentCandidate(
 
   try {
     if (provider === 'gemini') {
+      const { researchPersonWithGemini } = await loadGeminiResearch();
       const geminiResult = await researchPersonWithGemini({
         queueId: target.id,
         personId: target.person_id,
@@ -199,6 +200,7 @@ export async function buildPeopleEnrichmentCandidate(
     });
     if (!runGemini) return tmdbResult;
 
+    const { researchPersonWithGemini } = await loadGeminiResearch();
     const geminiResult = await researchPersonWithGemini({
       queueId: target.id,
       personId: target.person_id,

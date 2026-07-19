@@ -3,9 +3,10 @@ import { isValidAuth } from './auth.js';
 import { handleCors } from './cors.js';
 import { supabase } from './supabase.js';
 import { processPeopleEnrichmentBatch } from './people_enrichment.js';
-import { researchPersonWithGemini } from './gemini_people_enrichment.js';
 
 export const maxDuration = 60;
+
+const loadGeminiResearch = () => import('./gemini_people_enrichment.js');
 
 const PERSON_EMBED = `
   id,name,slug,photo_url,bio,date_of_birth,birthplace,nationality,gender,
@@ -152,6 +153,7 @@ async function researchGemini(body: any, res: VercelResponse) {
     })
     .eq('id', row.id);
 
+  const { researchPersonWithGemini } = await loadGeminiResearch();
   const result = await researchPersonWithGemini({
     queueId: row.id,
     personId: row.person_id,

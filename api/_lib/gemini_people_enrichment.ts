@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '@google/genai/node';
 import { supabase } from './supabase.js';
 import { GeminiPeopleResearchSchema } from './gemini_people_schema.js';
 import {

@@ -34,16 +34,26 @@ const STATUS_GROUPS = {
 const GEMINI_DEV_UNAVAILABLE = 'Gemini research requires the production API endpoint (not available in local DEV fallback).';
 
 async function apiRequest(body) {
+  // Local Vite DEV uses Supabase/TMDB fallbacks below. Production must hit the API.
   if (import.meta.env.DEV) return null;
-  const response = await fetch('/api/people-enrichment', {
+
+  const response = await fetch('/api/automation?action=people-enrichment', {
     method: 'POST',
     headers: await authHeaders(),
     body: JSON.stringify(body),
   });
   const contentType = response.headers.get('content-type') || '';
-  if (response.status === 404 || !contentType.includes('application/json')) return null;
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || 'People enrichment request failed');
+  const payload = contentType.includes('application/json')
+    ? await response.json().catch(() => ({}))
+    : {};
+
+  if (!response.ok) {
+    const detail = payload.error
+      || (response.status === 500
+        ? 'People enrichment API crashed on the server. Check the Vercel function logs.'
+        : `People enrichment request failed (${response.status})`);
+    throw new Error(detail);
+  }
   return payload;
 }
 
