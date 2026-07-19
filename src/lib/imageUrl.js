@@ -1,61 +1,108 @@
-// Supabase Storage images are served at full resolution. To cut the bytes (the
-// single biggest payload on the homepage) we route them through Vercel's Image
-// Optimization endpoint (/_vercel/image), which resizes + re-encodes to WebP/AVIF
-// on the fly. This works on the Supabase Free tier because the optimization
-// happens at the Vercel edge, not in Supabase.
-//
-// IMPORTANT: every width passed here MUST be present in vercel.json -> images.sizes
-// (or deviceSizes) or the optimizer returns HTTP 400. Keep the two in sync.
-
 const SUPABASE_DOMAIN = 'https://pkenrmorywmuvnzfoylp.supabase.co';
+const STORAGE_OBJECT_PREFIX = '/storage/v1/object/public/';
+const STORAGE_RENDER_PREFIX = '/storage/v1/render/image/public/';
 
-// Hosts that serve images hotlink-friendly (or are ours) — leave them untouched.
-// Everything else external gets routed through our /api/media proxy so the
-// origin is hidden and hotlink-protected images still render from muvidb.com.
+// These hosts already provide stable public images. Other external images are
+// routed through our cached media proxy in production.
 const FRIENDLY_HOST = /(^|\.)(tmdb\.org|ytimg\.com|youtube\.com|ggpht\.com|googleusercontent\.com|ui-avatars\.com|muvidb\.com)$/i;
 
-// Vite dev server doesn't serve /_vercel/image, and the storage reverse-proxy
-// (see vercel.json routes / vite.config proxy) only exists outside localhost,
-// so skip optimization in local development.
 const isLocalhost =
   typeof window !== 'undefined' &&
   /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname);
 
-/**
- * Rewrite an image URL for cheaper delivery.
- *
- * @param {string} originalUrl
- * @param {{ width?: number, quality?: number }} [opts]
- * @returns {string}
- */
-export function getProxiedImageUrl(originalUrl, opts = {}) {
-  if (!originalUrl) return originalUrl;
+export function normalizeImageUrl(value) {
+  if (!value) return '';
+  // A few legacy database values contain line breaks inside otherwise valid
+  // URLs. Browsers tolerate them, but optimizers and cache keys do not.
+  return String(value).replace(/[\r\n\t]/g, '').trim();
+}
 
-  const { width, quality = 75 } = opts;
+function clampInteger(value, min, max) {
+  const number = Math.round(Number(value));
+  if (!Number.isFinite(number)) return null;
+  return Math.min(max, Math.max(min, number));
+}
 
-  // Convert absolute Supabase Storage URLs to the same-origin reverse-proxy path
-  // so they share our domain (better caching, and required for the optimizer).
-  let url = originalUrl;
-  if (url.startsWith(SUPABASE_DOMAIN)) {
-    url = url.replace(SUPABASE_DOMAIN, '');
-  }
+function getSupabaseObjectPath(value) {
+  const url = normalizeImageUrl(value);
+  if (!url) return null;
 
-  // Same-origin Supabase storage path: optimize via Vercel (prod, width given).
-  if (url.startsWith('/')) {
-    if (isLocalhost || !width) return url;
-    return `/_vercel/image?url=${encodeURIComponent(url)}&w=${width}&q=${quality}`;
-  }
-
-  // External absolute URL. Friendly hosts (TMDB/YouTube/ours) render directly;
-  // everything else goes through the /api/media proxy to dodge hotlink blocks
-  // and keep the origin hidden. Skip the proxy on localhost (route not served by Vite).
-  if (/^https?:\/\//i.test(url) && !isLocalhost) {
-    let host = '';
-    try { host = new URL(url).hostname; } catch { /* leave host empty */ }
-    if (host && !FRIENDLY_HOST.test(host)) {
-      return `/api/media?url=${encodeURIComponent(originalUrl)}`;
+  let pathname = url;
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.origin !== SUPABASE_DOMAIN) return null;
+      pathname = parsed.pathname;
+    } catch {
+      return null;
     }
   }
 
-  return url;
+  if (pathname.startsWith(STORAGE_OBJECT_PREFIX)) {
+    return pathname.slice(STORAGE_OBJECT_PREFIX.length);
+  }
+  if (pathname.startsWith(STORAGE_RENDER_PREFIX)) {
+    return pathname.slice(STORAGE_RENDER_PREFIX.length);
+  }
+  return null;
+}
+
+function buildSupabaseImageUrl(objectPath, width, quality) {
+  if (!width) return `${STORAGE_OBJECT_PREFIX}${objectPath}`;
+
+  const params = new URLSearchParams({
+    width: String(width),
+    quality: String(quality),
+    resize: 'cover',
+  });
+  return `${STORAGE_RENDER_PREFIX}${objectPath}?${params.toString()}`;
+}
+
+/**
+ * Return a responsive, cache-stable image URL.
+ *
+ * Supabase-owned images use Pro image transformations through our existing
+ * same-origin storage proxy. Third-party images stay direct when reliable and
+ * use the cached MuviDB media proxy otherwise.
+ */
+export function getProxiedImageUrl(originalUrl, opts = {}) {
+  const normalized = normalizeImageUrl(originalUrl);
+  if (!normalized) return normalized;
+
+  const width = clampInteger(opts.width, 16, 2560);
+  const quality = clampInteger(opts.quality ?? 75, 20, 100) ?? 75;
+  const objectPath = getSupabaseObjectPath(normalized);
+
+  if (objectPath) {
+    return buildSupabaseImageUrl(objectPath, width, quality);
+  }
+
+  if (/^https?:\/\//i.test(normalized) && !isLocalhost) {
+    let host = '';
+    try {
+      host = new URL(normalized).hostname;
+    } catch {
+      return normalized;
+    }
+
+    if (host && !FRIENDLY_HOST.test(host)) {
+      const mediaUrl = `/api/media?url=${encodeURIComponent(normalized)}`;
+      if (!width) return mediaUrl;
+      return `/_vercel/image?url=${encodeURIComponent(mediaUrl)}&w=${width}&q=${quality}`;
+    }
+  }
+
+  return normalized;
+}
+
+export function getImageSrcSet(originalUrl, widths, quality = 75) {
+  const candidates = [...new Set((widths || [])
+    .map(width => clampInteger(width, 16, 2560))
+    .filter(Boolean))]
+    .sort((first, second) => first - second)
+    .map(width => ({ width, url: getProxiedImageUrl(originalUrl, { width, quality }) }));
+
+  const uniqueUrls = [...new Set(candidates.map(candidate => candidate.url))];
+  if (uniqueUrls.length < 2) return undefined;
+  return candidates.map(candidate => `${candidate.url} ${candidate.width}w`).join(', ');
 }

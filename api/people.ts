@@ -47,5 +47,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to fetch people' });
   }
 
+  res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=300, stale-while-revalidate=3600');
   return res.status(200).json({ people: data ?? [], limit, offset });
 }

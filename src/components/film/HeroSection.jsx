@@ -96,6 +96,8 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     fallbackType="banner"
                     name={formatFilmTitle(featuredFilm.title)}
                     width={1280}
+                    quality={78}
+                    sizes="(max-width: 1024px) 100vw, 75vw"
                     loading="eager"
                     fetchPriority="high"
                   />
@@ -119,6 +121,9 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       className="w-full h-full object-cover"
                       fallbackType="banner"
                       name={formatFilmTitle(featuredFilm.title)}
+                      width={384}
+                      sizes="150px"
+                      loading="eager"
                     />
                     {/* Hover Play button on poster */}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/poster:opacity-100 transition-opacity flex items-center justify-center">
@@ -252,6 +257,9 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                           className="w-full h-full object-cover"
                           fallbackType="banner"
                           name={formatFilmTitle(film.title)}
+                          width={256}
+                          sizes="120px"
+                          loading="lazy"
                         />
                         <div className="absolute inset-0 bg-black/10 group-hover:bg-black/50 transition-colors flex items-center justify-center">
                           <Icon icon="solar:play-bold" className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-transform transform group-hover:scale-110 duration-300" />

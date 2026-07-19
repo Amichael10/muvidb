@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 import { authHeaders } from '../../lib/apiAuth';
 
 export default function AdminAutomation() {
@@ -97,8 +98,8 @@ export default function AdminAutomation() {
                   <Icon icon="solar:user-id-bold" className="text-xl" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-text-primary">Actor Enricher</h3>
-                  <span className="text-xs text-text-muted">Runs continuously via Daemon (20/batch)</span>
+                  <h3 className="font-bold text-lg text-text-primary">People Enrichment</h3>
+                  <span className="text-xs text-text-muted">Prepares sourced proposals (5 per batch)</span>
                 </div>
               </div>
               {automationJobs.find(j => j.id === 'actor_enricher')?.status === 'running' ? (
@@ -130,14 +131,23 @@ export default function AdminAutomation() {
             </div>
           </div>
           
-          <button 
-            onClick={() => triggerJob('actor_enricher')}
-            disabled={automationLoading}
-            className="w-full bg-brand hover:bg-brand/90 text-white font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
-          >
-            <Icon icon="solar:play-bold" />
-            Run Manual Batch Now
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              to="/admin/people-enrichment"
+              className="flex items-center justify-center gap-2 border border-border bg-surface-2 px-4 py-3 text-sm font-bold text-text-primary hover:border-brand hover:text-brand"
+            >
+              <Icon icon="solar:clipboard-check-linear" />
+              Review queue
+            </Link>
+            <button
+              onClick={() => triggerJob('actor_enricher')}
+              disabled={automationLoading}
+              className="flex items-center justify-center gap-2 bg-brand px-4 py-3 text-sm font-bold text-white hover:bg-brand/90 disabled:opacity-50"
+            >
+              <Icon icon="solar:play-bold" />
+              Build 5 proposals
+            </button>
+          </div>
         </div>
 
         {/* Channel Fetcher Card */}

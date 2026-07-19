@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -712,6 +712,74 @@ export type Database = {
         }
         Relationships: []
       }
+      dedupe_ignored_pairs: {
+        Row: {
+          created_at: string
+          entity_type: string
+          id: string
+          ignored_by: string | null
+          left_record_id: string
+          reason: string | null
+          right_record_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          id?: string
+          ignored_by?: string | null
+          left_record_id: string
+          reason?: string | null
+          right_record_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          id?: string
+          ignored_by?: string | null
+          left_record_id?: string
+          reason?: string | null
+          right_record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dedupe_ignored_pairs_ignored_by_fkey"
+            columns: ["ignored_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dedupe_scan_runs: {
+        Row: {
+          candidate_groups: number
+          completed_at: string | null
+          entity_type: string
+          id: string
+          records_scanned: number
+          started_at: string
+          summary: Json
+        }
+        Insert: {
+          candidate_groups?: number
+          completed_at?: string | null
+          entity_type: string
+          id?: string
+          records_scanned?: number
+          started_at?: string
+          summary?: Json
+        }
+        Update: {
+          candidate_groups?: number
+          completed_at?: string | null
+          entity_type?: string
+          id?: string
+          records_scanned?: number
+          started_at?: string
+          summary?: Json
+        }
+        Relationships: []
+      }
       film_companies: {
         Row: {
           company_id: string
@@ -1165,6 +1233,66 @@ export type Database = {
           },
         ]
       }
+      pending_cinema_showtimes: {
+        Row: {
+          cinema_id: string
+          created_at: string
+          format: string
+          id: string
+          last_seen_at: string
+          pending_film_id: string
+          price: number | null
+          screen_name: string | null
+          show_date: string
+          show_time: string
+          source: string | null
+          ticket_url: string | null
+        }
+        Insert: {
+          cinema_id: string
+          created_at?: string
+          format?: string
+          id?: string
+          last_seen_at?: string
+          pending_film_id: string
+          price?: number | null
+          screen_name?: string | null
+          show_date: string
+          show_time: string
+          source?: string | null
+          ticket_url?: string | null
+        }
+        Update: {
+          cinema_id?: string
+          created_at?: string
+          format?: string
+          id?: string
+          last_seen_at?: string
+          pending_film_id?: string
+          price?: number | null
+          screen_name?: string | null
+          show_date?: string
+          show_time?: string
+          source?: string | null
+          ticket_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_cinema_showtimes_cinema_id_fkey"
+            columns: ["cinema_id"]
+            isOneToOne: false
+            referencedRelation: "cinemas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_cinema_showtimes_pending_film_id_fkey"
+            columns: ["pending_film_id"]
+            isOneToOne: false
+            referencedRelation: "pending_cinema_films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       people: {
         Row: {
           awards: Json
@@ -1266,6 +1394,157 @@ export type Database = {
           youtube_stats?: Json | null
         }
         Relationships: []
+      }
+      people_enrichment_history: {
+        Row: {
+          action: string
+          changed_fields: string[]
+          created_at: string
+          id: string
+          note: string | null
+          person_id: string
+          previous_data: Json
+          proposed_data: Json
+          queue_id: string | null
+          reviewed_by: string | null
+          source_details: Json
+        }
+        Insert: {
+          action: string
+          changed_fields?: string[]
+          created_at?: string
+          id?: string
+          note?: string | null
+          person_id: string
+          previous_data?: Json
+          proposed_data?: Json
+          queue_id?: string | null
+          reviewed_by?: string | null
+          source_details?: Json
+        }
+        Update: {
+          action?: string
+          changed_fields?: string[]
+          created_at?: string
+          id?: string
+          note?: string | null
+          person_id?: string
+          previous_data?: Json
+          proposed_data?: Json
+          queue_id?: string | null
+          reviewed_by?: string | null
+          source_details?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_enrichment_history_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_enrichment_history_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "people_enrichment_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_enrichment_history_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      people_enrichment_queue: {
+        Row: {
+          attempt_count: number
+          candidate_data: Json
+          created_at: string
+          current_completeness: number
+          field_sources: Json
+          id: string
+          last_attempt_at: string | null
+          match_confidence: number | null
+          match_reasons: string[]
+          matched_credits: string[]
+          missing_fields: string[]
+          person_id: string
+          priority_score: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_note: string | null
+          source_name: string | null
+          source_record_id: string | null
+          source_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          candidate_data?: Json
+          created_at?: string
+          current_completeness?: number
+          field_sources?: Json
+          id?: string
+          last_attempt_at?: string | null
+          match_confidence?: number | null
+          match_reasons?: string[]
+          matched_credits?: string[]
+          missing_fields?: string[]
+          person_id: string
+          priority_score?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          source_name?: string | null
+          source_record_id?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          candidate_data?: Json
+          created_at?: string
+          current_completeness?: number
+          field_sources?: Json
+          id?: string
+          last_attempt_at?: string | null
+          match_confidence?: number | null
+          match_reasons?: string[]
+          matched_credits?: string[]
+          missing_fields?: string[]
+          person_id?: string
+          priority_score?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          source_name?: string | null
+          source_record_id?: string | null
+          source_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_enrichment_queue_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_enrichment_queue_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_new_releases: {
         Row: {
@@ -1870,6 +2149,10 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: undefined
       }
+      apply_people_enrichment_candidate: {
+        Args: { p_fields: string[]; p_queue_id: string; p_reviewer_id?: string }
+        Returns: Json
+      }
       batch_certify_films: { Args: { film_uuids: string[] }; Returns: number }
       batch_create_films_from_videos: {
         Args: { video_db_ids: string[] }
@@ -2029,6 +2312,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      merge_films_group: {
+        Args: {
+          p_duplicate_ids: string[]
+          p_master_id: string
+          p_metadata?: Json
+        }
+        Returns: undefined
+      }
       merge_people:
         | {
             Args: { p_duplicate_ids: string[]; p_master_id: string }
@@ -2042,9 +2333,35 @@ export type Database = {
             }
             Returns: undefined
           }
+      merge_people_group: {
+        Args: {
+          p_duplicate_ids: string[]
+          p_master_id: string
+          p_metadata?: Json
+        }
+        Returns: undefined
+      }
+      promote_pending_cinema_film: {
+        Args: {
+          p_existing_film_id?: string
+          p_film_data?: Json
+          p_pending_id: string
+        }
+        Returns: string
+      }
       refresh_all_popularity_scores: { Args: never; Returns: undefined }
+      refresh_people_enrichment_queue: { Args: never; Returns: number }
       refresh_platform_new_releases: {
         Args: { p_platform: string }
+        Returns: undefined
+      }
+      review_people_enrichment_candidate: {
+        Args: {
+          p_note?: string
+          p_queue_id: string
+          p_reviewer_id?: string
+          p_status: string
+        }
         Returns: undefined
       }
       search_films_fuzzy: {

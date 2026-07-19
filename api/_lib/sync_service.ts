@@ -5,6 +5,11 @@ import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.j
 import { mirrorIfExternal } from './image_mirror.js';
 import { enrichFilmsFromAI, attachCreditsBatch, type EnrichedFilm } from './film_enrichment.js';
 import { pickTmdbMatch } from './tmdb_match.js';
+import {
+  curateYouTubeTitle,
+  isSensationalizedYouTubeTitle,
+  type YouTubeTitleDecision,
+} from './youtube_title_policy.js';
 
 /** Try to find a TMDB movie match and return enriched metadata */
 async function enrichFromTMDB(title: string, year?: number | null): Promise<{
@@ -53,10 +58,19 @@ export async function runShowtimesSync() {
   for (const cinema of cinemas) {
     try {
       const adapter = ADAPTERS[cinema.scrape_adapter];
-      if (!adapter) continue;
+      if (!adapter) {
+        results.push({ name: cinema.name, error: `No adapter configured for '${cinema.scrape_adapter || 'missing'}'` });
+        continue;
+      }
       const scraped = await adapter(cinema);
+      if (scraped.error) throw new Error(scraped.error);
       const stats = await upsertShowtimes(cinema.id, scraped.showtimes, cinema.scrape_adapter);
-      results.push({ name: cinema.name, ...stats });
+      results.push({
+        name: cinema.name,
+        raw_showtimes: scraped.showtimes.length,
+        warnings: scraped.warnings || [],
+        ...stats,
+      });
     } catch (e: any) {
       results.push({ name: cinema.name, error: e.message });
     }
@@ -108,6 +122,8 @@ export async function runVideosSync() {
   let totalUpserted = 0;
   let channelsProcessed = 0;
   let filmsCreated = 0;
+  let sensationalTitlesSkipped = 0;
+  let embeddedTitlesCleaned = 0;
   const FILM_MIN_SEC = 1800; // 30 minutes
 
   for (const ch of channels) {
@@ -241,23 +257,43 @@ export async function runVideosSync() {
           if (existingCVs) existingCVs.forEach((cv: any) => cvMap.set(cv.video_id, cv.film_id));
 
           const videosToProcess = longVideos.filter((v: any) => !cvMap.get(v.video_id));
+          const titlePolicies = new Map<string, YouTubeTitleDecision>(
+            videosToProcess.map((v: any) => [v.video_id, curateYouTubeTitle(v.title)]),
+          );
+          const skippedVideos = videosToProcess.filter(
+            (v: any) => titlePolicies.get(v.video_id)?.action === 'skip',
+          );
+          const eligibleVideos = videosToProcess.filter(
+            (v: any) => titlePolicies.get(v.video_id)?.action !== 'skip',
+          );
+
+          if (skippedVideos.length > 0) {
+            sensationalTitlesSkipped += skippedVideos.length;
+            const skippedIds = skippedVideos.map((v: any) => v.video_id);
+            await supabase
+              .from('channel_videos')
+              .update({ is_hidden: true, match_status: 'rejected' })
+              .eq('channel_id', ch.id)
+              .in('video_id', skippedIds);
+            console.log(`  Skipped ${skippedVideos.length} sensational title(s) without a film-title prefix`);
+          }
 
           // AI enrichment (title cleanup + cast extraction + synopsis de-spam)
           // for this batch. Best-effort: an empty map means the AI was
           // unavailable and we fall back to the regex cleaner / TMDB below.
           let aiMap = new Map<string, EnrichedFilm>();
-          if (videosToProcess.length > 0) {
+          if (eligibleVideos.length > 0) {
             try {
               aiMap = await enrichFilmsFromAI(
-                videosToProcess.map((v: any) => ({ videoId: v.video_id, title: v.title, description: v._description })),
+                eligibleVideos.map((v: any) => ({ videoId: v.video_id, title: v.title, description: v._description })),
               );
             } catch (e: any) {
               console.warn(`[runVideosSync] AI enrichment skipped for ${ch.name}: ${e.message}`);
             }
           }
 
-          if (videosToProcess.length > 0) {
-            const processVids = videosToProcess.map((v: any) => v.video_id);
+          if (eligibleVideos.length > 0) {
+            const processVids = eligibleVideos.map((v: any) => v.video_id);
             const { data: existingFilms } = await supabase
               .from('films').select('id, source_video_id').in('source_video_id', processVids);
               
@@ -268,12 +304,26 @@ export async function runVideosSync() {
             // Track series parent IDs to avoid duplicate lookups
             const seriesParentCache = new Map<string, string>(); // baseTitle → filmId
 
-            for (const v of videosToProcess) {
+            for (const v of eligibleVideos) {
               if (!existingFilmsMap.has(v.video_id)) {
                 const rawTitle = v.title;
                 const ai = aiMap.get(v.video_id);
-                // AI title if we got one, else the regex cleaner.
-                const cleanedTitle = ai?.title || cleanTitle(rawTitle);
+                const titlePolicy = titlePolicies.get(v.video_id)!;
+                if (!titlePolicy || titlePolicy.action === 'skip' || !titlePolicy.title) continue;
+                const aiTitle = ai?.title?.trim();
+                const normalizedRaw = rawTitle.toLocaleLowerCase();
+                const usableAiTitle = Boolean(
+                  aiTitle
+                  && aiTitle.length <= 70
+                  && normalizedRaw.includes(aiTitle.toLocaleLowerCase())
+                  && !isSensationalizedYouTubeTitle(aiTitle),
+                );
+                // The policy supplies a safe deterministic prefix. AI may
+                // shorten that prefix further when cast names were placed
+                // before the marketing marker, but only to text present in the
+                // original upload title.
+                const cleanedTitle = usableAiTitle ? cleanTitle(aiTitle!) : titlePolicy.title;
+                if (titlePolicy.action === 'clean') embeddedTitlesCleaned++;
                 const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
                 // Keep the full upload date, not just the year. publishedAt is the
                 // only date YouTube gives us, and for YouTube-native films it IS
@@ -282,7 +332,7 @@ export async function runVideosSync() {
                 const vidDate = v.published_at ? new Date(v.published_at).toISOString().slice(0, 10) : null;
 
                 // ── Detect if this is an episode of a series ──────────────────────────────
-                const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(rawTitle);
+                const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(cleanedTitle);
                 const normalizedBase = normalizeSeriesTitle(baseTitle);
                 const cleanedBase = cleanTitle(normalizedBase);
 
@@ -325,6 +375,7 @@ export async function runVideosSync() {
                       const mirroredBackdrop = await mirrorIfExternal(backdropSrc, 'backdrops', `series-new-${seriesSlug}-bd`);
                       const { data: newParent } = await supabase.from('films').insert({
                         title: cleanedBase,
+                        original_title: titlePolicy.originalTitle,
                         year: vidYear,
                         release_date: vidDate,
                         release_type: 'youtube',
@@ -355,6 +406,7 @@ export async function runVideosSync() {
                   const mirroredEpPoster = await mirrorIfExternal(v.thumbnail_url, 'posters', epSlug);
                   filmsToInsert.push({
                     title: cleanedTitle,
+                    original_title: titlePolicy.originalTitle,
                     year: vidYear,
                     release_date: vidDate,
                     release_type: 'youtube',
@@ -398,6 +450,7 @@ export async function runVideosSync() {
                       : mirroredMoviePoster;
                     filmsToInsert.push({
                       title: cleanedTitle,
+                      original_title: titlePolicy.originalTitle,
                       year: vidYear,
                       release_date: vidDate,
                       release_type: 'youtube',
@@ -440,7 +493,7 @@ export async function runVideosSync() {
               }
             }
 
-            const allFilmIds = videosToProcess.map((v: any) => existingFilmsMap.get(v.video_id)).filter(id => id);
+            const allFilmIds = eligibleVideos.map((v: any) => existingFilmsMap.get(v.video_id)).filter(id => id);
             
             if (allFilmIds.length > 0) {
               // Producer credit only for channels linked to a person. Channels
@@ -459,7 +512,7 @@ export async function runVideosSync() {
                 if (creditsToInsert.length > 0) await supabase.from('credits').insert(creditsToInsert);
               }
 
-              const updatePromises = videosToProcess
+              const updatePromises = eligibleVideos
                 .filter((v: any) => existingFilmsMap.has(v.video_id))
                 .map((v: any) => 
                   supabase.from('channel_videos')
@@ -472,7 +525,7 @@ export async function runVideosSync() {
 
               // Attach AI-extracted cast + director to each film (creates the
               // people if needed). Best-effort — a failure never blocks the sync.
-              const creditEntries = videosToProcess
+              const creditEntries = eligibleVideos
                 .map((v: any) => {
                   const ai = aiMap.get(v.video_id);
                   const people = [
@@ -504,7 +557,9 @@ export async function runVideosSync() {
   
   return { 
     task: 'videos', status: 'completed', processed: channelsProcessed,
-    total_channels: channels.length, upserted: totalUpserted, films_created: filmsCreated
+    total_channels: channels.length, upserted: totalUpserted, films_created: filmsCreated,
+    sensational_titles_skipped: sensationalTitlesSkipped,
+    embedded_titles_cleaned: embeddedTitlesCleaned,
   };
 }
 

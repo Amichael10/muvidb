@@ -1,146 +1,55 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../_lib/supabase';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+import { supabase } from '../_lib/supabase.js';
+import { processPeopleEnrichmentBatch } from '../_lib/people_enrichment.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST (for manual trigger) or Vercel Cron
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!GEMINI_API_KEY) {
-    await supabase.from('automation_jobs').upsert({
-      id: 'actor_enricher',
-      status: 'error',
-      last_message: 'GEMINI_API_KEY is missing',
-      last_run: new Date().toISOString()
-    });
-    return res.status(500).json({ error: 'Missing GEMINI_API_KEY' });
-  }
-
-  // Update status to running
   await supabase.from('automation_jobs').upsert({
     id: 'actor_enricher',
     status: 'running',
-    last_message: 'Starting micro-batch...',
-    last_run: new Date().toISOString()
-  });
-
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash'
+    last_message: 'Building sourced profile proposals...',
+    last_run: new Date().toISOString(),
   });
 
   try {
-    // 1. Fetch exactly 5 actors to avoid Vercel timeouts (10s hobby, 60s pro)
-    const { data: people, error } = await supabase
-      .from('people')
-      .select('id, name')
-      .or('bio.is.null,photo_url.is.null')
-      .limit(5);
+    const { count, error: countError } = await supabase
+      .from('people_enrichment_queue')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['pending', 'failed']);
+    if (countError) throw countError;
 
-    if (error) throw error;
-
-    if (!people || people.length === 0) {
-      await supabase.from('automation_jobs').upsert({
-        id: 'actor_enricher',
-        status: 'idle',
-        last_message: 'Finished: No actors missing details.',
-        last_run: new Date().toISOString()
-      });
-      return res.status(200).json({ message: 'No actors missing details.' });
+    if (!count) {
+      const { error: refreshError } = await supabase.rpc('refresh_people_enrichment_queue');
+      if (refreshError) throw refreshError;
     }
 
-    let processedCount = 0;
-    let errorsCount = 0;
-
-    for (const person of people) {
-      const prompt = `You are an expert Nollywood film historian.
-Your task is to provide accurate biographical details about the Nollywood actor/filmmaker "${person.name}".
-Rules:
-- Write a compelling, 2-3 paragraph professional biography based on your knowledge.
-- Do NOT hallucinate. Only use facts you are certain about.
-- If you know an image URL representing them online (e.g. from Wikipedia, IMDb, or a news article), provide it.
-- If a field cannot be reliably determined, return null.
-
-IMPORTANT: You must return ONLY raw JSON matching this structure:
-{
-  "bio": "string or null",
-  "date_of_birth": "YYYY-MM-DD or null",
-  "birthplace": "string or null",
-  "photo_url": "string or null"
-}
-Do NOT include markdown formatting or backticks around the JSON.`;
-
-      let responseText = "";
-      let retries = 2; // Reduced retries for serverless context
-      while (retries > 0) {
-        try {
-          const result = await model.generateContent(prompt);
-          responseText = result.response.text();
-          break;
-        } catch (err: any) {
-          if (err.message?.includes('503') && retries > 1) {
-            // Wait 1.5 seconds instead of 3 to save execution time
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            retries--;
-          } else {
-            throw err;
-          }
-        }
-      }
-
-      responseText = responseText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
-
-      let extractedData;
-      try {
-        extractedData = JSON.parse(responseText);
-      } catch (jsonErr) {
-        extractedData = {
-          bio: responseText.length > 50 ? responseText : null,
-          date_of_birth: null,
-          birthplace: null,
-          photo_url: null
-        };
-      }
-
-      const { error: updateError } = await supabase
-        .from('people')
-        .update({
-          bio: extractedData.bio || null,
-          date_of_birth: extractedData.date_of_birth || null,
-          birthplace: extractedData.birthplace || null,
-          photo_url: extractedData.photo_url || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', person.id);
-
-      if (updateError) {
-        errorsCount++;
-      } else {
-        processedCount++;
-      }
-    }
+    const results = await processPeopleEnrichmentBatch({ limit: 5 });
+    const ready = results.filter((result: any) => result.status === 'ready').length;
+    const review = results.filter((result: any) => result.status === 'needs_review').length;
+    const noMatch = results.filter((result: any) => result.status === 'no_match').length;
+    const failed = results.filter((result: any) => result.status === 'failed').length;
+    const message = results.length
+      ? `Prepared ${results.length} sourced proposals: ${ready} ready, ${review} review, ${noMatch} no match, ${failed} failed`
+      : 'No pending people enrichment records.';
 
     await supabase.from('automation_jobs').upsert({
       id: 'actor_enricher',
       status: 'idle',
-      last_message: `Success: Processed ${processedCount} actors (${errorsCount} errors)`,
-      last_run: new Date().toISOString()
+      last_message: message,
+      last_run: new Date().toISOString(),
     });
 
-    return res.status(200).json({ message: `Processed ${processedCount} actors.` });
-
+    return res.status(200).json({ message, results });
   } catch (error: any) {
-    console.error(error);
     await supabase.from('automation_jobs').upsert({
       id: 'actor_enricher',
       status: 'error',
-      last_message: `Error: ${error.message}`,
-      last_run: new Date().toISOString()
+      last_message: `Error: ${error?.message || 'Unknown enrichment failure'}`,
+      last_run: new Date().toISOString(),
     });
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error?.message || 'Actor enrichment failed' });
   }
 }

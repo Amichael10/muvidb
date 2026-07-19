@@ -60,6 +60,7 @@ const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
 const AdminOverview = lazyWithRetry(() => import('./pages/admin/AdminOverview'));
 const AdminFilms = lazyWithRetry(() => import('./pages/admin/AdminFilms'));
 const AdminPeople = lazyWithRetry(() => import('./pages/admin/AdminPeople'));
+const AdminPeopleEnrichment = lazyWithRetry(() => import('./pages/admin/AdminPeopleEnrichment'));
 const AdminCredits = lazyWithRetry(() => import('./pages/admin/AdminCredits'));
 const AdminCompanies = lazyWithRetry(() => import('./pages/admin/AdminCompanies'));
 const AdminClaims = lazyWithRetry(() => import('./pages/admin/AdminClaims'));
@@ -74,6 +75,7 @@ const AdminCreditsExtractor = lazyWithRetry(() => import('./pages/admin/AdminCre
 const AdminChannelDetail = lazyWithRetry(() => import('./pages/admin/AdminChannelDetail'));
 const AdminImport = lazyWithRetry(() => import('./pages/admin/AdminImport'));
 const AdminAI = lazyWithRetry(() => import('./pages/admin/AdminAI'));
+const AdminDeduplicator = lazyWithRetry(() => import('./pages/admin/AdminDeduplicator'));
 const AdminSpotlight = lazyWithRetry(() => import('./pages/admin/AdminSpotlight'));
 const AdminTop10 = lazyWithRetry(() => import('./pages/admin/AdminTop10'));
 const AdminLogs = lazyWithRetry(() => import('./pages/admin/AdminLogs'));
@@ -255,6 +257,7 @@ export default function App() {
                   <Route index element={<AdminOverview />} />
                   <Route path="films" element={<AdminFilms />} />
                   <Route path="people" element={<AdminPeople />} />
+                  <Route path="people-enrichment" element={<ProtectedRoute allowedRoles={['admin']}><AdminPeopleEnrichment /></ProtectedRoute>} />
                   <Route path="credits" element={<AdminCredits />} />
                   <Route path="credits/extractor" element={<AdminCreditsExtractor />} />
                   <Route path="companies" element={<AdminCompanies />} />
@@ -268,6 +271,7 @@ export default function App() {
                   <Route path="cinema-films" element={<AdminCinemaFilms />} />
                   <Route path="cinema-scraping" element={<AdminCinemaScraping />} />
                   <Route path="ai" element={<AdminAI />} />
+                  <Route path="deduplicator" element={<AdminDeduplicator />} />
                   <Route path="import" element={<AdminImport />} />
                   <Route path="spotlight" element={<AdminSpotlight />} />
                   <Route path="top10" element={<AdminTop10 />} />

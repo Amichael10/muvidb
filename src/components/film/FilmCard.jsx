@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useReactions } from '../../hooks/useReactions';
 import ImageWithFallback from '../ui/ImageWithFallback';
 import LikedScore from './LikedScore';
-import { getFilmLanguages } from '../../utils/languages';
 import { formatFilmTitle } from '../../utils/format';
 import { getPlatform } from '../../lib/platforms';
 
@@ -208,7 +207,6 @@ export default function FilmCard({
   // `countries` is an array; fall back to legacy singular `country` if present.
   const primaryCountry = (Array.isArray(film.countries) ? film.countries[0] : null) || film.country || null;
   const flag = countryFlag(primaryCountry);
-  const filmLanguages = getFilmLanguages(film);
   const isYoutubeVariant = variant === 'youtube';
   const isLandscapeVariant = variant === 'landscape' || isYoutubeVariant;
   const youtubeGenreLabel = film.genres?.slice(0, 2).join(' / ') || 'Genre unavailable';
@@ -265,6 +263,7 @@ export default function FilmCard({
               name={formatFilmTitle(film.title)}
               loading="lazy"
               width={640}
+              sizes="(max-width: 640px) 82vw, 320px"
             />
 
             {/* Gradient Overlay */}
@@ -347,6 +346,7 @@ export default function FilmCard({
             name={formatFilmTitle(film.title)}
             loading="lazy"
             width={384}
+            sizes="(max-width: 640px) 44vw, 192px"
           />
 
           {/* Gradient Overlay */}
@@ -441,22 +441,33 @@ export default function FilmCard({
               name={formatFilmTitle(film.title)}
               loading="lazy"
               width={640}
+              sizes="280px"
             />
           ) : (
             <div className="relative w-full h-full overflow-hidden">
               {/* Blurred Poster Cover Fallback */}
               <div className="absolute inset-0 filter blur-xl scale-110 opacity-60">
-                <img 
-                  src={film.poster_url || film.poster} 
-                  alt="" 
-                  className="w-full h-full object-cover" 
+                <ImageWithFallback
+                  src={film.poster_url || film.poster}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  fallbackType="banner"
+                  name={formatFilmTitle(film.title)}
+                  loading="lazy"
+                  width={640}
+                  sizes="280px"
                 />
               </div>
               <div className="relative w-full h-full flex items-center justify-center bg-black/20">
-                <img 
-                  src={film.poster_url || film.poster} 
-                  alt={formatFilmTitle(film.title)} 
-                  className="h-full object-contain transition-transform duration-700 group-hover/image:scale-105" 
+                <ImageWithFallback
+                  src={film.poster_url || film.poster}
+                  alt={formatFilmTitle(film.title)}
+                  className="h-full object-contain transition-transform duration-700 group-hover/image:scale-105"
+                  fallbackType="banner"
+                  name={formatFilmTitle(film.title)}
+                  loading="lazy"
+                  width={384}
+                  sizes="180px"
                 />
               </div>
             </div>
@@ -555,9 +566,7 @@ export default function FilmCard({
             {formattedTotalViews && <span className="text-brand font-bold">{formattedTotalViews}</span>}
             <span>{film.year || film.release_date?.split('-')[0]}</span>
             {primaryCountry && <span className="flex items-center gap-1">{flag} {primaryCountry}</span>}
-            {filmLanguages.length > 0 && (
-              <span className="flex items-center gap-1"><Icon icon="solar:global-linear" className="text-[11px]" />{filmLanguages.join('/')}</span>
-            )}
+            {/* Language hidden until per-film detection is accurate (data is ~99.7% default English) */}
             {likedPct != null && (
               <LikedScore percent={likedPct} variant="inline" className="text-text-primary" />
             )}

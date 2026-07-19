@@ -55,6 +55,7 @@ export default function StreamingCard({ film, platformId }) {
             name={title}
             loading="lazy"
             width={360}
+            sizes="(max-width: 640px) 42vw, 180px"
           />
         </Link>
 

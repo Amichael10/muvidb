@@ -69,6 +69,7 @@ export default function ComingSoonCard({ film }) {
             name={title}
             loading="lazy"
             width={640}
+            sizes="250px"
           />
         </Link>
 

@@ -159,7 +159,7 @@ function parseVeeziHtml(html: string, siteToken: string): ScrapedShowtime[] {
                      || block.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*poster[^"]*"/i);
     let posterUrl: string | null = null;
     if (posterMatch) {
-      const src = posterMatch[1];
+      const src = posterMatch[1].replace(/&amp;/g, '&');
       posterUrl = src.startsWith('http') ? src : `${VEEZI_BASE}${src}`;
     }
 

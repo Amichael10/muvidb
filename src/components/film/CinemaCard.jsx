@@ -73,6 +73,7 @@ export default function CinemaCard({ film }) {
             name={title}
             loading="lazy"
             width={640}
+            sizes="280px"
           />
         </Link>
 

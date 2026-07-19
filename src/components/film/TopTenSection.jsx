@@ -108,6 +108,7 @@ function FeatureCard({ film, featured = false }) {
             name={title}
             loading="lazy"
             width={featured ? 520 : 360}
+            sizes={featured ? '(max-width: 1024px) 50vw, 260px' : '(max-width: 1024px) 34vw, 180px'}
           />
         </Link>
         <div className="absolute left-2 top-2 z-20">
@@ -166,6 +167,7 @@ function PosterCard({ film }) {
             name={title}
             loading="lazy"
             width={360}
+            sizes="(max-width: 1024px) 28vw, 180px"
           />
         </Link>
         <RankTab rank={film.rank} floating />

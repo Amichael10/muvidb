@@ -11,7 +11,6 @@ import ReviewSection from '../components/film/ReviewSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 import LikedScore from '../components/film/LikedScore';
-import { getFilmLanguages } from '../utils/languages';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -282,19 +281,35 @@ export default function FilmDetail() {
     setLoading(true);
     try {
       const { col, val } = slugOrId(slug);
-      const { data, error } = await supabase
-        .from('films')
-        .select(`
-          *,
-          film_genres(genre_id, genres(name)),
-          film_companies(
-            companies(id, name, logo_url)
-          )
-        `)
-        .eq(col, val)
-        .single();
+      const fetchDirect = async () => {
+        const { data, error } = await supabase
+          .from('films')
+          .select(`
+            *,
+            film_genres(genre_id, genres(name)),
+            film_companies(
+              companies(id, name, logo_url)
+            )
+          `)
+          .eq(col, val)
+          .single();
+        if (error) throw error;
+        return data;
+      };
 
-      if (error) throw error;
+      let data;
+      if (import.meta.env.DEV) {
+        data = await fetchDirect();
+      } else {
+        const response = await fetch(`/api/films?id=${encodeURIComponent(val)}`);
+        if (response.ok) {
+          ({ film: data } = await response.json());
+        } else if (response.status === 404) {
+          throw new Error('Film not found');
+        } else {
+          data = await fetchDirect();
+        }
+      }
 
       const mappedFilm = {
         ...data,
@@ -438,6 +453,11 @@ export default function FilmDetail() {
           className="absolute inset-0 w-full h-full object-cover"
           fallbackType="banner"
           name={formatFilmTitle(film.title)}
+          width={1600}
+          quality={78}
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent w-full md:w-1/2"></div>
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg to-transparent"></div>
@@ -451,6 +471,9 @@ export default function FilmDetail() {
                 className="w-full rounded-xl shadow-2xl border border-white/10 object-cover aspect-[2/3]"
                 fallbackType="banner"
                 name={formatFilmTitle(film.title)}
+                width={512}
+                sizes="256px"
+                loading="eager"
               />
             </div>
 
@@ -476,8 +499,7 @@ export default function FilmDetail() {
                     ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
                     : `${film.runtime_minutes || film.runtime || 0} min`}
                 </span>
-                <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                <span>{getFilmLanguages(film).join(', ') || film.language}</span>
+                {/* Language hidden until per-film detection is accurate (data is ~99.7% default English) */}
                 <span className="w-1 h-1 rounded-full bg-white/20"></span>
                 <span className="bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold">
                   {film.nfvcb_rating}
@@ -675,6 +697,9 @@ export default function FilmDetail() {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           fallbackType="banner"
                           name={episode.title}
+                          width={384}
+                          sizes="(max-width: 639px) 100vw, 192px"
+                          loading="lazy"
                         />
                         {episode.youtube_watch_url && (
                           <a 
@@ -763,18 +788,16 @@ export default function FilmDetail() {
                       className="group flex flex-col w-28 sm:w-32 shrink-0 snap-start"
                     >
                       <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-border shadow-sm group-hover:border-brand transition-colors duration-300">
-                        {person.photo_url ? (
-                          <img 
-                            src={person.photo_url} 
-                            alt={formatPersonName(person.name)} 
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-surface-2 flex items-center justify-center text-text-muted text-4xl font-extrabold uppercase select-none transition-colors group-hover:bg-surface-3">
-                            {formatPersonName(person.name).charAt(0)}
-                          </div>
-                        )}
+                        <ImageWithFallback
+                          src={person.photo_url}
+                          alt={formatPersonName(person.name)}
+                          fallbackType="avatar"
+                          name={formatPersonName(person.name)}
+                          className="w-full h-full object-cover"
+                          width={256}
+                          sizes="(max-width: 639px) 112px, 128px"
+                          loading="lazy"
+                        />
                       </div>
                       <div className="mt-3 flex flex-col text-left">
                         <span className="font-bold text-text-primary text-sm tracking-tight leading-snug line-clamp-1 group-hover:text-gold transition-colors">
@@ -812,7 +835,16 @@ export default function FilmDetail() {
                       to={`/people/${member.slug || member.id}`}
                       className="flex items-center gap-4 bg-surface p-4 border-r border-b border-border last:border-r-0 last:border-b-0 hover:bg-surface-2 transition-colors group"
                     >
-                      <img src={member.photo_url || `https://placehold.co/150x150/1A1A1A/FF5C00?text=${formatPersonName(member.name).split(' ').map(n => n[0]).join('')}`} alt={formatPersonName(member.name)} className="w-10 h-10 rounded-lg object-cover border border-border group-hover:border-gold transition-colors" />
+                      <ImageWithFallback
+                        src={member.photo_url}
+                        alt={formatPersonName(member.name)}
+                        fallbackType="avatar"
+                        name={formatPersonName(member.name)}
+                        className="w-10 h-10 rounded-lg object-cover border border-border group-hover:border-gold transition-colors"
+                        width={96}
+                        sizes="40px"
+                        loading="lazy"
+                      />
                       <div>
                         <div className="font-bold text-text-primary text-xs line-clamp-1 tracking-tight group-hover:text-gold transition-colors">{formatPersonName(member.name)}</div>
                         {/* Already Sentence-cased by formatRole; toTitleCase here
@@ -841,7 +873,16 @@ export default function FilmDetail() {
                 <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4 group transition-all cursor-default">
                   <div className="w-12 h-12 bg-surface-2 rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50">
                     {film.film_companies[0].companies?.logo_url ? (
-                      <img src={film.film_companies[0].companies.logo_url} className="w-full h-full object-contain p-1" />
+                      <ImageWithFallback
+                        src={film.film_companies[0].companies.logo_url}
+                        alt={film.film_companies[0].companies?.name || 'Studio logo'}
+                        fallbackType="avatar"
+                        name={film.film_companies[0].companies?.name || 'Studio'}
+                        className="w-full h-full object-contain p-1"
+                        width={96}
+                        sizes="48px"
+                        loading="lazy"
+                      />
                     ) : (
                       film.film_companies[0].companies?.name?.charAt(0) || '?'
                     )}
@@ -877,14 +918,7 @@ export default function FilmDetail() {
                     <span className="text-text-primary text-right">{film.countries.join(', ')}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">{getFilmLanguages(film).length > 1 ? 'Languages' : 'Language'}</span>
-                  <span className="text-text-primary text-right flex flex-wrap gap-1 justify-end">
-                    {getFilmLanguages(film).map((l) => (
-                      <span key={l} className="bg-surface-2 border border-border rounded px-2 py-0.5 text-xs">{l}</span>
-                    ))}
-                  </span>
-                </div>
+                {/* Language row hidden until detection is accurate — re-enable with getFilmLanguages(film) */}
                 <div className="flex justify-between items-center border-b border-border pb-3">
                   <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>
                   <span className="text-text-primary">
@@ -999,6 +1033,9 @@ export default function FilmDetail() {
                       className="w-full aspect-[2/3] lg:w-12 lg:h-16 lg:aspect-auto object-cover rounded-md border border-border"
                       fallbackType="poster"
                       name={relatedFilm.title}
+                      width={192}
+                      sizes="(max-width: 639px) 40vw, (max-width: 1023px) 20vw, 48px"
+                      loading="lazy"
                     />
                     <div className="flex flex-col justify-center">
                       <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-2 mb-1 tracking-tight">

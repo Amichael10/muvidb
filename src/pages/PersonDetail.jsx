@@ -477,19 +477,17 @@ const PersonDetail = () => {
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
           <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
             <div className="flex-shrink-0 relative">
-              {person.photo_url ? (
-                <img
-                  src={person.photo_url}
-                  alt={formatPersonName(person.name)}
-                  className="relative w-48 md:w-56 aspect-[3/4] rounded-lg object-cover shadow-2xl border border-border"
-                />
-              ) : (
-                <div className="relative w-48 md:w-56 aspect-[3/4] rounded-lg bg-surface flex items-center justify-center shadow-2xl border border-border">
-                  <span className="text-6xl font-bold text-brand font-heading">
-                    {formatPersonName(person.name)?.charAt(0)}
-                  </span>
-                </div>
-              )}
+              <ImageWithFallback
+                src={person.photo_url}
+                alt={formatPersonName(person.name)}
+                fallbackType="avatar"
+                name={formatPersonName(person.name)}
+                className="relative w-48 md:w-56 aspect-[3/4] rounded-lg object-cover shadow-2xl border border-border"
+                width={512}
+                sizes="(max-width: 767px) 192px, 224px"
+                loading="eager"
+                fetchPriority="high"
+              />
             </div>
 
             <div className="flex-1 space-y-6">
@@ -668,6 +666,9 @@ const PersonDetail = () => {
                       fallbackType="poster"
                       name={credit.films.title}
                       className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                      width={384}
+                      sizes="(max-width: 639px) 144px, (max-width: 767px) 160px, 176px"
+                      loading="lazy"
                     />
                   </div>
                   <p className="mt-3 text-sm font-bold text-text-primary line-clamp-2 group-hover:text-brand transition-colors">
@@ -733,10 +734,15 @@ const PersonDetail = () => {
                   >
                     <div className="relative overflow-hidden rounded-lg aspect-[2/3] bg-surface-2 border border-border group-hover:border-brand transition-all shadow-sm">
                       {poster ? (
-                        <img
+                        <ImageWithFallback
                           src={poster}
                           alt={title}
+                          fallbackType="poster"
+                          name={title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          width={384}
+                          sizes="(max-width: 639px) calc(50vw - 24px), (max-width: 767px) calc(33vw - 24px), (max-width: 1023px) calc(25vw - 24px), 180px"
+                          loading="lazy"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -847,6 +853,9 @@ const PersonDetail = () => {
                                   fallbackType="banner"
                                   name={workTitle || ''}
                                   className="w-full h-full object-cover"
+                                  width={96}
+                                  sizes="46px"
+                                  loading="lazy"
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
@@ -923,6 +932,9 @@ const PersonDetail = () => {
                   fallbackType="avatar"
                   name={channel.name}
                   className="relative w-24 h-24 rounded-lg border border-border object-cover group-hover:scale-105 transition-transform duration-500"
+                  width={192}
+                  sizes="96px"
+                  loading="lazy"
                 />
               </div>
 

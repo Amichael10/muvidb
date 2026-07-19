@@ -6,9 +6,8 @@
  * From that we want: a clean title ("Si Olorun"), the cast pulled OUT of the
  * title into real credits, and a de-spammed synopsis (no hashtags / fake names).
  *
- * All of this is best-effort: if the AI providers are exhausted for the day the
- * caller just falls back to the regex cleaner + TMDB/none, and the film is still
- * created exactly as before.
+ * All of this is best-effort. The caller still applies its deterministic title
+ * policy when AI is unavailable, including rejecting sentence-only clickbait.
  */
 import { supabase } from './supabase.js';
 import { generateAIContent, parseJSON } from './ai_service.js';
@@ -49,6 +48,8 @@ For each item output an object with:
 - "cast": array of FULL actor names that appear in the title or description and are actually in this film. Proper Case. Use [] if none are clearly identifiable. Do NOT include the channel name or the uploader.
 - "director": the director's full name ONLY if explicitly credited (e.g. "Directed by …", "A film by …"). Otherwise null. Do NOT put the director in "cast".
 - "synopsis": a clean 1-3 sentence plot summary built ONLY from real plot information in the description. Strip hashtags, emojis, links, "subscribe"/channel promos, and keyword-stuffed name lists. Do NOT invent or guess a plot — if the description has no genuine plot description, return null.
+
+Example: "Premium Queen: YOU Will NOT Regret Watching This Mindblowing Mercy Kenneth 2026 New-nigerian Movies" becomes title "Premium Queen" with cast ["Mercy Kenneth"]. The words after the real title are marketing, not part of the title.
 
 Return ONLY a JSON array, no prose:
 [{"id":"...","title":"...","cast":["..."],"director":"..." or null,"synopsis":"..." or null}]

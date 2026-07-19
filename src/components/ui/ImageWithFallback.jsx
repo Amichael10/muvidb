@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { getProxiedImageUrl } from '../../lib/imageUrl';
+import { getImageSrcSet, getProxiedImageUrl, normalizeImageUrl } from '../../lib/imageUrl';
 
 // Premium brand-aligned gradients for fallback backgrounds
 const PRESET_GRADIENTS = [
@@ -24,15 +24,21 @@ const getHash = (str) => {
 
 // Upgrade low-res YouTube thumbnails to high-res maxresdefault.jpg
 const getHighResYoutubeThumbnail = (url) => {
-  if (!url) return '';
-  if (url.includes('ytimg.com') || url.includes('youtube.com/vi/')) {
-    const match = url.match(/\/vi\/([^/?#]+)/) || url.match(/\/vi_webp\/([^/?#]+)/);
+  const normalized = normalizeImageUrl(url);
+  if (!normalized) return '';
+  if (normalized.includes('ytimg.com') || normalized.includes('youtube.com/vi/')) {
+    const match = normalized.match(/\/vi\/([^/?#]+)/) || normalized.match(/\/vi_webp\/([^/?#]+)/);
     if (match && match[1]) {
       const videoId = match[1];
       return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
     }
   }
-  return url;
+  return normalized;
+};
+
+const getYoutubePreviewThumbnail = (url) => {
+  if (!url || !url.includes('/maxresdefault.jpg')) return '';
+  return url.replace('/maxresdefault.jpg', '/hqdefault.jpg');
 };
 
 export default function ImageWithFallback({
@@ -42,16 +48,26 @@ export default function ImageWithFallback({
   fallbackType = 'avatar', // 'avatar' | 'banner' | 'video'
   name = '',
   width, // optional: request an optimized image of this width (Supabase storage only)
+  quality = 75,
   style,
+  loading = 'lazy',
+  decoding = 'async',
+  fetchPriority,
+  sizes,
+  srcSet,
+  onLoad,
+  onError,
   ...props
 }) {
   const [imgSrc, setImgSrc] = useState(getHighResYoutubeThumbnail(src));
   const [hasError, setHasError] = useState(!src);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Sync state if the src changes dynamically
   useEffect(() => {
     setImgSrc(getHighResYoutubeThumbnail(src));
     setHasError(!src);
+    setIsLoaded(false);
   }, [src]);
 
   const hash = getHash(name || alt || 'MuviDB');
@@ -73,7 +89,8 @@ export default function ImageWithFallback({
 
   const initials = getInitials(name || alt);
 
-  const handleImageError = () => {
+  const handleImageError = (event) => {
+    setIsLoaded(false);
     if (imgSrc && imgSrc.includes('/maxresdefault.jpg')) {
       // Fallback to hqdefault (480x360), which always exists
       const fallbackSrc = imgSrc.replace('/maxresdefault.jpg', '/hqdefault.jpg');
@@ -84,6 +101,7 @@ export default function ImageWithFallback({
       setImgSrc(fallbackSrc);
     } else {
       setHasError(true);
+      onError?.(event);
     }
   };
 
@@ -161,36 +179,62 @@ export default function ImageWithFallback({
     );
   }
 
-  const handleImageLoad = (e) => {
-    const img = e.target;
+  const handleImageLoad = (event) => {
+    const img = event.currentTarget;
     // YouTube's "unavailable" placeholder image is returned with a width of 120px (120x90).
     // If we detect this placeholder, immediately swap to hqdefault.jpg which always exists.
     if (imgSrc && imgSrc.includes('/maxresdefault.jpg') && img.naturalWidth <= 120) {
       const fallbackSrc = imgSrc.replace('/maxresdefault.jpg', '/hqdefault.jpg');
       setImgSrc(fallbackSrc);
+      setIsLoaded(false);
+      return;
+    }
+
+    const reveal = () => {
+      setIsLoaded(true);
+      onLoad?.(event);
+    };
+    if (typeof img.decode === 'function') {
+      img.decode().catch(() => {}).finally(reveal);
+    } else {
+      reveal();
     }
   };
 
-  // Blur-up placeholder: render a tiny (32px) optimized version of the same image
-  // as the element's CSS background so the slot is never an empty/white flash —
-  // the soft low-res image shows instantly and the full photo paints over it
-  // (object-cover hides the background once loaded). Only Supabase storage images
-  // get the LQIP (those become a /_vercel/image path); everything else falls back
-  // to the branded gradient. No wrapper/structural change, so nothing else breaks.
-  const lqip = getProxiedImageUrl(imgSrc, { width: 32, quality: 40 });
-  const placeholderStyle =
-    typeof lqip === 'string' && lqip.startsWith('/_vercel/image')
-      ? { backgroundImage: `url("${lqip}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
-      : { background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` };
+  // Supabase Pro serves the tiny preview from its transformed-image CDN. For
+  // YouTube, keep maxres as the final image while hqdefault paints underneath
+  // immediately; failed maxres requests then reveal an already-warm fallback.
+  const mainUrl = getProxiedImageUrl(imgSrc, { width, quality });
+  const youtubePreview = getYoutubePreviewThumbnail(imgSrc);
+  const lqip = youtubePreview || getProxiedImageUrl(imgSrc, { width: 32, quality: 35 });
+  const hasUsefulPreview = Boolean(lqip && lqip !== mainUrl);
+  const placeholderStyle = hasUsefulPreview
+    ? { backgroundImage: `url("${lqip}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : { background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` };
+  const generatedSrcSet = srcSet || (width
+    ? getImageSrcSet(imgSrc, [Math.max(32, Math.round(width / 2)), width], quality)
+    : undefined);
+  const revealStyle = {
+    ...placeholderStyle,
+    filter: isLoaded ? 'blur(0)' : hasUsefulPreview ? 'blur(7px)' : 'none',
+    opacity: isLoaded ? 1 : 0.96,
+    transition: 'filter 220ms ease, opacity 180ms ease, transform 500ms ease',
+    ...style,
+  };
 
   // Optimize only at render time so the raw imgSrc above keeps driving the
   // YouTube/error fallback logic untouched.
   return (
     <img
-      src={getProxiedImageUrl(imgSrc, { width })}
+      src={mainUrl}
+      srcSet={generatedSrcSet}
+      sizes={sizes}
       alt={alt}
       className={className}
-      style={{ ...placeholderStyle, ...style }}
+      style={revealStyle}
+      loading={loading}
+      decoding={decoding}
+      fetchPriority={fetchPriority}
       onLoad={handleImageLoad}
       onError={handleImageError}
       {...props}

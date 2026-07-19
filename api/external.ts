@@ -7,7 +7,13 @@ const YOUTUBE_BASE = 'https://www.googleapis.com/youtube/v3';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 
 const YT_ALLOWED = new Set(['search', 'channels', 'videos', 'playlistItems', 'commentThreads']);
-const TMDB_ALLOWED = [ /^\/search\/movie$/, /^\/discover\/movie$/, /^\/movie\/\d+$/, /^\/person\/\d+$/ ];
+const TMDB_ALLOWED = [
+  /^\/search\/movie$/,
+  /^\/search\/person$/,
+  /^\/discover\/movie$/,
+  /^\/movie\/\d+$/,
+  /^\/person\/\d+$/,
+];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;

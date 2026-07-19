@@ -14,15 +14,27 @@ import { useAuth } from '../context/AuthContext';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { toTitleCase } from '../utils/format';
 import { getZonedClock, getNextDate, isFutureShowtime, compareShowtimes } from '../utils/showtimes';
+import ImageWithFallback from '../components/ui/ImageWithFallback';
 
 // Platforms shown in the homepage "New to Stream" tabbed rail.
 const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits'].includes(p.id));
 const NEW_STREAM_IDS = NEW_STREAM.map(p => p.id);
+const CINEMA_SHOWTIME_PAGE_SIZE = 1000;
+
+const cinemaFilmKey = (title = '') => title
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/&/g, ' and ')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim()
+  .replace(/\s+/g, ' ');
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isHeroLoading, setIsHeroLoading] = useState(true);
+  const [isCinemaLoading, setIsCinemaLoading] = useState(true);
   const [inCinemas, setInCinemas] = useState([]);
   const [newToStream, setNewToStream] = useState({}); // { netflix: [...], prime_video: [...], ... }
   const [streamTab, setStreamTab] = useState('netflix');
@@ -55,9 +67,6 @@ export default function Home() {
   // list is capped at 1000 rows and undercounts the 19k+ catalogue).
   const [platformCounts, setPlatformCounts] = useState({});
 
-  // Spotlight Image Fallback state (Issue 24)
-  const [spotlightImgError, setSpotlightImgError] = useState(false);
-
   // External YouTube Channel warning dialog states (Issue 19)
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
   const [externalUrl, setExternalUrl] = useState('');
@@ -81,13 +90,17 @@ export default function Home() {
   const fetchAllData = async () => {
     setIsLoading(true);
     setIsHeroLoading(true);
-    
-    // 1. Fetch above-the-fold content first for instant loading experience (Issue 1)
+
+    // Showtime aggregation is intentionally independent: a large cinema response
+    // should never delay the hero or the rest of the homepage.
+    setIsCinemaLoading(true);
+    const cinemaPromise = fetchInCinemasData()
+      .catch(e => console.error('Error fetching cinemas data:', e))
+      .finally(() => setIsCinemaLoading(false));
+
+    // Fetch the hero on its own critical path.
     try {
-      await Promise.all([
-        fetchFeaturedFilms().catch(e => console.error('Error fetching featured films:', e)),
-        fetchInCinemasData().catch(e => console.error('Error fetching cinemas data:', e))
-      ]);
+      await fetchFeaturedFilms().catch(e => console.error('Error fetching featured films:', e));
     } catch (e) {
       console.error('Error in critical fetches:', e);
     } finally {
@@ -120,6 +133,9 @@ export default function Home() {
     // Load this curated rail after the main homepage burst. Its status query is
     // indexed, but deferring it avoids competing with the heavier discovery rails.
     await fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e));
+
+    // Keep this promise observed without making lower homepage sections wait for it.
+    await cinemaPromise;
   };
 
   // Fetch films for the top genre sections at the bottom of the page.
@@ -314,18 +330,28 @@ export default function Home() {
     });
 
     // Build the complete set of films that still have an upcoming showtime.
-    const { data: stRows, error: showtimeError } = await supabase
-      .from('showtimes')
-      .select('film_id, cinema_id, show_date, show_time, cinemas(id, name, city, chain)')
-      .gte('show_date', cinemaClock.date)
-      .eq('is_available', true)
-      .order('show_date', { ascending: true })
-      .order('show_time', { ascending: true })
-      .limit(5000);
+    const stRows = [];
+    let showtimePage = 0;
 
-    if (showtimeError) {
-      console.error('Error fetching cinema showtimes:', showtimeError);
-      return;
+    while (true) {
+      const pageStart = showtimePage * CINEMA_SHOWTIME_PAGE_SIZE;
+      const { data: pageRows, error: showtimeError } = await supabase
+        .from('showtimes')
+        .select('film_id, cinema_id, show_date, show_time, cinemas(id, name, city, chain)')
+        .gte('show_date', cinemaClock.date)
+        .eq('is_available', true)
+        .order('show_date', { ascending: true })
+        .order('show_time', { ascending: true })
+        .range(pageStart, pageStart + CINEMA_SHOWTIME_PAGE_SIZE - 1);
+
+      if (showtimeError) {
+        console.error('Error fetching cinema showtimes:', showtimeError);
+        return;
+      }
+
+      stRows.push(...(pageRows || []));
+      if (!pageRows || pageRows.length < CINEMA_SHOWTIME_PAGE_SIZE) break;
+      showtimePage += 1;
     }
 
     // Showtimes are stored as local cinema dates/times. Compare them with the
@@ -334,7 +360,10 @@ export default function Home() {
     const nowIds = new Set(futureShowtimes.map(r => r.film_id).filter(Boolean));
     const nextShowByFilm = {};
     const todayShowtimesByFilm = {};
+    const futureShowtimeCountByFilm = {};
     futureShowtimes.forEach(showtime => {
+      futureShowtimeCountByFilm[showtime.film_id] = (futureShowtimeCountByFilm[showtime.film_id] || 0) + 1;
+
       if (showtime.show_date === cinemaClock.date) {
         if (!todayShowtimesByFilm[showtime.film_id]) todayShowtimesByFilm[showtime.film_id] = new Set();
         todayShowtimesByFilm[showtime.film_id].add(`${showtime.cinema_id}:${showtime.show_time}`);
@@ -357,17 +386,45 @@ export default function Home() {
         .from('films')
         .select(`*, film_genres(genres(name))`)
         .in('id', Array.from(nowIds))
-        .neq('source', 'youtube')
-        .or('youtube_watch_url.is.null,youtube_watch_url.eq.""')
-        .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
         // Newest cinema arrivals first: a freshly-fetched title leads the slider
         // so viewers slide right to reach the ones already showing.
         .order('created_at', { ascending: false });
-      nowFilms = (data || []).map(film => ({
+      const candidates = (data || []).map(film => ({
         ...withGenres(film),
         next_showtime: nextShowByFilm[film.id] || null,
-        remaining_today_showtime_count: todayShowtimesByFilm[film.id]?.size || 0
+        remaining_today_showtime_count: todayShowtimesByFilm[film.id]?.size || 0,
+        future_showtime_count: futureShowtimeCountByFilm[film.id] || 0
       }));
+
+      // Cinema chains frequently spell the same title differently (for example,
+      // "Remi & Nneoma" versus "Remi And Nneoma"). Keep one card per title and
+      // combine its showtime signal, preferring the best-supported catalog row.
+      const uniqueFilms = new Map();
+      candidates.forEach(candidate => {
+        const key = cinemaFilmKey(candidate.title) || candidate.id;
+        const existing = uniqueFilms.get(key);
+        if (!existing) {
+          uniqueFilms.set(key, candidate);
+          return;
+        }
+
+        const primary = candidate.future_showtime_count > existing.future_showtime_count
+          ? candidate
+          : existing;
+        const firstNextShow = [existing.next_showtime, candidate.next_showtime]
+          .filter(Boolean)
+          .sort(compareShowtimes)[0] || null;
+
+        uniqueFilms.set(key, {
+          ...primary,
+          next_showtime: firstNextShow,
+          remaining_today_showtime_count:
+            existing.remaining_today_showtime_count + candidate.remaining_today_showtime_count,
+          future_showtime_count: existing.future_showtime_count + candidate.future_showtime_count
+        });
+      });
+
+      nowFilms = Array.from(uniqueFilms.values());
     }
 
     setInCinemas(nowFilms);
@@ -663,13 +720,13 @@ export default function Home() {
         </div>
 
         {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
-        {(isLoading || inCinemas.length > 0) && (
+        {(isCinemaLoading || inCinemas.length > 0) && (
           <div className="landing-band panel py-8 md:py-10">
             <FilmRow
               title="In Cinemas"
               subtitle="Upcoming screenings across cinemas near you"
               films={inCinemas}
-              isLoading={isLoading}
+              isLoading={isCinemaLoading}
               linkTo="/showtimes"
               cardVariant="cinema"
             />
@@ -844,20 +901,16 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row items-stretch min-h-[400px]">
                     {/* 1. Artist Photo Cover (Left Pane) */}
                     <div className="w-full md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
-                      {!spotlightImgError && (spotlightContent.photo_url || spotlightContent.people.photo_url) ? (
-                        <img
-                          src={spotlightContent.photo_url || spotlightContent.people.photo_url}
-                          alt={spotlightContent.people.name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          onError={() => setSpotlightImgError(true)}
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-tr from-brand/20 via-surface-2 to-surface-3 flex items-center justify-center">
-                          <span className="text-white/20 text-7xl font-heading font-black tracking-tighter select-none">
-                            {spotlightContent.people.name ? spotlightContent.people.name.split(' ').map(n => n[0]).join('') : 'AA'}
-                          </span>
-                        </div>
-                      )}
+                      <ImageWithFallback
+                        src={spotlightContent.photo_url || spotlightContent.people.photo_url}
+                        alt={spotlightContent.people.name}
+                        fallbackType="avatar"
+                        name={spotlightContent.people.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        width={640}
+                        sizes="(max-width: 767px) 100vw, 28vw"
+                        loading="lazy"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/40 via-transparent to-black/20 pointer-events-none" />
                     </div>
 
@@ -904,11 +957,15 @@ export default function Home() {
                               title={film.title}
                             >
                               <div className="aspect-[2/3] w-full rounded-lg overflow-hidden border border-hairline bg-surface-2 relative shadow-md">
-                                <img
-                                  src={film.poster_url || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'}
+                                <ImageWithFallback
+                                  src={film.poster_url}
                                   alt={film.title}
+                                  fallbackType="banner"
+                                  name={film.title}
                                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300'; }}
+                                  width={256}
+                                  sizes="(max-width: 767px) 22vw, 100px"
+                                  loading="lazy"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
                                   <span className="text-[8px] font-bold text-white line-clamp-2 leading-tight">
@@ -1014,11 +1071,15 @@ export default function Home() {
                           className="shrink-0 w-44 bg-surface border border-hairline hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
                         >
                           <div className="relative">
-                            <img
-                              src={crew.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'}
+                            <ImageWithFallback
+                              src={crew.photo_url}
                               alt={crew.name}
+                              fallbackType="avatar"
+                              name={crew.name}
                               className="w-24 h-24 rounded-full object-cover border-2 border-transparent group-hover:border-brand transition-all duration-300"
-                              onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
+                              width={192}
+                              sizes="96px"
+                              loading="lazy"
                             />
                           </div>
                           <div className="space-y-2 w-full">
@@ -1102,10 +1163,15 @@ export default function Home() {
                         <div className="flex items-center gap-4">
                           {company.logo_url ? (
                             <div className="w-12 h-12 rounded-xl bg-white p-1 border border-hairline flex items-center justify-center overflow-hidden shrink-0">
-                              <img 
+                              <ImageWithFallback
                                 src={company.logo_url} 
                                 alt={company.name}
+                                fallbackType="avatar"
+                                name={company.name}
                                 className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                                width={96}
+                                sizes="48px"
+                                loading="lazy"
                               />
                             </div>
                           ) : (
@@ -1180,11 +1246,15 @@ export default function Home() {
                           className="group bg-surface p-8 hover:bg-surface-2/50 transition-all duration-500 flex flex-col gap-6 border-r border-b border-hairline animate-in fade-in"
                         >
                           <div className="flex items-center gap-5">
-                            <img 
-                              src={stats.thumbnail || creator.photo_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
+                            <ImageWithFallback
+                              src={stats.thumbnail || creator.photo_url}
                               alt={creator.name} 
+                              fallbackType="avatar"
+                              name={creator.name}
                               className="w-16 h-16 rounded-lg object-cover shadow-sm border border-hairline group-hover:scale-105 transition-transform" 
-                              onError={(e) => { e.target.src = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'; }}
+                              width={128}
+                              sizes="64px"
+                              loading="lazy"
                             />
                             <div>
                               <h3 className="text-lg font-black text-text-primary group-hover:text-brand transition-colors tracking-tight flex items-center gap-1.5">

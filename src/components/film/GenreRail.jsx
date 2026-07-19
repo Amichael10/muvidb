@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 import FilmCard from './FilmCard';
+import ImageWithFallback from '../ui/ImageWithFallback';
 
 const GENRES = [
   { name: 'Drama', icon: 'solar:mask-happly-bold', color: 'from-blue-500/20 to-blue-600/5' },
@@ -242,10 +243,14 @@ export default function GenreRail({ variant = 'grid' }) {
               >
                 {/* Cover poster */}
                 {genre.coverImage ? (
-                  <img
+                  <ImageWithFallback
                     src={genre.coverImage}
                     alt=""
+                    fallbackType="banner"
+                    name={genre.name}
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    width={640}
+                    sizes="(max-width: 639px) calc(50vw - 24px), (max-width: 767px) calc(33vw - 24px), (max-width: 1023px) calc(25vw - 24px), 240px"
                     loading="lazy"
                   />
                 ) : (
@@ -337,10 +342,14 @@ export default function GenreRail({ variant = 'grid' }) {
                 >
                   {/* Background Cover Image */}
                   {genre.coverImage ? (
-                    <img 
+                    <ImageWithFallback
                       src={genre.coverImage} 
-                      alt="" 
-                      className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50 group-hover:scale-110 transition-all duration-700" 
+                      alt=""
+                      fallbackType="banner"
+                      name={genre.name}
+                      className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50 group-hover:scale-110 transition-all duration-700"
+                      width={640}
+                      sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, (max-width: 1023px) 33vw, 300px"
                       loading="lazy"
                     />
                   ) : (

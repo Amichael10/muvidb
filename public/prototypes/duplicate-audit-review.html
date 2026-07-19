@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MuviDB Duplicate Film Review</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090909;
+      --surface: #111112;
+      --surface-raised: #171718;
+      --surface-hover: #1d1d1f;
+      --border: #2a2a2d;
+      --border-soft: #1d1d20;
+      --text: #f4f4f5;
+      --text-soft: #b2b2b8;
+      --muted: #76767f;
+      --brand: #ff5a1f;
+      --brand-soft: rgba(255, 90, 31, 0.12);
+      --green: #45c486;
+      --green-soft: rgba(69, 196, 134, 0.12);
+      --amber: #f2b84b;
+      --amber-soft: rgba(242, 184, 75, 0.12);
+      --blue: #6da9ff;
+      --blue-soft: rgba(109, 169, 255, 0.12);
+      --font-body: Aptos, "Segoe UI", sans-serif;
+      --font-display: Bahnschrift, "Arial Narrow", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; min-height: 100%; overflow-x: hidden; background: var(--bg); }
+
+    body {
+      color: var(--text);
+      font-family: var(--font-body);
+      letter-spacing: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 56px 56px;
+    }
+
+    button, input, select { font: inherit; letter-spacing: 0; }
+    button, select { cursor: pointer; }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+    }
+
+    .app-shell { min-height: 100vh; background: rgba(9, 9, 9, 0.88); }
+
+    .topbar {
+      height: 72px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(9, 9, 9, 0.96);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .brand-block { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .brand-block img { width: 112px; height: auto; display: block; }
+    .brand-divider { width: 1px; height: 28px; background: var(--border); }
+
+    .page-name {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-soft);
+    }
+
+    .read-only {
+      min-height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .summary-band {
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .summary-inner {
+      max-width: 1580px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(260px, 1.4fr) repeat(4, minmax(130px, 0.65fr));
+      min-height: 118px;
+    }
+
+    .summary-title,
+    .summary-stat {
+      padding: 22px 24px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .summary-title { border-left: 1px solid var(--border); }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--brand);
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 27px;
+      line-height: 1.1;
+    }
+
+    .summary-value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .summary-label {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .filter-band {
+      border-bottom: 1px solid var(--border);
+      background: rgba(17, 17, 18, 0.98);
+      position: sticky;
+      top: 72px;
+      z-index: 25;
+    }
+
+    .filters {
+      max-width: 1580px;
+      min-height: 76px;
+      margin: 0 auto;
+      padding: 12px 18px;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(230px, 1.2fr) auto minmax(130px, 0.5fr) minmax(150px, 0.55fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .field {
+      min-height: 44px;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--text);
+      padding: 0 13px;
+    }
+
+    .field::placeholder { color: var(--muted); }
+
+    .segments {
+      min-height: 44px;
+      min-width: 0;
+      width: 100%;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      display: flex;
+      align-items: stretch;
+      overflow-x: auto;
+    }
+
+    .segment {
+      min-height: 36px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .segment:hover { color: var(--text); }
+    .segment.is-active { background: var(--brand); color: white; }
+
+    .reset-button,
+    .action-button,
+    .load-button,
+    .close-button {
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface-raised);
+      color: var(--text-soft);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .reset-button:hover,
+    .action-button:hover,
+    .load-button:hover,
+    .close-button:hover { border-color: var(--brand); color: white; }
+
+    .workspace {
+      max-width: 1580px;
+      min-height: calc(100vh - 267px);
+      margin: 0 auto;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(340px, 410px) minmax(0, 1fr);
+      background: var(--surface);
+    }
+
+    .list-pane { min-width: 0; border-right: 1px solid var(--border); }
+
+    .pane-header {
+      height: 56px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--surface);
+      position: sticky;
+      top: 148px;
+      z-index: 10;
+    }
+
+    .pane-heading {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .result-count { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .title-list { min-height: 520px; }
+
+    .title-row {
+      width: 100%;
+      min-height: 92px;
+      padding: 14px 15px;
+      border: 0;
+      border-bottom: 1px solid var(--border-soft);
+      border-left: 3px solid transparent;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .title-row:hover { background: var(--surface-hover); }
+    .title-row.is-selected { background: var(--brand-soft); border-left-color: var(--brand); }
+    .title-row > span { min-width: 0; }
+
+    .title-row-name {
+      display: block;
+      margin: 0 0 8px;
+      overflow: hidden;
+      color: var(--text);
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .title-row-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .year-token,
+    .status-token,
+    .channel-token {
+      min-height: 23px;
+      padding: 3px 7px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--text-soft);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .year-token.has-duplicates { border-color: rgba(255, 90, 31, 0.45); color: #ff8b61; background: var(--brand-soft); }
+    .title-total { color: var(--text); font-family: var(--font-display); font-size: 21px; font-weight: 700; }
+    .title-total-label { margin-top: 3px; color: var(--muted); font-size: 9px; text-transform: uppercase; text-align: right; }
+
+    .list-footer { padding: 16px; display: flex; justify-content: center; }
+    .load-button { width: 100%; }
+
+    .detail-pane { min-width: 0; background: var(--bg); }
+    .detail-scroll { min-height: 100%; }
+
+    .empty-state {
+      min-height: 540px;
+      padding: 30px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .empty-mark {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 18px;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--brand);
+      background: var(--surface);
+    }
+
+    .empty-state h2 { margin: 0 0 7px; font-family: var(--font-display); font-size: 19px; }
+    .empty-state p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .detail-header {
+      padding: 25px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .detail-title {
+      margin: 3px 0 9px;
+      font-family: var(--font-display);
+      font-size: 28px;
+      line-height: 1.08;
+    }
+
+    .detail-subtitle { margin: 0; color: var(--muted); font-size: 12px; }
+    .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .close-button { display: none; }
+
+    .flags {
+      padding: 15px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: var(--bg);
+    }
+
+    .status-token.review { border-color: rgba(255, 90, 31, 0.45); background: var(--brand-soft); color: #ff8b61; }
+    .status-token.cross-year { border-color: rgba(69, 196, 134, 0.4); background: var(--green-soft); color: var(--green); }
+    .status-token.unknown { border-color: rgba(242, 184, 75, 0.42); background: var(--amber-soft); color: var(--amber); }
+    .status-token.channels { border-color: rgba(109, 169, 255, 0.4); background: var(--blue-soft); color: var(--blue); }
+
+    .year-section {
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 148px minmax(0, 1fr);
+      background: var(--bg);
+    }
+
+    .year-rail {
+      padding: 24px 20px;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .year-value { font-family: var(--font-display); font-size: 27px; font-weight: 700; }
+    .year-count { margin-top: 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
+
+    .year-count strong { color: var(--text); }
+
+    .year-body { min-width: 0; padding: 22px 24px 25px; }
+    .year-body.is-review { box-shadow: inset 3px 0 0 var(--brand); }
+
+    .section-label {
+      margin: 0 0 9px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .channel-list { margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 7px; }
+    .channel-token { color: var(--blue); border-color: rgba(109, 169, 255, 0.28); background: var(--blue-soft); }
+    .muted-value { color: var(--muted); font-size: 12px; }
+
+    .record-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr);
+      gap: 16px;
+    }
+
+    .record-block {
+      min-width: 0;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
+    .id-list { display: grid; gap: 6px; }
+
+    .id-row {
+      min-width: 0;
+      min-height: 32px;
+      padding: 7px 9px;
+      border: 1px solid var(--border-soft);
+      border-radius: 3px;
+      background: var(--surface);
+      color: var(--text-soft);
+      font-family: Consolas, monospace;
+      font-size: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .source-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .source-list span {
+      min-height: 27px;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text-soft);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .review-note {
+      margin-top: 18px;
+      padding: 12px 13px;
+      border-left: 3px solid var(--green);
+      background: var(--green-soft);
+      color: #a9dfc1;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .review-note.needs-review { border-left-color: var(--brand); background: var(--brand-soft); color: #ffc1aa; }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 70;
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid rgba(69, 196, 134, 0.45);
+      border-radius: 5px;
+      background: #102219;
+      color: #bcebd0;
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1100px) {
+      .summary-inner { grid-template-columns: 1.25fr repeat(4, 0.7fr); }
+      .filters { grid-template-columns: minmax(220px, 1fr) minmax(340px, auto) repeat(2, minmax(125px, 0.5fr)); }
+      .reset-button { grid-column: 4; }
+      .workspace { grid-template-columns: minmax(320px, 360px) minmax(0, 1fr); }
+      .record-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 860px) {
+      .topbar { height: 64px; padding: 0 16px; }
+      .brand-divider, .read-only { display: none; }
+      .page-name { font-size: 12px; }
+      .summary-inner { grid-template-columns: repeat(2, 1fr); }
+      .summary-title { grid-column: 1 / -1; border-left: 0; }
+      .summary-title, .summary-stat { min-height: 88px; padding: 16px; border-bottom: 1px solid var(--border); }
+      .summary-stat:nth-child(odd) { border-right: 0; }
+      .filter-band { top: 64px; }
+      .filters { grid-template-columns: 1fr 1fr; padding: 10px; border-left: 0; border-right: 0; }
+      .filters .field:first-child, .segments { grid-column: 1 / -1; }
+      .reset-button { grid-column: auto; }
+      .workspace { display: block; min-height: 520px; border-left: 0; border-right: 0; }
+      .list-pane { border-right: 0; }
+      .pane-header { top: 282px; }
+      .detail-pane {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        overflow-y: auto;
+        transform: translateX(100%);
+        transition: transform 220ms ease;
+      }
+      .detail-pane.is-open { transform: translateX(0); }
+      .detail-header { position: sticky; top: 0; z-index: 5; padding: 18px; }
+      .detail-title { font-size: 23px; }
+      .detail-actions .action-button { display: none; }
+      .close-button { display: inline-flex; align-items: center; }
+      .flags { padding: 13px 18px; }
+      .year-section { grid-template-columns: 92px minmax(0, 1fr); }
+      .year-rail { padding: 20px 13px; }
+      .year-value { font-size: 21px; }
+      .year-body { padding: 19px 15px 22px; }
+    }
+
+    @media (max-width: 520px) {
+      .brand-block img { width: 94px; }
+      .summary-stat { min-width: 0; }
+      .summary-value { font-size: 23px; }
+      .filters { grid-template-columns: 1fr; }
+      .filters > * { grid-column: 1 !important; }
+      .segments {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+      }
+      .segment { width: 100%; padding: 0 6px; }
+      .pane-header { top: 384px; }
+      .title-row { min-height: 98px; }
+      .year-section { grid-template-columns: 1fr; }
+      .year-rail { border-right: 0; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 10px; }
+      .record-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <img src="/images/MuviDB%20Brand/White%20Wordmark.svg" alt="MuviDB" />
+        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="page-name">Duplicate Film Review</span>
+      </div>
+      <span class="read-only">Audit prototype</span>
+    </header>
+
+    <section class="summary-band" aria-labelledby="audit-title">
+      <div class="summary-inner">
+        <div class="summary-title">
+          <p class="eyebrow">Catalogue integrity</p>
+          <h1 id="audit-title">Titles by production year</h1>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-value" id="metric-titles">0</span>
+          <span class="summary-label">Repeated titles</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-value" id="metric-year-groups">0</span>
+          <span class="summary-label">Title-year groups</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-value" id="metric-review">0</span>
+          <span class="summary-label">Same-year reviews</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-value" id="metric-cross-year">0</span>
+          <span class="summary-label">Cross-year only</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="filter-band" aria-label="Audit filters">
+      <div class="filters">
+        <input id="search" class="field" type="search" placeholder="Search title or channel" autocomplete="off" />
+        <div class="segments" role="group" aria-label="Review status">
+          <button class="segment is-active" type="button" data-mode="all">All titles</button>
+          <button class="segment" type="button" data-mode="review">Same-year review</button>
+          <button class="segment" type="button" data-mode="cross-year">Cross-year only</button>
+          <button class="segment" type="button" data-mode="unknown">Missing year</button>
+        </div>
+        <select id="year-filter" class="field" aria-label="Production year">
+          <option value="all">All years</option>
+        </select>
+        <select id="sort" class="field" aria-label="Sort titles">
+          <option value="title">Title A-Z</option>
+          <option value="copies">Most records</option>
+          <option value="review">Most same-year copies</option>
+        </select>
+        <button id="reset" class="reset-button" type="button">Reset</button>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="list-pane" aria-labelledby="results-heading">
+        <div class="pane-header">
+          <h2 id="results-heading" class="pane-heading">Repeated titles</h2>
+          <span class="result-count" id="result-count">0 results</span>
+        </div>
+        <div id="title-list" class="title-list"></div>
+        <div id="list-footer" class="list-footer" hidden>
+          <button id="load-more" class="load-button" type="button">Load more</button>
+        </div>
+      </section>
+
+      <aside id="detail-pane" class="detail-pane" aria-live="polite">
+        <div id="detail-content" class="detail-scroll">
+          <div class="empty-state">
+            <div>
+              <div class="empty-mark" aria-hidden="true"></div>
+              <h2>Select a title</h2>
+              <p>Production-year records will appear here.</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="./duplicate-audit-data.js"></script>
+  <script>
+    (() => {
+      const groups = Array.isArray(window.DUPLICATE_AUDIT_DATA) ? window.DUPLICATE_AUDIT_DATA : [];
+      const state = { mode: 'all', query: '', year: 'all', sort: 'title', selected: null, visible: 250 };
+      const refs = {
+        search: document.getElementById('search'),
+        year: document.getElementById('year-filter'),
+        sort: document.getElementById('sort'),
+        reset: document.getElementById('reset'),
+        list: document.getElementById('title-list'),
+        count: document.getElementById('result-count'),
+        footer: document.getElementById('list-footer'),
+        loadMore: document.getElementById('load-more'),
+        detailPane: document.getElementById('detail-pane'),
+        detail: document.getElementById('detail-content'),
+        toast: document.getElementById('toast'),
+      };
+
+      const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+      const titleCase = (value) => String(value || '').replace(/\b\w/g, (letter) => letter.toUpperCase());
+      const hasReview = (group) => group.years.some((year) => year.count > 1);
+      const crossYearOnly = (group) => group.years.length > 1 && group.years.every((year) => year.count === 1);
+      const hasUnknown = (group) => group.years.some((year) => year.year === 'Unknown');
+      const channelNames = (group) => [...new Set(group.years.flatMap((year) => year.channels))];
+      const maxYearCount = (group) => Math.max(...group.years.map((year) => year.count), 0);
+      const displayTitle = (group) => group.displayTitle || titleCase(group.title);
+
+      const formatNumber = (value) => Number(value || 0).toLocaleString();
+
+      const setMetrics = () => {
+        document.getElementById('metric-titles').textContent = formatNumber(groups.length);
+        document.getElementById('metric-year-groups').textContent = formatNumber(groups.reduce((sum, group) => sum + group.years.length, 0));
+        document.getElementById('metric-review').textContent = formatNumber(groups.reduce((sum, group) => sum + group.years.filter((year) => year.count > 1).length, 0));
+        document.getElementById('metric-cross-year').textContent = formatNumber(groups.filter(crossYearOnly).length);
+      };
+
+      const buildYearOptions = () => {
+        const years = [...new Set(groups.flatMap((group) => group.years.map((year) => year.year)))];
+        years.sort((first, second) => {
+          if (first === 'Unknown') return 1;
+          if (second === 'Unknown') return -1;
+          return Number(second) - Number(first);
+        });
+        refs.year.insertAdjacentHTML('beforeend', years.map((year) => `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`).join(''));
+      };
+
+      const filteredGroups = () => {
+        const query = state.query.trim().toLowerCase();
+        const filtered = groups.filter((group) => {
+          if (state.mode === 'review' && !hasReview(group)) return false;
+          if (state.mode === 'cross-year' && !crossYearOnly(group)) return false;
+          if (state.mode === 'unknown' && !hasUnknown(group)) return false;
+          if (state.year !== 'all' && !group.years.some((year) => year.year === state.year)) return false;
+          if (query) {
+            const haystack = [group.title, displayTitle(group), ...channelNames(group)].join(' ').toLowerCase();
+            if (!haystack.includes(query)) return false;
+          }
+          return true;
+        });
+
+        return filtered.sort((first, second) => {
+          if (state.sort === 'copies') return second.total - first.total || first.title.localeCompare(second.title);
+          if (state.sort === 'review') return maxYearCount(second) - maxYearCount(first) || first.title.localeCompare(second.title);
+          return first.title.localeCompare(second.title);
+        });
+      };
+
+      const yearTokens = (group) => group.years.map((year) => `
+        <span class="year-token ${year.count > 1 ? 'has-duplicates' : ''}">${escapeHtml(year.year)}: ${year.count}</span>
+      `).join('');
+
+      const renderList = () => {
+        const filtered = filteredGroups();
+        const visible = filtered.slice(0, state.visible);
+        refs.count.textContent = `${formatNumber(filtered.length)} ${filtered.length === 1 ? 'result' : 'results'}`;
+        refs.list.innerHTML = visible.length ? visible.map((group) => `
+          <button
+            class="title-row ${state.selected === group.title ? 'is-selected' : ''}"
+            type="button"
+            data-title="${escapeHtml(group.title)}"
+            aria-label="Review ${escapeHtml(displayTitle(group))}"
+          >
+            <span>
+              <span class="title-row-name">${escapeHtml(displayTitle(group))}</span>
+              <span class="title-row-meta">${yearTokens(group)}</span>
+            </span>
+            <span>
+              <span class="title-total">${group.total}</span>
+              <span class="title-total-label">records</span>
+            </span>
+          </button>
+        `).join('') : `
+          <div class="empty-state">
+            <div><div class="empty-mark" aria-hidden="true"></div><h2>No matching titles</h2><p>Adjust the current filters.</p></div>
+          </div>`;
+        refs.footer.hidden = visible.length >= filtered.length;
+      };
+
+      const splitValues = (values) => Array.isArray(values) ? values : [];
+
+      const exportGroup = (group) => {
+        const headers = ['title', 'production_year', 'records', 'channels', 'film_ids', 'sources', 'video_ids'];
+        const rows = group.years.map((year) => [
+          displayTitle(group), year.year, year.count, year.channels.join(' | '), year.filmIds.join(' | '), year.sources.join(' | '), year.videoIds.join(' | ')
+        ]);
+        const quote = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const csv = [headers, ...rows].map((row) => row.map(quote).join(',')).join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${group.title.replace(/[^a-z0-9]+/g, '-')}-audit.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      };
+
+      let toastTimer;
+      const showToast = (message) => {
+        refs.toast.textContent = message;
+        refs.toast.classList.add('is-visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => refs.toast.classList.remove('is-visible'), 1800);
+      };
+
+      const copyIds = async (group) => {
+        const ids = group.years.flatMap((year) => year.filmIds).join('\n');
+        try {
+          await navigator.clipboard.writeText(ids);
+          showToast('Film IDs copied');
+        } catch {
+          showToast('Clipboard permission unavailable');
+        }
+      };
+
+      const renderDetail = (group) => {
+        if (!group) return;
+        const channels = channelNames(group);
+        const flags = [
+          hasReview(group) ? '<span class="status-token review">Same-year review</span>' : '',
+          crossYearOnly(group) ? '<span class="status-token cross-year">Cross-year repeat</span>' : '',
+          hasUnknown(group) ? '<span class="status-token unknown">Missing production year</span>' : '',
+          channels.length ? `<span class="status-token channels">${channels.length} ${channels.length === 1 ? 'channel' : 'channels'}</span>` : '',
+        ].filter(Boolean).join('');
+
+        refs.detail.innerHTML = `
+          <div class="detail-header">
+            <div>
+              <p class="eyebrow">Title record</p>
+              <h2 class="detail-title">${escapeHtml(displayTitle(group))}</h2>
+              <p class="detail-subtitle">${group.total} records across ${group.years.length} production ${group.years.length === 1 ? 'year' : 'years'}: ${escapeHtml(group.breakdown)}</p>
+            </div>
+            <div class="detail-actions">
+              <button class="action-button" type="button" data-action="copy">Copy IDs</button>
+              <button class="action-button" type="button" data-action="export">Export title</button>
+              <button class="close-button" type="button" data-action="close">Close</button>
+            </div>
+          </div>
+          <div class="flags">${flags}</div>
+          ${group.years.map((year) => `
+            <section class="year-section">
+              <div class="year-rail">
+                <div class="year-value">${escapeHtml(year.year)}</div>
+                <div class="year-count"><strong>${year.count}</strong> ${year.count === 1 ? 'record' : 'records'}</div>
+              </div>
+              <div class="year-body ${year.count > 1 ? 'is-review' : ''}">
+                <p class="section-label">Channels</p>
+                <div class="channel-list">
+                  ${year.channels.length ? year.channels.map((channel) => `<span class="channel-token">${escapeHtml(channel)}</span>`).join('') : '<span class="muted-value">No linked channel</span>'}
+                </div>
+                <div class="record-grid">
+                  <div class="record-block">
+                    <p class="section-label">Film records</p>
+                    <div class="id-list">${year.filmIds.map((id) => `<div class="id-row" title="${escapeHtml(id)}">${escapeHtml(id)}</div>`).join('')}</div>
+                  </div>
+                  <div class="record-block">
+                    <p class="section-label">Sources</p>
+                    <div class="source-list">${splitValues(year.sources).map((source) => `<span>${escapeHtml(source)}</span>`).join('') || '<span>Unknown</span>'}</div>
+                    ${year.runtimes.length ? `<p class="section-label" style="margin-top:16px">Runtime values</p><div class="source-list">${year.runtimes.map((runtime) => `<span>${escapeHtml(runtime)} min</span>`).join('')}</div>` : ''}
+                  </div>
+                </div>
+                <div class="review-note ${year.count > 1 ? 'needs-review' : ''}">
+                  ${year.count > 1 ? 'Multiple records share this title and production year. Review the films before merging or reclassifying them.' : 'This production year has one record. Keep it separate from the other years unless the underlying film evidence proves otherwise.'}
+                </div>
+              </div>
+            </section>
+          `).join('')}
+        `;
+        refs.detailPane.classList.add('is-open');
+
+        const copyButton = refs.detail.querySelector('[data-action="copy"]');
+        const exportButton = refs.detail.querySelector('[data-action="export"]');
+        const closeButton = refs.detail.querySelector('[data-action="close"]');
+        if (copyButton) copyButton.addEventListener('click', () => copyIds(group));
+        if (exportButton) exportButton.addEventListener('click', () => exportGroup(group));
+        if (closeButton) closeButton.addEventListener('click', () => refs.detailPane.classList.remove('is-open'));
+      };
+
+      const update = () => {
+        state.visible = 250;
+        renderList();
+        if (state.selected) {
+          const selected = groups.find((group) => group.title === state.selected);
+          if (selected && filteredGroups().includes(selected)) renderDetail(selected);
+        }
+      };
+
+      refs.list.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-title]');
+        if (!button) return;
+        state.selected = button.dataset.title;
+        renderList();
+        renderDetail(groups.find((group) => group.title === state.selected));
+      });
+
+      document.querySelectorAll('[data-mode]').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('[data-mode]').forEach((item) => item.classList.remove('is-active'));
+          button.classList.add('is-active');
+          state.mode = button.dataset.mode;
+          update();
+        });
+      });
+
+      refs.search.addEventListener('input', () => { state.query = refs.search.value; update(); });
+      refs.year.addEventListener('change', () => { state.year = refs.year.value; update(); });
+      refs.sort.addEventListener('change', () => { state.sort = refs.sort.value; update(); });
+      refs.loadMore.addEventListener('click', () => { state.visible += 250; renderList(); });
+      refs.reset.addEventListener('click', () => {
+        state.mode = 'all'; state.query = ''; state.year = 'all'; state.sort = 'title'; state.selected = null; state.visible = 250;
+        refs.search.value = ''; refs.year.value = 'all'; refs.sort.value = 'title';
+        document.querySelectorAll('[data-mode]').forEach((button) => button.classList.toggle('is-active', button.dataset.mode === 'all'));
+        refs.detailPane.classList.remove('is-open');
+        refs.detail.innerHTML = '<div class="empty-state"><div><div class="empty-mark" aria-hidden="true"></div><h2>Select a title</h2><p>Production-year records will appear here.</p></div></div>';
+        renderList();
+      });
+
+      setMetrics();
+      buildYearOptions();
+      renderList();
+
+      const initial = groups.find((group) => group.title === 'abobaku') || groups[0];
+      if (initial && window.innerWidth > 860) {
+        state.selected = initial.title;
+        renderList();
+        renderDetail(initial);
+      }
+    })();
+  </script>
+</body>
+</html>

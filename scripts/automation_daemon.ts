@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,7 +9,6 @@ dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const YOUTUBE_API_KEY = process.env.VITE_YOUTUBE_API_KEY || process.env.YOUTUBE_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -47,113 +45,33 @@ async function updateStatus(id: string, status: string, message: string) {
 }
 
 async function runActorEnricher() {
-  if (!GEMINI_API_KEY) {
-    await updateStatus('actor_enricher', 'error', 'GEMINI_API_KEY is missing');
-    return;
-  }
-
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    tools: [{ googleSearch: {} }]
-  });
-
-  console.log("Starting Actor Enricher Batch...");
-  await updateStatus('actor_enricher', 'running', 'Fetching batch of 20 actors...');
+  console.log("Starting sourced People Enrichment batch...");
+  await updateStatus('actor_enricher', 'running', 'Building 5 sourced profile proposals...');
 
   try {
-    // Process 20 at a time (much faster than Vercel's 5)
-    const { data: people, error } = await supabase
-      .from('people')
-      .select('id, name')
-      .or('bio.is.null,photo_url.is.null')
-      .limit(20);
-
-    if (error) throw error;
-
-    if (!people || people.length === 0) {
-      await updateStatus('actor_enricher', 'idle', 'Finished: No actors missing details.');
-      return; // Stop processing for now
+    const { count, error: countError } = await supabase
+      .from('people_enrichment_queue')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['pending', 'failed']);
+    if (countError) throw countError;
+    if (!count) {
+      const { error: refreshError } = await supabase.rpc('refresh_people_enrichment_queue');
+      if (refreshError) throw refreshError;
     }
 
-    let processedCount = 0;
-    let errorsCount = 0;
-
-    for (const person of people) {
-      const prompt = `You are an expert Nollywood film historian with access to Google Search.
-Your task is to search the web for accurate biographical details about the Nollywood actor/filmmaker "${person.name}".
-Use your Google Search tool to find recent and accurate information, then extract their details and return it as a structured JSON object.
-Rules:
-- Write a compelling, 2-3 paragraph professional biography based on what you find online.
-- Do NOT hallucinate. Only use facts present in your search results or from your deep knowledge of famous Nollywood actors.
-- If you find an image URL representing them online (e.g. from Wikipedia, IMDb, or a news article), provide it.
-- If a field cannot be reliably determined from your searches, return null.
-
-IMPORTANT: You must return ONLY raw JSON matching this structure:
-{
-  "bio": "string or null",
-  "date_of_birth": "YYYY-MM-DD or null",
-  "birthplace": "string or null",
-  "photo_url": "string or null"
-}
-Do NOT include markdown formatting or backticks around the JSON.
-
-Please execute a search for: "${person.name} Nollywood actor biography date of birth"`;
-
-      let responseText = "";
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          const result = await model.generateContent(prompt);
-          responseText = result.response.text();
-          break;
-        } catch (err: any) {
-          if (err.message?.includes('503') && retries > 1) {
-            console.log(`Rate limit or 503 hit. Retrying for ${person.name}...`);
-            await sleep(5000); // Wait 5s on 503 since we're in a daemon
-            retries--;
-          } else {
-            throw err;
-          }
-        }
-      }
-
-      responseText = responseText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
-
-      let extractedData;
-      try {
-        extractedData = JSON.parse(responseText);
-      } catch (jsonErr) {
-        extractedData = {
-          bio: responseText.length > 50 ? responseText : null,
-          date_of_birth: null,
-          birthplace: null,
-          photo_url: null
-        };
-      }
-
-      const { error: updateError } = await supabase
-        .from('people')
-        .update({
-          bio: extractedData.bio || null,
-          date_of_birth: extractedData.date_of_birth || null,
-          birthplace: extractedData.birthplace || null,
-          photo_url: extractedData.photo_url || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', person.id);
-
-      if (updateError) {
-        errorsCount++;
-      } else {
-        processedCount++;
-      }
-      
-      // Small pause between individual actors to prevent overwhelming the DB/API
-      await sleep(1000);
-    }
-
-    await updateStatus('actor_enricher', 'idle', `Success: Processed ${processedCount} actors (${errorsCount} errors)`);
+    // Dynamic import happens after dotenv is loaded, so the shared server client
+    // receives the same service-role environment as this daemon.
+    const { processPeopleEnrichmentBatch } = await import('../api/_lib/people_enrichment.js');
+    const results = await processPeopleEnrichmentBatch({ limit: 5 });
+    const ready = results.filter((result: any) => result.status === 'ready').length;
+    const review = results.filter((result: any) => result.status === 'needs_review').length;
+    const noMatch = results.filter((result: any) => result.status === 'no_match').length;
+    const failed = results.filter((result: any) => result.status === 'failed').length;
+    await updateStatus(
+      'actor_enricher',
+      'idle',
+      `Prepared ${results.length} proposals: ${ready} ready, ${review} review, ${noMatch} no match, ${failed} failed`,
+    );
 
   } catch (error: any) {
     await updateStatus('actor_enricher', 'error', `Error: ${error.message}`);
@@ -222,9 +140,9 @@ async function startActorEnricherLoop() {
   console.log("Starting Actor Enricher Daemon Loop...");
   while (true) {
     await runActorEnricher();
-    // Wait 60 seconds between batches to avoid spamming Gemini paid quotas excessively
-    console.log("Actor Enricher sleeping for 60 seconds...");
-    await sleep(60 * 1000);
+    // Keep the source lookup deliberate: 5 profiles every 10 minutes.
+    console.log("People Enrichment sleeping for 10 minutes...");
+    await sleep(10 * 60 * 1000);
   }
 }
 

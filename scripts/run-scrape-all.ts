@@ -12,11 +12,22 @@ async function run() {
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
   );
 
-  const { data: cinemas } = await supabase
+  const { data: enabledCinemas } = await supabase
     .from('cinemas')
     .select('id, name, chain, city, booking_url, scrape_adapter, scrape_config, showtimes_last_fetched_at, scrape_failure_count')
     .eq('scrape_enabled', true)
     .order('name');
+
+  const requestedCinemas = process.argv
+    .slice(2)
+    .filter((arg) => arg.startsWith('--cinema='))
+    .map((arg) => arg.slice('--cinema='.length).trim().toLowerCase())
+    .filter(Boolean);
+  const cinemas = requestedCinemas.length
+    ? (enabledCinemas || []).filter((cinema) =>
+        requestedCinemas.includes(cinema.id.toLowerCase())
+        || requestedCinemas.includes(cinema.name.toLowerCase()))
+    : enabledCinemas;
 
   if (!cinemas?.length) {
     console.log('No cinemas enabled for scraping.');

@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
+import ImageWithFallback from '../ui/ImageWithFallback';
 
 export default function MergeModal({ 
   isOpen, 
   onClose, 
   onConfirm, 
   items, 
-  type = 'person' 
+  type = 'person',
+  confirmDisabled = false,
+  confirmDisabledReason = '',
 }) {
   const [primaryId, setPrimaryId] = useState(items[0]?.id);
   const [enrichedData, setEnrichedData] = useState({});
   const [step, setStep] = useState(1); // 1: Select Primary, 2: Enrich Data
 
   useEffect(() => {
-    if (items.length > 0) {
+    if (isOpen && items.length > 0) {
       setPrimaryId(items[0].id);
+      setEnrichedData({});
+      setStep(1);
     }
-  }, [items]);
+  }, [isOpen, items]);
 
   if (!isOpen || items.length < 2) return null;
 
@@ -28,19 +33,32 @@ export default function MergeModal({
     { key: 'name', label: 'Full Name' },
     { key: 'bio', label: 'Biography', type: 'longtext' },
     { key: 'photo_url', label: 'Photo', type: 'image' },
+    { key: 'date_of_birth', label: 'Date of Birth' },
+    { key: 'birthplace', label: 'Birthplace' },
     { key: 'nationality', label: 'Nationality' },
     { key: 'gender', label: 'Gender' },
+    { key: 'known_for_department', label: 'Known For' },
+    { key: 'instagram_url', label: 'Instagram' },
+    { key: 'facebook_url', label: 'Facebook' },
+    { key: 'twitter_url', label: 'X / Twitter' },
     { key: 'youtube_handle', label: 'YouTube Handle' },
     { key: 'youtube_channel_id', label: 'Channel ID' },
+    { key: 'tmdb_id', label: 'TMDB ID' },
+    { key: 'mubi_id', label: 'MUBI ID' },
   ] : [
     { key: 'title', label: 'Title' },
+    { key: 'original_title', label: 'Original Title' },
     { key: 'synopsis', label: 'Synopsis', type: 'longtext' },
     { key: 'poster_url', label: 'Poster', type: 'image' },
     { key: 'year', label: 'Release Year' },
+    { key: 'release_date', label: 'Release Date' },
     { key: 'language', label: 'Language' },
     { key: 'runtime_minutes', label: 'Runtime' },
     { key: 'status', label: 'Status' },
     { key: 'release_type', label: 'Release Type' },
+    { key: 'content_type', label: 'Content Type' },
+    { key: 'tmdb_id', label: 'TMDB ID' },
+    { key: 'mubi_id', label: 'MUBI ID' },
   ];
 
   // Create a composite secondary to show the best available data from ALL duplicates
@@ -108,7 +126,14 @@ export default function MergeModal({
                       
                       <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-xl bg-surface border border-border overflow-hidden flex-shrink-0 shadow-md">
-                          <img src={item.photo_url || item.poster_url || 'https://via.placeholder.com/150'} alt="" className="w-full h-full object-cover" />
+                          <ImageWithFallback
+                            src={item.photo_url || item.poster_url}
+                            alt={item.name || item.title || ''}
+                            name={item.name || item.title}
+                            fallbackType={type === 'person' ? 'avatar' : 'banner'}
+                            className="w-full h-full object-cover"
+                            width={128}
+                          />
                         </div>
                         <div className="min-w-0 pr-4">
                           <div className="font-bold text-text-primary text-base truncate">{item.name || item.title}</div>
@@ -177,7 +202,14 @@ export default function MergeModal({
                   >
                     {field.type === 'image' ? (
                       <div className="w-16 h-16 rounded-lg border border-border overflow-hidden bg-surface shadow-sm">
-                        <img src={primary[field.key] || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
+                        <ImageWithFallback
+                          src={primary[field.key]}
+                          alt={primary.name || primary.title || ''}
+                          name={primary.name || primary.title}
+                          fallbackType={type === 'person' ? 'avatar' : 'banner'}
+                          className="w-full h-full object-cover"
+                          width={128}
+                        />
                       </div>
                     ) : field.type === 'longtext' ? (
                       <p className="text-xs text-text-primary line-clamp-3 leading-relaxed">{primary[field.key] || <em className="text-text-muted/50">No data</em>}</p>
@@ -207,7 +239,14 @@ export default function MergeModal({
                   >
                     {field.type === 'image' ? (
                       <div className="w-16 h-16 rounded-lg border border-border overflow-hidden bg-surface shadow-sm">
-                        <img src={compositeSecondary[field.key] || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" />
+                        <ImageWithFallback
+                          src={compositeSecondary[field.key]}
+                          alt={compositeSecondary.name || compositeSecondary.title || ''}
+                          name={compositeSecondary.name || compositeSecondary.title}
+                          fallbackType={type === 'person' ? 'avatar' : 'banner'}
+                          className="w-full h-full object-cover"
+                          width={128}
+                        />
                       </div>
                     ) : field.type === 'longtext' ? (
                       <p className="text-xs text-text-primary line-clamp-3 leading-relaxed">{compositeSecondary[field.key] || <em className="text-text-muted/50">No data</em>}</p>
@@ -227,38 +266,47 @@ export default function MergeModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-border bg-surface-2/50 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-             {step === 2 && (
-               <button 
-                 onClick={() => setStep(1)}
-                 className="flex items-center gap-2 text-text-muted hover:text-text-primary transition-colors text-xs font-bold"
-               >
-                 <Icon icon="solar:alt-arrow-left-linear" />
-                 Change Primary Record
-               </button>
-             )}
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} className="px-6 py-2.5 rounded-lg text-sm font-bold text-text-muted hover:text-text-primary transition-colors">Abort</button>
-            {step === 1 ? (
-              <button
-                onClick={handleInitializeEnrichment}
-                className="px-8 py-2.5 bg-brand text-white font-black text-sm rounded-lg shadow-lg shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
-              >
-                Configure Data
-                <Icon icon="solar:alt-arrow-right-linear" />
-              </button>
-            ) : (
-              <button
-                onClick={() => onConfirm(primaryId, secondaries.map(s => s.id), enrichedData)}
-                className="px-8 py-2.5 bg-brand text-white font-black text-sm rounded-lg shadow-lg shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
-              >
-                Finalize & Merge Records
-                <Icon icon="solar:magic-stick-bold" />
-              </button>
-            )}
+        <div className="border-t border-border bg-surface-2/50">
+          {step === 2 && confirmDisabled && confirmDisabledReason && (
+            <div className="flex items-start gap-3 border-b border-amber-500/20 bg-amber-500/10 px-6 py-3 text-amber-200">
+              <Icon icon="solar:database-bold" className="mt-0.5 shrink-0 text-amber-400" width="18" />
+              <p className="text-xs font-semibold leading-relaxed">{confirmDisabledReason}</p>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4 p-6">
+            <div className="flex items-center gap-4">
+              {step === 2 && (
+                <button
+                  onClick={() => setStep(1)}
+                  className="flex items-center gap-2 text-text-muted hover:text-text-primary transition-colors text-xs font-bold"
+                >
+                  <Icon icon="solar:alt-arrow-left-linear" />
+                  Change Primary Record
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button onClick={onClose} className="px-6 py-2.5 rounded-lg text-sm font-bold text-text-muted hover:text-text-primary transition-colors">Abort</button>
+              {step === 1 ? (
+                <button
+                  onClick={handleInitializeEnrichment}
+                  className="px-8 py-2.5 bg-brand text-white font-black text-sm rounded-lg shadow-lg shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+                >
+                  Configure Data
+                  <Icon icon="solar:alt-arrow-right-linear" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => onConfirm(primaryId, secondaries.map(s => s.id), enrichedData)}
+                  disabled={confirmDisabled}
+                  className="px-8 py-2.5 bg-brand text-white font-black text-sm rounded-lg shadow-lg shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
+                >
+                  Finalize & Merge Records
+                  <Icon icon="solar:magic-stick-bold" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

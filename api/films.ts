@@ -6,6 +6,7 @@ import { handleCors } from './_lib/cors.js';
 
 const FIELDS = [
   'id',
+  'slug',
   'title',
   'poster_url',
   'backdrop_url',
@@ -39,10 +40,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ── Single Film Detail ──────────────────────────────────────────────────────
   if (id && !Array.isArray(id)) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
     const { data, error } = await supabase
       .from('films')
-      .select(`${FIELDS}, film_watch_links(id, distributor, url)`)
-      .eq('id', id)
+      .select(`
+        *,
+        film_genres(genre_id, genres(name)),
+        film_companies(companies(id, name, logo_url)),
+        film_watch_links(id, distributor, url)
+      `)
+      .eq(isUuid ? 'id' : 'slug', id)
       // Service-role client bypasses the RLS publish gate, so filter here too:
       // an unpublished film must 404 for the public just like it's hidden in lists.
       .eq('is_published', true)
@@ -52,10 +59,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error) return res.status(500).json({ error: 'Failed to fetch film' });
 
     const raw = data as any;
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400');
     return res.status(200).json({ 
       film: {
         ...raw,
-        film_genres: undefined,
         genres: raw.film_genres?.map((fg: any) => fg.genres?.name).filter(Boolean) ?? [],
         watch_links: raw.film_watch_links ?? [],
         film_watch_links: undefined,
@@ -111,5 +118,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     genres: f.film_genres?.map((fg: any) => fg.genres?.name).filter(Boolean) ?? [],
   }));
 
+  res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=300, stale-while-revalidate=3600');
   return res.status(200).json({ films, limit: limitValue, offset: offsetValue });
 }
