@@ -6,8 +6,6 @@ import { processPeopleEnrichmentBatch } from './people_enrichment.js';
 
 export const maxDuration = 60;
 
-const loadGeminiResearch = () => import('./gemini_people_enrichment.js');
-
 const PERSON_EMBED = `
   id,name,slug,photo_url,bio,date_of_birth,birthplace,nationality,gender,
   known_for_department,instagram_url,facebook_url,twitter_url,tiktok_url,
@@ -59,7 +57,6 @@ function applyFilters(query: any, body: any) {
   if (status === 'review') query = query.in('status', ['ready', 'needs_review']);
   else if (status === 'pending') query = query.in('status', ['pending', 'fetching', 'failed']);
   else if (status !== 'all') query = query.eq('status', status);
-
   if (body?.missingField && body.missingField !== 'all') {
     query = query.contains('missing_fields', [String(body.missingField)]);
   }
@@ -96,20 +93,16 @@ async function list(body: any, res: VercelResponse) {
   const page = Math.max(1, Number(body?.page) || 1);
   const pageSize = Math.min(100, Math.max(10, Number(body?.pageSize) || 40));
   const from = (page - 1) * pageSize;
-
-  function runQuery(select: string) {
-    return applyFilters(
-      supabase.from('people_enrichment_queue').select(select, { count: 'exact' }),
-      body,
-    )
-      .order('priority_score', { ascending: false })
-      .order('updated_at', { ascending: false })
-      .range(from, from + pageSize - 1);
-  }
+  const runQuery = (select: string) => applyFilters(
+    supabase.from('people_enrichment_queue').select(select, { count: 'exact' }),
+    body,
+  )
+    .order('priority_score', { ascending: false })
+    .order('updated_at', { ascending: false })
+    .range(from, from + pageSize - 1);
 
   let [{ data, error, count }, stats] = await Promise.all([runQuery(QUEUE_SELECT), queueStats()]);
   if (error) {
-    // Fallback before Gemini research tables are available.
     [{ data, error, count }, stats] = await Promise.all([runQuery(QUEUE_SELECT_BASIC), queueStats()]);
   }
   if (error) throw error;
@@ -125,62 +118,7 @@ async function refresh(res: VercelResponse) {
 async function suggest(body: any, res: VercelResponse) {
   const queueIds = uniqueStringIds(body?.queueIds, 10);
   const limit = Math.min(10, Math.max(1, Number(body?.limit) || 5));
-  const provider = body?.provider === 'tmdb_then_gemini' || body?.provider === 'gemini'
-    ? body.provider
-    : 'tmdb';
-  const results = await processPeopleEnrichmentBatch({ limit, queueIds, provider });
-  return res.status(200).json({ success: true, results, stats: await queueStats() });
-}
-
-async function researchGemini(body: any, res: VercelResponse) {
-  const queueId = String(body?.queueId || '');
-  if (!queueId) return res.status(400).json({ error: 'queueId is required' });
-
-  const { data: row, error } = await supabase
-    .from('people_enrichment_queue')
-    .select('id,person_id,attempt_count,missing_fields,status')
-    .eq('id', queueId)
-    .single();
-  if (error) throw error;
-  if (!row) return res.status(404).json({ error: 'Queue row not found' });
-
-  await supabase
-    .from('people_enrichment_queue')
-    .update({
-      status: 'fetching',
-      attempt_count: Number(row.attempt_count || 0) + 1,
-      last_attempt_at: new Date().toISOString(),
-    })
-    .eq('id', row.id);
-
-  const { researchPersonWithGemini } = await loadGeminiResearch();
-  const result = await researchPersonWithGemini({
-    queueId: row.id,
-    personId: row.person_id,
-    missingFields: row.missing_fields || [],
-    force: Boolean(body?.force),
-  });
-
-  // Transport failures leave prior TMDB proposals untouched.
-  if (result.preserveExistingProposal && row.status && row.status !== 'fetching') {
-    await supabase
-      .from('people_enrichment_queue')
-      .update({ status: row.status })
-      .eq('id', row.id);
-  }
-
-  return res.status(200).json({ success: true, result, stats: await queueStats() });
-}
-
-async function researchGeminiBatch(body: any, res: VercelResponse) {
-  const queueIds = uniqueStringIds(body?.queueIds, 5);
-  const limit = Math.min(5, Math.max(1, Number(body?.limit) || 5));
-  const results = await processPeopleEnrichmentBatch({
-    limit,
-    queueIds,
-    provider: 'gemini',
-    forceGemini: true,
-  });
+  const results = await processPeopleEnrichmentBatch({ limit, queueIds });
   return res.status(200).json({ success: true, results, stats: await queueStats() });
 }
 
@@ -225,8 +163,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'list') return await list(req.body, res);
     if (action === 'refresh') return await refresh(res);
     if (action === 'suggest') return await suggest(req.body, res);
-    if (action === 'research_gemini') return await researchGemini(req.body, res);
-    if (action === 'research_gemini_batch') return await researchGeminiBatch(req.body, res);
     if (action === 'apply') return await apply(req, req.body, res);
     if (action === 'review') return await review(req, req.body, res);
     return res.status(400).json({ error: 'Invalid action' });

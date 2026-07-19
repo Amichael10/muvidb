@@ -3,15 +3,11 @@ import {
   buildTmdbEnrichmentProposal,
   chooseBestTmdbPerson,
 } from '../../src/lib/peopleEnrichment.js';
-import { shouldRunGeminiAfterTmdb } from '../../src/lib/geminiPeopleEnrichment.js';
-
-// Lazy-load Gemini so /api/automation stays healthy for TMDB/status routes.
-const loadGeminiResearch = () => import('./gemini_people_enrichment.js');
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 
-export type EnrichmentProvider = 'tmdb' | 'gemini' | 'tmdb_then_gemini';
+export type EnrichmentProvider = 'tmdb';
 
 type QueueTarget = {
   id: string;
@@ -53,11 +49,9 @@ async function tmdbFetch(path: string, params: Record<string, string | number | 
   return response.json();
 }
 
-function tmdbPersonDetails(id: string | number) {
-  return tmdbFetch(`/person/${id}`, {
-    append_to_response: 'external_ids,combined_credits',
-  });
-}
+const tmdbPersonDetails = (id: string | number) => tmdbFetch(`/person/${id}`, {
+  append_to_response: 'external_ids,combined_credits',
+});
 
 async function getPersonContext(personId: string): Promise<PersonContext> {
   const [{ data: person, error: personError }, { data: credits, error: creditsError }] = await Promise.all([
@@ -137,16 +131,7 @@ async function writeTmdbProposal(target: QueueTarget, proposal: any) {
   if (error) throw error;
 }
 
-export async function buildPeopleEnrichmentCandidate(
-  target: QueueTarget,
-  {
-    provider = 'tmdb',
-    forceGemini = false,
-  }: {
-    provider?: EnrichmentProvider;
-    forceGemini?: boolean;
-  } = {},
-) {
+export async function buildPeopleEnrichmentCandidate(target: QueueTarget) {
   await supabase
     .from('people_enrichment_queue')
     .update({
@@ -157,78 +142,17 @@ export async function buildPeopleEnrichmentCandidate(
     .eq('id', target.id);
 
   try {
-    if (provider === 'gemini') {
-      const { researchPersonWithGemini } = await loadGeminiResearch();
-      const geminiResult = await researchPersonWithGemini({
-        queueId: target.id,
-        personId: target.person_id,
-        missingFields: target.missing_fields || [],
-        force: true,
-      });
-      return {
-        queueId: target.id,
-        personId: target.person_id,
-        provider: 'gemini',
-        status: geminiResult.status,
-        confidence: geminiResult.confidence || 0,
-        proposedFields: geminiResult.proposedFields || [],
-        error: geminiResult.error,
-        cached: geminiResult.cached,
-      };
-    }
-
     const context = await getPersonContext(target.person_id);
     const proposal: any = await findTmdbMatch(context);
     await writeTmdbProposal(target, proposal);
 
-    const tmdbResult = {
+    return {
       queueId: target.id,
       personId: target.person_id,
       provider: 'tmdb' as const,
       status: proposal.status,
       confidence: proposal.confidence || 0,
       proposedFields: Object.keys(proposal.candidateData || {}),
-    };
-
-    if (provider === 'tmdb') return tmdbResult;
-
-    const runGemini = shouldRunGeminiAfterTmdb({
-      tmdbProposal: proposal,
-      person: context.person,
-      missingFields: target.missing_fields || [],
-      force: forceGemini,
-    });
-    if (!runGemini) return tmdbResult;
-
-    const { researchPersonWithGemini } = await loadGeminiResearch();
-    const geminiResult = await researchPersonWithGemini({
-      queueId: target.id,
-      personId: target.person_id,
-      missingFields: target.missing_fields || [],
-      force: forceGemini,
-    });
-
-    // Gemini transport failures must not damage existing TMDB proposals.
-    if (geminiResult.preserveExistingProposal || geminiResult.status === 'failed') {
-      return {
-        ...tmdbResult,
-        gemini: {
-          status: geminiResult.status,
-          error: geminiResult.error,
-          preservedTmdb: true,
-        },
-      };
-    }
-
-    return {
-      queueId: target.id,
-      personId: target.person_id,
-      provider: 'tmdb_then_gemini',
-      status: geminiResult.status || tmdbResult.status,
-      confidence: geminiResult.confidence ?? tmdbResult.confidence,
-      proposedFields: geminiResult.proposedFields || tmdbResult.proposedFields,
-      tmdb: tmdbResult,
-      gemini: geminiResult,
     };
   } catch (error: any) {
     await supabase
@@ -247,17 +171,13 @@ export async function buildPeopleEnrichmentCandidate(
 export async function processPeopleEnrichmentBatch({
   limit = 5,
   queueIds,
-  provider = 'tmdb',
-  forceGemini = false,
 }: {
   limit?: number;
   queueIds?: string[];
   provider?: EnrichmentProvider;
   forceGemini?: boolean;
 } = {}) {
-  // Gemini batches stay at five people and always process sequentially.
-  const usesGemini = provider === 'gemini' || provider === 'tmdb_then_gemini';
-  const capped = Math.min(Math.max(limit, 1), usesGemini ? 5 : 10);
+  const capped = Math.min(Math.max(limit, 1), 10);
 
   let query = supabase
     .from('people_enrichment_queue')
@@ -266,14 +186,14 @@ export async function processPeopleEnrichmentBatch({
     .limit(capped);
 
   if (queueIds?.length) query = query.in('id', queueIds.slice(0, capped));
-  else query = query.in('status', ['pending', 'failed', 'no_match']);
+  else query = query.in('status', ['pending', 'failed']);
 
   const { data, error } = await query;
   if (error) throw error;
 
   const results = [];
   for (const target of (data || []) as QueueTarget[]) {
-    results.push(await buildPeopleEnrichmentCandidate(target, { provider, forceGemini }));
+    results.push(await buildPeopleEnrichmentCandidate(target));
   }
   return results;
 }
