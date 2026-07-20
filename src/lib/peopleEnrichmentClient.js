@@ -31,19 +31,39 @@ const STATUS_GROUPS = {
   pending: ['pending', 'fetching', 'failed'],
 };
 
-const GEMINI_DEV_UNAVAILABLE = 'Gemini research requires the production API endpoint (not available in local DEV fallback).';
+const GEMINI_UNAVAILABLE = 'Gemini research is temporarily unavailable. Try again after the latest deploy finishes.';
 
 async function apiRequest(body) {
+  // Prefer the API, but fall back to direct Supabase for list/refresh/apply
+  // so the admin UI keeps working if automation is unhealthy.
   if (import.meta.env.DEV) return null;
-  const response = await fetch('/api/people-enrichment', {
+  try {
+    const response = await fetch('/api/people-enrichment', {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify(body),
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('application/json')) return null;
+    return await response.json().catch(() => null);
+  } catch {
+    return null;
+  }
+}
+
+async function geminiApiRequest(task, data) {
+  const response = await fetch('/api/ai', {
     method: 'POST',
     headers: await authHeaders(),
-    body: JSON.stringify(body),
+    body: JSON.stringify({ task, data }),
   });
   const contentType = response.headers.get('content-type') || '';
-  if (response.status === 404 || !contentType.includes('application/json')) return null;
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || 'People enrichment request failed');
+  const payload = contentType.includes('application/json')
+    ? await response.json().catch(() => ({}))
+    : {};
+  if (!response.ok) {
+    throw new Error(payload.error || `Gemini research failed (${response.status})`);
+  }
   return payload;
 }
 
@@ -208,6 +228,8 @@ export async function listPeopleEnrichment(options = {}) {
 
   const [{ data, error, count }, stats] = await Promise.all([
     query
+      // Least-complete first: tackle 0% profiles before the 50-90% ones.
+      .order('current_completeness', { ascending: true })
       .order('priority_score', { ascending: false })
       .order('updated_at', { ascending: false })
       .range(from, from + pageSize - 1),
@@ -226,11 +248,11 @@ export async function refreshPeopleEnrichment() {
 }
 
 export async function suggestPeopleEnrichment({ queueIds, limit = 5, provider = 'tmdb' } = {}) {
-  const remote = await apiRequest({ action: 'suggest', queueIds, limit, provider });
-  if (remote) return remote;
   if (provider === 'gemini' || provider === 'tmdb_then_gemini') {
-    throw new Error(GEMINI_DEV_UNAVAILABLE);
+    return researchPeopleWithGeminiBatch({ queueIds, limit });
   }
+  const remote = await apiRequest({ action: 'suggest', queueIds, limit, provider: 'tmdb' });
+  if (remote) return remote;
   let query = supabase
     .from('people_enrichment_queue')
     .select('id,person_id,attempt_count')
@@ -246,19 +268,16 @@ export async function suggestPeopleEnrichment({ queueIds, limit = 5, provider = 
 }
 
 export async function researchPeopleWithGemini({ queueId, force = true } = {}) {
-  const remote = await apiRequest({ action: 'research_gemini', queueId, force });
-  if (remote) return remote;
-  throw new Error(GEMINI_DEV_UNAVAILABLE);
+  if (import.meta.env.DEV) throw new Error(GEMINI_UNAVAILABLE);
+  return geminiApiRequest('people_enrichment_gemini', { queueId, force });
 }
 
 export async function researchPeopleWithGeminiBatch({ queueIds, limit = 5 } = {}) {
-  const remote = await apiRequest({
-    action: 'research_gemini_batch',
+  if (import.meta.env.DEV) throw new Error(GEMINI_UNAVAILABLE);
+  return geminiApiRequest('people_enrichment_gemini_batch', {
     queueIds: (queueIds || []).slice(0, 5),
     limit: Math.min(5, limit),
   });
-  if (remote) return remote;
-  throw new Error(GEMINI_DEV_UNAVAILABLE);
 }
 
 export async function applyPeopleEnrichment(queueId, fields) {

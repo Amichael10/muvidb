@@ -32,6 +32,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'discover_actors': return await discoverActors(data, res);
       case 'deduplicate': return await mergeDuplicates(data, res);
       case 'extract_credits_from_image': return await extractCreditsFromImage(data, res);
+      case 'people_enrichment_gemini': return await peopleEnrichmentGemini(data, res);
+      case 'people_enrichment_gemini_batch': return await peopleEnrichmentGeminiBatch(data, res);
       default: return res.status(400).json({ error: 'Invalid task' });
     }
   } catch (err: any) {
@@ -626,4 +628,88 @@ async function extractCreditsFromImage(data: any, res: VercelResponse) {
     console.error('Vision API Error:', err);
     return res.status(500).json({ error: err.message });
   }
+}
+
+/** Grounded Gemini people research — kept on /api/ai so /api/automation stays light. */
+async function peopleEnrichmentGemini(data: any, res: VercelResponse) {
+  const queueId = String(data?.queueId || '');
+  if (!queueId) return res.status(400).json({ error: 'queueId is required' });
+
+  const { data: row, error } = await supabase
+    .from('people_enrichment_queue')
+    .select('id,person_id,attempt_count,missing_fields,status')
+    .eq('id', queueId)
+    .single();
+  if (error) throw error;
+  if (!row) return res.status(404).json({ error: 'Queue row not found' });
+
+  await supabase
+    .from('people_enrichment_queue')
+    .update({
+      status: 'fetching',
+      attempt_count: Number(row.attempt_count || 0) + 1,
+      last_attempt_at: new Date().toISOString(),
+    })
+    .eq('id', row.id);
+
+  const { researchPersonWithGemini } = await import('./_lib/gemini_people_enrichment.js');
+  const result = await researchPersonWithGemini({
+    queueId: row.id,
+    personId: row.person_id,
+    missingFields: row.missing_fields || [],
+    force: Boolean(data?.force ?? true),
+  });
+
+  if (result.preserveExistingProposal && row.status && row.status !== 'fetching') {
+    await supabase
+      .from('people_enrichment_queue')
+      .update({ status: row.status })
+      .eq('id', row.id);
+  }
+
+  return res.status(200).json({ success: true, result });
+}
+
+async function peopleEnrichmentGeminiBatch(data: any, res: VercelResponse) {
+  const queueIds = Array.isArray(data?.queueIds)
+    ? [...new Set(data.queueIds.filter((id: unknown): id is string => typeof id === 'string' && Boolean(id)))]
+      .slice(0, 5)
+    : [];
+  if (!queueIds.length) return res.status(400).json({ error: 'Select up to 5 queue rows' });
+
+  const { data: rows, error } = await supabase
+    .from('people_enrichment_queue')
+    .select('id,person_id,attempt_count,missing_fields,status')
+    .in('id', queueIds);
+  if (error) throw error;
+
+  const { researchPersonWithGemini } = await import('./_lib/gemini_people_enrichment.js');
+  const results = [];
+  for (const row of rows || []) {
+    await supabase
+      .from('people_enrichment_queue')
+      .update({
+        status: 'fetching',
+        attempt_count: Number(row.attempt_count || 0) + 1,
+        last_attempt_at: new Date().toISOString(),
+      })
+      .eq('id', row.id);
+
+    const result = await researchPersonWithGemini({
+      queueId: row.id,
+      personId: row.person_id,
+      missingFields: row.missing_fields || [],
+      force: true,
+    });
+
+    if (result.preserveExistingProposal && row.status && row.status !== 'fetching') {
+      await supabase
+        .from('people_enrichment_queue')
+        .update({ status: row.status })
+        .eq('id', row.id);
+    }
+    results.push(result);
+  }
+
+  return res.status(200).json({ success: true, results });
 }

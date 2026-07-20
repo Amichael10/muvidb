@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { GoogleGenAI } from '@google/genai';
 import { supabase } from './supabase.js';
 import { GeminiPeopleResearchSchema } from './gemini_people_schema.js';
 import {
@@ -262,6 +261,8 @@ async function findCachedRun(fingerprint: string) {
 
 async function callGeminiResearch(prompt: string) {
   if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
+  // Dynamic import keeps @google/genai out of cold-start for other API routes.
+  const { GoogleGenAI } = await import('@google/genai/node');
   const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
   let lastError: any;
