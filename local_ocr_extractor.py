@@ -107,9 +107,10 @@ except ImportError:
     pass
 
 # ── Config ────────────────────────────────────────────────────────────────────
-OUTRO_DURATION  = 600   # Last 10 minutes — where end-credit rolls live
+OUTRO_DURATION  = int(os.getenv("OUTRO_DURATION", "300"))  # Last 5 minutes — where end-credit rolls live
 INTRO_DURATION  = 180   # First 3 minutes — many Nollywood films list cast here instead of an end-roll
-SCAN_INTRO      = os.getenv("SCAN_INTRO", "1").strip().lower() in ("1", "true", "yes")
+SCAN_INTRO      = os.getenv("SCAN_INTRO", "0").strip().lower() in ("1", "true", "yes")  # outro-only by default
+CREDITS_THRESHOLD = int(os.getenv("CREDITS_THRESHOLD", "5"))  # Films with FEWER than this many credits are "incomplete"
 FRAME_INTERVAL  = 2     # Fallback sample rate (seconds) if mpdecimate yields nothing
 HASH_THRESHOLD  = 4     # Hamming distance threshold for duplicate frame detection
 FRAME_MAX_EDGE  = 1024  # Downscale long edge — keeps credit text legible, cuts VLM vision tokens 3-4x
@@ -921,11 +922,11 @@ class SupabaseSync:
                 time.sleep(backoff * attempt)
 
     def fetch_incomplete_youtube_films(self) -> list[dict]:
-        """Phase 0: Query films table for youtube source and nested credit IDs to find incomplete pages (0-10 credits)."""
+        """Phase 0: Query films table for youtube source and nested credit IDs to find incomplete pages (fewer than CREDITS_THRESHOLD credits)."""
         if not self.enabled:
             return []
-        
-        print("\n[Phase 0] Querying Supabase for films with 0 to 10 credits...")
+
+        print(f"\n[Phase 0] Querying Supabase for films with fewer than {CREDITS_THRESHOLD} credits...")
         # Rest query to grab films and credits relation. Newest-first (page 1 →
         # backward) so the 24/7 loop starts where the catalog UI starts.
         query_url = (
@@ -942,7 +943,7 @@ class SupabaseSync:
             incomplete = []
             for f in all_films:
                 credits_count = len(f.get("credits", []))
-                if 0 <= credits_count <= 10 and f.get("youtube_watch_url"):
+                if 0 <= credits_count < CREDITS_THRESHOLD and f.get("youtube_watch_url"):
                     f["credits_count"] = credits_count
                     incomplete.append(f)
             
@@ -1289,8 +1290,8 @@ def main():
             sys.exit(1)
         credits_count = len(film.get("credits", []))
         print(f"🔍 Film: '{film['title']}' has {credits_count} existing credits.")
-        if not (0 <= credits_count <= 10):
-            print(f"⚠️ Skipped: Film has {credits_count} credits, outside the 0-10 limit.")
+        if not (0 <= credits_count < CREDITS_THRESHOLD):
+            print(f"⚠️ Skipped: Film has {credits_count} credits (target is fewer than {CREDITS_THRESHOLD}).")
             sys.exit(0)
         film["credits_count"] = credits_count
         process_sweep([film], sync, ocr, paddle, output_dir, single_mode=True)
