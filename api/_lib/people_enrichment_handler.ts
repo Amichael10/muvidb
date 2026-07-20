@@ -97,6 +97,8 @@ async function list(body: any, res: VercelResponse) {
     supabase.from('people_enrichment_queue').select(select, { count: 'exact' }),
     body,
   )
+    // Least-complete first: tackle 0% profiles before the 50-90% ones.
+    .order('current_completeness', { ascending: true })
     .order('priority_score', { ascending: false })
     .order('updated_at', { ascending: false })
     .range(from, from + pageSize - 1);

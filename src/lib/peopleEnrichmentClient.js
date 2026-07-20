@@ -228,6 +228,8 @@ export async function listPeopleEnrichment(options = {}) {
 
   const [{ data, error, count }, stats] = await Promise.all([
     query
+      // Least-complete first: tackle 0% profiles before the 50-90% ones.
+      .order('current_completeness', { ascending: true })
       .order('priority_score', { ascending: false })
       .order('updated_at', { ascending: false })
       .range(from, from + pageSize - 1),
