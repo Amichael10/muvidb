@@ -15,6 +15,16 @@ const esc = (s: any = '') =>
 
 const clean = (s: any) => String(s ?? '').replace(/\s+/g, ' ').trim();
 
+/** Profiles worth indexing / listing in the people sitemap. */
+const isIndexablePerson = (person: any, creditCount: number) => {
+  if (person?.is_verified || person?.is_spotlight) return true;
+  if (Number(person?.film_count || 0) > 0) return true;
+  if (creditCount > 0) return true;
+  const bio = clean(person?.bio);
+  if (bio.length >= 40 && person?.photo_url) return true;
+  return false;
+};
+
 const WATCH_NAMES: Record<string, string> = {
   netflix: 'Netflix', prime_video: 'Prime Video', youtube: 'YouTube',
   showmax: 'Showmax', kava: 'Kava', docuth: 'Docuth', cinema: 'In Cinemas',
@@ -56,7 +66,13 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
       }
 
       if (slug === 'people') {
-        const { data } = await supabase.from('people').select('id, slug, updated_at').limit(50000);
+        // Only invite Google to profiles with real filmography — thin name-only
+        // stubs inflate "Crawled - currently not indexed" / Soft 404 in Search Console.
+        const { data } = await supabase
+          .from('people')
+          .select('id, slug, updated_at')
+          .gt('film_count', 0)
+          .limit(50000);
         return res.status(200).send(urlset(
           (data || []).map((p: any) => `  <url>
     <loc>${baseUrl}/people/${p.slug || p.id}</loc>
@@ -168,47 +184,59 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
       } else {
         const name = clean(data.name);
         const job = data.known_for_department || 'Actor';
+        const creditCount = Array.isArray(data.credits) ? data.credits.length : 0;
+        const indexable = isIndexablePerson(data, creditCount);
         canonical = `${baseUrl}/people/${data.slug || data.id}`;
         title = `${name} – Nollywood ${job} | MuviDB`;
         description = clean(data.bio).slice(0, 155) ||
           `Discover ${name}'s filmography, credits and videos on MuviDB — the home of Nollywood.`;
         if (data.photo_url) image = data.photo_url;
 
-        const sameAs = [
-          data.instagram_url, data.twitter_url, data.facebook_url,
-          data.youtube_handle ? `https://youtube.com/${String(data.youtube_handle).replace(/^@?/, '@')}` : null,
-        ].filter(Boolean);
+        // Thin stubs: keep the SPA shell for humans, but tell Google not to index
+        // and return 404 so Soft 404 / "Crawled - not indexed" can clear.
+        if (!indexable) {
+          statusCode = 404;
+          robots = 'noindex, follow';
+          title = `${name} | MuviDB`;
+          description = `${name} on MuviDB.`;
+          body = `<main><h1>${esc(name)}</h1><p>Profile coming soon.</p></main>`;
+        } else {
+          const sameAs = [
+            data.instagram_url, data.twitter_url, data.facebook_url,
+            data.youtube_handle ? `https://youtube.com/${String(data.youtube_handle).replace(/^@?/, '@')}` : null,
+          ].filter(Boolean);
 
-        const knownFor = (data.credits || [])
-          .map((c: any) => c.films).filter(Boolean).slice(0, 12);
+          const knownFor = (data.credits || [])
+            .map((c: any) => c.films).filter(Boolean).slice(0, 12);
 
-        jsonLdBlocks.push({
-          '@context': 'https://schema.org',
-          '@type': 'Person',
-          name,
-          url: canonical,
-          image,
-          description,
-          jobTitle: job,
-          ...(data.date_of_birth ? { birthDate: data.date_of_birth } : {}),
-          ...(data.birthplace ? { birthPlace: clean(data.birthplace) } : {}),
-          ...(data.nationality ? { nationality: clean(data.nationality) } : {}),
-          ...(data.gender ? { gender: clean(data.gender) } : {}),
-          ...(sameAs.length ? { sameAs } : {}),
-        });
-        jsonLdBlocks.push(crumbs([
-          { name: 'Home', item: `${baseUrl}/` },
-          { name: 'People', item: `${baseUrl}/people` },
-          { name, item: canonical },
-        ]));
+          jsonLdBlocks.push({
+            '@context': 'https://schema.org',
+            '@type': 'Person',
+            name,
+            url: canonical,
+            image,
+            description,
+            jobTitle: job,
+            ...(data.date_of_birth ? { birthDate: data.date_of_birth } : {}),
+            ...(data.birthplace ? { birthPlace: clean(data.birthplace) } : {}),
+            ...(data.nationality ? { nationality: clean(data.nationality) } : {}),
+            ...(data.gender ? { gender: clean(data.gender) } : {}),
+            ...(sameAs.length ? { sameAs } : {}),
+          });
+          jsonLdBlocks.push(crumbs([
+            { name: 'Home', item: `${baseUrl}/` },
+            { name: 'People', item: `${baseUrl}/people` },
+            { name, item: canonical },
+          ]));
 
-        body = `<main>
+          body = `<main>
   <h1>${esc(name)}</h1>
   <p>${esc(job)}${data.nationality ? ` · ${esc(clean(data.nationality))}` : ''}</p>
   ${data.bio ? `<p>${esc(clean(data.bio))}</p>` : ''}
   ${knownFor.length ? `<h2>Known For</h2><ul>${knownFor.map((f: any) =>
     `<li><a href="${baseUrl}/films/${f.slug || f.id}">${esc(clean(f.title))}${f.year ? ` (${f.year})` : ''}</a></li>`).join('')}</ul>` : ''}
 </main>`;
+        }
       }
     } else if (type === 'film' && slug) {
       const key = UUID_RE.test(slug as string) ? 'id' : 'slug';
@@ -430,7 +458,11 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate');
+    // Thin/404 person pages: short cache so a later enrichment can become indexable quickly.
+    const cacheControl = statusCode === 404
+      ? 'public, max-age=60, s-maxage=300, stale-while-revalidate'
+      : 'public, max-age=60, s-maxage=3600, stale-while-revalidate';
+    res.setHeader('Cache-Control', cacheControl);
     res.status(statusCode).send(html);
   } catch (err: any) {
     console.error('SEO Error:', err);

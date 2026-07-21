@@ -17,7 +17,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import ShareAction from '../components/ui/ShareAction'
 import ImageWithFallback from '../components/ui/ImageWithFallback'
 import { slugOrId } from '../utils/slug'
-import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle } from '../utils/format'
+import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatDateOfBirth } from '../utils/format'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -562,11 +562,7 @@ const PersonDetail = () => {
                 )}
                 {person.date_of_birth && (
                   <span className="text-text-muted">
-                    Born: {new Date(person.date_of_birth).toLocaleDateString('en-NG', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
+                    Born: {formatDateOfBirth(person.date_of_birth)}
                   </span>
                 )}
               </div>

@@ -660,13 +660,56 @@ _JUNK_NAME_TOKENS = (
     "n/a", "unknown", "no character", "misreading", "error", "see ocr",
 )
 
+# Job titles / departments lifted straight off the credit roll. These are ROLES,
+# not people — unfiltered they created thousands of fake "people" rows
+# (GAFFER, CAMERA ASSISTANT, POST PRODUCTION, CASTING DIRECTOR...).
+_CREW_ROLE_WORDS = {
+    "camera", "cameraman", "cam", "asst", "assistant", "assistance", "assist", "ass",
+    "editor", "editing", "edit", "production", "productions", "producer", "executive",
+    "exec", "director", "direction", "dir", "makeup", "make", "up", "costume",
+    "costumier", "wardrobe", "location", "manager", "mgr", "unit", "props", "prop",
+    "set", "design", "designer", "gaffer", "boom", "sound", "audio", "light",
+    "lighting", "script", "continuity", "driver", "security", "catering", "welfare",
+    "medic", "still", "stills", "photography", "photographer", "colorist", "color",
+    "colour", "grade", "dop", "cinematography", "cinematographer", "art", "graphics",
+    "vfx", "sfx", "effects", "music", "soundtrack", "score", "dance", "choreographer",
+    "stunt", "stunts", "transport", "logistics", "accountant", "publicity", "marketing",
+    "poster", "subtitle", "subtitles", "translator", "voice", "crew", "cast", "thanks",
+    "special", "end", "copyright", "rights", "reserved", "presents", "produced",
+    "written", "story", "screenplay", "coordinator", "supervisor", "operator",
+    "hairstylist", "hair", "stylist", "second", "first", "third", "by", "the", "of",
+    "and", "a", "an", "in", "on", "for", "with", "to",
+    "post", "casting", "co", "line", "associate", "chief", "head", "senior", "junior",
+    "1st", "2nd", "3rd", "4th", "st", "nd", "rd", "th", "best", "boy", "key", "grip",
+    "clapper", "loader", "focus", "puller", "scenic", "runner", "intern", "trainee",
+}
+_TITLE_CARD_RE = re.compile(r"^\s*\d+\s*(months?|years?|days?|weeks?|hours?|minutes?)\s*(later)?\s*$", re.I)
+_PART_CARD_RE = re.compile(r"^\s*(part|episode|ep|chapter|scene|act)\s*\d+\s*$", re.I)
+_COPYRIGHT_RE = re.compile(r"^\s*\(?\s*[c©e1]\s*\)?\s*\d{4}", re.I)
+
+
 def _looks_like_junk_name(name: str) -> bool:
-    """True if this 'name' is really prose/commentary, not a person to save."""
+    """True if this 'name' is really prose/commentary/a job title, not a person."""
     low = name.lower()
     if any(tok in low for tok in _JUNK_NAME_TOKENS):
         return True
     # Real credit names are short; a 7+ word 'name' is a sentence, not a person.
     if len(name.split()) > 6:
+        return True
+
+    stripped = name.strip()
+    # OCR noise: a person needs at least 3 letters ("Cj", "M E", "d", "K").
+    if len(re.sub(r"[^A-Za-z]", "", stripped)) < 3:
+        return True
+    # Mostly punctuation/symbols — OCR garbage like "» 'ee", "J, & 4", "-SY -".
+    if len(re.sub(r"[A-Za-z0-9\s]", "", stripped)) / max(len(stripped), 1) > 0.4:
+        return True
+    # Credit-roll furniture rather than a person.
+    if _COPYRIGHT_RE.match(stripped) or _TITLE_CARD_RE.match(stripped) or _PART_CARD_RE.match(stripped):
+        return True
+    # Every token is a crew-role/filler word => it's a job title, not a person.
+    toks = [t for t in re.sub(r"[^A-Za-z0-9\s]", " ", stripped.lower()).split() if t]
+    if toks and all(t in _CREW_ROLE_WORDS or t.isdigit() for t in toks):
         return True
     return False
 

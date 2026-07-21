@@ -171,17 +171,8 @@ export default function AdminDeduplicator() {
 
   const report = reports[entity];
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/prototypes/people-deduplicator-report.json', { cache: 'no-store' })
-      .then((response) => response.ok ? response.json() : null)
-      .then((payload) => {
-        if (cancelled || !payload) return;
-        setReports((current) => ({ ...current, people: payload }));
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  // Do not preload a static prototype report — it goes stale after merges and
+  // makes the queue look like nothing was cleaned. Start empty; user hits Scan.
 
   const checkDatabaseSetup = async (announce = false) => {
     setDatabaseReady(null);
