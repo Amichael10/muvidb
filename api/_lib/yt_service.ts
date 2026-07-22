@@ -6,16 +6,14 @@
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 
 // Collect every configured YouTube API key. Supports a comma-separated list in
-// YOUTUBE_API_KEY and numbered fallbacks (YOUTUBE_API_KEY_2, _3, ...). Each key
+// YOUTUBE_API_KEY and numbered fallbacks (YOUTUBE_API_KEY_2 … _10). Each key
 // carries its own daily quota, so rotating across them multiplies the ceiling.
 function collectYtKeys(): string[] {
-  const raw = [
+  const raw: (string | undefined)[] = [
     process.env.YOUTUBE_API_KEY,
-    process.env.YOUTUBE_API_KEY_2,
-    process.env.YOUTUBE_API_KEY_3,
-    process.env.YOUTUBE_API_KEY_4,
     process.env.VITE_YOUTUBE_API_KEY,
   ];
+  for (let i = 2; i <= 10; i++) raw.push(process.env[`YOUTUBE_API_KEY_${i}`]);
   return [
     ...new Set(
       raw.filter(Boolean).flatMap((k) => k!.split(',')).map((k) => k.trim()).filter(Boolean)

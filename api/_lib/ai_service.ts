@@ -31,14 +31,31 @@ function isGeminiQuotaError(err: any): boolean {
   return err?.status === 429 || /quota|resource_exhausted|rate limit|too many requests|\b429\b/.test(msg);
 }
 
-/** Run a Gemini call, rotating to the next key on quota errors. */
+/** A revoked/typo'd Gemini key (401). Drop it for the life of this process. */
+function isDeadGeminiKeyError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 401 || /api key not valid|invalid.?api.?key|unauthorized|\b401\b|permission.?denied/.test(msg);
+}
+const deadGeminiKeys = new Set<string>();
+
+/** Run a Gemini call, rotating to the next key on quota or dead-key errors. */
 async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): Promise<any> {
   let lastErr: any;
   for (let attempt = 0; attempt < Math.max(1, GEMINI_KEYS.length); attempt++) {
+    if (deadGeminiKeys.has(GEMINI_KEYS[geminiKeyIdx]) && deadGeminiKeys.size < GEMINI_KEYS.length) {
+      geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
+      continue;
+    }
     try {
       return await fn(geminiModelFor(model));
     } catch (err: any) {
       lastErr = err;
+      if (isDeadGeminiKeyError(err) && GEMINI_KEYS.length > 1) {
+        console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} is INVALID — dropping it`);
+        deadGeminiKeys.add(GEMINI_KEYS[geminiKeyIdx]);
+        geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
+        continue;
+      }
       if (isGeminiQuotaError(err) && GEMINI_KEYS.length > 1) {
         console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} quota hit, rotating…`);
         geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
