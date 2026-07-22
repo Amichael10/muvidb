@@ -15,13 +15,37 @@ const About = () => {
         
         <div className="space-y-8 text-lg text-text-muted leading-relaxed">
           <p>
-            MuviDB is your ultimate destination for discovering, tracking, and engaging with movies and TV shows from around the world. Our mission is to create a comprehensive and accessible database for film enthusiasts, professionals, and casual viewers alike.
+            MuviDB is a Nollywood and African film database. Fans use it to discover movies and TV
+            shows, cinema showtimes, streaming availability, cast and crew, ratings, and free
+            YouTube titles. Professionals can claim talent profiles and keep their credits up to date.
           </p>
-          
+
           <p>
-            We believe that every great story deserves to be found. Whether you're looking for the latest cinema releases, free-to-watch YouTube films, or hidden gems on streaming platforms, MuviDB organizes everything in one intuitive platform.
+            We organize African cinema in one place — latest releases, free-to-watch YouTube films,
+            and titles on platforms like Netflix, Prime Video, and others — so every story is easier
+            to find.
           </p>
-          
+
+          <div className="bg-surface border border-border p-8 rounded-xl space-y-4">
+            <h2 className="text-2xl font-heading font-bold text-text-primary">Google services we use</h2>
+            <p className="text-base">
+              <strong className="text-text-primary">Google Sign-In</strong> — optional account
+              creation; we receive your name, email, and profile photo only if you choose to sign in
+              with Google.
+            </p>
+            <p className="text-base">
+              <strong className="text-text-primary">YouTube Data API</strong> — public catalogue
+              metadata (titles, thumbnails, statistics, channel information) so MuviDB can list free
+              African films and trailers. We do not access private YouTube account data.
+            </p>
+            <p className="text-base">
+              Details are in our{' '}
+              <a href="/privacy" className="text-brand font-bold hover:underline">Privacy Policy</a>
+              {' '}and{' '}
+              <a href="/terms" className="text-brand font-bold hover:underline">Terms</a>.
+            </p>
+          </div>
+
           <div className="bg-surface border border-border p-8 rounded-xl mt-12">
             <h2 className="text-2xl font-heading font-bold text-text-primary mb-4">Connect With Us</h2>
             <p className="mb-6">
