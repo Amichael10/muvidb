@@ -25,12 +25,13 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config(); // fall back to .env for anything not set in .env.local
 
-const url = (process.env.VITE_SUPABASE_URL || '').trim();
+// CI workflows usually set SUPABASE_URL; local scripts often use VITE_SUPABASE_URL.
+const url = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
 const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
 if (!url || !serviceKey) {
   console.error(
-    'Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (checked .env.local, then .env)'
+    'Missing VITE_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (checked .env.local, then .env)'
   );
   process.exit(1);
 }
