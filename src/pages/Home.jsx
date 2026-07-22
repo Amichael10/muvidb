@@ -713,6 +713,108 @@ export default function Home() {
         isLoading={isHeroLoading}
       />
 
+      {/* GOOGLE OAUTH VERIFICATION — temporary purpose block (safe to remove later) */}
+      <section
+        aria-label="About MuviDB"
+        className="relative border-y border-border/80 overflow-hidden"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          style={{
+            background:
+              'radial-gradient(ellipse 80% 60% at 0% 50%, color-mix(in srgb, var(--color-brand) 18%, transparent), transparent 55%), radial-gradient(ellipse 50% 80% at 100% 0%, color-mix(in srgb, var(--color-brand) 10%, transparent), transparent 50%)',
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(-12deg, transparent, transparent 11px, currentColor 11px, currentColor 12px)',
+          }}
+        />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20">
+          <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
+            <div className="lg:col-span-7 space-y-6">
+              <p className="text-brand text-[10px] md:text-[11px] font-bold uppercase tracking-[0.28em]">
+                What is MuviDB
+              </p>
+              <h2 className="font-heading font-bold text-3xl sm:text-4xl md:text-[2.75rem] text-text-primary tracking-tighter leading-[1.05] max-w-2xl">
+                The database for Nollywood &amp; African film.
+              </h2>
+              <p className="text-text-secondary text-sm md:text-base leading-relaxed max-w-2xl">
+                MuviDB helps fans and industry professionals discover African movies and TV shows,
+                cinema showtimes, streaming availability, cast and crew, and free YouTube titles —
+                then rate, review, and follow the people who make them.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Link
+                  to="/privacy"
+                  className="inline-flex items-center gap-2 bg-brand text-white px-5 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest hover:bg-brand-hover transition-colors"
+                >
+                  Privacy Policy
+                  <Icon icon="solar:arrow-right-up-linear" className="w-4 h-4" />
+                </Link>
+                <Link
+                  to="/about"
+                  className="inline-flex items-center gap-2 border border-border bg-surface/60 text-text-primary px-5 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest hover:border-brand/50 transition-colors"
+                >
+                  About MuviDB
+                </Link>
+                <Link
+                  to="/terms"
+                  className="text-text-muted hover:text-brand text-[11px] font-bold uppercase tracking-widest transition-colors px-2"
+                >
+                  Terms
+                </Link>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 space-y-4">
+              <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.22em]">
+                How we use Google services
+              </p>
+              <ul className="space-y-3">
+                {[
+                  {
+                    icon: 'solar:login-3-linear',
+                    title: 'Google Sign-In',
+                    body: 'If you choose “Sign in with Google,” we receive your name, email, and profile photo to create or access your MuviDB account.',
+                  },
+                  {
+                    icon: 'solar:videocamera-record-linear',
+                    title: 'YouTube public catalogue data',
+                    body: 'We use the YouTube Data API to show public film metadata — titles, thumbnails, view counts, and channel info — so you can find free African films and trailers.',
+                  },
+                  {
+                    icon: 'solar:shield-check-linear',
+                    title: 'Your data stays limited',
+                    body: 'We do not sell Google user data. Use is limited to running MuviDB as described in our Privacy Policy.',
+                  },
+                ].map((item) => (
+                  <li
+                    key={item.title}
+                    className="group flex gap-4 rounded-xl border border-border/80 bg-surface/40 backdrop-blur-sm p-4 md:p-5 hover:border-brand/35 transition-colors"
+                  >
+                    <span className="shrink-0 w-10 h-10 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+                      <Icon icon={item.icon} className="w-5 h-5" />
+                    </span>
+                    <div className="min-w-0 space-y-1">
+                      <h3 className="font-heading font-bold text-text-primary text-sm tracking-tight">
+                        {item.title}
+                      </h3>
+                      <p className="text-text-muted text-xs md:text-[13px] leading-relaxed">
+                        {item.body}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div className="muvi-landing-shell max-w-7xl mx-auto">
         {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
         <div className="landing-band grided watch-platform-band">
