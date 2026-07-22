@@ -60,14 +60,33 @@ function isGroqQuotaError(err: any): boolean {
   return err?.status === 429 || /quota|rate limit|rate_limit|too many requests|\b429\b/.test(msg);
 }
 
-/** Run a Groq call, rotating to the next key on quota errors. */
+/** A revoked/typo'd key (401). Unlike a quota error this NEVER recovers, so the
+ *  key is dropped from the pool instead of being retried forever. */
+function isDeadKeyError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 401 || /invalid api key|invalid_api_key|unauthorized|\b401\b/.test(msg);
+}
+const deadGroqKeys = new Set<string>();
+
+/** Run a Groq call, rotating on quota AND skipping keys that are simply dead. */
 async function withGroqRotation(fn: (client: Groq) => Promise<any>): Promise<any> {
   let lastErr: any;
   for (let attempt = 0; attempt < Math.max(1, GROQ_KEYS.length); attempt++) {
+    // Skip keys already proven dead this process.
+    if (deadGroqKeys.has(GROQ_KEYS[groqKeyIdx]) && deadGroqKeys.size < GROQ_KEYS.length) {
+      groqKeyIdx = (groqKeyIdx + 1) % GROQ_KEYS.length;
+      continue;
+    }
     try {
       return await fn(groqClientFor());
     } catch (err: any) {
       lastErr = err;
+      if (isDeadKeyError(err) && GROQ_KEYS.length > 1) {
+        console.warn(`[groq] key #${groqKeyIdx + 1}/${GROQ_KEYS.length} is INVALID (401) — dropping it`);
+        deadGroqKeys.add(GROQ_KEYS[groqKeyIdx]);
+        groqKeyIdx = (groqKeyIdx + 1) % GROQ_KEYS.length;
+        continue;
+      }
       if (isGroqQuotaError(err) && GROQ_KEYS.length > 1) {
         console.warn(`[groq] key #${groqKeyIdx + 1}/${GROQ_KEYS.length} quota hit, rotating…`);
         groqKeyIdx = (groqKeyIdx + 1) % GROQ_KEYS.length;
@@ -125,7 +144,7 @@ export async function generateAIContent(prompt: string) {
     providers.push({
       name: 'gemini',
       execute: async () => {
-        const result = await withGeminiRotation('gemini-2.5-flash', (m) => m.generateContent(prompt));
+        const result = await withGeminiRotation('gemini-flash-latest', (m) => m.generateContent(prompt));
         return { text: result.response.text(), engine: 'gemini', headers: null };
       }
     });
@@ -222,7 +241,7 @@ export async function generateAIVisionContent(prompt: string, base64Data: string
 
   // Attempt 1: Gemini 2.5 Flash (primary), rotating keys on quota
   try {
-    const result = await withGeminiRotation('gemini-2.5-flash', (m) => m.generateContent([prompt, imagePart]));
+    const result = await withGeminiRotation('gemini-flash-latest', (m) => m.generateContent([prompt, imagePart]));
     return {
       text: result.response.text(),
       telemetry: { engine: 'gemini-vision-2.5', status: 'ok' }

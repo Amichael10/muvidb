@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from './_lib/supabase.js';
+import { trackSeoHit } from './_lib/scrape_guard.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -39,6 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // ---- SITEMAP HANDLING ----
     if (type === 'sitemap') {
+      trackSeoHit(req, 'sitemap', String(slug || 'index'));
       res.setHeader('Content-Type', 'text/xml');
       res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate');
 
@@ -170,6 +172,7 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
     });
 
     if (type === 'person' && slug) {
+      trackSeoHit(req, 'person', String(slug));
       const key = UUID_RE.test(slug as string) ? 'id' : 'slug';
       const { data } = await supabase
         .from('people')
@@ -239,6 +242,7 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
         }
       }
     } else if (type === 'film' && slug) {
+      trackSeoHit(req, 'film', String(slug));
       const key = UUID_RE.test(slug as string) ? 'id' : 'slug';
       const { data } = await supabase
         .from('films')
