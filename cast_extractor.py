@@ -324,7 +324,7 @@ Ignore subtitles, dialogue text, and channel watermarks.
 Return only the raw extracted text, one entry per line.
 If no credits are visible in a frame, skip it silently."""
 
-STRUCTURE_PROMPT = """You are building a Nollywood film database called Ensembla.
+STRUCTURE_PROMPT = """You are building a Nollywood film database called MuviDB.
 Below is raw text extracted from the credits of a movie called '{title}'.
 Some text may be garbled, duplicated, or noisy from OCR on video frames.
 Clean it up using your knowledge of Nollywood naming conventions to fix obvious errors.
