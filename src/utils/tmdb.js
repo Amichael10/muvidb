@@ -50,7 +50,7 @@ export const mapStatus = (tmdbStatus) => {
   return STATUS_MAP[tmdbStatus] || 'announced'
 }
 
-// ─── TMDB Genre → Ensembla Genre Mapping ────
+// ─── TMDB Genre → MuviDB Genre Mapping ────
 // TMDB genre IDs: https://developer.themoviedb.org/reference/genre-movie-list
 const TMDB_GENRE_MAP = {
   28: 'Action',

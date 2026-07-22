@@ -35,7 +35,7 @@ export function getFriendlyErrorMessage(error) {
     message.includes("unique constraint") ||
     message.includes("already exists")
   ) {
-    return "This record has already been added to Ensembla! No need to duplicate it.";
+    return "This record has already been added to MuviDB! No need to duplicate it.";
   }
 
   // 3. Database Integrity / Foreign Key Deletion Blockers

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Ensembla Local OCR Cast & Crew Extractor
+MuviDB Local OCR Cast & Crew Extractor
 Extracts cast/crew from Nollywood YouTube videos using:
 1. Database Discovery: Self-targets YouTube films with 0-10 existing credits.
 2. Outro Download: yt-dlp + ffmpeg (last 10 min only — avoids bot detection).
@@ -610,7 +610,7 @@ def extract_frames(video_path: Path, out_dir: Path, label: str) -> list[Path]:
     return sorted(out_dir.glob(f"{label}_*.jpg"))
 
 # ── AI Formatting Prompts ─────────────────────────────────────────────────────
-AI_STRUCTURE_PROMPT = """You are building a Nollywood film database called Ensembla.
+AI_STRUCTURE_PROMPT = """You are building a Nollywood film database called MuviDB.
 Below is raw text extracted via Local OCR from the credit cards of a movie called '{title}'.
 Some characters may be garbled, misspelled, duplicated, or out of order due to video background noise.
 Clean it up using Nollywood industry knowledge. Deduplicate entries. Separate cast from crew.
