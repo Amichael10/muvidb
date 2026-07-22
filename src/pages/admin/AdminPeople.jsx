@@ -10,7 +10,7 @@ import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AddCreditModal from '../../components/admin/AddCreditModal';
 import AwardsEditor from '../../components/admin/AwardsEditor';
-import { formatRole } from '../../lib/creditRoles';
+import { ALL_ROLES, CAST_ROLE, formatRole, normalizeRole } from '../../lib/creditRoles';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
@@ -54,6 +54,9 @@ export default function AdminPeople() {
   const [isBatchDeletingPeople, setIsBatchDeletingPeople] = useState(false);
   const [personCredits, setPersonCredits] = useState([]);
   const [showAddCredit, setShowAddCredit] = useState(false);
+  const [deletingCredit, setDeletingCredit] = useState(null);
+  const [isDeletingCredit, setIsDeletingCredit] = useState(false);
+  const [updatingCreditId, setUpdatingCreditId] = useState(null);
 
   // Shared by the drawer's initial load and the add-credit modal's save.
   const refetchCredits = async (personId) => {
@@ -67,6 +70,76 @@ export default function AdminPeople() {
       .order('billing_order');
 
     setPersonCredits(data || []);
+  };
+
+  const updateCreditField = async (credit, patch) => {
+    if (!editingPerson) return;
+    setUpdatingCreditId(credit.id);
+
+    const nextRole = patch.role !== undefined ? normalizeRole(patch.role) : normalizeRole(credit.role);
+    if (patch.role !== undefined) {
+      const dupe = personCredits.some(
+        (c) =>
+          c.id !== credit.id &&
+          (c.films?.id || c.film_id) === credit.films?.id &&
+          normalizeRole(c.role) === nextRole,
+      );
+      if (dupe) {
+        setUpdatingCreditId(null);
+        return toast.error(`Already credited as ${formatRole(nextRole)} on this film.`);
+      }
+    }
+
+    const payload = { ...patch };
+    if (payload.role !== undefined) payload.role = nextRole;
+    // Character name only applies to cast; clear it when switching away from actor.
+    if (payload.role !== undefined && payload.role !== CAST_ROLE) {
+      payload.character_name = null;
+    }
+
+    const { error } = await supabase.from('credits').update(payload).eq('id', credit.id);
+    setUpdatingCreditId(null);
+
+    if (error) {
+      if (error.code === '23505') {
+        return toast.error(`Already credited as ${formatRole(nextRole)} on this film.`);
+      }
+      return toast.error(getFriendlyErrorMessage(error));
+    }
+
+    setPersonCredits((prev) =>
+      prev.map((c) => (c.id === credit.id ? { ...c, ...payload } : c)),
+    );
+    await logAdminAction(
+      user,
+      'update',
+      'credit',
+      credit.id,
+      `${editingPerson.name} → ${credit.films?.title || 'film'}`,
+      payload,
+    );
+    toast.success('Credit updated');
+  };
+
+  const handleDeleteCredit = async () => {
+    if (!deletingCredit || !editingPerson) return;
+    setIsDeletingCredit(true);
+    const { error } = await supabase.from('credits').delete().eq('id', deletingCredit.id);
+    setIsDeletingCredit(false);
+
+    if (error) return toast.error(getFriendlyErrorMessage(error));
+
+    setPersonCredits((prev) => prev.filter((c) => c.id !== deletingCredit.id));
+    await logAdminAction(
+      user,
+      'delete',
+      'credit',
+      deletingCredit.id,
+      `${editingPerson.name} → ${deletingCredit.films?.title || 'film'}`,
+      { role: deletingCredit.role },
+    );
+    toast.success('Credit removed');
+    setDeletingCredit(null);
   };
   const [youtubeFilmography, setYoutubeFilmography] = useState([]);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -1020,8 +1093,13 @@ export default function AdminPeople() {
               )}
 
               <div className="space-y-3">
-                {personCredits.map(credit => (
-                  <div key={credit.id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
+                {personCredits.map(credit => {
+                  const roleValue = normalizeRole(credit.role);
+                  const knownRole = ALL_ROLES.some((r) => r.value === roleValue);
+                  const busy = updatingCreditId === credit.id;
+
+                  return (
+                  <div key={credit.id} className="flex items-start gap-3 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
                     <div className="w-10 h-14 bg-surface rounded border border-border overflow-hidden flex-shrink-0">
                       {credit.films?.poster_url ? (
                         <img src={credit.films.poster_url} className="w-full h-full object-cover" alt="" />
@@ -1029,16 +1107,61 @@ export default function AdminPeople() {
                         <div className="w-full h-full flex items-center justify-center text-[8px] bg-surface-3 text-text-muted">NO POSTER</div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
-                      <div className="text-[10px] text-text-muted mt-0.5 font-medium">
-                        <span>{formatRole(credit.role)}</span>
-                        {credit.character_name && ` as ${credit.character_name}`}
-                        {credit.films?.year && ` (${credit.films.year})`}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
+                          {credit.films?.year && (
+                            <div className="text-[10px] text-text-muted mt-0.5 font-medium">{credit.films.year}</div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingCredit(credit)}
+                          disabled={busy}
+                          className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0"
+                          title="Remove credit"
+                        >
+                          <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={roleValue}
+                          onChange={(e) => updateCreditField(credit, { role: e.target.value })}
+                          disabled={busy}
+                          className="bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-bold focus:border-brand outline-none disabled:opacity-50"
+                        >
+                          {!knownRole && roleValue && (
+                            <option value={roleValue}>{formatRole(roleValue)}</option>
+                          )}
+                          {ALL_ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>{r.label}</option>
+                          ))}
+                        </select>
+                        {roleValue === CAST_ROLE && (
+                          <input
+                            type="text"
+                            placeholder="Character name"
+                            defaultValue={credit.character_name || ''}
+                            key={`${credit.id}-${credit.character_name || ''}`}
+                            onBlur={(e) => {
+                              const next = e.target.value.trim();
+                              const prev = (credit.character_name || '').trim();
+                              if (next === prev) return;
+                              updateCreditField(credit, {
+                                character_name: next ? toTitleCase(next) : null,
+                              });
+                            }}
+                            disabled={busy}
+                            className="flex-1 min-w-[8rem] bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-medium focus:border-brand outline-none disabled:opacity-50"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -1198,6 +1321,16 @@ export default function AdminPeople() {
           existingCredits={personCredits}
           onClose={() => setShowAddCredit(false)}
           onSaved={() => refetchCredits(editingPerson.id)}
+        />
+      )}
+      {deletingCredit && (
+        <ConfirmModal
+          onCancel={() => !isDeletingCredit && setDeletingCredit(null)}
+          onConfirm={handleDeleteCredit}
+          title="Remove Credit"
+          message={`Remove ${formatRole(deletingCredit.role)} credit for “${deletingCredit.films?.title || 'this film'}”?`}
+          confirmLabel="Remove Credit"
+          isProcessing={isDeletingCredit}
         />
       )}
       {deletingPerson && (
