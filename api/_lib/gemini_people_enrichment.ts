@@ -13,7 +13,18 @@ import {
   validateGeminiPeoplePayload,
 } from '../../src/lib/geminiPeopleEnrichment.js';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_KEYS = (() => {
+  const raw: (string | undefined)[] = [process.env.GEMINI_API_KEY];
+  for (let i = 2; i <= 10; i++) raw.push(process.env[`GEMINI_API_KEY_${i}`]);
+  return [
+    ...new Set(
+      raw.filter(Boolean).flatMap((k) => k!.split(',')).map((k) => k.trim()).filter(Boolean),
+    ),
+  ];
+})();
+let geminiKeyIdx = 0;
+const deadGeminiKeys = new Set<string>();
+
 const GEMINI_PEOPLE_MODEL = process.env.GEMINI_PEOPLE_MODEL || 'gemini-2.5-flash';
 const DAILY_BUDGET_USD = Number(process.env.GEMINI_PEOPLE_DAILY_BUDGET_USD || '5');
 const CACHE_DAYS = 30;
@@ -57,6 +68,20 @@ function sleep(ms: number): Promise<void> {
 function isRateLimitError(err: any): boolean {
   const msg = String(err?.message || '').toLowerCase();
   return err?.status === 429 || /quota|resource_exhausted|rate limit|too many requests|\b429\b/.test(msg);
+}
+
+function isDeadGeminiKeyError(err: any): boolean {
+  const msg = String(err?.message || '').toLowerCase();
+  return err?.status === 401 || /api key not valid|invalid.?api.?key|unauthorized|\b401\b|permission.?denied/.test(msg);
+}
+
+function nextLiveGeminiKeyIndex(fromIdx: number): number | null {
+  if (!GEMINI_KEYS.length) return null;
+  for (let step = 1; step <= GEMINI_KEYS.length; step += 1) {
+    const idx = (fromIdx + step) % GEMINI_KEYS.length;
+    if (!deadGeminiKeys.has(GEMINI_KEYS[idx])) return idx;
+  }
+  return null;
 }
 
 function parseModelJson(text: string): any {
@@ -260,13 +285,23 @@ async function findCachedRun(fingerprint: string) {
 }
 
 async function callGeminiResearch(prompt: string) {
-  if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
+  if (!GEMINI_KEYS.length) throw new Error('GEMINI_API_KEY is not configured');
   // Dynamic import keeps @google/genai out of cold-start for other API routes.
   const { GoogleGenAI } = await import('@google/genai/node');
-  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
   let lastError: any;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
+  // Try each live key, with a small retry budget on transient rate limits.
+  const maxAttempts = Math.max(GEMINI_KEYS.length, MAX_RETRIES) * 2;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (deadGeminiKeys.has(GEMINI_KEYS[geminiKeyIdx])) {
+      const next = nextLiveGeminiKeyIndex(geminiKeyIdx);
+      if (next == null) break;
+      geminiKeyIdx = next;
+    }
+
+    const apiKey = GEMINI_KEYS[geminiKeyIdx];
+    const ai = new GoogleGenAI({ apiKey });
+
     try {
       const response = await ai.models.generateContent({
         model: GEMINI_PEOPLE_MODEL,
@@ -289,6 +324,29 @@ async function callGeminiResearch(prompt: string) {
       };
     } catch (error: any) {
       lastError = error;
+      if (isDeadGeminiKeyError(error) && GEMINI_KEYS.length > 1) {
+        console.warn(
+          `[gemini-people] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} invalid — dropping it`,
+        );
+        deadGeminiKeys.add(apiKey);
+        const next = nextLiveGeminiKeyIndex(geminiKeyIdx);
+        if (next == null) break;
+        geminiKeyIdx = next;
+        continue;
+      }
+      if (isRateLimitError(error) && GEMINI_KEYS.length > 1) {
+        console.warn(
+          `[gemini-people] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} quota hit, rotating…`,
+        );
+        const next = nextLiveGeminiKeyIndex(geminiKeyIdx);
+        if (next == null) {
+          await sleep(1000 * (2 ** Math.min(attempt, 3)));
+          continue;
+        }
+        geminiKeyIdx = next;
+        await sleep(250);
+        continue;
+      }
       if (isRateLimitError(error) && attempt < MAX_RETRIES - 1) {
         await sleep(1000 * (2 ** attempt));
         continue;
@@ -296,7 +354,7 @@ async function callGeminiResearch(prompt: string) {
       throw error;
     }
   }
-  throw lastError;
+  throw lastError || new Error('All Gemini API keys exhausted');
 }
 
 function mapCandidateForQueue(candidateFields: Record<string, any>): Record<string, any> {
