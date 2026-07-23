@@ -132,7 +132,8 @@ export async function signedContributionUrl(path) {
 // On approval: download the quarantined file, re-encode it again (defence in
 // depth, in the trusted admin's browser), publish to the public film-images
 // bucket, and return the public URL. Returns null on failure.
-export async function publishContributionImage(path) {
+// `folder` is typically 'people' (portrait) or 'posters' (film art).
+export async function publishContributionImage(path, folder = 'people') {
   if (!path) return null;
   const { data, error } = await supabase.storage.from('contributions').download(path);
   if (error || !data) return null;
@@ -144,7 +145,8 @@ export async function publishContributionImage(path) {
     return null;
   }
 
-  const dest = `people/${crypto.randomUUID()}.webp`;
+  const safeFolder = String(folder || 'people').replace(/[^a-z0-9_-]/gi, '') || 'people';
+  const dest = `${safeFolder}/${crypto.randomUUID()}.webp`;
   const { error: upErr } = await supabase.storage
     .from('film-images')
     .upload(dest, clean, { contentType: 'image/webp', upsert: true });

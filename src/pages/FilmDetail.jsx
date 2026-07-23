@@ -669,7 +669,22 @@ export default function FilmDetail() {
                 </button>
               </div>
               {showFilmEdit && (
-                <SuggestEditModal target="film" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowFilmEdit(false)} />
+                <SuggestEditModal
+                  target="film"
+                  targetId={filmId}
+                  targetName={formatFilmTitle(film.title)}
+                  current={{
+                    title: film.title,
+                    year: film.year,
+                    synopsis: film.synopsis,
+                    runtime_minutes: film.runtime_minutes ?? film.duration,
+                    language: film.language,
+                    countries: film.countries,
+                    trailer_youtube_id: film.trailer_youtube_id,
+                    tagline: film.tagline,
+                  }}
+                  onClose={() => setShowFilmEdit(false)}
+                />
               )}
               {showReport && (
                 <ReportModal kind="link" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowReport(false)} />

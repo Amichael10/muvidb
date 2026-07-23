@@ -406,15 +406,10 @@ export async function upsertShowtimes(
  *
  *   1. Expire every past showtime (show_date < today) → is_available=false, so
  *      last month's schedule stops counting and drops out of the UI.
- *   2. A film that still has an upcoming showtime, or was seen in a scrape within
- *      the grace window, keeps is_in_cinemas=true. With upcoming showtimes it
- *      reads as "In Cinemas Now"; without them it reads as "Leaving Cinemas Soon"
- *      (the split is derived client-side from whether live showtimes exist).
- *   3. A scraper-sourced film not seen for longer than `graceDays` has
- *      is_in_cinemas cleared, so it leaves the cinema rails entirely.
- *
- * Only films that have at least one showtime row (i.e. came from a scraper) are
- * ever auto-unflagged — manually curated cinema films are left untouched.
+ *   2. A film keeps is_in_cinemas only if it still has a future available
+ *      showtime, or was seen in a scrape within the grace window.
+ *   3. Everything else (including manual flags with no showtimes, and titles
+ *      that left cinemas) is cleared so "In Cinemas" badges don't linger.
  */
 export async function sweepStaleCinemas(
   graceDays = 14,
@@ -441,26 +436,17 @@ export async function sweepStaleCinemas(
   }
   const flaggedIds = flagged.map(f => f.id);
 
-  // 3a. Films that came from a scraper. Scraper showtimes always carry a
-  //     `source` (adapter name); admin-entered showtimes leave it null, so we
-  //     filter to non-null source to avoid ever demoting manually curated titles.
-  const { data: withShowtimes } = await supabase
-    .from('showtimes')
-    .select('film_id')
-    .in('film_id', flaggedIds)
-    .not('source', 'is', null);
-  const scrapedIds = new Set((withShowtimes ?? []).map(s => s.film_id));
-
-  // 3b. Films still "fresh" — an upcoming showtime or seen within the grace window.
+  // 3. Keep only films that are still "live" in cinemas:
+  //    - future available showtime, OR
+  //    - scrape last_seen within the grace window (leaving soon).
   const { data: fresh } = await supabase
     .from('showtimes')
     .select('film_id')
     .in('film_id', flaggedIds)
-    .or(`show_date.gte.${today},last_seen_at.gte.${graceCutoff}`);
+    .or(`and(show_date.gte.${today},is_available.eq.true),last_seen_at.gte.${graceCutoff}`);
   const keepIds = new Set((fresh ?? []).map(s => s.film_id));
 
-  // Drop only scraper-sourced films that have gone stale.
-  const dropIds = flaggedIds.filter(id => scrapedIds.has(id) && !keepIds.has(id));
+  const dropIds = flaggedIds.filter(id => !keepIds.has(id));
 
   let dropped = 0;
   if (dropIds.length) {
