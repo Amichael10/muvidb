@@ -47,10 +47,43 @@ jobs:
           fetch-depth: 1
 
       - name: Verify Environment
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "Checking Secrets Presence..."
-          if [ -z "$CRON_SECRET" ]; then echo "❌ CRON_SECRET is MISSING"; else echo "✅ CRON_SECRET is set"; fi
-          if [ -z "${{ secrets.FIRECRAWL_API_KEY }}" ]; then echo "❌ FIRECRAWL_API_KEY is MISSING"; else echo "✅ FIRECRAWL_API_KEY is set"; fi
+          # PREFLIGHT — fail fast on missing credentials.
+          #
+          # Every sync step below writes to Supabase AND runs with
+          # continue-on-error, so when SUPABASE_SERVICE_ROLE_KEY was accidentally
+          # deleted the entire pipeline (YouTube, cinemas, TMDB, all feeds,
+          # comment mining, AI maintenance) silently no-opped for a day while the
+          # run still reported ✅ success. The only symptom was runtime dropping
+          # from ~25 min to ~2 min. Make that impossible to miss.
+          #
+          # Required = nothing can work without it -> hard fail.
+          # Optional = only that feature degrades -> warn and continue.
+          echo "Checking secrets…"
+          missing=""
+          for v in SUPABASE_SERVICE_ROLE_KEY VITE_SUPABASE_URL; do
+            if [ -z "${!v}" ]; then missing="$missing $v"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::FATAL — required secret(s) missing:$missing"
+            echo "Every sync step writes to Supabase, so this run would do nothing."
+            echo "Set them under: Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "✅ Supabase credentials present"
+          for v in CRON_SECRET FIRECRAWL_API_KEY YOUTUBE_API_KEY GEMINI_API_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "::warning::$v is missing — steps needing it will be degraded or skipped"
+            else
+              echo "✅ $v is set"
+            fi
+          done
           echo "Base URL: $BASE_URL"
 
       - name: Setup Node.js
