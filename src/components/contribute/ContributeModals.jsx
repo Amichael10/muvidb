@@ -9,6 +9,9 @@ import {
   suggestFilmEdit,
   reportLink,
   reportChannel,
+  PERSON_EDIT_FIELDS,
+  FILM_EDIT_FIELDS,
+  compactFields,
 } from '../../lib/contributions';
 import { uploadContributionImage } from '../../lib/imageUpload';
 
@@ -206,41 +209,137 @@ export function SuggestPersonModal({ onClose }) {
 }
 
 // 2. Suggest an edit to a person or film ------------------------------------
-export function SuggestEditModal({ onClose, target, targetId, targetName }) {
+// Chip-based: pick only the fields you want to change. All optional; at least
+// one field / photo / note is required. Current values shown as hints.
+export function SuggestEditModal({ onClose, target, targetId, targetName, current = {} }) {
   // target: 'person' | 'film'
   const { submitting, run } = useContributionSubmit(onClose);
-  const [changes, setChanges] = useState('');
+  const fieldDefs = target === 'person' ? PERSON_EDIT_FIELDS : FILM_EDIT_FIELDS;
+  const photoLabel = target === 'person' ? 'Photo' : 'Poster';
+
+  const [open, setOpen] = useState({}); // fieldKey | 'photo' | 'note' → bool
+  const [values, setValues] = useState({});
   const [imagePath, setImagePath] = useState(null);
+  const [note, setNote] = useState('');
+
+  const toggle = (key) => setOpen((p) => ({ ...p, [key]: !p[key] }));
+  const setVal = (key) => (e) => setValues((p) => ({ ...p, [key]: e.target.value }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!changes.trim() && !imagePath) {
-      toast.error('Describe what should change, or attach a new image.');
+    const fields = compactFields(values);
+    if (!Object.keys(fields).length && !imagePath && !note.trim()) {
+      toast.error(`Pick at least one field, attach a ${photoLabel.toLowerCase()}, or add a note.`);
       return;
     }
     if (target === 'person') {
-      run(() => suggestPersonEdit({ personId: targetId, changes, image_path: imagePath }));
+      run(() => suggestPersonEdit({ personId: targetId, fields, image_path: imagePath, note }));
     } else {
-      run(() => suggestFilmEdit({ filmId: targetId, changes, image_path: imagePath }));
+      run(() => suggestFilmEdit({ filmId: targetId, fields, image_path: imagePath, note }));
     }
   };
 
+  const chipCls = (active) =>
+    `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+      active
+        ? 'bg-brand/15 text-brand border-brand/40'
+        : 'bg-surface-2 text-text-secondary border-border hover:border-brand/30'
+    }`;
+
   return (
     <ModalShell
-      title={`Suggest an edit`}
-      subtitle={targetName ? `For "${targetName}"` : 'Help us fix or complete this entry.'}
+      title="Suggest an edit"
+      subtitle={
+        targetName
+          ? `For "${targetName}" — tap what you want to fix. Everything is optional.`
+          : 'Tap the fields you want to fix. Everything is optional.'
+      }
       onClose={onClose}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="What's missing or wrong?" required>
-          <textarea
-            className={`${inputCls} resize-none h-32`}
-            value={changes}
-            onChange={(e) => setChanges(e.target.value)}
-            placeholder="e.g. The release year should be 2023, the director is X, add the social link…"
-          />
-        </Field>
-        <ImageUploadField label="New image (optional)" onUploaded={setImagePath} />
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => toggle('photo')} className={chipCls(open.photo || !!imagePath)}>
+            <Icon icon="solar:camera-linear" width="14" />
+            {photoLabel}
+            {imagePath && <Icon icon="solar:check-circle-bold" width="12" />}
+          </button>
+          {fieldDefs.map((f) => {
+            const filled = !!(values[f.key] && String(values[f.key]).trim());
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => toggle(f.key)}
+                className={chipCls(open[f.key] || filled)}
+              >
+                {f.label}
+                {filled && <Icon icon="solar:check-circle-bold" width="12" />}
+              </button>
+            );
+          })}
+          <button type="button" onClick={() => toggle('note')} className={chipCls(open.note || !!note.trim())}>
+            Something else
+            {!!note.trim() && <Icon icon="solar:check-circle-bold" width="12" />}
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {open.photo && (
+            <ImageUploadField label={`New ${photoLabel.toLowerCase()}`} onUploaded={setImagePath} />
+          )}
+
+          {fieldDefs.map((f) => {
+            if (!open[f.key]) return null;
+            const hint = current[f.key];
+            const hintText =
+              hint == null || hint === ''
+                ? null
+                : Array.isArray(hint)
+                  ? hint.join(', ')
+                  : String(hint);
+            return (
+              <Field key={f.key} label={f.label}>
+                {f.kind === 'textarea' ? (
+                  <textarea
+                    className={`${inputCls} resize-none h-24`}
+                    value={values[f.key] || ''}
+                    onChange={setVal(f.key)}
+                    placeholder={hintText ? `Currently: ${hintText}` : f.placeholder}
+                  />
+                ) : (
+                  <input
+                    type={f.kind === 'date' ? 'date' : f.kind === 'number' ? 'number' : 'text'}
+                    className={inputCls}
+                    value={values[f.key] || ''}
+                    onChange={setVal(f.key)}
+                    placeholder={hintText ? `Currently: ${hintText}` : f.placeholder}
+                  />
+                )}
+                {hintText && f.kind !== 'textarea' && (
+                  <p className="text-text-muted text-[10px] mt-1 truncate">Current: {hintText}</p>
+                )}
+              </Field>
+            );
+          })}
+
+          {open.note && (
+            <Field label="Anything else we should know?">
+              <textarea
+                className={`${inputCls} resize-none h-20`}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Free-text note (reviewed manually — not auto-applied)"
+              />
+            </Field>
+          )}
+        </div>
+
+        {!Object.values(open).some(Boolean) && (
+          <p className="text-text-muted text-xs text-center py-2">
+            Select one or more chips above to add suggestions.
+          </p>
+        )}
+
         <SubmitRow submitting={submitting} onClose={onClose} label="Submit edit" />
       </form>
     </ModalShell>

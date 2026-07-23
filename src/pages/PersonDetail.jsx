@@ -526,6 +526,19 @@ const PersonDetail = () => {
                     target="person"
                     targetId={personId}
                     targetName={formatPersonName(person.name)}
+                    current={{
+                      name: person.name,
+                      known_for_department: person.known_for_department,
+                      bio: person.bio,
+                      date_of_birth: person.date_of_birth,
+                      birthplace: person.birthplace,
+                      nationality: person.nationality,
+                      instagram_url: person.instagram_url,
+                      twitter_url: person.twitter_url,
+                      tiktok_url: person.tiktok_url,
+                      facebook_url: person.facebook_url,
+                      youtube_handle: person.youtube_handle,
+                    }}
                     onClose={() => setShowEdit(false)}
                   />
                 )}

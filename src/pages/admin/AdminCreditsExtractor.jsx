@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
@@ -6,6 +6,190 @@ import { getFriendlyErrorMessage } from '../../utils/errors';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toast } from 'react-hot-toast';
+import {
+  personNameTokens,
+  sortedNameKey,
+  pickAutoMatch,
+  foldPersonText,
+} from '../../lib/personNameMatch';
+
+const PEOPLE_SELECT = 'id, name, photo_url, film_count';
+
+/** Exact + name-order-swap lookup for one talent string. */
+async function resolvePersonMatch(rawName) {
+  const name = String(rawName || '').trim();
+  if (!name) return null;
+
+  // 1) Exact (case-insensitive)
+  const { data: exactRows, error: exactErr } = await supabase
+    .from('people')
+    .select(PEOPLE_SELECT)
+    .ilike('name', name)
+    .limit(10);
+  if (exactErr) throw exactErr;
+  const exact = pickAutoMatch(name, exactRows || []);
+  if (exact && foldPersonText(exact.name) === foldPersonText(name)) return exact;
+
+  // 2) Token-order swap — require every token to appear (AND ilike)
+  const tokens = personNameTokens(name);
+  const key = sortedNameKey(name);
+  if (tokens.length >= 2 && key) {
+    let q = supabase.from('people').select(PEOPLE_SELECT).limit(40);
+    for (const t of tokens) q = q.ilike('name', `%${t}%`);
+    const { data: candidates, error } = await q;
+    if (error) throw error;
+    const swap = pickAutoMatch(name, candidates || []);
+    if (swap) return swap;
+  }
+
+  // Prefer exact from step 1 even if casing differed
+  return exact || null;
+}
+
+/** Typeahead: partial name search, ranked by film_count. */
+async function searchPeopleSuggestions(rawQuery, limit = 8) {
+  const q = String(rawQuery || '').trim();
+  if (q.length < 2) return [];
+
+  const { data, error } = await supabase
+    .from('people')
+    .select(PEOPLE_SELECT)
+    .ilike('name', `%${q}%`)
+    .order('film_count', { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) throw error;
+
+  // Also surface token-swap style hits when query has 2+ tokens
+  // (e.g. typing "Adekola Odun" should still find "Odunlade Adekola")
+  const tokens = personNameTokens(q);
+  if (tokens.length >= 2) {
+    let sq = supabase.from('people').select(PEOPLE_SELECT).limit(limit);
+    for (const t of tokens) sq = sq.ilike('name', `%${t}%`);
+    const { data: tokenHits } = await sq;
+    const map = new Map((data || []).map((p) => [p.id, p]));
+    for (const p of tokenHits || []) map.set(p.id, p);
+    return Array.from(map.values())
+      .sort((a, b) => Number(b.film_count || 0) - Number(a.film_count || 0))
+      .slice(0, limit);
+  }
+
+  return data || [];
+}
+
+/** Typeahead name cell for credit roster rows. */
+function PersonNameCell({ row, disabled, onTextChange, onAutoLink, onPickPerson, onResolve }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const wrapRef = useRef(null);
+  const debounceRef = useRef(null);
+  const blurTimer = useRef(null);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  useEffect(() => {
+    if (disabled) return undefined;
+    const q = row.name.trim();
+    clearTimeout(debounceRef.current);
+    if (q.length < 2) {
+      setSuggestions([]);
+      setSearching(false);
+      return undefined;
+    }
+
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const hits = await searchPeopleSuggestions(q);
+        setSuggestions(hits);
+        // Auto-link exact / name-order swap without rewriting the typed string
+        const auto = pickAutoMatch(q, hits);
+        if (auto) onAutoLink(auto);
+      } catch (err) {
+        console.error('People suggestion search failed:', err);
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(debounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-search when the typed name changes
+  }, [row.name, disabled]);
+
+  const handleBlur = () => {
+    clearTimeout(blurTimer.current);
+    blurTimer.current = setTimeout(() => {
+      setOpen(false);
+      if (row.name.trim() && !row.matchId) onResolve(row.name);
+    }, 150);
+  };
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <input
+        type="text"
+        value={row.name}
+        disabled={disabled}
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onBlur={handleBlur}
+        onChange={(e) => {
+          onTextChange(e.target.value);
+          setOpen(true);
+        }}
+        className="w-full bg-transparent border-b border-transparent focus:border-brand/40 text-text-primary text-sm font-bold focus:outline-none focus:ring-0 py-0.5 placeholder:text-text-muted/30"
+        placeholder="Type a name to search…"
+      />
+      {open && !disabled && row.name.trim().length >= 2 && (
+        <div className="absolute left-0 top-full mt-1 w-[min(100%,22rem)] min-w-[16rem] bg-surface border border-border rounded-lg shadow-2xl z-40 overflow-hidden ring-1 ring-black/5">
+          {searching ? (
+            <div className="px-3 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest">
+              Searching…
+            </div>
+          ) : suggestions.length === 0 ? (
+            <div className="px-3 py-3 text-xs text-text-muted">
+              No matches — will create a new profile
+            </div>
+          ) : (
+            suggestions.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPickPerson(p);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-2 transition-colors border-b border-border/50 last:border-0 ${
+                  row.matchId === p.id ? 'bg-blue-500/5' : ''
+                }`}
+              >
+                <div className="w-7 h-7 rounded-full bg-surface-2 border border-border overflow-hidden shrink-0">
+                  {p.photo_url ? (
+                    <img src={p.photo_url} alt="" className="w-full h-full object-cover" />
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-text-primary truncate">{p.name}</p>
+                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">
+                    {p.film_count ? `${p.film_count} credits` : 'Existing profile'}
+                  </p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminCreditsExtractor() {
   const { user } = useAuth();
@@ -99,44 +283,60 @@ export default function AdminCreditsExtractor() {
   }, [filmSearch]);
 
 
-  // Fetch live matches from database whenever the name list changes
+  // Fetch live matches from database whenever the name list changes.
+  // Exact match first (batch), then per-row token-order swap for leftovers.
   const runLiveProfileVerification = async (rows, setter) => {
     if (!rows.length) return;
-    
-    // Extract unique name strings
-    const nameStrings = rows.map(r => r.name.trim()).filter(Boolean);
+
+    const nameStrings = [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
     if (!nameStrings.length) return;
 
     try {
-      // Direct exact match query
-      const { data: matchedPeople, error } = await supabase
+      const { data: exactPeople, error } = await supabase
         .from('people')
-        .select('id, name, photo_url')
+        .select(PEOPLE_SELECT)
         .in('name', nameStrings);
-
       if (error) throw error;
 
-      const matchMap = new Map(matchedPeople.map(p => [p.name.toLowerCase(), p]));
+      const exactMap = new Map((exactPeople || []).map((p) => [foldPersonText(p.name), p]));
+      const resolved = new Map(); // queryName → person
 
-      // Update match status for each row
-      setter(prevRows =>
-        prevRows.map(row => {
-          const match = matchMap.get(row.name.toLowerCase());
+      for (const n of nameStrings) {
+        const hit = exactMap.get(foldPersonText(n));
+        if (hit) resolved.set(n, hit);
+      }
+
+      const unmatched = nameStrings.filter((n) => !resolved.has(n));
+      // Resolve swaps in small parallel batches
+      const BATCH = 6;
+      for (let i = 0; i < unmatched.length; i += BATCH) {
+        const slice = unmatched.slice(i, i + BATCH);
+        const found = await Promise.all(slice.map((n) => resolvePersonMatch(n).catch(() => null)));
+        slice.forEach((n, idx) => {
+          if (found[idx]) resolved.set(n, found[idx]);
+        });
+      }
+
+      setter((prevRows) =>
+        prevRows.map((row) => {
+          const match = resolved.get(row.name.trim());
           if (match) {
             return {
               ...row,
               matchId: match.id,
+              matchName: match.name,
               photoUrl: match.photo_url,
-              status: 'matched'
-            };
-          } else {
-            return {
-              ...row,
-              matchId: null,
-              photoUrl: null,
-              status: 'new'
+              status: row.forceCreate ? 'new' : 'matched',
             };
           }
+          return {
+            ...row,
+            matchId: null,
+            matchName: null,
+            photoUrl: null,
+            forceCreate: false,
+            status: 'new',
+          };
         })
       );
     } catch (err) {
@@ -242,7 +442,9 @@ export default function AdminCreditsExtractor() {
         selected: true,
         status: 'checking', // 'checking', 'matched', 'new'
         matchId: null,
-        photoUrl: null
+        matchName: null,
+        photoUrl: null,
+        forceCreate: false,
       }));
 
       if (activeTab === 'cast') {
@@ -264,47 +466,93 @@ export default function AdminCreditsExtractor() {
     }
   };
 
-  // Re-run matching if an admin edits a name input cell manually
-  const handleNameCellChange = async (key, newName, type) => {
+  // Update name text + clear stale link until autocomplete / resolve finishes
+  const handleNameTextChange = (key, newName, type) => {
     const setter = type === 'cast' ? setCastRows : setCrewRows;
-    setter(prev =>
-      prev.map(row => (row.key === key ? { ...row, name: newName, status: 'checking' } : row))
+    setter((prev) =>
+      prev.map((row) =>
+        row.key === key
+          ? {
+              ...row,
+              name: newName,
+              matchId: null,
+              matchName: null,
+              photoUrl: null,
+              forceCreate: false,
+              status: newName.trim() ? 'checking' : 'new',
+            }
+          : row
+      )
     );
+  };
 
-    // Debounce/Trigger live search for this edited row
-    try {
-      const { data: matched, error } = await supabase
-        .from('people')
-        .select('id, name, photo_url')
-        .ilike('name', newName)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      setter(prev =>
-        prev.map(row => {
-          if (row.key === key) {
-            if (matched) {
-              return {
-                ...row,
-                matchId: matched.id,
-                photoUrl: matched.photo_url,
-                status: 'matched'
-              };
-            } else {
-              return {
+  const applyPersonMatch = (key, person, type, typedName) => {
+    const setter = type === 'cast' ? setCastRows : setCrewRows;
+    if (!person) {
+      setter((prev) =>
+        prev.map((row) =>
+          row.key === key
+            ? {
                 ...row,
                 matchId: null,
+                matchName: null,
                 photoUrl: null,
-                status: 'new'
-              };
-            }
-          }
-          return row;
-        })
+                status: 'new',
+              }
+            : row
+        )
       );
+      return;
+    }
+    setter((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        const pickedFromDropdown = typedName != null && foldPersonText(typedName) === foldPersonText(person.name);
+        // Auto-link while "create new" is chosen: keep candidate, stay on create
+        if (row.forceCreate && !pickedFromDropdown) {
+          return {
+            ...row,
+            matchId: person.id,
+            matchName: person.name,
+            photoUrl: person.photo_url,
+            status: 'new',
+          };
+        }
+        return {
+          ...row,
+          name: typedName != null ? typedName : row.name,
+          matchId: person.id,
+          matchName: person.name,
+          photoUrl: person.photo_url,
+          forceCreate: false,
+          status: 'matched',
+        };
+      })
+    );
+  };
+
+  const setRowLinkMode = (key, mode, type) => {
+    const setter = type === 'cast' ? setCastRows : setCrewRows;
+    setter((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        if (mode === 'create') {
+          return { ...row, forceCreate: true, status: 'new' };
+        }
+        // Link to existing — only if we have a candidate
+        if (!row.matchId) return row;
+        return { ...row, forceCreate: false, status: 'matched' };
+      })
+    );
+  };
+
+  const resolveRowName = async (key, name, type) => {
+    try {
+      const matched = await resolvePersonMatch(name);
+      applyPersonMatch(key, matched, type, name);
     } catch (err) {
       console.error(err);
+      applyPersonMatch(key, null, type, name);
     }
   };
 
@@ -349,7 +597,8 @@ export default function AdminCreditsExtractor() {
 
     for (const row of selectedRows) {
       try {
-        let personId = row.matchId;
+        // forceCreate = admin rejected a near-match and wants a brand-new person
+        let personId = row.forceCreate ? null : row.matchId;
 
         // Step A: If new profile, insert to people first
         if (!personId) {
@@ -643,7 +892,7 @@ export default function AdminCreditsExtractor() {
             </div>
 
             {/* Editable Table */}
-            <div className="overflow-x-auto">
+            <div className="overflow-visible">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="border-b border-border bg-surface-2/10 text-text-muted text-[10px] font-black uppercase tracking-[0.2em]">
@@ -702,15 +951,17 @@ export default function AdminCreditsExtractor() {
                           />
                         </td>
 
-                        {/* Editable Name */}
-                        <td className="px-4 py-4">
-                          <input
-                            type="text"
-                            value={row.name}
+                        {/* Editable Name + typeahead */}
+                        <td className="px-4 py-4 relative overflow-visible">
+                          <PersonNameCell
+                            row={row}
                             disabled={savedRows.has(row.key) || savingRows.has(row.key)}
-                            onChange={(e) => handleNameCellChange(row.key, e.target.value, activeTab)}
-                            className="w-full bg-transparent border-b border-transparent focus:border-brand/40 text-text-primary text-sm font-bold focus:outline-none focus:ring-0 py-0.5 placeholder:text-text-muted/30"
-                            placeholder="Enter full name..."
+                            onTextChange={(val) => handleNameTextChange(row.key, val, activeTab)}
+                            onAutoLink={(person) => applyPersonMatch(row.key, person, activeTab)}
+                            onPickPerson={(person) =>
+                              applyPersonMatch(row.key, person, activeTab, person.name)
+                            }
+                            onResolve={(name) => resolveRowName(row.key, name, activeTab)}
                           />
                         </td>
 
@@ -737,13 +988,42 @@ export default function AdminCreditsExtractor() {
                               <div className="w-2.5 h-2.5 border border-brand/30 border-t-brand rounded-full animate-spin"></div>
                               Saving...
                             </span>
-                          ) : row.status === 'matched' ? (
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                Link to existing profile
-                              </span>
-                              {row.photoUrl && (
-                                <img src={row.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover border border-border shadow-sm" />
+                          ) : row.matchId ? (
+                            <div className="flex flex-col gap-1.5 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setRowLinkMode(row.key, 'link', activeTab)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                    !row.forceCreate
+                                      ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                      : 'bg-surface-2 text-text-muted border-border hover:border-blue-500/30 hover:text-blue-400'
+                                  }`}
+                                  title={row.matchName ? `Link to ${row.matchName}` : 'Link to existing'}
+                                >
+                                  {row.photoUrl && (
+                                    <img src={row.photoUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                  )}
+                                  Link existing
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setRowLinkMode(row.key, 'create', activeTab)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                    row.forceCreate
+                                      ? 'bg-purple-500/10 text-purple-500 border-purple-500/20'
+                                      : 'bg-surface-2 text-text-muted border-border hover:border-purple-500/30 hover:text-purple-400'
+                                  }`}
+                                  title="Create a new person instead of linking this match"
+                                >
+                                  ✨ Create new
+                                </button>
+                              </div>
+                              {row.matchName && (
+                                <p className="text-[10px] text-text-muted truncate" title={row.matchName}>
+                                  {row.forceCreate ? 'Ignoring match: ' : '→ '}
+                                  {row.matchName}
+                                </p>
                               )}
                             </div>
                           ) : row.status === 'new' ? (
