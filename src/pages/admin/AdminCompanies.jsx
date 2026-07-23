@@ -19,6 +19,58 @@ export default function AdminCompanies() {
   const [editingCompany, setEditingCompany] = useState(null);
   const [deletingCompany, setDeletingCompany] = useState(null);
 
+  // Merge state: ids of selected duplicates + the chosen primary for confirmation
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [mergePlan, setMergePlan] = useState(null); // { primary, duplicates: [...] }
+  const [isMerging, setIsMerging] = useState(false);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const selectedCompanies = companies.filter((c) => selectedIds.has(c.id));
+
+  // Default the survivor to the richest record so films aren't lost visually.
+  const openMerge = () => {
+    if (selectedCompanies.length < 2) return;
+    const primary = [...selectedCompanies].sort(
+      (a, b) =>
+        (b.tmdb_id ? 1 : 0) - (a.tmdb_id ? 1 : 0) ||
+        (b.logo_url ? 1 : 0) - (a.logo_url ? 1 : 0) ||
+        new Date(a.created_at) - new Date(b.created_at),
+    )[0];
+    setMergePlan({ primary, duplicates: selectedCompanies.filter((c) => c.id !== primary.id) });
+  };
+
+  const confirmMerge = async () => {
+    if (!mergePlan) return;
+    setIsMerging(true);
+    try {
+      const { error } = await supabase.rpc('merge_companies_group', {
+        p_master_id: mergePlan.primary.id,
+        p_duplicate_ids: mergePlan.duplicates.map((c) => c.id),
+        p_metadata: {},
+      });
+      if (error) throw error;
+      await logAdminAction(user, 'merge', 'company', mergePlan.primary.id, mergePlan.primary.name, {
+        absorbed: mergePlan.duplicates.map((c) => c.name),
+      });
+      toast.success(`Merged ${mergePlan.duplicates.length + 1} companies into "${mergePlan.primary.name}"`);
+      setMergePlan(null);
+      setSelectedIds(new Set());
+      fetchCompanies();
+    } catch (err) {
+      console.error('Company merge failed:', err);
+      toast.error(err.message || 'Merge failed');
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -149,12 +201,31 @@ export default function AdminCompanies() {
           <p className="text-brand text-xs font-bold mb-1">Administration</p>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Companies</h1>
         </div>
-        <button
-          onClick={openAddDrawer}
-          className="bg-brand text-white font-bold px-6 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all"
-        >
-          Add company record
-        </button>
+        <div className="flex items-center gap-3">
+          {selectedIds.size >= 2 && (
+            <button
+              onClick={openMerge}
+              className="bg-amber-500 text-white font-bold px-5 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+            >
+              <Icon icon="solar:posts-carousel-vertical-linear" className="w-4 h-4" />
+              Merge {selectedIds.size} selected
+            </button>
+          )}
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-text-muted hover:text-text-primary font-medium text-xs px-2"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            onClick={openAddDrawer}
+            className="bg-brand text-white font-bold px-6 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            Add company record
+          </button>
+        </div>
       </div>
 
       {/* Data Table */}
@@ -163,6 +234,7 @@ export default function AdminCompanies() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-text-muted uppercase bg-surface-2/50 border-b border-border">
               <tr>
+                <th className="px-4 py-4 font-medium w-10"></th>
                 <th className="px-6 py-4 font-medium">Logo</th>
                 <th className="px-6 py-4 font-medium">Name</th>
                 <th className="px-6 py-4 font-medium">Website</th>
@@ -175,13 +247,25 @@ export default function AdminCompanies() {
                 Array(5).fill(0).map((_, i) => <SkeletonRow key={i} columns={5} />)
               ) : companies.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-text-muted">
+                  <td colSpan="6" className="px-6 py-8 text-center text-text-muted">
                     No companies found.
                   </td>
                 </tr>
               ) : (
                 companies.map((company) => (
-                  <tr key={company.id} className="hover:bg-surface-2/50 transition-colors group">
+                  <tr
+                    key={company.id}
+                    className={`transition-colors group ${selectedIds.has(company.id) ? 'bg-amber-500/10' : 'hover:bg-surface-2/50'}`}
+                  >
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(company.id)}
+                        onChange={() => toggleSelect(company.id)}
+                        className="w-4 h-4 rounded border-border accent-amber-500 cursor-pointer"
+                        title="Select to merge"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       {company.logo_url ? (
                         <img src={company.logo_url} alt={company.name} className="w-10 h-10 rounded-lg object-cover bg-white" />
@@ -340,6 +424,49 @@ export default function AdminCompanies() {
           onConfirm={handleDelete}
           onCancel={() => setDeletingCompany(null)}
         />
+      )}
+
+      {/* Merge Confirmation — pick the record to KEEP */}
+      {mergePlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !isMerging && setMergePlan(null)}>
+          <div className="bg-surface rounded-xl border border-border w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-text-primary">Merge companies</h2>
+            <p className="text-sm text-text-muted">
+              Choose the record to <strong className="text-text-primary">keep</strong>. Every film and channel from the others moves onto it, and the duplicates are deleted. This cannot be undone.
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {selectedCompanies.map((c) => (
+                <label
+                  key={c.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${mergePlan.primary.id === c.id ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:bg-surface-2/50'}`}
+                >
+                  <input
+                    type="radio"
+                    name="mergePrimary"
+                    checked={mergePlan.primary.id === c.id}
+                    onChange={() => setMergePlan({ primary: c, duplicates: selectedCompanies.filter((x) => x.id !== c.id) })}
+                    className="accent-amber-500"
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-bold text-text-primary truncate">{c.name}</span>
+                    <span className="block text-[11px] text-text-muted">
+                      {mergePlan.primary.id === c.id ? 'KEEP — others merge into this' : 'will be merged & deleted'}
+                      {c.founded_year ? ` · ${c.founded_year}` : ''}{c.tmdb_id ? ' · TMDB' : ''}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setMergePlan(null)} disabled={isMerging} className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={confirmMerge} disabled={isMerging} className="px-5 py-2 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-lg disabled:opacity-60">
+                {isMerging ? 'Merging…' : `Merge ${selectedCompanies.length} → 1`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
