@@ -8,6 +8,13 @@ import { formatViewCount } from '../utils/youtube'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
 import { formatPersonName, toTitleCase } from '../utils/format'
+import {
+  PEOPLE_ROLE_FILTERS,
+  PEOPLE_FILTER_TO_ROLE,
+  canonicalizeRole,
+  formatDepartment,
+} from '../lib/creditRoles'
+import { searchPeopleByName } from '../lib/peopleSearch'
 
 const PersonCard = ({ person, currentUser }) => {
   const navigate = useNavigate()
@@ -42,15 +49,7 @@ const PersonCard = ({ person, currentUser }) => {
     .slice(0, 2)
 
   const creditCount = person.credits?.length || 0
-  const primaryRole = person.known_for_department || 'filmmaker'
-
-  const roleLabels = {
-    actor: 'Actor',
-    director: 'Director',
-    writer: 'Writer',
-    producer: 'Producer',
-    filmmaker: 'Filmmaker'
-  }
+  const primaryRole = formatDepartment(person.known_for_department) || 'Filmmaker'
 
   return (
     <Link
@@ -87,7 +86,7 @@ const PersonCard = ({ person, currentUser }) => {
         </h3>
 
         <p className="text-text-muted text-[10px] font-black tracking-widest mt-1 opacity-60">
-          {toTitleCase(roleLabels[primaryRole] || primaryRole)}
+          {toTitleCase(primaryRole)}
         </p>
 
         <div className="flex items-center justify-between mt-4">
@@ -153,7 +152,7 @@ const PeopleList = () => {
   const [hasMore, setHasMore] = useState(true)
 
   const PAGE_SIZE = 20
-  const roles = ['All', 'Actor', 'Director', 'Writer', 'Producer', 'Cinematographer', 'Costume Designer', 'Gaffer', 'Editor', 'Sound']
+  const roles = PEOPLE_ROLE_FILTERS
 
   useEffect(() => {
     setPeople([])
@@ -165,51 +164,92 @@ const PeopleList = () => {
   const fetchPeople = async (pageNum, reset = false) => {
     setLoading(true)
 
-    let query = supabase
-      .from('people')
-      .select(`
-        id, slug, name, photo_url,
-        popularity_score, is_verified,
-        known_for_department,
-        credits(id)
-      `)
+    const roleValue = roleFilter !== 'All' ? PEOPLE_FILTER_TO_ROLE[roleFilter] : null
+    const roleLabel = roleFilter !== 'All' ? (formatDepartment(roleValue) || roleFilter) : null
+    const fetchSize = roleValue ? PAGE_SIZE * 3 : PAGE_SIZE
 
-    if (debouncedSearch) {
-      query = query.ilike('name', `%${debouncedSearch}%`)
-    }
+    try {
+      if (debouncedSearch.trim()) {
+        // Order-insensitive name search (Adekola Odunlade ≡ Odunlade Adekola)
+        const rows = await searchPeopleByName(debouncedSearch, {
+          limit: 80,
+          select: `
+            id, slug, name, photo_url,
+            popularity_score, is_verified,
+            known_for_department,
+            credits(id, role)
+          `,
+        })
 
-    if (sortBy === 'popularity') {
-      query = query.order('popularity_score', { ascending: false })
-    } else if (sortBy === 'name') {
-      query = query.order('name', { ascending: true })
-    }
+        let filtered = rows
+        if (roleValue) {
+          filtered = filtered.filter((p) => {
+            const dept = canonicalizeRole(p.known_for_department)
+            if (dept === roleValue) return true
+            return (p.credits || []).some((c) => canonicalizeRole(c.role) === roleValue)
+          })
+        }
 
-    query = query.range(
-      pageNum * PAGE_SIZE,
-      (pageNum + 1) * PAGE_SIZE - 1
-    )
+        if (sortBy === 'name') {
+          filtered = [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        } else if (sortBy === 'popularity') {
+          filtered = [...filtered].sort(
+            (a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0)
+          )
+        }
 
-    const { data } = await query
+        const slice = filtered.slice(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE)
+        setHasMore((pageNum + 1) * PAGE_SIZE < filtered.length)
+        setPeople(reset ? slice : (prev) => [...prev, ...slice])
+        return
+      }
 
-    if (!data || data.length < PAGE_SIZE) {
+      // Browse mode (no text query)
+      let query = supabase
+        .from('people')
+        .select(`
+          id, slug, name, photo_url,
+          popularity_score, is_verified,
+          known_for_department,
+          credits(id, role)
+        `)
+
+      if (roleLabel) {
+        query = query.ilike('known_for_department', roleLabel)
+      }
+
+      if (sortBy === 'popularity') {
+        query = query.order('popularity_score', { ascending: false })
+      } else if (sortBy === 'name') {
+        query = query.order('name', { ascending: true })
+      }
+
+      query = query.range(pageNum * fetchSize, (pageNum + 1) * fetchSize - 1)
+
+      const { data } = await query
+
+      let filtered = data || []
+      if (roleValue) {
+        filtered = filtered
+          .filter((p) => {
+            const dept = canonicalizeRole(p.known_for_department)
+            if (dept === roleValue) return true
+            return (p.credits || []).some((c) => canonicalizeRole(c.role) === roleValue)
+          })
+          .slice(0, PAGE_SIZE)
+      }
+
+      if (!data || data.length < fetchSize || filtered.length < PAGE_SIZE) {
+        setHasMore(false)
+      }
+
+      setPeople(reset ? filtered : (prev) => [...prev, ...filtered])
+    } catch (err) {
+      console.error('fetchPeople failed:', err)
       setHasMore(false)
+    } finally {
+      setLoading(false)
     }
-
-    let filtered = data || []
-    if (roleFilter !== 'All') {
-      const roleKey = roleFilter.toLowerCase()
-      filtered = filtered.filter(p =>
-        p.known_for_department?.toLowerCase().includes(roleKey)
-      )
-    }
-
-    if (reset) {
-      setPeople(filtered)
-    } else {
-      setPeople(prev => [...prev, ...filtered])
-    }
-
-    setLoading(false)
   }
 
   const loadMore = () => {

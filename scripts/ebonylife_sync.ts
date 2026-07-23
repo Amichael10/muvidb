@@ -57,16 +57,15 @@ async function scrapeEbonyLife() {
 
 async function upsertPerson(name) {
   if (!name) return null;
-  const { data: existing } = await supabase.from('people').select('id, source').ilike('name', name).maybeSingle();
-  if (existing) {
-    if (!existing.source) {
-       await supabase.from('people').update({ source: 'ebonylife' }).eq('id', existing.id);
-    }
-    return existing.id;
-  }
-  const { data: newPerson, error } = await supabase.from('people').insert({ name, source: 'ebonylife', nationality: 'Nigerian' }).select('id').single();
-  if (error) return null;
-  return newPerson.id;
+  // // Shared matcher (migration 20260723112408): exact name, else
+  // people.name_key (order-insensitive + honorific-stripped), so
+  // "Kosoko Jide" / "Prince Jide Kosoko" resolve to the existing person.
+  const { data: id, error } = await supabase.rpc('upsert_person_by_name', {
+    p_name: name,
+    p_extra: { nationality: 'Nigerian', source: 'ebonylife' },
+  });
+  if (error || !id) return null;
+  return id;
 }
 
 function parseDurationStr(durationStr) {

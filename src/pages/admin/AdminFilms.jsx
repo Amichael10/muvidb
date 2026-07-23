@@ -7,7 +7,8 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AwardsEditor from '../../components/admin/AwardsEditor';
-import { ALL_ROLES } from '../../lib/creditRoles';
+import { ALL_ROLES, canonicalizeRole } from '../../lib/creditRoles';
+import { searchPeopleByName } from '../../lib/peopleSearch';
 import { extractYoutubeId } from '../../lib/youtube';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
@@ -688,13 +689,18 @@ export default function AdminFilms() {
     
     searchTimeout.current = setTimeout(async () => {
       setIsSearchingPeople(true);
-      const { data } = await supabase
-        .from('people')
-        .select('id, name, photo_url')
-        .ilike('name', `%${query}%`)
-        .limit(5);
-      setPeopleResults(data || []);
-      setIsSearchingPeople(false);
+      try {
+        const data = await searchPeopleByName(query, {
+          limit: 8,
+          select: 'id, name, photo_url, film_count',
+        });
+        setPeopleResults(data || []);
+      } catch (err) {
+        console.error(err);
+        setPeopleResults([]);
+      } finally {
+        setIsSearchingPeople(false);
+      }
     }, 300);
   };
 
@@ -774,8 +780,8 @@ export default function AdminFilms() {
   };
 
   const addCredit = (person, role = 'actor') => {
-    const normRole = role.trim().toLowerCase();
-    if (credits.some(c => c.person_id === person.id && (c.role || '').trim().toLowerCase() === normRole)) {
+    const normRole = canonicalizeRole(role) || role.trim().toLowerCase();
+    if (credits.some(c => c.person_id === person.id && canonicalizeRole(c.role) === normRole)) {
       toast.error('Person already added with this role');
       return;
     }
@@ -944,7 +950,7 @@ export default function AdminFilms() {
             const seen = new Set();
 
             for (const c of validCredits) {
-              const normalizedRole = c.role ? toTitleCase(c.role.trim()) : '';
+              const normalizedRole = c.role ? canonicalizeRole(c.role) || c.role.trim().toLowerCase() : '';
               const key = `${c.person_id}-${normalizedRole}`;
 
               if (!seen.has(key)) {

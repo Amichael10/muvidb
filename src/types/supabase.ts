@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -76,6 +76,50 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      artist_outreach: {
+        Row: {
+          contacted_at: string | null
+          created_at: string
+          id: string
+          last_message: string | null
+          notes: string | null
+          person_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          contacted_at?: string | null
+          created_at?: string
+          id?: string
+          last_message?: string | null
+          notes?: string | null
+          person_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          contacted_at?: string | null
+          created_at?: string
+          id?: string
+          last_message?: string | null
+          notes?: string | null
+          person_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_outreach_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
@@ -1312,6 +1356,7 @@ export type Database = {
           mubi_id: number | null
           mubi_slug: string | null
           name: string
+          name_key: string | null
           nationality: string | null
           needs_review: boolean | null
           photo_url: string | null
@@ -1346,6 +1391,7 @@ export type Database = {
           mubi_id?: number | null
           mubi_slug?: string | null
           name: string
+          name_key?: string | null
           nationality?: string | null
           needs_review?: boolean | null
           photo_url?: string | null
@@ -1380,6 +1426,7 @@ export type Database = {
           mubi_id?: number | null
           mubi_slug?: string | null
           name?: string
+          name_key?: string | null
           nationality?: string | null
           needs_review?: boolean | null
           photo_url?: string | null
@@ -1848,6 +1895,54 @@ export type Database = {
           },
         ]
       }
+      scrape_alert_log: {
+        Row: {
+          ip: string
+          last_alert_at: string
+          last_hits: number | null
+          last_message: string | null
+        }
+        Insert: {
+          ip: string
+          last_alert_at?: string
+          last_hits?: number | null
+          last_message?: string | null
+        }
+        Update: {
+          ip?: string
+          last_alert_at?: string
+          last_hits?: number | null
+          last_message?: string | null
+        }
+        Relationships: []
+      }
+      scrape_ip_buckets: {
+        Row: {
+          hits: number
+          ip: string
+          sample_paths: string[]
+          updated_at: string
+          user_agent: string | null
+          window_start: string
+        }
+        Insert: {
+          hits?: number
+          ip: string
+          sample_paths?: string[]
+          updated_at?: string
+          user_agent?: string | null
+          window_start: string
+        }
+        Update: {
+          hits?: number
+          ip?: string
+          sample_paths?: string[]
+          updated_at?: string
+          user_agent?: string | null
+          window_start?: string
+        }
+        Relationships: []
+      }
       showtimes: {
         Row: {
           cinema_id: string
@@ -2314,6 +2409,7 @@ export type Database = {
         }
         Returns: string
       }
+      find_person_by_name: { Args: { p_name: string }; Returns: string }
       force_promote_to_admin: {
         Args: { user_email: string }
         Returns: undefined
@@ -2481,6 +2577,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      person_name_key: { Args: { n: string }; Returns: string }
       promote_pending_cinema_film: {
         Args: {
           p_existing_film_id?: string
@@ -2590,6 +2687,7 @@ export type Database = {
           mubi_id: number | null
           mubi_slug: string | null
           name: string
+          name_key: string | null
           nationality: string | null
           needs_review: boolean | null
           photo_url: string | null
@@ -2614,6 +2712,10 @@ export type Database = {
         }
       }
       tmdb_liked_pct: { Args: { avg: number; votes: number }; Returns: number }
+      upsert_person_by_name: {
+        Args: { p_extra?: Json; p_name: string }
+        Returns: string
+      }
     }
     Enums: {
       claim_status: "pending" | "approved" | "rejected"

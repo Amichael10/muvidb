@@ -101,12 +101,14 @@ export async function runCastExtraction() {
       // Tier 3: Create new person
       let personId = person?.id;
       if (!personId) {
-        const { data: newP } = await supabase
-          .from('people')
-          .insert({ name: actorName, nationality: 'Nigerian', created_at: new Date().toISOString() })
-          .select('id').single();
-        personId = newP?.id;
-        console.log(`[AI Maintenance] Created: "${actorName}"`);
+        // // Shared matcher (migration 20260723112408): exact name, else
+  // people.name_key (order-insensitive + honorific-stripped), so
+  // "Kosoko Jide" / "Prince Jide Kosoko" resolve to the existing person.
+        const { data: rpcId } = await supabase.rpc('upsert_person_by_name', {
+          p_name: actorName,
+          p_extra: { nationality: 'Nigerian', source: 'ai-maintenance' },
+        });
+        personId = rpcId as unknown as string;
       }
       if (personId) {
         personIds.set(actorName, personId);

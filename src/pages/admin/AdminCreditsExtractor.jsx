@@ -7,11 +7,11 @@ import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toast } from 'react-hot-toast';
 import {
-  personNameTokens,
-  sortedNameKey,
   pickAutoMatch,
   foldPersonText,
 } from '../../lib/personNameMatch';
+import { canonicalizeRole } from '../../lib/creditRoles';
+import { searchPeopleByName } from '../../lib/peopleSearch';
 
 const PEOPLE_SELECT = 'id, name, photo_url, film_count';
 
@@ -20,60 +20,17 @@ async function resolvePersonMatch(rawName) {
   const name = String(rawName || '').trim();
   if (!name) return null;
 
-  // 1) Exact (case-insensitive)
-  const { data: exactRows, error: exactErr } = await supabase
-    .from('people')
-    .select(PEOPLE_SELECT)
-    .ilike('name', name)
-    .limit(10);
-  if (exactErr) throw exactErr;
-  const exact = pickAutoMatch(name, exactRows || []);
-  if (exact && foldPersonText(exact.name) === foldPersonText(name)) return exact;
+  const hits = await searchPeopleByName(name, { limit: 12, select: PEOPLE_SELECT });
+  const auto = pickAutoMatch(name, hits);
+  if (auto) return auto;
 
-  // 2) Token-order swap — require every token to appear (AND ilike)
-  const tokens = personNameTokens(name);
-  const key = sortedNameKey(name);
-  if (tokens.length >= 2 && key) {
-    let q = supabase.from('people').select(PEOPLE_SELECT).limit(40);
-    for (const t of tokens) q = q.ilike('name', `%${t}%`);
-    const { data: candidates, error } = await q;
-    if (error) throw error;
-    const swap = pickAutoMatch(name, candidates || []);
-    if (swap) return swap;
-  }
-
-  // Prefer exact from step 1 even if casing differed
-  return exact || null;
+  const folded = foldPersonText(name);
+  return hits.find((p) => foldPersonText(p.name) === folded) || null;
 }
 
-/** Typeahead: partial name search, ranked by film_count. */
+/** Typeahead: partial name search, ranked. */
 async function searchPeopleSuggestions(rawQuery, limit = 8) {
-  const q = String(rawQuery || '').trim();
-  if (q.length < 2) return [];
-
-  const { data, error } = await supabase
-    .from('people')
-    .select(PEOPLE_SELECT)
-    .ilike('name', `%${q}%`)
-    .order('film_count', { ascending: false, nullsFirst: false })
-    .limit(limit);
-  if (error) throw error;
-
-  // Also surface token-swap style hits when query has 2+ tokens
-  // (e.g. typing "Adekola Odun" should still find "Odunlade Adekola")
-  const tokens = personNameTokens(q);
-  if (tokens.length >= 2) {
-    let sq = supabase.from('people').select(PEOPLE_SELECT).limit(limit);
-    for (const t of tokens) sq = sq.ilike('name', `%${t}%`);
-    const { data: tokenHits } = await sq;
-    const map = new Map((data || []).map((p) => [p.id, p]));
-    for (const p of tokenHits || []) map.set(p.id, p);
-    return Array.from(map.values())
-      .sort((a, b) => Number(b.film_count || 0) - Number(a.film_count || 0))
-      .slice(0, limit);
-  }
-
-  return data || [];
+  return searchPeopleByName(rawQuery, { limit, select: PEOPLE_SELECT });
 }
 
 /** Typeahead name cell for credit roster rows. */
@@ -618,7 +575,10 @@ export default function AdminCreditsExtractor() {
         }
 
         // Step B: Connect Credit link
-        const creditRole = activeTab === 'cast' ? 'actor' : row.roleOrCharacter.toLowerCase().trim().replace(/\s+/g, '_');
+        const creditRole =
+          activeTab === 'cast'
+            ? 'actor'
+            : canonicalizeRole(row.roleOrCharacter) || row.roleOrCharacter.toLowerCase().trim();
         const characterName = activeTab === 'cast' ? row.roleOrCharacter.trim() : null;
 
         // Check if exact credit link exists to prevent database exceptions

@@ -103,25 +103,21 @@ export async function attachCreditsBatch(
 
   for (const name of uniqueNames) {
     try {
-      // Tier 1: exact (case-insensitive) match.
-      let { data: person } = await supabase
-        .from('people').select('id, name').ilike('name', name).limit(1).maybeSingle();
-      // Tier 2: partial match (handles minor spelling/casing differences).
-      if (!person) {
-        const { data: partial } = await supabase
-          .from('people').select('id, name').ilike('name', `%${name}%`).limit(1).maybeSingle();
-        if (partial) person = partial;
-      }
-      // Tier 3: create.
-      let id = person?.id;
-      if (!id) {
-        const { data: newP } = await supabase
-          .from('people')
-          .insert({ name, nationality: 'Nigerian', created_at: new Date().toISOString() })
-          .select('id').single();
-        id = newP?.id;
-      }
-      if (id) personId.set(name, id);
+      // Single shared matcher for every ingestion path (see migration
+      // 20260723112408): exact name, else people.name_key — which is
+      // order-insensitive and honorific-stripped, so "Kosoko Jide" and
+      // "Prince Jide Kosoko" resolve to the existing "Jide Kosoko" instead of
+      // creating rivals. Creates only on a genuine miss.
+      //
+      // The old tier-2 `ilike('%name%')` substring fallback is deliberately
+      // gone: it let a person named "Jide" match "Jide Kosoko" and silently
+      // attach that film's credits to the wrong profile.
+      const { data: id, error } = await supabase.rpc('upsert_person_by_name', {
+        p_name: name,
+        p_extra: { nationality: 'Nigerian', source: 'enrichment' },
+      });
+      if (error) throw error;
+      if (id) personId.set(name, id as unknown as string);
     } catch (e: any) {
       console.warn(`[film-enrichment] cast resolve failed for "${name}": ${e.message}`);
     }

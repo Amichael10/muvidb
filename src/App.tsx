@@ -64,6 +64,7 @@ const AdminPeopleEnrichment = lazyWithRetry(() => import('./pages/admin/AdminPeo
 const AdminCredits = lazyWithRetry(() => import('./pages/admin/AdminCredits'));
 const AdminCompanies = lazyWithRetry(() => import('./pages/admin/AdminCompanies'));
 const AdminClaims = lazyWithRetry(() => import('./pages/admin/AdminClaims'));
+const AdminOutreach = lazyWithRetry(() => import('./pages/admin/AdminOutreach'));
 const AdminContributions = lazyWithRetry(() => import('./pages/admin/AdminContributions'));
 const AdminNewReleases = lazyWithRetry(() => import('./pages/admin/AdminNewReleases'));
 const AdminUsers = lazyWithRetry(() => import('./pages/admin/AdminUsers'));
@@ -262,6 +263,7 @@ export default function App() {
                   <Route path="credits/extractor" element={<AdminCreditsExtractor />} />
                   <Route path="companies" element={<AdminCompanies />} />
                   <Route path="claims" element={<AdminClaims />} />
+                  <Route path="outreach" element={<ProtectedRoute allowedRoles={['admin']}><AdminOutreach /></ProtectedRoute>} />
                   <Route path="contributions" element={<AdminContributions />} />
                   <Route path="new-releases" element={<AdminNewReleases />} />
                   <Route path="users" element={<AdminUsers />} />
