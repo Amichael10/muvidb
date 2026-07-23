@@ -5,13 +5,15 @@
 // title literally contains that exact string — even though the person exists
 // and stars in dozens of films. Instead we:
 //   1. split the query into words (terms),
-//   2. match ANY term (so word order / extra words / partial names still hit),
+//   2. match people in an order-insensitive way (name_key + AND-of-tokens),
 //   3. also find films by their cast (searching an actor shows their films),
 //   4. rank everything so exact/most-complete matches lead and "similar"
 //      results still show below.
 // Optional pg_trgm RPCs (see migration) add typo tolerance on top; if they
 // aren't installed yet we silently skip them.
 import { supabase } from './supabase';
+import { searchPeopleByName } from './peopleSearch';
+import { sortedNameKey } from './personNameMatch';
 
 const FILM_FIELDS = `
   id, slug, title, poster_url, backdrop_url, year, language, runtime_minutes,
@@ -61,6 +63,10 @@ function scoreText(text, fullQ, terms) {
   let s = 0;
   if (t === fullQ) s += 1000;            // exact
   else if (t.includes(fullQ)) s += 300;  // full phrase appears
+  // Name/surname in either order ("adekola odunlade" ↔ "odunlade adekola")
+  const qKey = sortedNameKey(fullQ);
+  const tKey = sortedNameKey(t);
+  if (qKey && tKey && qKey === tKey) s += 700;
   let matched = 0;
   for (const term of terms) if (t.includes(term)) { s += 60; matched++; }
   if (matched === terms.length) s += 120; // every word present
@@ -71,14 +77,6 @@ function scoreText(text, fullQ, terms) {
   s -= Math.min(t.length, 80) * 0.15;     // gently prefer tighter matches
   return s;
 }
-
-// Match ANY term. This used to filter on a single term because a leading-wildcard
-// `ilike '%term%'` seq-scanned and blew the statement timeout — but the pg_trgm
-// GIN indexes turn each one into a bitmap index scan (~6ms), so ORing them is
-// cheap now and catches names where only the surname matches ("…Adekola").
-// Terms are already stripped to letters/digits by tokenize(), so they're safe to
-// interpolate into a PostgREST `.or()` string (which uses `*` as the wildcard).
-const orIlike = (field, terms) => terms.map((t) => `${field}.ilike.*${t}*`).join(',');
 
 // Best-effort pg_trgm fuzzy top-up (typo tolerance). No-ops if the RPC or the
 // extension isn't installed yet.
@@ -97,30 +95,31 @@ export async function searchAll(query) {
   const terms = tokenize(query);
   if (!terms.length) return { films: [], people: [], companies: [] };
 
-  // Match any term at the DB level (index-backed), then rank by all terms
-  // client-side below. The fuzzy RPCs run alongside — they're the only way a
-  // misspelt term finds anything, and a common word ("party") would otherwise
-  // flood the results and hide the intended match. Parallel, so no extra wait.
-  const [peopleRes, companyRes] = await Promise.all([
-    supabase.from('people').select('*').or(orIlike('name', terms)).limit(60),
+  // People: order-insensitive + AND-of-tokens (fast). Companies still OR terms.
+  // Fuzzy RPCs only when the first pass is empty — keeps common searches snappy.
+  const orIlike = (field, ts) => ts.map((t) => `${field}.ilike.*${t}*`).join(',');
+
+  const [peopleRows, companyRes] = await Promise.all([
+    searchPeopleByName(query, {
+      limit: 40,
+      select: '*',
+    }).catch(() => []),
     supabase.from('companies').select('*').or(orIlike('name', terms)).limit(40),
   ]);
 
   // A strong person-name match means the useful film results are that person's
   // credits. Skip the full film-title lookup in that case; it is both less
   // relevant and unnecessarily expensive on a large catalogue.
-  const confidentPersonMatch = (peopleRes.data || [])
+  const confidentPersonMatch = peopleRows
     .some((person) => scoreText(person.name, fullQ, terms) >= 180);
   const titleFilmRes = confidentPersonMatch
     ? { data: [], error: null }
     : await supabase.from('films').select(FILM_FIELDS).ilike('title', `%${fullQ}%`).limit(80);
 
-  // Fuzzy RPCs are more expensive than indexed substring lookups. Only call
-  // them when exact matching is genuinely thin, rather than on every search.
-  const peopleFz = (peopleRes.data || []).length === 0
+  const peopleFz = peopleRows.length === 0
     ? await fuzzy('search_people_fuzzy', fullQ)
     : [];
-  const filmsFz = (titleFilmRes.data || []).length === 0 && (peopleRes.data || []).length === 0
+  const filmsFz = (titleFilmRes.data || []).length === 0 && peopleRows.length === 0
     ? await fuzzy('search_films_fuzzy', fullQ)
     : [];
 
@@ -130,7 +129,7 @@ export async function searchAll(query) {
     return [...rows, ...fz.filter((r) => r?.id && !seen.has(r.id))];
   };
 
-  const people = mergeFuzzy(peopleRes.data || [], peopleFz)
+  const people = mergeFuzzy(peopleRows, peopleFz)
     .map((p) => ({ ...p, _score: scoreText(p.name, fullQ, terms) }))
     .sort((a, b) => b._score - a._score)
     .slice(0, 24);

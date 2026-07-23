@@ -5,7 +5,7 @@
 const PERSON_NOISE = new Set([
   'actor', 'actress', 'alhaji', 'alhaja', 'chief', 'comedian', 'director',
   'dr', 'engr', 'evangelist', 'hon', 'mr', 'mrs', 'ms', 'pastor', 'prince',
-  'princess', 'producer', 'sir', 'official',
+  'princess', 'producer', 'sir', 'official', 'and',
 ]);
 
 export function foldPersonText(value) {

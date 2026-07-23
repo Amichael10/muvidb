@@ -20,9 +20,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ENTRIES_PATH = path.resolve(__dirname, '..', 'scratch', 'amaa', 'entries.json');
-const FALLBACK_WINS = path.resolve(__dirname, '..', 'scratch', 'amaa', 'winners.json');
-const REPORT_PATH = path.resolve(__dirname, '..', 'scratch', 'amaa', 'apply-report.json');
+// Organisation + input file are configurable so the same proven pipeline can
+// apply any awards body (AMAA, DIYMA, ...). Defaults preserve AMAA behaviour.
+const argOf = (flag: string) => (process.argv.find((a) => a.startsWith(`--${flag}=`)) || '').split('=')[1] || '';
+const ORG = (argOf('org') || 'AMAA').toUpperCase();
+const ORG_DIR = (argOf('dir') || ORG.toLowerCase());
+const ENTRIES_PATH = argOf('entries') || path.resolve(__dirname, '..', 'scratch', ORG_DIR, 'entries.json');
+const FALLBACK_WINS = path.resolve(__dirname, '..', 'scratch', ORG_DIR, 'winners.json');
+const REPORT_PATH = path.resolve(__dirname, '..', 'scratch', ORG_DIR, 'apply-report.json');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -34,6 +39,10 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 const db = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 const DRY = process.argv.includes('--dry-run');
 const NO_CREATE = process.argv.includes('--no-create');
+// Awards often cite films the catalogue doesn't carry. Creating them would add
+// title-only rows that publish as thin pages, so allow skipping ONLY film
+// creation — person awards still record the film name in the `work` field.
+const NO_CREATE_FILMS = NO_CREATE || process.argv.includes('--no-create-films');
 
 type Entry = {
   season: number;
@@ -50,7 +59,7 @@ type Entry = {
 type AwardEntry = {
   title: string;
   category: string;
-  organization: 'AMAA';
+  organization: string;
   year: number;
   season: number;
   won: boolean;
@@ -60,6 +69,25 @@ type AwardEntry = {
 
 /** Site spelling variants → canonical DB names */
 const NAME_ALIASES: Record<string, string> = {
+  // DIYMA award-graphic spellings -> existing DB records
+  'olaide almoroof': 'olaide almaroof',
+  'prince jide kosoko': 'jide kosoko',   // honorific blocks the match
+  'moto moto': 'motomoto',              // film: DB stores it unspaced
+  'abiola adeshina paul': 'abiola paul',
+  'omowonuola olorunnisola': 'olorunisola omowonuola wisdom',
+  'debbie shokoya': 'debora shokoya',
+  'akin akano': 'akinola akano',
+  'abiola bogumbe paul': 'abiola paul',
+  'almaroof olaide': 'olaide almaroof',      // name-order variant
+  'olamilekan bature': 'lekan bature',
+  'sanjo adegoke': 'adegoke sanjo',          // name-order variant
+  'lukman abdulahman': 'lukman abdulrahman',
+  'adeshina paul': 'abiola paul',
+  'adeleke adewale': 'adewale adeleke',       // name-order variant
+  'kafayat somakin': 'kafayat sobakin',
+  'olalekan bature': 'lekan bature',
+  'david otemolu': 'davin otamolu',      // existing record has an OCR-corrupted name
+  'atinuke kazeen': 'kudirat soremi',   // 'Mama No Network' — winners graphic misnamed her
   'ramsey noah': 'ramsey nouah',
   'ramsey noah jnr': 'ramsey nouah jnr',
   'jackie apia': 'jackie appiah',
@@ -196,7 +224,21 @@ function roleFromCategory(category: string): { role: string; dept: string; isCas
   if (/LEAD ACTOR|LEAD ACTRESS|SUPPORTING ACTOR|SUPPORTING ACTRESS|BEST ACTOR|BEST ACTRESS|SUPPORT ACTRESS|SUPPORT ACTOR|ACTOR IN A COMEDY|ACTRESS IN A COMEDY/.test(c)) {
     return { role: 'actor', dept: 'Acting', isCast: true };
   }
+  // Performer categories that don't contain the literal "BEST ACTOR/ACTRESS"
+  if (/KID ACTOR|CHILD ACTOR|COMEDIAN|REVELATION|LEGENDARY|RECOGNITION|LIFETIME/.test(c)) {
+    return { role: 'actor', dept: 'Acting', isCast: true };
+  }
+  // MUST precede the generic /DIRECTOR/ test — "Director of Photography" is a
+  // cinematographer, not a director.
+  if (/PHOTOGRAPHY|CINEMATOGRAPH|DOP/.test(c)) return { role: 'cinematographer', dept: 'Camera', isCast: false };
+  if (/SCREENWRIT|SCREEN WRIT|SCREENPLAY|SCREEN PLAY/.test(c)) return { role: 'writer', dept: 'Writing', isCast: false };
+  if (/DIALOGUE/.test(c)) return { role: 'dialogue_director', dept: 'Directing', isCast: false };
+  if (/SPECIAL EFFECT|VISUAL EFFECT|VFX|SFX/.test(c)) return { role: 'vfx_artist', dept: 'Visual Effects', isCast: false };
+  if (/SOUND ?TRACK|SOUNDTRACK|MUSIC|SCORE|COMPOSER/.test(c)) return { role: 'composer', dept: 'Sound', isCast: false };
+  if (/MOVIE EDITOR|FILM EDITOR/.test(c)) return { role: 'editor', dept: 'Editing', isCast: false };
   if (/DIRECTOR/.test(c)) return { role: 'director', dept: 'Directing', isCast: false };
+  if (/SET DESIGN|PRODUCTION DESIGN/.test(c)) return { role: 'production_designer', dept: 'Art', isCast: false };
+  if (/CONTINUITY|SCRIPT SUPERVIS/.test(c)) return { role: 'continuity', dept: 'Crew', isCast: false };
   if (/WRITING|WRITER|SCRIPT/.test(c)) return { role: 'writer', dept: 'Writing', isCast: false };
   if (/CINEMATOGRAPH|LIGHTING/.test(c)) return { role: 'cinematographer', dept: 'Camera', isCast: false };
   if (/EDITING|EDITOR/.test(c)) return { role: 'editor', dept: 'Editing', isCast: false };
@@ -209,7 +251,7 @@ function roleFromCategory(category: string): { role: string; dept: string; isCas
     return { role: 'creator', dept: 'Creator', isCast: false };
   }
   // Series/movie category winners are often producers/creators
-  if (/BEST MOVIE|BEST SERIES|BEST SHORT|BEST DOCUMENTARY|INDIGENOUS|M-NET|MULTICHOICE|ORIGINAL/.test(c)) {
+  if (/BEST MOVIE|BEST FILM|MOVIE OF THE YEAR|BEST .*MOVIE|BEST SERIES|BEST SHORT|BEST DOCUMENTARY|INDIGENOUS|M-NET|MULTICHOICE|ORIGINAL/.test(c)) {
     return { role: 'producer', dept: 'Production', isCast: false };
   }
   return { role: 'crew', dept: 'Crew', isCast: false };
@@ -258,7 +300,7 @@ function personScore(p: any): number {
   if (p.photo_url) s += 20;
   if (p.bio && String(p.bio).length > 40) s += 8;
   if (!p.needs_review) s += 10;
-  if (p.source && p.source !== 'AMAA') s += 5;
+  if (p.source && p.source !== ORG) s += 5;
   const n = String(p.name || '');
   if (/red carpet|unnamed|unknown|\(winner\)/i.test(n)) s -= 50;
   if (/[a-z]{3,}[A-Z]/.test(n) || n.length > 45) s -= 20;
@@ -284,7 +326,7 @@ function toPersonAward(e: Entry): AwardEntry {
   return {
     title: e.work || e.category,
     category: e.category,
-    organization: 'AMAA',
+    organization: ORG,
     year: e.year,
     season: e.season,
     won: e.won,
@@ -296,7 +338,7 @@ function toFilmAward(e: Entry, recipients: string[]): AwardEntry {
   return {
     title: e.category,
     category: e.category,
-    organization: 'AMAA',
+    organization: ORG,
     year: e.year,
     season: e.season,
     won: e.won,
@@ -323,7 +365,10 @@ async function loadAll(table: 'people' | 'films', cols: string) {
   let from = 0;
   const all: any[] = [];
   for (;;) {
-    const { data, error } = await db.from(table).select(cols).range(from, from + pageSize - 1);
+    // MUST order by a stable key: .range() paging without ORDER BY lets Postgres
+    // return rows in arbitrary order per page, so records get skipped entirely
+    // (e.g. Lateef Adedimeji existed but never loaded -> reported unmatched).
+    const { data, error } = await db.from(table).select(cols).order('id').range(from, from + pageSize - 1);
     if (error) throw error;
     if (!data?.length) break;
     all.push(...data);
@@ -384,7 +429,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`${entries.length} AMAA entries after cleanup (from ${loaded.length}; ${entries.filter((e) => e.won).length} wins / ${entries.filter((e) => !e.won).length} noms)`);
+  console.log(`${entries.length} ${ORG} entries after cleanup (from ${loaded.length}; ${entries.filter((e) => e.won).length} wins / ${entries.filter((e) => !e.won).length} noms)`);
   console.log(`   dry-run=${DRY} create=${!NO_CREATE}`);
 
   console.log('Loading people + films...');
@@ -443,7 +488,7 @@ async function main() {
   }
 
   // --- Create missing films ---
-  if (!NO_CREATE) {
+  if (!NO_CREATE_FILMS) {
     for (const [, meta] of workMeta) {
       const k = normalizeName(meta.title);
       if (filmsByTitle.has(k)) continue;
@@ -453,7 +498,7 @@ async function main() {
         continue;
       }
       let poster = meta.imageUrl;
-      if (poster) poster = (await mirrorToStorage(poster, 'posters', `AMAA-${makeSlug(meta.title)}`)) || poster;
+      if (poster) poster = (await mirrorToStorage(poster, 'posters', `${ORG}-${makeSlug(meta.title)}`)) || poster;
       const slug = await uniqueSlug('films', makeSlug(meta.title));
       const { data, error } = await db
         .from('films')
@@ -463,7 +508,7 @@ async function main() {
           year: meta.year || null,
           synopsis: meta.synopsis,
           poster_url: poster,
-          source: 'AMAA',
+          source: ORG,
           status: 'released',
           awards: [],
           needs_review: true,
@@ -497,10 +542,10 @@ async function main() {
         continue;
       }
       let photo = meta.imageUrl;
-      if (photo) photo = (await mirrorToStorage(photo, 'people', `AMAA-${makeSlug(meta.name)}`)) || photo;
+      if (photo) photo = (await mirrorToStorage(photo, 'people', `${ORG}-${makeSlug(meta.name)}`)) || photo;
       const slug = await uniqueSlug('people', makeSlug(meta.name));
       const bioBits = [
-        meta.work ? `AMAA-nominated for ${meta.category} (${meta.work}).` : `AMAA-nominated for ${meta.category}.`,
+        meta.work ? `${ORG}-nominated for ${meta.category} (${meta.work}).` : `${ORG}-nominated for ${meta.category}.`,
         'Profile seeded from Africa Movie Academy Awards (ama-awards.com) listings.',
       ];
       const { data, error } = await db
@@ -511,7 +556,7 @@ async function main() {
           photo_url: photo,
           bio: bioBits.join(' '),
           known_for_department: dept,
-          source: 'AMAA',
+          source: ORG,
           awards: [],
           needs_review: true,
         })
@@ -563,7 +608,7 @@ async function main() {
 
       // Enrich empty poster/synopsis on existing films
       if (!NO_CREATE && !DRY && e.imageUrl && !filmRow.poster_url) {
-        const poster = await mirrorToStorage(e.imageUrl, 'posters', `AMAA-${filmRow.id}`);
+        const poster = await mirrorToStorage(e.imageUrl, 'posters', `${ORG}-${filmRow.id}`);
         if (poster) {
           await db.from('films').update({ poster_url: poster }).eq('id', filmRow.id);
           filmRow.poster_url = poster;

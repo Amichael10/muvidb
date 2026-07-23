@@ -104,7 +104,12 @@ async function upsertPerson(name: string, photoUrl?: string): Promise<string | n
   const low = clean.toLowerCase();
   if (['africanmoviedb', 'unknown', 'actor', 'n/a'].some(b => low.includes(b))) return null;
 
-  const { data: existing } = await supabase.from('people').select('id, photo_url, biography').ilike('name', clean);
+  // Shared matcher (migration 20260723112408) instead of `ilike('name')`, so
+  // order swaps / honorifics resolve to the existing person.
+  const { data: foundId } = await supabase.rpc('find_person_by_name', { p_name: clean });
+  const { data: existing } = foundId
+    ? await supabase.from('people').select('id, photo_url, biography').eq('id', foundId as unknown as string)
+    : { data: null as any };
   if (existing && existing.length > 0) {
     const p = existing[0];
     if (!p.photo_url || !p.biography) {

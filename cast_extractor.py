@@ -492,19 +492,28 @@ class SupabaseSync:
         return None
 
     def upsert_person(self, name: str) -> str:
-        # Exact match check
-        query = f"{self.url}/rest/v1/people?name=ilike.{name}&select=id"
-        res = requests.get(query, headers=self.headers)
-        if res.status_code == 200 and res.json():
-            return res.json()[0]['id']
-        
-        # Create new person if not found
-        payload = {"name": name, "nationality": "Nigerian"}
-        res = requests.post(f"{self.url}/rest/v1/people", headers=self.headers, json=payload)
-        if res.status_code in [201, 200] and res.json():
-            return res.json()[0]['id']
-        return ""
+        """Find-or-create via the shared DB matcher.
 
+        Was: `people?name=ilike.{name}` then INSERT on miss — which could not see
+        order swaps or honorifics, so "Kosoko Jide" / "Prince Jide Kosoko" became
+        NEW rows next to "Jide Kosoko". upsert_person_by_name matches on
+        people.name_key (order-insensitive, honorific-stripped) and only inserts
+        when there is genuinely no match.
+        """
+        clean = (name or "").strip()
+        if not clean:
+            return ""
+        res = self._request(
+            "POST",
+            f"{self.url}/rest/v1/rpc/upsert_person_by_name",
+            headers=self.headers,
+            json={"p_name": clean, "p_extra": {"nationality": "Nigerian", "source": "ocr"}},
+        )
+        if res.status_code in (200, 201):
+            pid = res.json()
+            if isinstance(pid, str) and pid:
+                return pid
+        return ""
     def link_credit(self, film_id: str, person_id: str, role: str, char_name: str = "", order: int = 0):
         # Check for existing
         q = f"{self.url}/rest/v1/credits?film_id=eq.{film_id}&person_id=eq.{person_id}&role=eq.{role}"
