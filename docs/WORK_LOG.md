@@ -82,14 +82,39 @@ Two things to know if this is revisited:
 
 ---
 
+### ✅ Backlog item 6 — cinema dedupe: NO ACTION NEEDED (surveyed 2026-07-24)
+The note claimed a destructive merge was "staged and dry-run verified". **That
+tooling does not exist in the repo** — the note was stale. `scripts/cleanup-cinemas.ts`
+is the weekly hygiene job (expires showtimes, demotes stale films) and
+`sql/cinema_cleanup.sql` only *disables scraping*; neither merges rows.
+
+Read-only survey of production:
+- **183 cinemas, 0 exact duplicates** (by normalised name, and by name+city).
+- `sql/cinema_cleanup.sql` **was** applied: 0 `custom`-adapter rows still enabled,
+  0 token-less `veezi` rows still enabled.
+- 16 near-duplicate pairs (one name a prefix of another), but these are
+  parent/branch pairs where the generic row is **already disabled** — e.g.
+  "Viva Cinemas" (off) alongside its six city branches (on), "…Jabi Lake Mall"
+  (off) alongside "…Jabi Lake" (on). That is the intended end state.
+- 59 of 183 cinemas have `scrape_enabled = true`.
+
+**Left for the owner's judgement — 5 pairs where BOTH rows are enabled**, which
+could double-count showtimes. Not merged: these may be genuinely distinct branches,
+and deleting a real cinema is irreversible.
+
+| | |
+|---|---|
+| "KADA Cinemas" | "Kada Cinemas Benin" |
+| "Nile Cinemas" | "Nile Cinemas Vintano" |
+| "Nile Cinemas" | "Nile Cinemas THC" |
+| "Box Office Cinemas" | "Box Office Cinemas Pleasure Park" |
+| "Nova Cinema" | "Nova Cinema Abuja" |
+
+---
+
 ## Pending
 
 Ordered by my recommendation.
-
-### 6. Cinema dedupe — **destructive, awaiting explicit go-ahead**
-Merge of duplicate cinema rows; previously staged and dry-run verified. Needs the
-dry-run re-run and the affected row count confirmed before anything is deleted.
-**Do not execute without the owner confirming the numbers.**
 
 ### 1. SSR migration — parked on branch `ssr-phase-1` (`6b03941`)
 Code-complete through Phase 3 (Home hero, Browse, Search, FilmDetail, PersonDetail
