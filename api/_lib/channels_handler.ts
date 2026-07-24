@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from './_lib/supabase';
-import { checkRateLimit } from './_lib/rateLimit';
-import { isValidAuth } from './_lib/auth';
+import { supabase } from './supabase.js';
+import { checkRateLimit } from './rateLimit.js';
+import { isValidAuth } from './auth.js';
 
-import { handleCors } from './_lib/cors.js';
+import { handleCors } from './cors.js';
 
 const YT_KEY = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
@@ -17,7 +17,7 @@ async function ytGet(endpoint: string, params: Record<string, string>) {
   return res.json();
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleChannels(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
