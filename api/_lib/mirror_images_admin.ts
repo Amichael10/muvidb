@@ -16,11 +16,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from './_lib/supabase.js';
-import { mirrorImageToStorage, isOwnUrl } from './_lib/image_mirror.js';
-import { isValidAuth } from './_lib/auth.js';
+import { supabase } from './supabase.js';
+import { mirrorImageToStorage, isOwnUrl } from './image_mirror.js';
+import { isValidAuth } from './auth.js';
 
-export const maxDuration = 60;
 
 /** Domains in priority order. Lower index = processed first. */
 const PRIORITY_DOMAINS = [
@@ -43,7 +42,7 @@ function getFilmnameSafe(title: string, id: string): string {
   return `${id.slice(0, 8)}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleMirrorImages(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });

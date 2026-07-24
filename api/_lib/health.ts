@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleHealth(req: VercelRequest, res: VercelResponse) {
   const { service } = req.query;
 
   if (service === 'youtube') {
