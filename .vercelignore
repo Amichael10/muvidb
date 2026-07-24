@@ -4,6 +4,7 @@ temp_lumi/
 output/
 scratch/
 scripts/
+!scripts/write_spa_index.mjs
 .git/
 node_modules/
 dist/
