@@ -6,11 +6,100 @@ any agent or developer can pick up without the originating conversation.
 
 Companion doc: `docs/SSR_MIGRATION.md` (the SSR effort has its own detailed plan).
 
-**Last updated:** 2026-07-24.
+**Last updated:** 2026-07-24 (evening) — invert-SSR live on `muvidb.com`.
+
+**Where we stopped:** Production is on `main` @ `f95cd26` (same tip as `staging`).
+Invert-SSR is live and smoked. Next optional work: remaining Phase 3 list pages
+(PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows), and/or scale off
+Hobby via `server/node-server.mjs` + `docs/SSR_SCALE.md` if function limits bite.
+Do **not** set the Vercel dashboard Framework Preset to “React Router” — leave
+**Other / None** so `vercel.json` `"framework": null` stays in force.
 
 ---
 
 ## Done
+
+### ✅ Invert-SSR packaging — LIVE on production (2026-07-24)
+
+**Branches / tip:** `ssr-once-and-for-all` → merged `staging` → fast-forwarded
+`main` @ `f95cd26`. Companion detail: `docs/SSR_MIGRATION.md`, `docs/SSR_SCALE.md`.
+
+#### What blocked SSR (the real outage)
+
+A first attempt used Vercel’s **framework mode** (`framework: "react-router"` /
+`vercelPreset()`). That made the React Router build own `.vercel/output` via the
+Build Output API and **switched off `api/` auto-detection entirely**.
+
+Symptoms in production:
+- Every `/api/*` and `/sitemap.xml` returned **HTTP 200** with the **SSR HTML shell**
+  (not JSON / XML) → film page, image proxy, sitemaps all looked “up” by status code
+  but were dead by content-type.
+- Experiment `6beac43` tried declaring `"functions": { "api/**/*.ts": … }` under
+  framework mode. Build failed with:
+  `The pattern "api/**/*.ts" … doesn't match any Serverless Functions inside the api directory`
+  → Vercel saw **zero** `api/` functions. Proof that declaring them cannot force
+  auto-detection back on. Reverted in `26b72a3`.
+- Site was rolled back to classic Vite SPA (`bbf44d4` / `4ca629d`) so `muvidb.com`
+  worked again while packaging was fixed on a preview branch.
+
+**Do not “fix” this by converting all seven APIs into RR resource routes** unless
+Hobby limits force it — that was the old plan; invert packaging is the chosen fix.
+
+#### How we fixed it (invert packaging)
+
+Keep every existing `api/*.ts` function. Add one more function that serves the app:
+
+| Piece | Role |
+|---|---|
+| `vercel.json` `"framework": null` | Restores normal `api/` detection |
+| `npm run build` → `react-router build` | Emits `build/client` + `build/server` |
+| `outputDirectory`: `build/client` | Static assets |
+| Catch-all rewrite → `/api/ssr?__pathname=/$1` | HTML documents |
+| `api/ssr.ts` | Node `(VercelRequest, VercelResponse)` adapter |
+| `api/_lib/rrHandler.ts` | Lazy-imports `build/server`, `createRequestHandler` from **`react-router`** (not `@react-router/node`) |
+| `api/seo.ts` | **Sitemaps only**; document SEO via route loaders / `seo.server.ts` |
+| `react-router.config.ts` | **No** `vercelPreset()` / `@vercel/react-router` |
+| `vite.config.ts` | Must use `reactRouter()` from `@react-router/dev/vite` — **not** `@vitejs/plugin-react` alone |
+
+Function count: previous 7 + `api/ssr` ≈ 8 (inside Hobby). Phase 0 consolidation
+is what made room for this.
+
+#### Landmines hit while shipping (and the commits)
+
+1. **Web Fetch-only `api/ssr` export** → `FUNCTION_INVOCATION_FAILED` on Vercel.
+   Fix: Node adapter wrapping the RR handler (`ef5f145` / follow-ups).
+2. **Static import of RR build at module top** → empty/missing build at cold start.
+   Fix: lazy-import in `rrHandler` + clear missing-build errors (`2edc213`).
+3. **`supabase.server.ts` baked empty `SUPABASE_URL` at Vite build** → loaders failed.
+   Fix: lazy server client creation.
+4. **Staging merge kept SPA `vite.config.ts`** (no `reactRouter()` plugin) →
+   `React Router Vite plugin not found in Vite config`. Fix: restore SSR vite
+   config (`f95cd26`). Always prefer SSR tip for `vite.config.ts` /
+   `vercel.json` / `api/ssr.ts` / `package.json` scripts on merge.
+5. **Actor photos on cards but not PersonDetail** — cards used raw `photo_url`;
+   detail used `ImageWithFallback` → `getProxiedImageUrl` nested `/api/media`
+   inside `/_vercel/image` → `400 INVALID_IMAGE_OPTIMIZE_REQUEST` → initials
+   fallback. Fix: never nest `/api/media` in `/_vercel/image` (`d86e051`);
+   accept `photo_url \|\| photo` (`27bca8a`).
+6. **Vercel dashboard Framework Preset = “React Router”** reintroduces the
+   original outage class. Must be **Other / None**. Overrides off; `vercel.json`
+   owns build/output.
+
+#### Smoke that must pass (content-type, not just status)
+
+```
+GET /              → 200 text/html + header X-MuviDB-SSR: ok
+GET /api/films     → 200 application/json
+GET /sitemap.xml   → 200 text/xml
+Person hero img    → src="/api/media?url=…" and that URL returns image/*
+```
+
+Verified 2026-07-24 on staging preview and on **https://muvidb.com**.
+
+Scale path (not required yet): `server/node-server.mjs`, `Dockerfile`,
+`npm run smoke:ssr`, `docs/SSR_SCALE.md`.
+
+---
 
 ### ✅ Phase 0 — API function consolidation (merged, live)
 12 → 7 Vercel functions to fit the Hobby free tier. `api/media.ts` absorbs
@@ -176,83 +265,21 @@ credit roll rarely fits in one frame.
 
 ## Pending
 
-Ordered by my recommendation.
+Ordered by recommendation.
 
-### 1. SSR migration — parked on branch `ssr-phase-1` (now `6beac43`)
+### 1. SSR — remaining Phase 3 list pages (optional polish)
 
-**IN PROGRESS — experiment awaiting a preview-deploy result.**
+Invert packaging is **live**. Still not SSR’d as first-class route modules (or only
+thinly): PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows. Detail
+routes + Home/Browse/Search/Film/Person already ship HTML + SEO loaders.
 
-Before rewriting seven endpoints on an unverified diagnosis, `6beac43` tests the
-cheaper hypothesis. Two mechanisms could explain why every `/api/*` route returned
-the SSR shell in production, and they have very different fixes:
+Open product decision (unchanged): thin/missing entities return `200` + `noindex`
+where old `api/seo.ts` document SEO returned `404`. See `docs/SSR_MIGRATION.md`.
 
-- **(a)** Vercel never builds `api/` once a framework owns the Build Output API
-  output → declaring the functions explicitly fixes it (one config line).
-- **(b)** The functions build but are shadowed by the SSR catch-all → routing fix,
-  or convert all seven endpoints to React Router **resource routes** (large).
+### 2. Scale off Vercel Hobby if limits bite (optional)
 
-`6beac43` adds `"functions": { "api/**/*.ts": { "maxDuration": 60 } }` to test (a).
-
-**RESULT — the build failed, and the error is definitive:**
-
-```
-Error: The pattern "api/**/*.ts" defined in `functions` doesn't match any
-Serverless Functions inside the `api` directory.
-```
-
-**Vercel sees ZERO functions in `api/` when `framework: react-router` is set.** The
-framework build owns `.vercel/output` via the Build Output API, which switches off
-`api/` auto-detection entirely. Declaring them cannot force it back on. So
-`api/*.ts` and framework-mode SSR genuinely cannot coexist — now *verified*, not
-assumed. Experiment reverted in `26b72a3`; the branch builds again.
-
-### → The fix: invert it. Don't let the framework own the output.
-
-Rather than converting seven endpoints to resource routes (large, risky, and it
-buries a 60s cron and an image proxy inside the SSR function), keep every existing
-`api/*.ts` function untouched and add **one more function that serves the SSR app**:
-
-1. **Remove** `framework: react-router` from `vercel.json` so Vercel's normal `api/`
-   detection stays on and the seven functions build as they do today.
-2. Keep building with `react-router build` → `build/client` + `build/server`.
-3. Add `api/ssr.ts`:
-   ```ts
-   import { createRequestHandler } from '@react-router/node';
-   import * as build from '../build/server/index.js';
-   const handler = createRequestHandler(build, 'production');
-   export default (request: Request) => handler(request);
-   ```
-   Vercel Node functions accept the Web-standard `(Request) => Response` signature,
-   which is exactly what React Router's handler is.
-4. `vercel.json`: serve static assets from `build/client`, route everything else to
-   `/api/ssr`, and add `includeFiles` so `build/server` is bundled into that function.
-5. Drop `@vercel/react-router` and the `vercelPreset()` from `react-router.config.ts` —
-   the preset is what triggers the Build Output takeover.
-
-**Function count: 7 + 1 = 8**, inside the Hobby limit of ~12 — which is precisely
-what Phase 0's consolidation bought. (Phase 0 was justified after all, just not for
-the reason originally recorded.)
-
-**Unverified, must be checked on a preview before merging:** whether `includeFiles`
-correctly bundles the server build, and whether static assets resolve from
-`build/client`. Verify by **content-type**, never status code — the SSR shell
-returns 200, which is what hid the original breakage.
-
----
-
-Prior state of this item (still accurate):
-Code-complete through Phase 3 (Home hero, Browse, Search, FilmDetail, PersonDetail
-+ the six detail routes' SEO). **Cannot merge as-is.**
-
-**Blocker:** `api/*.ts` serverless functions and a framework-mode SSR build do not
-coexist — a first merge to production made *every* `/api/*` route and `/sitemap.xml`
-return the SSR shell, breaking the film page, image proxy and sitemaps. Reverted in
-`5a38d92`. The fix is to convert the seven endpoints to React Router **resource
-routes**, which also dissolves the Hobby function-count limit that motivated Phase 0.
-
-Remaining Phase 3 pages: PeopleList, Channels, Companies, Cinemas, Showtimes,
-TVShows. Open decision: thin/missing entities now return 200 + `noindex` where
-`api/seo.ts` returned 404. Details in `docs/SSR_MIGRATION.md`.
+`server/node-server.mjs` + `Dockerfile` + `docs/SSR_SCALE.md` are ready. Do not
+migrate hosts preemptively — only if cold starts / function caps become real pain.
 
 ### Data-quality queue
 - **Curation:** ~4,192 "farm-but-engaged" films to clean.
@@ -277,16 +304,25 @@ TVShows. Open decision: thin/missing entities now return 200 + `noindex` where
 
 ## Lessons that cost real time
 
-1. **Verify deploys by response body, not status code.** The SSR deploy returned
-   `200` on every `/api/*` route while serving the SSR shell. Status codes said
-   healthy; content-type said the entire API layer was down.
-2. **Verify the *staged* diff, not the working tree.** `git add` with a pathspec
+1. **Verify deploys by response body, not status code.** Framework-mode SSR
+   returned `200` on every `/api/*` while serving the HTML shell. Status said
+   healthy; content-type said the API layer was gone.
+2. **`framework: "react-router"` / dashboard preset “React Router” zeros `api/`.**
+   Declaring `functions.api/**` cannot bring them back. Invert: `framework: null`
+   + `api/ssr.ts`. Never re-enable the React Router Vercel preset.
+3. **Verify the *staged* diff, not the working tree.** `git add` with a pathspec
    that no longer exists fatals before staging anything, and a local build still
    passes because it reads the working tree. This shipped a broken commit once and
    a silently half-applied Phase 0 for weeks.
-3. **A loading flag that starts `true` defeats SSR.** Components gated on it
+4. **A loading flag that starts `true` defeats SSR.** Components gated on it
    server-render a skeleton. Hit three times (AuthContext, `isHeroLoading`,
    Browse's `loading`).
-4. **Don't assume a dirty file is someone else's work** — check `git diff` on it.
+5. **Don't assume a dirty file is someone else's work** — check `git diff` on it.
    `api/media.ts` sat uncommitted for a whole session because it was misread as
    unrelated local WIP.
+6. **Merging SSR into a SPA rollback branch:** conflict resolution must take the
+   SSR `vite.config.ts` (with `reactRouter()`). Taking “ours” SPA config breaks
+   `react-router build` with “React Router Vite plugin not found”.
+7. **Do not nest `/api/media` inside `/_vercel/image`.** Vercel image optimizer
+   returns `INVALID_IMAGE_OPTIMIZE_REQUEST`; UI falls back to initials while cards
+   (raw URLs) still look fine — easy to misdiagnose as “detail page data missing”.
