@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from './_lib/supabase';
-import { checkRateLimit } from './_lib/rateLimit';
+import { supabase } from './supabase.js';
+import { checkRateLimit } from './rateLimit.js';
 
-import { handleCors } from './_lib/cors.js';
+import { handleCors } from './cors.js';
 
 const FIELDS = [
   'id',
@@ -15,7 +15,7 @@ const FIELDS = [
   'youtube_stats',
 ].join(', ');
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handlePeople(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 

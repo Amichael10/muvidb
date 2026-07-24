@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from './_lib/supabase.js';
+import { supabase } from './supabase.js';
 
 /**
  * Protected-content endpoint. Serves the data we don't want bulk-scraped
@@ -22,7 +22,7 @@ const MAX_FILMS = 100;  // mirrors search.js (.limit(100))
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleContent(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
