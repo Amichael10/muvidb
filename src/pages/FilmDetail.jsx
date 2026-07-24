@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, Link, useNavigate, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '@iconify/react';
@@ -132,10 +131,27 @@ export default function FilmDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [film, setFilm] = useState(null);
-  const [filmId, setFilmId] = useState(null); // actual UUID for sub-queries
+
+  // The route loader (src/routes/film-detail.tsx) already fetched this film
+  // server-side to build the SEO head, so the same row seeds the page and the
+  // first paint has real content. Unpublished films aren't seeded (the loader
+  // filters on is_published) and fall back to the client fetch below.
+  const loaderData = useLoaderData();
+  const seededFilm = loaderData?.film
+    ? {
+        ...loaderData.film,
+        genres: dedupeGenres(
+          loaderData.film.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || []
+        ),
+      }
+    : null;
+
+  const [film, setFilm] = useState(seededFilm);
+  const [filmId, setFilmId] = useState(seededFilm?.id ?? null); // actual UUID for sub-queries
   const [relatedFilms, setRelatedFilms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Starts false when seeded — otherwise the server renders the loading state
+  // and SSR gains nothing.
+  const [loading, setLoading] = useState(!seededFilm);
   const [episodes, setEpisodes] = useState([]);
   const [parentSeries, setParentSeries] = useState(null);
 
@@ -196,8 +212,18 @@ export default function FilmDetail() {
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
 
+  // For the slug the loader seeded, hand the row straight to fetchFilm so it
+  // skips the primary query but STILL runs the follow-on work (credits,
+  // episodes, related). Navigating to another film refetches normally.
+  const seededSlug = useRef(seededFilm ? slug : null);
+
   useEffect(() => {
-    fetchFilm();
+    let preloaded = null;
+    if (seededSlug.current === slug) {
+      preloaded = loaderData?.film ?? null;
+      seededSlug.current = null; // one-shot
+    }
+    fetchFilm(preloaded);
   }, [slug]);
 
   const fetchCredits = async (uuid) => {
@@ -277,8 +303,10 @@ export default function FilmDetail() {
     }
   };
 
-  const fetchFilm = async () => {
-    setLoading(true);
+  // `preloaded` is the row the route loader already fetched server-side. When
+  // present the primary query is skipped, but everything after it still runs.
+  const fetchFilm = async (preloaded = null) => {
+    if (!preloaded) setLoading(true);
     try {
       const { col, val } = slugOrId(slug);
       const fetchDirect = async () => {
@@ -297,17 +325,19 @@ export default function FilmDetail() {
         return data;
       };
 
-      let data;
-      if (import.meta.env.DEV) {
-        data = await fetchDirect();
-      } else {
-        const response = await fetch(`/api/films?id=${encodeURIComponent(val)}`);
-        if (response.ok) {
-          ({ film: data } = await response.json());
-        } else if (response.status === 404) {
-          throw new Error('Film not found');
-        } else {
+      let data = preloaded;
+      if (!data) {
+        if (import.meta.env.DEV) {
           data = await fetchDirect();
+        } else {
+          const response = await fetch(`/api/films?id=${encodeURIComponent(val)}`);
+          if (response.ok) {
+            ({ film: data } = await response.json());
+          } else if (response.status === 404) {
+            throw new Error('Film not found');
+          } else {
+            data = await fetchDirect();
+          }
         }
       }
 
@@ -318,7 +348,8 @@ export default function FilmDetail() {
 
       setFilm(mappedFilm);
       setFilmId(data.id);
-      document.title = `MuviDB | ${formatFilmTitle(data.title)}`;
+      // Title comes from the route's `meta` export now — setting it here would
+      // overwrite the server-rendered one after hydration.
       // Render the page as soon as the main film row is in — everything below
       // (credits, episodes, related) loads in the background instead of blocking.
       setLoading(false);
@@ -438,13 +469,6 @@ export default function FilmDetail() {
 
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
-      <Helmet>
-        <title>{`MuviDB | ${formatFilmTitle(film.title)}`}</title>
-        <meta name="description" content={film.synopsis?.slice(0, 150) || `Watch ${formatFilmTitle(film.title)} on MuviDB.`} />
-        <meta property="og:title" content={`MuviDB | ${formatFilmTitle(film.title)}`} />
-        <meta property="og:description" content={film.synopsis?.slice(0, 150) || `Watch ${formatFilmTitle(film.title)} on MuviDB.`} />
-        {(film.poster_url || film.poster) && <meta property="og:image" content={film.poster_url || film.poster} />}
-      </Helmet>
       {/* 1. CINEMATIC HEADER */}
       <div className="relative w-full h-[60vh] min-h-[500px] border-b border-border overflow-hidden">
         <ImageWithFallback
