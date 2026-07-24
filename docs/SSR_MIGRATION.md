@@ -5,6 +5,20 @@ continue this migration without the original conversation. Read it top to bottom
 then look at **"Current status"** for exactly where to pick up. Update the checkboxes
 and the status section as you go.
 
+> **⚠️ PACKAGING BANNER (2026-07-24) — read before touching Vercel config**
+>
+> Do **NOT** re-add `"framework": "react-router"` to `vercel.json`, and do **NOT**
+> re-add `@vercel/react-router` / `vercelPreset()` to `react-router.config.ts`.
+> That combo makes Vercel’s Build Output API own the deploy and zeroes out `api/`
+> detection — every `/api/*` route then returns the SSR shell (verified failure).
+>
+> **Correct packaging (invert-fix):** keep normal `api/*.ts` detection, build with
+> `react-router build` → `build/client` + `build/server`, serve pages via
+> `api/ssr.ts` (`createRequestHandler` + `includeFiles: build/server/**`), static
+> assets from `outputDirectory: "build/client"`, catch-all rewrite
+> `/((?!api/).*)` → `/api/ssr`. Details: `docs/WORK_LOG.md` § “The fix: invert it”.
+> Branch: `ssr-packaging-fix`.
+
 ---
 
 ## The goal (decided with the owner)
@@ -123,7 +137,11 @@ Verify with `npm run build` and by curling each old path.
       so the ~50 existing pages stay put. `react-router.config.ts`, `src/root.tsx`
       (document + providers + chrome), `src/routes.ts` (mirrors the old `<Routes>`).
       Default `entry.client`/`entry.server` are used — no custom entries needed.
-- [x] Vercel preset wired (`@vercel/react-router`) — deploys as one SSR function.
+- [x] ~~Vercel preset wired (`@vercel/react-router`)~~ — **REVERTED.** Preset +
+      `framework: "react-router"` zeroes out `api/` (see packaging banner above).
+- [x] **Invert packaging** (`ssr-packaging-fix`): `api/ssr.ts` + `framework: null`
+      + `outputDirectory: build/client` + catch-all excluding `/api`. Function
+      count target: 7 existing APIs + 1 SSR = 8 (Hobby-safe).
 - [x] Builds and server-renders. `npm run build` produces `build/client` +
       `build/server`; `curl /` returns **real markup** (639 divs, nav/main/footer,
       14 sections) instead of an empty shell. No console errors, no hydration
@@ -185,12 +203,12 @@ stay one module graph); `VitePWA` now client-build only.
   and silently evaluates to undefined on the server.
 
 **Still open before merge:**
-- [ ] Deploy to a Vercel preview and smoke-test — `vercel.json` rewrites and the
-      Vercel preset's function output can only be verified on a real deployment.
+- [ ] Deploy `ssr-packaging-fix` to a Vercel **preview** and smoke-test by
+      **content-type** (not status code) — confirm APIs stay JSON/XML and pages
+      are HTML from `api/ssr`. See checklist under Current status.
 - [ ] Missing/thin entities set `robots: noindex` but still return **HTTP 200**;
-      api/seo.ts returned 404. `noindex` is the operative signal, but if the soft-404
-      status matters, it needs a custom `entry.server` that reads a route handle.
-- [ ] Remaining pages (Browse, Search, PeopleList…) still fetch client-side — Phase 3.
+      api/seo.ts returned 404. Soft-404 HTTP status is TODO (packaging priority).
+- [ ] Remaining pages (PeopleList, Channels, …) still fetch client-side — Phase 3.
 
 ### Phase 1b — original cutover checklist (superseded by the above)
 The scaffold runs, but **merging as-is would break production.** `api/seo.ts`
@@ -322,8 +340,12 @@ Order by traffic/value: Browse → Film detail → Person detail → the rest. E
 preserved by `vercel.json` rewrites, so **no frontend caller changed**. Build passes,
 `tsc` clean. **Function count 12 → 7**, leaving ~5 Hobby slots for SSR.
 
-**Phases 1, 1b and 2 are CODE-COMPLETE on branch `ssr-phase-1` — NOT merged, NOT
-deployed.** `main` is at `487c324` (Phase 0 only) and is unaffected by any of it.
+**Phases 1–3 page work is on `ssr-phase-1`; packaging fix is on `ssr-packaging-fix`
+(based on `ssr-phase-1` @ `26b72a3`). NOT merged, NOT deployed.** `main` stays on
+the SPA + Phase 0 APIs until preview smoke-tests pass.
+
+**Packaging:** invert-fix — no `vercelPreset`, no `framework: "react-router"`.
+SSR is `api/ssr.ts`. See banner at top of this file.
 
 Branch commits, oldest first:
 - `d2a19ab` — Phase 1: RR7 framework-mode scaffold (SSR foundation).
@@ -337,45 +359,36 @@ Verified locally (`npm run build` passes, `react-router dev` on :3001):
   `Movie` JSON-LD the old api/seo.ts produced.
 - No hydration mismatches; page renders correctly in the browser.
 
-**First preview deploy FAILED and was fixed** (`No Output Directory named "dist"`).
-Two causes, both now handled in `vercel.json`:
-1. The project's Framework Preset was still **Vite**, so Vercel expected a static
-   `dist/` and never ran its React Router builder. The app's own build succeeded —
-   it emits `build/client` + `build/server/nodejs_<b64>/`, and converting that into
-   `.vercel/output` is done by Vercel's builder, which only runs when the framework
-   is known. Fixed with `"framework": "react-router"` (verified a real slug against
-   `@vercel/frameworks`).
-2. The legacy `routes` array would have broken SSR even once the framework was
-   detected: `routes` **replaces** the framework's own routing, so nothing would
-   reach the SSR function. All of it is converted to `rewrites`, which merge with
-   framework routing and let unmatched paths fall through to SSR.
-   Regex captures became path-to-regexp (`/api/film/(?<id>.*)` → `/api/film/:id`),
-   and the `{ "handle": "filesystem" }` / `/api/(.*)` identity entries are gone —
-   both are implicit in the rewrites model.
+**First preview deploy FAILED** (`No Output Directory named "dist"`), then
+`framework: "react-router"` was tried so Vercel would run the RR builder. That
+fixed the output-dir error **but** switched off `api/` detection — every API
+returned the SSR shell. **Do not restore that.** The invert-fix on
+`ssr-packaging-fix` sets `"framework": null`, `outputDirectory: "build/client"`,
+and `api/ssr.ts` with `includeFiles: "build/server/**"`.
 
-If a deploy still looks for `dist`, check **Project Settings → Framework Preset** in
-the Vercel dashboard; a dashboard override there can win over `vercel.json`.
+If a deploy still looks for `dist` or React Router framework output, check
+**Project Settings → Framework Preset** in the Vercel dashboard; a dashboard
+override can win over `vercel.json`. Set it to **Other** (or unset).
 
-### ⚠️ NEXT ACTION — redeploy `ssr-phase-1` to a Vercel PREVIEW and smoke-test
+### ⚠️ NEXT ACTION — preview-deploy `ssr-packaging-fix` and smoke-test by content-type
 
-This is the only thing standing between the branch and merge. Everything below can
-**only** be checked on a real deployment — `vercel.json` `routes` do not apply under
-`react-router dev`, and the Vercel preset's function output doesn't exist locally.
-Do not merge to `main` before this passes.
+Everything below can **only** be checked on a real deployment. Do not merge to
+`main` before this passes. **Verify content-type / body, never status alone**
+(SSR shell returns 200 for shadowed APIs).
 
-1. Push a preview deploy of `ssr-phase-1` (do NOT promote to production).
-2. Run the Phase 0 API smoke-test list at the bottom of this file.
-3. Then check the SSR cutover specifically:
-   - `/` → 200, HTML contains the hero film markup, `Cache-Control: s-maxage=3600`.
-   - `/films/<slug>`, `/people/<slug>`, `/watch/netflix`, `/channels/<slug>`,
-     `/companies/<slug>`, `/cinemas/<id>` → 200 with correct `<title>` + JSON-LD.
-     These are the six routes api/seo.ts used to own — **most likely to break.**
-   - `/sitemap.xml` and the other `/sitemap-*.xml` → still 200 XML (api/seo.ts
-     keeps this half; only its HTML branch was retired).
-   - `/admin` → still loads (client-side guard, unchanged).
-   - **Confirm the deployment's function count is still ≤ 12** with the SSR
-     function added. Expected 8: the 7 from Phase 0 + the SSR function.
-4. If it passes: merge to `main`, then `staging`. Then do the Phase 3 cleanup below.
+1. Push a preview deploy of `ssr-packaging-fix` (do NOT promote to production).
+2. Phase 0 API checks (expect **JSON**, not `text/html`):
+   - `/api/films?limit=1`, `/api/people?limit=1`, `/api/channels?limit=1`
+   - `/api/content?resource=film-credits&filmId=<uuid>`
+   - `/api/health?service=youtube`, `/api/media?url=…`
+3. Sitemaps (expect **XML**): `/sitemap.xml`, `/sitemap-films.xml`, …
+4. SSR pages (expect **HTML** with real markup, not empty shell):
+   - `/` — hero film link present; prefer `Cache-Control: s-maxage=3600`
+   - `/films/<slug>`, `/people/<slug>`, `/watch/netflix`, …
+5. `/admin` still loads (client guard).
+6. **Function count ≤ 12**, expected **8**: ai, automation, data, external, media,
+   seo, cron/sync, **ssr**.
+7. If it passes: merge to `main`, then `staging`. Then Phase 3 cleanup below.
 
 **Known deviation to decide on:** missing/thin entities now return **HTTP 200 with
 `robots: noindex`**, where api/seo.ts returned **404**. `noindex` is the operative
