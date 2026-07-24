@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
@@ -32,8 +32,15 @@ const cinemaFilmKey = (title = '') => title
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
+  // Hero rail is server-rendered and edge-cached by the route loader in
+  // src/routes/home.tsx, so it's already in the HTML on first paint. Empty means
+  // the loader couldn't seed it (slow/failed DB) — the client fetch below then
+  // runs as a fallback exactly as it did before SSR.
+  const loaderData = useLoaderData();
   const [isLoading, setIsLoading] = useState(true);
-  const [isHeroLoading, setIsHeroLoading] = useState(true);
+  // Starts false when the loader already server-rendered the hero, otherwise the
+  // skeleton would be what gets server-rendered and SSR would buy us nothing.
+  const [isHeroLoading, setIsHeroLoading] = useState(!loaderData?.featuredFilms?.length);
   const [isCinemaLoading, setIsCinemaLoading] = useState(true);
   const [inCinemas, setInCinemas] = useState([]);
   const [newToStream, setNewToStream] = useState({}); // { netflix: [...], prime_video: [...], ... }
@@ -46,7 +53,7 @@ export default function Home() {
   const [newReleases, setNewReleases] = useState([]);
   const [isComingSoonLoading, setIsComingSoonLoading] = useState(true);
 
-  const [featuredFilms, setFeaturedFilms] = useState([]);
+  const [featuredFilms, setFeaturedFilms] = useState(loaderData?.featuredFilms ?? []);
   const [comingSoon, setComingSoon] = useState([]);
   const [curatedCollection, setCuratedCollection] = useState(null);
   const [recentlyAdded, setRecentlyAdded] = useState([]);
@@ -89,7 +96,9 @@ export default function Home() {
 
   const fetchAllData = async () => {
     setIsLoading(true);
-    setIsHeroLoading(true);
+    // Don't flip the seeded hero back to a skeleton after hydration — that would
+    // make the server-rendered hero visibly flash away on every load.
+    if (!loaderData?.featuredFilms?.length) setIsHeroLoading(true);
 
     // Showtime aggregation is intentionally independent: a large cinema response
     // should never delay the hero or the rest of the homepage.
@@ -199,6 +208,10 @@ export default function Home() {
   };
 
   const fetchFeaturedFilms = async () => {
+    // Already server-rendered by the route loader — don't re-query the slow DB
+    // from the browser just to arrive at the same rows.
+    if (loaderData?.featuredFilms?.length) return;
+
     const { data } = await supabase
       .from('films')
       .select(`

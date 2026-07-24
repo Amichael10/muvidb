@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import { Icon } from '@iconify/react';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
@@ -119,14 +118,6 @@ export default function WatchPlatform() {
 
   return (
     <div className="min-h-screen bg-bg">
-      <Helmet>
-        <title>{`Where to Watch Nollywood on ${platform.name} | MuviDB`}</title>
-        <meta
-          name="description"
-          content={`Browse every Nollywood title available on ${platform.name}. ${totalCount} films and counting on MuviDB — the home of Nollywood.`}
-        />
-        <link rel="canonical" href={`https://muvidb.com/watch/${platform.id}`} />
-      </Helmet>
 
       {/* Header */}
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">

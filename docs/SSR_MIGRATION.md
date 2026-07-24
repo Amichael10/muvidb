@@ -117,13 +117,103 @@ named exports (fix `./_lib/` → `./` imports), create `api/data.ts` dispatching
 Verify with `npm run build` and by curling each old path.
 
 ### Phase 1 — Stand up RR7 framework mode (SSR foundation)
-- [ ] Add the RR7 framework-mode Vite plugin + `app/` structure (or keep `src/`), create
-      `entry.server` / `entry.client`, root route, and the route config.
-- [ ] Wire Vercel preset so the app deploys as a single SSR function.
-- [ ] Get it building + deploying with **no loaders yet** — behaves like today but
-      server-rendered shell. Verify every route still renders.
-- [ ] **Auth:** switch Supabase session to cookies via `@supabase/ssr` ONLY when a
-      server-rendered route needs the logged-in user. Home doesn't — defer this.
+**Status: scaffold works on branch `ssr-phase-1`. NOT merged — see "Before cutover".**
+
+- [x] RR7 framework-mode Vite plugin + route config, keeping `appDirectory: 'src'`
+      so the ~50 existing pages stay put. `react-router.config.ts`, `src/root.tsx`
+      (document + providers + chrome), `src/routes.ts` (mirrors the old `<Routes>`).
+      Default `entry.client`/`entry.server` are used — no custom entries needed.
+- [x] Vercel preset wired (`@vercel/react-router`) — deploys as one SSR function.
+- [x] Builds and server-renders. `npm run build` produces `build/client` +
+      `build/server`; `curl /` returns **real markup** (639 divs, nav/main/footer,
+      14 sections) instead of an empty shell. No console errors, no hydration
+      mismatch, page renders correctly.
+- [ ] **Auth:** cookie-based Supabase session via `@supabase/ssr` — still deferred,
+      correctly. Guards remain client-side (see `src/components/routing/ProtectedRoute.tsx`).
+
+**Three blocking things had to change to make SSR possible — all real bugs, not cosmetics:**
+1. `AuthContext` rendered a full-screen spinner *instead of* `children` while
+   `loading`. On the server `loading` starts true and the effect that clears it
+   never runs, so **every route server-rendered nothing but a spinner**. Children
+   now always render; `ProtectedRoute` still gates on `loading`, so guarded routes
+   are never exposed. Tradeoff: auth-dependent chrome briefly shows its
+   logged-out state before the session resolves.
+2. `ThemeContext` called `localStorage.getItem` in a `useState` initialiser, which
+   runs during server render → crash. Guarded with `typeof window`.
+3. PostHog was initialised at module scope in `main.tsx` → would run on the
+   server. Moved into a client effect with a dynamic import.
+
+**Build-config changes:** `@vitejs/plugin-react` removed (reactRouter() provides
+React handling; two React plugins conflict); `manualChunks` vendor-splitting
+removed (framework mode does route-level splitting and the server bundle must
+stay one module graph); `VitePWA` now client-build only.
+
+### Phase 1b + 2 — DONE (on `ssr-phase-1`)
+- [x] `api/seo.ts`'s per-entity meta ported to route `meta` exports. Logic lives in
+      `src/lib/seo.server.ts` (DB queries) + `src/lib/seo.ts` (pure shaping).
+      **They must stay split:** `meta` is a *client* export, so if it imports the
+      server module React Router refuses to build ("other route exports depend on
+      …server"), since that would pull the service-role client into the browser
+      bundle. Only `loader`/`action`/`headers` may touch `.server` modules.
+- [x] Six thin route wrappers in `src/routes/*-detail.tsx` add `loader`+`meta`+
+      `headers` without touching the page components, which still fetch their own
+      display data client-side.
+- [x] Verified: `/films/asore-sika-part-1` server-renders
+      `<title>Asore Sika PART 1 (2026) – Where to Watch | MuviDB</title>`, og:title,
+      `robots: index, follow`, canonical, and the `Movie` JSON-LD — matching the
+      old api/seo.ts output.
+- [x] Six detail rewrites removed from `vercel.json`; `/sitemap*.xml` kept.
+      `includeFiles: dist/index.html` removed. SPA fallback removed (SSR serves it).
+- [x] `api/seo.ts`'s HTML branch returns 404 with a comment; its ~300 lines of now
+      unreachable code should be deleted once the cutover is confirmed in prod.
+- [x] **Home loader + edge cache.** `src/routes/home.tsx` server-renders the hero
+      rail and sends `s-maxage=3600, stale-while-revalidate`. Verified: a real film
+      link is in the server HTML.
+      Deliberately **not** all ~15 rails — that would serialise ~15 queries against
+      a DB that runs 8–15s and has thrown 57014, risking the function budget on a
+      cache miss. Below-fold rails still hydrate client-side.
+
+**Two more SSR-only bugs surfaced and were fixed:**
+- `isHeroLoading` started `true`, so the server rendered the hero *skeleton* even
+  with data seeded — same shape of bug as the AuthContext spinner. It's now seeded
+  from the loader, and `fetchAllData` no longer flips it back after hydration.
+- `src/lib/imageUrl.js` computed `isLocalhost` from `window.location.hostname` at
+  module scope → server said "not localhost" and emitted `/_vercel/image` URLs while
+  the browser emitted raw ones: a hydration mismatch. Dev-only (in prod both sides
+  evaluate false and agree), now resolved via `import.meta.env.DEV`. Note this must
+  be the **exact** token — `import.meta.env?.DEV` is not statically replaced by Vite
+  and silently evaluates to undefined on the server.
+
+**Still open before merge:**
+- [ ] Deploy to a Vercel preview and smoke-test — `vercel.json` rewrites and the
+      Vercel preset's function output can only be verified on a real deployment.
+- [ ] Missing/thin entities set `robots: noindex` but still return **HTTP 200**;
+      api/seo.ts returned 404. `noindex` is the operative signal, but if the soft-404
+      status matters, it needs a custom `entry.server` that reads a route handle.
+- [ ] Remaining pages (Browse, Search, PeopleList…) still fetch client-side — Phase 3.
+
+### Phase 1b — original cutover checklist (superseded by the above)
+The scaffold runs, but **merging as-is would break production.** `api/seo.ts`
+currently owns `/films/:slug`, `/people/:slug`, `/watch/:slug`, `/channels/:slug`,
+`/companies/:slug`, `/cinemas/:slug` via `vercel.json` rewrites, and serves them by
+`readFileSync('dist/index.html')` + injecting title/og/twitter/JSON-LD.
+
+Under framework mode **there is no `dist/index.html`** (output moved to
+`build/client` + `build/server`, and SSR generates the document from `root.tsx`),
+so those routes would 500. Also `vercel.json` pins
+`functions: { "api/seo.ts": { includeFiles: "dist/index.html" } }`.
+
+- [ ] Port `api/seo.ts`'s per-entity meta into route `meta` exports. Needs the
+      entity data server-side → this is really Phase 2 work (loaders), so Phase 1b
+      and Phase 2 should land together.
+- [ ] Drop the six detail-page rewrites from `vercel.json`; **keep** the
+      `/sitemap*.xml` ones (that half of `api/seo.ts` is unaffected and still needed).
+- [ ] Remove the now-dead entry points: `index.html`, `src/main.tsx`, `src/App.tsx`
+      (superseded by `root.tsx` + `routes.ts`). Left in place on the branch so the
+      scaffold stays a clean, revertible addition.
+- [ ] Re-point the SPA fallback rewrite in `vercel.json` (`/(?!...)` → `/index.html`)
+      at the SSR function.
+- [ ] Confirm the deployed function count is still ≤ 12 with the SSR function added.
 
 ### Phase 2 — Convert Home to SSR + cache
 - [ ] Move Home's rail queries (`src/pages/Home.jsx`, multiple `supabase.from('films')`
@@ -133,7 +223,65 @@ Verify with `npm run build` and by curling each old path.
 - [ ] Verify: `curl` the homepage → HTML contains the film grid; TTFB fast; no client
       Supabase call needed for first paint. Compare before/after.
 
-### Phase 3 — Page by page
+### Phase 3 — progress
+
+- [x] **Browse** — full loader + edge cache (`src/routes/browse.tsx`). Server-renders
+      the first 50 results, cached per URL; the param space is bounded
+      (`genre`/`country`/`sort`/`platform`) so the cache stays effective. Verified
+      `?genre=Drama&sort=rating` shares **zero** results with the unfiltered page and
+      an unknown genre returns none — the inner join and sort really apply.
+      Only URL-derived filters can be server-rendered; the rest of Browse's filter
+      state lives in component state, not the URL, so it stays client-side. The page
+      seeds from the loader and skips only its on-mount fetch (via a ref).
+      **Known duplication:** the loader restates Browse.jsx's query instead of sharing
+      a builder, because one uses the browser client and the other the service-role
+      one. Worth folding into a single builder that takes a client — if you change
+      `fetchFilms`, change the loader too.
+- [x] **Search** — `meta` only, **no loader, deliberately**. The query space is
+      unbounded, so each distinct `?q=` would be a cache miss putting a
+      user-controlled workload on the slow DB (and a cheap scraping lever), and
+      search results shouldn't be indexed anyway, so SSR buys no SEO. The wrapper
+      adds the `noindex` the page never had — as a client-only route it inherited the
+      site-wide `index, follow`, so every crawled `/search?q=` was an index candidate.
+- [x] **FilmDetail + PersonDetail** — bodies now server-rendered too, at **no extra
+      query cost**: `filmSeo`/`personSeo` already fetched these rows for the head, so
+      they now select the superset the pages render and the wrappers return the row
+      next to the `seo` payload.
+      The pages pass that row into `fetchFilm`/`fetchPerson` as `preloaded`, which
+      skips **only the primary query** — credits, episodes, related films, the
+      channel/YouTube fetches and the `increment_profile_views` write all still run
+      client-side. That write must stay client-side: in a loader, edge caching would
+      skew the counts. Seeding is one-shot per slug.
+      `filmSeo` keeps its `is_published` filter, so unpublished films aren't seeded
+      and fall back to the client fetch (which has no such filter) — unchanged
+      behaviour, and they stay out of the index.
+- [ ] Remaining: PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows.
+
+**Two traps this uncovered — expect both again on the remaining pages:**
+- `ShareAction` read `window.location`/`document.title` during render and **500'd**
+  the server the moment a real page body was rendered. It had never been
+  server-rendered before, because these pages only ever reached the server as a
+  skeleton. Any component that only appears inside a loaded page body is untested
+  under SSR — grep for `window.`/`document.` outside effects before converting one.
+- FilmDetail, PersonDetail and WatchPlatform each rendered a `<Helmet>` block that
+  duplicated the route `meta`, emitting **two `<title>` tags per page**. All removed;
+  the route `meta` supersedes them and carries the better SEO titles plus canonical,
+  robots and JSON-LD. **If you convert a page, check it for `<Helmet>` too.** The
+  only Helmet left is in the dead `src/main.tsx`.
+
+**Pattern for the remaining pages** (all three steps needed — the first alone does
+nothing visible):
+1. Add `src/routes/<page>.tsx` re-exporting the page as default, plus `loader`,
+   `meta`, `headers`; point `src/routes.ts` at it.
+2. Seed the page's state from `useLoaderData()`.
+3. **Seed the page's `loading`/skeleton flag too.** Every page here gates render on a
+   `loading` boolean that starts `true`; leave it and the server renders a skeleton
+   and SSR gains nothing. This has bitten three times now (AuthContext,
+   `isHeroLoading`, Browse's `loading`).
+Also delete any `document.title = …` effect — the `meta` export owns the title, and
+the effect overwrites the server-rendered one after hydration.
+
+### Phase 3 — original plan
 Order by traffic/value: Browse → Film detail → Person detail → the rest. Each: move
 `useEffect` fetch → `loader`, add caching, verify. Admin/auth pages may stay client-side.
 
@@ -174,9 +322,78 @@ Order by traffic/value: Browse → Film detail → Person detail → the rest. E
 preserved by `vercel.json` rewrites, so **no frontend caller changed**. Build passes,
 `tsc` clean. **Function count 12 → 7**, leaving ~5 Hobby slots for SSR.
 
-**Next action: Phase 1** — stand up RR7 framework mode (see Phase 1 checklist above).
-Before starting, do the deploy smoke-test below; rewrites can only be verified on a real
-deployment, so a broken rewrite would otherwise be discovered mid-Phase-1.
+**Phases 1, 1b and 2 are CODE-COMPLETE on branch `ssr-phase-1` — NOT merged, NOT
+deployed.** `main` is at `487c324` (Phase 0 only) and is unaffected by any of it.
+
+Branch commits, oldest first:
+- `d2a19ab` — Phase 1: RR7 framework-mode scaffold (SSR foundation).
+- `0aa21c6` — Phase 1b + 2: api/seo.ts meta ported to route loaders; Home hero
+  server-rendered + edge-cached.
+
+Verified locally (`npm run build` passes, `react-router dev` on :3001):
+- `curl /` returns real markup (nav/main/footer, ~639 divs) with a real film link
+  from the hero loader — not an empty SPA shell.
+- `curl /films/asore-sika-part-1` returns the same title / og / robots / canonical /
+  `Movie` JSON-LD the old api/seo.ts produced.
+- No hydration mismatches; page renders correctly in the browser.
+
+**First preview deploy FAILED and was fixed** (`No Output Directory named "dist"`).
+Two causes, both now handled in `vercel.json`:
+1. The project's Framework Preset was still **Vite**, so Vercel expected a static
+   `dist/` and never ran its React Router builder. The app's own build succeeded —
+   it emits `build/client` + `build/server/nodejs_<b64>/`, and converting that into
+   `.vercel/output` is done by Vercel's builder, which only runs when the framework
+   is known. Fixed with `"framework": "react-router"` (verified a real slug against
+   `@vercel/frameworks`).
+2. The legacy `routes` array would have broken SSR even once the framework was
+   detected: `routes` **replaces** the framework's own routing, so nothing would
+   reach the SSR function. All of it is converted to `rewrites`, which merge with
+   framework routing and let unmatched paths fall through to SSR.
+   Regex captures became path-to-regexp (`/api/film/(?<id>.*)` → `/api/film/:id`),
+   and the `{ "handle": "filesystem" }` / `/api/(.*)` identity entries are gone —
+   both are implicit in the rewrites model.
+
+If a deploy still looks for `dist`, check **Project Settings → Framework Preset** in
+the Vercel dashboard; a dashboard override there can win over `vercel.json`.
+
+### ⚠️ NEXT ACTION — redeploy `ssr-phase-1` to a Vercel PREVIEW and smoke-test
+
+This is the only thing standing between the branch and merge. Everything below can
+**only** be checked on a real deployment — `vercel.json` `routes` do not apply under
+`react-router dev`, and the Vercel preset's function output doesn't exist locally.
+Do not merge to `main` before this passes.
+
+1. Push a preview deploy of `ssr-phase-1` (do NOT promote to production).
+2. Run the Phase 0 API smoke-test list at the bottom of this file.
+3. Then check the SSR cutover specifically:
+   - `/` → 200, HTML contains the hero film markup, `Cache-Control: s-maxage=3600`.
+   - `/films/<slug>`, `/people/<slug>`, `/watch/netflix`, `/channels/<slug>`,
+     `/companies/<slug>`, `/cinemas/<id>` → 200 with correct `<title>` + JSON-LD.
+     These are the six routes api/seo.ts used to own — **most likely to break.**
+   - `/sitemap.xml` and the other `/sitemap-*.xml` → still 200 XML (api/seo.ts
+     keeps this half; only its HTML branch was retired).
+   - `/admin` → still loads (client-side guard, unchanged).
+   - **Confirm the deployment's function count is still ≤ 12** with the SSR
+     function added. Expected 8: the 7 from Phase 0 + the SSR function.
+4. If it passes: merge to `main`, then `staging`. Then do the Phase 3 cleanup below.
+
+**Known deviation to decide on:** missing/thin entities now return **HTTP 200 with
+`robots: noindex`**, where api/seo.ts returned **404**. `noindex` is the operative
+signal for Google, but the 404 was deliberate, to clear "Soft 404 / Crawled - not
+indexed". Reproducing the status needs a custom `entry.server.tsx` that reads a
+route `handle`. Owner has not yet decided whether this matters.
+
+**Dead code to delete once the cutover is confirmed in production** (left in place
+deliberately so the branch stays revertible):
+- `index.html`, `src/main.tsx`, `src/App.tsx` — superseded by `src/root.tsx` +
+  `src/routes.ts`. Nothing imports them; they are no longer entry points.
+- `api/seo.ts` — everything after the early `return res.status(404)` is unreachable
+  (~300 lines of HTML injection).
+
+**Environment gotcha:** npm's cache is configured at `D:\npm-cache` and `D:` does not
+exist, so every `npm install`/`npm view` fails with a bogus `ENOENT ... mkdir '\\?'`.
+Work around per-command with `npm install --cache <writable-dir>`, or fix it for good
+with `npm config set cache <writable-dir>`.
 
 **Owner preferences:** free tier only for now; hybrid is fine; convert Home first.
 

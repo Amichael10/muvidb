@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getShowName } from '../utils/series';
 import FilmCard from '../components/film/FilmCard';
@@ -14,11 +14,18 @@ export default function Browse() {
 
   const initialPlatform = searchParams.get('platform') || '';
 
+  // First page of results is server-rendered and edge-cached by the route loader
+  // in src/routes/browse.tsx, so it's already in the HTML on first paint.
+  const loaderData = useLoaderData();
+  const seeded = !!loaderData?.seeded && (loaderData.films?.length ?? 0) > 0;
+
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
-  const [films, setFilms] = useState([]);
+  const [films, setFilms] = useState(loaderData?.films ?? []);
   const [dbGenres, setDbGenres] = useState([]);
   const [dbCountries, setDbCountries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Starts false when seeded, otherwise the server would render the skeleton and
+  // SSR would buy us nothing.
+  const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState(null);
   
   // Filters state
@@ -41,12 +48,21 @@ export default function Browse() {
   }, [searchQuery]);
 
   useEffect(() => {
-    document.title = "MuviDB | Movies";
+    // Title now comes from the route's `meta` export — setting it here too would
+    // overwrite the server-rendered one after hydration.
     fetchGenres();
   }, []);
 
+  // Skip only the on-mount fetch when the loader already seeded results; every
+  // later filter change still refetches through the normal client path.
+  const skipInitialFetch = useRef(seeded);
+
   useEffect(() => {
     setError(null);
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchFilms();
   }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy, debouncedSearchQuery]);
 
