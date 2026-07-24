@@ -12,6 +12,9 @@
       "includeFiles": "build/**",
       "maxDuration": 60,
       "memory": 1024
+    },
+    "api/seo.ts": {
+      "includeFiles": "build/client/index.html"
     }
   },
   "rewrites": [
@@ -48,9 +51,6 @@
     { "source": "/sitemap-cinemas.xml", "destination": "/api/seo?type=sitemap&slug=cinemas" },
     { "source": "/sitemap-channels.xml", "destination": "/api/seo?type=sitemap&slug=channels" },
 
-    // Temporary: serve the client shell directly. /api/ssr was FUNCTION_INVOCATION_FAILED
-    // on every document request (module crash before any fallback). Static index.html
-    // restores the site; SSR reattach is a follow-up once the function loads cleanly.
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
