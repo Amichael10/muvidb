@@ -1,42 +1,50 @@
 {
-  "framework": "react-router",
+  "functions": {
+    "api/seo.ts": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "images": {
     "sizes": [16, 32, 48, 160, 256, 384, 640, 750, 828, 1080, 1280, 1920],
     "formats": ["image/webp"],
     "minimumCacheTTL": 86400
   },
-  "rewrites": [
-    { "source": "/storage/v1/render/image/public/:path*", "destination": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/render/image/public/:path*" },
-    { "source": "/storage/v1/object/public/:path*", "destination": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/:path*" },
-
-    { "source": "/api/film/:id", "destination": "/api/data?_r=films&id=:id" },
-    { "source": "/api/channel/:id", "destination": "/api/data?_r=channels&id=:id" },
-    { "source": "/api/admin/search-channels", "destination": "/api/data?_r=channels&action=yt_search" },
-    { "source": "/api/films", "destination": "/api/data?_r=films" },
-    { "source": "/api/people", "destination": "/api/data?_r=people" },
-    { "source": "/api/channels", "destination": "/api/data?_r=channels" },
-    { "source": "/api/content", "destination": "/api/data?_r=content" },
-
-    { "source": "/api/youtube", "destination": "/api/external?provider=youtube" },
-    { "source": "/api/tmdb", "destination": "/api/external?provider=tmdb" },
-
-    { "source": "/api/health", "destination": "/api/media?op=health" },
-    { "source": "/api/mirror-images", "destination": "/api/media?op=mirror" },
-
-    { "source": "/api/scrape-imdb-actor", "destination": "/api/automation?action=scrape-imdb-actor" },
-    { "source": "/api/deduplicator", "destination": "/api/automation?action=deduplicator" },
-    { "source": "/api/people-enrichment", "destination": "/api/automation?action=people-enrichment" },
-
-    { "source": "/api/cron/refresh-videos", "destination": "/api/cron/sync?task=refresh_videos" },
-    { "source": "/api/cron/mirror-images", "destination": "/api/cron/sync?task=mirror_images" },
-
-    { "source": "/sitemap.xml", "destination": "/api/seo?type=sitemap&slug=index" },
-    { "source": "/sitemap-static.xml", "destination": "/api/seo?type=sitemap&slug=static" },
-    { "source": "/sitemap-people.xml", "destination": "/api/seo?type=sitemap&slug=people" },
-    { "source": "/sitemap-films.xml", "destination": "/api/seo?type=sitemap&slug=films" },
-    { "source": "/sitemap-watch.xml", "destination": "/api/seo?type=sitemap&slug=watch" },
-    { "source": "/sitemap-companies.xml", "destination": "/api/seo?type=sitemap&slug=companies" },
-    { "source": "/sitemap-cinemas.xml", "destination": "/api/seo?type=sitemap&slug=cinemas" },
-    { "source": "/sitemap-channels.xml", "destination": "/api/seo?type=sitemap&slug=channels" }
+  "routes": [
+    { "src": "/storage/v1/render/image/public/(.*)", "dest": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/render/image/public/$1" },
+    { "src": "/storage/v1/object/public/(.*)", "dest": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/$1" },
+    { "src": "/api/film/(?<id>.*)", "dest": "/api/data?_r=films&id=$id" },
+    { "src": "/api/channel/(?<id>.*)", "dest": "/api/data?_r=channels&id=$id" },
+    { "src": "/api/youtube(.*)", "dest": "/api/external?provider=youtube$1" },
+    { "src": "/api/tmdb", "dest": "/api/external?provider=tmdb" },
+    { "src": "/api/admin/search-channels", "dest": "/api/data?_r=channels&action=yt_search" },
+    { "src": "/api/cron/refresh-videos", "dest": "/api/cron/sync?task=refresh_videos" },
+    { "src": "/api/cron/mirror-images", "dest": "/api/cron/sync?task=mirror_images" },
+    { "src": "/api/scrape-imdb-actor", "dest": "/api/automation?action=scrape-imdb-actor" },
+    { "src": "/api/deduplicator", "dest": "/api/automation?action=deduplicator" },
+    { "src": "/api/people-enrichment", "dest": "/api/automation?action=people-enrichment" },
+    { "src": "/api/health", "dest": "/api/media?op=health" },
+    { "src": "/api/mirror-images", "dest": "/api/media?op=mirror" },
+    { "src": "/api/films", "dest": "/api/data?_r=films" },
+    { "src": "/api/people", "dest": "/api/data?_r=people" },
+    { "src": "/api/channels", "dest": "/api/data?_r=channels" },
+    { "src": "/api/content", "dest": "/api/data?_r=content" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/sitemap\\.xml", "dest": "/api/seo?type=sitemap&slug=index" },
+    { "src": "/sitemap-static\\.xml", "dest": "/api/seo?type=sitemap&slug=static" },
+    { "src": "/sitemap-people\\.xml", "dest": "/api/seo?type=sitemap&slug=people" },
+    { "src": "/sitemap-films\\.xml", "dest": "/api/seo?type=sitemap&slug=films" },
+    { "src": "/sitemap-watch\\.xml", "dest": "/api/seo?type=sitemap&slug=watch" },
+    { "src": "/sitemap-companies\\.xml", "dest": "/api/seo?type=sitemap&slug=companies" },
+    { "src": "/sitemap-cinemas\\.xml", "dest": "/api/seo?type=sitemap&slug=cinemas" },
+    { "src": "/sitemap-channels\\.xml", "dest": "/api/seo?type=sitemap&slug=channels" },
+    { "src": "/people/(?<slug>[^/]+)", "dest": "/api/seo?type=person&slug=$slug" },
+    { "src": "/films/(?<slug>[^/]+)", "dest": "/api/seo?type=film&slug=$slug" },
+    { "src": "/film/(?<slug>[^/]+)", "dest": "/api/seo?type=film&slug=$slug" },
+    { "src": "/watch/(?<slug>[^/]+)", "dest": "/api/seo?type=watch&slug=$slug" },
+    { "src": "/channels/(?<slug>[^/]+)", "dest": "/api/seo?type=channel&slug=$slug" },
+    { "src": "/companies/(?<slug>[^/]+)", "dest": "/api/seo?type=company&slug=$slug" },
+    { "src": "/cinemas/(?<slug>[^/]+)", "dest": "/api/seo?type=cinema&slug=$slug" },
+    { "handle": "filesystem" },
+    { "src": "/(?!(?:src|node_modules|@vite|@id|@react-refresh|api|favicon\\.ico|manifest\\.webmanifest|.*\\.(?:js|css|png|jpg|svg|ico|json|map|xml|html|txt))).*", "dest": "/index.html" }
   ]
 }

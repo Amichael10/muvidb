@@ -177,16 +177,14 @@ export function AuthProvider({ children }) {
     loading: authState.loading
   };
 
-  // NB: this used to render a full-screen spinner *instead of* children while
-  // loading. Under SSR that made every route server-render nothing but a
-  // spinner — `loading` starts true on the server and the effect that clears it
-  // never runs there — which defeats the entire point of server rendering.
-  //
-  // Children now always render and `loading` is exposed on the context for
-  // consumers to gate on: ProtectedRoute returns null while loading, so guarded
-  // routes are still never shown to an unauthenticated user. The tradeoff is
-  // that auth-dependent chrome (e.g. the navbar's logged-in menu) briefly
-  // renders its logged-out state before the session resolves.
+  if (authState.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand"></div>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider value={value}>
       {children}

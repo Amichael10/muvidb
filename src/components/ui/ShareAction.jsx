@@ -6,20 +6,8 @@ const ShareAction = ({ title, text, url, variant = 'default', className = '', co
   const [copied, setCopied] = useState(false);
   const menuRef = useRef(null);
 
-  // These read window/document during render, which crashes under SSR. Fall back
-  // to empty strings on the server; the effect below fills them in on mount, and
-  // every real caller passes `url`/`title` explicitly anyway.
-  const isBrowser = typeof window !== 'undefined';
-  const [browserUrl, setBrowserUrl] = useState('');
-  const [browserTitle, setBrowserTitle] = useState('');
-
-  useEffect(() => {
-    setBrowserUrl(window.location.href);
-    setBrowserTitle(document.title);
-  }, []);
-
-  const shareUrl = url || (isBrowser ? browserUrl : '');
-  const shareTitle = title || (isBrowser ? browserTitle : '');
+  const shareUrl = url || window.location.href;
+  const shareTitle = title || document.title;
   const shareText = text || `Check this out on MuviDB`;
 
   const socialPlatforms = [
