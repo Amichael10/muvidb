@@ -11,8 +11,9 @@ export { default } from '../pages/FilmDetail';
 
 export async function loader({ params, request }: { params: any; request: Request }) {
   const base = baseUrlFrom(request);
-  const { seo, status } = await filmSeo(String(params.slug), base);
-  return data({ seo }, {
+  // One query serves both the SEO head and the page body — see filmSeo's select.
+  const { seo, status, data: film } = await filmSeo(String(params.slug), base);
+  return data({ seo, film }, {
     headers: { 'Cache-Control': status === 200 ? CACHE_OK : CACHE_404 },
   });
 }

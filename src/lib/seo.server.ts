@@ -68,7 +68,20 @@ const notFound = (base: string, what: string, noun: string): Seo => ({
 export async function personSeo(slug: string, base: string) {
   const { data } = await supabaseServer
     .from('people')
-    .select('*, credits(role, character_name, films(title, slug, id, year))')
+    // Superset of the SEO head's needs and what PersonDetail renders, so one
+    // round-trip serves both.
+    .select(`
+      *,
+      credits(
+        id, role, character_name, billing_order,
+        films(
+          id, title, year, poster_url, trailer_youtube_id,
+          view_count, average_rating, liked_percent, slug,
+          release_type,
+          film_genres(genres(name))
+        )
+      )
+    `)
     .eq(keyFor(slug), slug)
     .maybeSingle();
 
@@ -134,8 +147,19 @@ export async function personSeo(slug: string, base: string) {
 export async function filmSeo(slug: string, base: string) {
   const { data } = await supabaseServer
     .from('films')
-    .select('*, film_genres(genres(name)), credits(role, character_name, billing_order, people(name, slug, id))')
+    // Superset of what the SEO head needs and what FilmDetail renders, so one
+    // round-trip serves both: film_genres(genre_id) and film_companies are for
+    // the page, credits(people) for the JSON-LD cast.
+    .select(`
+      *,
+      film_genres(genre_id, genres(name)),
+      film_companies(companies(id, name, logo_url)),
+      credits(role, character_name, billing_order, people(name, slug, id))
+    `)
     .eq(keyFor(slug), slug)
+    // Kept deliberately: unpublished films stay out of the index. They simply
+    // don't get seeded, and FilmDetail falls back to its own client fetch (which
+    // has no such filter), so their behaviour is unchanged from today.
     .eq('is_published', true)
     .maybeSingle();
 
