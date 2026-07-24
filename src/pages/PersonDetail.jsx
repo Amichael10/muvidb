@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link, useLoaderData } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
@@ -128,26 +129,12 @@ const PersonDetail = () => {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  // The route loader (src/routes/person-detail.tsx) already fetched this person
-  // server-side for the SEO head, so the same row seeds the page.
-  const loaderData = useLoaderData()
-  const seededPerson = loaderData?.person
-    ? {
-        ...loaderData.person,
-        credits: (loaderData.person.credits || []).map((credit) => ({
-          ...credit,
-          role: normalizeRole(credit.role),
-        })),
-      }
-    : null
-
-  const [person, setPerson] = useState(seededPerson)
+  const [person, setPerson] = useState(null)
   const [awardFilms, setAwardFilms] = useState({}) // film_id -> { slug, title, poster_url }
-  const [personId, setPersonId] = useState(seededPerson?.id ?? null) // actual UUID
+  const [personId, setPersonId] = useState(null) // actual UUID
   const [channel, setChannel] = useState(null)
   const [channelVideos, setChannelVideos] = useState([])
-  // Starts false when seeded — otherwise the server renders the loading state.
-  const [loading, setLoading] = useState(!seededPerson)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showEdit, setShowEdit] = useState(false)
   const [activeRole, setActiveRole] = useState('actor')
@@ -162,36 +149,23 @@ const PersonDetail = () => {
     toggleFollow
   } = useFollow(personId, user)
 
-  // Hand the seeded row to fetchPerson so it skips the primary query but still
-  // runs everything after it (profile-view increment, channel, YouTube films).
-  const seededSlug = useRef(seededPerson ? slug : null)
-
   useEffect(() => {
-    let preloaded = null
-    if (seededSlug.current === slug) {
-      preloaded = loaderData?.person ?? null
-      seededSlug.current = null // one-shot
-    }
-    fetchPerson(preloaded)
+    fetchPerson()
   }, [slug])
 
   useEffect(() => {
     setVisibleCreditsCount(20)
   }, [activeRole])
 
-  // `preloaded` is the row the route loader already fetched server-side. When
-  // present the primary query is skipped, but everything after it still runs.
-  const fetchPerson = async (preloaded = null) => {
-    if (!preloaded) setLoading(true)
+  const fetchPerson = async () => {
+    setLoading(true)
     setError(null)
     setYoutubeVideoIds([])
     setChannel(null)
     setChannelVideos([])
 
     const { col, val } = slugOrId(slug);
-    const { data, error } = preloaded
-      ? { data: preloaded, error: null }
-      : await supabase
+    const { data, error } = await supabase
       .from('people')
       .select(`
         *,
@@ -227,8 +201,7 @@ const PersonDetail = () => {
 
     setPerson(basePerson)
     setPersonId(data.id)
-    // Title comes from the route's `meta` export now — setting it here would
-    // overwrite the server-rendered one after hydration.
+    document.title = `MuviDB | ${data.name}`
 
     // Posters/slugs for the films an award was won/nominated for. They aren't
     // always in this person's credits (you can win for a film we don't credit
@@ -492,6 +465,13 @@ const PersonDetail = () => {
 
   return (
     <div className="min-h-screen bg-bg">
+      <Helmet>
+        <title>{`MuviDB | ${formatPersonName(person.name)}`}</title>
+        <meta name="description" content={toSentenceCase(person.biography)?.slice(0, 150) || `Discover ${formatPersonName(person.name)}'s filmography and videos on MuviDB.`} />
+        <meta property="og:title" content={`MuviDB | ${formatPersonName(person.name)}`} />
+        <meta property="og:description" content={toSentenceCase(person.biography)?.slice(0, 150) || `Discover ${formatPersonName(person.name)}'s filmography and videos on MuviDB.`} />
+        {person.photo_url && <meta property="og:image" content={person.photo_url} />}
+      </Helmet>
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">

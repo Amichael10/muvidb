@@ -6,18 +6,9 @@ const STORAGE_RENDER_PREFIX = '/storage/v1/render/image/public/';
 // routed through our cached media proxy in production.
 const FRIENDLY_HOST = /(^|\.)(tmdb\.org|ytimg\.com|youtube\.com|ggpht\.com|googleusercontent\.com|ui-avatars\.com|muvidb\.com)$/i;
 
-// Under SSR this module is evaluated on the server too, where there is no
-// window — so the server would compute `false` and emit a /_vercel/image URL
-// while the browser on localhost computes `true` and emits the raw URL, which
-// React reports as a hydration mismatch. Treating a dev-mode server render as
-// localhost keeps both sides in agreement. In production both evaluate false.
 const isLocalhost =
-  typeof window !== 'undefined'
-    ? /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname)
-    // NB: must be the exact token `import.meta.env.DEV` — Vite substitutes it
-    // statically at build time, and optional chaining (`import.meta.env?.DEV`)
-    // defeats that replacement, leaving it undefined on the server.
-    : import.meta.env.DEV === true;
+  typeof window !== 'undefined' &&
+  /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname);
 
 export function normalizeImageUrl(value) {
   if (!value) return '';

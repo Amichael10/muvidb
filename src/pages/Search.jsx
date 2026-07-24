@@ -20,8 +20,7 @@ export default function Search() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Title comes from the route's `meta` export now — setting it here too would
-    // overwrite the server-rendered one after hydration.
+    document.title = "MuviDB | Search";
     fetchGenres();
     if (initialQuery) {
       fetchAll();
