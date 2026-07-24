@@ -149,6 +149,29 @@ source*, rather than only helping someone who is already searching.
 `ADEBAYO ADENIYI` (8 films) are separate records and plausibly the same person.
 Not merged — that is a judgement call.
 
+### ✅ Credit extractor — multi-image upload 2026-07-24
+`src/pages/admin/AdminCreditsExtractor.jsx` accepted one screenshot at a time; a
+credit roll rarely fits in one frame.
+
+- `screenshotBase64`/`screenshotPreview` (single) → `screenshots[]`
+  (`{id, name, base64}`); file input takes `multiple`.
+- Thumbnail grid with per-image remove + "clear all"; input value is reset after
+  each pick so the same file can be re-added after removal.
+- Extraction loops the images **sequentially, not in parallel** — the Vision
+  endpoint rotates API keys, and parallel calls burn quota far faster than they
+  save wall-clock time.
+- **One bad image no longer discards the batch**: each is caught individually and
+  rows already harvested are kept. Log shows per-image success/failure.
+- **De-dupes across images** on `name|role` (also against rows already on screen),
+  because consecutive frames of a credit roll overlap heavily. Toast reports
+  extracted / duplicates skipped / images failed.
+- Profile verification runs once on the merged list, so matching sees every image.
+
+`tsc` clean, build passes, no stale references to the old single-image state.
+
+> **Not visually tested** — it is behind admin auth. Worth one manual run with 2–3
+> overlapping screenshots to confirm the de-dupe count looks right.
+
 ---
 
 ## Pending
