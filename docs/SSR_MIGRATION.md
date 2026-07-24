@@ -264,20 +264,54 @@ Order by traffic/value: Browse → Film detail → Person detail → the rest. E
 preserved by `vercel.json` rewrites, so **no frontend caller changed**. Build passes,
 `tsc` clean. **Function count 12 → 7**, leaving ~5 Hobby slots for SSR.
 
-**Phase 1 scaffold works, on branch `ssr-phase-1` (not merged).** RR7 framework mode
-builds and genuinely server-renders. Verified locally: `curl /` returns real markup,
-no hydration errors, page renders. Three real SSR blockers fixed on the way
-(AuthContext spinner gate, ThemeContext localStorage, module-scope PostHog).
+**Phases 1, 1b and 2 are CODE-COMPLETE on branch `ssr-phase-1` — NOT merged, NOT
+deployed.** `main` is at `487c324` (Phase 0 only) and is unaffected by any of it.
 
-**Next action:** Phase 1b + Phase 2 together — they're entangled and must land as one
-change. `api/seo.ts` owns the six detail-page routes and serves them from
-`dist/index.html`, which framework mode no longer produces, so its meta injection has
-to be replaced by route `meta` exports, and those need loaders. See the Phase 1b
-checklist. **Do not merge `ssr-phase-1` before that**: SSR builds fine, but the six
-detail routes would 500 in production.
+Branch commits, oldest first:
+- `d2a19ab` — Phase 1: RR7 framework-mode scaffold (SSR foundation).
+- `0aa21c6` — Phase 1b + 2: api/seo.ts meta ported to route loaders; Home hero
+  server-rendered + edge-cached.
 
-Also still outstanding from Phase 0: the deploy smoke-test below (rewrites can only be
-verified on a real deployment).
+Verified locally (`npm run build` passes, `react-router dev` on :3001):
+- `curl /` returns real markup (nav/main/footer, ~639 divs) with a real film link
+  from the hero loader — not an empty SPA shell.
+- `curl /films/asore-sika-part-1` returns the same title / og / robots / canonical /
+  `Movie` JSON-LD the old api/seo.ts produced.
+- No hydration mismatches; page renders correctly in the browser.
+
+### ⚠️ NEXT ACTION — deploy `ssr-phase-1` to a Vercel PREVIEW and smoke-test
+
+This is the only thing standing between the branch and merge. Everything below can
+**only** be checked on a real deployment — `vercel.json` `routes` do not apply under
+`react-router dev`, and the Vercel preset's function output doesn't exist locally.
+Do not merge to `main` before this passes.
+
+1. Push a preview deploy of `ssr-phase-1` (do NOT promote to production).
+2. Run the Phase 0 API smoke-test list at the bottom of this file.
+3. Then check the SSR cutover specifically:
+   - `/` → 200, HTML contains the hero film markup, `Cache-Control: s-maxage=3600`.
+   - `/films/<slug>`, `/people/<slug>`, `/watch/netflix`, `/channels/<slug>`,
+     `/companies/<slug>`, `/cinemas/<id>` → 200 with correct `<title>` + JSON-LD.
+     These are the six routes api/seo.ts used to own — **most likely to break.**
+   - `/sitemap.xml` and the other `/sitemap-*.xml` → still 200 XML (api/seo.ts
+     keeps this half; only its HTML branch was retired).
+   - `/admin` → still loads (client-side guard, unchanged).
+   - **Confirm the deployment's function count is still ≤ 12** with the SSR
+     function added. Expected 8: the 7 from Phase 0 + the SSR function.
+4. If it passes: merge to `main`, then `staging`. Then do the Phase 3 cleanup below.
+
+**Known deviation to decide on:** missing/thin entities now return **HTTP 200 with
+`robots: noindex`**, where api/seo.ts returned **404**. `noindex` is the operative
+signal for Google, but the 404 was deliberate, to clear "Soft 404 / Crawled - not
+indexed". Reproducing the status needs a custom `entry.server.tsx` that reads a
+route `handle`. Owner has not yet decided whether this matters.
+
+**Dead code to delete once the cutover is confirmed in production** (left in place
+deliberately so the branch stays revertible):
+- `index.html`, `src/main.tsx`, `src/App.tsx` — superseded by `src/root.tsx` +
+  `src/routes.ts`. Nothing imports them; they are no longer entry points.
+- `api/seo.ts` — everything after the early `return res.status(404)` is unreachable
+  (~300 lines of HTML injection).
 
 **Environment gotcha:** npm's cache is configured at `D:\npm-cache` and `D:` does not
 exist, so every `npm install`/`npm view` fails with a bogus `ENOENT ... mkdir '\\?'`.
