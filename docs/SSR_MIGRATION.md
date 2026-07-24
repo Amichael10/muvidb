@@ -279,7 +279,26 @@ Verified locally (`npm run build` passes, `react-router dev` on :3001):
   `Movie` JSON-LD the old api/seo.ts produced.
 - No hydration mismatches; page renders correctly in the browser.
 
-### ⚠️ NEXT ACTION — deploy `ssr-phase-1` to a Vercel PREVIEW and smoke-test
+**First preview deploy FAILED and was fixed** (`No Output Directory named "dist"`).
+Two causes, both now handled in `vercel.json`:
+1. The project's Framework Preset was still **Vite**, so Vercel expected a static
+   `dist/` and never ran its React Router builder. The app's own build succeeded —
+   it emits `build/client` + `build/server/nodejs_<b64>/`, and converting that into
+   `.vercel/output` is done by Vercel's builder, which only runs when the framework
+   is known. Fixed with `"framework": "react-router"` (verified a real slug against
+   `@vercel/frameworks`).
+2. The legacy `routes` array would have broken SSR even once the framework was
+   detected: `routes` **replaces** the framework's own routing, so nothing would
+   reach the SSR function. All of it is converted to `rewrites`, which merge with
+   framework routing and let unmatched paths fall through to SSR.
+   Regex captures became path-to-regexp (`/api/film/(?<id>.*)` → `/api/film/:id`),
+   and the `{ "handle": "filesystem" }` / `/api/(.*)` identity entries are gone —
+   both are implicit in the rewrites model.
+
+If a deploy still looks for `dist`, check **Project Settings → Framework Preset** in
+the Vercel dashboard; a dashboard override there can win over `vercel.json`.
+
+### ⚠️ NEXT ACTION — redeploy `ssr-phase-1` to a Vercel PREVIEW and smoke-test
 
 This is the only thing standing between the branch and merge. Everything below can
 **only** be checked on a real deployment — `vercel.json` `routes` do not apply under
