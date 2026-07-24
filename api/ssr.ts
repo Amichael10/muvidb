@@ -1,16 +1,18 @@
 /**
  * Vercel SSR entry (invert packaging).
  *
- * Do NOT set framework:"react-router" / vercelPreset() — that zeroes out api/.
- * Catch-all document routes rewrite here; /api/* stay as separate functions.
- * See docs/WORK_LOG.md § "The fix: invert it".
+ * Lazy-load the RR handler so a bad import cannot crash the whole function
+ * before we can return an error body (FUNCTION_INVOCATION_FAILED).
  *
- * All other api/*.ts handlers use the Node (VercelRequest, VercelResponse)
- * signature — a Web-Fetch-only export crashes with FUNCTION_INVOCATION_FAILED.
+ * Node (req, res) signature — matches every other api/*.ts in this project.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleSsrRequest } from './_lib/rrHandler';
 
+// Ensure the RR server bundle is copied into this function's deployment.
+export const config = {
+  includeFiles: ['build/server/**'],
+  maxDuration: 60,
+};
 function headerString(
   value: string | string[] | undefined,
 ): string | undefined {
@@ -18,7 +20,6 @@ function headerString(
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** Rebuild the browser URL after a rewrite to /api/ssr. */
 function toWebRequest(req: VercelRequest): Request {
   const proto = headerString(req.headers['x-forwarded-proto']) || 'https';
   const host =
@@ -26,7 +27,6 @@ function toWebRequest(req: VercelRequest): Request {
     headerString(req.headers.host) ||
     'localhost';
 
-  // Prefer an explicit pathname from the rewrite (?__pathname=/films/x).
   const rawPath = req.query.__pathname;
   const pathnameFromQuery = Array.isArray(rawPath) ? rawPath[0] : rawPath;
 
@@ -68,30 +68,41 @@ function toWebRequest(req: VercelRequest): Request {
   return new Request(url, init);
 }
 
-async function writeWebResponse(res: VercelResponse, response: Response) {
-  res.status(response.status);
-  response.headers.forEach((value, key) => {
-    if (key.toLowerCase() === 'transfer-encoding') return;
-    res.setHeader(key, value);
-  });
-  const buf = Buffer.from(await response.arrayBuffer());
-  res.end(buf);
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const response = await handleSsrRequest(toWebRequest(req));
-    await writeWebResponse(res, response);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[api/ssr] FUNCTION ERROR:', message);
-    res.status(500);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-MuviDB-SSR', 'node-adapter-error');
-    res.end(
-      `<!doctype html><html><body style="font-family:system-ui;background:#0A0A0B;color:#fff;padding:2rem">` +
-        `<h1>SSR adapter error</h1><pre>${message.replace(/</g, '&lt;')}</pre></body></html>`,
+    // Dynamic import — top-level import of react-router/rrHandler was crashing
+    // the lambda before any response could be written.
+    const { handleSsrRequest, resolveServerBuildPath } = await import(
+      './_lib/rrHandler.js'
     );
+
+    const buildPath = resolveServerBuildPath();
+    if (!buildPath) {
+      res.status(500);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('X-MuviDB-SSR', 'missing-server-build');
+      res.end(
+        `SSR server build missing. cwd=${process.cwd()} includeFiles=build/server/**`,
+      );
+      return;
+    }
+
+    const response = await handleSsrRequest(toWebRequest(req));
+    res.status(response.status);
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'transfer-encoding') return;
+      res.setHeader(key, value);
+    });
+    res.setHeader('X-MuviDB-SSR', 'ok');
+    res.setHeader('X-MuviDB-SSR-Build', buildPath);
+    res.end(Buffer.from(await response.arrayBuffer()));
+  } catch (err) {
+    const message = err instanceof Error ? err.stack || err.message : String(err);
+    console.error('[api/ssr]', message);
+    res.status(500);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-MuviDB-SSR', 'handler-error');
+    res.end(message.slice(0, 4000));
   }
 }

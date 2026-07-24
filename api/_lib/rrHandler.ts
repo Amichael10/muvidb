@@ -1,4 +1,3 @@
-import { createRequestHandler } from 'react-router';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -6,15 +5,14 @@ import { pathToFileURL } from 'node:url';
 /**
  * Shared React Router SSR handler (invert-fix — see docs/WORK_LOG.md).
  *
- * Used by api/ssr.ts (Vercel) and mirrored by server/node-server.mjs (scale path).
- * Dynamic-import the RR server build so @vercel/node does not esbuild the whole graph.
- * vercel.json includeFiles must ship build/server/** into the function.
- *
- * Note: createRequestHandler lives on `react-router` in v7.18+ (not @react-router/node).
+ * Lazy-imports createRequestHandler from `react-router` so api/ssr.ts can boot
+ * even if RR init is heavy. vercel.json includeFiles must ship build/server/**.
  */
 
 let buildPromise: Promise<unknown> | null = null;
 let resolvedBuildPath: string | null = null;
+let requestHandlerPromise: Promise<(request: Request) => Promise<Response>> | null =
+  null;
 
 function candidatePaths(): string[] {
   const cwd = process.cwd();
@@ -64,15 +62,23 @@ function getBuild() {
   return buildPromise;
 }
 
-const mode = process.env.NODE_ENV || 'production';
-const requestHandler = createRequestHandler(() => getBuild() as any, mode);
-
-export function getSsrHandler() {
-  return requestHandler;
+async function getRequestHandler() {
+  if (!requestHandlerPromise) {
+    requestHandlerPromise = (async () => {
+      const { createRequestHandler } = await import('react-router');
+      const mode = process.env.NODE_ENV || 'production';
+      return createRequestHandler(() => getBuild() as any, mode);
+    })().catch((err) => {
+      requestHandlerPromise = null;
+      throw err;
+    });
+  }
+  return requestHandlerPromise;
 }
 
 export async function handleSsrRequest(request: Request): Promise<Response> {
   try {
+    const requestHandler = await getRequestHandler();
     return await requestHandler(request);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
