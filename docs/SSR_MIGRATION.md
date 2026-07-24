@@ -148,7 +148,51 @@ React handling; two React plugins conflict); `manualChunks` vendor-splitting
 removed (framework mode does route-level splitting and the server bundle must
 stay one module graph); `VitePWA` now client-build only.
 
-### Phase 1b — Cutover (REQUIRED before this can ship)
+### Phase 1b + 2 — DONE (on `ssr-phase-1`)
+- [x] `api/seo.ts`'s per-entity meta ported to route `meta` exports. Logic lives in
+      `src/lib/seo.server.ts` (DB queries) + `src/lib/seo.ts` (pure shaping).
+      **They must stay split:** `meta` is a *client* export, so if it imports the
+      server module React Router refuses to build ("other route exports depend on
+      …server"), since that would pull the service-role client into the browser
+      bundle. Only `loader`/`action`/`headers` may touch `.server` modules.
+- [x] Six thin route wrappers in `src/routes/*-detail.tsx` add `loader`+`meta`+
+      `headers` without touching the page components, which still fetch their own
+      display data client-side.
+- [x] Verified: `/films/asore-sika-part-1` server-renders
+      `<title>Asore Sika PART 1 (2026) – Where to Watch | MuviDB</title>`, og:title,
+      `robots: index, follow`, canonical, and the `Movie` JSON-LD — matching the
+      old api/seo.ts output.
+- [x] Six detail rewrites removed from `vercel.json`; `/sitemap*.xml` kept.
+      `includeFiles: dist/index.html` removed. SPA fallback removed (SSR serves it).
+- [x] `api/seo.ts`'s HTML branch returns 404 with a comment; its ~300 lines of now
+      unreachable code should be deleted once the cutover is confirmed in prod.
+- [x] **Home loader + edge cache.** `src/routes/home.tsx` server-renders the hero
+      rail and sends `s-maxage=3600, stale-while-revalidate`. Verified: a real film
+      link is in the server HTML.
+      Deliberately **not** all ~15 rails — that would serialise ~15 queries against
+      a DB that runs 8–15s and has thrown 57014, risking the function budget on a
+      cache miss. Below-fold rails still hydrate client-side.
+
+**Two more SSR-only bugs surfaced and were fixed:**
+- `isHeroLoading` started `true`, so the server rendered the hero *skeleton* even
+  with data seeded — same shape of bug as the AuthContext spinner. It's now seeded
+  from the loader, and `fetchAllData` no longer flips it back after hydration.
+- `src/lib/imageUrl.js` computed `isLocalhost` from `window.location.hostname` at
+  module scope → server said "not localhost" and emitted `/_vercel/image` URLs while
+  the browser emitted raw ones: a hydration mismatch. Dev-only (in prod both sides
+  evaluate false and agree), now resolved via `import.meta.env.DEV`. Note this must
+  be the **exact** token — `import.meta.env?.DEV` is not statically replaced by Vite
+  and silently evaluates to undefined on the server.
+
+**Still open before merge:**
+- [ ] Deploy to a Vercel preview and smoke-test — `vercel.json` rewrites and the
+      Vercel preset's function output can only be verified on a real deployment.
+- [ ] Missing/thin entities set `robots: noindex` but still return **HTTP 200**;
+      api/seo.ts returned 404. `noindex` is the operative signal, but if the soft-404
+      status matters, it needs a custom `entry.server` that reads a route handle.
+- [ ] Remaining pages (Browse, Search, PeopleList…) still fetch client-side — Phase 3.
+
+### Phase 1b — original cutover checklist (superseded by the above)
 The scaffold runs, but **merging as-is would break production.** `api/seo.ts`
 currently owns `/films/:slug`, `/people/:slug`, `/watch/:slug`, `/channels/:slug`,
 `/companies/:slug`, `/cinemas/:slug` via `vercel.json` rewrites, and serves them by

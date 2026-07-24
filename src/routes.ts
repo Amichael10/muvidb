@@ -7,27 +7,31 @@ import { type RouteConfig, index, layout, route } from '@react-router/dev/routes
  * did as an SPA (see docs/SSR_MIGRATION.md, Phase 1).
  */
 export default [
-  index('pages/Home.jsx'),
+  index('routes/home.tsx'),
 
   // ---- Public ----
-  route('films/:slug', 'pages/FilmDetail.jsx'),
+  // The six detail routes below use thin wrappers in src/routes/ that add a
+  // server `loader` + `meta` to build the SEO head. That replaces the meta
+  // injection api/seo.ts used to do via vercel.json rewrites — see
+  // src/lib/seo.server.ts.
+  route('films/:slug', 'routes/film-detail.tsx'),
   // Legacy singular alias. Same module, so it needs an explicit unique route id.
-  route('film/:slug', 'pages/FilmDetail.jsx', { id: 'film-detail-legacy-alias' }),
+  route('film/:slug', 'routes/film-detail.tsx', { id: 'film-detail-legacy-alias' }),
   route('search', 'pages/Search.jsx'),
   route('browse', 'pages/Browse.jsx'),
   route('tv-shows', 'pages/TVShows.jsx'),
-  route('watch/:platform', 'pages/WatchPlatform.jsx'),
+  route('watch/:platform', 'routes/watch-platform.tsx'),
   route('login', 'pages/Login.jsx'),
   route('signup', 'pages/Signup.jsx'),
   route('people', 'pages/PeopleList.jsx'),
-  route('people/:slug', 'pages/PersonDetail.jsx'),
+  route('people/:slug', 'routes/person-detail.tsx'),
   route('showtimes', 'pages/Showtimes.jsx'),
   route('cinemas', 'pages/Cinemas.jsx'),
-  route('cinemas/:id', 'pages/CinemaDetail.jsx'),
+  route('cinemas/:id', 'routes/cinema-detail.tsx'),
   route('channels', 'pages/Channels.jsx'),
-  route('channels/:slug', 'pages/ChannelDetail.jsx'),
+  route('channels/:slug', 'routes/channel-detail.tsx'),
   route('companies', 'pages/Companies.jsx'),
-  route('companies/:id', 'pages/CompanyDetail.jsx'),
+  route('companies/:id', 'routes/company-detail.tsx'),
   route('terms', 'pages/Terms.jsx'),
   route('privacy', 'pages/Privacy.jsx'),
   route('about', 'pages/About.jsx'),

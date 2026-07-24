@@ -144,15 +144,24 @@ ${maps.map(m => `  <sitemap><loc>${baseUrl}/sitemap-${m}.xml</loc></sitemap>`).j
       return res.status(404).send('Sitemap not found');
     }
 
-    // ---- SEO META + CONTENT INJECTION ----
+    // ---- SEO META + CONTENT INJECTION (RETIRED) ----
+    // This half used to serve /films/:slug, /people/:slug, /watch/:slug,
+    // /channels/:slug, /companies/:slug and /cinemas/:slug by reading
+    // dist/index.html and injecting meta + a synthetic crawlable <main>.
+    //
+    // Those routes are now server-rendered by React Router framework mode, which
+    // renders the *real* page and builds the head from each route's `meta`
+    // export (see src/lib/seo.server.ts — the meta/JSON-LD/robots rules were
+    // ported verbatim). The vercel.json rewrites that pointed here are gone, and
+    // framework mode no longer emits dist/index.html, so this path can no longer
+    // work. Only the sitemap half above is still live.
+    //
+    // Everything below this line is unreachable and should be deleted once the
+    // SSR cutover is confirmed in production — see docs/SSR_MIGRATION.md.
+    return res.status(404).send('Not found: SEO HTML rendering moved to the SSR app.');
+
+    // eslint-disable-next-line no-unreachable
     let html = '';
-    try {
-      const indexPath = join(process.cwd(), 'dist', 'index.html');
-      html = readFileSync(indexPath, 'utf8');
-    } catch (e) {
-      console.error('Failed to read dist/index.html:', e);
-      return res.status(500).send('Error loading base HTML');
-    }
 
     let title = 'MuviDB | The Ultimate African Film & Entertainment Database';
     let description = 'Discover African films, actors, and entertainment.';
