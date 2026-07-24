@@ -109,6 +109,46 @@ as a "duplicate cinemas" task.**
 | "Box Office Cinemas" | "Box Office Cinemas Pleasure Park" |
 | "Nova Cinema" | "Nova Cinema Abuja" |
 
+### ✅ Person-name matching — fuzzy suggestions added 2026-07-24
+Reported as "the name swap doesn't recognise CAPITAL LETTERS or close names like
+Bayo Adeniyi vs Adebayo Adeniyi". **Both halves of that were partly wrong — measured
+against production before changing anything:**
+
+- **Case was never broken.** `find_person_by_name` already returns the same id for
+  `Adebayo Adeniyi`, `ADEBAYO ADENIYI`, `adebayo adeniyi`, and the order swap
+  (`Adeniyi Adebayo`) already resolved correctly. What looked like a matching
+  failure is that the record is **stored** as `ADEBAYO ADENIYI` in all caps.
+  → **Separate open task: normalise shouty stored names.** Matching is fine.
+- **`Bayo Adeniyi` → `Adebayo Adeniyi` already worked — but only by accident**,
+  because `%bayo%` is a substring of `ADEBAYO`. Non-substring variants
+  (`Shola`/`Sola`) found nothing. That was the real gap.
+
+**Added** `supabase/migrations/20260724170000_suggest_similar_people.sql`:
+`suggest_similar_people(p_name, p_limit)` — pg_trgm similarity, plus an exact
+`name_key` (order-insensitive) match scored `1.0` as a certainty rather than a
+guess. It **never links or merges**; `find_person_by_name` stays strict so two
+different people are never silently merged.
+
+Verified live: `Bayo Adeniyi` → `Adeniyi Bayo` (1.00), `ADEBAYO ADENIYI` (0.73),
+`Bayo Adeniran` (0.59). Caps make no difference to results.
+
+Wired into `src/lib/peopleSearch.js`: new `suggestSimilarPeople()` export, and
+`searchPeopleByName` falls back to it **only when nothing matched**, so ranked
+results are never diluted by guesses and a missing RPC can't break a search box.
+
+> **Gotcha:** `pg_trgm` lives in Supabase's `extensions` schema, not `public`. An
+> unqualified `gin_trgm_ops` fails with "operator class does not exist for access
+> method gin"; the function also needs `extensions` on its `search_path` for
+> `similarity()` and `%`. First push failed on exactly this.
+
+**Still to do:** the credit-extractor / admin create-person flows don't call
+`suggestSimilarPeople()` yet — that is where it would prevent duplicates *at
+source*, rather than only helping someone who is already searching.
+
+**Live duplicate found, left for the owner:** `Adeniyi Bayo` (1 film) and
+`ADEBAYO ADENIYI` (8 films) are separate records and plausibly the same person.
+Not merged — that is a judgement call.
+
 ---
 
 ## Pending

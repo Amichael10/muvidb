@@ -11,6 +11,31 @@ const DEFAULT_SELECT = 'id, slug, name, photo_url, film_count, known_for_departm
  * - 2+ tokens: name_key equality (order-insensitive) UNION AND-of-tokens
  * Results ranked: exact fold → token-key swap → all tokens present → popularity
  */
+/**
+ * Fuzzy "did you mean…?" candidates — trigram similarity, plus an exact
+ * token-set (order-insensitive) match scored as 1.0.
+ *
+ * Deliberately separate from matching: this NEVER links or merges. Use it to
+ * offer suggestions before creating a new person. Authoritative matching stays
+ * with find_person_by_name(), which is strict on purpose so two different people
+ * are never silently merged.
+ *
+ * Catches what the substring search cannot: "Bayo Adeniyi" only finds
+ * "Adebayo Adeniyi" today because %bayo% happens to be a substring of it —
+ * "Shola" vs "Sola" finds nothing without this.
+ */
+export async function suggestSimilarPeople(query, { limit = 8 } = {}) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const { data, error } = await supabase.rpc('suggest_similar_people', {
+    p_name: q,
+    p_limit: limit,
+  });
+  // Suggestions are a nicety — never let a missing RPC break a search box.
+  if (error) return [];
+  return (data || []).map((p) => ({ ...p, _suggested: true }));
+}
+
 export async function searchPeopleByName(query, { limit = 24, select = DEFAULT_SELECT } = {}) {
   const q = String(query || '').trim();
   const tokens = personNameTokens(q);
@@ -58,6 +83,14 @@ export async function searchPeopleByName(query, { limit = 24, select = DEFAULT_S
       }
       addRows(data);
     }
+  }
+
+  // Nothing matched by exact/substring — fall back to fuzzy suggestions so a
+  // near-miss ("Shola" vs "Sola") surfaces an existing person instead of looking
+  // like a brand-new name. Only on empty results, so ranked matches are never
+  // diluted by guesses.
+  if (!seen.size) {
+    addRows(await suggestSimilarPeople(q, { limit }));
   }
 
   const qFold = foldPersonText(q);
