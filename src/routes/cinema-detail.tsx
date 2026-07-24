@@ -8,6 +8,7 @@ export async function loader({ params, request }: { params: any; request: Reques
   const base = baseUrlFrom(request);
   const { seo, status } = await cinemaSeo(String(params.id), base);
   return data({ seo }, {
+    status,
     headers: { 'Cache-Control': status === 200 ? CACHE_OK : CACHE_404 },
   });
 }

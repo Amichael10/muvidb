@@ -14,6 +14,7 @@ export async function loader({ params, request }: { params: any; request: Reques
   // One query serves both the SEO head and the page body — see filmSeo's select.
   const { seo, status, data: film } = await filmSeo(String(params.slug), base);
   return data({ seo, film }, {
+    status,
     headers: { 'Cache-Control': status === 200 ? CACHE_OK : CACHE_404 },
   });
 }

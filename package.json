@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "react-router dev --port=3001 --host=0.0.0.0",
     "build": "react-router build",
+    "build:ssr": "react-router build",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "start": "react-router-serve ./build/server/index.js",
+    "start:node": "node server/node-server.mjs",
+    "smoke:ssr": "node scripts/ssr_smoke.mjs",
+    "clean": "rm -rf dist build",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,7 +30,6 @@
     "fix-db": "tsx scripts/fix_db.ts",
     "db": "tsx scripts/query.ts",
     "recon": "tsx scripts/recon.ts",
-    "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc --noEmit"
   },
   "dependencies": {
@@ -36,6 +39,7 @@
     "@iconify/react": "^6.0.2",
     "@mendable/firecrawl-js": "^4.18.3",
     "@react-router/node": "^7.18.1",
+    "@react-router/serve": "^7.18.1",
     "@supabase/supabase-js": "^2.101.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
