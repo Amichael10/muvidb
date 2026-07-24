@@ -45,11 +45,9 @@ untouched. Service-role writes (cron, `api/_lib/supabase.ts`) bypass RLS, unaffe
 **Verified:** migration recorded remotely; `is_admin()` returns false for anon;
 reads still open; anon writes return 0 rows; types regenerated; `tsc` clean.
 
-> ⚠️ **Still needs a human check.** The hole was for *logged-in* users, and anon
-> never had access — so anon-key testing proves nothing about the actual fix.
-> Log in as an admin and confirm you can still create/edit/delete a film, and that
-> a normal (non-admin) logged-in account cannot. If admin writes break, look at
-> `is_admin()` — it reads `public.users.role`.
+> ✅ **Owner confirmed 2026-07-24:** admin login can still edit and save. The
+> hardening did not break admin writes. (Anon-key testing could never prove this —
+> the hole was for *logged-in* users, and anon never had access.)
 >
 > Several policies reported "does not exist, skipping": the real exposure was
 > narrower than the audit file assumed. Treat that inventory as approximate.
@@ -98,9 +96,10 @@ Read-only survey of production:
   (off) alongside "…Jabi Lake" (on). That is the intended end state.
 - 59 of 183 cinemas have `scrape_enabled = true`.
 
-**Left for the owner's judgement — 5 pairs where BOTH rows are enabled**, which
-could double-count showtimes. Not merged: these may be genuinely distinct branches,
-and deleting a real cinema is irreversible.
+**✅ Owner ruled 2026-07-24: these are DIFFERENT BRANCHES — do not delete or merge.**
+The 5 both-enabled pairs below are legitimately separate cinemas, so both rows
+scraping is correct, not double-counting. **This item is closed; do not reopen it
+as a "duplicate cinemas" task.**
 
 | | |
 |---|---|
