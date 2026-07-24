@@ -161,8 +161,9 @@ export default function AdminCreditsExtractor() {
   const [ocrLogs, setOcrLogs] = useState([]);
 
   // Upload/Image State
-  const [screenshotPreview, setScreenshotPreview] = useState(null);
-  const [screenshotBase64, setScreenshotBase64] = useState('');
+  // Multiple screenshots: a credit roll rarely fits in one frame. Each entry is
+  // { id, name, base64 }; extraction runs them in order and pools the rows.
+  const [screenshots, setScreenshots] = useState([]);
 
   // Roster Rows (editable)
   const [castRows, setCastRows] = useState([]);
@@ -301,20 +302,15 @@ export default function AdminCreditsExtractor() {
     }
   };
 
-  // Convert and compress uploaded image file to lightweight Base64
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (PNG/JPG).');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
+  // Compress one file to a lightweight Base64 JPEG.
+  const compressToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error(`${file.name} is not a readable image`));
+        img.onload = () => {
         // Target maximum dimension to keep OCR highly legible but extremely lightweight
         const MAX_WIDTH = 1200;
         const MAX_HEIGHT = 1200;
@@ -342,82 +338,164 @@ export default function AdminCreditsExtractor() {
 
         // Compress to high-quality JPEG (0.8 quality yields extremely small files ~100KB-200KB)
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-        setScreenshotPreview(compressedBase64);
-        setScreenshotBase64(compressedBase64);
-        
         const sizeKB = Math.round((compressedBase64.length * 3) / 4 / 1024);
-        console.log(`[OCR Harvester] Image compressed from ${Math.round(file.size / 1024)}KB down to ${sizeKB}KB (Resolution: ${width}x${height})`);
+        console.log(`[OCR Harvester] ${file.name}: ${Math.round(file.size / 1024)}KB -> ${sizeKB}KB (${width}x${height})`);
+          resolve(compressedBase64);
+        };
+        img.src = event.target.result;
       };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    });
+
+  // Accept several screenshots at once — a credit roll rarely fits in one frame.
+  const handleFileChange = async (e) => {
+    const picked = Array.from(e.target.files || []);
+    // Let the same file be chosen again after removal.
+    e.target.value = '';
+    if (!picked.length) return;
+
+    const images = picked.filter((f) => f.type.startsWith('image/'));
+    if (images.length < picked.length) {
+      toast.error(`Skipped ${picked.length - images.length} non-image file(s).`);
+    }
+    if (!images.length) return;
+
+    const results = await Promise.allSettled(images.map(compressToBase64));
+    const added = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        added.push({
+          id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+          name: images[i].name,
+          base64: r.value,
+        });
+      } else {
+        // One unreadable file must not discard the rest of the batch.
+        toast.error(r.reason?.message || `Could not process ${images[i].name}`);
+      }
+    });
+
+    if (added.length) {
+      setScreenshots((prev) => [...prev, ...added]);
+      toast.success(`Added ${added.length} image${added.length > 1 ? 's' : ''}.`);
+    }
   };
+
+  const removeScreenshot = (id) =>
+    setScreenshots((prev) => prev.filter((s) => s.id !== id));
 
   // Run Vision AI OCR to extract cast or crew
   const handleExtractCredits = async () => {
-    if (!screenshotBase64) {
-      toast.error('Please upload a screenshot first.');
+    if (!screenshots.length) {
+      toast.error('Please upload at least one screenshot first.');
       return;
     }
 
     setIsProcessingOCR(true);
-    setOcrLogs(['Parsing base64 image data...', 'Initializing Vision connection...', 'Running Gemini Flash OCR...']);
+    setOcrLogs([`Queued ${screenshots.length} image${screenshots.length > 1 ? 's' : ''} for extraction...`]);
+
+    // Rows already on screen — used to drop repeats, since consecutive frames of
+    // a credit roll usually overlap.
+    const existing = activeTab === 'cast' ? castRows : crewRows;
+    const dedupeKey = (n, r) =>
+      `${String(n || '').trim().toLowerCase()}|${String(r || '').trim().toLowerCase()}`;
+    const seenKeys = new Set(existing.map((r) => dedupeKey(r.name, r.roleOrCharacter)));
+
+    const newRows = [];
+    let failedImages = 0;
+    let duplicatesSkipped = 0;
 
     try {
-      const response = await fetch('/api/ai', {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify({
-          task: 'extract_credits_from_image',
-          data: {
-            image: screenshotBase64,
-            creditType: activeTab
-          }
-        })
-      });
+      // Sequential, not parallel: the Vision endpoint rotates API keys and
+      // parallel calls burn quota far faster than they save wall-clock time.
+      for (let i = 0; i < screenshots.length; i++) {
+        const shot = screenshots[i];
+        const label = `Image ${i + 1}/${screenshots.length}`;
+        setOcrLogs((prev) => [...prev, `🔍 ${label} (${shot.name}): running Vision OCR...`]);
 
-      if (!response.ok) {
-        const errJson = await response.json();
-        throw new Error(errJson.error || 'Server returned an error');
+        try {
+          const response = await fetch('/api/ai', {
+            method: 'POST',
+            headers: await authHeaders(),
+            body: JSON.stringify({
+              task: 'extract_credits_from_image',
+              data: { image: shot.base64, creditType: activeTab },
+            }),
+          });
+
+          if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(errJson.error || 'Server returned an error');
+          }
+
+          const resData = await response.json();
+          const extracted = resData.results || [];
+
+          if (!extracted.length) {
+            setOcrLogs((prev) => [...prev, `⚠️ ${label}: no credits found.`]);
+            continue;
+          }
+
+          let addedHere = 0;
+          extracted.forEach((item, idx) => {
+            const k = dedupeKey(item.name, item.role_or_character);
+            if (seenKeys.has(k)) { duplicatesSkipped++; return; }
+            seenKeys.add(k);
+            addedHere++;
+            newRows.push({
+              key: `${activeTab}-${i}-${idx}-${Date.now()}`,
+              name: item.name || '',
+              roleOrCharacter: item.role_or_character || '',
+              selected: true,
+              status: 'checking', // 'checking', 'matched', 'new'
+              matchId: null,
+              matchName: null,
+              photoUrl: null,
+              forceCreate: false,
+            });
+          });
+
+          setOcrLogs((prev) => [
+            ...prev,
+            `✅ ${label}: ${addedHere} new row${addedHere === 1 ? '' : 's'}` +
+              (extracted.length - addedHere > 0 ? ` (${extracted.length - addedHere} duplicate)` : ''),
+          ]);
+        } catch (err) {
+          // One bad image must never discard rows already harvested from others.
+          failedImages++;
+          console.error(`OCR Error on ${shot.name}:`, err);
+          setOcrLogs((prev) => [...prev, `❌ ${label} failed: ${err.message}`]);
+        }
       }
 
-      const resData = await response.json();
-      const extracted = resData.results || [];
-
-      if (!extracted.length) {
-        toast.error('Vision could not find any text listings in this screenshot. Please try a clearer crop.');
-        setOcrLogs(prev => [...prev, '❌ Extraction finished with 0 credits.']);
-        setIsProcessingOCR(false);
+      if (!newRows.length) {
+        toast.error(
+          failedImages === screenshots.length
+            ? 'Every image failed to process.'
+            : 'No new credits found — try a clearer crop.'
+        );
         return;
       }
 
-      // Map raw OCR records into row objects with a local unique key
-      const formattedRows = extracted.map((item, idx) => ({
-        key: `${activeTab}-${idx}-${Date.now()}`,
-        name: item.name || '',
-        roleOrCharacter: item.role_or_character || '',
-        selected: true,
-        status: 'checking', // 'checking', 'matched', 'new'
-        matchId: null,
-        matchName: null,
-        photoUrl: null,
-        forceCreate: false,
-      }));
-
+      // Verify against the full list so matching sees rows from every image.
+      const merged = [...existing, ...newRows];
       if (activeTab === 'cast') {
-        setCastRows(prev => [...prev, ...formattedRows]);
-        await runLiveProfileVerification([...castRows, ...formattedRows], setCastRows);
+        setCastRows(merged);
+        await runLiveProfileVerification(merged, setCastRows);
       } else {
-        setCrewRows(prev => [...prev, ...formattedRows]);
-        await runLiveProfileVerification([...crewRows, ...formattedRows], setCrewRows);
+        setCrewRows(merged);
+        await runLiveProfileVerification(merged, setCrewRows);
       }
 
-      toast.success(`Extracted ${extracted.length} credit entries!`);
-      setOcrLogs(prev => [...prev, `✅ Successfully parsed ${extracted.length} rows.`]);
+      const parts = [`Extracted ${newRows.length} credit entries`];
+      if (duplicatesSkipped) parts.push(`${duplicatesSkipped} duplicate skipped`);
+      if (failedImages) parts.push(`${failedImages} image failed`);
+      toast.success(`${parts.join(' · ')}!`);
+      setOcrLogs((prev) => [...prev, `✅ Done: ${newRows.length} rows from ${screenshots.length} image(s).`]);
     } catch (err) {
       console.error('OCR Error:', err);
       toast.error(`OCR Extraction failed: ${getFriendlyErrorMessage(err)}`);
-      setOcrLogs(prev => [...prev, `❌ Error: ${err.message}`]);
+      setOcrLogs((prev) => [...prev, `❌ Error: ${err.message}`]);
     } finally {
       setIsProcessingOCR(false);
     }
@@ -742,7 +820,7 @@ export default function AdminCreditsExtractor() {
 
           {/* Screenshot Upload Card */}
           <div className="card-cal p-6 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">2. Upload Credit Screen</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">2. Upload Credit Screens</h3>
             
             {/* Upload Area */}
             <div className="border-2 border-dashed border-border/80 hover:border-brand/40 rounded-xl p-6 transition-all flex flex-col items-center justify-center text-center cursor-pointer relative bg-surface-2/20 group">
@@ -751,29 +829,67 @@ export default function AdminCreditsExtractor() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 onChange={handleFileChange}
                 accept="image/*"
+                multiple
               />
-              {screenshotPreview ? (
-                <div className="space-y-3 w-full">
-                  <img src={screenshotPreview} alt="Credits Screenshot" className="max-h-48 object-contain rounded-lg mx-auto border border-border shadow-md" />
-                  <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest group-hover:text-brand transition-colors">Click to replace screenshot</p>
+              <div className="space-y-3">
+                <div className="w-12 h-12 bg-surface-2 border border-border rounded-full flex items-center justify-center mx-auto text-text-muted group-hover:scale-110 transition-transform shadow-sm">
+                  📷
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="w-12 h-12 bg-surface-2 border border-border rounded-full flex items-center justify-center mx-auto text-text-muted group-hover:scale-110 transition-transform shadow-sm">
-                    📷
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-text-primary">Drag or Drop Image</p>
-                    <p className="text-[10px] text-text-muted font-semibold uppercase tracking-widest mt-1">Supports PNG, JPG, JPEG</p>
-                  </div>
+                <div>
+                  <p className="text-sm font-bold text-text-primary">
+                    {screenshots.length ? 'Add more images' : 'Drag or drop images'}
+                  </p>
+                  <p className="text-[10px] text-text-muted font-semibold uppercase tracking-widest mt-1">
+                    PNG, JPG — select several at once
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
+
+            {/* Queued screenshots */}
+            {screenshots.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                    {screenshots.length} image{screenshots.length > 1 ? 's' : ''} queued
+                  </p>
+                  <button
+                    onClick={() => setScreenshots([])}
+                    disabled={isProcessingOCR}
+                    className="text-[10px] font-bold uppercase tracking-widest text-text-muted hover:text-red-400 transition-colors disabled:opacity-40"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {screenshots.map((shot, i) => (
+                    <div key={shot.id} className="relative group/thumb">
+                      <img
+                        src={shot.base64}
+                        alt={shot.name}
+                        className="h-20 w-full object-cover rounded-lg border border-border shadow-sm"
+                      />
+                      <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                        {i + 1}
+                      </span>
+                      <button
+                        onClick={() => removeScreenshot(shot.id)}
+                        disabled={isProcessingOCR}
+                        title={`Remove ${shot.name}`}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-black flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity shadow-lg disabled:hidden"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Run Extraction Button */}
             <button
               onClick={handleExtractCredits}
-              disabled={isProcessingOCR || !screenshotBase64}
+              disabled={isProcessingOCR || !screenshots.length}
               className="w-full bg-brand text-white font-black py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 disabled:opacity-40 disabled:hover:scale-100 flex items-center justify-center gap-2"
             >
               {isProcessingOCR ? (
@@ -782,7 +898,7 @@ export default function AdminCreditsExtractor() {
                   Harvesting Credits...
                 </>
               ) : (
-                '🚀 Run AI Vision Extraction'
+                `🚀 Run AI Vision Extraction${screenshots.length > 1 ? ` (${screenshots.length} images)` : ''}`
               )}
             </button>
 
