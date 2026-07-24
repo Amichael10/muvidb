@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -999,6 +999,9 @@ export type Database = {
           episode_number: number | null
           genres: string[] | null
           id: string
+          imdb_id: string | null
+          imdb_rating: number | null
+          imdb_vote_count: number | null
           is_featured: boolean | null
           is_in_cinemas: boolean | null
           is_nollywood: boolean | null
@@ -1056,6 +1059,9 @@ export type Database = {
           episode_number?: number | null
           genres?: string[] | null
           id?: string
+          imdb_id?: string | null
+          imdb_rating?: number | null
+          imdb_vote_count?: number | null
           is_featured?: boolean | null
           is_in_cinemas?: boolean | null
           is_nollywood?: boolean | null
@@ -1113,6 +1119,9 @@ export type Database = {
           episode_number?: number | null
           genres?: string[] | null
           id?: string
+          imdb_id?: string | null
+          imdb_rating?: number | null
+          imdb_vote_count?: number | null
           is_featured?: boolean | null
           is_in_cinemas?: boolean | null
           is_nollywood?: boolean | null
@@ -2409,6 +2418,10 @@ export type Database = {
         }
         Returns: string
       }
+      external_liked_pct: {
+        Args: { avg: number; votes: number }
+        Returns: number
+      }
       find_person_by_name: { Args: { p_name: string }; Returns: string }
       force_promote_to_admin: {
         Args: { user_email: string }
@@ -2435,6 +2448,9 @@ export type Database = {
           episode_number: number | null
           genres: string[] | null
           id: string
+          imdb_id: string | null
+          imdb_rating: number | null
+          imdb_vote_count: number | null
           is_featured: boolean | null
           is_in_cinemas: boolean | null
           is_nollywood: boolean | null
@@ -2540,6 +2556,22 @@ export type Database = {
           sim: number
         }[]
       }
+      merge_companies: {
+        Args: {
+          p_metadata?: Json
+          p_primary_id: string
+          p_secondary_id: string
+        }
+        Returns: undefined
+      }
+      merge_companies_group: {
+        Args: {
+          p_duplicate_ids: string[]
+          p_master_id: string
+          p_metadata?: Json
+        }
+        Returns: undefined
+      }
       merge_films: {
         Args: {
           p_metadata?: Json
@@ -2620,6 +2652,9 @@ export type Database = {
           episode_number: number | null
           genres: string[] | null
           id: string
+          imdb_id: string | null
+          imdb_rating: number | null
+          imdb_vote_count: number | null
           is_featured: boolean | null
           is_in_cinemas: boolean | null
           is_nollywood: boolean | null

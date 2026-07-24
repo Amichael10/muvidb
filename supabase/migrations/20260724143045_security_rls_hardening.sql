@@ -1,12 +1,16 @@
 -- =============================================================================
 -- SECURITY RLS HARDENING
 -- =============================================================================
--- Fixes a live vulnerability found in the RLS audit (2026-06-26): many content
--- tables had write policies named "admins can ..." whose actual rule was only
--- `auth.uid() IS NOT NULL` — i.e. ANY logged-in user could insert/update/DELETE
--- films, people, credits, the homepage Top 10, etc. Postgres OR's permissive
--- policies, so these loose policies also defeated the correct admin-only ones
--- sitting beside them.
+-- Promoted from the orphaned loose file sql/security_rls_hardening.sql, which
+-- was written after the 2026-06-26 RLS audit but never applied — loose .sql
+-- files in sql/ are not part of the migration pipeline, so this security fix
+-- sat unapplied in production. Content is unchanged from that file.
+--
+-- The vulnerability: many content tables had write policies *named* like
+-- "admins can ..." whose actual rule was only `auth.uid() IS NOT NULL` — i.e.
+-- ANY logged-in user could insert/update/DELETE films, people, credits, the
+-- homepage Top 10, etc. Postgres OR's permissive policies together, so these
+-- loose policies also defeated the correct admin-only ones sitting beside them.
 --
 -- This migration:
 --   1. adds an is_admin() helper,
@@ -16,11 +20,13 @@
 --   4. applies the real 5-minute edit/delete window on reviews.
 --
 -- Public SELECT policies are left untouched (reads stay open, including the
--- country-visibility logic on films/people/channels). Safe to re-run.
+-- country-visibility logic on films/people/channels). Idempotent, safe to re-run.
 --
--- Run once in the Supabase SQL editor. AFTER running, log in as an admin and
--- confirm you can still create/edit/delete a film, and that a normal user
--- account CANNOT (try editing a film id via the API and expect a 403/empty).
+-- Service-role writes (the cron sync, api/_lib/supabase.ts) bypass RLS entirely
+-- and are unaffected.
+--
+-- AFTER applying: log in as an admin and confirm you can still create/edit/delete
+-- a film, and that a normal (non-admin) logged-in account CANNOT.
 -- =============================================================================
 
 -- 1. Admin check helper (security definer so it can read public.users under RLS).
