@@ -1,23 +1,18 @@
-import { reactRouter } from '@react-router/dev/vite';
-import tailwindcss from '@tailwindcss/vite';
+﻿import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig(({ mode, isSsrBuild }) => {
+export default defineConfig(({ mode }) => {
   // loadEnv reads .env files; process.env catches Vercel-injected vars at build time.
   // We merge both so the build works locally (via .env) and on Vercel (via process.env).
   const env = { ...process.env, ...loadEnv(mode, '.', '') };
   return {
     plugins: [
-      // reactRouter() supplies React/JSX handling and Fast Refresh itself, so
-      // @vitejs/plugin-react must NOT also be registered — two React plugins
-      // conflict.
+      react(), 
       tailwindcss(),
-      reactRouter(),
-      // The service worker is built from the client bundle only; running the
-      // PWA plugin over the SSR build has nothing to precache.
-      !isSsrBuild && VitePWA({
+      VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         workbox: {
@@ -52,17 +47,26 @@ export default defineConfig(({ mode, isSsrBuild }) => {
           ]
         }
       })
-    ].filter(Boolean),
+    ],
     define: {
       // Expose Supabase connection vars to the browser bundle.
       // Priority: VITE_-prefixed (explicit) > plain (Vercel Supabase integration).
       'process.env.SUPABASE_URL':      JSON.stringify(env.VITE_SUPABASE_URL      || env.SUPABASE_URL      || ''),
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''),
     },
-    // NOTE: the previous manualChunks vendor-splitting is deliberately gone.
-    // Framework mode does its own route-level code splitting and shares a
-    // common chunk across routes; forcing manualChunks fights that and breaks
-    // the SSR build (the server bundle must stay a single module graph).
+    build: {
+      rollupOptions: {
+        output: {
+          // Split heavy, rarely-changing vendor code into cacheable chunks so the
+          // main bundle (and main-thread parse/exec cost) stays small.
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'supabase-vendor': ['@supabase/supabase-js'],
+            'motion-vendor': ['motion'],
+          },
+        },
+      },
+    },
     server: {
       port: 3001,
       host: '0.0.0.0',
@@ -131,7 +135,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
         },
         // Vercel functions don't run under `vite dev`, and once anon SELECT is
         // revoked on `credits` (anti-scraping) the browser can't read the table
-        // directly either — so local dev talks to the deployed endpoint.
+        // directly either ÔÇö so local dev talks to the deployed endpoint.
         '/api/content': {
           target: 'https://muvidb.com',
           changeOrigin: true,

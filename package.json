@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "react-router dev --port=3001 --host=0.0.0.0",
-    "build": "react-router build && node tooling/write_spa_index.mjs",
+    "dev": "vite --port=3001 --host=0.0.0.0",
+    "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -26,8 +26,7 @@
     "fix-db": "tsx scripts/fix_db.ts",
     "db": "tsx scripts/query.ts",
     "recon": "tsx scripts/recon.ts",
-    "start": "react-router-serve ./build/server/index.js",
-    "typecheck": "react-router typegen && tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^2.12.0",
