@@ -1,9 +1,17 @@
 {
-  "framework": "react-router",
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "build/client",
   "images": {
     "sizes": [16, 32, 48, 160, 256, 384, 640, 750, 828, 1080, 1280, 1920],
     "formats": ["image/webp"],
     "minimumCacheTTL": 86400
+  },
+  "functions": {
+    "api/ssr.ts": {
+      "includeFiles": "build/server/**",
+      "maxDuration": 60
+    }
   },
   "rewrites": [
     { "source": "/storage/v1/render/image/public/:path*", "destination": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/render/image/public/:path*" },
@@ -37,6 +45,8 @@
     { "source": "/sitemap-watch.xml", "destination": "/api/seo?type=sitemap&slug=watch" },
     { "source": "/sitemap-companies.xml", "destination": "/api/seo?type=sitemap&slug=companies" },
     { "source": "/sitemap-cinemas.xml", "destination": "/api/seo?type=sitemap&slug=cinemas" },
-    { "source": "/sitemap-channels.xml", "destination": "/api/seo?type=sitemap&slug=channels" }
+    { "source": "/sitemap-channels.xml", "destination": "/api/seo?type=sitemap&slug=channels" },
+
+    { "source": "/((?!api/).*)", "destination": "/api/ssr" }
   ]
 }
