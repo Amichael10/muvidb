@@ -243,9 +243,31 @@ so those routes would 500. Also `vercel.json` pins
       search results shouldn't be indexed anyway, so SSR buys no SEO. The wrapper
       adds the `noindex` the page never had — as a client-only route it inherited the
       site-wide `index, follow`, so every crawled `/search?q=` was an index candidate.
-- [ ] Remaining: FilmDetail/PersonDetail *body* data (their `meta` is already
-      server-side, but the page content still fetches client-side), PeopleList,
-      Channels, Companies, Cinemas, Showtimes, TVShows.
+- [x] **FilmDetail + PersonDetail** — bodies now server-rendered too, at **no extra
+      query cost**: `filmSeo`/`personSeo` already fetched these rows for the head, so
+      they now select the superset the pages render and the wrappers return the row
+      next to the `seo` payload.
+      The pages pass that row into `fetchFilm`/`fetchPerson` as `preloaded`, which
+      skips **only the primary query** — credits, episodes, related films, the
+      channel/YouTube fetches and the `increment_profile_views` write all still run
+      client-side. That write must stay client-side: in a loader, edge caching would
+      skew the counts. Seeding is one-shot per slug.
+      `filmSeo` keeps its `is_published` filter, so unpublished films aren't seeded
+      and fall back to the client fetch (which has no such filter) — unchanged
+      behaviour, and they stay out of the index.
+- [ ] Remaining: PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows.
+
+**Two traps this uncovered — expect both again on the remaining pages:**
+- `ShareAction` read `window.location`/`document.title` during render and **500'd**
+  the server the moment a real page body was rendered. It had never been
+  server-rendered before, because these pages only ever reached the server as a
+  skeleton. Any component that only appears inside a loaded page body is untested
+  under SSR — grep for `window.`/`document.` outside effects before converting one.
+- FilmDetail, PersonDetail and WatchPlatform each rendered a `<Helmet>` block that
+  duplicated the route `meta`, emitting **two `<title>` tags per page**. All removed;
+  the route `meta` supersedes them and carries the better SEO titles plus canonical,
+  robots and JSON-LD. **If you convert a page, check it for `<Helmet>` too.** The
+  only Helmet left is in the dead `src/main.tsx`.
 
 **Pattern for the remaining pages** (all three steps needed — the first alone does
 nothing visible):
