@@ -1,10 +1,5 @@
 {
   "framework": "react-router",
-  "functions": {
-    "api/**/*.ts": {
-      "maxDuration": 60
-    }
-  },
   "images": {
     "sizes": [16, 32, 48, 160, 256, 384, 640, 750, 828, 1080, 1280, 1920],
     "formats": ["image/webp"],
