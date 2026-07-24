@@ -95,9 +95,11 @@ export function getProxiedImageUrl(originalUrl, opts = {}) {
     }
 
     if (host && !FRIENDLY_HOST.test(host)) {
-      const mediaUrl = `/api/media?url=${encodeURIComponent(normalized)}`;
-      if (!width) return mediaUrl;
-      return `/_vercel/image?url=${encodeURIComponent(mediaUrl)}&w=${width}&q=${quality}`;
+      // Route through our media proxy. Do NOT wrap in /_vercel/image — Vercel
+      // image optimization rejects relative /api/media URLs
+      // (INVALID_IMAGE_OPTIMIZE_REQUEST), which blanked person photos on
+      // PersonDetail (width={512}) while PersonCard (raw src) still worked.
+      return `/api/media?url=${encodeURIComponent(normalized)}`;
     }
   }
 

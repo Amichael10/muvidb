@@ -220,6 +220,15 @@ export default function Root() {
   );
 }
 
+/** Shown while the client hydrates deferred UI — must not replace SSR HTML permanently. */
+export function HydrateFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bg text-text-secondary text-sm">
+      Loading…
+    </div>
+  );
+}
+
 export function ErrorBoundary({ error }: { error: unknown }) {
   const message = isRouteErrorResponse(error)
     ? error.status === 404

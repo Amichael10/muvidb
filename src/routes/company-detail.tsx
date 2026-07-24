@@ -9,6 +9,7 @@ export async function loader({ params, request }: { params: any; request: Reques
   // Route param is :id but may be a slug or a uuid — companySeo handles both.
   const { seo, status } = await companySeo(String(params.id), base);
   return data({ seo }, {
+    status,
     headers: { 'Cache-Control': status === 200 ? CACHE_OK : CACHE_404 },
   });
 }

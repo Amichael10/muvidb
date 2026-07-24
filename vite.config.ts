@@ -18,6 +18,14 @@ export default defineConfig(({ mode }) => {
         workbox: {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
           cleanupOutdatedCaches: true, // purge old precaches so stale chunks don't linger
+          // SSR has no static index.html navigate target — never fall back to a SPA shell.
+          navigateFallback: null,
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+              handler: 'NetworkOnly',
+            },
+          ],
         },
         manifest: {
           name: 'MuviDB | African Cinema Database',

@@ -498,7 +498,7 @@ const PersonDetail = () => {
           <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
             <div className="flex-shrink-0 relative">
               <ImageWithFallback
-                src={person.photo_url}
+                src={person.photo_url || person.photo}
                 alt={formatPersonName(person.name)}
                 fallbackType="avatar"
                 name={formatPersonName(person.name)}

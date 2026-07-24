@@ -9,6 +9,7 @@ export async function loader({ params, request }: { params: any; request: Reques
   // Purely static per platform — no DB round-trip needed.
   const { seo, status } = watchSeo(String(params.platform), base);
   return data({ seo }, {
+    status,
     headers: { 'Cache-Control': status === 200 ? CACHE_OK : CACHE_404 },
   });
 }
