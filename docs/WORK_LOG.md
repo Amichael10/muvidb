@@ -115,7 +115,41 @@ as a "duplicate cinemas" task.**
 
 Ordered by my recommendation.
 
-### 1. SSR migration — parked on branch `ssr-phase-1` (`6b03941`)
+### 1. SSR migration — parked on branch `ssr-phase-1` (now `6beac43`)
+
+**IN PROGRESS — experiment awaiting a preview-deploy result.**
+
+Before rewriting seven endpoints on an unverified diagnosis, `6beac43` tests the
+cheaper hypothesis. Two mechanisms could explain why every `/api/*` route returned
+the SSR shell in production, and they have very different fixes:
+
+- **(a)** Vercel never builds `api/` once a framework owns the Build Output API
+  output → declaring the functions explicitly fixes it (one config line).
+- **(b)** The functions build but are shadowed by the SSR catch-all → routing fix,
+  or convert all seven endpoints to React Router **resource routes** (large).
+
+`6beac43` adds `"functions": { "api/**/*.ts": { "maxDuration": 60 } }` to test (a).
+
+**Result so far: `/api/health` on the preview still returns `text/html` after ~6
+minutes of polling — but this is NOT yet conclusive.** I could not confirm the
+preview actually built that commit. If Vercel rejects a `functions` declaration
+alongside a Build Output API framework, the *build fails* and the branch alias keeps
+serving the previous (broken) deployment — indistinguishable from "the fix didn't
+work" when probing from outside.
+
+**→ NEXT: check the Vercel dashboard for the `ssr-phase-1` preview of commit
+`6beac43`.**
+- Build **failed** → hypothesis (a) is ruled out by config incompatibility; the log
+  will say why. Go to resource routes.
+- Build **succeeded** and `/api/*` still serves HTML → hypothesis (b). Go to
+  resource routes.
+- Build succeeded and `/api/*` returns JSON → **(a) confirmed, no rewrite needed.**
+
+Verify by **content-type**, never status code — the SSR shell returns 200.
+
+---
+
+Prior state of this item (still accurate):
 Code-complete through Phase 3 (Home hero, Browse, Search, FilmDetail, PersonDetail
 + the six detail routes' SEO). **Cannot merge as-is.**
 
