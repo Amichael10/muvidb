@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatViewCount } from '../utils/youtube';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -129,14 +129,21 @@ function ChannelSkeleton() {
 }
 
 export default function Channels() {
-  const [channels, setChannels] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const loaderData = useLoaderData();
+  const seeded = !!loaderData?.seeded && (loaderData.channels?.length ?? 0) > 0;
+  const [channels, setChannels] = useState(loaderData?.channels ?? []);
+  const [loading, setLoading] = useState(!seeded);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchInput, setSearchInput] = useState('');
+  const skipInitialFetch = useRef(seeded);
 
   useEffect(() => {
-    document.title = 'MuviDB | YouTube Channels';
+    // Title comes from the route `meta` export — do not overwrite after hydrate.
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchChannels();
   }, [search, activeCategory]);
 

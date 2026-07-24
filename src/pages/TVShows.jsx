@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, Link, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Icon } from '@iconify/react';
 import FilmCard from '../components/film/FilmCard';
@@ -22,21 +22,24 @@ const PLATFORM_OPTIONS = [
 
 export default function TVShows() {
   const [searchParams] = useSearchParams();
-  const [shows, setShows] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const loaderData = useLoaderData();
+  const urlPlatform = searchParams.get('platform') || '';
+  const seeded =
+    !!loaderData?.seeded &&
+    (loaderData.shows?.length ?? 0) > 0 &&
+    (loaderData.platform || '') === urlPlatform;
+  const [shows, setShows] = useState(seeded ? (loaderData.shows ?? []) : []);
+  const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState(null);
-  const [selectedPlatform, setSelectedPlatform] = useState(searchParams.get('platform') || '');
+  const [selectedPlatform, setSelectedPlatform] = useState(urlPlatform);
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(seeded ? (loaderData.totalCount ?? 0) : 0);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 48;
-
-  useEffect(() => {
-    document.title = 'MuviDB | TV Shows';
-  }, []);
+  const skipInitialFetch = useRef(seeded);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -46,6 +49,10 @@ export default function TVShows() {
   }, [searchQuery]);
 
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
     setPage(0);
     fetchShows(0);
   }, [selectedPlatform, sortBy, debouncedSearchQuery]);

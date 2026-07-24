@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { SuggestPersonModal } from '../components/contribute/ContributeModals'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
@@ -133,9 +133,11 @@ const PersonSkeleton = () => (
 
 const PeopleList = () => {
   const { user } = useAuth()
+  const loaderData = useLoaderData()
+  const seeded = !!loaderData?.seeded && (loaderData.people?.length ?? 0) > 0
   const [showSuggest, setShowSuggest] = useState(false)
-  const [people, setPeople] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [people, setPeople] = useState(loaderData?.people ?? [])
+  const [loading, setLoading] = useState(!seeded)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -153,8 +155,13 @@ const PeopleList = () => {
 
   const PAGE_SIZE = 20
   const roles = PEOPLE_ROLE_FILTERS
+  const skipInitialFetch = useRef(seeded)
 
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false
+      return
+    }
     setPeople([])
     setPage(0)
     setHasMore(true)

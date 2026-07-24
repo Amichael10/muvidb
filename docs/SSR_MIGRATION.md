@@ -273,7 +273,8 @@ so those routes would 500. Also `vercel.json` pins
       `filmSeo` keeps its `is_published` filter, so unpublished films aren't seeded
       and fall back to the client fetch (which has no such filter) — unchanged
       behaviour, and they stay out of the index.
-- [ ] Remaining: PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows.
+- [x] Remaining: PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows
+      (wrappers + seeded loading, 2026-07-24).
 
 **Two traps this uncovered — expect both again on the remaining pages:**
 - `ShareAction` read `window.location`/`document.title` during render and **500'd**

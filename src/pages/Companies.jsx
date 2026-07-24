@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
@@ -97,12 +97,19 @@ const CompanySkeleton = () => (
 )
 
 const Companies = () => {
-  const [companies, setCompanies] = useState([])
-  const [filmCounts, setFilmCounts] = useState({})
-  const [loading, setLoading] = useState(true)
+  const loaderData = useLoaderData()
+  const seeded = !!loaderData?.seeded && (loaderData.companies?.length ?? 0) > 0
+  const [companies, setCompanies] = useState(loaderData?.companies ?? [])
+  const [filmCounts, setFilmCounts] = useState(loaderData?.filmCounts ?? {})
+  const [loading, setLoading] = useState(!seeded)
   const [search, setSearch] = useState('')
+  const skipInitialFetch = useRef(seeded)
 
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false
+      return
+    }
     fetchCompanies()
   }, [])
 

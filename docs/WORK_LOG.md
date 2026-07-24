@@ -8,12 +8,12 @@ Companion doc: `docs/SSR_MIGRATION.md` (the SSR effort has its own detailed plan
 
 **Last updated:** 2026-07-24 (evening) — invert-SSR live on `muvidb.com`.
 
-**Where we stopped:** Production is on `main` @ `f95cd26` (same tip as `staging`).
-Invert-SSR is live and smoked. Next optional work: remaining Phase 3 list pages
-(PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows), and/or scale off
-Hobby via `server/node-server.mjs` + `docs/SSR_SCALE.md` if function limits bite.
-Do **not** set the Vercel dashboard Framework Preset to “React Router” — leave
-**Other / None** so `vercel.json` `"framework": null` stays in force.
+**Where we stopped:** Production is on `main` with invert-SSR. Phase 3 public
+list pages (`/people`, `/channels`, `/companies`, `/cinemas`, `/showtimes`,
+`/tv-shows`) now have loaders + meta — ship after smoke. Admin/auth stay
+client-side. Optional next: scale path (`docs/SSR_SCALE.md`) if Hobby limits
+bite. Do **not** set Vercel Framework Preset to “React Router” — leave
+**Other / None**.
 
 ---
 
@@ -95,6 +95,17 @@ Person hero img    → src="/api/media?url=…" and that URL returns image/*
 ```
 
 Verified 2026-07-24 on staging preview and on **https://muvidb.com**.
+
+#### ✅ Phase 3 list pages — loaders + meta (2026-07-24)
+
+Same invert packaging. Added route wrappers and seeded each page’s `loading`
+flag from `useLoaderData` (skeleton-on-server was the trap):
+
+`/people`, `/channels`, `/companies`, `/cinemas`, `/showtimes`, `/tv-shows`.
+
+Removed `document.title` effects on Channels/Cinemas/TVShows (route `meta`
+owns the title). Showtimes seeds Lagos `selectedDate` from the loader to
+reduce hydration drift.
 
 Scale path (not required yet): `server/node-server.mjs`, `Dockerfile`,
 `npm run smoke:ssr`, `docs/SSR_SCALE.md`.
@@ -267,14 +278,23 @@ credit roll rarely fits in one frame.
 
 Ordered by recommendation.
 
-### 1. SSR — remaining Phase 3 list pages (optional polish)
+### 1. SSR — remaining Phase 3 list pages ✅ DONE (2026-07-24)
 
-Invert packaging is **live**. Still not SSR’d as first-class route modules (or only
-thinly): PeopleList, Channels, Companies, Cinemas, Showtimes, TVShows. Detail
-routes + Home/Browse/Search/Film/Person already ship HTML + SEO loaders.
+All six public list pages now have route wrappers with `loader` + `meta` +
+edge cache, and seed `loading=false` from `useLoaderData` so the server HTML
+is the real grid (not a skeleton):
 
-Open product decision (unchanged): thin/missing entities return `200` + `noindex`
-where old `api/seo.ts` document SEO returned `404`. See `docs/SSR_MIGRATION.md`.
+| Route | Wrapper |
+|---|---|
+| `/people` | `src/routes/people-list.tsx` |
+| `/channels` | `src/routes/channels-list.tsx` |
+| `/companies` | `src/routes/companies-list.tsx` |
+| `/cinemas` | `src/routes/cinemas-list.tsx` |
+| `/showtimes` | `src/routes/showtimes.tsx` |
+| `/tv-shows` | `src/routes/tv-shows.tsx` |
+
+Admin/auth and thin static pages (About, Contact, Terms, Privacy, Waitlist,
+Login, Signup, Dashboard, Admin) stay client-side by design.
 
 ### 2. Scale off Vercel Hobby if limits bite (optional)
 

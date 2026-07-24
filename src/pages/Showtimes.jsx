@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
@@ -158,15 +158,19 @@ const CinemaList = ({ filmCinemas }) => {
 }
 
 const Showtimes = () => {
-
-    const [showtimes, setShowtimes] = useState([])
-    const [loading, setLoading] = useState(true)
+    const loaderData = useLoaderData()
+    const seeded = !!loaderData?.seeded && (loaderData.showtimes?.length ?? 0) > 0
+    const [showtimes, setShowtimes] = useState(loaderData?.showtimes ?? [])
+    const [loading, setLoading] = useState(!seeded)
     const [currentTime, setCurrentTime] = useState(() => new Date())
     const [selectedCity, setSelectedCity] = useState('All')
-    const [selectedDate, setSelectedDate] = useState(() => getZonedClock().date)
+    const [selectedDate, setSelectedDate] = useState(
+      () => loaderData?.selectedDate || getZonedClock().date
+    )
     const [selectedCinema, setSelectedCinema] = useState('All')
     const [selectedFormat, setSelectedFormat] = useState('All')
-    const [cinemas, setCinemas] = useState([])
+    const [cinemas, setCinemas] = useState(loaderData?.cinemas ?? [])
+    const skipInitialFetch = useRef(seeded)
 
     const cities = ['All', 'Lagos', 'Abuja', 'Port Harcourt']
     const formats = ['All', 'Standard', 'IMAX', '3D', '4DX', 'Dolby']
@@ -174,8 +178,12 @@ const Showtimes = () => {
     const next7Days = getNext7Dates(currentTime)
 
     useEffect(() => {
-        fetchShowtimes()
-        fetchCinemas()
+        if (skipInitialFetch.current) {
+            skipInitialFetch.current = false
+        } else {
+            fetchShowtimes()
+            fetchCinemas()
+        }
 
         const clockRefresh = window.setInterval(() => {
             setCurrentTime(new Date())

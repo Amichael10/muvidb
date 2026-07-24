@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
@@ -116,17 +116,24 @@ const CinemaSkeleton = () => (
 )
 
 const Cinemas = () => {
-  const [cinemas, setCinemas] = useState([])
-  const [showCounts, setShowCounts] = useState({})
-  const [loading, setLoading] = useState(true)
+  const loaderData = useLoaderData()
+  const seeded = !!loaderData?.seeded && (loaderData.cinemas?.length ?? 0) > 0
+  const [cinemas, setCinemas] = useState(loaderData?.cinemas ?? [])
+  const [showCounts, setShowCounts] = useState(loaderData?.showCounts ?? {})
+  const [loading, setLoading] = useState(!seeded)
   const [selectedCity, setSelectedCity] = useState('All')
   const [selectedChain, setSelectedChain] = useState('All')
   const [search, setSearch] = useState('')
+  const skipInitialFetch = useRef(seeded)
 
   const CHAINS = ['All', 'Filmhouse', 'Genesis', 'Silverbird', 'Ozone', 'Blu Star', 'Kada', 'Viva']
 
   useEffect(() => {
-    document.title = 'MuviDB | Cinemas'
+    // Title comes from the route `meta` export.
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false
+      return
+    }
     fetchCinemas()
   }, [])
 
