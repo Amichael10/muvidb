@@ -9,8 +9,9 @@
   },
   "functions": {
     "api/ssr.ts": {
-      "includeFiles": "build/server/**",
-      "maxDuration": 60
+      "includeFiles": "build/**",
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "rewrites": [
