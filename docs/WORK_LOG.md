@@ -6,14 +6,16 @@ any agent or developer can pick up without the originating conversation.
 
 Companion doc: `docs/SSR_MIGRATION.md` (the SSR effort has its own detailed plan).
 
-**Last updated:** 2026-07-24 (evening) — invert-SSR live on `muvidb.com`.
+**Last updated:** 2026-07-24 (late evening) — public SSR Phase 3 complete.
 
-**Where we stopped:** Production is on `main` with invert-SSR. Phase 3 public
-list pages (`/people`, `/channels`, `/companies`, `/cinemas`, `/showtimes`,
-`/tv-shows`) now have loaders + meta — ship after smoke. Admin/auth stay
-client-side. Optional next: scale path (`docs/SSR_SCALE.md`) if Hobby limits
-bite. Do **not** set Vercel Framework Preset to “React Router” — leave
-**Other / None**.
+**Where we stopped:** Public SSR work is **done**. Production `main` @ `aac5051`
+(same tip as `staging`): invert packaging + Home/Browse/Search + all detail
+routes + all six public list pages. Smoked live on `muvidb.com`.
+
+Admin/auth and thin static pages stay client-side **by design** (not unfinished
+SSR). Next non-SSR work is the data-quality / housekeeping queue below. Optional
+scale path: `docs/SSR_SCALE.md` only if Hobby limits hurt. Do **not** set the
+Vercel Framework Preset to “React Router” — leave **Other / None**.
 
 ---
 
@@ -21,8 +23,8 @@ bite. Do **not** set Vercel Framework Preset to “React Router” — leave
 
 ### ✅ Invert-SSR packaging — LIVE on production (2026-07-24)
 
-**Branches / tip:** `ssr-once-and-for-all` → merged `staging` → fast-forwarded
-`main` @ `f95cd26`. Companion detail: `docs/SSR_MIGRATION.md`, `docs/SSR_SCALE.md`.
+**Branches / tip:** `ssr-once-and-for-all` → `staging` → `main` @ `aac5051`.
+Companion detail: `docs/SSR_MIGRATION.md`, `docs/SSR_SCALE.md`.
 
 #### What blocked SSR (the real outage)
 
@@ -96,16 +98,29 @@ Person hero img    → src="/api/media?url=…" and that URL returns image/*
 
 Verified 2026-07-24 on staging preview and on **https://muvidb.com**.
 
-#### ✅ Phase 3 list pages — loaders + meta (2026-07-24)
+#### ✅ Phase 3 list pages — loaders + meta (2026-07-24, `aac5051`)
 
-Same invert packaging. Added route wrappers and seeded each page’s `loading`
-flag from `useLoaderData` (skeleton-on-server was the trap):
+Public SSR Phase 3 is complete. Route wrappers + `loader`/`meta`/edge cache;
+pages seed `loading=false` from `useLoaderData` so the server HTML is the real
+grid (skeleton-on-server was the trap):
 
-`/people`, `/channels`, `/companies`, `/cinemas`, `/showtimes`, `/tv-shows`.
+| Route | Wrapper |
+|---|---|
+| `/people` | `src/routes/people-list.tsx` |
+| `/channels` | `src/routes/channels-list.tsx` |
+| `/companies` | `src/routes/companies-list.tsx` |
+| `/cinemas` | `src/routes/cinemas-list.tsx` |
+| `/showtimes` | `src/routes/showtimes.tsx` |
+| `/tv-shows` | `src/routes/tv-shows.tsx` |
+
+Already done earlier in Phase 3: Home, Browse, Search (meta-only), Film/Person
+detail, Watch platform, Cinema/Channel/Company detail.
 
 Removed `document.title` effects on Channels/Cinemas/TVShows (route `meta`
-owns the title). Showtimes seeds Lagos `selectedDate` from the loader to
-reduce hydration drift.
+owns the title). Showtimes seeds Lagos `selectedDate` from the loader.
+
+**Verified live:** each list URL returns large HTML with correct `<title>` and
+seeded cards (not skeletons). Admin/auth/static stay client-side on purpose.
 
 Scale path (not required yet): `server/node-server.mjs`, `Dockerfile`,
 `npm run smoke:ssr`, `docs/SSR_SCALE.md`.
@@ -276,27 +291,10 @@ credit roll rarely fits in one frame.
 
 ## Pending
 
-Ordered by recommendation.
+Public SSR is complete. Remaining items are non-SSR product/data work unless
+Hobby limits force a host move.
 
-### 1. SSR — remaining Phase 3 list pages ✅ DONE (2026-07-24)
-
-All six public list pages now have route wrappers with `loader` + `meta` +
-edge cache, and seed `loading=false` from `useLoaderData` so the server HTML
-is the real grid (not a skeleton):
-
-| Route | Wrapper |
-|---|---|
-| `/people` | `src/routes/people-list.tsx` |
-| `/channels` | `src/routes/channels-list.tsx` |
-| `/companies` | `src/routes/companies-list.tsx` |
-| `/cinemas` | `src/routes/cinemas-list.tsx` |
-| `/showtimes` | `src/routes/showtimes.tsx` |
-| `/tv-shows` | `src/routes/tv-shows.tsx` |
-
-Admin/auth and thin static pages (About, Contact, Terms, Privacy, Waitlist,
-Login, Signup, Dashboard, Admin) stay client-side by design.
-
-### 2. Scale off Vercel Hobby if limits bite (optional)
+### 1. Scale off Vercel Hobby if limits bite (optional)
 
 `server/node-server.mjs` + `Dockerfile` + `docs/SSR_SCALE.md` are ready. Do not
 migrate hosts preemptively — only if cold starts / function caps become real pain.
