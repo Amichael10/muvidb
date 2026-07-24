@@ -1,71 +1,41 @@
-import { createRequestHandler } from '@react-router/node';
+/**
+ * SSR entry — currently unused by vercel.json (pages go to /index.html)
+ * after FUNCTION_INVOCATION_FAILED on every document request.
+ *
+ * Kept minimal so enabling `/api/ssr` again cannot take the site down while
+ * we debug the React Router server-build load on Vercel.
+ *
+ * To re-enable: point the catch-all rewrite at `/api/ssr` and restore the
+ * createRequestHandler + build/server import (see git history).
+ */
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
-/**
- * Inverted packaging (docs/WORK_LOG.md): this function serves RR SSR while the
- * other api/*.ts functions stay normal Vercel Node functions.
- *
- * IMPORTANT: the server build must be resolvable AND its imports (react, etc.)
- * must be traced into this function. Prefer a static import when the file
- * exists at build time; fall back to runtime load + SPA shell if SSR fails
- * so hard-refresh never 500s the whole site.
- */
-
-async function loadServerBuild() {
-  // Static relative import path — resolved after `npm run build` on Vercel.
-  // Dynamic-only import() was crashing because NFT did not pull react/etc.
-  // into the function bundle.
-  try {
-    // @ts-expect-error built artifact, not in TS project
-    return await import('../build/server/index.js');
-  } catch (staticErr) {
-    const candidates = [
-      path.join(process.cwd(), 'build', 'server', 'index.js'),
-      path.join(process.cwd(), '..', 'build', 'server', 'index.js'),
-    ];
-    for (const file of candidates) {
-      if (fs.existsSync(file)) {
-        return import(pathToFileURL(file).href);
-      }
-    }
-    throw staticErr;
-  }
-}
-
-function spaFallback(): Response {
+function readIndexHtml(): Buffer | null {
   const candidates = [
     path.join(process.cwd(), 'build', 'client', 'index.html'),
     path.join(process.cwd(), 'index.html'),
   ];
   for (const file of candidates) {
-    if (fs.existsSync(file)) {
-      return new Response(fs.readFileSync(file), {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store',
-        },
-      });
-    }
+    if (fs.existsSync(file)) return fs.readFileSync(file);
   }
-  return new Response(
-    '<!doctype html><html><body><p>MuviDB is warming up. <a href="/">Retry</a></p><script>location.replace("/")</script></body></html>',
-    { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-  );
+  return null;
 }
 
-const handler = createRequestHandler(
-  () => loadServerBuild(),
-  process.env.NODE_ENV || 'production',
-);
-
-export default async function ssr(request: Request): Promise<Response> {
-  try {
-    return await handler(request);
-  } catch (err) {
-    console.error('[api/ssr] handler failed, serving SPA shell:', err);
-    return spaFallback();
+export default async function ssr(_request: Request): Promise<Response> {
+  const html = readIndexHtml();
+  if (!html) {
+    return new Response(
+      'SSR shell missing (build/client/index.html). Check includeFiles.',
+      { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } },
+    );
   }
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-MuviDB-SSR': 'spa-shell',
+    },
+  });
 }

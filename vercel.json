@@ -48,6 +48,9 @@
     { "source": "/sitemap-cinemas.xml", "destination": "/api/seo?type=sitemap&slug=cinemas" },
     { "source": "/sitemap-channels.xml", "destination": "/api/seo?type=sitemap&slug=channels" },
 
-    { "source": "/((?!api/).*)", "destination": "/api/ssr" }
+    // Temporary: serve the client shell directly. /api/ssr was FUNCTION_INVOCATION_FAILED
+    // on every document request (module crash before any fallback). Static index.html
+    // restores the site; SSR reattach is a follow-up once the function loads cleanly.
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
