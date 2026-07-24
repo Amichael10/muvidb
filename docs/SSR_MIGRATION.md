@@ -223,7 +223,43 @@ so those routes would 500. Also `vercel.json` pins
 - [ ] Verify: `curl` the homepage → HTML contains the film grid; TTFB fast; no client
       Supabase call needed for first paint. Compare before/after.
 
-### Phase 3 — Page by page
+### Phase 3 — progress
+
+- [x] **Browse** — full loader + edge cache (`src/routes/browse.tsx`). Server-renders
+      the first 50 results, cached per URL; the param space is bounded
+      (`genre`/`country`/`sort`/`platform`) so the cache stays effective. Verified
+      `?genre=Drama&sort=rating` shares **zero** results with the unfiltered page and
+      an unknown genre returns none — the inner join and sort really apply.
+      Only URL-derived filters can be server-rendered; the rest of Browse's filter
+      state lives in component state, not the URL, so it stays client-side. The page
+      seeds from the loader and skips only its on-mount fetch (via a ref).
+      **Known duplication:** the loader restates Browse.jsx's query instead of sharing
+      a builder, because one uses the browser client and the other the service-role
+      one. Worth folding into a single builder that takes a client — if you change
+      `fetchFilms`, change the loader too.
+- [x] **Search** — `meta` only, **no loader, deliberately**. The query space is
+      unbounded, so each distinct `?q=` would be a cache miss putting a
+      user-controlled workload on the slow DB (and a cheap scraping lever), and
+      search results shouldn't be indexed anyway, so SSR buys no SEO. The wrapper
+      adds the `noindex` the page never had — as a client-only route it inherited the
+      site-wide `index, follow`, so every crawled `/search?q=` was an index candidate.
+- [ ] Remaining: FilmDetail/PersonDetail *body* data (their `meta` is already
+      server-side, but the page content still fetches client-side), PeopleList,
+      Channels, Companies, Cinemas, Showtimes, TVShows.
+
+**Pattern for the remaining pages** (all three steps needed — the first alone does
+nothing visible):
+1. Add `src/routes/<page>.tsx` re-exporting the page as default, plus `loader`,
+   `meta`, `headers`; point `src/routes.ts` at it.
+2. Seed the page's state from `useLoaderData()`.
+3. **Seed the page's `loading`/skeleton flag too.** Every page here gates render on a
+   `loading` boolean that starts `true`; leave it and the server renders a skeleton
+   and SSR gains nothing. This has bitten three times now (AuthContext,
+   `isHeroLoading`, Browse's `loading`).
+Also delete any `document.title = …` effect — the `meta` export owns the title, and
+the effect overwrites the server-rendered one after hydration.
+
+### Phase 3 — original plan
 Order by traffic/value: Browse → Film detail → Person detail → the rest. Each: move
 `useEffect` fetch → `loader`, add caching, verify. Admin/auth pages may stay client-side.
 
