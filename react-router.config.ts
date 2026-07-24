@@ -8,5 +8,5 @@ export default {
   // ~50 page components stay where they are.
   appDirectory: 'src',
   // No vercelPreset(): that triggers Build Output API takeover and zeroes out
-  // api/ detection. SSR is served by api/ssr.ts instead (see docs/WORK_LOG.md).
+  // api/ detection. See docs/WORK_LOG.md invert-fix.
 } satisfies Config;
