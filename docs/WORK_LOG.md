@@ -130,22 +130,50 @@ the SSR shell in production, and they have very different fixes:
 
 `6beac43` adds `"functions": { "api/**/*.ts": { "maxDuration": 60 } }` to test (a).
 
-**Result so far: `/api/health` on the preview still returns `text/html` after ~6
-minutes of polling — but this is NOT yet conclusive.** I could not confirm the
-preview actually built that commit. If Vercel rejects a `functions` declaration
-alongside a Build Output API framework, the *build fails* and the branch alias keeps
-serving the previous (broken) deployment — indistinguishable from "the fix didn't
-work" when probing from outside.
+**RESULT — the build failed, and the error is definitive:**
 
-**→ NEXT: check the Vercel dashboard for the `ssr-phase-1` preview of commit
-`6beac43`.**
-- Build **failed** → hypothesis (a) is ruled out by config incompatibility; the log
-  will say why. Go to resource routes.
-- Build **succeeded** and `/api/*` still serves HTML → hypothesis (b). Go to
-  resource routes.
-- Build succeeded and `/api/*` returns JSON → **(a) confirmed, no rewrite needed.**
+```
+Error: The pattern "api/**/*.ts" defined in `functions` doesn't match any
+Serverless Functions inside the `api` directory.
+```
 
-Verify by **content-type**, never status code — the SSR shell returns 200.
+**Vercel sees ZERO functions in `api/` when `framework: react-router` is set.** The
+framework build owns `.vercel/output` via the Build Output API, which switches off
+`api/` auto-detection entirely. Declaring them cannot force it back on. So
+`api/*.ts` and framework-mode SSR genuinely cannot coexist — now *verified*, not
+assumed. Experiment reverted in `26b72a3`; the branch builds again.
+
+### → The fix: invert it. Don't let the framework own the output.
+
+Rather than converting seven endpoints to resource routes (large, risky, and it
+buries a 60s cron and an image proxy inside the SSR function), keep every existing
+`api/*.ts` function untouched and add **one more function that serves the SSR app**:
+
+1. **Remove** `framework: react-router` from `vercel.json` so Vercel's normal `api/`
+   detection stays on and the seven functions build as they do today.
+2. Keep building with `react-router build` → `build/client` + `build/server`.
+3. Add `api/ssr.ts`:
+   ```ts
+   import { createRequestHandler } from '@react-router/node';
+   import * as build from '../build/server/index.js';
+   const handler = createRequestHandler(build, 'production');
+   export default (request: Request) => handler(request);
+   ```
+   Vercel Node functions accept the Web-standard `(Request) => Response` signature,
+   which is exactly what React Router's handler is.
+4. `vercel.json`: serve static assets from `build/client`, route everything else to
+   `/api/ssr`, and add `includeFiles` so `build/server` is bundled into that function.
+5. Drop `@vercel/react-router` and the `vercelPreset()` from `react-router.config.ts` —
+   the preset is what triggers the Build Output takeover.
+
+**Function count: 7 + 1 = 8**, inside the Hobby limit of ~12 — which is precisely
+what Phase 0's consolidation bought. (Phase 0 was justified after all, just not for
+the reason originally recorded.)
+
+**Unverified, must be checked on a preview before merging:** whether `includeFiles`
+correctly bundles the server build, and whether static assets resolve from
+`build/client`. Verify by **content-type**, never status code — the SSR shell
+returns 200, which is what hid the original breakage.
 
 ---
 
