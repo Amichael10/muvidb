@@ -17,8 +17,8 @@ export default [
   route('films/:slug', 'routes/film-detail.tsx'),
   // Legacy singular alias. Same module, so it needs an explicit unique route id.
   route('film/:slug', 'routes/film-detail.tsx', { id: 'film-detail-legacy-alias' }),
-  route('search', 'pages/Search.jsx'),
-  route('browse', 'pages/Browse.jsx'),
+  route('search', 'routes/search.tsx'),
+  route('browse', 'routes/browse.tsx'),
   route('tv-shows', 'pages/TVShows.jsx'),
   route('watch/:platform', 'routes/watch-platform.tsx'),
   route('login', 'pages/Login.jsx'),
