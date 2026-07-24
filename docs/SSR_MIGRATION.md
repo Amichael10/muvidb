@@ -117,13 +117,59 @@ named exports (fix `./_lib/` → `./` imports), create `api/data.ts` dispatching
 Verify with `npm run build` and by curling each old path.
 
 ### Phase 1 — Stand up RR7 framework mode (SSR foundation)
-- [ ] Add the RR7 framework-mode Vite plugin + `app/` structure (or keep `src/`), create
-      `entry.server` / `entry.client`, root route, and the route config.
-- [ ] Wire Vercel preset so the app deploys as a single SSR function.
-- [ ] Get it building + deploying with **no loaders yet** — behaves like today but
-      server-rendered shell. Verify every route still renders.
-- [ ] **Auth:** switch Supabase session to cookies via `@supabase/ssr` ONLY when a
-      server-rendered route needs the logged-in user. Home doesn't — defer this.
+**Status: scaffold works on branch `ssr-phase-1`. NOT merged — see "Before cutover".**
+
+- [x] RR7 framework-mode Vite plugin + route config, keeping `appDirectory: 'src'`
+      so the ~50 existing pages stay put. `react-router.config.ts`, `src/root.tsx`
+      (document + providers + chrome), `src/routes.ts` (mirrors the old `<Routes>`).
+      Default `entry.client`/`entry.server` are used — no custom entries needed.
+- [x] Vercel preset wired (`@vercel/react-router`) — deploys as one SSR function.
+- [x] Builds and server-renders. `npm run build` produces `build/client` +
+      `build/server`; `curl /` returns **real markup** (639 divs, nav/main/footer,
+      14 sections) instead of an empty shell. No console errors, no hydration
+      mismatch, page renders correctly.
+- [ ] **Auth:** cookie-based Supabase session via `@supabase/ssr` — still deferred,
+      correctly. Guards remain client-side (see `src/components/routing/ProtectedRoute.tsx`).
+
+**Three blocking things had to change to make SSR possible — all real bugs, not cosmetics:**
+1. `AuthContext` rendered a full-screen spinner *instead of* `children` while
+   `loading`. On the server `loading` starts true and the effect that clears it
+   never runs, so **every route server-rendered nothing but a spinner**. Children
+   now always render; `ProtectedRoute` still gates on `loading`, so guarded routes
+   are never exposed. Tradeoff: auth-dependent chrome briefly shows its
+   logged-out state before the session resolves.
+2. `ThemeContext` called `localStorage.getItem` in a `useState` initialiser, which
+   runs during server render → crash. Guarded with `typeof window`.
+3. PostHog was initialised at module scope in `main.tsx` → would run on the
+   server. Moved into a client effect with a dynamic import.
+
+**Build-config changes:** `@vitejs/plugin-react` removed (reactRouter() provides
+React handling; two React plugins conflict); `manualChunks` vendor-splitting
+removed (framework mode does route-level splitting and the server bundle must
+stay one module graph); `VitePWA` now client-build only.
+
+### Phase 1b — Cutover (REQUIRED before this can ship)
+The scaffold runs, but **merging as-is would break production.** `api/seo.ts`
+currently owns `/films/:slug`, `/people/:slug`, `/watch/:slug`, `/channels/:slug`,
+`/companies/:slug`, `/cinemas/:slug` via `vercel.json` rewrites, and serves them by
+`readFileSync('dist/index.html')` + injecting title/og/twitter/JSON-LD.
+
+Under framework mode **there is no `dist/index.html`** (output moved to
+`build/client` + `build/server`, and SSR generates the document from `root.tsx`),
+so those routes would 500. Also `vercel.json` pins
+`functions: { "api/seo.ts": { includeFiles: "dist/index.html" } }`.
+
+- [ ] Port `api/seo.ts`'s per-entity meta into route `meta` exports. Needs the
+      entity data server-side → this is really Phase 2 work (loaders), so Phase 1b
+      and Phase 2 should land together.
+- [ ] Drop the six detail-page rewrites from `vercel.json`; **keep** the
+      `/sitemap*.xml` ones (that half of `api/seo.ts` is unaffected and still needed).
+- [ ] Remove the now-dead entry points: `index.html`, `src/main.tsx`, `src/App.tsx`
+      (superseded by `root.tsx` + `routes.ts`). Left in place on the branch so the
+      scaffold stays a clean, revertible addition.
+- [ ] Re-point the SPA fallback rewrite in `vercel.json` (`/(?!...)` → `/index.html`)
+      at the SSR function.
+- [ ] Confirm the deployed function count is still ≤ 12 with the SSR function added.
 
 ### Phase 2 — Convert Home to SSR + cache
 - [ ] Move Home's rail queries (`src/pages/Home.jsx`, multiple `supabase.from('films')`
@@ -174,9 +220,25 @@ Order by traffic/value: Browse → Film detail → Person detail → the rest. E
 preserved by `vercel.json` rewrites, so **no frontend caller changed**. Build passes,
 `tsc` clean. **Function count 12 → 7**, leaving ~5 Hobby slots for SSR.
 
-**Next action: Phase 1** — stand up RR7 framework mode (see Phase 1 checklist above).
-Before starting, do the deploy smoke-test below; rewrites can only be verified on a real
-deployment, so a broken rewrite would otherwise be discovered mid-Phase-1.
+**Phase 1 scaffold works, on branch `ssr-phase-1` (not merged).** RR7 framework mode
+builds and genuinely server-renders. Verified locally: `curl /` returns real markup,
+no hydration errors, page renders. Three real SSR blockers fixed on the way
+(AuthContext spinner gate, ThemeContext localStorage, module-scope PostHog).
+
+**Next action:** Phase 1b + Phase 2 together — they're entangled and must land as one
+change. `api/seo.ts` owns the six detail-page routes and serves them from
+`dist/index.html`, which framework mode no longer produces, so its meta injection has
+to be replaced by route `meta` exports, and those need loaders. See the Phase 1b
+checklist. **Do not merge `ssr-phase-1` before that**: SSR builds fine, but the six
+detail routes would 500 in production.
+
+Also still outstanding from Phase 0: the deploy smoke-test below (rewrites can only be
+verified on a real deployment).
+
+**Environment gotcha:** npm's cache is configured at `D:\npm-cache` and `D:` does not
+exist, so every `npm install`/`npm view` fails with a bogus `ENOENT ... mkdir '\\?'`.
+Work around per-command with `npm install --cache <writable-dir>`, or fix it for good
+with `npm config set cache <writable-dir>`.
 
 **Owner preferences:** free tier only for now; hybrid is fine; convert Home first.
 
