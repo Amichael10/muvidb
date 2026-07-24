@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev --port=3001 --host=0.0.0.0",
-    "build": "react-router build && node scripts/write_spa_index.mjs",
+    "build": "react-router build && node tooling/write_spa_index.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
