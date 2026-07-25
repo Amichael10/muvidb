@@ -6,16 +6,16 @@ any agent or developer can pick up without the originating conversation.
 
 Companion doc: `docs/SSR_MIGRATION.md` (the SSR effort has its own detailed plan).
 
-**Last updated:** 2026-07-24 (late evening) — public SSR Phase 3 complete.
+**Last updated:** 2026-07-25 — homepage performance pass in progress.
 
-**Where we stopped:** Public SSR work is **done**. Production `main` @ `aac5051`
-(same tip as `staging`): invert packaging + Home/Browse/Search + all detail
-routes + all six public list pages. Smoked live on `muvidb.com`.
+**Where we stopped:** Public SSR done. Next workstream is **homepage Lighthouse
+performance** (lab: Perf ~27, LCP ~19s, TBT huge, DOM ~3.5k). First pass shipped
+locally / pending deploy: defer below-fold rails, fix skeleton-on-SSR loading
+flags, lazy GenreRail/TopTen/PersonCard/FilmCard, drop PlatformRail motion, cap
+cinema/row cards at 12, leaner hero loader.
 
-Admin/auth and thin static pages stay client-side **by design** (not unfinished
-SSR). Next non-SSR work is the data-quality / housekeeping queue below. Optional
-scale path: `docs/SSR_SCALE.md` only if Hobby limits hurt. Do **not** set the
-Vercel Framework Preset to “React Router” — leave **Other / None**.
+After this lands and re-score: proceed to **data-quality queue**, then
+**housekeeping**. Do **not** set Vercel Framework Preset to “React Router”.
 
 ---
 
@@ -291,8 +291,22 @@ credit roll rarely fits in one frame.
 
 ## Pending
 
-Public SSR is complete. Remaining items are non-SSR product/data work unless
-Hobby limits force a host move.
+### 0. Homepage performance (IN PROGRESS — 2026-07-25)
+
+Lighthouse mobile baseline on `muvidb.com/`: Perf ~27, LCP ~19s, TBT ~27s,
+DOM ~3481, unused JS ~186KiB. SEO already ~92.
+
+**Shipped in this pass (code):**
+- `DeferredMount` + split `fetchPriorityData` / `fetchSecondaryData` (idle then IO)
+- Loading flags start `false` so SSR no longer emits skeleton rails under hero
+- Lazy `GenreRail` / `TopTenSection` / `PersonCard` / `FilmCard`
+- `PlatformRail` no longer imports `motion`
+- `GenreRail` poster-grid skips the unused 50-film fetch
+- `FilmRow` `maxItems` + cinema rail capped at 12
+- Hero loader `.limit(6)` + leaner select + `meta`
+
+**Still open after re-score:** further unused-JS cuts, What’s New tab consolidation,
+moving the Google-about block below priority rails if LCP still fights it.
 
 ### 1. Scale off Vercel Hobby if limits bite (optional)
 

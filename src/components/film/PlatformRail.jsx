@@ -1,4 +1,3 @@
-import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { PLATFORMS, isFilmOnPlatform } from '../../lib/platforms';
@@ -47,14 +46,8 @@ export default function PlatformRail({ films = [], counts = {} }) {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
-          {activePlatforms.map((platform, i) => (
-            <motion.div
-              key={platform.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(i * 0.05, 0.3), duration: 0.5 }}
-              viewport={{ once: true }}
-            >
+          {activePlatforms.map((platform) => (
+            <div key={platform.id}>
               <Link
                 to={`/watch/${platform.id}`}
                 style={{
@@ -116,7 +109,7 @@ export default function PlatformRail({ films = [], counts = {} }) {
                   </div>
                 </div>
               </Link>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>

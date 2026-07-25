@@ -1,20 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
-import FilmCard from '../components/film/FilmCard';
-import TopTenSection from '../components/film/TopTenSection';
-import GenreRail from '../components/film/GenreRail';
 import PlatformRail from '../components/film/PlatformRail';
-import PersonCard from '../components/person/PersonCard';
+import DeferredMount from '../components/ui/DeferredMount';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { toTitleCase } from '../utils/format';
 import { getZonedClock, getNextDate, isFutureShowtime, compareShowtimes } from '../utils/showtimes';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+
+// Below-fold sections — keep them out of the critical homepage JS chunk.
+const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
+const GenreRail = lazy(() => import('../components/film/GenreRail'));
+const PersonCard = lazy(() => import('../components/person/PersonCard'));
+const FilmCard = lazy(() => import('../components/film/FilmCard'));
+
+const HOME_ROW_CAP = 12;
 
 // Platforms shown in the homepage "New to Stream" tabbed rail.
 const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits'].includes(p.id));
@@ -37,11 +42,13 @@ export default function Home() {
   // the loader couldn't seed it (slow/failed DB) — the client fetch below then
   // runs as a fallback exactly as it did before SSR.
   const loaderData = useLoaderData();
-  const [isLoading, setIsLoading] = useState(true);
+  // Priority rails (cinema / new releases / new to stream). Starts false so SSR
+  // does not emit a wall of skeleton rows under the hero.
+  const [isPriorityLoading, setIsPriorityLoading] = useState(false);
   // Starts false when the loader already server-rendered the hero, otherwise the
   // skeleton would be what gets server-rendered and SSR would buy us nothing.
   const [isHeroLoading, setIsHeroLoading] = useState(!loaderData?.featuredFilms?.length);
-  const [isCinemaLoading, setIsCinemaLoading] = useState(true);
+  const [isCinemaLoading, setIsCinemaLoading] = useState(false);
   const [inCinemas, setInCinemas] = useState([]);
   const [newToStream, setNewToStream] = useState({}); // { netflix: [...], prime_video: [...], ... }
   const [streamTab, setStreamTab] = useState('netflix');
@@ -51,7 +58,10 @@ export default function Home() {
   const [otherPeople, setOtherPeople] = useState([]);
   const [creators, setCreators] = useState([]);
   const [newReleases, setNewReleases] = useState([]);
-  const [isComingSoonLoading, setIsComingSoonLoading] = useState(true);
+  const [isComingSoonLoading, setIsComingSoonLoading] = useState(false);
+  // Secondary (below-fold) rails — fetch only after DeferredMount activates.
+  const [isSecondaryLoading, setIsSecondaryLoading] = useState(false);
+  const secondaryFetched = useRef(false);
 
   const [featuredFilms, setFeaturedFilms] = useState(loaderData?.featuredFilms ?? []);
   const [comingSoon, setComingSoon] = useState([]);
@@ -79,35 +89,44 @@ export default function Home() {
   const [externalUrl, setExternalUrl] = useState('');
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
+  // Priority wave: hero fallback + cinema + new releases + new-to-stream.
+  // Scheduled on idle so hydration of the SSR hero isn't competing with ~13 queries.
   useEffect(() => {
-    document.title = "MuviDB | Home";
-    // Run the platform counts AFTER the main load burst clears, not during it —
-    // the unindexed streaming_links count scans are slow and were timing out while
-    // ~13 other queries hammered the DB, leaving tiles stuck on "Browse". The tiles
-    // render immediately regardless; this just makes their labels reliable.
-    fetchAllData().finally(() => fetchPlatformCounts());
+    const runPriority = () => {
+      fetchPriorityData().finally(() => fetchPlatformCounts());
+    };
+    let idleId = null;
+    let timeoutId = null;
+    if (typeof requestIdleCallback === 'function') {
+      idleId = requestIdleCallback(runPriority, { timeout: 1200 });
+    } else {
+      timeoutId = setTimeout(runPriority, 100);
+    }
 
     const cinemaRefresh = window.setInterval(() => {
       fetchInCinemasData().catch(error => console.error('Error refreshing cinema data:', error));
     }, 60_000);
 
-    return () => window.clearInterval(cinemaRefresh);
+    return () => {
+      if (idleId != null && typeof cancelIdleCallback === 'function') {
+        cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
+      window.clearInterval(cinemaRefresh);
+    };
   }, []);
 
-  const fetchAllData = async () => {
-    setIsLoading(true);
+  const fetchPriorityData = async () => {
+    setIsPriorityLoading(true);
     // Don't flip the seeded hero back to a skeleton after hydration — that would
     // make the server-rendered hero visibly flash away on every load.
     if (!loaderData?.featuredFilms?.length) setIsHeroLoading(true);
 
-    // Showtime aggregation is intentionally independent: a large cinema response
-    // should never delay the hero or the rest of the homepage.
     setIsCinemaLoading(true);
     const cinemaPromise = fetchInCinemasData()
       .catch(e => console.error('Error fetching cinemas data:', e))
       .finally(() => setIsCinemaLoading(false));
 
-    // Fetch the hero on its own critical path.
     try {
       await fetchFeaturedFilms().catch(e => console.error('Error fetching featured films:', e));
     } catch (e) {
@@ -116,12 +135,29 @@ export default function Home() {
       setIsHeroLoading(false);
     }
 
-    // 2. Fetch all other sections in the background progressively
+    try {
+      await Promise.all([
+        fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
+        fetchNewToStream().catch(e => console.error('Error fetching new to stream:', e)),
+      ]);
+    } catch (error) {
+      console.error('Error in priority fetches:', error);
+    } finally {
+      setIsPriorityLoading(false);
+    }
+
+    await cinemaPromise;
+  };
+
+  const fetchSecondaryData = async () => {
+    if (secondaryFetched.current) return;
+    secondaryFetched.current = true;
+    setIsSecondaryLoading(true);
+    setIsComingSoonLoading(true);
+
     try {
       await Promise.all([
         fetchFeaturedSeries().catch(e => console.error('Error fetching series:', e)),
-        fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
-        fetchNewToStream().catch(e => console.error('Error fetching new to stream:', e)),
         fetchYoutubeFeed().catch(e => console.error('Error fetching youtube feed:', e)),
         fetchPeople().catch(e => console.error('Error fetching people:', e)),
         fetchCreators().catch(e => console.error('Error fetching creators:', e)),
@@ -131,20 +167,15 @@ export default function Home() {
         fetchCrewMembers().catch(e => console.error('Error fetching crew:', e)),
         fetchCompanies().catch(e => console.error('Error fetching companies:', e)),
         fetchRecentlyAdded().catch(e => console.error('Error fetching recently added:', e)),
-        fetchGenreSections().catch(e => console.error('Error fetching genre sections:', e))
+        fetchGenreSections().catch(e => console.error('Error fetching genre sections:', e)),
       ]);
     } catch (error) {
-      console.error('Error in progressive fetches:', error);
+      console.error('Error in secondary fetches:', error);
     } finally {
-      setIsLoading(false);
+      setIsSecondaryLoading(false);
     }
 
-    // Load this curated rail after the main homepage burst. Its status query is
-    // indexed, but deferring it avoids competing with the heavier discovery rails.
     await fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e));
-
-    // Keep this promise observed without making lower homepage sections wait for it.
-    await cinemaPromise;
   };
 
   // Fetch films for the top genre sections at the bottom of the page.
@@ -440,7 +471,7 @@ export default function Home() {
       nowFilms = Array.from(uniqueFilms.values());
     }
 
-    setInCinemas(nowFilms);
+    setInCinemas(nowFilms.slice(0, HOME_ROW_CAP));
   };
 
   const fetchComingSoon = async (attempt = 0) => {
@@ -844,26 +875,28 @@ export default function Home() {
               isLoading={isCinemaLoading}
               linkTo="/showtimes"
               cardVariant="cinema"
+              maxItems={HOME_ROW_CAP}
             />
           </div>
         )}
 
         {/* 6b. NEW RELEASES (landscape single slideable row) */}
-        {(isLoading || newReleases.length > 0) && (
+        {(isPriorityLoading || newReleases.length > 0) && (
           <div className="landing-band alt py-8 md:py-10">
             <FilmRow
               title="New Releases"
               subtitle="Just dropped — the latest additions"
               films={newReleases}
-              isLoading={isLoading}
+              isLoading={isPriorityLoading}
               linkTo="/browse?sort=newest"
               cardVariant="landscape"
+              maxItems={HOME_ROW_CAP}
             />
           </div>
         )}
 
         {/* 4. STREAMING RAILS (turn watch-link data into a browse axis) */}
-        {(isLoading || NEW_STREAM_IDS.some(id => (newToStream[id] || []).length > 0)) && (
+        {(isPriorityLoading || NEW_STREAM_IDS.some(id => (newToStream[id] || []).length > 0)) && (
           <div className="landing-band alt grided py-8 md:py-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
               <div className="flex items-end justify-between gap-4 mb-6">
@@ -900,73 +933,88 @@ export default function Home() {
             <div className="mt-6 md:mt-7">
               <FilmRow
                 films={newToStream[streamTab] || []}
-                isLoading={isLoading}
+                isLoading={isPriorityLoading}
                 noHeader
                 cardVariant="streaming"
                 platform={streamTab}
+                maxItems={HOME_ROW_CAP}
               />
             </div>
           </div>
         )}
-        {(isLoading || featuredSeries.length > 0) && (
+
+        {/* Below-fold discovery + editorial — mount/fetch only when near viewport */}
+        <DeferredMount
+          minHeight={480}
+          rootMargin="500px 0px"
+          onActivate={() => {
+            fetchSecondaryData();
+          }}
+        >
+        <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
+        {(isSecondaryLoading || featuredSeries.length > 0) && (
           <div className="landing-band alt py-8 md:py-10">
             <FilmRow
               title="Popular TV Shows & Series"
               subtitle="Must-watch African series and episodes"
               films={featuredSeries}
-              isLoading={isLoading}
+              isLoading={isSecondaryLoading}
               linkTo="/tv-shows"
+              maxItems={HOME_ROW_CAP}
             />
           </div>
         )}
-        {(isLoading || youtubeFeed.length > 0) && (
+        {(isSecondaryLoading || youtubeFeed.length > 0) && (
           <div className="landing-band panel py-8 md:py-10">
             <FilmRow
               title="Free on YouTube"
               subtitle="No subscription needed"
               films={youtubeFeed}
-              isLoading={isLoading}
+              isLoading={isSecondaryLoading}
               linkTo="/watch/youtube"
               cardVariant="youtube"
+              maxItems={HOME_ROW_CAP}
             />
           </div>
         )}
         {/* 5. TOP 10 THIS WEEK */}
-        {(isLoading || top10Films.length > 0) && (
+        {(isSecondaryLoading || top10Films.length > 0) && (
           <div className="landing-band panel py-8 md:py-10">
             <TopTenSection
               title="Top 10 This Week"
               subtitle="The most-watched Nollywood stories right now"
               films={top10Films}
-              isLoading={isLoading}
+              isLoading={isSecondaryLoading}
             />
           </div>
         )}
 
         {/* 6a. COMING SOON (keep existing horizontal scroll cards) */}
-        {(isLoading || isComingSoonLoading || comingSoon.length > 0) && (
+        {(isSecondaryLoading || isComingSoonLoading || comingSoon.length > 0) && (
           <div className="landing-band panel py-8 md:py-10">
             <FilmRow
               title="Coming Soon"
               subtitle="Upcoming releases to look forward to"
               films={comingSoon}
-              isLoading={isLoading || isComingSoonLoading}
+              isLoading={isSecondaryLoading || isComingSoonLoading}
               linkTo="/browse?sort=upcoming"
               cardVariant="coming-soon"
+              maxItems={HOME_ROW_CAP}
             />
           </div>
         )}
 
         {/* 6c. RECENTLY ADDED (landscape single slideable row) */}
-        {(isLoading || recentlyAdded.length > 0) && (
+        {(isSecondaryLoading || recentlyAdded.length > 0) && (
           <div className="landing-band panel py-8 md:py-10">
             <FilmRow
               title="Recently Added"
               subtitle="Fresh to the database — explore new additions"
               films={recentlyAdded}
-              isLoading={isLoading}
+              isLoading={isSecondaryLoading}
               linkTo="/browse?sort=recent"
               cardVariant="landscape"
+              maxItems={HOME_ROW_CAP}
             />
           </div>
         )}
@@ -984,7 +1032,7 @@ export default function Home() {
               title={curatedCollection.name}
               subtitle={curatedCollection.description}
               films={curatedCollection.films}
-              isLoading={isLoading}
+              isLoading={isSecondaryLoading}
             />
           </div>
         )}
@@ -999,7 +1047,7 @@ export default function Home() {
           </div>
 
         {/* 9. SPOTLIGHT (Editorial) */}
-        {(isLoading || spotlightContent) && (
+        {(isSecondaryLoading || spotlightContent) && (
           <div className="relative z-10 border-b border-hairline py-14 md:py-16 bg-surface/40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-2 mb-10">
@@ -1010,7 +1058,7 @@ export default function Home() {
               </div>
 
               <div className="landing-module relative rounded-lg overflow-hidden">
-                {isLoading ? (
+                {isSecondaryLoading ? (
                   <div className="h-[400px] animate-pulse bg-surface-2" />
                 ) : spotlightContent && spotlightContent.people && (
                   <div className="flex flex-col md:flex-row items-stretch min-h-[400px]">
@@ -1105,7 +1153,7 @@ export default function Home() {
         )}
 
         {/* 10. & 11. FEATURED TALENT (Artist & Crew Tabs) */}
-        {(isLoading || spotlightPerson || crewMembers.length > 0) && (
+        {(isSecondaryLoading || spotlightPerson || crewMembers.length > 0) && (
           <div className="relative z-10 border-b border-hairline">
             <section className="py-16">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1149,11 +1197,11 @@ export default function Home() {
                     <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
                     <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
                       <div className="xl:flex-1">
-                        <PersonCard person={spotlightPerson} variant="full" isLoading={isLoading} />
+                        <PersonCard person={spotlightPerson} variant="full" isLoading={isSecondaryLoading} />
                       </div>
                       <div className="h-px xl:w-px xl:h-64 bg-border"></div>
                       <div className="w-full xl:w-80 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-2 gap-4">
-                        {isLoading ? (
+                        {isSecondaryLoading ? (
                           [...Array(4)].map((_, i) => (
                             <PersonCard key={i} variant="compact" isLoading={true} />
                           ))
@@ -1170,7 +1218,7 @@ export default function Home() {
                 {/* Tab Content: Behind the Magic (Crew) */}
                 {featuredTalentTab === 'crew' && (
                   <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x page-fade-in">
-                    {isLoading ? (
+                    {isSecondaryLoading ? (
                       [...Array(6)].map((_, i) => (
                         <div key={i} className="shrink-0 w-44 bg-surface border border-hairline rounded-2xl p-5 text-center flex flex-col items-center gap-4">
                           <div className="w-24 h-24 rounded-full bg-surface-2 animate-pulse" />
@@ -1234,7 +1282,7 @@ export default function Home() {
           </div>
 
         {/* 12. NOLLYWOOD STUDIOS (Production Companies) */}
-        {(isLoading || productionCompanies.length > 0) && (
+        {(isSecondaryLoading || productionCompanies.length > 0) && (
           <div className="relative z-10 border-b border-hairline py-14 md:py-16 bg-surface/30">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-end justify-between mb-12">
@@ -1252,7 +1300,7 @@ export default function Home() {
               </div>
 
               <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x">
-                {isLoading ? (
+                {isSecondaryLoading ? (
                   [...Array(4)].map((_, i) => (
                     <div key={i} className="shrink-0 w-64 bg-surface border border-hairline rounded-2xl p-6 flex flex-col gap-4">
                       <div className="flex items-center gap-4">
@@ -1321,7 +1369,7 @@ export default function Home() {
         )}
 
         {/* 13. FEATURED CHANNELS */}
-        {(isLoading || creators.length > 0) && (
+        {(isSecondaryLoading || creators.length > 0) && (
           <div className="relative z-10 border-b border-hairline bg-surface/40 overflow-hidden">
              <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
             <section className="py-16 relative z-10">
@@ -1337,7 +1385,7 @@ export default function Home() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-hairline rounded-xl overflow-hidden shadow-sm">
-                  {isLoading ? (
+                  {isSecondaryLoading ? (
                     [...Array(6)].map((_, i) => (
                       <div key={i} className="bg-surface p-8 border-r border-b border-hairline flex items-center gap-5">
                         <div className="w-16 h-16 rounded-lg bg-surface-2 animate-shimmer shrink-0"></div>
@@ -1439,6 +1487,8 @@ export default function Home() {
             ))}
           </div>
         )}
+        </Suspense>
+        </DeferredMount>
 
         {/* 14. NEW MEMBER CTA BANNER (Issue 29) */}
         {!isAuthenticated && (

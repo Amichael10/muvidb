@@ -7,18 +7,19 @@ import StreamingCard from './StreamingCard';
 import SkeletonCard from '../ui/SkeletonCard';
 import { Icon } from '@iconify/react';
 
-export default function FilmRow({ title, subtitle, films, sortKey, isLoading = false, noHeader = false, linkTo, cardVariant, platform }) {
+export default function FilmRow({ title, subtitle, films, sortKey, isLoading = false, noHeader = false, linkTo, cardVariant, platform, maxItems }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  // Sort films if sortKey is provided
+  // Sort films if sortKey is provided; optional cap keeps homepage DOM bounded.
   const sortedFilms = [...films].sort((a, b) => {
     if (sortKey === 'views') return (b.view_count || 0) - (a.view_count || 0);
     if (sortKey === 'year') return (b.year || 0) - (a.year || 0);
     if (sortKey === 'rating') return (b.rating || 0) - (a.rating || 0);
     return 0;
   });
+  const visibleFilms = typeof maxItems === 'number' ? sortedFilms.slice(0, maxItems) : sortedFilms;
 
   const checkScroll = () => {
     if (scrollRef.current) {
@@ -73,7 +74,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
           <div className={`absolute top-0 right-0 bottom-0 w-20 z-10 bg-gradient-to-l from-bg to-transparent pointer-events-none transition-opacity duration-300 hidden md:block ${canScrollRight ? 'opacity-100' : 'opacity-0'}`} />
 
           {/* Navigation Arrows - Only visible if there's more than 1 item */}
-          {films.length > 1 && (
+          {visibleFilms.length > 1 && (
             <>
               <button 
                 onClick={() => scroll('left')}
@@ -104,12 +105,12 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
                   <SkeletonCard size="md" variant={cardVariant} />
                 </div>
               ))
-            ) : films.length === 0 ? (
+            ) : visibleFilms.length === 0 ? (
               <div className="w-full py-16 text-center text-text-muted text-sm bg-surface-2/10 rounded-2xl border border-dashed border-border/50 mx-4">
                 No titles available in this section.
               </div>
             ) : (
-              sortedFilms.map((film, index) => (
+              visibleFilms.map((film, index) => (
                 <div key={film.id} className="shrink-0">
                   {cardVariant === 'cinema' ? (
                     <CinemaCard film={film} />

@@ -102,16 +102,20 @@ export default function GenreRail({ variant = 'grid' }) {
     .filter(g => g.count > 0);
 
   // Auto-select top genre with most films once counts arrive.
+  // poster-grid never renders the film lineup — skip so the homepage doesn't
+  // pull 50 films for a UI it doesn't show.
   useEffect(() => {
+    if (isPosterGrid) return;
     if (!selectedGenre && activeGenres.length > 0) {
       const topGenre = [...activeGenres].sort((a, b) => b.count - a.count)[0].name;
       setSelectedGenre(topGenre);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genreCounts]);
+  }, [genreCounts, isPosterGrid]);
 
   // Lazy-load the films for the selected genre only when it changes (top 20 by views).
   useEffect(() => {
+    if (isPosterGrid) return;
     if (!selectedGenre) return;
     let active = true;
     (async () => {
@@ -143,7 +147,7 @@ export default function GenreRail({ variant = 'grid' }) {
       }
     })();
     return () => { active = false; };
-  }, [selectedGenre]);
+  }, [selectedGenre, isPosterGrid]);
 
   // Scroll checking logic for lineup
   const checkScroll = () => {
