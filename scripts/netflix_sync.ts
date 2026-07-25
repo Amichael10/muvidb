@@ -115,11 +115,16 @@ async function login(page) {
     await handleHouseholdBlock(page);
 
     // Handle CAPTCHA or error messages
-    const errorMsg = await page.$('.ui-message-error, [data-uia="login-error"], .recaptcha-error');
+    const errorMsg = await page.$('.ui-message-error, [data-uia="login-error"], .recaptcha-error, [data-uia="error-message-container"]');
     if (errorMsg) {
       const text = await errorMsg.textContent();
-      console.log(`❌ Login Issue detected: ${text}`);
+      console.error(`❌ Login error on page: ${text?.trim()}`);
+      console.error('   Netflix is blocking automated login (common with Playwright + reCAPTCHA).');
+      console.error('   Fix: run a manual session capture, then re-sync:');
+      console.error('     $env:NETFLIX_NO_PROXY="true"; npx tsx scripts/netflix_capture.ts');
+      console.error('     $env:NETFLIX_NO_PROXY="true"; npx tsx scripts/netflix_sync.ts');
       await page.screenshot({ path: 'netflix-login-error.png' });
+      throw new Error(`Netflix login blocked: ${text?.trim() || 'unknown error'}`);
     }
 
     // 5. Handle Profile Selection
@@ -219,6 +224,29 @@ async function handleProfileSelection(page) {
 }
 
 async function scrapeNetflix() {
+  // Prefer attaching to the user's real Chrome (already logged in):
+  //   Chrome: --remote-debugging-port=9222
+  //   $env:NETFLIX_CDP="http://127.0.0.1:9222"
+  const cdp = (process.env.NETFLIX_CDP || '').trim();
+
+  let browser: any;
+  let context: any;
+  let anonContext: any;
+  let ownsBrowser = true;
+
+  if (cdp) {
+    console.log(`Connecting to existing Chrome via CDP: ${cdp}`);
+    browser = await chromium.connectOverCDP(cdp.replace(/\/$/, ''));
+    ownsBrowser = false;
+    context = browser.contexts()[0];
+    if (!context) throw new Error('No context on CDP Chrome — is Chrome running with --remote-debugging-port?');
+    anonContext = await browser.newContext({
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 720 },
+    });
+    console.log('Using your real Chrome session (no Playwright login).');
+  } else {
   // Use NETFLIX_HEADLESS=false to run in visible mode (useful for manual CAPTCHA solving)
   const headless = process.env.NETFLIX_HEADLESS !== 'false';
   const launchOptions: any = { headless, channel: 'chrome' };
@@ -249,10 +277,9 @@ async function scrapeNetflix() {
     console.log('👁️ Running in HEADFUL mode — browser window will open. Handle any CAPTCHA manually.');
   }
 
-  const browser = await chromium.launch(launchOptions);
+  browser = await chromium.launch(launchOptions);
   
   // Use persistent context or storage state if available
-  let context;
   if (fs.existsSync(STATE_FILE)) {
     console.log('📄 Loading existing session state...');
     try {
@@ -279,10 +306,11 @@ async function scrapeNetflix() {
   }
 
   // Create an anonymous context for fetching clean JSON-LD metadata from public title pages
-  const anonContext = await browser.newContext({
+  anonContext = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 720 },
   });
+  } // end non-CDP launch
   
   const page = await context.newPage();
   const anonPage = await anonContext.newPage();
@@ -295,6 +323,11 @@ async function scrapeNetflix() {
 
     // Check if we were redirected to login
     if (page.url().includes('/login')) {
+      if (cdp) {
+        throw new Error(
+          'CDP Chrome hit Netflix login — log in in that Chrome window first, then re-run sync.'
+        );
+      }
       console.log('ℹ️ Redirected to login. Starting authentication flow...');
       await login(page);
       
@@ -695,7 +728,13 @@ async function scrapeNetflix() {
     await page.waitForTimeout(1000 + Math.random() * 1000);
   }
 
-  await browser.close();
+  if (ownsBrowser) {
+    await browser.close();
+  } else {
+    await anonContext.close().catch(() => null);
+    // Disconnect from CDP without quitting the user's Chrome
+    browser.close().catch(() => null);
+  }
   return detailedMovies;
 }
 

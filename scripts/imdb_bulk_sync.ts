@@ -1,10 +1,17 @@
 /**
- * Firecrawl-backed IMDb Africa enrich sync (one-time friendly).
+ * Firecrawl-backed IMDb Africa enrich sync.
  * Playwright often gets empty/blocked IMDb search pages; Firecrawl works.
  *
  *   npx tsx scripts/imdb_bulk_sync.ts --dry-run --max-films 10
  *   npx tsx scripts/imdb_bulk_sync.ts --max-films 150 --countries ng,gh,za,ke
  *   npx tsx scripts/imdb_bulk_sync.ts --resume
+ *   npx tsx scripts/imdb_bulk_sync.ts --ids tt0490011 --full-credits
+ *
+ * Batch-enrich OUR thin films (preferred for catalog backfill):
+ *   npx tsx scripts/imdb_bulk_sync.ts --from-db --full-credits --skip-people-pages --max-films 50
+ *   npx tsx scripts/imdb_bulk_sync.ts --from-db --max-credits 8 --max-films 100 --resume
+ *
+ * Official aggregate rating only — never scrapes IMDb user review text (IP).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,12 +44,46 @@ const DEFAULT_COUNTRIES = [
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const RESUME = args.includes('--resume');
+const FROM_DB = args.includes('--from-db');
+const FULL_CREDITS = args.includes('--full-credits') || args.includes('--ids') || FROM_DB;
 const MAX_FILMS = Number(args[args.indexOf('--max-films') + 1]) || 200;
 const MAX_SEARCH_PAGES = Number(args[args.indexOf('--max-pages') + 1]) || 6;
+/** Films with fewer than this many credits are candidates for --from-db. */
+const MAX_CREDITS = Number(args[args.indexOf('--max-credits') + 1]) || 8;
 const ENRICH_PEOPLE = !args.includes('--skip-people-pages');
+const ID_LIST = args.includes('--ids')
+  ? String(args[args.indexOf('--ids') + 1] || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => /^tt\d+$/i.test(s))
+      .map((s) => s.toLowerCase())
+  : [];
 const countriesArg = args.includes('--countries')
   ? String(args[args.indexOf('--countries') + 1] || '').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
   : DEFAULT_COUNTRIES;
+
+type DbFilmTarget = {
+  id: string;
+  title: string;
+  year: number | null;
+  imdb_id: string | null;
+  creditCount: number;
+};
+
+type QueueItem = {
+  title: string;
+  url: string;
+  /** When set, always write onto this film row (don't fuzzy-create/match elsewhere). */
+  forceFilmId?: string;
+};
+
+type CreditRow = {
+  name: string;
+  role: string;
+  character: string | null;
+  img: string | null;
+  imdbUrl: string | null;
+};
 
 type FilmMeta = {
   imdbId: string | null;
@@ -52,12 +93,18 @@ type FilmMeta = {
   synopsis: string | null;
   posterUrl: string | null;
   genres: string[];
+  /** IMDb aggregate rating 0–10 (official score only — no user review text). */
+  rating: number | null;
+  voteCount: number | null;
   cast: Array<{ name: string; character: string | null; img: string | null; imdbUrl: string | null }>;
   directors: Array<{ name: string; imdbUrl: string | null }>;
+  /** Extra crew from /fullcredits/ (producers, designers, etc.) */
+  crew: CreditRow[];
 };
 
 type Checkpoint = {
   doneFilmUrls: string[];
+  doneFilmIds: string[];
   stats: Record<string, number>;
 };
 
@@ -266,6 +313,49 @@ function parseFilmFromHtml(html: string, fallbackTitle: string): FilmMeta {
 
   const imdbId = (html.match(/\/title\/(tt\d+)/) || [])[1] || null;
 
+  // Official aggregate score only — never scrape user review bodies (IP).
+  let rating: number | null = null;
+  let voteCount: number | null = null;
+  const ldBlocks = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const block of ldBlocks) {
+    const raw = block.replace(/^<script[^>]*>/i, '').replace(/<\/script>$/i, '');
+    try {
+      const json = JSON.parse(raw);
+      const nodes = Array.isArray(json) ? json : [json];
+      for (const node of nodes) {
+        const agg = node?.aggregateRating;
+        if (!agg) continue;
+        const v = Number(agg.ratingValue);
+        const c = Number(agg.ratingCount ?? agg.reviewCount);
+        if (Number.isFinite(v) && v > 0 && v <= 10) rating = Math.round(v * 10) / 10;
+        if (Number.isFinite(c) && c > 0) voteCount = Math.round(c);
+      }
+    } catch {
+      /* ignore bad JSON-LD */
+    }
+  }
+  if (rating == null) {
+    const scoreText =
+      $('[data-testid="hero-rating-bar__aggregate-rating__score"] span').first().text().trim()
+      || $('[data-testid="hero-rating-bar__aggregate-rating__score"]').first().text().trim();
+    const v = parseFloat(scoreText);
+    if (Number.isFinite(v) && v > 0 && v <= 10) rating = Math.round(v * 10) / 10;
+  }
+  if (voteCount == null) {
+    const voteText =
+      $('[data-testid="hero-rating-bar__aggregate-rating"]').text()
+      || $('[data-testid="hero-rating-bar__aggregate-rating__score"]').parent().text();
+    const m = voteText.match(/([\d.,]+)\s*([kKmM])?\s*(?:User ratings|ratings)?/i)
+      || html.match(/"ratingCount"\s*:\s*(\d+)/i);
+    if (m) {
+      let n = parseFloat(String(m[1]).replace(/,/g, ''));
+      const unit = (m[2] || '').toLowerCase();
+      if (unit === 'k') n *= 1000;
+      if (unit === 'm') n *= 1_000_000;
+      if (Number.isFinite(n) && n > 0) voteCount = Math.round(n);
+    }
+  }
+
   return {
     imdbId,
     title: title || fallbackTitle,
@@ -274,9 +364,137 @@ function parseFilmFromHtml(html: string, fallbackTitle: string): FilmMeta {
     synopsis: synopsis && !isJunkSynopsis(synopsis) ? synopsis : null,
     posterUrl,
     genres,
+    rating,
+    voteCount,
     cast,
     directors,
+    crew: [],
   };
+}
+
+/** Map IMDb fullcredits section headers → our credit roles. */
+function mapCreditsSection(header: string): string | null {
+  const h = header.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!h || h === 'edit' || h === 'see more' || h.length > 60) return null;
+  if (/^direct(ed|or|ion)\b/.test(h)) return 'director';
+  if (/^writ(ing|er|ten)\b/.test(h) || h.includes('screenplay') || /^story by\b/.test(h)) return 'writer';
+  if (/^cast$/.test(h) || h === 'cast in credits order' || /^cast\b/.test(h)) return 'actor';
+  if (/^produc/.test(h)) return 'producer';
+  if (h.includes('cinematograph') || h.includes('director of photography')) return 'cinematographer';
+  if (h.includes('production design') || /^art direction\b/.test(h) || /^art director\b/.test(h)) return 'art director';
+  if (/^edit(or|ing|ed by)\b/.test(h) || h === 'film editing') return 'editor';
+  if (/^music\b/.test(h) || h.includes('composer') || h.includes('soundtrack')) return 'composer';
+  if (/^sound\b/.test(h)) return 'sound';
+  if (h.includes('costume')) return 'costume designer';
+  if (h.includes('makeup') || h.includes('make up')) return 'makeup';
+  return null;
+}
+
+function parseFullCredits(html: string, markdown: string): { cast: FilmMeta['cast']; directors: FilmMeta['directors']; crew: CreditRow[] } {
+  const cast: FilmMeta['cast'] = [];
+  const directors: FilmMeta['directors'] = [];
+  const crew: CreditRow[] = [];
+  const seen = new Set<string>();
+
+  const push = (name: string, role: string, character: string | null, href: string | null) => {
+    const n = name.replace(/\s+/g, ' ').trim();
+    if (!n || n.length < 2) return;
+    if (/^(edit|see agents|imdbpro|contribute|jump to|related lists|go to|back to|more from|more to explore)/i.test(n)) return;
+    if (/^go to\b/i.test(n)) return;
+    if (!/[a-zA-ZÀ-ÖØ-öø-ÿ]/.test(n)) return;
+    const key = `${role}|${n.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const imdbUrl = href
+      ? (href.startsWith('http') ? href.split('?')[0] : `https://www.imdb.com${href.split('?')[0]}`)
+      : null;
+    if (role === 'director') {
+      directors.push({ name: n, imdbUrl });
+    } else if (role === 'actor') {
+      cast.push({ name: n, character, img: null, imdbUrl });
+    } else {
+      crew.push({ name: n, role, character: null, img: null, imdbUrl });
+    }
+  };
+
+  // Prefer classic fullcredits tables in HTML
+  const $ = cheerio.load(html || '');
+  let currentRole: string | null = null;
+  $('h4, h3, .ipc-title__text, table').each((_, el) => {
+    const tag = ((el as any).tagName || (el as any).name || '').toLowerCase();
+    if (tag === 'h4' || tag === 'h3' || $(el).hasClass('ipc-title__text')) {
+      const mapped = mapCreditsSection($(el).text());
+      if (mapped) currentRole = mapped;
+      return;
+    }
+    if (tag !== 'table' || !currentRole) return;
+    $(el).find('tr').each((__, tr) => {
+      const a = $(tr).find('a[href*="/name/nm"]').first();
+      const name = a.text().trim();
+      if (!name) return;
+      const href = a.attr('href') || null;
+      let character: string | null = null;
+      if (currentRole === 'actor') {
+        character = $(tr).find('.character a, td.character').text().replace(/\s+/g, ' ').trim() || null;
+        if (character) character = character.replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim() || null;
+      }
+      push(name, currentRole!, character, href);
+    });
+  });
+
+  // Markdown fallback (Firecrawl often returns clean section headers)
+  if (!cast.length && !directors.length) {
+    const lines = (markdown || '').split(/\n/);
+    let role: string | null = null;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      const header = line.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim();
+      const mapped = mapCreditsSection(header);
+      if (mapped && line.length < 80) {
+        role = mapped;
+        continue;
+      }
+      if (!role) continue;
+      const link = line.match(/\[([^\]]+)\]\((https?:\/\/www\.imdb\.com\/name\/nm\d+[^)]*)\)/i)
+        || line.match(/\[([^\]]+)\]\((\/name\/nm\d+[^)]*)\)/i);
+      if (link) {
+        let character: string | null = null;
+        if (role === 'actor') {
+          const asMatch = line.match(/\(as\s+([^)]+)\)/i);
+          character = asMatch?.[1]?.trim() || null;
+        }
+        push(link[1], role, character, link[2]);
+        continue;
+      }
+      // Plain name line under a section (no link)
+      if (/^[A-ZÀ-ÖØ-öø-ÿ][\w.'’\- ]{1,60}$/.test(line) && !/^edit$/i.test(line)) {
+        push(line, role, null, null);
+      }
+    }
+  }
+
+  return { cast, directors, crew };
+}
+
+function mergeFullCredits(meta: FilmMeta, extra: ReturnType<typeof parseFullCredits>): FilmMeta {
+  const castNames = new Set(meta.cast.map((c) => c.name.toLowerCase()));
+  for (const c of extra.cast) {
+    if (!castNames.has(c.name.toLowerCase())) {
+      meta.cast.push(c);
+      castNames.add(c.name.toLowerCase());
+    } else {
+      const existing = meta.cast.find((x) => x.name.toLowerCase() === c.name.toLowerCase());
+      if (existing && !existing.character && c.character) existing.character = c.character;
+      if (existing && !existing.imdbUrl && c.imdbUrl) existing.imdbUrl = c.imdbUrl;
+    }
+  }
+  const dirNames = new Set(meta.directors.map((d) => d.name.toLowerCase()));
+  for (const d of extra.directors) {
+    if (!dirNames.has(d.name.toLowerCase())) meta.directors.push(d);
+  }
+  meta.crew = extra.crew;
+  return meta;
 }
 
 function parsePersonFromHtml(html: string, fallbackName: string) {
@@ -314,22 +532,59 @@ function parsePersonFromHtml(html: string, fallbackName: string) {
   return { name, bio, photoUrl, dateOfBirth, birthplace };
 }
 
-async function matchFilm(title: string) {
+async function matchFilm(title: string, year: number | null = null, imdbId: string | null = null) {
+  if (imdbId) {
+    const { data: byId } = await supabase
+      .from('films')
+      .select('id,title,year,synopsis,poster_url,backdrop_url,runtime_minutes,genres,countries,source,imdb_id,imdb_rating,imdb_vote_count,tmdb_rating')
+      .eq('imdb_id', imdbId)
+      .maybeSingle();
+    if (byId) return byId;
+  }
+
   const { data: exactRows } = await supabase
     .from('films')
-    .select('id,title,year,synopsis,poster_url,backdrop_url,runtime_minutes,genres,countries,source')
+    .select('id,title,year,synopsis,poster_url,backdrop_url,runtime_minutes,genres,countries,source,imdb_id,imdb_rating,imdb_vote_count,tmdb_rating')
     .ilike('title', title)
     .limit(10);
-  if (exactRows?.length) return [...exactRows].sort((a, b) => filmRichness(b) - filmRichness(a))[0];
+  if (exactRows?.length) {
+    if (year) {
+      const sameYear = exactRows.filter((r) => r.year === year);
+      if (sameYear.length) return [...sameYear].sort((a, b) => filmRichness(b) - filmRichness(a))[0];
+    }
+    return [...exactRows].sort((a, b) => filmRichness(b) - filmRichness(a))[0];
+  }
+
+  // Avoid fuzzy-matching "Title" onto "Title 2" / "Title 3"
+  if (year) {
+    const { data: yearRows } = await supabase
+      .from('films')
+      .select('id,title,year,synopsis,poster_url,backdrop_url,runtime_minutes,genres,countries,source,imdb_id,imdb_rating,imdb_vote_count,tmdb_rating')
+      .eq('year', year)
+      .ilike('title', `${title}%`)
+      .limit(10);
+    const exactish = (yearRows || []).filter((r) => {
+      const a = (r.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+      const b = title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+      return a === b;
+    });
+    if (exactish.length) return exactish[0];
+  }
 
   const { data } = await supabase.rpc('match_film_fuzzy', { query_title: title, threshold: 0.65 });
   const row = Array.isArray(data) ? data[0] : data;
   if (!row?.id) return null;
   const { data: film } = await supabase
     .from('films')
-    .select('id,title,year,synopsis,poster_url,backdrop_url,runtime_minutes,genres,countries,source')
+    .select('id,title,year,synopsis,poster_url,backdrop_url,runtime_minutes,genres,countries,source,imdb_id,imdb_rating,imdb_vote_count,tmdb_rating')
     .eq('id', row.id)
     .maybeSingle();
+  if (film && year && film.year && film.year !== year) {
+    // Fuzzy hit on a sequel/different year — treat as no match so we create the right title
+    const a = (film.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const b = title.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (a !== b) return null;
+  }
   return film;
 }
 
@@ -365,6 +620,11 @@ function filmPatch(existing: any, imdb: FilmMeta) {
     genres: imdb.genres,
   });
 
+  // Always keep IMDb identity + official score (not review text).
+  if (imdb.imdbId && existing.imdb_id !== imdb.imdbId) patch.imdb_id = imdb.imdbId;
+  if (imdb.rating != null && existing.imdb_rating !== imdb.rating) patch.imdb_rating = imdb.rating;
+  if (imdb.voteCount != null && existing.imdb_vote_count !== imdb.voteCount) patch.imdb_vote_count = imdb.voteCount;
+
   if (ours >= theirs + 10 && !isJunkSynopsis(existing.synopsis) && textLen(existing.synopsis) >= 120 && existing.poster_url) {
     return { patch, skip: true };
   }
@@ -396,9 +656,26 @@ function personPatch(existing: any, imdb: ReturnType<typeof parsePersonFromHtml>
 }
 
 function loadCheckpoint(): Checkpoint {
-  if (RESUME && fs.existsSync(CHECKPOINT)) return JSON.parse(fs.readFileSync(CHECKPOINT, 'utf8'));
+  if (RESUME && fs.existsSync(CHECKPOINT)) {
+    const raw = JSON.parse(fs.readFileSync(CHECKPOINT, 'utf8'));
+    return {
+      doneFilmUrls: raw.doneFilmUrls || [],
+      doneFilmIds: raw.doneFilmIds || [],
+      stats: raw.stats || {
+        filmsCreated: 0,
+        filmsEnriched: 0,
+        filmsSkippedRich: 0,
+        peopleCreated: 0,
+        peopleEnriched: 0,
+        creditsLinked: 0,
+        filmsUnmatched: 0,
+        errors: 0,
+      },
+    };
+  }
   return {
     doneFilmUrls: [],
+    doneFilmIds: [],
     stats: {
       filmsCreated: 0,
       filmsEnriched: 0,
@@ -406,6 +683,7 @@ function loadCheckpoint(): Checkpoint {
       peopleCreated: 0,
       peopleEnriched: 0,
       creditsLinked: 0,
+      filmsUnmatched: 0,
       errors: 0,
     },
   };
@@ -448,15 +726,204 @@ async function collectFilmLinks(countries: string[], maxPages: number) {
   return [...all.values()];
 }
 
-async function upsertFilm(meta: FilmMeta, cp: Checkpoint) {
-  if (!meta.title) return null;
-  const existing = await matchFilm(meta.title);
+function normTitle(s: string) {
+  return (s || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isJunkImdbCandidateTitle(title: string) {
+  const t = title.toLowerCase();
+  if (
+    /\b(trailer|teaser|behind the scenes|bts|interview|premiere night|showing next|watch online|full movie|official video|just released|super interesting|mafia boss|stopped smiling)\b/.test(t)
+  ) return true;
+  if (/\b(part|episode|ep)\.?\s*\d+\b/.test(t)) return true;
+  if (/\bon\s+(youtube|netflix|amazon|apatatv|ibakatv|rokstudios)\+?\b/.test(t)) return true;
+  if (title.length > 80) return true;
+  if (title.split(/\s+/).filter(Boolean).length >= 10) return true;
+  return false;
+}
+
+/** Find published films with thin cast/crew for batch enrichment. */
+async function collectThinFilmsFromDb(limit: number, maxCredits: number, doneIds: Set<string>): Promise<DbFilmTarget[]> {
+  const pageSize = 500;
+  const candidates: Array<DbFilmTarget & { score: number }> = [];
+  let from = 0;
+  const goodSources = new Set([
+    'nollymeter', 'nollydata', 'tmdb', 'mubi', 'netflix', 'imdb', 'manual', 'amaa', 'amvca', 'tinff',
+  ]);
+
+  while (candidates.length < limit * 4) {
+    const { data: films, error } = await supabase
+      .from('films')
+      .select('id,title,year,imdb_id,synopsis,poster_url,is_published,status,source')
+      .eq('is_published', true)
+      .lte('year', 2024)
+      .gte('year', 1985)
+      .order('year', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!films?.length) break;
+
+    const ids = films.map((f) => f.id).filter((id) => !doneIds.has(id));
+    const counts = new Map<string, number>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const slice = ids.slice(i, i + 200);
+      const { data: creds } = await supabase.from('credits').select('film_id').in('film_id', slice);
+      for (const c of creds || []) {
+        counts.set(c.film_id, (counts.get(c.film_id) || 0) + 1);
+      }
+    }
+
+    for (const f of films) {
+      if (doneIds.has(f.id)) continue;
+      const n = counts.get(f.id) || 0;
+      if (n >= maxCredits) continue;
+      const title = (f.title || '').trim();
+      if (title.length < 2) continue;
+      if (isJunkImdbCandidateTitle(title)) continue;
+      if (!f.imdb_id && !f.year) continue;
+      // Most brand-new YouTube-year rows aren't on IMDb with usable credits yet.
+      if (!f.imdb_id && f.year && f.year >= 2026) continue;
+
+      let score = 0;
+      if (f.imdb_id) score += 1000;
+      if (f.year && f.year <= 2025) score += 80;
+      if (f.year && f.year >= 1990 && f.year <= 2024) score += 40;
+      if (goodSources.has(String(f.source || '').toLowerCase())) score += 60;
+      if (textLen(f.synopsis) > 60) score += 40;
+      if (f.poster_url) score += 20;
+      // Partial cast already → more likely a real title worth completing
+      if (n >= 1 && n < maxCredits) score += 50;
+      score -= n; // thinner first among peers
+
+      candidates.push({
+        id: f.id,
+        title,
+        year: f.year,
+        imdb_id: f.imdb_id,
+        creditCount: n,
+        score,
+      });
+    }
+
+    from += pageSize;
+    if (films.length < pageSize) break;
+  }
+
+  candidates.sort((a, b) => b.score - a.score || (b.year || 0) - (a.year || 0));
+  return candidates.slice(0, limit).map(({ score: _s, ...rest }) => rest);
+}
+
+/** Resolve title(+year) → IMDb tt id via find page. */
+async function findImdbTitle(title: string, year: number | null): Promise<{ id: string; url: string } | null> {
+  const q = year ? `${title} ${year}` : title;
+  const url = `https://www.imdb.com/find/?q=${encodeURIComponent(q)}&s=tt`;
+  const scraped = await firecrawlScrape(url);
+  const found = extractTitleLinks(scraped.links, scraped.markdown);
+  if (!found.length) return null;
+
+  const want = normTitle(title);
+  const scored = found.map((f) => {
+    const id = (f.url.match(/tt\d+/) || [])[0] || '';
+    const got = normTitle(f.title === id ? '' : f.title);
+    let score = 0;
+    if (got && got === want) score += 100;
+    else if (got && (got.includes(want) || want.includes(got))) score += 40;
+    if (year && new RegExp(`\\b${year}\\b`).test(f.title)) score += 30;
+    // Prefer titled anchors over bare tt ids
+    if (f.title && f.title !== id) score += 10;
+    return { id, url: `https://www.imdb.com/title/${id}/`, score, title: f.title };
+  }).filter((x) => x.id);
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+  // Require a reasonably confident title match — bare first-hit linking poisons the catalog.
+  if (!best || best.score < 70) return null;
+  return { id: best.id, url: best.url };
+}
+
+async function resolveDbTargetsToQueue(targets: DbFilmTarget[], cp: Checkpoint): Promise<QueueItem[]> {
+  const queue: QueueItem[] = [];
+  for (const t of targets) {
+    if (t.imdb_id) {
+      queue.push({
+        title: t.title,
+        url: `https://www.imdb.com/title/${t.imdb_id}/`,
+        forceFilmId: t.id,
+      });
+      continue;
+    }
+    console.log(`🔎 find IMDb: ${t.title}${t.year ? ` (${t.year})` : ''} [credits=${t.creditCount}]`);
+    try {
+      const hit = await findImdbTitle(t.title, t.year);
+      if (!hit) {
+        console.log(`   ✗ no IMDb match`);
+        cp.stats.filmsUnmatched++;
+        cp.doneFilmIds.push(t.id);
+        continue;
+      }
+      console.log(`   → ${hit.id}`);
+      queue.push({ title: t.title, url: hit.url, forceFilmId: t.id });
+      await delay(600);
+    } catch (e: any) {
+      console.warn(`   find fail: ${e.message}`);
+      cp.stats.errors++;
+    }
+  }
+  return queue;
+}
+
+async function upsertFilm(meta: FilmMeta, cp: Checkpoint, forceFilmId?: string) {
+  if (!meta.title && !forceFilmId) return null;
+
+  let existing: any = null;
+  if (forceFilmId) {
+    const { data } = await supabase
+      .from('films')
+      .select('id,title,year,synopsis,poster_url,backdrop_url,runtime_minutes,genres,countries,source,imdb_id,imdb_rating,imdb_vote_count,tmdb_rating')
+      .eq('id', forceFilmId)
+      .maybeSingle();
+    existing = data;
+    if (!existing) {
+      console.warn(`   force film missing: ${forceFilmId}`);
+      cp.stats.errors++;
+      return null;
+    }
+  } else {
+    existing = await matchFilm(meta.title!, meta.year, meta.imdbId);
+  }
 
   if (existing) {
     const { patch, skip } = filmPatch(existing, meta);
-    if (skip || !Object.keys(patch).length) {
+    if (!existing.countries?.length) patch.countries = ['Nigeria'];
+    const ratingOnly =
+      Object.keys(patch).every((k) => ['imdb_id', 'imdb_rating', 'imdb_vote_count', 'countries'].includes(k));
+    if (skip && Object.keys(patch).length === 0) {
       cp.stats.filmsSkippedRich++;
-      console.log(`   ⏭️ rich enough: ${meta.title}`);
+      console.log(`   ⏭️ rich enough: ${existing.title || meta.title}`);
+      return existing.id as string;
+    }
+    if (skip && !ratingOnly && !(Object.keys(patch).length === 1 && patch.countries)) {
+      // Still apply IMDb id/score even when metadata is rich enough.
+      const keep: Record<string, any> = {};
+      for (const k of ['imdb_id', 'imdb_rating', 'imdb_vote_count', 'countries']) {
+        if (k in patch) keep[k] = patch[k];
+      }
+      Object.keys(patch).forEach((k) => delete patch[k]);
+      Object.assign(patch, keep);
+      if (!Object.keys(patch).length) {
+        cp.stats.filmsSkippedRich++;
+        console.log(`   ⏭️ rich enough: ${existing.title || meta.title}`);
+        return existing.id as string;
+      }
+    }
+    if (!Object.keys(patch).length) {
+      cp.stats.filmsSkippedRich++;
+      console.log(`   ⏭️ rich enough: ${existing.title || meta.title}`);
       return existing.id as string;
     }
     if (!DRY) {
@@ -468,7 +935,7 @@ async function upsertFilm(meta: FilmMeta, cp: Checkpoint) {
       }
     }
     cp.stats.filmsEnriched++;
-    console.log(`   ✨ enriched: ${meta.title} (${Object.keys(patch).join(', ')})`);
+    console.log(`   ✨ enriched: ${existing.title || meta.title} (${Object.keys(patch).join(', ')})`);
     return existing.id as string;
   }
 
@@ -477,7 +944,7 @@ async function upsertFilm(meta: FilmMeta, cp: Checkpoint) {
     console.log(`   +film ${meta.title}`);
     return null;
   }
-  const slug = await uniqueSlug('films', makeSlug(meta.title));
+  const slug = await uniqueSlug('films', makeSlug(meta.title!));
   const { data, error } = await supabase
     .from('films')
     .insert({
@@ -488,6 +955,10 @@ async function upsertFilm(meta: FilmMeta, cp: Checkpoint) {
       synopsis: meta.synopsis,
       poster_url: upgradeImdbImage(meta.posterUrl),
       genres: meta.genres.length ? meta.genres : null,
+      countries: ['Nigeria'],
+      imdb_id: meta.imdbId,
+      imdb_rating: meta.rating,
+      imdb_vote_count: meta.voteCount,
       source: 'imdb',
       status: 'released',
       needs_review: true,
@@ -569,46 +1040,95 @@ async function main() {
   }
 
   const cp = loadCheckpoint();
-  console.log(`IMDb Africa sync (Firecrawl) dry=${DRY} resume=${RESUME} maxFilms=${MAX_FILMS}`);
-  console.log(`countries=${countriesArg.join(',')}`);
+  console.log(
+    `IMDb Africa sync (Firecrawl) dry=${DRY} resume=${RESUME} fromDb=${FROM_DB} `
+    + `maxFilms=${MAX_FILMS} fullCredits=${FULL_CREDITS}`
+    + (FROM_DB ? ` maxCredits=${MAX_CREDITS}` : ''),
+  );
+  if (ID_LIST.length) console.log(`ids=${ID_LIST.join(',')}`);
+  else if (!FROM_DB) console.log(`countries=${countriesArg.join(',')}`);
 
-  let links = await collectFilmLinks(countriesArg, MAX_SEARCH_PAGES);
-  const done = new Set(cp.doneFilmUrls);
-  links = links.filter((l) => !done.has(l.url)).slice(0, MAX_FILMS);
+  let links: QueueItem[] = [];
+  if (ID_LIST.length) {
+    links = ID_LIST.map((id) => ({
+      title: id,
+      url: `https://www.imdb.com/title/${id}/`,
+    }));
+  } else if (FROM_DB) {
+    const doneIds = new Set(cp.doneFilmIds);
+    const targets = await collectThinFilmsFromDb(MAX_FILMS, MAX_CREDITS, doneIds);
+    console.log(`\n🎯 ${targets.length} thin DB films (credits < ${MAX_CREDITS})`);
+    links = await resolveDbTargetsToQueue(targets, cp);
+    saveCheckpoint(cp);
+  } else {
+    links = await collectFilmLinks(countriesArg, MAX_SEARCH_PAGES);
+    const done = new Set(cp.doneFilmUrls);
+    links = links.filter((l) => !done.has(l.url)).slice(0, MAX_FILMS);
+  }
   console.log(`\n🎯 ${links.length} films to process`);
 
   const thinQueue: Array<{ id: string; url: string; name: string }> = [];
 
   for (let i = 0; i < links.length; i++) {
     const item = links[i];
-    console.log(`\n[${i + 1}/${links.length}] ${item.title}`);
+    console.log(`\n[${i + 1}/${links.length}] ${item.title}${item.forceFilmId ? ` → ${item.forceFilmId.slice(0, 8)}` : ''}`);
     try {
       const scraped = await firecrawlScrape(item.url);
-      const meta = parseFilmFromHtml(scraped.html, item.title);
-      if (!meta.title) {
+      let meta = parseFilmFromHtml(scraped.html, item.title);
+      if (!meta.title && !item.forceFilmId) {
         cp.stats.errors++;
         continue;
       }
-      console.log(`   year=${meta.year || '?'} cast=${meta.cast.length} dirs=${meta.directors.length}`);
 
-      const filmId = await upsertFilm(meta, cp);
+      if (FULL_CREDITS) {
+        const creditsUrl = item.url.replace(/\/?$/, '/') + 'fullcredits/';
+        console.log(`   📋 fullcredits…`);
+        try {
+          const creditsPage = await firecrawlScrape(creditsUrl);
+          meta = mergeFullCredits(meta, parseFullCredits(creditsPage.html, creditsPage.markdown));
+        } catch (e: any) {
+          console.warn(`   fullcredits fail: ${e.message}`);
+        }
+      }
+
+      console.log(
+        `   year=${meta.year || '?'} rating=${meta.rating ?? '?'} votes=${meta.voteCount ?? '?'} `
+        + `cast=${meta.cast.length} dirs=${meta.directors.length} crew=${meta.crew.length}`,
+      );
+
+      const creditHits = meta.cast.length + meta.directors.length + meta.crew.length;
+      // From-db search can latch onto empty/wrong IMDb pages — don't stamp a bad imdb_id.
+      if (item.forceFilmId && creditHits === 0 && meta.rating == null) {
+        console.log(`   ✗ empty IMDb page — skip (no cast/rating)`);
+        cp.stats.filmsUnmatched++;
+        if (item.forceFilmId) cp.doneFilmIds.push(item.forceFilmId);
+        continue;
+      }
+
+      const filmId = await upsertFilm(meta, cp, item.forceFilmId);
       const seen = new Set<string>();
-      for (const d of meta.directors.slice(0, 4)) {
+      for (const d of meta.directors.slice(0, 6)) {
         const k = d.name.toLowerCase();
         if (seen.has(k)) continue;
         seen.add(k);
         await upsertPerson(d.name, 'director', filmId, null, null, d.imdbUrl, cp, thinQueue);
       }
-      for (const c of meta.cast.slice(0, 15)) {
+      const castLimit = FULL_CREDITS ? 80 : 15;
+      for (const c of meta.cast.slice(0, castLimit)) {
         await upsertPerson(c.name, 'actor', filmId, c.character, c.img, c.imdbUrl, cp, thinQueue);
+      }
+      for (const c of meta.crew.slice(0, 40)) {
+        await upsertPerson(c.name, c.role, filmId, null, null, c.imdbUrl, cp, thinQueue);
       }
 
       cp.doneFilmUrls.push(item.url);
+      if (item.forceFilmId) cp.doneFilmIds.push(item.forceFilmId);
       if ((i + 1) % 5 === 0) saveCheckpoint(cp);
       await delay(400);
     } catch (e: any) {
       console.warn(`   ❌ ${e.message}`);
       cp.stats.errors++;
+      if (item.forceFilmId) cp.doneFilmIds.push(item.forceFilmId);
     }
   }
 
@@ -653,7 +1173,15 @@ async function main() {
   saveCheckpoint(cp);
   fs.writeFileSync(
     REPORT,
-    JSON.stringify({ finishedAt: new Date().toISOString(), dryRun: DRY, countries: countriesArg, stats: cp.stats }, null, 2),
+    JSON.stringify({
+      finishedAt: new Date().toISOString(),
+      dryRun: DRY,
+      fromDb: FROM_DB,
+      maxCredits: FROM_DB ? MAX_CREDITS : undefined,
+      countries: FROM_DB ? undefined : countriesArg,
+      ids: ID_LIST,
+      stats: cp.stats,
+    }, null, 2),
   );
   console.log('\n────────────────────────────');
   console.log(JSON.stringify(cp.stats, null, 2));

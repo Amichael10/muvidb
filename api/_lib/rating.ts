@@ -62,3 +62,6 @@ export function tmdbLikedPercent(voteAverage: number, voteCount: number): number
   const wr = (v * voteAverage + TMDB_MIN_VOTES * TMDB_PRIOR_MEAN) / (v + TMDB_MIN_VOTES);
   return pctLiked(wr);
 }
+
+/** Same Bayesian + curve as TMDB — IMDb's official aggregate is also 0–10. */
+export const imdbLikedPercent = tmdbLikedPercent;
