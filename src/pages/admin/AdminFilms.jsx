@@ -1314,6 +1314,8 @@ export default function AdminFilms() {
             <option value="kava">Kava</option>
             <option value="iroko_tv">IrokoTV</option>
             <option value="docuth">Docuth</option>
+            <option value="ebonylife">EbonyLife</option>
+            <option value="circuits">Circuits</option>
           </select>
 
           <select
@@ -1511,7 +1513,17 @@ export default function AdminFilms() {
                             <Icon icon="solar:play-bold" className="w-4 h-4" />
                           </a>
                         )}
-                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && (
+                        {film.streaming_links?.ebonylife && (
+                          <a href={film.streaming_links.ebonylife} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-600/10 text-purple-600 hover:bg-purple-600 hover:text-white transition-all shadow-sm" title="EbonyLife Link">
+                            <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {film.streaming_links?.circuits && (
+                          <a href={film.streaming_links.circuits} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-orange-500/10 text-[#F0532B] hover:bg-[#F0532B] hover:text-white transition-all shadow-sm" title="Circuits.tv Link">
+                            <Icon icon="solar:clapperboard-play-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && (
                           <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
                         )}
                       </div>
@@ -2166,7 +2178,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -2255,6 +2267,7 @@ export default function AdminFilms() {
                       { id: 'showmax', label: 'Showmax', placeholder: 'https://showmax.com/...' },
                       { id: 'docuth', label: 'Docuth', placeholder: 'https://docuth.com/...' },
                       { id: 'ebonylife', label: 'EbonyLife', placeholder: 'https://ebonylifeonplus.com/...' },
+                      { id: 'circuits', label: 'Circuits', placeholder: 'https://www.circuits.tv/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;

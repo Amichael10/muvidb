@@ -14,6 +14,8 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
     showmax: 'https://showmax.com',
     ironflix: 'https://ironflix.com',
     docuth: 'https://web.docuth.com',
+    ebonylife: 'https://ebonylifeonplus.com',
+    circuits: 'https://www.circuits.tv',
   };
 
   const platforms = [
@@ -24,6 +26,8 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
     { id: 'youtube', label: 'YouTube', color: 'bg-[#FF0000]', icon: 'simple-icons:youtube' },
     { id: 'showmax', label: 'Showmax', color: 'bg-[#E10098]', icon: 'solar:tv-linear' },
     { id: 'docuth', label: 'Docuth', color: 'bg-[#0F0F10]', icon: 'solar:play-bold' },
+    { id: 'ebonylife', label: 'EbonyLife', color: 'bg-[#800080]', icon: 'solar:play-circle-bold' },
+    { id: 'circuits', label: 'Circuits', color: 'bg-[#F0532B]', icon: 'solar:clapperboard-play-bold' },
   ];
 
   const availableLinks = platforms.map(p => {
