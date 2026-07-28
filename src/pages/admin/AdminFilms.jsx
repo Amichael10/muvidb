@@ -16,7 +16,7 @@ import { toTitleCase, toSentenceCase } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { authHeaders } from '../../lib/apiAuth';
-import { parseLanguages } from '../../utils/languages';
+import { parseLanguages, AFRICAN_LANGUAGES } from '../../utils/languages';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -2158,16 +2158,70 @@ export default function AdminFilms() {
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Content Rating</label>
-                    <select 
-                      name="nfvcb_rating" 
-                      value={formData.nfvcb_rating} 
-                      onChange={handleChange} 
+                    <select
+                      name="nfvcb_rating"
+                      value={formData.nfvcb_rating}
+                      onChange={handleChange}
                       className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
                     >
                       {['G', 'PG', 'PG-13', '15', '18'].map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
                 </div>
+
+                {/* Languages — multi-select. Backed by the single `formData.language`
+                    string ("English, Yoruba"); the existing save path parses it into
+                    the languages[] array. First selected = primary language. */}
+                {(() => {
+                  const selected = parseLanguages(formData.language);
+                  const setLangs = (arr) =>
+                    setFormData((prev) => ({ ...prev, language: arr.join(', ') }));
+                  const remaining = AFRICAN_LANGUAGES.filter((l) => !selected.includes(l));
+                  return (
+                    <div className="pt-2">
+                      <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">
+                        Languages {selected.length > 0 && <span className="text-text-muted/60 normal-case font-normal">· first is primary</span>}
+                      </label>
+                      {selected.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {selected.map((lang, i) => (
+                            <span
+                              key={lang}
+                              className={`inline-flex items-center gap-1 text-[11px] font-semibold pl-2 pr-1 py-1 rounded-md border ${
+                                i === 0
+                                  ? 'bg-brand/15 border-brand/40 text-brand'
+                                  : 'bg-surface-2 border-border text-text-primary'
+                              }`}
+                            >
+                              {lang}
+                              {i === 0 && <span className="text-[8px] uppercase opacity-70">primary</span>}
+                              <button
+                                type="button"
+                                onClick={() => setLangs(selected.filter((l) => l !== lang))}
+                                className="w-4 h-4 rounded hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center"
+                                title={`Remove ${lang}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) setLangs([...selected, e.target.value]);
+                        }}
+                        className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      >
+                        <option value="">+ Add a language…</option>
+                        {remaining.map((l) => (
+                          <option key={l} value={l}>{l}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="p-5 bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/20 rounded-lg space-y-4">

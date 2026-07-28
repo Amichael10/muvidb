@@ -368,6 +368,36 @@ export default function FilmDetail() {
   };
 
   const fetchRelated = async (film) => {
+    // Precomputed "More Like This" first — one indexed read of film_related,
+    // built offline by scripts/build_related_films.ts (shared cast > rare genre >
+    // language > series, with popularity fallback and dup/franchise de-duping).
+    // Falls through to the live genre query below only when a film has no
+    // precomputed rows yet (e.g. added since the last rebuild).
+    try {
+      const { data: pre } = await supabase
+        .from('film_related')
+        .select('rank, reason, films:related_id (id, title, year, poster_url, backdrop_url, slug, view_count, content_type, film_genres(genres(name)))')
+        .eq('film_id', film.id)
+        .order('rank', { ascending: true })
+        .limit(12);
+
+      if (pre && pre.length) {
+        const mapped = pre
+          .filter((r) => r.films)
+          .map((r) => ({
+            ...r.films,
+            _reason: r.reason || null,
+            genres: dedupeGenres(r.films.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || []),
+          }));
+        if (mapped.length) {
+          setRelatedFilms(mapped);
+          return;
+        }
+      }
+    } catch {
+      // Table missing or read failed — fall back to the live logic below.
+    }
+
     const sourceGenreIds = (film.film_genres || []).map((row) => row.genre_id).filter(Boolean);
     let candidateIds = [];
 
@@ -1080,9 +1110,14 @@ export default function FilmDetail() {
                       <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-2 mb-1 tracking-tight">
                         {formatFilmTitle(relatedFilm.title)}
                       </h4>
-                      <div className="text-[10px] font-bold text-text-muted mb-2">
+                      <div className="text-[10px] font-bold text-text-muted mb-1">
                         {relatedFilm.year} • {relatedFilm.genres && relatedFilm.genres.length > 0 ? relatedFilm.genres[0] : 'Media'}
                       </div>
+                      {relatedFilm._reason && (
+                        <div className="text-[9px] font-bold text-brand/80 uppercase tracking-wide line-clamp-1">
+                          {relatedFilm._reason}
+                        </div>
+                      )}
                     </div>
                   </Link>
                 ))}

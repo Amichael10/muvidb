@@ -6,7 +6,105 @@ any agent or developer can pick up without the originating conversation.
 
 Companion doc: `docs/SSR_MIGRATION.md` (the SSR effort has its own detailed plan).
 
-**Last updated:** 2026-07-25 — homepage perf pass 1 live (`e8de7fd`).
+**Last updated:** 2026-07-28.
+
+---
+
+## ⏳ IN PROGRESS — YouTube credit-roll harvester (2026-07-28) — LOCAL ONLY, not committed
+
+**Problem:** Nollywood YouTube films aren't on IMDB. Measured the alternatives:
+descriptions are hashtag spam (**0%** carry cast markers — the "Starring:" theory was
+tested and is false); the **actor is often in the TITLE** ("JACINTA THE WISE FOOL PT 1
+— Ekene Umenwa"). The credit roll remains the only full cast/crew source. Manual
+screenshot+OCR hits 99% **because a human picks the frame** — so the automation's real
+failure is *frame selection and validation*, not the AI.
+
+**Design (see the reasoning in this session):** ffmpeg finds the roll, **local OCR
+(tesseract) reads it — zero image tokens**, only the video *tail* is downloaded at low
+res. Runs headless on a spare laptop (residential IP + flat bandwidth; cloud+residential
+proxy would cost thousands, since proxies bill per GB and video is heavy).
+
+**Built:**
+- `supabase/migrations/20260728010500_credit_harvest.sql` — **applied**.
+  `credit_harvest_jobs` (work queue) + `credit_candidates` (proposals awaiting review).
+  Admin-only RLS **and** table GRANTs (the `film_related` 42501 lesson).
+  `outcome='no_credits'` is a **first-class result**, so films with no roll are recorded
+  and never re-guessed.
+- `scripts/harvest_credits.ts` — headless worker. Enqueue modes (`--enqueue-recon`,
+  `--enqueue-popular`), claim loop, resumable, rate-limited.
+  **Fixes the two reported failures:** `STOP_MARKERS` discard promo blocks wholesale
+  ("coming soon", "subscribe", "watch part 2") so end-of-video adverts are never mined
+  for names; a **structural density gate** (`MIN_ENTRIES`) rejects frames that aren't a
+  real roll instead of harvesting stray names. Names resolve via
+  `find_person_by_name` / `upsert_person_by_name` so it can't spawn duplicate people.
+- `src/pages/admin/AdminCreditHarvest.jsx` + route `/admin/credits/harvest` + nav link.
+  Pipeline stats, grouped-by-film review, **approve / reject / delete** (per-row and
+  bulk), confidence filter. Approve creates the person if needed then writes the credit;
+  reject keeps the row so the same bad name isn't re-proposed; delete removes OCR junk.
+
+**Verified:** migration applied; table read/write; `--enqueue-recon=1` really enqueued
+**991 jobs across 992 channels** (those rows are live in the queue now); the admin
+page's exact embedded query returns correctly-shaped data; `npm run build` passes.
+
+**NOT verified — the extraction loop has never actually run.** `yt-dlp`, `ffmpeg` and
+`tesseract` are not installed on this machine, so download → frame-extract → OCR → parse
+is unproven end to end. Expect the OCR parsing heuristics (`looksLikeName`, role
+splitting, `STOP_MARKERS`) to need tuning against real Nollywood rolls — that's the part
+to iterate on first.
+
+**To start on the worker laptop:** install the three tools, then
+`npx tsx scripts/harvest_credits.ts --enqueue-recon=3` and
+`npx tsx scripts/harvest_credits.ts`. **Disable sleep first** — that's the usual reason
+these jobs are found dead days later. Debug a single film with `--film=<uuid> --keep`.
+
+---
+
+## ⏳ IN PROGRESS — "More Like This" recommender + film-edit language dropdown (2026-07-28)
+
+**Status: built + DB migrations applied, but LOCAL ONLY — NOT committed, NOT pushed**
+(owner's standing rule this session: experiments on staging, no push without the
+word). Built in the working tree alongside the owner's own uncommitted WIP, which
+was left untouched — my target files (`AdminFilms.jsx`, `FilmDetail.jsx`) weren't in
+their dirty set.
+
+**Recommender — precomputed `film_related` table (the "best option").** Replaces the
+old genre-only related query that degraded to random (62%→actually 97% of films are
+"Drama", and its empty-genre fallback pulled 12 arbitrary rows).
+- **Migrations applied to the shared DB** (additive, safe, nothing read it until the
+  frontend wire): `20260728002546_film_related.sql` (table + RLS public-read),
+  `20260728002727_film_related_grants.sql`. NB the table shipped with no GRANTs, so
+  even service_role hit 42501 until granted — RLS narrows, GRANT enables.
+- `scripts/build_related_films.ts` — weighted blend, computed offline:
+  **shared cast/crew** (strongest; label "More with <name>") > **rarity-weighted
+  genre** (IDF; **Drama on 97% of films is excluded entirely — the key lever**) >
+  **shared minority language** (bonus only when non-English) > **same series** >
+  year proximity, **popularity as a non-random fallback** (never arbitrary rows).
+- De-dup guards that proved necessary: drops re-uploads of the SAME film under
+  variant titles ("Cwa (Calamity Wanders Ahead)" vs "Calamity Wanders Ahead"), and
+  caps each franchise to 2 via a `franchiseKey` that strips part/season/episode
+  numbers (naive first-N-words fails: "Koleoso Pt 13" vs "Koleoso Part 7").
+- **Populated 467,875 rows across ~39k films.** Verified on cast-rich films
+  (Koleoso → other Ibrahim Yekini/Itele films; Calamity → varied cast) and confirmed
+  the exact anon embedded query the browser runs returns relevant, labelled results.
+- `FilmDetail.jsx` reads `film_related` first (one indexed query), falls back to the
+  old live genre logic only when a film has no precomputed rows. A brand-orange
+  reason label renders under each related title.
+- **Freshness TODO:** `film_related` is a snapshot — new films/credits won't show as
+  related until a rebuild. Schedule `npx tsx scripts/build_related_films.ts` (weekly,
+  or after the daily sync). Re-running is safe (delete-then-insert per film).
+
+**Film-edit language dropdown.** `AFRICAN_LANGUAGES` (curated, Nigeria-first) added to
+`src/utils/languages.js`; `AdminFilms.jsx` edit form gets a chip multi-select in the
+Duration/Rating row, backed by the existing `formData.language` string (first =
+primary). Existing save path already parses it to `languages[]` — no save change.
+
+**Caveats:** neither feature is visually tested (dev server had a stale-service-worker
+issue earlier). `tsc`/build pass; the two chunking warnings are pre-existing. Nothing
+committed or pushed — awaiting the owner's call on landing to staging.
+
+---
+
+### Homepage perf pass 1 (2026-07-25, live `e8de7fd`)
 
 **Where we stopped:** Homepage perf pass 1 is on production. Lab re-score
 (mobile, 2-run avg) vs baseline:
