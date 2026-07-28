@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Icon } from '@iconify/react';
 
+const MOTION_STORAGE_KEY = 'MuviDB_motion_enabled';
+
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -11,12 +13,17 @@ export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState(['King of Boys', 'Funke Akindele', 'Anikulapo']);
   const [unreadNotifications, setUnreadNotifications] = useState(false);
+  const [isMotionEnabled, setIsMotionEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem(MOTION_STORAGE_KEY) !== 'false';
+  });
   
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const searchInputRef = useRef(null);
+  const isHome = location.pathname === '/';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -41,6 +48,13 @@ export default function Navbar() {
       }
     }
   }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    document.documentElement.classList.toggle('muvi-motion-paused', !isMotionEnabled);
+    localStorage.setItem(MOTION_STORAGE_KEY, isMotionEnabled ? 'true' : 'false');
+  }, [isMotionEnabled]);
 
   // Close search and menus on route change
   useEffect(() => {
@@ -124,6 +138,27 @@ export default function Navbar() {
           >
             <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="22" height="22" />
           </button>
+
+          {isHome && (
+            <button
+              onClick={() => setIsMotionEnabled((enabled) => !enabled)}
+              className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 ${
+                isMotionEnabled
+                  ? 'bg-brand/10 text-brand hover:bg-brand/15'
+                  : 'text-text-muted hover:text-brand hover:bg-brand/10'
+              }`}
+              aria-label={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
+              aria-pressed={isMotionEnabled}
+              title={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
+            >
+              <span
+                className={`muvi-motion-toggle-kernel ${
+                  isMotionEnabled ? '' : 'muvi-motion-toggle-kernel--off'
+                }`}
+                aria-hidden="true"
+              />
+            </button>
+          )}
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2 md:gap-4">

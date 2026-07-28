@@ -119,9 +119,18 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
 function BackToTop() {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const handleScroll = () => setVisible(window.scrollY > 400);
+    const handleScroll = () => {
+      const footer = document.querySelector('footer');
+      const footerVisible = footer ? footer.getBoundingClientRect().top < window.innerHeight : false;
+      setVisible(window.scrollY > 400 && !footerVisible);
+    };
+    handleScroll();
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
   }, []);
   if (!visible) return null;
   return (
