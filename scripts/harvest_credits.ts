@@ -209,19 +209,50 @@ async function insertJobs(rows: { film_id: string; channel_id: string | null; pr
 }
 
 // ------------------------------------------------------------- processing ---
-/** Pull the tail of the video at low res into a temp dir. */
-async function downloadTail(url: string, dir: string): Promise<string> {
+/** Run yt-dlp and, on failure, surface its actual stderr (not just "command failed"). */
+async function ytdlp(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  try {
+    return await run('yt-dlp', args, { timeout: 300_000, maxBuffer: 32 * 1024 * 1024 });
+  } catch (e: any) {
+    const detail = String(e?.stderr || e?.stdout || e?.message || '')
+      .trim().split('\n').filter(Boolean).slice(-4).join('  |  ');
+    throw new Error(detail || 'yt-dlp failed');
+  }
+}
+
+/** Ask yt-dlp for the video duration in seconds (no download). */
+async function probeDuration(url: string): Promise<number> {
+  const { stdout } = await ytdlp(['--skip-download', '--no-warnings', '--print', '%(duration)s', ...cookieArgs(), url]);
+  const d = parseInt(String(stdout).trim(), 10);
+  return Number.isFinite(d) && d > 0 ? d : 0;
+}
+
+/**
+ * Pull the tail of the video at low res. yt-dlp's --download-sections takes
+ * TIMESTAMPS, not percentages (the previous *86%-100% was invalid), so we probe
+ * the real duration first, fall back to the DB runtime, and section by seconds.
+ */
+async function downloadTail(url: string, dir: string, runtimeSecHint = 0): Promise<string> {
   const out = join(dir, 'tail.mp4');
+
+  let duration = 0;
+  try { duration = await probeDuration(url); } catch { /* fall back to hint */ }
+  if (!duration) duration = runtimeSecHint;
+  if (!duration) throw new Error('could not determine video duration (probe failed, no DB runtime)');
+
+  const start = Math.max(0, Math.floor(duration * (1 - TAIL_PCT)));
+  const end = Math.ceil(duration) + 5; // a hair past the end; explicit beats "inf"
+
   // worst video that's still >=360p keeps text legible while staying tiny.
-  await run('yt-dlp', [
+  await ytdlp([
     '-f', 'worstvideo[height>=360]/worst',
-    '--download-sections', `*${Math.round((1 - TAIL_PCT) * 100)}%-100%`,
+    '--download-sections', `*${start}-${end}`,
     '--force-keyframes-at-cuts',
     ...cookieArgs(),
     '-o', out,
-    '--no-playlist', '--no-warnings', '--quiet',
+    '--no-playlist', '--no-warnings',
     url,
-  ], { timeout: 300_000 });
+  ]);
   return out;
 }
 
@@ -292,7 +323,7 @@ function looksLikeName(s: string): boolean {
 async function processJob(job: Job) {
   const { data: film } = await supabase
     .from('films')
-    .select('id, title, youtube_watch_url')
+    .select('id, title, youtube_watch_url, runtime_minutes')
     .eq('id', job.film_id)
     .single();
 
@@ -310,7 +341,7 @@ async function processJob(job: Job) {
 
   try {
     console.log(`   ⬇️  downloading tail of "${film.title?.slice(0, 45)}"…`);
-    const video = await downloadTail(film.youtube_watch_url, dir);
+    const video = await downloadTail(film.youtube_watch_url, dir, (film.runtime_minutes ?? 0) * 60);
     const frames = await extractFrames(video, dir);
     if (!frames.length) { await finish(job, 'no_credits', 0, 'no frames'); return; }
 
