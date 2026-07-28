@@ -240,23 +240,21 @@ async function probeDuration(url: string): Promise<number> {
   return Number.isFinite(d) && d > 0 ? d : 0;
 }
 
-/** Resolve the direct media URL for the lowest legible video-only stream. */
-async function getStreamUrl(url: string): Promise<string> {
-  const { stdout } = await ytdlp(['-g', '-f', 'worstvideo[height>=360]/worst', ...cookieArgs(), '--no-warnings', url]);
-  const first = String(stdout).trim().split('\n').filter(Boolean)[0];
-  if (!first) throw new Error('yt-dlp returned no stream URL');
-  return first;
-}
+// yt-dlp player client. Pass --client=tv|ios|android_vr|default to try a
+// different one if throttled. ANDROID_VR (yt-dlp's current default here) came
+// throttled to a trickle; 'tv' and 'ios' are often faster. Comma list = fallback
+// order.
+const YT_CLIENT = arg('client') || 'tv,ios,android_vr';
 
 /**
- * Extract sampled frames from ONLY the tail window, straight from the stream —
- * no intermediate video file.
+ * Download only the tail (last few minutes) via yt-dlp, then extract frames from
+ * it locally.
  *
- * Why this shape: YouTube throttles these formats to a trickle (the ANDROID_VR
- * URL came with initcwndbps≈371k). Downloading a 16-min section and re-reading
- * it was copying ~150MB through that trickle and timing out. Here ffmpeg
- * fast-seeks (-ss before -i → HTTP range) to the last few minutes and decodes
- * only that window directly to JPEGs — a fraction of the bytes, one pass.
+ * Why let yt-dlp do the download (not raw ffmpeg on a -g URL): yt-dlp invokes
+ * ffmpeg WITH the right `-headers "User-Agent: …"`, which googlevideo requires —
+ * a hand-rolled ffmpeg call omits it and gets rejected. The earlier failure was
+ * copying a 16-MIN section through a throttled stream; the fix is a SMALL window
+ * (last ~4 min) plus a client that isn't throttled, not bypassing yt-dlp.
  */
 async function extractTailFrames(url: string, dir: string, runtimeSecHint = 0): Promise<string[]> {
   let duration = 0;
@@ -266,25 +264,31 @@ async function extractTailFrames(url: string, dir: string, runtimeSecHint = 0): 
 
   const window = Math.max(30, Math.min(TAIL_SECONDS, Math.floor(duration * TAIL_MAX_PCT)));
   const start = Math.max(0, Math.floor(duration - window));
+  const end = Math.ceil(duration) + 5;
+  const tail = join(dir, 'tail.mp4');
 
-  const streamUrl = await getStreamUrl(url);
-  try {
-    await run('ffmpeg', [
-      '-ss', String(start),           // fast input seek (ranged) — before -i
-      '-i', streamUrl,
-      '-t', String(window + 5),
-      '-an',                          // no audio
-      '-vf', `fps=1/${FRAME_EVERY_SEC},scale=960:-1`,
-      '-q:v', '3',
-      join(dir, 'f_%03d.jpg'),
-      '-hide_banner', '-loglevel', 'error', '-y',
-    ], { timeout: YTDLP_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
-  } catch (e: any) {
-    const detail = String(e?.stderr || e?.message || '').trim().split('\n').filter(Boolean).slice(-4).join('\n       ');
-    const err = new Error(`ffmpeg: ${detail || 'frame extraction failed'}`);
-    (err as any).full = String(e?.stderr || e?.message || '');
-    throw err;
-  }
+  const t0 = Date.now();
+  await ytdlp([
+    '-f', 'worstvideo[height>=360]/worst',
+    '--download-sections', `*${start}-${end}`,
+    '--extractor-args', `youtube:player_client=${YT_CLIENT}`,
+    ...cookieArgs(),
+    '-o', tail,
+    '--no-playlist', '--no-warnings',
+    url,
+  ]);
+  console.log(`   ⏱️  downloaded ${window}s tail in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+
+  // Extract frames from the small local file (fast, no network).
+  await run('ffmpeg', [
+    '-i', tail, '-an',
+    '-vf', `fps=1/${FRAME_EVERY_SEC},scale=960:-1`,
+    '-q:v', '3',
+    join(dir, 'f_%03d.jpg'),
+    '-hide_banner', '-loglevel', 'error', '-y',
+  ], { timeout: 120_000, maxBuffer: 32 * 1024 * 1024 });
+
+  await rm(tail, { force: true }); // keep frames, drop the video
   return (await readdir(dir)).filter((f) => f.startsWith('f_')).sort().map((f) => join(dir, f));
 }
 
