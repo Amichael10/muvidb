@@ -23,7 +23,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { supabase } from './lib/db';
@@ -214,9 +214,14 @@ async function ytdlp(args: string[]): Promise<{ stdout: string; stderr: string }
   try {
     return await run('yt-dlp', args, { timeout: 300_000, maxBuffer: 32 * 1024 * 1024 });
   } catch (e: any) {
-    const detail = String(e?.stderr || e?.stdout || e?.message || '')
-      .trim().split('\n').filter(Boolean).slice(-4).join('  |  ');
-    throw new Error(detail || 'yt-dlp failed');
+    // Keep the FULL output on the error so the caller can log it; the short
+    // message prints the last lines each on their own line (a single joined line
+    // gets truncated by the terminal, hiding the actual error).
+    const full = String(e?.stderr || '') + (e?.stdout ? '\n' + e.stdout : '');
+    const tail = full.trim().split('\n').filter(Boolean).slice(-8).join('\n       ');
+    const err = new Error(tail || e?.message || 'yt-dlp failed');
+    (err as any).full = full || String(e?.message ?? '');
+    throw err;
   }
 }
 
@@ -244,10 +249,13 @@ async function downloadTail(url: string, dir: string, runtimeSecHint = 0): Promi
   const end = Math.ceil(duration) + 5; // a hair past the end; explicit beats "inf"
 
   // worst video that's still >=360p keeps text legible while staying tiny.
+  // NB: no --force-keyframes-at-cuts. It forces an ffmpeg re-encode at the cut
+  // boundary, which needs ffmpeg on yt-dlp's own PATH and is a common failure
+  // point. We don't need frame-precise cuts — keyframe-aligned is fine for
+  // grabbing credit-roll frames — so let yt-dlp cut at the nearest keyframe.
   await ytdlp([
     '-f', 'worstvideo[height>=360]/worst',
     '--download-sections', `*${start}-${end}`,
-    '--force-keyframes-at-cuts',
     ...cookieArgs(),
     '-o', out,
     '--no-playlist', '--no-warnings',
@@ -399,7 +407,15 @@ async function processJob(job: Job) {
     console.log(`   ✅ ${film.title?.slice(0, 45)} → ${rows.length} candidates`);
   } catch (e: any) {
     await finish(job, 'error', 0, String(e?.message ?? e).slice(0, 300));
-    console.log(`   ❌ ${film.title?.slice(0, 45)} → ${String(e?.message ?? e).slice(0, 80)}`);
+    // Print the full (multi-line) message, and dump everything to a log file so
+    // nothing is lost to terminal truncation.
+    console.log(`   ❌ ${film.title?.slice(0, 45)}:\n       ${String(e?.message ?? e)}`);
+    try {
+      const logPath = join(dir, 'error.log');
+      await mkdir(dir, { recursive: true });
+      await writeFile(logPath, String((e as any)?.full ?? e?.stack ?? e?.message ?? e));
+      console.log(`   📝 full error → ${logPath}`);
+    } catch { /* best effort */ }
   } finally {
     // Keep frames-only output (that's the whole point) and honour --keep;
     // otherwise wipe the temp dir.
