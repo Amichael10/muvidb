@@ -1,6 +1,8 @@
 /**
  * Headless credit-roll harvester. Runs unattended on a spare machine.
  *
+ *   npx tsx scripts/harvest_credits.ts --enqueue-sparse     # films with < 4 credits (MAIN)
+ *   npx tsx scripts/harvest_credits.ts --enqueue-sparse=2   # films with < 2 credits
  *   npx tsx scripts/harvest_credits.ts --enqueue-recon      # 3 films/channel (recon)
  *   npx tsx scripts/harvest_credits.ts --enqueue-popular=2000
  *   npx tsx scripts/harvest_credits.ts                      # run the worker loop
@@ -146,6 +148,51 @@ async function enqueuePopular(limit: number) {
   await insertJobs((data ?? []).map((f: any) => ({
     film_id: f.id, channel_id: null, priority: Math.round(Math.log10((f.view_count ?? 0) + 1) * 10),
   })));
+}
+
+/**
+ * Enqueue films that AREN'T already enriched — fewer than `minCredits` existing
+ * cast+crew rows. This is the main targeting mode: ~5k films already have full
+ * credits (>=4) and re-harvesting them is pure waste. Ordered by view_count so
+ * the films users actually land on are done first.
+ */
+async function enqueueSparse(minCredits: number) {
+  console.log(`📋 Sparse enqueue: published YouTube films with < ${minCredits} existing credits…`);
+
+  // Count credits per film in one pass (95k rows fits comfortably in memory).
+  const creditCount = new Map<string, number>();
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase.from('credits').select('film_id').range(from, from + 999);
+    if (error) throw new Error(`credits: ${error.message}`);
+    if (!data?.length) break;
+    for (const r of data as any[]) creditCount.set(r.film_id, (creditCount.get(r.film_id) ?? 0) + 1);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+
+  // Walk published YouTube films, keep those below the threshold.
+  const rows: { film_id: string; channel_id: string | null; priority: number }[] = [];
+  from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from('films')
+      .select('id, view_count')
+      .eq('is_published', true)
+      .not('youtube_watch_url', 'is', null)
+      .range(from, from + 999);
+    if (error) throw new Error(`films: ${error.message}`);
+    if (!data?.length) break;
+    for (const f of data as any[]) {
+      if ((creditCount.get(f.id) ?? 0) < minCredits) {
+        rows.push({ film_id: f.id, channel_id: null, priority: Math.round(Math.log10((f.view_count ?? 0) + 1) * 10) });
+      }
+    }
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  console.log(`   ${rows.length} films under the ${minCredits}-credit threshold`);
+  await insertJobs(rows);
 }
 
 async function insertJobs(rows: { film_id: string; channel_id: string | null; priority: number }[]) {
@@ -362,6 +409,7 @@ async function claim(): Promise<Job | null> {
 async function main() {
   if (arg('enqueue-recon') !== undefined) { await enqueueRecon(Number(arg('enqueue-recon')) || 3); return; }
   if (arg('enqueue-popular') !== undefined) { await enqueuePopular(Number(arg('enqueue-popular')) || 2000); return; }
+  if (arg('enqueue-sparse') !== undefined) { await enqueueSparse(Number(arg('enqueue-sparse')) || 4); return; }
 
   await checkPrereqs();
 
