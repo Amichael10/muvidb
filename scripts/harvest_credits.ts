@@ -37,9 +37,14 @@ const arg = (n: string) => {
   return eq === -1 ? 'true' : hit.slice(eq + 1);
 };
 
-const TAIL_PCT = 0.14;          // download the last 14% — where rolls live
+// Credit rolls sit in the final couple of minutes. Grab the last N seconds
+// (capped as a fraction of runtime for very short clips). Small + targeted keeps
+// the download fast — a 16-min section of a DASH stream was timing out.
+const TAIL_SECONDS = 300;       // last 5 minutes
+const TAIL_MAX_PCT = 0.30;      // …but never more than 30% of a short video
 const MIN_ENTRIES = 4;          // structural gate: fewer than this isn't a roll
 const FRAME_EVERY_SEC = 3;      // sample cadence inside the tail
+const YTDLP_TIMEOUT = 600_000;  // 10 min — throttled YouTube streams are slow
 
 /**
  * Anything at/after these markers is promo, not credits. This is the direct fix
@@ -212,15 +217,18 @@ async function insertJobs(rows: { film_id: string; channel_id: string | null; pr
 /** Run yt-dlp and, on failure, surface its actual stderr (not just "command failed"). */
 async function ytdlp(args: string[]): Promise<{ stdout: string; stderr: string }> {
   try {
-    return await run('yt-dlp', args, { timeout: 300_000, maxBuffer: 32 * 1024 * 1024 });
+    return await run('yt-dlp', args, { timeout: YTDLP_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
   } catch (e: any) {
-    // Keep the FULL output on the error so the caller can log it; the short
-    // message prints the last lines each on their own line (a single joined line
-    // gets truncated by the terminal, hiding the actual error).
+    // A timeout/kill shows up as killed/signal, NOT as stderr text, so report it
+    // explicitly — otherwise the message ends mid-download with no visible cause.
+    const reasons: string[] = [];
+    if (e?.killed || e?.signal) reasons.push(`process KILLED (timeout ${YTDLP_TIMEOUT / 1000}s or OOM; signal=${e?.signal ?? 'n/a'})`);
+    if (typeof e?.code === 'number') reasons.push(`exit code ${e.code}`);
     const full = String(e?.stderr || '') + (e?.stdout ? '\n' + e.stdout : '');
     const tail = full.trim().split('\n').filter(Boolean).slice(-8).join('\n       ');
-    const err = new Error(tail || e?.message || 'yt-dlp failed');
-    (err as any).full = full || String(e?.message ?? '');
+    const msg = [reasons.join(', '), tail].filter(Boolean).join('\n       ');
+    const err = new Error(msg || e?.message || 'yt-dlp failed');
+    (err as any).full = `${reasons.join(', ')}\n${full}` || String(e?.message ?? '');
     throw err;
   }
 }
@@ -232,47 +240,51 @@ async function probeDuration(url: string): Promise<number> {
   return Number.isFinite(d) && d > 0 ? d : 0;
 }
 
-/**
- * Pull the tail of the video at low res. yt-dlp's --download-sections takes
- * TIMESTAMPS, not percentages (the previous *86%-100% was invalid), so we probe
- * the real duration first, fall back to the DB runtime, and section by seconds.
- */
-async function downloadTail(url: string, dir: string, runtimeSecHint = 0): Promise<string> {
-  const out = join(dir, 'tail.mp4');
+/** Resolve the direct media URL for the lowest legible video-only stream. */
+async function getStreamUrl(url: string): Promise<string> {
+  const { stdout } = await ytdlp(['-g', '-f', 'worstvideo[height>=360]/worst', ...cookieArgs(), '--no-warnings', url]);
+  const first = String(stdout).trim().split('\n').filter(Boolean)[0];
+  if (!first) throw new Error('yt-dlp returned no stream URL');
+  return first;
+}
 
+/**
+ * Extract sampled frames from ONLY the tail window, straight from the stream —
+ * no intermediate video file.
+ *
+ * Why this shape: YouTube throttles these formats to a trickle (the ANDROID_VR
+ * URL came with initcwndbps≈371k). Downloading a 16-min section and re-reading
+ * it was copying ~150MB through that trickle and timing out. Here ffmpeg
+ * fast-seeks (-ss before -i → HTTP range) to the last few minutes and decodes
+ * only that window directly to JPEGs — a fraction of the bytes, one pass.
+ */
+async function extractTailFrames(url: string, dir: string, runtimeSecHint = 0): Promise<string[]> {
   let duration = 0;
   try { duration = await probeDuration(url); } catch { /* fall back to hint */ }
   if (!duration) duration = runtimeSecHint;
   if (!duration) throw new Error('could not determine video duration (probe failed, no DB runtime)');
 
-  const start = Math.max(0, Math.floor(duration * (1 - TAIL_PCT)));
-  const end = Math.ceil(duration) + 5; // a hair past the end; explicit beats "inf"
+  const window = Math.max(30, Math.min(TAIL_SECONDS, Math.floor(duration * TAIL_MAX_PCT)));
+  const start = Math.max(0, Math.floor(duration - window));
 
-  // worst video that's still >=360p keeps text legible while staying tiny.
-  // NB: no --force-keyframes-at-cuts. It forces an ffmpeg re-encode at the cut
-  // boundary, which needs ffmpeg on yt-dlp's own PATH and is a common failure
-  // point. We don't need frame-precise cuts — keyframe-aligned is fine for
-  // grabbing credit-roll frames — so let yt-dlp cut at the nearest keyframe.
-  await ytdlp([
-    '-f', 'worstvideo[height>=360]/worst',
-    '--download-sections', `*${start}-${end}`,
-    ...cookieArgs(),
-    '-o', out,
-    '--no-playlist', '--no-warnings',
-    url,
-  ]);
-  return out;
-}
-
-/** Extract sampled frames from the tail. */
-async function extractFrames(video: string, dir: string): Promise<string[]> {
-  await run('ffmpeg', [
-    '-i', video,
-    '-vf', `fps=1/${FRAME_EVERY_SEC},scale=960:-1`,
-    '-q:v', '3',
-    join(dir, 'f_%03d.jpg'),
-    '-hide_banner', '-loglevel', 'error',
-  ], { timeout: 300_000 });
+  const streamUrl = await getStreamUrl(url);
+  try {
+    await run('ffmpeg', [
+      '-ss', String(start),           // fast input seek (ranged) — before -i
+      '-i', streamUrl,
+      '-t', String(window + 5),
+      '-an',                          // no audio
+      '-vf', `fps=1/${FRAME_EVERY_SEC},scale=960:-1`,
+      '-q:v', '3',
+      join(dir, 'f_%03d.jpg'),
+      '-hide_banner', '-loglevel', 'error', '-y',
+    ], { timeout: YTDLP_TIMEOUT, maxBuffer: 32 * 1024 * 1024 });
+  } catch (e: any) {
+    const detail = String(e?.stderr || e?.message || '').trim().split('\n').filter(Boolean).slice(-4).join('\n       ');
+    const err = new Error(`ffmpeg: ${detail || 'frame extraction failed'}`);
+    (err as any).full = String(e?.stderr || e?.message || '');
+    throw err;
+  }
   return (await readdir(dir)).filter((f) => f.startsWith('f_')).sort().map((f) => join(dir, f));
 }
 
@@ -348,14 +360,12 @@ async function processJob(job: Job) {
   if (FRAMES_ONLY) await mkdir(dir, { recursive: true });
 
   try {
-    console.log(`   ⬇️  downloading tail of "${film.title?.slice(0, 45)}"…`);
-    const video = await downloadTail(film.youtube_watch_url, dir, (film.runtime_minutes ?? 0) * 60);
-    const frames = await extractFrames(video, dir);
+    console.log(`   ⬇️  grabbing tail frames of "${film.title?.slice(0, 45)}"…`);
+    const frames = await extractTailFrames(film.youtube_watch_url, dir, (film.runtime_minutes ?? 0) * 60);
     if (!frames.length) { await finish(job, 'no_credits', 0, 'no frames'); return; }
 
     if (FRAMES_ONLY) {
       // Stop here — no OCR, no DB writes. Just prove download+frames work.
-      await rm(video, { force: true }); // drop the video, keep the frames
       console.log(`   🖼️  ${frames.length} frames saved → ${dir}`);
       console.log('       Open that folder: the last few frames should show the credit roll.');
       return;
