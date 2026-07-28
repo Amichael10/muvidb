@@ -254,18 +254,30 @@ async function ytdlp(args: string[]): Promise<{ stdout: string; stderr: string }
  *    corrupt partial (the android_vr stream was resetting mid-download).
  *  - let yt-dlp drive the download so it passes ffmpeg the required UA header.
  */
+/** Video duration in seconds via yt-dlp (no download). */
+async function probeDuration(url: string): Promise<number> {
+  const { stdout } = await ytdlp(['--skip-download', '--no-warnings', '--print', '%(duration)s', ...clientArgs(), ...cookieArgs(), url]);
+  const d = parseInt(String(stdout).trim(), 10);
+  return Number.isFinite(d) && d > 0 ? d : 0;
+}
+
 async function extractTailFrames(url: string, dir: string): Promise<string[]> {
   const tail = join(dir, 'tail.mp4');
 
+  // POSITIVE timestamps only. The negative form (`*-300-inf`) produced a 262-byte
+  // empty stub with these DASH formats; explicit `*<start>-<end>` computed from the
+  // real duration is what actually downloaded data (confirmed: ffmpeg decoded it).
+  const duration = await probeDuration(url);
+  if (!duration) throw new Error('could not determine video duration');
+  const start = Math.max(0, duration - TAIL_SECONDS);
+  const end = duration + 5;
+
   const t0 = Date.now();
   await ytdlp([
-    // Must always resolve to something WITH a video stream. The old bare `worst`
-    // fallback picked an audio-only format (smallest), giving ffmpeg no video.
-    // Order: avc1 video-only ≤480 → any video-only ≤480 → best combined ≤480
-    // (progressive, still has video) → best. None of these can be audio-only.
+    // 135 = 480p avc1 (best for reading credit text), else any avc1/video ≤480.
+    // All these have real https URLs per -F; none are audio-only or SABR/DRM.
     '-f', 'bv*[height<=480][vcodec^=avc1]/bv*[height<=480]/best[height<=480]/best',
-    '--download-sections', `*-${TAIL_SECONDS}-inf`,
-    '-N', '4',                                    // parallel fragments
+    '--download-sections', `*${start}-${end}`,
     '--retries', 'infinite', '--fragment-retries', 'infinite', '--socket-timeout', '30',
     ...clientArgs(),
     ...cookieArgs(),
