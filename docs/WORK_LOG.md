@@ -46,16 +46,33 @@ proxy would cost thousands, since proxies bill per GB and video is heavy).
 **991 jobs across 992 channels** (those rows are live in the queue now); the admin
 page's exact embedded query returns correctly-shaped data; `npm run build` passes.
 
-**NOT verified — the extraction loop has never actually run.** `yt-dlp`, `ffmpeg` and
-`tesseract` are not installed on this machine, so download → frame-extract → OCR → parse
-is unproven end to end. Expect the OCR parsing heuristics (`looksLikeName`, role
-splitting, `STOP_MARKERS`) to need tuning against real Nollywood rolls — that's the part
-to iterate on first.
+**DOWNLOAD PATH SOLVED (2026-07-28, on the worker laptop).** The hard part — getting the
+video tail off YouTube — now works and is FAST. Long debugging arc, key findings:
+- yt-dlp `--download-sections` takes TIMESTAMPS not percentages; `*-300-inf` (negative
+  start) = "last 5 min", no duration probe needed.
+- Do NOT bypass yt-dlp with raw ffmpeg on a `-g` URL — googlevideo needs the User-Agent
+  header yt-dlp passes to ffmpeg; a hand-rolled call gets rejected.
+- Clients: `android_vr` (yt-dlp's default) is throttled to ~7KiB/s and connection-resets;
+  `tv` is DRM'd; `ios` needs a PO token. **Fix: don't force a client — cookies unlock the
+  default client's good, un-throttled formats.** With cookies the 300s tail downloaded in
+  **~9 seconds**.
+- Format must never fall back to bare `worst` (that's audio-only → ffmpeg "no stream").
+  Selector: `bv*[height<=480][vcodec^=avc1]/bv*[height<=480]/best[height<=480]/best`.
+- Cookies (Netscape cookies.txt) are mandatory; pass `--cookies=<path>` or set
+  `COOKIES_FILE` in `.env.local`. Resilience flags added (`-N 4`, infinite retries,
+  `--socket-timeout 30`) so a dropped connection retries instead of writing a partial.
 
-**To start on the worker laptop:** install the three tools, then
-`npx tsx scripts/harvest_credits.ts --enqueue-recon=3` and
-`npx tsx scripts/harvest_credits.ts`. **Disable sleep first** — that's the usual reason
-these jobs are found dead days later. Debug a single film with `--film=<uuid> --keep`.
+**STILL UNVERIFIED past the download:** frame extraction just started succeeding
+(commit b1b440c); OCR (tesseract) → parse has NOT run end to end. Next actual step is
+`--frames-only` on the 3 test films → open `harvest_frames/<id>/` and confirm the credit
+roll is in the last 5 min. Then wire/tune OCR — expect `looksLikeName`, role splitting and
+`STOP_MARKERS` to need tuning against real rolls. PaddleOCR-vs-tesseract still parked.
+
+**To start the grind on the laptop** (after frames + OCR confirmed): **disable sleep
+first** (usual reason these die unattended), then
+`npx tsx scripts/harvest_credits.ts --enqueue-sparse` (films with <4 credits) and
+`npx tsx scripts/harvest_credits.ts --cookies=<path>`. Debug one film with
+`--film=<uuid> --frames-only --keep`.
 
 ---
 
