@@ -23,7 +23,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, rm, readdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readdir, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { supabase } from './lib/db';
@@ -273,7 +273,18 @@ async function extractTailFrames(url: string, dir: string): Promise<string[]> {
     '--no-playlist', '--no-warnings',
     url,
   ]);
-  console.log(`   ⏱️  tail (${TAIL_SECONDS}s) downloaded in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  // Guard: a "successful" yt-dlp exit can still write an empty stub when the
+  // chosen format is SABR/DRM (no downloadable URL). Catch that explicitly
+  // instead of handing ffmpeg an empty file and getting a cryptic "no stream".
+  const { size } = await stat(tail);
+  const secs = ((Date.now() - t0) / 1000).toFixed(0);
+  if (size < 50_000) {
+    throw new Error(
+      `downloaded only ${size} bytes in ${secs}s — the selected format has no data ` +
+      `(SABR/DRM). Run:  yt-dlp --cookies <path> -F "${url}"  and pick a format with a real filesize.`,
+    );
+  }
+  console.log(`   ⏱️  tail (${TAIL_SECONDS}s) = ${(size / 1024 / 1024).toFixed(1)}MB in ${secs}s`);
 
   // Extract frames from the small local file (fast, no network).
   await run('ffmpeg', [
