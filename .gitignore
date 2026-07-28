@@ -84,3 +84,6 @@ scratch/
 # React Router framework-mode generated typegen + build output
 .react-router/
 build/
+
+# Local credit-roll frame dumps from harvest_credits.ts --frames-only
+harvest_frames/

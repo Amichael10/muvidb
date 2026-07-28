@@ -21,7 +21,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, rm, readdir, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { supabase } from './lib/db';
@@ -67,18 +67,36 @@ type Job = {
   attempts: number;
 };
 
+// yt-dlp cookies, to get past "Sign in to confirm you're not a bot". Pass a
+// Netscape cookies.txt via --cookies=<path> (or YT_COOKIES env), or pull live
+// from an installed browser via --cookies-from-browser=chrome|edge|firefox.
+const COOKIES_FILE = arg('cookies') ?? process.env.YT_COOKIES;
+const COOKIES_BROWSER = arg('cookies-from-browser');
+function cookieArgs(): string[] {
+  if (COOKIES_FILE) return ['--cookies', COOKIES_FILE];
+  if (COOKIES_BROWSER) return ['--cookies-from-browser', COOKIES_BROWSER];
+  return [];
+}
+
+// --frames-only: download the tail + extract frames, NO OCR. This validates the
+// two things that actually decide the project — can we download these videos,
+// and is the credit roll in the tail — before committing to an OCR engine.
+const FRAMES_ONLY = arg('frames-only') !== undefined;
+
 // ---------------------------------------------------------------- prereqs ---
 async function checkPrereqs() {
+  // Only require the tools the chosen mode actually uses. yt-dlp + ffmpeg are
+  // always needed; tesseract only when we OCR (skipped in --frames-only).
+  const need: Array<[string, string[]]> = [['yt-dlp', ['--version']], ['ffmpeg', ['-version']]];
+  if (!FRAMES_ONLY) need.push(['tesseract', ['--version']]);
   const missing: string[] = [];
-  const probes: Array<[string, string[]]> = [
-    ['yt-dlp', ['--version']], ['ffmpeg', ['-version']], ['tesseract', ['--version']],
-  ];
-  for (const [bin, args] of probes) {
+  for (const [bin, args] of need) {
     try { await run(bin, args); } catch { missing.push(bin); }
   }
   if (missing.length) {
     console.error(`\n💀 Missing required tools on PATH: ${missing.join(', ')}`);
     console.error('   Windows:  winget install yt-dlp.yt-dlp  |  winget install Gyan.FFmpeg  |  winget install UB-Mannheim.TesseractOCR');
+    console.error('   NOTE: open a NEW terminal after winget installs — PATH only refreshes in new shells.');
     process.exit(1);
   }
 }
@@ -152,6 +170,7 @@ async function downloadTail(url: string, dir: string): Promise<string> {
     '-f', 'worstvideo[height>=360]/worst',
     '--download-sections', `*${Math.round((1 - TAIL_PCT) * 100)}%-100%`,
     '--force-keyframes-at-cuts',
+    ...cookieArgs(),
     '-o', out,
     '--no-playlist', '--no-warnings', '--quiet',
     url,
@@ -235,11 +254,26 @@ async function processJob(job: Job) {
     return;
   }
 
-  const dir = await mkdtemp(join(tmpdir(), 'harvest-'));
+  // --frames-only: write to a durable, inspectable folder in the project so you
+  // can open it and SEE whether the tail actually contains the credit roll.
+  const dir = FRAMES_ONLY
+    ? join(process.cwd(), 'harvest_frames', job.film_id)
+    : await mkdtemp(join(tmpdir(), 'harvest-'));
+  if (FRAMES_ONLY) await mkdir(dir, { recursive: true });
+
   try {
+    console.log(`   ⬇️  downloading tail of "${film.title?.slice(0, 45)}"…`);
     const video = await downloadTail(film.youtube_watch_url, dir);
     const frames = await extractFrames(video, dir);
     if (!frames.length) { await finish(job, 'no_credits', 0, 'no frames'); return; }
+
+    if (FRAMES_ONLY) {
+      // Stop here — no OCR, no DB writes. Just prove download+frames work.
+      await rm(video, { force: true }); // drop the video, keep the frames
+      console.log(`   🖼️  ${frames.length} frames saved → ${dir}`);
+      console.log('       Open that folder: the last few frames should show the credit roll.');
+      return;
+    }
 
     // OCR frames from the END backwards — rolls sit at the very end, and this
     // finds them with the fewest OCR calls.
@@ -289,7 +323,9 @@ async function processJob(job: Job) {
     await finish(job, 'error', 0, String(e?.message ?? e).slice(0, 300));
     console.log(`   ❌ ${film.title?.slice(0, 45)} → ${String(e?.message ?? e).slice(0, 80)}`);
   } finally {
-    if (arg('keep') === undefined) await rm(dir, { recursive: true, force: true });
+    // Keep frames-only output (that's the whole point) and honour --keep;
+    // otherwise wipe the temp dir.
+    if (!FRAMES_ONLY && arg('keep') === undefined) await rm(dir, { recursive: true, force: true });
   }
 }
 
