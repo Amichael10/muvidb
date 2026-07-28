@@ -259,7 +259,11 @@ async function extractTailFrames(url: string, dir: string): Promise<string[]> {
 
   const t0 = Date.now();
   await ytdlp([
-    '-f', 'bv*[height<=480][vcodec^=avc1]/worstvideo[height>=360]/worst',
+    // Must always resolve to something WITH a video stream. The old bare `worst`
+    // fallback picked an audio-only format (smallest), giving ffmpeg no video.
+    // Order: avc1 video-only ≤480 → any video-only ≤480 → best combined ≤480
+    // (progressive, still has video) → best. None of these can be audio-only.
+    '-f', 'bv*[height<=480][vcodec^=avc1]/bv*[height<=480]/best[height<=480]/best',
     '--download-sections', `*-${TAIL_SECONDS}-inf`,
     '-N', '4',                                    // parallel fragments
     '--retries', 'infinite', '--fragment-retries', 'infinite', '--socket-timeout', '30',
@@ -274,7 +278,7 @@ async function extractTailFrames(url: string, dir: string): Promise<string[]> {
   // Extract frames from the small local file (fast, no network).
   await run('ffmpeg', [
     '-i', tail, '-an',
-    '-vf', `fps=1/${FRAME_EVERY_SEC},scale=960:-1`,
+    '-vf', `fps=1/${FRAME_EVERY_SEC},scale=960:-2`,
     '-q:v', '3',
     join(dir, 'f_%03d.jpg'),
     '-hide_banner', '-loglevel', 'error', '-y',
