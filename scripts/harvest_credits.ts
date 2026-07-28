@@ -37,14 +37,13 @@ const arg = (n: string) => {
   return eq === -1 ? 'true' : hit.slice(eq + 1);
 };
 
-// Credit rolls sit in the final couple of minutes. Grab the last N seconds
-// (capped as a fraction of runtime for very short clips). Small + targeted keeps
-// the download fast — a 16-min section of a DASH stream was timing out.
-const TAIL_SECONDS = 300;       // last 5 minutes
-const TAIL_MAX_PCT = 0.30;      // …but never more than 30% of a short video
+// Credit rolls sit in the final minutes. yt-dlp's --download-sections takes a
+// NEGATIVE start timestamp meaning "from N seconds before the end", so we grab
+// the last TAIL_SECONDS with `*-<N>-inf` — no need to know the duration.
+const TAIL_SECONDS = Number(arg('tail')) || 300; // last 5 min (override: --tail=420)
 const MIN_ENTRIES = 4;          // structural gate: fewer than this isn't a roll
 const FRAME_EVERY_SEC = 3;      // sample cadence inside the tail
-const YTDLP_TIMEOUT = 600_000;  // 10 min — throttled YouTube streams are slow
+const YTDLP_TIMEOUT = 900_000;  // 15 min ceiling for a throttled tail
 
 /**
  * Anything at/after these markers is promo, not credits. This is the direct fix
@@ -74,15 +73,25 @@ type Job = {
   attempts: number;
 };
 
-// yt-dlp cookies, to get past "Sign in to confirm you're not a bot". Pass a
-// Netscape cookies.txt via --cookies=<path> (or YT_COOKIES env), or pull live
-// from an installed browser via --cookies-from-browser=chrome|edge|firefox.
-const COOKIES_FILE = arg('cookies') ?? process.env.YT_COOKIES;
+// Cookies are what UNLOCK the good (un-throttled, non-DRM) formats — a prior
+// recon found guest downloads get only a throttled android_vr stream (~7 KiB/s),
+// tv formats are DRM'd, and ios needs a PO token. Pass a Netscape cookies.txt
+// via --cookies=<path> (or COOKIES_FILE/YT_COOKIES env), or pull from a browser
+// via --cookies-from-browser=chrome|edge|firefox.
+const COOKIES_FILE = arg('cookies') ?? process.env.COOKIES_FILE ?? process.env.YT_COOKIES;
 const COOKIES_BROWSER = arg('cookies-from-browser');
 function cookieArgs(): string[] {
   if (COOKIES_FILE) return ['--cookies', COOKIES_FILE];
   if (COOKIES_BROWSER) return ['--cookies-from-browser', COOKIES_BROWSER];
   return [];
+}
+
+// Player client. Default = don't force one, so cookies can unlock the default
+// client's good formats. Forcing tv/ios is a dead end (DRM / PO-token). Override
+// with --client=android_vr as a last resort.
+const YT_CLIENT = arg('client') || '';
+function clientArgs(): string[] {
+  return YT_CLIENT ? ['--extractor-args', `youtube:player_client=${YT_CLIENT}`] : [];
 }
 
 // --frames-only: download the tail + extract frames, NO OCR. This validates the
@@ -233,51 +242,34 @@ async function ytdlp(args: string[]): Promise<{ stdout: string; stderr: string }
   }
 }
 
-/** Ask yt-dlp for the video duration in seconds (no download). */
-async function probeDuration(url: string): Promise<number> {
-  const { stdout } = await ytdlp(['--skip-download', '--no-warnings', '--print', '%(duration)s', ...cookieArgs(), url]);
-  const d = parseInt(String(stdout).trim(), 10);
-  return Number.isFinite(d) && d > 0 ? d : 0;
-}
-
-// yt-dlp player client. Pass --client=tv|ios|android_vr|default to try a
-// different one if throttled. ANDROID_VR (yt-dlp's current default here) came
-// throttled to a trickle; 'tv' and 'ios' are often faster. Comma list = fallback
-// order.
-const YT_CLIENT = arg('client') || 'tv,ios,android_vr';
-
 /**
- * Download only the tail (last few minutes) via yt-dlp, then extract frames from
+ * Download only the tail (last TAIL_SECONDS) via yt-dlp, then extract frames from
  * it locally.
  *
- * Why let yt-dlp do the download (not raw ffmpeg on a -g URL): yt-dlp invokes
- * ffmpeg WITH the right `-headers "User-Agent: …"`, which googlevideo requires —
- * a hand-rolled ffmpeg call omits it and gets rejected. The earlier failure was
- * copying a 16-MIN section through a throttled stream; the fix is a SMALL window
- * (last ~4 min) plus a client that isn't throttled, not bypassing yt-dlp.
+ * Key choices (from the recon documented in the header):
+ *  - `*-<N>-inf` negative-timestamp section = "last N seconds", no duration probe.
+ *  - prefer a low-res avc1 DASH VIDEO-ONLY format (small, legible, no audio);
+ *    cookies are what make these available.
+ *  - resilience flags so a Lagos-connection blip retries instead of writing a
+ *    corrupt partial (the android_vr stream was resetting mid-download).
+ *  - let yt-dlp drive the download so it passes ffmpeg the required UA header.
  */
-async function extractTailFrames(url: string, dir: string, runtimeSecHint = 0): Promise<string[]> {
-  let duration = 0;
-  try { duration = await probeDuration(url); } catch { /* fall back to hint */ }
-  if (!duration) duration = runtimeSecHint;
-  if (!duration) throw new Error('could not determine video duration (probe failed, no DB runtime)');
-
-  const window = Math.max(30, Math.min(TAIL_SECONDS, Math.floor(duration * TAIL_MAX_PCT)));
-  const start = Math.max(0, Math.floor(duration - window));
-  const end = Math.ceil(duration) + 5;
+async function extractTailFrames(url: string, dir: string): Promise<string[]> {
   const tail = join(dir, 'tail.mp4');
 
   const t0 = Date.now();
   await ytdlp([
-    '-f', 'worstvideo[height>=360]/worst',
-    '--download-sections', `*${start}-${end}`,
-    '--extractor-args', `youtube:player_client=${YT_CLIENT}`,
+    '-f', 'bv*[height<=480][vcodec^=avc1]/worstvideo[height>=360]/worst',
+    '--download-sections', `*-${TAIL_SECONDS}-inf`,
+    '-N', '4',                                    // parallel fragments
+    '--retries', 'infinite', '--fragment-retries', 'infinite', '--socket-timeout', '30',
+    ...clientArgs(),
     ...cookieArgs(),
     '-o', tail,
     '--no-playlist', '--no-warnings',
     url,
   ]);
-  console.log(`   ⏱️  downloaded ${window}s tail in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  console.log(`   ⏱️  tail (${TAIL_SECONDS}s) downloaded in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 
   // Extract frames from the small local file (fast, no network).
   await run('ffmpeg', [
@@ -365,7 +357,7 @@ async function processJob(job: Job) {
 
   try {
     console.log(`   ⬇️  grabbing tail frames of "${film.title?.slice(0, 45)}"…`);
-    const frames = await extractTailFrames(film.youtube_watch_url, dir, (film.runtime_minutes ?? 0) * 60);
+    const frames = await extractTailFrames(film.youtube_watch_url, dir);
     if (!frames.length) { await finish(job, 'no_credits', 0, 'no frames'); return; }
 
     if (FRAMES_ONLY) {
