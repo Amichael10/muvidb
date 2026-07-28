@@ -410,6 +410,34 @@ credit roll rarely fits in one frame.
 
 ---
 
+### Credit harvester download diagnostic 2026-07-28
+
+Continuation from `docs/HARVEST_HANDOFF.md`: the positive timestamp fix was real,
+but the old format selector was still too heavy for the available YouTube client.
+
+- Old selector chose `135` (480p avc1) and hit the 900s worker timeout before
+  saving frames.
+- `yt-dlp -F` with cookies still shows clean HTTPS formats; no DRM/SABR evidence.
+- `web` and `mweb` clients returned "Video unavailable"; default `android_vr`
+  remains the confirmed path, just throttled.
+- Direct section recon with `133` (240p avc1) succeeded, and visual inspection
+  showed readable credits.
+- `scripts/harvest_credits.ts` now prefers `133/134/135/...` by default, with
+  `--format=` / `YTDLP_FORMAT` available for override.
+
+Verified command:
+
+```
+npx.cmd tsx scripts/harvest_credits.ts --frames-only --film=bceeb358-9bcd-4211-8656-decf3a1f784c --cookies="C:\Users\User\Downloads\Cookies.txt"
+```
+
+Result: `tail (300s) = 2.6MB in 215s`; 100 frames saved to
+`harvest_frames\bceeb358-9bcd-4211-8656-decf3a1f784c`. Spot checks: `f_070.jpg`
+has the cast list, `f_100.jpg` has the closing director/production card. Download
+path is confirmed for this film; next bottleneck is OCR/parsing quality.
+
+---
+
 ## Pending
 
 ### 0. Homepage performance — pass 1 DONE (`e8de7fd`, 2026-07-25)

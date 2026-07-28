@@ -37,13 +37,18 @@ const arg = (n: string) => {
   return eq === -1 ? 'true' : hit.slice(eq + 1);
 };
 
-// Credit rolls sit in the final minutes. yt-dlp's --download-sections takes a
-// NEGATIVE start timestamp meaning "from N seconds before the end", so we grab
-// the last TAIL_SECONDS with `*-<N>-inf` — no need to know the duration.
+// Credit rolls sit in the final minutes. Use explicit positive timestamps for
+// --download-sections; the negative form (`*-300-inf`) produced empty stubs on
+// this source even though yt-dlp exited successfully.
 const TAIL_SECONDS = Number(arg('tail')) || 300; // last 5 min (override: --tail=420)
 const MIN_ENTRIES = 4;          // structural gate: fewer than this isn't a roll
 const FRAME_EVERY_SEC = 3;      // sample cadence inside the tail
 const YTDLP_TIMEOUT = 900_000;  // 15 min ceiling for a throttled tail
+const DEFAULT_VIDEO_FORMAT =
+  // 240p avc1 first: android_vr section downloads are heavily throttled, and
+  // direct recon showed 480p can time out while 240p still leaves credits legible.
+  '133/134/135/160/bv*[height<=360][vcodec^=avc1]/bv*[height<=360]/bv*[height<=480][vcodec^=avc1]/bv*[height<=480]/best[height<=480]/best';
+const VIDEO_FORMAT = arg('format') ?? process.env.YTDLP_FORMAT ?? DEFAULT_VIDEO_FORMAT;
 
 /**
  * Anything at/after these markers is promo, not credits. This is the direct fix
@@ -247,9 +252,10 @@ async function ytdlp(args: string[]): Promise<{ stdout: string; stderr: string }
  * it locally.
  *
  * Key choices (from the recon documented in the header):
- *  - `*-<N>-inf` negative-timestamp section = "last N seconds", no duration probe.
+ *  - probe duration, then use explicit positive `*<start>-<end>` sections.
  *  - prefer a low-res avc1 DASH VIDEO-ONLY format (small, legible, no audio);
- *    cookies are what make these available.
+ *    cookies are what make these available. Override with --format=134/135
+ *    if a faster YouTube client or PO-token path is available.
  *  - resilience flags so a Lagos-connection blip retries instead of writing a
  *    corrupt partial (the android_vr stream was resetting mid-download).
  *  - let yt-dlp drive the download so it passes ffmpeg the required UA header.
@@ -274,9 +280,7 @@ async function extractTailFrames(url: string, dir: string): Promise<string[]> {
 
   const t0 = Date.now();
   await ytdlp([
-    // 135 = 480p avc1 (best for reading credit text), else any avc1/video ≤480.
-    // All these have real https URLs per -F; none are audio-only or SABR/DRM.
-    '-f', 'bv*[height<=480][vcodec^=avc1]/bv*[height<=480]/best[height<=480]/best',
+    '-f', VIDEO_FORMAT,
     '--download-sections', `*${start}-${end}`,
     '--retries', 'infinite', '--fragment-retries', 'infinite', '--socket-timeout', '30',
     ...clientArgs(),

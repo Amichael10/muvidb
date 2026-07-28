@@ -8,6 +8,30 @@ The YouTube-credit-roll harvester's **download path is fixed but UNCONFIRMED** �
 was just pushed (`b592efc`) and the very next step is to run one command on the worker
 laptop and read the `⏱️` line. Everything downstream (OCR, review) is built but unproven.
 
+## Continuation note (2026-07-28)
+
+Codex ran the immediate diagnostic in `C:\Users\User\Filmdba\lumi` after pulling
+`origin/staging` (already up to date). The first run with the old 480p-first
+selector picked format `135` and timed out after 900s; it did not produce an
+empty stub, but it also did not save frames.
+
+Direct recon showed the same cookies/default `android_vr` client can download a
+240p section (`133`), albeit slowly. `web` and `mweb` both returned "Video
+unavailable" for this URL. The harvester now prefers `133/134/135/...` and can
+still be overridden with `--format=134` or `--format=135`.
+
+Verified run:
+
+```
+npx.cmd tsx scripts/harvest_credits.ts --frames-only --film=bceeb358-9bcd-4211-8656-decf3a1f784c --cookies="C:\Users\User\Downloads\Cookies.txt"
+```
+
+Result: `tail (300s) = 2.6MB in 215s`, `100 frames saved` to
+`harvest_frames\bceeb358-9bcd-4211-8656-decf3a1f784c`. Real visual check:
+`f_070.jpg` contains the cast list, and `f_100.jpg` contains the closing credit
+card ("DIRECTOR IKECHUKWU NWEKE" / "DESTINY ETIKO PRODUCTIONS"). Download is
+confirmed for this film; next work is OCR quality/parsing.
+
 ## Git / where the code is
 
 - **All work is on branch `staging`** (remote `origin/staging = b592efc`). **`main` is
