@@ -36,6 +36,8 @@ export default [
   route('privacy', 'pages/Privacy.jsx'),
   route('about', 'pages/About.jsx'),
   route('contact', 'pages/Contact.jsx'),
+  route('careers', 'pages/Careers.jsx'),
+  route('careers/:slug', 'pages/CareerDetail.jsx'),
   route('waitlist', 'pages/Waitlist.tsx'),
 
   // ---- Authenticated ----
@@ -69,6 +71,7 @@ export default [
       route('deduplicator', 'pages/admin/AdminDeduplicator.jsx'),
       route('import', 'pages/admin/AdminImport.jsx'),
       route('spotlight', 'pages/admin/AdminSpotlight.jsx'),
+      route('jobs', 'pages/admin/AdminJobs.jsx'),
       route('top10', 'pages/admin/AdminTop10.jsx'),
       route('automation', 'pages/admin/AdminAutomation.jsx'),
       route('countries', 'pages/admin/AdminCountries.jsx'),

@@ -44,6 +44,7 @@ export default function Footer() {
               <h3 className="text-xs font-bold text-text-primary mb-6 uppercase tracking-widest">Platform</h3>
               <ul className="space-y-4">
                 <li><Link to="/about" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">About Us</Link></li>
+                <li><Link to="/careers" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Careers</Link></li>
                 <li><Link to="/contact" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Contact</Link></li>
                 <li><Link to="/login" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Sign In</Link></li>
                 <li><Link to="/signup" className="text-xs font-bold text-text-muted hover:text-brand transition-colors">Join MuviDB</Link></li>

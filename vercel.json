@@ -87,6 +87,10 @@
       "destination": "/api/data?_r=content"
     },
     {
+      "source": "/api/job-apply",
+      "destination": "/api/data?_r=job-apply"
+    },
+    {
       "source": "/api/youtube",
       "destination": "/api/external?provider=youtube"
     },

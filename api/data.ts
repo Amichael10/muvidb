@@ -3,6 +3,7 @@ import { handleFilms } from './_lib/films_handler.js';
 import { handlePeople } from './_lib/people_handler.js';
 import { handleChannels } from './_lib/channels_handler.js';
 import { handleContent } from './_lib/content_handler.js';
+import { handleJobApply } from './_lib/job_apply_handler.js';
 
 // Consolidated data router (Hobby free-tier function budget — see
 // docs/SSR_MIGRATION.md). Public paths are preserved by vercel.json rewrites:
@@ -10,6 +11,7 @@ import { handleContent } from './_lib/content_handler.js';
 //   /api/people   -> /api/data?_r=people
 //   /api/channels -> /api/data?_r=channels
 //   /api/content  -> /api/data?_r=content
+//   /api/job-apply -> /api/data?_r=job-apply
 //
 // The router param is `_r`, NOT `resource`: content.ts already owns `?resource=`
 // as its own dispatch key (film-credits, person-credits, person-films,
@@ -21,6 +23,7 @@ const ROUTES = {
   people: handlePeople,
   channels: handleChannels,
   content: handleContent,
+  'job-apply': handleJobApply,
 } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
