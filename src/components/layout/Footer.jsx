@@ -24,6 +24,7 @@ const footerGroups = [
     title: 'Platform',
     links: [
       { label: 'About Us', to: '/about' },
+      { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/contact' },
       { label: 'Sign In', to: '/login' },
       { label: 'Join MuviDB', to: '/signup' },

@@ -54,6 +54,8 @@ const Privacy = lazyWithRetry(() => import('./pages/Privacy'));
 const Waitlist = lazyWithRetry(() => import('./pages/Waitlist'));
 const About = lazyWithRetry(() => import('./pages/About'));
 const Contact = lazyWithRetry(() => import('./pages/Contact'));
+const Careers = lazyWithRetry(() => import('./pages/Careers'));
+const CareerDetail = lazyWithRetry(() => import('./pages/CareerDetail'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
@@ -78,6 +80,7 @@ const AdminImport = lazyWithRetry(() => import('./pages/admin/AdminImport'));
 const AdminAI = lazyWithRetry(() => import('./pages/admin/AdminAI'));
 const AdminDeduplicator = lazyWithRetry(() => import('./pages/admin/AdminDeduplicator'));
 const AdminSpotlight = lazyWithRetry(() => import('./pages/admin/AdminSpotlight'));
+const AdminJobs = lazyWithRetry(() => import('./pages/admin/AdminJobs'));
 const AdminTop10 = lazyWithRetry(() => import('./pages/admin/AdminTop10'));
 const AdminLogs = lazyWithRetry(() => import('./pages/admin/AdminLogs'));
 const AdminAutomation = lazyWithRetry(() => import('./pages/admin/AdminAutomation'));
@@ -252,6 +255,8 @@ export default function App() {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/careers" element={<Careers />} />
+                <Route path="/careers/:slug" element={<CareerDetail />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />
@@ -285,6 +290,7 @@ export default function App() {
                   <Route path="deduplicator" element={<AdminDeduplicator />} />
                   <Route path="import" element={<AdminImport />} />
                   <Route path="spotlight" element={<AdminSpotlight />} />
+                  <Route path="jobs" element={<AdminJobs />} />
                   <Route path="top10" element={<AdminTop10 />} />
                   <Route path="automation" element={<AdminAutomation />} />
                   <Route path="countries" element={<AdminCountries />} />
