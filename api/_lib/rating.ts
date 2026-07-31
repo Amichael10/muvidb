@@ -26,18 +26,28 @@ export function pctLiked(score10: number): number {
 /**
  * De-inflated comment score (0-10) before it hits `pctLiked`.
  *
- * Two corrections to the raw likes-weighted mean:
+ * Two corrections to the raw mean:
  *  1. Bayesian shrink toward a prior of 6.5 (an average film, NOT 8.0) — a
  *     handful of glowing comments shouldn't read as acclaim.
- *  2. The prior is worth only ~6 comments now (was 10) so real volume moves the
- *     score, but low-sample films still sit near "decent", not "amazing".
+ *  2. The prior is worth ~10 comments, so real volume moves the score but a
+ *     thin sample stays near "unremarkable".
  *
  * The rest of the de-inflation is upstream: we keep critical/commentary
  * comments (not just praise) and score them on a stricter rubric, so the raw
  * mean feeding this is honest in the first place.
  */
 export const COMMENT_PRIOR_MEAN = 6.5;
-export const COMMENT_PRIOR_WEIGHT = 6;
+export const COMMENT_PRIOR_WEIGHT = 10;
+
+/**
+ * Qualifying opinions required before a film may publish a rating at all.
+ *
+ * Shrinkage alone can't rescue a 3-comment film: it just parks it near the
+ * prior and presents that guess as a measurement. Below this floor we keep the
+ * mined reviews but leave liked_percent/audience_rating null, and the film
+ * detail page falls back to its "Be the first to rate" state.
+ */
+export const MIN_RATING_SAMPLE = 8;
 export function shrinkCommentScore(weightedMean: number, count: number): number {
   const n = Math.max(0, count);
   return (n * weightedMean + COMMENT_PRIOR_WEIGHT * COMMENT_PRIOR_MEAN) / (n + COMMENT_PRIOR_WEIGHT);
