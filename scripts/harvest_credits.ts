@@ -5,7 +5,9 @@
  *   npx tsx scripts/harvest_credits.ts --enqueue-sparse=2   # films with < 2 credits
  *   npx tsx scripts/harvest_credits.ts --enqueue-recon      # 3 films/channel (recon)
  *   npx tsx scripts/harvest_credits.ts --enqueue-popular=2000
+ *   npx tsx scripts/harvest_credits.ts --requeue-low-coverage=12
  *   npx tsx scripts/harvest_credits.ts                      # run the worker loop
+ *   npx tsx scripts/harvest_credits.ts --reharvest-existing  # second pass; append new, skip duplicates
  *   npx tsx scripts/harvest_credits.ts --once               # single job (debugging)
  *   npx tsx scripts/harvest_credits.ts --film=<uuid> --keep  # one film, keep frames
  *
@@ -24,9 +26,15 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, rm, readdir, writeFile, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { hostname, tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { supabase } from './lib/db';
+import {
+  consolidateCreditObservations,
+  parseCreditFrame,
+  parseTesseractTsv,
+  type CreditObservation,
+} from './lib/credit_roll_parser';
 
 const run = promisify(execFile);
 
@@ -42,7 +50,9 @@ const arg = (n: string) => {
 // this source even though yt-dlp exited successfully.
 const TAIL_SECONDS = Number(arg('tail')) || 300; // last 5 min (override: --tail=420)
 const MIN_ENTRIES = 4;          // structural gate: fewer than this isn't a roll
-const FRAME_EVERY_SEC = 3;      // sample cadence inside the tail
+const FRAME_EVERY_SEC = Number(arg('frame-every')) || 1; // sample cadence inside the tail
+const SINGLE_FRAME_MIN_OCR_CONFIDENCE = Number(arg('single-frame-min-ocr')) || 0.65;
+const REHARVEST_EXISTING = arg('reharvest-existing') !== undefined;
 const YTDLP_TIMEOUT = 900_000;  // 15 min ceiling for a throttled tail
 const DEFAULT_VIDEO_FORMAT =
   // 240p avc1 first: android_vr section downloads are heavily throttled, and
@@ -78,6 +88,170 @@ type Job = {
   attempts: number;
 };
 
+type WorkerStatus =
+  | 'starting'
+  | 'idle'
+  | 'running'
+  | 'paused'
+  | 'stopping'
+  | 'stopped'
+  | 'failed';
+
+type WorkerLogLevel = 'info' | 'success' | 'warning' | 'error';
+
+const WORKER_MACHINE = hostname() || 'unknown-machine';
+const WORKER_ID = `${WORKER_MACHINE}-${process.pid}-${Date.now().toString(36)}`;
+const WORKER_STARTED_AT = new Date().toISOString();
+const HEARTBEAT_MS = 15_000;
+const PAUSE_POLL_MS = 5_000;
+
+let workerStatus: WorkerStatus = 'starting';
+let workerMessage = 'Worker is starting';
+let workerProcessed = 0;
+let workerFailures = 0;
+let activeJobId: string | null = null;
+let activeFilmId: string | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let heartbeatBusy = false;
+let stopRequested = false;
+let monitorWarningShown = false;
+
+function monitorWarning(label: string, error: unknown) {
+  if (monitorWarningShown) return;
+  monitorWarningShown = true;
+  console.warn(`   ⚠️  Worker monitor ${label} failed; harvesting will continue: ${String(error)}`);
+}
+
+async function writeWorkerRow() {
+  const { error } = await supabase
+    .from('credit_harvest_workers')
+    .upsert({
+      worker_id: WORKER_ID,
+      machine_name: WORKER_MACHINE,
+      process_id: process.pid,
+      status: workerStatus,
+      current_job_id: activeJobId,
+      current_film_id: activeFilmId,
+      processed_count: workerProcessed,
+      failure_count: workerFailures,
+      last_message: workerMessage,
+      started_at: WORKER_STARTED_AT,
+      last_seen_at: new Date().toISOString(),
+      stopped_at: ['stopped', 'failed'].includes(workerStatus)
+        ? new Date().toISOString()
+        : null,
+    }, { onConflict: 'worker_id' });
+  if (error) throw new Error(error.message);
+}
+
+async function heartbeat() {
+  if (heartbeatBusy) return;
+  heartbeatBusy = true;
+  try {
+    await writeWorkerRow();
+    if (activeJobId) {
+      const { error } = await supabase
+        .from('credit_harvest_jobs')
+        .update({
+          heartbeat_at: new Date().toISOString(),
+          worker_id: WORKER_ID,
+        })
+        .eq('id', activeJobId)
+        .eq('status', 'running');
+      if (error) throw new Error(error.message);
+    }
+    monitorWarningShown = false;
+  } catch (error) {
+    monitorWarning('heartbeat', error);
+  } finally {
+    heartbeatBusy = false;
+  }
+}
+
+async function setWorkerActivity(
+  status: WorkerStatus,
+  message: string,
+  job?: Job | null,
+) {
+  workerStatus = status;
+  workerMessage = message;
+  if (job !== undefined) {
+    activeJobId = job?.id || null;
+    activeFilmId = job?.film_id || null;
+  }
+  await heartbeat();
+}
+
+async function writeWorkerLog(
+  level: WorkerLogLevel,
+  eventType: string,
+  message: string,
+  job?: Job | null,
+  details?: Record<string, unknown>,
+) {
+  try {
+    const { error } = await supabase
+      .from('credit_harvest_logs')
+      .insert({
+        worker_id: WORKER_ID,
+        level,
+        event_type: eventType,
+        message,
+        job_id: job?.id || null,
+        film_id: job?.film_id || null,
+        details: details || null,
+      });
+    if (error) throw new Error(error.message);
+  } catch (error) {
+    monitorWarning('log write', error);
+  }
+}
+
+function startHeartbeat() {
+  if (heartbeatTimer) return;
+  heartbeatTimer = setInterval(() => { void heartbeat(); }, HEARTBEAT_MS);
+}
+
+function stopHeartbeat() {
+  if (!heartbeatTimer) return;
+  clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
+}
+
+async function isHarvestPaused() {
+  const { data, error } = await supabase
+    .from('credit_harvest_control')
+    .select('paused')
+    .eq('id', 1)
+    .maybeSingle();
+  if (error) throw new Error(`read pause state: ${error.message}`);
+  return data?.paused === true;
+}
+
+async function waitInterruptibly(milliseconds: number) {
+  const deadline = Date.now() + milliseconds;
+  while (!stopRequested && Date.now() < deadline) {
+    await new Promise((resolveWait) => {
+      setTimeout(resolveWait, Math.min(1000, Math.max(0, deadline - Date.now())));
+    });
+  }
+}
+
+function requestGracefulStop(signal: string) {
+  if (stopRequested) return;
+  stopRequested = true;
+  workerStatus = 'stopping';
+  workerMessage = activeJobId
+    ? `Stopping after the current movie (${signal})`
+    : `Stopping before the next movie (${signal})`;
+  console.log(`\n🛑 ${workerMessage}`);
+  void heartbeat();
+  void writeWorkerLog('warning', 'stop_requested', workerMessage);
+}
+
+process.on('SIGINT', () => requestGracefulStop('Ctrl-C'));
+process.on('SIGTERM', () => requestGracefulStop('termination signal'));
+
 // Cookies are what UNLOCK the good (un-throttled, non-DRM) formats — a prior
 // recon found guest downloads get only a throttled android_vr stream (~7 KiB/s),
 // tv formats are DRM'd, and ios needs a PO token. Pass a Netscape cookies.txt
@@ -103,12 +277,15 @@ function clientArgs(): string[] {
 // two things that actually decide the project — can we download these videos,
 // and is the credit roll in the tail — before committing to an OCR engine.
 const FRAMES_ONLY = arg('frames-only') !== undefined;
+const EXISTING_FRAMES_DIR = arg('frames-dir');
 
 // ---------------------------------------------------------------- prereqs ---
 async function checkPrereqs() {
   // Only require the tools the chosen mode actually uses. yt-dlp + ffmpeg are
   // always needed; tesseract only when we OCR (skipped in --frames-only).
-  const need: Array<[string, string[]]> = [['yt-dlp', ['--version']], ['ffmpeg', ['-version']]];
+  const need: Array<[string, string[]]> = EXISTING_FRAMES_DIR
+    ? []
+    : [['yt-dlp', ['--version']], ['ffmpeg', ['-version']]];
   if (!FRAMES_ONLY) need.push(['tesseract', ['--version']]);
   const missing: string[] = [];
   for (const [bin, args] of need) {
@@ -172,8 +349,8 @@ async function enqueuePopular(limit: number) {
 /**
  * Enqueue films that AREN'T already enriched — fewer than `minCredits` existing
  * cast+crew rows. This is the main targeting mode: ~5k films already have full
- * credits (>=4) and re-harvesting them is pure waste. Ordered by view_count so
- * the films users actually land on are done first.
+ * credits (>=4) and re-harvesting them is pure waste. Ordered like the Films
+ * admin page ("Recently Added" first) so page-1 movies become approvable first.
  */
 async function enqueueSparse(minCredits: number) {
   console.log(`📋 Sparse enqueue: published YouTube films with < ${minCredits} existing credits…`);
@@ -196,15 +373,23 @@ async function enqueueSparse(minCredits: number) {
   for (;;) {
     const { data, error } = await supabase
       .from('films')
-      .select('id, view_count')
+      .select('id, view_count, created_at')
       .eq('is_published', true)
       .not('youtube_watch_url', 'is', null)
+      .order('created_at', { ascending: false })
       .range(from, from + 999);
     if (error) throw new Error(`films: ${error.message}`);
     if (!data?.length) break;
     for (const f of data as any[]) {
       if ((creditCount.get(f.id) ?? 0) < minCredits) {
-        rows.push({ film_id: f.id, channel_id: null, priority: Math.round(Math.log10((f.view_count ?? 0) + 1) * 10) });
+        const createdPriority = Math.floor(Date.parse(f.created_at || '') / 1000);
+        rows.push({
+          film_id: f.id,
+          channel_id: null,
+          priority: Number.isFinite(createdPriority)
+            ? Math.min(createdPriority, 2_000_000_000)
+            : Math.round(Math.log10((f.view_count ?? 0) + 1) * 10),
+        });
       }
     }
     if (data.length < 1000) break;
@@ -225,6 +410,61 @@ async function insertJobs(rows: { film_id: string; channel_id: string | null; pr
     added += count ?? 0;
   }
   console.log(`✅ Enqueued ${added} new jobs (duplicates ignored).`);
+}
+
+async function requeueLowCoverage(maxCandidates: number) {
+  const limit = Number(arg('limit')) || 500;
+  console.log(`Requeue: done credit-found jobs with <= ${maxCandidates} candidates (limit ${limit})...`);
+  const { data, error } = await supabase
+    .from('credit_harvest_jobs')
+    .select('id, film_id, candidates_found, processed_at')
+    .eq('status', 'done')
+    .eq('outcome', 'credits_found')
+    .lte('candidates_found', maxCandidates)
+    .order('processed_at', { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  if (!rows.length) {
+    console.log('   No low-coverage jobs matched.');
+    return;
+  }
+
+  for (let i = 0; i < rows.length; i += 200) {
+    const ids = rows.slice(i, i + 200).map((row: any) => row.id);
+    const { error: updateError } = await supabase
+      .from('credit_harvest_jobs')
+      .update({
+        status: 'pending',
+        outcome: null,
+        error: null,
+        started_at: null,
+        processed_at: null,
+      })
+      .in('id', ids);
+    if (updateError) throw new Error(updateError.message);
+  }
+
+  console.log(`Requeued ${rows.length} low-coverage jobs.`);
+  console.log('   Start workers with --reharvest-existing so existing pending candidates are kept and only new rows are appended.');
+}
+
+function normalizeCandidateValue(value: string | null | undefined): string {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim();
+}
+
+function candidateKey(row: { raw_name: string; role_or_character?: string | null; credit_type: string }) {
+  return [
+    normalizeCandidateValue(row.raw_name),
+    normalizeCandidateValue(row.role_or_character),
+    normalizeCandidateValue(row.credit_type),
+  ].join('|');
 }
 
 // ------------------------------------------------------------- processing ---
@@ -267,7 +507,10 @@ async function probeDuration(url: string): Promise<number> {
   return Number.isFinite(d) && d > 0 ? d : 0;
 }
 
-async function extractTailFrames(url: string, dir: string): Promise<string[]> {
+async function extractTailFrames(
+  url: string,
+  dir: string,
+): Promise<{ frames: string[]; videoStartSec: number }> {
   const tail = join(dir, 'tail.mp4');
 
   // POSITIVE timestamps only. The negative form (`*-300-inf`) produced a 262-byte
@@ -312,13 +555,21 @@ async function extractTailFrames(url: string, dir: string): Promise<string[]> {
   ], { timeout: 120_000, maxBuffer: 32 * 1024 * 1024 });
 
   await rm(tail, { force: true }); // keep frames, drop the video
-  return (await readdir(dir)).filter((f) => f.startsWith('f_')).sort().map((f) => join(dir, f));
+  const frames = (await readdir(dir))
+    .filter((f) => f.startsWith('f_'))
+    .sort()
+    .map((f) => join(dir, f));
+  return { frames, videoStartSec: start };
 }
 
 /** Local OCR — no API tokens. */
-async function ocr(frame: string): Promise<string> {
+async function ocrTsv(frame: string): Promise<string> {
   try {
-    const { stdout } = await run('tesseract', [frame, 'stdout', '--psm', '6'], { timeout: 60_000 });
+    const { stdout } = await run(
+      'tesseract',
+      [frame, 'stdout', '--psm', '6', 'tsv'],
+      { timeout: 60_000, maxBuffer: 16 * 1024 * 1024 },
+    );
     return stdout;
   } catch { return ''; }
 }
@@ -374,22 +625,65 @@ async function processJob(job: Job) {
     .eq('id', job.film_id)
     .single();
 
+  const filmLabel = film?.title?.trim() || job.film_id;
+  if (job.id) {
+    await setWorkerActivity('running', `Processing ${filmLabel}`, job);
+    await writeWorkerLog('info', 'job_started', `Started ${filmLabel}`, job);
+  }
+
   if (!film?.youtube_watch_url) {
-    await finish(job, 'unavailable', 0, 'no youtube url');
+    await finish(job, 'unavailable', 0, 'no youtube url', filmLabel);
     return;
+  }
+
+  // Queue runs are resumable and may be re-enqueued while an earlier debug run
+  // already has candidates awaiting review. Do not download/OCR the same film
+  // again in that case; keep the existing review set and close the queue job.
+  // `--film` debug runs intentionally bypass this guard so they remain useful
+  // for OCR/parser experiments.
+  if (job.id) {
+    const { count, error } = await supabase
+      .from('credit_candidates')
+      .select('id', { count: 'exact', head: true })
+      .eq('film_id', job.film_id)
+      .eq('status', 'pending');
+    if (error) throw new Error(`existing candidates: ${error.message}`);
+    if ((count ?? 0) > 0 && !REHARVEST_EXISTING) {
+      await finish(job, 'credits_found', count ?? 0, undefined, filmLabel);
+      console.log(`   ⏭️  ${film.title?.slice(0, 45)} → ${count} pending candidates already exist`);
+      return;
+    }
   }
 
   // --frames-only: write to a durable, inspectable folder in the project so you
   // can open it and SEE whether the tail actually contains the credit roll.
-  const dir = FRAMES_ONLY
-    ? join(process.cwd(), 'harvest_frames', job.film_id)
-    : await mkdtemp(join(tmpdir(), 'harvest-'));
+  const dir = EXISTING_FRAMES_DIR
+    ? resolve(EXISTING_FRAMES_DIR)
+    : FRAMES_ONLY
+      ? join(process.cwd(), 'harvest_frames', job.film_id)
+      : await mkdtemp(join(tmpdir(), 'harvest-'));
   if (FRAMES_ONLY) await mkdir(dir, { recursive: true });
 
   try {
     console.log(`   ⬇️  grabbing tail frames of "${film.title?.slice(0, 45)}"…`);
-    const frames = await extractTailFrames(film.youtube_watch_url, dir);
-    if (!frames.length) { await finish(job, 'no_credits', 0, 'no frames'); return; }
+    let frames: string[];
+    let videoStartSec: number;
+    if (EXISTING_FRAMES_DIR) {
+      frames = (await readdir(dir))
+        .filter((name) => /^f_\d+\.(jpg|jpeg|png)$/i.test(name))
+        .sort()
+        .map((name) => join(dir, name));
+      const sampledSeconds = frames.length * FRAME_EVERY_SEC;
+      videoStartSec = Number(arg('video-start'))
+        || Math.max(0, Number(film.runtime_minutes || 0) * 60 - sampledSeconds);
+      console.log(`   using ${frames.length} existing frames`);
+    } else {
+      ({ frames, videoStartSec } = await extractTailFrames(film.youtube_watch_url, dir));
+    }
+    if (!frames.length) {
+      await finish(job, 'no_credits', 0, 'no frames', filmLabel);
+      return;
+    }
 
     if (FRAMES_ONLY) {
       // Stop here — no OCR, no DB writes. Just prove download+frames work.
@@ -400,50 +694,96 @@ async function processJob(job: Job) {
 
     // OCR frames from the END backwards — rolls sit at the very end, and this
     // finds them with the fewest OCR calls.
-    const found = new Map<string, Parsed & { frameSec: number }>();
+    const observations: CreditObservation[] = [];
     let rollFrames = 0;
     for (let i = frames.length - 1; i >= 0; i--) {
-      const parsed = parseCredits(await ocr(frames[i]));
-      if (!parsed) continue;
+      const frameSec = i * FRAME_EVERY_SEC;
+      const parsed = parseCreditFrame(
+        parseTesseractTsv(await ocrTsv(frames[i])),
+        i,
+        frameSec,
+        videoStartSec + frameSec,
+      );
+      if (!parsed.length) continue;
       rollFrames++;
-      const sec = i * FRAME_EVERY_SEC;
-      for (const p of parsed) {
-        const key = p.name.toLowerCase();
-        if (!found.has(key)) found.set(key, { ...p, frameSec: sec });
-      }
+      observations.push(...parsed);
     }
 
-    if (!found.size) { await finish(job, 'no_credits', 0); return; }
+    const found = consolidateCreditObservations(observations);
+    if (!found.length) {
+      await finish(job, 'no_credits', 0, undefined, filmLabel);
+      return;
+    }
 
-    // Resolve names against existing people so the reviewer sees matches, and
-    // so confidence reflects "this is a person we already know".
-    const rows = [];
-    for (const p of found.values()) {
-      let matched: string | null = null;
-      try {
-        const { data } = await supabase.rpc('find_person_by_name', { p_name: p.name });
-        matched = (data as string) || null;
-      } catch { /* matcher optional */ }
+    // Name resolution happens at approval time. Doing one remote matcher call
+    // per OCR candidate made the worker slower than OCR itself and did not
+    // improve extraction quality. Fast end-roll cards can appear for only a
+    // second, so keep strong one-frame observations for human approval.
+    let rows: Array<Record<string, any>> = [];
+    for (const p of found) {
+      const strongSingleFrame = p.frameSupport === 1 && p.ocrConfidence >= SINGLE_FRAME_MIN_OCR_CONFIDENCE;
+      if (p.frameSupport < 2 && !strongSingleFrame) continue;
+      const repeated = p.frameSupport >= 2;
       const conf = Math.min(1,
-        0.35                              // base: survived the structural gate
-        + (matched ? 0.35 : 0)            // resolves to a known person
-        + (p.role ? 0.15 : 0)             // had an explicit role label
-        + Math.min(0.15, rollFrames * 0.03), // appeared across several roll frames
+        (repeated ? 0.45 : 0.34)
+        + Math.min(0.25, Math.max(0, p.frameSupport - 1) * 0.07)
+        + p.ocrConfidence * (repeated ? 0.25 : 0.35),
       );
       rows.push({
         film_id: job.film_id, job_id: job.id,
-        raw_name: p.name, role_or_character: p.role,
-        credit_type: p.type, confidence: Number(conf.toFixed(2)),
-        matched_person_id: matched, source_frame_sec: p.frameSec,
+        raw_name: p.name,
+        role_or_character: p.roleOrCharacter,
+        credit_type: p.creditType,
+        confidence: Number(conf.toFixed(2)),
+        ocr_confidence: Number(p.ocrConfidence.toFixed(3)),
+        frame_support: p.frameSupport,
+        matched_person_id: null,
+        source_frame_sec: p.frameSec,
+        source_video_sec: p.videoSec,
+        source_frame_index: p.frameIndex,
+        source_ocr_text: p.evidenceText,
+        source_layout: p.layout,
       });
+    }
+
+    if (rows.length < MIN_ENTRIES && !REHARVEST_EXISTING) {
+      await finish(
+        job,
+        'no_credits',
+        0,
+        `only ${rows.length} validated candidates across ${rollFrames} frames`,
+        filmLabel,
+      );
+      return;
+    }
+
+    const { data: existingRows, error: existingRowsError } = await supabase
+      .from('credit_candidates')
+      .select('raw_name, role_or_character, credit_type')
+      .eq('film_id', job.film_id);
+    if (existingRowsError) throw new Error(`existing candidate rows: ${existingRowsError.message}`);
+
+    const existingKeys = new Set((existingRows ?? []).map((row: any) => candidateKey(row)));
+    rows = rows.filter((row) => !existingKeys.has(candidateKey(row as any)));
+
+    if (!rows.length) {
+      await finish(job, 'credits_found', existingRows?.length ?? 0, undefined, filmLabel);
+      console.log(`   no new unique candidates for ${film.title?.slice(0, 45)} (${existingRows?.length ?? 0} existing kept)`);
+      return;
     }
 
     const { error } = await supabase.from('credit_candidates').insert(rows);
     if (error) throw new Error(error.message);
-    await finish(job, 'credits_found', rows.length);
+    await finish(job, 'credits_found', rows.length, undefined, filmLabel);
     console.log(`   ✅ ${film.title?.slice(0, 45)} → ${rows.length} candidates`);
   } catch (e: any) {
-    await finish(job, 'error', 0, String(e?.message ?? e).slice(0, 300));
+    await finish(
+      job,
+      'error',
+      0,
+      String(e?.message ?? e).slice(0, 300),
+      filmLabel,
+    );
     // Print the full (multi-line) message, and dump everything to a log file so
     // nothing is lost to terminal truncation.
     console.log(`   ❌ ${film.title?.slice(0, 45)}:\n       ${String(e?.message ?? e)}`);
@@ -456,44 +796,75 @@ async function processJob(job: Job) {
   } finally {
     // Keep frames-only output (that's the whole point) and honour --keep;
     // otherwise wipe the temp dir.
-    if (!FRAMES_ONLY && arg('keep') === undefined) await rm(dir, { recursive: true, force: true });
+    if (!EXISTING_FRAMES_DIR && !FRAMES_ONLY && arg('keep') === undefined) {
+      await rm(dir, { recursive: true, force: true });
+    }
   }
 }
 
-async function finish(job: Job, outcome: string, candidates: number, error?: string) {
+async function finish(
+  job: Job,
+  outcome: string,
+  candidates: number,
+  error?: string,
+  filmLabel?: string,
+) {
   // --film debug mode has no queue row to update.
   if (!job.id) { console.log(`   [debug] outcome=${outcome} candidates=${candidates}${error ? ` error=${error}` : ''}`); return; }
-  await supabase.from('credit_harvest_jobs').update({
+  const { error: finishError } = await supabase.from('credit_harvest_jobs').update({
     status: outcome === 'error' ? 'failed' : 'done',
     outcome, candidates_found: candidates, error: error ?? null,
     processed_at: new Date().toISOString(),
+    heartbeat_at: new Date().toISOString(),
   }).eq('id', job.id);
+  if (finishError) throw new Error(`finish job: ${finishError.message}`);
+
+  workerProcessed++;
+  if (outcome === 'error') workerFailures++;
+  const label = filmLabel || job.film_id;
+  const level: WorkerLogLevel = outcome === 'error'
+    ? 'error'
+    : outcome === 'credits_found'
+      ? 'success'
+      : outcome === 'unavailable'
+        ? 'warning'
+        : 'info';
+  const resultMessage = outcome === 'credits_found'
+    ? `${label}: found ${candidates} candidate${candidates === 1 ? '' : 's'}`
+    : outcome === 'no_credits'
+      ? `${label}: no usable credit roll found`
+      : outcome === 'unavailable'
+        ? `${label}: source video unavailable`
+        : `${label}: ${error || 'harvest failed'}`;
+
+  await writeWorkerLog(
+    level,
+    outcome === 'error' ? 'job_failed' : 'job_completed',
+    resultMessage,
+    job,
+    error ? { error } : undefined,
+  );
+  await setWorkerActivity(
+    stopRequested ? 'stopping' : 'idle',
+    resultMessage,
+    null,
+  );
 }
 
 /** Claim the next pending job (highest priority first). */
 async function claim(): Promise<Job | null> {
-  const { data } = await supabase
-    .from('credit_harvest_jobs')
-    .select('id, film_id, channel_id, attempts')
-    .eq('status', 'pending')
-    .order('priority', { ascending: false })
-    .order('created_at', { ascending: true })
-    .limit(1);
-  const job = data?.[0] as Job | undefined;
-  if (!job) return null;
-  const { error } = await supabase
-    .from('credit_harvest_jobs')
-    .update({ status: 'running', attempts: job.attempts + 1, started_at: new Date().toISOString() })
-    .eq('id', job.id)
-    .eq('status', 'pending'); // guard against a second worker taking it
-  if (error) return null;
-  return job;
+  const { data, error } = await supabase.rpc('claim_credit_harvest_job', {
+    p_worker_id: WORKER_ID,
+  });
+  if (error) throw new Error(`claim job: ${error.message}`);
+  return (data?.[0] as Job | undefined) ?? null;
 }
 
 async function main() {
   if (arg('enqueue-recon') !== undefined) { await enqueueRecon(Number(arg('enqueue-recon')) || 3); return; }
   if (arg('enqueue-popular') !== undefined) { await enqueuePopular(Number(arg('enqueue-popular')) || 2000); return; }
   if (arg('enqueue-sparse') !== undefined) { await enqueueSparse(Number(arg('enqueue-sparse')) || 4); return; }
+  if (arg('requeue-low-coverage') !== undefined) { await requeueLowCoverage(Number(arg('requeue-low-coverage')) || 12); return; }
 
   await checkPrereqs();
 
@@ -503,22 +874,73 @@ async function main() {
     return;
   }
 
+  await setWorkerActivity('starting', `Worker started on ${WORKER_MACHINE}`, null);
+  await writeWorkerLog(
+    'info',
+    'worker_started',
+    `Worker ${WORKER_ID} started on ${WORKER_MACHINE}`,
+  );
+  startHeartbeat();
+
   console.log('👷 Worker started. Ctrl-C to stop; progress is saved per film.\n');
   let done = 0;
-  for (;;) {
-    const job = await claim();
-    if (!job) {
+  let wasPaused = false;
+  try {
+    while (!stopRequested) {
+      const paused = await isHarvestPaused();
+      if (paused) {
+        if (!wasPaused) {
+          const message = 'Paused by the admin dashboard; waiting to resume';
+          console.log(`   ⏸️  ${message}`);
+          await setWorkerActivity('paused', message, null);
+          await writeWorkerLog('warning', 'worker_paused', message);
+          wasPaused = true;
+        }
+        await waitInterruptibly(PAUSE_POLL_MS);
+        continue;
+      }
+
+      if (wasPaused) {
+        const message = 'Resumed by the admin dashboard';
+        console.log(`   ▶️  ${message}`);
+        await setWorkerActivity('idle', message, null);
+        await writeWorkerLog('info', 'worker_resumed', message);
+        wasPaused = false;
+      } else {
+        await setWorkerActivity('idle', 'Waiting for the next movie', null);
+      }
+
+      const job = await claim();
+      if (!job) {
+        if (arg('once') !== undefined) break;
+        const message = 'Queue empty; checking again in 60 seconds';
+        console.log(`   …${message.toLowerCase()}`);
+        await setWorkerActivity('idle', message, null);
+        await waitInterruptibly(60_000);
+        continue;
+      }
+
+      await processJob(job);
+      done++;
+      if (done % 25 === 0) console.log(`— ${done} films processed —`);
       if (arg('once') !== undefined) break;
-      console.log('   …queue empty, sleeping 60s');
-      await new Promise((r) => setTimeout(r, 60_000));
-      continue;
+      // Gentle pacing so we don't look like a scraper.
+      await waitInterruptibly(2000 + Math.random() * 3000);
     }
-    await processJob(job);
-    done++;
-    if (done % 25 === 0) console.log(`— ${done} films processed —`);
-    if (arg('once') !== undefined) break;
-    // Gentle pacing so we don't look like a scraper.
-    await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
+  } catch (error) {
+    const message = `Worker stopped after an unexpected failure: ${String(error)}`;
+    await setWorkerActivity('failed', message, null);
+    await writeWorkerLog('error', 'worker_failed', message);
+    throw error;
+  } finally {
+    stopHeartbeat();
+    if (workerStatus !== 'failed') {
+      const message = stopRequested
+        ? 'Worker stopped safely after the current movie'
+        : 'Worker stopped';
+      await setWorkerActivity('stopped', message, null);
+      await writeWorkerLog('info', 'worker_stopped', message);
+    }
   }
 }
 

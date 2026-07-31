@@ -8,6 +8,7 @@ export default defineConfig({
       'src/**/*.test.ts',
       'api/**/*.test.ts',
       'api/**/*.test.js',
+      'scripts/**/*.test.ts',
     ],
   },
 });
