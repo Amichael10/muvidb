@@ -67,9 +67,14 @@ export default function CookieConsent() {
       role="dialog"
       aria-live="polite"
       aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-0 z-[60] p-4 pb-24 lg:pb-4 lg:p-6 page-fade-in"
+      className="fixed inset-x-0 bottom-0 z-[60] p-4 pb-24 lg:pb-4 lg:p-6 pointer-events-none consent-rise"
     >
-      <div className="relative max-w-3xl mx-auto bg-surface border border-border rounded-2xl shadow-2xl shadow-black/40 backdrop-blur-md overflow-hidden">
+      {/* Scrim: the banner sits over a busy hero, so fade the page out beneath it
+          rather than relying on the panel edge alone to separate the two. */}
+      <div className="absolute inset-x-0 bottom-0 -top-16 bg-gradient-to-t from-bg via-bg/70 to-transparent pointer-events-none" />
+
+      <div className="relative pointer-events-auto max-w-3xl mx-auto bg-surface border border-border rounded-2xl shadow-2xl shadow-black/60 overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/60 to-transparent pointer-events-none"></div>
         <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
         <div className="relative z-10 p-6 lg:p-7 flex flex-col lg:flex-row lg:items-center gap-6">
           {/* Copy */}

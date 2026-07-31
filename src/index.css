@@ -1,6 +1,6 @@
 /* Fonts are loaded via <link> in index.html (preconnect + stylesheet) so they are
    discovered immediately instead of after this CSS downloads — improves FCP/LCP. */
-@import "tailwindcss";
+@import "tailwindcss" source("./");
 
 :root {
   /* Spacing System */
@@ -134,6 +134,26 @@
   
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Site container ────────────────────────────────────────────────────────
+   Every page/section wraps its content in `max-w-7xl mx-auto`, which Tailwind
+   resolves from --container-7xl. Overriding it here widens the whole site from
+   one place instead of touching ~70 files. It stays 1280px on laptops and steps
+   up on large displays so the layout doesn't float in a sea of margin. The film
+   rails are fixed-width horizontal scrollers, so the extra width shows more
+   posters rather than inflating the existing ones. */
+:root {
+  --container-7xl: 80rem; /* 1280px */
+}
+@media (min-width: 1536px) {
+  :root { --container-7xl: 90rem; } /* 1440px */
+}
+@media (min-width: 1800px) {
+  :root { --container-7xl: 100rem; } /* 1600px */
+}
+@media (min-width: 2200px) {
+  :root { --container-7xl: 108rem; } /* 1728px */
 }
 
 @layer base {
@@ -588,6 +608,164 @@
     box-shadow: rgba(19, 19, 22, 0.1) 0px 2px 8px -4px, rgba(34, 42, 53, 0.12) 0px 0px 0px 1px, rgba(34, 42, 53, 0.08) 0px 8px 16px 0px;
   }
 
+  .admin-workspace {
+    --admin-table-min-width: 1120px;
+    --admin-control-height: 44px;
+    background:
+      linear-gradient(180deg, var(--color-surface-2) 0, transparent 340px),
+      var(--color-bg);
+  }
+
+  .admin-workspace .admin-sidebar {
+    box-shadow: 1px 0 0 var(--color-hairline);
+  }
+
+  .admin-workspace .admin-nav {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+
+  .admin-workspace .admin-nav::-webkit-scrollbar,
+  .admin-workspace .admin-content::-webkit-scrollbar,
+  .admin-workspace .overflow-x-auto::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .admin-workspace .admin-nav::-webkit-scrollbar-thumb,
+  .admin-workspace .admin-content::-webkit-scrollbar-thumb,
+  .admin-workspace .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  .admin-workspace .admin-topbar {
+    backdrop-filter: blur(14px);
+  }
+
+  .admin-workspace .admin-main-inner {
+    max-width: none;
+  }
+
+  .admin-workspace .admin-page {
+    width: 100%;
+  }
+
+  .admin-workspace .admin-page-header {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    padding: clamp(1rem, 1.6vw, 1.5rem);
+  }
+
+  .admin-workspace .admin-filter-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    padding: clamp(1rem, 1.4vw, 1.25rem);
+  }
+
+  .admin-workspace .admin-filter-panel {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+  }
+
+  .admin-workspace .admin-selection-bar {
+    background: var(--color-brand-muted);
+    border: 1px solid rgba(255, 90, 31, 0.28);
+    border-radius: var(--radius-lg);
+  }
+
+  .admin-workspace :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+    min-height: var(--admin-control-height);
+    border-color: var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .admin-workspace :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 4px var(--color-brand-muted);
+  }
+
+  .admin-workspace .admin-table-card,
+  .admin-workspace .card-cal {
+    border-color: var(--color-border);
+    overflow: hidden;
+  }
+
+  .admin-workspace table {
+    min-width: var(--admin-table-min-width);
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+  }
+
+  .admin-workspace table thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .admin-workspace table th {
+    background: var(--color-surface-2);
+    color: var(--color-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    padding: 0.9rem 1rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .admin-workspace table td {
+    border-bottom: 1px solid var(--color-hairline);
+    line-height: 1.45;
+    padding: 1rem;
+    vertical-align: top;
+  }
+
+  .admin-workspace table tbody tr {
+    transition: background-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .admin-workspace table tbody tr:hover {
+    background: var(--color-surface-2);
+  }
+
+  .admin-workspace table td .truncate,
+  .admin-workspace table td.truncate {
+    max-width: min(36rem, 54vw);
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-workspace table td a.truncate,
+  .admin-workspace table td span.truncate,
+  .admin-workspace table td p.truncate,
+  .admin-workspace table td div.truncate {
+    display: inline;
+  }
+
+  .admin-workspace table td .admin-row-actions,
+  .admin-workspace table td .group-hover\:opacity-100 {
+    opacity: 1;
+  }
+
+  .admin-workspace .admin-table-meta {
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+  }
+
   .link-underline {
     @apply relative inline-block;
   }
@@ -605,6 +783,23 @@
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Consent banner entrance. Deliberately transform-only: page-fade-in starts at
+     opacity 0, so any stall (hidden tab, throttled timeline) leaves the banner
+     ghosted over the page instead of sitting on top of it. Sliding a fully
+     opaque panel has no such failure mode. */
+  .consent-rise {
+    animation: consent-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes consent-rise {
+    from { transform: translateY(16px); }
+    to { transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .consent-rise {
+      animation: none;
+    }
   }
 
   /* Hide scrollbar utility */
