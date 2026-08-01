@@ -21,6 +21,7 @@ export default [
   route('browse', 'routes/browse.tsx'),
   route('tv-shows', 'routes/tv-shows.tsx'),
   route('watch/:platform', 'routes/watch-platform.tsx'),
+  route('classification', 'pages/Classification.jsx'),
   route('login', 'pages/Login.jsx'),
   route('signup', 'pages/Signup.jsx'),
   route('people', 'routes/people-list.tsx'),

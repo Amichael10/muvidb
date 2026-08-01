@@ -131,7 +131,11 @@ const TMDBSyncPanel = () => {
         language: details.language,
         tmdb_id: details.tmdbId,
         tmdb_rating: details.rating || null,
-        nfvcb_rating: '18',
+        // NFVCB classification is a decision of the Censors Board, not something
+        // we can infer from TMDB. Defaulting every import to '18' stamped films
+        // with an official adult rating they were never given. Null means
+        // "not classified", which is the truthful state.
+        nfvcb_rating: null,
         view_count: 0,
       }
 
