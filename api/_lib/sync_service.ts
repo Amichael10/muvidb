@@ -11,6 +11,37 @@ import {
   type YouTubeTitleDecision,
 } from './youtube_title_policy.js';
 
+/**
+ * True when a freshly fetched video row differs from what is already stored.
+ *
+ * Sync used to upsert every row on every run. A YouTube video's title,
+ * thumbnail, publish date and duration are effectively static, so that rewrote
+ * every row and every index on it for no change — by a wide margin the largest
+ * write source in the database. Filtering on this trades a cheap read for a
+ * costly rewrite.
+ *
+ * Timestamps are compared as instants, not strings: Postgres returns
+ * `2024-01-05T10:30:00+00:00` where the YouTube API sends
+ * `2024-01-05T10:30:00Z`. Comparing those as text marks every row as changed
+ * and silently defeats the whole filter.
+ */
+export function channelVideoChanged(
+  prior: Record<string, any> | undefined,
+  row: Record<string, any>,
+  fields: string[],
+): boolean {
+  if (!prior) return true;
+
+  return fields.some(field => {
+    if (field === 'published_at') {
+      const a = new Date(prior[field] ?? 0).getTime();
+      const b = new Date(row[field] ?? 0).getTime();
+      return a !== b;
+    }
+    return (prior[field] ?? null) !== (row[field] ?? null);
+  });
+}
+
 /** Try to find a TMDB movie match and return enriched metadata */
 async function enrichFromTMDB(title: string, year?: number | null): Promise<{
   synopsis?: string;
@@ -209,13 +240,17 @@ export async function runVideosSync() {
       }
 
       // Fetch hidden videos for this channel
-      const { data: hiddenVids } = await supabase
+      // One read serves two purposes: which videos are hidden, and what we
+      // already have stored so unchanged rows can be skipped below.
+      const { data: storedVids } = await supabase
         .from('channel_videos')
-        .select('video_id')
-        .eq('channel_id', ch.id)
-        .eq('is_hidden', true);
-      
-      const hiddenSet = new Set(hiddenVids?.map((v: any) => v.video_id) || []);
+        .select('video_id,is_hidden,title,thumbnail_url,published_at,duration_seconds')
+        .eq('channel_id', ch.id);
+
+      const hiddenSet = new Set(
+        (storedVids || []).filter((v: any) => v.is_hidden).map((v: any) => v.video_id),
+      );
+      const storedByVideo = new Map((storedVids || []).map((v: any) => [v.video_id, v]));
 
       const videoRows = plItems.map((item: any) => {
         const vid = item.snippet.resourceId.videoId;
@@ -237,8 +272,26 @@ export async function runVideosSync() {
         // would fail the whole upsert (PGRST204). It stays on the in-memory rows
         // for AI enrichment below.
         const cleanVideoRows = videoRows.map(({ _description, ...rest }: any) => rest);
-        await supabase.from('channel_videos').upsert(cleanVideoRows, { onConflict: 'channel_id,video_id' });
-        totalUpserted += videoRows.length;
+
+        // Only write rows that are new or genuinely different. A YouTube
+        // video's title, thumbnail, publish date and duration are effectively
+        // static, so upserting all of them every run rewrote every row and
+        // every index on it for no change — this was by far the largest write
+        // source in the database. Reads are cheap; row rewrites are not.
+        const changedRows = cleanVideoRows.filter((row: any) =>
+          channelVideoChanged(storedByVideo.get(row.video_id), row, [
+            'title',
+            'thumbnail_url',
+            'duration_seconds',
+            'published_at',
+          ]),
+        );
+
+        if (changedRows.length > 0) {
+          await supabase.from('channel_videos').upsert(changedRows, { onConflict: 'channel_id,video_id' });
+        }
+        // Counts actual writes now, not rows considered.
+        totalUpserted += changedRows.length;
       }
       
       // Auto-create films for 30+ min videos from ALL channels (not just
@@ -585,8 +638,12 @@ export async function runTMDBSync() {
     channel = newChannel;
   }
 
-  const { data: hiddenVids } = await supabase.from('channel_videos').select('video_id').eq('channel_id', channel.id).eq('is_hidden', true);
-  const hiddenSet = new Set(hiddenVids?.map(v => v.video_id) || []);
+  const { data: storedVids } = await supabase
+    .from('channel_videos')
+    .select('video_id,is_hidden,title,description,thumbnail_url,published_at')
+    .eq('channel_id', channel.id);
+  const hiddenSet = new Set((storedVids || []).filter((v: any) => v.is_hidden).map((v: any) => v.video_id));
+  const storedByVideo = new Map((storedVids || []).map((v: any) => [v.video_id, v]));
 
   const videoRows = movies.map((m: any) => ({
     channel_id: channel!.id,
@@ -597,8 +654,18 @@ export async function runTMDBSync() {
     published_at: m.release_date ? new Date(m.release_date).toISOString() : new Date().toISOString()
   })).filter(row => !hiddenSet.has(row.video_id));
 
-  if (videoRows.length > 0) {
-    await supabase.from('channel_videos').upsert(videoRows, { onConflict: 'channel_id,video_id' });
+  // Same reasoning as the YouTube path: skip rows that have not changed.
+  const changedRows = videoRows.filter((row: any) =>
+    channelVideoChanged(storedByVideo.get(row.video_id), row, [
+      'title',
+      'description',
+      'thumbnail_url',
+      'published_at',
+    ]),
+  );
+
+  if (changedRows.length > 0) {
+    await supabase.from('channel_videos').upsert(changedRows, { onConflict: 'channel_id,video_id' });
   }
 
   await supabase.from('channels').update({ videos_last_fetched_at: new Date().toISOString() }).eq('id', channel.id);

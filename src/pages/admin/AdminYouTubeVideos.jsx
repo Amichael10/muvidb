@@ -11,7 +11,7 @@ import { formatViewCount } from '../../utils/youtube';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 
-const FILM_MIN = 60; // 1 min in seconds (includes skits)
+const FILM_MIN = 1800; // 30 min — film-length only
 
 function fmtDuration(s) {
   if (!s) return '—';

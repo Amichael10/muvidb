@@ -398,12 +398,14 @@ export default function AdminFilms() {
   const fetchYoutubeBuffer = async () => {
     setLoading(true);
     try {
-      // Fetch videos that are NOT hidden and do NOT have a film_id
+      // Film-length unmapped signals only (≥30 min). Shorter clips are purged /
+      // never useful as "map to film" candidates (trailers, skits, promos).
       let query = supabase
         .from('channel_videos')
         .select('*, channels(name)', { count: 'exact' })
         .is('film_id', null)
-        .eq('is_hidden', false);
+        .eq('is_hidden', false)
+        .gte('duration_seconds', 1800);
 
       if (searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
 
