@@ -1,12 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { embedWithCohere, hasCohere } from './_lib/ai_service.js';
+import { embedWithCohere, hasCohere, rerankWithCohere } from './_lib/ai_service.js';
 import { supabase } from './_lib/supabase.js';
 
 export const maxDuration = 30;
 
 /**
- * Public semantic film search: Cohere query embed → pgvector neighbours.
- * POST { q: string, limit?: number }
+ * Semantic film ranking without hammering Postgres IO.
+ *
+ * Default (Micro-safe): Cohere Rerank over caller-supplied lexical candidates.
+ *   POST { q, mode?: 'rerank', candidates: [{ id, title }] }
+ *
+ * Opt-in pgvector path (needs compute headroom + HNSW):
+ *   SEMANTIC_VECTOR_SEARCH=true
+ *   POST { q, mode: 'vector', limit? }
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -14,61 +20,96 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const q = String(
-    req.method === 'GET' ? req.query.q : req.body?.q ?? ''
-  ).trim();
-  const limit = Math.min(
-    48,
-    Math.max(1, Number(req.method === 'GET' ? req.query.limit : req.body?.limit) || 16)
-  );
+  const body = req.method === 'GET' ? req.query : req.body || {};
+  const q = String(body.q ?? '').trim();
+  const mode = String(body.mode || 'rerank').toLowerCase();
+  const vectorEnabled = process.env.SEMANTIC_VECTOR_SEARCH === 'true';
 
   if (q.length < 2) return res.status(400).json({ error: 'q too short', films: [] });
   if (!hasCohere()) return res.status(503).json({ error: 'Cohere not configured', films: [] });
 
   try {
-    const [vector] = await embedWithCohere([q.slice(0, 500)], { inputType: 'search_query' });
-    if (!vector?.length) return res.json({ films: [], engine: 'cohere' });
+    if (mode === 'vector') {
+      if (!vectorEnabled) {
+        return res.status(503).json({
+          error: 'pgvector search disabled (set SEMANTIC_VECTOR_SEARCH=true when compute allows)',
+          films: [],
+          engine: 'disabled',
+        });
+      }
+      return await vectorSearch(q, body, res);
+    }
 
-    const literal = `[${vector.join(',')}]`;
-    const { data: matches, error } = await supabase.rpc('match_films_by_embedding', {
-      query_embedding: literal,
-      match_count: limit,
-      min_similarity: 0.28,
-    });
-    if (error) throw new Error(error.message);
-
-    const ids = (matches || []).map((m: any) => m.film_id).filter(Boolean);
-    if (!ids.length) return res.json({ films: [], engine: 'cohere' });
-
-    // Explicit type args: TS cannot infer tuple entries from `any[][]`, so the
-    // Map lands as Map<unknown, unknown> and arithmetic on `.get()` fails.
-    const simById = new Map<string, number>(
-      (matches || []).map((m: any) => [m.film_id, m.similarity] as [string, number]),
-    );
-    const { data: films, error: filmErr } = await supabase
-      .from('films')
-      .select(`
-        id, slug, title, poster_url, backdrop_url, year, language, runtime_minutes,
-        view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating,
-        content_type, youtube_watch_url, release_type, streaming_links, source, countries,
-        film_genres!left(genres(name))
-      `)
-      .in('id', ids)
-      .eq('is_published', true);
-    if (filmErr) throw new Error(filmErr.message);
-
-    const ordered = (films || [])
-      .map((f: any) => ({
-        ...f,
-        genres: f.film_genres?.map((g: any) => g.genres?.name).filter(Boolean) || [],
-        _score: Math.round((simById.get(f.id) || 0) * 500),
-        _semantic: simById.get(f.id) || 0,
-      }))
-      .sort((a: any, b: any) => b._semantic - a._semantic);
-
-    return res.json({ films: ordered, engine: 'cohere' });
+    return await rerankSearch(q, body, res);
   } catch (err: any) {
     console.error('semantic-search:', err?.message || err);
     return res.status(500).json({ error: err?.message || 'semantic search failed', films: [] });
   }
+}
+
+async function rerankSearch(q: string, body: any, res: VercelResponse) {
+  const candidates: Array<{ id: string; title?: string }> = Array.isArray(body.candidates)
+    ? body.candidates
+    : [];
+
+  if (candidates.length < 2) {
+    return res.json({ films: [], engine: 'cohere-rerank', note: 'need >=2 candidates' });
+  }
+
+  const docs = candidates.map((c) => String(c.title || c.id).slice(0, 500));
+  const ranked = await rerankWithCohere(q.slice(0, 500), docs, {
+    topN: Math.min(candidates.length, Number(body.limit) || 24),
+  });
+
+  const films = ranked.map((r) => ({
+    id: candidates[r.index]?.id,
+    title: candidates[r.index]?.title,
+    _score: Math.round(r.relevanceScore * 500),
+    _semantic: r.relevanceScore,
+  })).filter((f) => f.id);
+
+  return res.json({ films, engine: 'cohere-rerank' });
+}
+
+async function vectorSearch(q: string, body: any, res: VercelResponse) {
+  const limit = Math.min(48, Math.max(1, Number(body.limit) || 16));
+  const [vector] = await embedWithCohere([q.slice(0, 500)], { inputType: 'search_query' });
+  if (!vector?.length) return res.json({ films: [], engine: 'cohere-vector' });
+
+  const literal = `[${vector.join(',')}]`;
+  const { data: matches, error } = await supabase.rpc('match_films_by_embedding', {
+    query_embedding: literal,
+    match_count: limit,
+    min_similarity: 0.28,
+  });
+  if (error) throw new Error(error.message);
+
+  const ids = (matches || []).map((m: any) => m.film_id).filter(Boolean);
+  if (!ids.length) return res.json({ films: [], engine: 'cohere-vector' });
+
+  const simById = new Map<string, number>(
+    (matches || []).map((m: any) => [m.film_id, m.similarity] as [string, number]),
+  );
+  const { data: films, error: filmErr } = await supabase
+    .from('films')
+    .select(`
+      id, slug, title, poster_url, backdrop_url, year, language, runtime_minutes,
+      view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating,
+      content_type, youtube_watch_url, release_type, streaming_links, source, countries,
+      film_genres!left(genres(name))
+    `)
+    .in('id', ids)
+    .eq('is_published', true);
+  if (filmErr) throw new Error(filmErr.message);
+
+  const ordered = (films || [])
+    .map((f: any) => ({
+      ...f,
+      genres: f.film_genres?.map((g: any) => g.genres?.name).filter(Boolean) || [],
+      _score: Math.round((simById.get(f.id) || 0) * 500),
+      _semantic: simById.get(f.id) || 0,
+    }))
+    .sort((a: any, b: any) => b._semantic - a._semantic);
+
+  return res.json({ films: ordered, engine: 'cohere-vector' });
 }
