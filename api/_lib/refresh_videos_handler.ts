@@ -119,7 +119,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           // Process only new videos to avoid unnecessary processing and database duplicate writes
           if (newVideosInBatch.length > 0) {
-            const promotableVids = newVideosInBatch.filter((v: any) => parseDuration(v.contentDetails.duration) >= 900 && !hiddenSet.has(v.id));
+            // Same 30-min floor as runVideosSync — shorts/trailers never enter the buffer.
+            const FILM_MIN_SEC = 1800;
+            const promotableVids = newVideosInBatch.filter((v: any) => parseDuration(v.contentDetails.duration) >= FILM_MIN_SEC && !hiddenSet.has(v.id));
 
             // 1. Bulk check existing films
             const existingFilmsMap = new Map();
@@ -161,10 +163,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               })));
             }
 
-            // 4. Construct video rows for new videos
+            // 4. Film-length rows only (matches channel_videos ingest policy).
             for (const v of newVideosInBatch) {
               if (hiddenSet.has(v.id)) continue;
               const duration = parseDuration(v.contentDetails.duration);
+              if (duration < FILM_MIN_SEC) continue;
               const row: any = {
                 channel_id: ch.id,
                 video_id: v.id,
@@ -172,8 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 thumbnail_url: v.snippet.thumbnails?.high?.url || v.snippet.thumbnails?.medium?.url,
                 published_at: v.snippet.publishedAt,
                 duration_seconds: duration,
-                match_status: (duration >= 900 && existingFilmsMap.has(v.id)) ? 'matched' : 'unmatched',
-                film_id: (duration >= 900) ? existingFilmsMap.get(v.id) : null
+                match_status: existingFilmsMap.has(v.id) ? 'matched' : 'unmatched',
+                film_id: existingFilmsMap.get(v.id) || null
               };
               allVideoRows.push(row);
             }

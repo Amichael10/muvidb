@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { channelVideoChanged } from './sync_service.js';
+import { channelVideoChanged, isFilmLengthDuration, CHANNEL_VIDEO_MIN_SEC } from './sync_service.js';
 
 const FIELDS = ['title', 'thumbnail_url', 'duration_seconds', 'published_at'];
 
@@ -65,5 +65,14 @@ describe('channelVideoChanged', () => {
   it('only inspects the fields it is asked about', () => {
     const noisy = { ...fetched, some_other_column: 'ignored' };
     expect(channelVideoChanged(stored, noisy, FIELDS)).toBe(false);
+  });
+});
+
+describe('isFilmLengthDuration', () => {
+  it('uses a 30-minute floor', () => {
+    expect(CHANNEL_VIDEO_MIN_SEC).toBe(1800);
+    expect(isFilmLengthDuration(1799)).toBe(false);
+    expect(isFilmLengthDuration(1800)).toBe(true);
+    expect(isFilmLengthDuration(null)).toBe(false);
   });
 });
