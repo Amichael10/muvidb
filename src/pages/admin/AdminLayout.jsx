@@ -43,6 +43,7 @@ export default function AdminLayout() {
     { path: '/admin/people', label: 'People', icon: 'solar:user-linear' },
     { path: '/admin/people-enrichment', label: 'People Enrichment', icon: 'solar:user-check-linear' },
     { path: '/admin/credits', label: 'Credits', icon: 'solar:case-linear' },
+    { path: '/admin/credits/harvest', label: 'Credit Harvest', icon: 'solar:magnifer-zoom-in-linear' },
     { path: '/admin/companies', label: 'Companies', icon: 'solar:buildings-linear' },
     { path: '/admin/claims', label: 'Pending Claims', icon: 'solar:clipboard-list-linear' },
     { path: '/admin/outreach', label: 'Artist Outreach', icon: 'solar:chat-round-line-linear' },

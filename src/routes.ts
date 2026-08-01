@@ -58,6 +58,7 @@ export default [
       route('people', 'pages/admin/AdminPeople.jsx'),
       route('credits', 'pages/admin/AdminCredits.jsx'),
       route('credits/extractor', 'pages/admin/AdminCreditsExtractor.jsx'),
+      route('credits/harvest', 'pages/admin/AdminCreditHarvest.jsx'),
       route('companies', 'pages/admin/AdminCompanies.jsx'),
       route('claims', 'pages/admin/AdminClaims.jsx'),
       route('contributions', 'pages/admin/AdminContributions.jsx'),

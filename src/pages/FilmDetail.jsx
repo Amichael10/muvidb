@@ -368,9 +368,12 @@ export default function FilmDetail() {
   };
 
   const fetchRelated = async (film) => {
-    // Precomputed rail first (cast + Cohere embeddings + rare genre), built by
-    // scripts/build_related_films.ts. Fall back to live genre match only when
-    // a film has no rows yet.
+    // Precomputed "More Like This" first — one indexed read of film_related,
+    // built offline by scripts/build_related_films.ts (shared cast > Cohere
+    // embedding similarity > rare genre > language > series, with popularity
+    // fallback and dup/franchise de-duping).
+    // Falls through to the live genre query below only when a film has no
+    // precomputed rows yet (e.g. added since the last rebuild).
     try {
       const { data: pre } = await supabase
         .from('film_related')
@@ -393,7 +396,7 @@ export default function FilmDetail() {
         }
       }
     } catch {
-      // Table missing / read failed — live fallback below.
+      // Table missing or read failed — fall back to the live logic below.
     }
 
     const sourceGenreIds = (film.film_genres || []).map((row) => row.genre_id).filter(Boolean);
@@ -1108,7 +1111,7 @@ export default function FilmDetail() {
                       <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-2 mb-1 tracking-tight">
                         {formatFilmTitle(relatedFilm.title)}
                       </h4>
-                      <div className="text-[10px] font-bold text-text-muted mb-2">
+                      <div className="text-[10px] font-bold text-text-muted mb-1">
                         {relatedFilm.year} • {relatedFilm.genres && relatedFilm.genres.length > 0 ? relatedFilm.genres[0] : 'Media'}
                       </div>
                       {relatedFilm._reason && (

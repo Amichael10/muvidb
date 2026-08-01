@@ -87,3 +87,6 @@ build/
 
 # Social Studio design mockups (large PNG references, kept local)
 docs/social-templates/*.png
+
+# Local credit-roll frame dumps from harvest_credits.ts --frames-only
+harvest_frames/

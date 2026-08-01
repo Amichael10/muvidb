@@ -43,3 +43,31 @@ export function getFilmLanguages(film) {
   if (Array.isArray(film?.languages) && film.languages.length) return film.languages;
   return parseLanguages(film?.language);
 }
+
+/**
+ * Curated list of African (and Africa-relevant) languages for the film edit
+ * dropdown. Ordered by how common they are in this catalogue — Nigerian tongues
+ * first, then wider West/East/Southern Africa, then the colonial linguae francae,
+ * then a small tail of non-African languages that still occur in the data.
+ *
+ * Every entry is a display name that matches normalizeLanguage()'s output, so a
+ * value picked here round-trips cleanly through parseLanguages().
+ */
+export const AFRICAN_LANGUAGES = [
+  // Nigeria (the bulk of the catalogue)
+  'English', 'Pidgin', 'Yoruba', 'Igbo', 'Hausa', 'Fulani', 'Edo', 'Ibibio',
+  'Efik', 'Tiv', 'Kanuri', 'Nupe', 'Ijaw', 'Urhobo', 'Igala',
+  // Ghana / wider West Africa
+  'Twi', 'Akan', 'Ewe', 'Ga', 'Fante', 'Dagbani', 'Wolof', 'Bambara', 'Mandinka',
+  'Krio', 'Mossi', 'Fon',
+  // Central Africa
+  'Lingala', 'Kikongo', 'Tshiluba', 'Sango',
+  // East Africa
+  'Swahili', 'Amharic', 'Oromo', 'Tigrinya', 'Somali', 'Kinyarwanda', 'Kirundi',
+  'Luganda', 'Kikuyu', 'Luo',
+  // Southern Africa
+  'Zulu', 'Xhosa', 'Afrikaans', 'Sotho', 'Tswana', 'Shona', 'Ndebele', 'Swazi',
+  'Tsonga', 'Venda', 'Chichewa', 'Bemba',
+  // North Africa / diaspora linguae francae
+  'Arabic', 'French', 'Portuguese', 'Spanish',
+];
