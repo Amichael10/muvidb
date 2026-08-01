@@ -6,7 +6,7 @@ import { runShowtimesSync, runVideosSync, runTMDBSync } from '../_lib/sync_servi
 import { sweepStaleCinemas } from '../_lib/cinema-adapters/index.js';
 import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
 import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
-import { runSocialPublisher } from '../_lib/social_studio.js';
+import { pruneSocialAssets, runSocialPublisher } from '../_lib/social_studio.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
 
 
@@ -121,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ~21s per person (upload, async add-on poll, download, store), against a
       // 60s function budget — so two per run, not a big batch.
       case 'people_cutouts': result = await runPeopleCutoutJob({ limit: 2 }); break;
+      case 'social_prune_assets': result = await pruneSocialAssets(); break;
       case 'kava':      
         return res.status(200).json({ 
           task: 'kava', 

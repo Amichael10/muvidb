@@ -75,12 +75,14 @@ export default function AdminSocialStudio() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [drafts, setDrafts] = useState([]);
+  const [reviewingId, setReviewingId] = useState(null);
+  const [scheduleAt, setScheduleAt] = useState({});
 
   const fetchDrafts = async () => {
     try {
       const { data, error } = await supabase
         .from('social_content_items')
-        .select('id,title,status,content_type,created_at,social_platform_variants(id,platform,status)')
+        .select('id,title,status,content_type,created_at,rejection_reason,social_platform_variants(id,platform,status)')
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -115,6 +117,97 @@ export default function AdminSocialStudio() {
   const refreshAll = () => {
     fetchSummary();
     fetchDrafts();
+  };
+
+  // Which review actions each status offers. Mirrors the server-side machine in
+  // transitions.ts; the server re-checks, so a stale tab cannot force a move.
+  const reviewActions = status => {
+    if (status === 'draft') return [{ action: 'submit', label: 'Submit for review', tone: 'brand' }];
+    if (status === 'ready_for_review') {
+      return [
+        { action: 'approve', label: 'Approve', tone: 'green' },
+        { action: 'reject', label: 'Reject', tone: 'red' },
+        { action: 'reopen', label: 'Back to draft', tone: 'plain' },
+      ];
+    }
+    if (status === 'rejected') return [{ action: 'reopen', label: 'Reopen', tone: 'plain' }];
+    // Approved is still reversible until the item is scheduled.
+    if (status === 'approved') return [{ action: 'reopen', label: 'Undo approval', tone: 'plain' }];
+    return [];
+  };
+
+  const runReview = async (contentItemId, action) => {
+    let reason = null;
+    if (action === 'reject') {
+      reason = window.prompt('Why is this being rejected?');
+      if (reason === null) return;
+      if (!reason.trim()) return toast.error('A rejection reason is required');
+    }
+
+    setReviewingId(contentItemId);
+    try {
+      const res = await fetch('/api/social?task=review', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId, action, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`${data.from} → ${data.status}`);
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Review action failed');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const runSchedule = async contentItemId => {
+    const value = scheduleAt[contentItemId];
+    if (!value) return toast.error('Pick a date and time first');
+
+    setReviewingId(contentItemId);
+    try {
+      // datetime-local has no zone, so it is read in the browser's zone and
+      // sent as an absolute instant.
+      const res = await fetch('/api/social?task=schedule', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId, scheduledFor: new Date(value).toISOString() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`Scheduled ${data.jobs} job(s): ${data.platforms.join(', ')}`);
+      setScheduleAt(current => ({ ...current, [contentItemId]: '' }));
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Scheduling failed');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const runCancelSchedule = async contentItemId => {
+    setReviewingId(contentItemId);
+    try {
+      const res = await fetch('/api/social?task=cancel_schedule', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(
+        data.inFlight
+          ? `Cancelled ${data.cancelledJobs} job(s); ${data.inFlight} already publishing`
+          : `Cancelled ${data.cancelledJobs} job(s) — back to approved`,
+      );
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Cancel failed');
+    } finally {
+      setReviewingId(null);
+    }
   };
 
   const runMockPublisher = async () => {
@@ -230,7 +323,64 @@ export default function AdminSocialStudio() {
                     </span>
                   ))}
                   <Pill tone={STATUS_TONES[item.status] || 'brand'}>{item.status}</Pill>
+
+                  {reviewActions(item.status).map(({ action, label, tone }) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => runReview(item.id, action)}
+                      disabled={reviewingId === item.id}
+                      className={`rounded-md border px-2.5 py-1 text-[10px] font-bold transition-colors disabled:opacity-50 ${
+                        tone === 'green'
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                          : tone === 'red'
+                            ? 'border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                            : tone === 'brand'
+                              ? 'border-brand/30 bg-brand/10 text-brand hover:bg-brand/20'
+                              : 'border-border bg-surface text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
+
+                {item.rejection_reason && (
+                  <p className="mt-1 w-full text-[11px] text-red-500">Rejected: {item.rejection_reason}</p>
+                )}
+
+                {item.status === 'scheduled' && (
+                  <button
+                    type="button"
+                    onClick={() => runCancelSchedule(item.id)}
+                    disabled={reviewingId === item.id}
+                    className="mt-1 rounded-md border border-border bg-surface px-2.5 py-1 text-[10px] font-bold text-text-muted transition-colors hover:text-text-primary disabled:opacity-50"
+                  >
+                    Cancel schedule
+                  </button>
+                )}
+
+                {item.status === 'approved' && (
+                  <div className="mt-1 flex w-full items-center gap-2">
+                    <input
+                      type="datetime-local"
+                      value={scheduleAt[item.id] || ''}
+                      onChange={event =>
+                        setScheduleAt(current => ({ ...current, [item.id]: event.target.value }))
+                      }
+                      className="h-8 rounded-md border border-border bg-surface px-2 text-[11px] text-text-primary outline-none focus:border-brand"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => runSchedule(item.id)}
+                      disabled={reviewingId === item.id || !scheduleAt[item.id]}
+                      className="rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1 text-[10px] font-bold text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
+                    >
+                      Schedule
+                    </button>
+                    <span className="text-[10px] text-text-muted">{summary.defaultTimezone}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>

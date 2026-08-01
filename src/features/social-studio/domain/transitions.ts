@@ -4,8 +4,14 @@ const CONTENT_TRANSITIONS: Record<SocialContentStatus, readonly SocialContentSta
   generating: ['draft', 'failed'],
   draft: ['ready_for_review', 'rejected', 'archived'],
   ready_for_review: ['draft', 'approved', 'rejected'],
-  approved: ['scheduled', 'publishing', 'archived'],
-  scheduled: ['publishing', 'archived'],
+  // `draft` is reachable from `approved` so a mistaken approval can be undone
+  // while nothing is scheduled yet. Once it moves on to scheduled/publishing the
+  // job queue owns it and reopening is no longer safe.
+  approved: ['scheduled', 'publishing', 'archived', 'draft'],
+  // `approved` is reachable so a schedule can be cancelled while its jobs are
+  // still queued. Once `publishing` starts the adapter is mid-flight and the
+  // item is no longer ours to pull back.
+  scheduled: ['publishing', 'archived', 'approved'],
   publishing: ['published', 'partially_published', 'failed'],
   partially_published: ['published', 'failed', 'archived'],
   published: ['archived'],
@@ -17,7 +23,7 @@ const CONTENT_TRANSITIONS: Record<SocialContentStatus, readonly SocialContentSta
 const VARIANT_TRANSITIONS: Record<SocialVariantStatus, readonly SocialVariantStatus[]> = {
   draft: ['approved', 'skipped'],
   approved: ['scheduled', 'publishing', 'skipped'],
-  scheduled: ['publishing', 'skipped'],
+  scheduled: ['publishing', 'skipped', 'approved'],
   publishing: ['published', 'uploaded_as_draft', 'failed'],
   published: [],
   uploaded_as_draft: [],

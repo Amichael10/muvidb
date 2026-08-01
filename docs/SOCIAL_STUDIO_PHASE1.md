@@ -18,8 +18,8 @@ Last updated: 2026-07-31
 | Phase 2 slice 1 — content generation | **Done, verified against live data** |
 | Phase 2 slice 2 — asset rendering | **Done and wired end to end** |
 | Cloudinary cut-out pipeline | **Done** — migration, rotation, batch job, cron |
-| Phase 2 slice 3 — review / approve UI | Not started ← **NEXT** |
-| Phase 2 slice 4 — schedule → enqueue → publish | Not started |
+| Phase 2 slice 3 — review / approve | **Done** |
+| Phase 2 slice 4 — schedule → enqueue → publish | **Done** |
 | Phase 3 — OAuth + live Meta/TikTok | Not started, deliberately |
 
 Everything is still **mock-only**. `SOCIAL_STUDIO_ENABLED` defaults to `false`.
@@ -45,18 +45,98 @@ Asset rendering never fails generation. If it throws, the item still becomes a
 `draft` with a caption-only body and a reviewer warning, and
 `selected_asset_id` stays null.
 
-## NEXT: slice 3 — review and approve
+## Review and approve (slice 3)
 
-The groundwork is already there and unused:
+`POST /api/social?task=review` with `{ contentItemId, action, reason? }`, where
+action is `submit | approve | reject | reopen`. Buttons appear per row in the
+Recent Drafts panel, driven by the item's current status.
 
-- `transitions.ts` has the full status machine, with tests.
-- `social_content_items` has `approved_by`, `approved_at`, `rejected_by`,
-  `rejected_at`, `rejection_reason`.
-- The mock publisher already reads `selected_asset_id`, which is now populated.
+Legality is enforced server-side from `transitions.ts`, not in the UI, so a
+stale browser tab cannot approve something another reviewer already rejected.
+Approving cascades draft variants to `approved`, which is what makes them
+eligible for scheduling; reopening pulls them back. Only untouched variants
+move, so anything already published or skipped is left alone.
 
-What is missing is the UI and the endpoints to drive `draft → ready_for_review →
-approved`, plus reject-with-reason. After that, slice 4 wires
-`approved → scheduled → publishing` onto the existing job queue.
+Two rules came out of testing the real lifecycle:
+
+- **No-op reviews are refused.** `canTransitionContentStatus` permits
+  self-transitions, so re-approving an approved item silently overwrote
+  `approved_by`/`approved_at` and lost the original reviewer. Same-status review
+  actions now 409.
+- **`approved → draft` was added to the transition table.** Approval was
+  previously a dead end: a mis-click could never be undone. Reopening is only
+  legal before scheduling — `scheduled` and `publishing` remain one-way, because
+  the job queue owns the item from that point.
+
+## Scheduling (slice 4)
+
+`POST /api/social?task=schedule` with `{ contentItemId, scheduledFor }` (ISO).
+A `datetime-local` input appears on approved rows; the browser's zone is
+converted to an absolute instant before sending.
+
+It writes `scheduled_for` on every approved variant, moves them to `scheduled`,
+and enqueues one `social_publish_jobs` row each. Jobs use the deterministic key
+`social:<item>:<platform>:<time>` on a unique column, so the same instant cannot
+double-post.
+
+Guards, all exercised against the live database:
+
+- A past `scheduledFor` is refused (60s of slack for clock skew).
+- An unparseable date is refused.
+- Variants with no rendered asset are refused **by name**, because every target
+  platform posts media and the failure would otherwise surface inside the
+  publisher.
+- **Only `approved` items can be scheduled.** This is deliberately narrower than
+  the transition table, which also permits `scheduled -> scheduled`. Rescheduling
+  would have to move already-`scheduled` variants and cancel their outstanding
+  jobs; this function only promotes `approved` ones, so a reschedule would
+  silently half-apply.
+
+## Verified end to end
+
+generate → submit → approve → schedule → mock publish, against live data:
+2 jobs queued, both processed, item reached `published`, Instagram `published`
+and TikTok `uploaded_as_draft` (its dedicated draft-upload status from Phase 1).
+
+## Cancel and reschedule
+
+`POST /api/social?task=cancel_schedule` with `{ contentItemId }` returns a
+scheduled item to `approved`, cancels its queued jobs and clears
+`scheduled_for`. **Rescheduling is cancel-then-schedule**, not an in-place edit:
+queued jobs carry the old timestamp inside their idempotency key, so they have
+to be cancelled regardless — two explicit steps beat two code paths that can
+disagree.
+
+Jobs already `processing` are left alone and reported back as `inFlight`; the
+adapter is mid-flight by then. Cancelled job rows are kept as an audit trail and
+the publisher ignores them.
+
+`scheduled → approved` was added to both the content and variant transition
+tables. `publishing → approved` is deliberately still illegal.
+
+## Asset retention
+
+`pruneSocialAssets()`, wired as cron `task=social_prune_assets`. Deletes storage
+objects and `social_assets` rows for terminal items
+(`published`/`archived`/`rejected`), clearing `selected_asset_id` first so
+nothing points at a missing file. Content items, variants and the event log are
+kept — this reclaims bytes, not history. Window is
+`SOCIAL_ASSET_RETENTION_DAYS`, default 30.
+
+**Age is measured from `published_at`, not `updated_at`.** `social_content_items`
+has an `updated_at` trigger, so that column tracks the last edit and can never
+age while anything touches the row — an early version of this silently pruned
+nothing. Items that never published fall back to `created_at`.
+
+## NEXT
+
+- **More card types.** 1 of ~19 designed cards is built. Each needs a domain
+  type, a `cardCopy()` branch, a source loader and a template row — no migration.
+  The editorial roundups (`today-in-africa`, `this-week-top-rated`,
+  `africa-stories`) need a schema decision first: they are multi-title, and the
+  schema assumes one `source_entity_id` per item.
+- **Phase 3.** OAuth and live Meta/TikTok adapters, behind `SOCIAL_PUBLISH_MODE`.
+  Still deliberately untouched.
 
 ## BLOCKED ON USER: the card design
 

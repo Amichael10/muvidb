@@ -2,6 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   generateSocialDraft,
   getSocialStudioSummary,
+  isSocialReviewAction,
+  cancelContentSchedule,
+  reviewContentItem,
+  scheduleContentItem,
   requireSocialPublisherAuth,
   requireSocialStudioAdmin,
   runSocialPublisher,
@@ -36,6 +40,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         return res.status(201).json(await generateSocialDraft(parsed, actor));
+      }
+
+      if (task === 'review') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, action, reason } = req.body || {};
+
+        if (!isSocialReviewAction(action)) {
+          return res.status(400).json({ error: 'action must be submit, approve, reject or reopen' });
+        }
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+
+        return res.status(200).json(await reviewContentItem({ contentItemId, action, reason }, actor));
+      }
+
+      if (task === 'schedule') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, scheduledFor } = req.body || {};
+
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+        if (typeof scheduledFor !== 'string' || !scheduledFor) {
+          return res.status(400).json({ error: 'scheduledFor is required' });
+        }
+
+        return res.status(200).json(await scheduleContentItem({ contentItemId, scheduledFor }, actor));
+      }
+
+      if (task === 'cancel_schedule') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId } = req.body || {};
+
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+
+        return res.status(200).json(await cancelContentSchedule({ contentItemId }, actor));
       }
 
       if (task === 'publish_due') {

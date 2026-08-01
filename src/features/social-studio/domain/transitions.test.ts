@@ -39,3 +39,45 @@ describe('social status transitions', () => {
     expect(nextRetryAvailableAt(now, 20).toISOString()).toBe('2026-08-01T11:00:00.000Z');
   });
 });
+
+describe('review reversibility', () => {
+  it('lets a mistaken approval go back to draft', () => {
+    expect(canTransitionContentStatus('approved', 'draft')).toBe(true);
+  });
+
+  it('still allows approved to move forward', () => {
+    expect(canTransitionContentStatus('approved', 'scheduled')).toBe(true);
+    expect(canTransitionContentStatus('approved', 'publishing')).toBe(true);
+  });
+
+  it('does not let a scheduled item be reopened — the queue owns it', () => {
+    expect(canTransitionContentStatus('scheduled', 'draft')).toBe(false);
+    expect(canTransitionContentStatus('publishing', 'draft')).toBe(false);
+  });
+
+  it('keeps rejected reopenable', () => {
+    expect(canTransitionContentStatus('rejected', 'draft')).toBe(true);
+  });
+});
+
+describe('schedule reversibility', () => {
+  it('lets a scheduled item be cancelled back to approved', () => {
+    expect(canTransitionContentStatus('scheduled', 'approved')).toBe(true);
+    expect(canTransitionVariantStatus('scheduled', 'approved')).toBe(true);
+  });
+
+  it('does not let a publishing item be pulled back', () => {
+    // The adapter is mid-flight by then; the item is no longer ours to revert.
+    expect(canTransitionContentStatus('publishing', 'approved')).toBe(false);
+    expect(canTransitionVariantStatus('publishing', 'approved')).toBe(false);
+  });
+
+  it('allows a queued job to be cancelled', () => {
+    expect(canTransitionJobStatus('queued', 'cancelled')).toBe(true);
+    expect(canTransitionJobStatus('retrying', 'cancelled')).toBe(true);
+  });
+
+  it('does not allow a succeeded job to be cancelled', () => {
+    expect(canTransitionJobStatus('succeeded', 'cancelled')).toBe(false);
+  });
+});

@@ -4,7 +4,9 @@ import { supabase } from './supabase.js';
 import { isValidAuth } from './auth.js';
 import { MockSocialPlatformAdapter } from '../../src/features/social-studio/platforms/mock-adapter.js';
 import { SocialPlatformError } from '../../src/features/social-studio/platforms/platform-errors.js';
-import { nextRetryAvailableAt } from '../../src/features/social-studio/domain/transitions.js';
+import { assertContentTransition, nextRetryAvailableAt } from '../../src/features/social-studio/domain/transitions.js';
+import type { SocialContentStatus } from '../../src/features/social-studio/domain/statuses.js';
+import { createPublishJobIdempotencyKey } from '../../src/features/social-studio/domain/validation.js';
 import type { SocialContentType } from '../../src/features/social-studio/domain/content-types.js';
 import { preferredAssetFormat, type SocialPlatform } from '../../src/features/social-studio/domain/platform-types.js';
 import {
@@ -688,6 +690,402 @@ export async function generateSocialDraft(
     variants: variants || [],
     assets: assets.rows,
     warnings,
+  };
+}
+
+/** Review actions a full admin can take, and the status each moves an item to. */
+const REVIEW_ACTIONS = {
+  submit: 'ready_for_review',
+  approve: 'approved',
+  reject: 'rejected',
+  reopen: 'draft',
+} as const;
+
+export type SocialReviewAction = keyof typeof REVIEW_ACTIONS;
+
+export function isSocialReviewAction(value: unknown): value is SocialReviewAction {
+  return typeof value === 'string' && value in REVIEW_ACTIONS;
+}
+
+/**
+ * Moves a content item through the review states.
+ *
+ * The legal moves live in `transitions.ts` and are enforced here rather than in
+ * the UI, so a stale browser tab cannot approve an item somebody else already
+ * rejected. Variants follow the item: approving an item approves its draft
+ * variants, which is what makes them eligible for scheduling.
+ */
+export async function reviewContentItem(
+  input: { contentItemId: string; action: SocialReviewAction; reason?: string | null },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+
+  const target = REVIEW_ACTIONS[input.action];
+  const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
+
+  if (input.action === 'reject' && !reason) {
+    throw httpError(400, 'A rejection reason is required');
+  }
+
+  const { data: item, error } = await supabase
+    .from('social_content_items')
+    .select('id,status,title')
+    .eq('id', input.contentItemId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!item) throw httpError(404, 'Content item not found');
+
+  // The transition table permits self-transitions, which for a review action
+  // would silently re-stamp approved_by/approved_at and lose the original
+  // reviewer. A no-op review is a mistake, so it is refused outright.
+  if (item.status === target) {
+    throw httpError(409, `Content item is already ${target}`);
+  }
+
+  try {
+    assertContentTransition(item.status as SocialContentStatus, target as SocialContentStatus);
+  } catch (transitionError) {
+    throw httpError(409, (transitionError as Error).message);
+  }
+
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = { status: target };
+
+  if (input.action === 'approve') {
+    patch.approved_by = actor.id;
+    patch.approved_at = now;
+    patch.rejection_reason = null;
+  } else if (input.action === 'reject') {
+    patch.rejected_by = actor.id;
+    patch.rejected_at = now;
+    patch.rejection_reason = reason;
+  } else if (input.action === 'reopen') {
+    // Reopening clears the previous verdict so the next reviewer starts clean.
+    patch.approved_by = null;
+    patch.approved_at = null;
+    patch.rejected_by = null;
+    patch.rejected_at = null;
+    patch.rejection_reason = null;
+  }
+
+  const { error: updateError } = await supabase
+    .from('social_content_items')
+    .update(patch)
+    .eq('id', input.contentItemId);
+  if (updateError) throw updateError;
+
+  // Approval cascades to variants so the scheduler has something to pick up;
+  // reopening pulls them back to draft. Only untouched variants move, so a
+  // variant already published or skipped is left alone.
+  if (input.action === 'approve') {
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'approved' })
+      .eq('content_item_id', input.contentItemId)
+      .eq('status', 'draft');
+  } else if (input.action === 'reopen') {
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'draft' })
+      .eq('content_item_id', input.contentItemId)
+      .eq('status', 'approved');
+  }
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: `review_${input.action}`,
+    eventData: { actor_id: actor.id, from: item.status, to: target, reason: reason || null },
+  });
+
+  return { id: item.id, title: item.title, from: item.status, status: target };
+}
+
+/**
+ * Schedules an approved item for publication.
+ *
+ * Writes `scheduled_for` on every approved variant, moves them to `scheduled`,
+ * and enqueues one `social_publish_jobs` row each. The publisher already drains
+ * that queue, so this is the last link in the chain.
+ *
+ * Jobs carry a deterministic idempotency key of
+ * `social:<item>:<platform>:<time>`, and the column is unique — rescheduling to
+ * the same instant cannot double-post.
+ */
+export async function scheduleContentItem(
+  input: { contentItemId: string; scheduledFor: string },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+
+  const when = new Date(input.scheduledFor);
+  if (Number.isNaN(when.getTime())) throw httpError(400, 'scheduledFor must be a valid date');
+
+  // A minute of slack absorbs clock skew between the browser and the server.
+  if (when.getTime() < Date.now() - 60_000) {
+    throw httpError(400, 'scheduledFor is in the past');
+  }
+
+  const { data: item, error } = await supabase
+    .from('social_content_items')
+    .select('id,status,title')
+    .eq('id', input.contentItemId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!item) throw httpError(404, 'Content item not found');
+
+  // Deliberately narrower than the transition table, which also allows
+  // scheduled -> scheduled. Rescheduling would need to move variants that are
+  // already `scheduled` and cancel their outstanding jobs; this function only
+  // promotes `approved` variants, so a reschedule would silently half-apply.
+  // Refuse it outright until reschedule is built properly.
+  if (item.status !== 'approved') {
+    throw httpError(409, `Only approved items can be scheduled (this one is ${item.status})`);
+  }
+
+  try {
+    assertContentTransition(item.status as SocialContentStatus, 'scheduled');
+  } catch (transitionError) {
+    throw httpError(409, (transitionError as Error).message);
+  }
+
+  const { data: variants, error: variantError } = await supabase
+    .from('social_platform_variants')
+    .select('id,platform,status,selected_asset_id')
+    .eq('content_item_id', input.contentItemId)
+    .eq('status', 'approved');
+
+  if (variantError) throw variantError;
+  if (!variants?.length) throw httpError(409, 'No approved variants to schedule');
+
+  // Every platform here posts media. Scheduling a variant with no asset would
+  // only fail later inside the publisher, so it is caught up front and names
+  // the offending platforms.
+  const missingAsset = variants.filter(variant => !variant.selected_asset_id).map(v => v.platform);
+  if (missingAsset.length) {
+    throw httpError(409, `These variants have no rendered asset: ${missingAsset.join(', ')}`);
+  }
+
+  const scheduledForIso = when.toISOString();
+  const jobRows = variants.map(variant => ({
+    platform_variant_id: variant.id,
+    status: 'queued',
+    scheduled_for: scheduledForIso,
+    available_at: scheduledForIso,
+    idempotency_key: createPublishJobIdempotencyKey({
+      contentItemId: input.contentItemId,
+      platform: variant.platform as SocialPlatform,
+      scheduledFor: scheduledForIso,
+    }),
+  }));
+
+  const { data: jobs, error: jobError } = await supabase
+    .from('social_publish_jobs')
+    .upsert(jobRows, { onConflict: 'idempotency_key' })
+    .select('id,platform_variant_id');
+
+  if (jobError) throw jobError;
+
+  await supabase
+    .from('social_platform_variants')
+    .update({ status: 'scheduled', scheduled_for: scheduledForIso })
+    .eq('content_item_id', input.contentItemId)
+    .eq('status', 'approved');
+
+  await supabase
+    .from('social_content_items')
+    .update({ status: 'scheduled' })
+    .eq('id', input.contentItemId);
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'scheduled',
+    eventData: {
+      actor_id: actor.id,
+      scheduled_for: scheduledForIso,
+      platforms: variants.map(v => v.platform),
+      jobs: jobs?.length || 0,
+    },
+  });
+
+  return {
+    id: item.id,
+    title: item.title,
+    status: 'scheduled',
+    scheduledFor: scheduledForIso,
+    jobs: jobs?.length || 0,
+    platforms: variants.map(v => v.platform),
+  };
+}
+
+/**
+ * Cancels a schedule, returning the item to `approved`.
+ *
+ * Rescheduling is cancel-then-schedule rather than an in-place edit: the queued
+ * jobs carry the old timestamp in their idempotency key, so they have to be
+ * cancelled anyway. Doing it in two explicit steps keeps one code path instead
+ * of two that can disagree.
+ *
+ * Only jobs that have not started are cancelled. A job already `processing` is
+ * mid-flight inside the adapter, so its variant is left alone and reported back
+ * rather than silently reverted.
+ */
+export async function cancelContentSchedule(input: { contentItemId: string }, actor: SocialActor) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+
+  const { data: item, error } = await supabase
+    .from('social_content_items')
+    .select('id,status,title')
+    .eq('id', input.contentItemId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!item) throw httpError(404, 'Content item not found');
+  if (item.status !== 'scheduled') {
+    throw httpError(409, `Only scheduled items can be cancelled (this one is ${item.status})`);
+  }
+
+  const { data: variants, error: variantError } = await supabase
+    .from('social_platform_variants')
+    .select('id,platform,status')
+    .eq('content_item_id', input.contentItemId)
+    .eq('status', 'scheduled');
+  if (variantError) throw variantError;
+
+  const variantIds = (variants || []).map(variant => variant.id);
+  let cancelledJobs = 0;
+  let inFlight = 0;
+
+  if (variantIds.length) {
+    const { data: cancelled, error: jobError } = await supabase
+      .from('social_publish_jobs')
+      .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+      .in('platform_variant_id', variantIds)
+      .in('status', ['queued', 'retrying'])
+      .select('id');
+    if (jobError) throw jobError;
+    cancelledJobs = cancelled?.length || 0;
+
+    const { count } = await supabase
+      .from('social_publish_jobs')
+      .select('id', { count: 'exact', head: true })
+      .in('platform_variant_id', variantIds)
+      .eq('status', 'processing');
+    inFlight = count || 0;
+
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'approved', scheduled_for: null })
+      .in('id', variantIds);
+  }
+
+  await supabase
+    .from('social_content_items')
+    .update({ status: 'approved' })
+    .eq('id', input.contentItemId);
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'schedule_cancelled',
+    eventData: { actor_id: actor.id, cancelled_jobs: cancelledJobs, in_flight: inFlight },
+  });
+
+  return {
+    id: item.id,
+    title: item.title,
+    status: 'approved',
+    cancelledJobs,
+    inFlight,
+  };
+}
+
+/**
+ * Deletes rendered assets for items that have finished their lifecycle.
+ *
+ * Once a post is live the platform holds the canonical copy, so keeping our
+ * render forever just accumulates storage — roughly 3 MB per post across the
+ * three formats. Only terminal items are pruned, and the `social_assets` rows
+ * go with the objects so nothing points at a missing file.
+ *
+ * The content item, its variants and its event log are all left intact; this
+ * reclaims bytes, not history.
+ */
+export async function pruneSocialAssets(
+  input: { olderThanDays?: number; limit?: number } = {},
+): Promise<{ skipped?: true; reason?: string; items: number; objects: number; bytes: number }> {
+  if (!isSocialStudioEnabled()) {
+    return { skipped: true, reason: 'social_studio_disabled', items: 0, objects: 0, bytes: 0 };
+  }
+
+  const days = Math.max(1, input.olderThanDays ?? (Number(process.env.SOCIAL_ASSET_RETENTION_DAYS) || 30));
+  const limit = Math.min(Math.max(input.limit || 50, 1), 200);
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+
+  // Age is measured from when the post actually went live, not `updated_at`:
+  // that column is maintained by a trigger, so it tracks the last edit and can
+  // never age while anything touches the row. Items that never published
+  // (rejected, archived drafts) fall back to `created_at`.
+  const { data: items, error } = await supabase
+    .from('social_content_items')
+    .select('id,created_at,social_platform_variants(published_at)')
+    .in('status', ['published', 'archived', 'rejected'])
+    .limit(limit);
+
+  if (error) throw error;
+  if (!items?.length) return { items: 0, objects: 0, bytes: 0 };
+
+  const ids = items
+    .filter(item => {
+      const published = (item.social_platform_variants || [])
+        .map((variant: any) => variant.published_at)
+        .filter(Boolean)
+        .sort()
+        .pop();
+      return (published || item.created_at) < cutoff;
+    })
+    .map(item => item.id);
+
+  if (!ids.length) return { items: 0, objects: 0, bytes: 0 };
+
+  const { data: assets, error: assetError } = await supabase
+    .from('social_assets')
+    .select('id,content_item_id,storage_bucket,storage_path,file_size_bytes')
+    .in('content_item_id', ids);
+
+  if (assetError) throw assetError;
+  if (!assets?.length) return { items: 0, objects: 0, bytes: 0 };
+
+  // Group by bucket so each bucket is a single remove() call.
+  const byBucket = new Map<string, string[]>();
+  for (const asset of assets) {
+    const paths = byBucket.get(asset.storage_bucket) || [];
+    paths.push(asset.storage_path);
+    byBucket.set(asset.storage_bucket, paths);
+  }
+
+  for (const [bucket, paths] of byBucket) {
+    const { error: removeError } = await supabase.storage.from(bucket).remove(paths);
+    if (removeError) throw removeError;
+  }
+
+  // Variants point at assets; clear the reference before the rows disappear.
+  await supabase
+    .from('social_platform_variants')
+    .update({ selected_asset_id: null })
+    .in('content_item_id', ids);
+
+  const { error: deleteError } = await supabase
+    .from('social_assets')
+    .delete()
+    .in('id', assets.map(asset => asset.id));
+  if (deleteError) throw deleteError;
+
+  return {
+    items: new Set(assets.map(asset => asset.content_item_id)).size,
+    objects: assets.length,
+    bytes: assets.reduce((sum, asset) => sum + (asset.file_size_bytes || 0), 0),
   };
 }
 
