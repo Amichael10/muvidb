@@ -84,3 +84,6 @@ scratch/
 # React Router framework-mode generated typegen + build output
 .react-router/
 build/
+
+# Social Studio design mockups (large PNG references, kept local)
+docs/social-templates/*.png

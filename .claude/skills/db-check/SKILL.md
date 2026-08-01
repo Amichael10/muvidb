@@ -31,7 +31,7 @@ npm run db -- films --select "id,title,credits(person_id,role)" --limit 5
 ## Complex one-offs: write to scratch/, import the shared client
 
 If the runner can't express it (multi-step logic, writes, RPC calls), write a
-throwaway script in `scratch/` (gitignored) and delete it when done:
+throwaway script in `scratch/` and delete it when done:
 
 ```ts
 // scratch/check_thing.ts
@@ -40,6 +40,11 @@ import { supabase } from '../scripts/lib/db';
 ```
 
 Run with `npx tsx scratch/check_thing.ts`.
+
+> **`scratch/` is tracked by git, not ignored.** It holds ~126 committed files.
+> Clean up by deleting the specific files you created, by name. Never
+> `rm -rf scratch` — it wipes the tracked contents. (Recoverable with
+> `git restore scratch/`, but only for files that were committed.)
 
 Never re-create a Supabase client manually — `scripts/lib/db.ts` handles env
 loading (`.env.local` then `.env`), IPv4 DNS ordering, and the service-role key.

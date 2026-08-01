@@ -39,6 +39,7 @@ export default [
   route('careers', 'pages/Careers.jsx'),
   route('careers/:slug', 'pages/CareerDetail.jsx'),
   route('waitlist', 'pages/Waitlist.tsx'),
+  route('run-scanners', 'routes/api.run-scanners.tsx'),
 
   // ---- Authenticated ----
   layout('routes/require-auth.tsx', [
@@ -76,8 +77,9 @@ export default [
       route('automation', 'pages/admin/AdminAutomation.jsx'),
       route('countries', 'pages/admin/AdminCountries.jsx'),
 
-      // Full admins only — these three carried a second, stricter guard.
+      // Full admins only — `admin_limited` must not reach these.
       layout('routes/require-admin-strict.tsx', [
+        route('social', 'pages/admin/AdminSocialStudio.jsx'),
         route('people-enrichment', 'pages/admin/AdminPeopleEnrichment.jsx'),
         route('outreach', 'pages/admin/AdminOutreach.jsx'),
         route('logs', 'pages/admin/AdminLogs.jsx'),

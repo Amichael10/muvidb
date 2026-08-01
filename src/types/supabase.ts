@@ -648,6 +648,297 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_candidates: {
+        Row: {
+          confidence: number
+          created_at: string
+          credit_type: string
+          film_id: string
+          frame_support: number
+          id: string
+          job_id: string | null
+          matched_person_id: string | null
+          ocr_confidence: number | null
+          raw_name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          role_or_character: string | null
+          source_frame_index: number | null
+          source_frame_sec: number | null
+          source_layout: Json | null
+          source_ocr_text: string | null
+          source_video_sec: number | null
+          status: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          credit_type?: string
+          film_id: string
+          frame_support?: number
+          id?: string
+          job_id?: string | null
+          matched_person_id?: string | null
+          ocr_confidence?: number | null
+          raw_name: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          role_or_character?: string | null
+          source_frame_index?: number | null
+          source_frame_sec?: number | null
+          source_layout?: Json | null
+          source_ocr_text?: string | null
+          source_video_sec?: number | null
+          status?: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          credit_type?: string
+          film_id?: string
+          frame_support?: number
+          id?: string
+          job_id?: string | null
+          matched_person_id?: string | null
+          ocr_confidence?: number | null
+          raw_name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          role_or_character?: string | null
+          source_frame_index?: number | null
+          source_frame_sec?: number | null
+          source_layout?: Json | null
+          source_ocr_text?: string | null
+          source_video_sec?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_candidates_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "credit_harvest_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_candidates_matched_person_id_fkey"
+            columns: ["matched_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_harvest_control: {
+        Row: {
+          id: number
+          pause_requested_at: string | null
+          paused: boolean
+          resumed_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: number
+          pause_requested_at?: string | null
+          paused?: boolean
+          resumed_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: number
+          pause_requested_at?: string | null
+          paused?: boolean
+          resumed_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      credit_harvest_jobs: {
+        Row: {
+          attempts: number
+          candidates_found: number
+          channel_id: string | null
+          created_at: string
+          error: string | null
+          film_id: string
+          heartbeat_at: string | null
+          id: string
+          outcome: string | null
+          priority: number
+          processed_at: string | null
+          roll_end_pct: number | null
+          roll_start_pct: number | null
+          started_at: string | null
+          status: string
+          worker_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          candidates_found?: number
+          channel_id?: string | null
+          created_at?: string
+          error?: string | null
+          film_id: string
+          heartbeat_at?: string | null
+          id?: string
+          outcome?: string | null
+          priority?: number
+          processed_at?: string | null
+          roll_end_pct?: number | null
+          roll_start_pct?: number | null
+          started_at?: string | null
+          status?: string
+          worker_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          candidates_found?: number
+          channel_id?: string | null
+          created_at?: string
+          error?: string | null
+          film_id?: string
+          heartbeat_at?: string | null
+          id?: string
+          outcome?: string | null
+          priority?: number
+          processed_at?: string | null
+          roll_end_pct?: number | null
+          roll_start_pct?: number | null
+          started_at?: string | null
+          status?: string
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_harvest_jobs_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: true
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_harvest_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          event_type: string
+          film_id: string | null
+          id: number
+          job_id: string | null
+          level: string
+          message: string
+          worker_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          event_type: string
+          film_id?: string | null
+          id?: number
+          job_id?: string | null
+          level?: string
+          message: string
+          worker_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          event_type?: string
+          film_id?: string | null
+          id?: number
+          job_id?: string | null
+          level?: string
+          message?: string
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_harvest_logs_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_harvest_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "credit_harvest_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_harvest_workers: {
+        Row: {
+          current_film_id: string | null
+          current_job_id: string | null
+          failure_count: number
+          last_message: string | null
+          last_seen_at: string
+          machine_name: string
+          process_id: number | null
+          processed_count: number
+          started_at: string
+          status: string
+          stopped_at: string | null
+          worker_id: string
+        }
+        Insert: {
+          current_film_id?: string | null
+          current_job_id?: string | null
+          failure_count?: number
+          last_message?: string | null
+          last_seen_at?: string
+          machine_name: string
+          process_id?: number | null
+          processed_count?: number
+          started_at?: string
+          status?: string
+          stopped_at?: string | null
+          worker_id: string
+        }
+        Update: {
+          current_film_id?: string | null
+          current_job_id?: string | null
+          failure_count?: number
+          last_message?: string | null
+          last_seen_at?: string
+          machine_name?: string
+          process_id?: number | null
+          processed_count?: number
+          started_at?: string
+          status?: string
+          stopped_at?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_harvest_workers_current_film_id_fkey"
+            columns: ["current_film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_harvest_workers_current_job_id_fkey"
+            columns: ["current_job_id"]
+            isOneToOne: false
+            referencedRelation: "credit_harvest_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credits: {
         Row: {
           billing_order: number | null
@@ -887,6 +1178,38 @@ export type Database = {
           },
         ]
       }
+      film_embeddings: {
+        Row: {
+          content_hash: string
+          embedding: string
+          film_id: string
+          model: string
+          updated_at: string
+        }
+        Insert: {
+          content_hash: string
+          embedding: string
+          film_id: string
+          model?: string
+          updated_at?: string
+        }
+        Update: {
+          content_hash?: string
+          embedding?: string
+          film_id?: string
+          model?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "film_embeddings_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: true
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       film_genres: {
         Row: {
           film_id: string
@@ -943,6 +1266,48 @@ export type Database = {
           {
             foreignKeyName: "film_reactions_film_id_fkey"
             columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      film_related: {
+        Row: {
+          computed_at: string
+          film_id: string
+          rank: number
+          reason: string | null
+          related_id: string
+          score: number
+        }
+        Insert: {
+          computed_at?: string
+          film_id: string
+          rank: number
+          reason?: string | null
+          related_id: string
+          score: number
+        }
+        Update: {
+          computed_at?: string
+          film_id?: string
+          rank?: number
+          reason?: string | null
+          related_id?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "film_related_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "film_related_related_id_fkey"
+            columns: ["related_id"]
             isOneToOne: false
             referencedRelation: "films"
             referencedColumns: ["id"]
@@ -1220,6 +1585,137 @@ export type Database = {
         }
         Relationships: []
       }
+      job_applications: {
+        Row: {
+          admin_notes: string | null
+          answers: Json
+          availability: string | null
+          content_idea: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          introduction: string | null
+          job_id: string
+          location: string | null
+          phone: string | null
+          portfolio_links: string | null
+          resume_content_type: string | null
+          resume_filename: string | null
+          resume_path: string | null
+          social_links: string | null
+          status: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          answers?: Json
+          availability?: string | null
+          content_idea?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          introduction?: string | null
+          job_id: string
+          location?: string | null
+          phone?: string | null
+          portfolio_links?: string | null
+          resume_content_type?: string | null
+          resume_filename?: string | null
+          resume_path?: string | null
+          social_links?: string | null
+          status?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          answers?: Json
+          availability?: string | null
+          content_idea?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          introduction?: string | null
+          job_id?: string
+          location?: string | null
+          phone?: string | null
+          portfolio_links?: string | null
+          resume_content_type?: string | null
+          resume_filename?: string | null
+          resume_path?: string | null
+          social_links?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_postings: {
+        Row: {
+          application_form: Json
+          apply_email: string | null
+          apply_url: string | null
+          created_at: string
+          department: string | null
+          description_md: string
+          employment_type: string
+          experience_level: string | null
+          id: string
+          is_published: boolean
+          location: string | null
+          published_at: string | null
+          salary_text: string | null
+          slug: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          application_form?: Json
+          apply_email?: string | null
+          apply_url?: string | null
+          created_at?: string
+          department?: string | null
+          description_md?: string
+          employment_type?: string
+          experience_level?: string | null
+          id?: string
+          is_published?: boolean
+          location?: string | null
+          published_at?: string | null
+          salary_text?: string | null
+          slug: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          application_form?: Json
+          apply_email?: string | null
+          apply_url?: string | null
+          created_at?: string
+          department?: string | null
+          description_md?: string
+          employment_type?: string
+          experience_level?: string | null
+          id?: string
+          is_published?: boolean
+          location?: string | null
+          published_at?: string | null
+          salary_text?: string | null
+          slug?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pending_cinema_films: {
         Row: {
           admin_decision: string | null
@@ -1368,6 +1864,11 @@ export type Database = {
           name_key: string | null
           nationality: string | null
           needs_review: boolean | null
+          photo_cutout_attempted_at: string | null
+          photo_cutout_error: string | null
+          photo_cutout_source_url: string | null
+          photo_cutout_status: string | null
+          photo_cutout_url: string | null
           photo_url: string | null
           popularity_score: number
           profile_views: number | null
@@ -1403,6 +1904,11 @@ export type Database = {
           name_key?: string | null
           nationality?: string | null
           needs_review?: boolean | null
+          photo_cutout_attempted_at?: string | null
+          photo_cutout_error?: string | null
+          photo_cutout_source_url?: string | null
+          photo_cutout_status?: string | null
+          photo_cutout_url?: string | null
           photo_url?: string | null
           popularity_score?: number
           profile_views?: number | null
@@ -1438,6 +1944,11 @@ export type Database = {
           name_key?: string | null
           nationality?: string | null
           needs_review?: boolean | null
+          photo_cutout_attempted_at?: string | null
+          photo_cutout_error?: string | null
+          photo_cutout_source_url?: string | null
+          photo_cutout_status?: string | null
+          photo_cutout_url?: string | null
           photo_url?: string | null
           popularity_score?: number
           profile_views?: number | null
@@ -2015,6 +2526,439 @@ export type Database = {
           },
         ]
       }
+      social_assets: {
+        Row: {
+          content_item_id: string
+          created_at: string
+          file_size_bytes: number | null
+          format: Database["public"]["Enums"]["social_asset_format"]
+          height: number | null
+          id: string
+          mime_type: string
+          public_url: string
+          render_metadata: Json
+          storage_bucket: string
+          storage_path: string
+          template_version: number | null
+          width: number | null
+        }
+        Insert: {
+          content_item_id: string
+          created_at?: string
+          file_size_bytes?: number | null
+          format: Database["public"]["Enums"]["social_asset_format"]
+          height?: number | null
+          id?: string
+          mime_type: string
+          public_url: string
+          render_metadata?: Json
+          storage_bucket: string
+          storage_path: string
+          template_version?: number | null
+          width?: number | null
+        }
+        Update: {
+          content_item_id?: string
+          created_at?: string
+          file_size_bytes?: number | null
+          format?: Database["public"]["Enums"]["social_asset_format"]
+          height?: number | null
+          id?: string
+          mime_type?: string
+          public_url?: string
+          render_metadata?: Json
+          storage_bucket?: string
+          storage_path?: string
+          template_version?: number | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_assets_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_connections: {
+        Row: {
+          connection_metadata: Json
+          created_at: string
+          created_by: string | null
+          display_name: string | null
+          external_account_id: string
+          external_parent_id: string | null
+          granted_scopes: string[]
+          id: string
+          last_verified_at: string | null
+          platform: Database["public"]["Enums"]["social_platform"]
+          profile_image_url: string | null
+          refresh_token_expires_at: string | null
+          status: Database["public"]["Enums"]["social_connection_status"]
+          token_expires_at: string | null
+          token_secret_id: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          connection_metadata?: Json
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          external_account_id: string
+          external_parent_id?: string | null
+          granted_scopes?: string[]
+          id?: string
+          last_verified_at?: string | null
+          platform: Database["public"]["Enums"]["social_platform"]
+          profile_image_url?: string | null
+          refresh_token_expires_at?: string | null
+          status?: Database["public"]["Enums"]["social_connection_status"]
+          token_expires_at?: string | null
+          token_secret_id?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          connection_metadata?: Json
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          external_account_id?: string
+          external_parent_id?: string | null
+          granted_scopes?: string[]
+          id?: string
+          last_verified_at?: string | null
+          platform?: Database["public"]["Enums"]["social_platform"]
+          profile_image_url?: string | null
+          refresh_token_expires_at?: string | null
+          status?: Database["public"]["Enums"]["social_connection_status"]
+          token_expires_at?: string | null
+          token_secret_id?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      social_content_events: {
+        Row: {
+          actor_user_id: string | null
+          content_item_id: string
+          created_at: string
+          event_data: Json
+          event_type: string
+          id: string
+          platform_variant_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          content_item_id: string
+          created_at?: string
+          event_data?: Json
+          event_type: string
+          id?: string
+          platform_variant_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          content_item_id?: string
+          created_at?: string
+          event_data?: Json
+          event_type?: string
+          id?: string
+          platform_variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_content_events_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_content_events_platform_variant_id_fkey"
+            columns: ["platform_variant_id"]
+            isOneToOne: false
+            referencedRelation: "social_platform_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_content_items: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          content_type: string
+          created_at: string
+          created_by: string | null
+          generation_method: string
+          generation_notes: string | null
+          id: string
+          internal_notes: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          source_entity_id: string
+          source_entity_type: string
+          source_snapshot: Json
+          status: Database["public"]["Enums"]["social_content_status"]
+          template_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          content_type: string
+          created_at?: string
+          created_by?: string | null
+          generation_method?: string
+          generation_notes?: string | null
+          id?: string
+          internal_notes?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          source_entity_id: string
+          source_entity_type: string
+          source_snapshot: Json
+          status?: Database["public"]["Enums"]["social_content_status"]
+          template_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          generation_method?: string
+          generation_notes?: string | null
+          id?: string
+          internal_notes?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          source_entity_id?: string
+          source_entity_type?: string
+          source_snapshot?: Json
+          status?: Database["public"]["Enums"]["social_content_status"]
+          template_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_content_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "social_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_platform_variants: {
+        Row: {
+          caption: string
+          connection_id: string | null
+          content_item_id: string
+          created_at: string
+          external_permalink: string | null
+          external_post_id: string | null
+          hashtags: string[]
+          id: string
+          last_error_code: string | null
+          last_error_message: string | null
+          mentions: string[]
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_options: Json
+          published_at: string | null
+          scheduled_for: string | null
+          selected_asset_id: string | null
+          status: Database["public"]["Enums"]["social_variant_status"]
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          caption?: string
+          connection_id?: string | null
+          content_item_id: string
+          created_at?: string
+          external_permalink?: string | null
+          external_post_id?: string | null
+          hashtags?: string[]
+          id?: string
+          last_error_code?: string | null
+          last_error_message?: string | null
+          mentions?: string[]
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_options?: Json
+          published_at?: string | null
+          scheduled_for?: string | null
+          selected_asset_id?: string | null
+          status?: Database["public"]["Enums"]["social_variant_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          caption?: string
+          connection_id?: string | null
+          content_item_id?: string
+          created_at?: string
+          external_permalink?: string | null
+          external_post_id?: string | null
+          hashtags?: string[]
+          id?: string
+          last_error_code?: string | null
+          last_error_message?: string | null
+          mentions?: string[]
+          platform?: Database["public"]["Enums"]["social_platform"]
+          platform_options?: Json
+          published_at?: string | null
+          scheduled_for?: string | null
+          selected_asset_id?: string | null
+          status?: Database["public"]["Enums"]["social_variant_status"]
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_platform_variants_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "social_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_platform_variants_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_platform_variants_selected_asset_id_fkey"
+            columns: ["selected_asset_id"]
+            isOneToOne: false
+            referencedRelation: "social_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_publish_jobs: {
+        Row: {
+          attempt_count: number
+          available_at: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          idempotency_key: string
+          last_error_code: string | null
+          last_error_details: Json | null
+          last_error_message: string | null
+          locked_at: string | null
+          locked_by: string | null
+          max_attempts: number
+          platform_variant_id: string
+          provider_publish_id: string | null
+          provider_response: Json | null
+          scheduled_for: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["social_job_status"]
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          available_at: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          last_error_code?: string | null
+          last_error_details?: Json | null
+          last_error_message?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          max_attempts?: number
+          platform_variant_id: string
+          provider_publish_id?: string | null
+          provider_response?: Json | null
+          scheduled_for: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["social_job_status"]
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          available_at?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          last_error_code?: string | null
+          last_error_details?: Json | null
+          last_error_message?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          max_attempts?: number
+          platform_variant_id?: string
+          provider_publish_id?: string | null
+          provider_response?: Json | null
+          scheduled_for?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["social_job_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_publish_jobs_platform_variant_id_fkey"
+            columns: ["platform_variant_id"]
+            isOneToOne: false
+            referencedRelation: "social_platform_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_templates: {
+        Row: {
+          content_type: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          template_config: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          content_type: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          template_config?: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          content_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          template_config?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       spotlights: {
         Row: {
           created_at: string | null
@@ -2397,6 +3341,19 @@ export type Database = {
         Args: { p_fields: string[]; p_queue_id: string; p_reviewer_id?: string }
         Returns: Json
       }
+      approve_credit_candidate: {
+        Args: {
+          p_candidate_id: string
+          p_credit_type: string
+          p_matched_person_id?: string
+          p_name: string
+          p_role_or_character?: string
+        }
+        Returns: {
+          created_person: boolean
+          person_id: string
+        }[]
+      }
       batch_certify_films: { Args: { film_uuids: string[] }; Returns: number }
       batch_create_films_from_videos: {
         Args: { video_db_ids: string[] }
@@ -2408,6 +3365,15 @@ export type Database = {
       calculate_popularity_score: {
         Args: { person_uuid: string }
         Returns: number
+      }
+      claim_credit_harvest_job: {
+        Args: { p_worker_id?: string }
+        Returns: {
+          attempts: number
+          channel_id: string
+          film_id: string
+          id: string
+        }[]
       }
       create_pro_profile: {
         Args: {
@@ -2429,6 +3395,20 @@ export type Database = {
       }
       generate_slug: { Args: { input: string }; Returns: string }
       get_coming_soon_films: { Args: { p_limit?: number }; Returns: Json[] }
+      get_credit_candidate_review_films: {
+        Args: {
+          p_limit?: number
+          p_min_confidence?: number
+          p_offset?: number
+          p_status?: string
+        }
+        Returns: {
+          candidate_count: number
+          film_id: string
+          max_confidence: number
+          total_films: number
+        }[]
+      }
       get_duplicate_films: {
         Args: never
         Returns: {
@@ -2540,6 +3520,7 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_clickbait_title: { Args: { t: string }; Returns: boolean }
+      is_social_studio_admin: { Args: never; Returns: boolean }
       match_film_fuzzy: {
         Args: { query_title: string; threshold?: number }
         Returns: {
@@ -2548,12 +3529,30 @@ export type Database = {
           title: string
         }[]
       }
+      match_films_by_embedding: {
+        Args: {
+          match_count?: number
+          min_similarity?: number
+          query_embedding: string
+        }
+        Returns: {
+          film_id: string
+          similarity: number
+        }[]
+      }
       match_person_fuzzy: {
         Args: { query_name: string; threshold?: number }
         Returns: {
           id: string
           name: string
           sim: number
+        }[]
+      }
+      match_related_by_embedding: {
+        Args: { match_count?: number; p_film_id: string }
+        Returns: {
+          film_id: string
+          similarity: number
         }[]
       }
       merge_companies: {
@@ -2617,6 +3616,10 @@ export type Database = {
           p_pending_id: string
         }
         Returns: string
+      }
+      recover_stale_credit_harvest_jobs: {
+        Args: { p_stale_after_minutes?: number }
+        Returns: number
       }
       refresh_all_popularity_scores: { Args: never; Returns: undefined }
       refresh_people_enrichment_queue: { Args: never; Returns: number }
@@ -2725,6 +3728,11 @@ export type Database = {
           name_key: string | null
           nationality: string | null
           needs_review: boolean | null
+          photo_cutout_attempted_at: string | null
+          photo_cutout_error: string | null
+          photo_cutout_source_url: string | null
+          photo_cutout_status: string | null
+          photo_cutout_url: string | null
           photo_url: string | null
           popularity_score: number
           profile_views: number | null
@@ -2745,6 +3753,34 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      set_credit_harvest_paused: {
+        Args: { p_paused: boolean }
+        Returns: {
+          id: number
+          pause_requested_at: string | null
+          paused: boolean
+          resumed_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "credit_harvest_control"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      suggest_similar_people: {
+        Args: { p_limit?: number; p_name: string }
+        Returns: {
+          film_count: number
+          id: string
+          name: string
+          photo_url: string
+          score: number
+          slug: string
+        }[]
       }
       tmdb_liked_pct: { Args: { avg: number; votes: number }; Returns: number }
       upsert_person_by_name: {
@@ -2774,6 +3810,48 @@ export type Database = {
         | "completed"
         | "cancelled"
       nfvcb_rating: "G" | "PG" | "PG-13" | "15" | "18"
+      social_asset_format:
+        | "portrait_4_5"
+        | "square_1_1"
+        | "vertical_9_16"
+        | "landscape_16_9"
+        | "video_vertical_9_16"
+      social_connection_status:
+        | "pending"
+        | "connected"
+        | "expired"
+        | "revoked"
+        | "error"
+      social_content_status:
+        | "generating"
+        | "draft"
+        | "ready_for_review"
+        | "approved"
+        | "scheduled"
+        | "publishing"
+        | "partially_published"
+        | "published"
+        | "failed"
+        | "rejected"
+        | "archived"
+      social_job_status:
+        | "queued"
+        | "processing"
+        | "retrying"
+        | "succeeded"
+        | "failed"
+        | "dead_letter"
+        | "cancelled"
+      social_platform: "instagram" | "facebook" | "threads" | "tiktok"
+      social_variant_status:
+        | "draft"
+        | "approved"
+        | "scheduled"
+        | "publishing"
+        | "published"
+        | "uploaded_as_draft"
+        | "failed"
+        | "skipped"
       user_role: "fan" | "professional" | "admin" | "admin_limited"
     }
     CompositeTypes: {
@@ -2928,6 +4006,53 @@ export const Constants = {
         "cancelled",
       ],
       nfvcb_rating: ["G", "PG", "PG-13", "15", "18"],
+      social_asset_format: [
+        "portrait_4_5",
+        "square_1_1",
+        "vertical_9_16",
+        "landscape_16_9",
+        "video_vertical_9_16",
+      ],
+      social_connection_status: [
+        "pending",
+        "connected",
+        "expired",
+        "revoked",
+        "error",
+      ],
+      social_content_status: [
+        "generating",
+        "draft",
+        "ready_for_review",
+        "approved",
+        "scheduled",
+        "publishing",
+        "partially_published",
+        "published",
+        "failed",
+        "rejected",
+        "archived",
+      ],
+      social_job_status: [
+        "queued",
+        "processing",
+        "retrying",
+        "succeeded",
+        "failed",
+        "dead_letter",
+        "cancelled",
+      ],
+      social_platform: ["instagram", "facebook", "threads", "tiktok"],
+      social_variant_status: [
+        "draft",
+        "approved",
+        "scheduled",
+        "publishing",
+        "published",
+        "uploaded_as_draft",
+        "failed",
+        "skipped",
+      ],
       user_role: ["fan", "professional", "admin", "admin_limited"],
     },
   },

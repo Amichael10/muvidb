@@ -36,11 +36,18 @@
     "api/automation.ts": {
       "maxDuration": 60
     },
+    "api/social.ts": {
+      "includeFiles": "api/_lib/{fonts,decor}/**",
+      "maxDuration": 60
+    },
     "api/cron/sync.ts": {
       "maxDuration": 60
     },
     "api/ai.ts": {
       "maxDuration": 60
+    },
+    "api/semantic-search.ts": {
+      "maxDuration": 30
     },
     "api/media.ts": {
       "maxDuration": 60
