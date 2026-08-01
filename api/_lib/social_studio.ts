@@ -18,6 +18,7 @@ import type { SocialSourceSnapshot } from '../../src/features/social-studio/cont
 import {
   SOURCE_ENTITY_TYPES,
   buildActorSpotlightSnapshot,
+  buildBirthdaySpotlightSnapshot,
   buildUpcomingMovieSnapshot,
   collectSnapshotWarnings,
 } from '../../src/features/social-studio/content/snapshots.js';
@@ -411,10 +412,14 @@ const ACTIVE_CONTENT_STATUSES = [
   'published',
 ];
 
-async function loadActorSpotlightSource(personId: string, capturedAt: string) {
+async function loadPersonSource(
+  personId: string,
+  capturedAt: string,
+  contentType: SocialContentType,
+) {
   const { data: person, error } = await supabase
     .from('people')
-    .select('id,name,slug,photo_url,photo_cutout_url,photo_cutout_status,nationality,known_for_department,bio')
+    .select('id,name,slug,photo_url,photo_cutout_url,photo_cutout_status,nationality,known_for_department,bio,date_of_birth')
     .eq('id', personId)
     .maybeSingle();
 
@@ -424,7 +429,7 @@ async function loadActorSpotlightSource(personId: string, capturedAt: string) {
   // Billing order ranks the headline roles; nulls sort last so leads win.
   const { data: credits, error: creditsError } = await supabase
     .from('credits')
-    .select('character_name,billing_order,films!inner(id,title,slug,year,release_date,poster_url,is_published)')
+    .select('role,character_name,billing_order,films!inner(id,title,slug,year,release_date,poster_url,is_published)')
     .eq('person_id', personId)
     .eq('films.is_published', true)
     .order('billing_order', { ascending: true, nullsFirst: false })
@@ -432,7 +437,10 @@ async function loadActorSpotlightSource(personId: string, capturedAt: string) {
 
   if (creditsError) throw creditsError;
 
-  return buildActorSpotlightSnapshot({ person, credits: credits || [], capturedAt });
+  // Both person cards share this query; only the snapshot shape differs.
+  return contentType === 'birthday_spotlight'
+    ? buildBirthdaySpotlightSnapshot({ person, credits: credits || [], capturedAt })
+    : buildActorSpotlightSnapshot({ person, credits: credits || [], capturedAt });
 }
 
 async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
@@ -593,13 +601,17 @@ export async function generateSocialDraft(
   }
 
   const snapshot =
-    input.contentType === 'actor_spotlight'
-      ? await loadActorSpotlightSource(input.sourceEntityId, capturedAt)
+    sourceEntityType === 'person'
+      ? await loadPersonSource(input.sourceEntityId, capturedAt, input.contentType)
       : await loadUpcomingMovieSource(input.sourceEntityId, capturedAt);
 
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
-    snapshot.kind === 'actor_spotlight' ? `Actor Spotlight — ${snapshot.name}` : `Upcoming Movie — ${snapshot.title}`;
+    snapshot.kind === 'actor_spotlight'
+      ? `Actor Spotlight — ${snapshot.name}`
+      : snapshot.kind === 'birthday_spotlight'
+        ? `Birthday Spotlight — ${snapshot.name}`
+        : `Upcoming Movie — ${snapshot.title}`;
 
   const { data: contentItem, error: insertError } = await supabase
     .from('social_content_items')

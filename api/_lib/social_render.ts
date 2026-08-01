@@ -163,11 +163,11 @@ type CardCopy = {
 };
 
 function cardCopy(snapshot: SocialSourceSnapshot): CardCopy {
-  if (snapshot.kind === 'actor_spotlight') {
+  if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     const descriptor = [snapshot.nationality, snapshot.knownForDepartment].filter(Boolean).join(' · ');
     const titles = snapshot.knownFor.map(film => film.title).slice(0, 2).join(' · ');
     return {
-      eyebrow: 'Actor Spotlight',
+      eyebrow: snapshot.kind === 'birthday_spotlight' ? 'Birthday Spotlight' : 'Actor Spotlight',
       headline: snapshot.name,
       support: titles || descriptor || null,
       // Prefer the cut-out; a plain photo still renders, just without the
@@ -350,8 +350,48 @@ function dotGrid(x: number, y: number, s: number): SatoriNode {
   );
 }
 
-function buildActorSpotlightCard(
-  snapshot: Extract<SocialSourceSnapshot, { kind: 'actor_spotlight' }>,
+/**
+ * Copy that varies between the person-spotlight cards. The layout, density
+ * tuning and decor are identical across them, so only these three strings and
+ * the eyebrow change — see docs/social-templates.
+ */
+type PersonCardSpec = { eyebrow: string; kicker: string; roleLine: string; support: string | null };
+
+/**
+ * Copy for each person card.
+ *
+ * The birthday card deliberately carries a fixed celebratory line rather than
+ * the person's bio: the mockup's supporting text is addressed to the subject
+ * ("the impact you bring"), and a scraped bio reads wrong in that slot.
+ *
+ * The age is only mentioned when it was derived from a real year — no age is
+ * better than a wrong one on a post about a living person.
+ */
+function personCardSpec(
+  snapshot: Extract<SocialSourceSnapshot, { kind: 'actor_spotlight' | 'birthday_spotlight' }>,
+): PersonCardSpec {
+  if (snapshot.kind === 'birthday_spotlight') {
+    return {
+      eyebrow: 'BIRTHDAY SPOTLIGHT',
+      kicker: 'BIRTHDAY',
+      roleLine: (snapshot.roles.length ? snapshot.roles : ['Actor'])
+        .map(role => role.toUpperCase())
+        .join('  •  '),
+      support: 'Celebrating the talent, versatility and impact you bring to African cinema.',
+    };
+  }
+
+  return {
+    eyebrow: 'ACTOR SPOTLIGHT',
+    kicker: 'THIS WEEK',
+    roleLine: (snapshot.knownForDepartment || 'Actor').toUpperCase(),
+    support: snapshot.bio,
+  };
+}
+
+function buildPersonSpotlightCard(
+  snapshot: Extract<SocialSourceSnapshot, { kind: 'actor_spotlight' | 'birthday_spotlight' }>,
+  spec: PersonCardSpec,
   format: SocialAssetFormat,
   portrait: Artwork,
   logo: BrandLockup,
@@ -377,12 +417,11 @@ function buildActorSpotlightCard(
   const g = s * density.gap;
 
   const name = splitHeadlineName(snapshot.name);
-  const role = (snapshot.knownForDepartment || 'Actor').toUpperCase();
   const titles = snapshot.knownFor.map(f => f.title).slice(0, density.titles);
   const bio =
-    snapshot.bio && snapshot.bio.length > density.bio
-      ? `${snapshot.bio.slice(0, density.bio - 3).trimEnd()}…`
-      : snapshot.bio;
+    spec.support && spec.support.length > density.bio
+      ? `${spec.support.slice(0, density.bio - 3).trimEnd()}…`
+      : spec.support;
 
   const children: unknown[] = [];
 
@@ -569,7 +608,7 @@ function buildActorSpotlightCard(
             letterSpacing: `${2.6 * s}px`,
             color: BRAND.ink,
           },
-          'ACTOR SPOTLIGHT',
+          spec.eyebrow,
         ),
         h(
           'div',
@@ -601,7 +640,7 @@ function buildActorSpotlightCard(
         letterSpacing: `${5 * s}px`,
         color: BRAND.ink,
       },
-      'THIS WEEK',
+      spec.kicker,
     ),
     h('div', { display: 'flex', marginTop: `${14 * g}px`, marginBottom: `${26 * g}px` }, rule(`${splitX - pad - 40 * s}px`, s)),
   );
@@ -648,7 +687,7 @@ function buildActorSpotlightCard(
         letterSpacing: `${4.5 * s}px`,
         color: BRAND.ink,
       },
-      role,
+      spec.roleLine,
     ),
     h('div', { display: 'flex', marginTop: `${22 * g}px`, marginBottom: `${26 * g}px` }, rule(`${230 * s}px`, s, 'rgba(255,90,31,0.35)')),
   );
@@ -989,8 +1028,15 @@ export async function renderSnapshotAsset(input: {
   const artwork = input.artwork !== undefined ? input.artwork : await loadArtwork(copy.imageUrl);
 
   const element =
-    input.snapshot.kind === 'actor_spotlight'
-      ? buildActorSpotlightCard(input.snapshot, input.format, artwork, await getBrandLockup(), await getCardDecor())
+    input.snapshot.kind === 'actor_spotlight' || input.snapshot.kind === 'birthday_spotlight'
+      ? buildPersonSpotlightCard(
+          input.snapshot,
+          personCardSpec(input.snapshot),
+          input.format,
+          artwork,
+          await getBrandLockup(),
+          await getCardDecor(),
+        )
       : buildCard(copy, input.format, artwork);
 
   const svg = await satori(element as never, {

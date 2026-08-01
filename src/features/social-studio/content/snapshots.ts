@@ -65,10 +65,28 @@ export type UpcomingMovieSnapshot = {
   topCast: SnapshotCastMember[];
 };
 
-export type SocialSourceSnapshot = ActorSpotlightSnapshot | UpcomingMovieSnapshot;
+/**
+ * A birthday post. Structurally the actor card with a different eyebrow and a
+ * celebratory line in place of the bio, so it carries the same person fields
+ * plus the birthday itself.
+ */
+export type BirthdaySpotlightSnapshot = Omit<ActorSpotlightSnapshot, 'kind'> & {
+  kind: 'birthday_spotlight';
+  dateOfBirth: string;
+  /** Null when the stored date has no year (some rows carry only month/day). */
+  age: number | null;
+  /** Display roles for the "ACTOR · PRODUCER" line, derived from credits. */
+  roles: string[];
+};
+
+export type SocialSourceSnapshot =
+  | ActorSpotlightSnapshot
+  | BirthdaySpotlightSnapshot
+  | UpcomingMovieSnapshot;
 
 export const SOURCE_ENTITY_TYPES: Record<SocialContentType, 'person' | 'film'> = {
   actor_spotlight: 'person',
+  birthday_spotlight: 'person',
   upcoming_movie: 'film',
 };
 
@@ -136,6 +154,82 @@ export function buildActorSpotlightSnapshot(input: {
   };
 }
 
+/**
+ * Age on the captured date. Returns null when the stored value carries no
+ * usable year — some rows hold only a month and day, and a birthday card is
+ * still valid without an age.
+ */
+function ageOn(dateOfBirth: string, capturedAt: string): number | null {
+  const born = new Date(dateOfBirth);
+  const on = new Date(capturedAt);
+  if (Number.isNaN(born.getTime()) || Number.isNaN(on.getTime())) return null;
+  if (born.getUTCFullYear() < 1900) return null;
+
+  let age = on.getUTCFullYear() - born.getUTCFullYear();
+  const monthDelta = on.getUTCMonth() - born.getUTCMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && on.getUTCDate() < born.getUTCDate())) age -= 1;
+
+  return age >= 0 && age < 130 ? age : null;
+}
+
+/**
+ * Roles for the "ACTOR · PRODUCER" line. Ordered by how often the person is
+ * credited, so the role they are best known for leads.
+ */
+function rolesFromCredits(credits: Record<string, any>[]): string[] {
+  const counts = new Map<string, number>();
+
+  for (const credit of credits) {
+    const role = text(credit?.role);
+    if (!role) continue;
+    const label = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([label]) => label);
+}
+
+/**
+ * Days from the captured date to the next occurrence of the birthday, ignoring
+ * year. 0 means today. Returns null when the date cannot be parsed.
+ */
+export function daysUntilBirthday(dateOfBirth: string, capturedAt: string): number | null {
+  const born = new Date(dateOfBirth);
+  const on = new Date(capturedAt);
+  if (Number.isNaN(born.getTime()) || Number.isNaN(on.getTime())) return null;
+
+  const today = Date.UTC(on.getUTCFullYear(), on.getUTCMonth(), on.getUTCDate());
+  let next = Date.UTC(on.getUTCFullYear(), born.getUTCMonth(), born.getUTCDate());
+  if (next < today) next = Date.UTC(on.getUTCFullYear() + 1, born.getUTCMonth(), born.getUTCDate());
+
+  return Math.round((next - today) / 86_400_000);
+}
+
+export function buildBirthdaySpotlightSnapshot(input: {
+  person: Record<string, any>;
+  credits?: Record<string, any>[];
+  capturedAt: string;
+  knownForLimit?: number;
+}): BirthdaySpotlightSnapshot {
+  const base = buildActorSpotlightSnapshot(input);
+  const credits = Array.isArray(input.credits) ? input.credits : [];
+  const dateOfBirth = String(text(input.person.date_of_birth) || '');
+
+  const roles = rolesFromCredits(credits);
+  if (!roles.length && base.knownForDepartment) roles.push(base.knownForDepartment);
+
+  return {
+    ...base,
+    kind: 'birthday_spotlight',
+    dateOfBirth,
+    age: dateOfBirth ? ageOn(dateOfBirth, input.capturedAt) : null,
+    roles,
+  };
+}
+
 export function buildUpcomingMovieSnapshot(input: {
   film: Record<string, any>;
   credits?: Record<string, any>[];
@@ -186,9 +280,29 @@ export function buildUpcomingMovieSnapshot(input: {
 export function collectSnapshotWarnings(snapshot: SocialSourceSnapshot): string[] {
   const warnings: string[] = [];
 
-  if (snapshot.kind === 'actor_spotlight') {
+  if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     if (!snapshot.photoUrl) warnings.push('Person has no photo_url; assets cannot be rendered from a portrait.');
     if (!snapshot.knownFor.length) warnings.push('Person has no linked film credits to feature.');
+
+    if (snapshot.kind === 'birthday_spotlight') {
+      if (!snapshot.dateOfBirth) warnings.push('Person has no date_of_birth; the card cannot claim a birthday.');
+      else {
+        // Not fatal — the card omits the age rather than inventing one — but a
+        // reviewer should know the "turns N today" line will be missing.
+        if (snapshot.age === null) warnings.push('date_of_birth has no usable year; age will be omitted.');
+
+        // Generating a few days early to schedule is a normal workflow, so this
+        // warns rather than refuses. But a card that says "Happy birthday" on
+        // the wrong day is the single worst failure this template has, so a
+        // reviewer must be told before it goes out.
+        const days = daysUntilBirthday(snapshot.dateOfBirth, snapshot.capturedAt);
+        if (days === null) warnings.push('date_of_birth is unparseable; cannot confirm the birthday.');
+        else if (days > 7) {
+          warnings.push(`Birthday is ${days} days away — this card greets them on the wrong day unless scheduled.`);
+        }
+      }
+    }
+
     return warnings;
   }
 

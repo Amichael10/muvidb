@@ -1,5 +1,5 @@
 import type { SocialPlatform } from '../domain/platform-types';
-import type { ActorSpotlightSnapshot, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots';
+import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots';
 import { firstUsableCopy } from './copy-quality';
 
 export type PlatformCaptionLimits = {
@@ -94,6 +94,25 @@ function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
   return lines;
 }
 
+/**
+ * The age is only stated when it came from a real birth year. Guessing an age
+ * for a living person in a published post is worse than omitting it.
+ */
+function birthdayBody(snapshot: BirthdaySpotlightSnapshot): string[] {
+  const lines: string[] = [
+    snapshot.age === null
+      ? `Happy birthday, ${snapshot.name}!`
+      : `Happy birthday, ${snapshot.name} — ${snapshot.age} today!`,
+  ];
+
+  if (snapshot.roles.length) lines.push(`${joinTitles(snapshot.roles)}.`);
+
+  const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
+  if (titles.length) lines.push(`Known for ${joinTitles(titles)}.`);
+
+  return lines;
+}
+
 function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
   const heading = snapshot.year ? `${snapshot.title} (${snapshot.year})` : snapshot.title;
   const lines: string[] = [snapshot.comingSoon ? `Coming soon: ${heading}` : heading];
@@ -110,11 +129,11 @@ function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
 function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
   const tags: (string | null)[] = ['MuviDB'];
 
-  if (snapshot.kind === 'actor_spotlight') {
+  if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     tags.push(toHashtag(snapshot.name));
     if (snapshot.nationality) tags.push(toHashtag(snapshot.nationality));
     tags.push(...snapshot.knownFor.map(film => toHashtag(film.title)));
-    tags.push('ActorSpotlight');
+    tags.push(snapshot.kind === 'birthday_spotlight' ? 'HappyBirthday' : 'ActorSpotlight');
     return tags;
   }
 
@@ -141,7 +160,12 @@ export function buildVariantContent(input: {
   const limits = PLATFORM_CAPTION_LIMITS[input.platform];
   const hashtags = dedupeHashtags(baseHashtags(input.snapshot), limits.hashtagLimit);
 
-  const lines = input.snapshot.kind === 'actor_spotlight' ? actorBody(input.snapshot) : movieBody(input.snapshot);
+  const lines =
+    input.snapshot.kind === 'birthday_spotlight'
+      ? birthdayBody(input.snapshot)
+      : input.snapshot.kind === 'actor_spotlight'
+        ? actorBody(input.snapshot)
+        : movieBody(input.snapshot);
   const body = lines.filter(Boolean).join('\n\n');
 
   const hashtagBlock = hashtags.map(tag => `#${tag}`).join(' ');
@@ -150,7 +174,7 @@ export function buildVariantContent(input: {
 
   const title = limits.usesTitle
     ? truncateAtWord(
-        input.snapshot.kind === 'actor_spotlight'
+        input.snapshot.kind === 'actor_spotlight' || input.snapshot.kind === 'birthday_spotlight'
           ? `Spotlight: ${input.snapshot.name}`
           : input.snapshot.title,
         100,
