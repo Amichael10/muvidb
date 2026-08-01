@@ -171,15 +171,38 @@ export async function searchAll(query) {
     }
   }
 
-  // Merge title + cast films, dedupe, score (cast match gets a baseline), sort.
+  // Semantic top-up when title matching is thin (saves Cohere quota on
+  // exact-title hits). Synopsis-level neighbours fill the gap for vague queries.
+  let semanticFilms = [];
+  if (!confidentPersonMatch && titleFilms.length < 8) {
+    try {
+      const res = await fetch('/api/semantic-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: query, limit: 16 }),
+      });
+      if (res.ok) {
+        const body = await res.json();
+        semanticFilms = body.films || [];
+      }
+    } catch {
+      // Lexical search still works if the semantic endpoint is down.
+    }
+  }
+
+  // Merge title + cast + semantic films, dedupe, score (cast match gets a baseline), sort.
   const byId = new Map();
-  for (const f of [...titleFilms, ...castFilms]) if (!byId.has(f.id)) byId.set(f.id, f);
+  for (const f of [...titleFilms, ...castFilms, ...semanticFilms]) if (!byId.has(f.id)) byId.set(f.id, f);
   const films = [...byId.values()]
-    .map((f) => ({
-      ...f,
-      genres: f.film_genres?.map((g) => g.genres?.name).filter(Boolean) || [],
-      _score: Math.max(scoreText(f.title, fullQ, terms), castFilmIds.has(f.id) ? 45 : 0),
-    }))
+    .map((f) => {
+      const lexical = Math.max(scoreText(f.title, fullQ, terms), castFilmIds.has(f.id) ? 45 : 0);
+      const semantic = typeof f._semantic === 'number' ? f._semantic * 420 : (f._score || 0);
+      return {
+        ...f,
+        genres: f.genres || f.film_genres?.map((g) => g.genres?.name).filter(Boolean) || [],
+        _score: Math.max(lexical, semantic),
+      };
+    })
     .sort((a, b) => b._score - a._score)
     .slice(0, 48);
 

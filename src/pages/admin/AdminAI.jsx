@@ -402,6 +402,20 @@ export default function AdminAI() {
                 onClick={() => handleRunTask('extract_cast')}
                 disabled={isProcessing}
               />
+              <OperationButton 
+                icon="🎬"
+                title="Gemini Synopsis & Ratings"
+                desc="MuviDB synopses, genres & age ratings"
+                onClick={() => handleRunTask('enrich_film_gemini')}
+                disabled={isProcessing}
+              />
+              <OperationButton 
+                icon="🛡️"
+                title="Strict People Verification"
+                desc="Zero-hallucination bio & social audit"
+                onClick={() => handleRunTask('enrich_people_strict')}
+                disabled={isProcessing}
+              />
               <div className="mt-2 pt-4 border-t border-border space-y-3">
                 <p className="text-[9px] font-black text-text-muted uppercase tracking-widest">Image Hygiene</p>
                 <button

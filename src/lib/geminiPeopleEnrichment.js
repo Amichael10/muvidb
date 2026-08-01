@@ -267,14 +267,13 @@ export function reconcileCitations(parsed, groundingMetadata = {}, urlContextMet
         .flatMap((row) => (row?.evidence_urls || []).map(normalizeUrl).filter((url) => url && allowed.has(url)));
       const cited = [...new Set([...sentenceUrls, ...fieldHasCitedUrl(proposal, allowed)])];
       if (!cited.length) {
-        rejected.push({ field: fieldName, reason: 'Bio lacks grounding citations' });
+        rejected.push({ field: fieldName, reason: 'Bio lacks grounded citations' });
         continue;
       }
-      const labeled = text.startsWith('AI-synthesized from cited sources')
-        ? text
-        : `AI-synthesized from cited sources. ${text}`;
-      candidateFields[fieldName] = labeled;
-      evidence.push(...buildEvidenceRows(fieldName, labeled, cited, proposal));
+      // Clean bio text — no synthetic prefixing
+      const cleanText = text.replace(/^AI-synthesized from cited sources\.?\s*/i, '').trim();
+      candidateFields[fieldName] = cleanText;
+      evidence.push(...buildEvidenceRows(fieldName, cleanText, cited, proposal));
       continue;
     }
 
@@ -307,6 +306,31 @@ export function reconcileCitations(parsed, groundingMetadata = {}, urlContextMet
 
     if (typeof nextValue === 'string' && /_url$/.test(fieldName)) {
       nextValue = normalizeUrl(nextValue) || nextValue;
+
+      // STRICT ZERO-HALLUCINATION ENFORCEMENT FOR SOCIAL LINKS:
+      // A social URL (e.g., instagram_url) MUST have a grounded citation on that platform's domain (e.g. instagram.com).
+      // A generic news or blog citation CANNOT validate a constructed social handle.
+      const domainMap = {
+        instagram_url: /instagram\.com/i,
+        twitter_url: /(twitter\.com|x\.com)/i,
+        facebook_url: /facebook\.com/i,
+        tiktok_url: /tiktok\.com/i,
+        youtube_url: /(youtube\.com|youtu\.be)/i,
+      };
+
+      const requiredDomain = domainMap[fieldName];
+      if (requiredDomain) {
+        const hasPlatformCitation = cited.some((cUrl) => requiredDomain.test(cUrl));
+        const valDomainMatches = requiredDomain.test(nextValue);
+
+        if (!hasPlatformCitation || !valDomainMatches) {
+          rejected.push({
+            field: fieldName,
+            reason: `Social handle for ${fieldName} lacks direct verification on ${fieldName.replace('_url', '')}`,
+          });
+          continue;
+        }
+      }
     }
     candidateFields[fieldName] = nextValue;
     evidence.push(...buildEvidenceRows(fieldName, String(nextValue), cited, proposal));

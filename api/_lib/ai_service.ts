@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { CohereClientV2 } from 'cohere-ai';
 import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
@@ -118,6 +119,75 @@ async function withGroqRotation(fn: (client: Groq) => Promise<any>): Promise<any
 // Initialize OpenAI (if key exists)
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
+// Cohere: same multi-key rotation as Groq (chat + embed + rerank).
+const COHERE_KEYS = collectKeys('COHERE_API_KEY');
+let cohereKeyIdx = 0;
+const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL || 'command-a-03-2025';
+const COHERE_EMBED_MODEL = process.env.COHERE_EMBED_MODEL || 'embed-v4.0';
+const COHERE_RERANK_MODEL = process.env.COHERE_RERANK_MODEL || 'rerank-v4.0-pro';
+
+const cohereClientFor = () => new CohereClientV2({ token: COHERE_KEYS[cohereKeyIdx] || '' });
+
+/** Cohere SDK uses statusCode; some paths surface status. */
+function cohereErrStatus(err: any): number | undefined {
+  return err?.statusCode ?? err?.status;
+}
+
+function isCohereQuotaError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return cohereErrStatus(err) === 429 || /quota|rate limit|rate_limit|too many requests|\b429\b/.test(msg);
+}
+
+/** Revoked/typo'd key (401/403). Drop it for the life of this process. */
+function isCohereDeadKeyError(err: any): boolean {
+  const status = cohereErrStatus(err);
+  const msg = (err?.message || '').toLowerCase();
+  return status === 401 || status === 403 || /invalid.?api.?key|unauthorized|forbidden|\b401\b|\b403\b/.test(msg);
+}
+const deadCohereKeys = new Set<string>();
+
+/** Run a Cohere call, rotating on quota AND skipping keys that are simply dead. */
+async function withCohereRotation(fn: (client: CohereClientV2) => Promise<any>): Promise<any> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < Math.max(1, COHERE_KEYS.length); attempt++) {
+    // Skip keys already proven dead this process.
+    if (deadCohereKeys.has(COHERE_KEYS[cohereKeyIdx]) && deadCohereKeys.size < COHERE_KEYS.length) {
+      cohereKeyIdx = (cohereKeyIdx + 1) % COHERE_KEYS.length;
+      continue;
+    }
+    try {
+      return await fn(cohereClientFor());
+    } catch (err: any) {
+      lastErr = err;
+      if (isCohereDeadKeyError(err) && COHERE_KEYS.length > 1) {
+        console.warn(`[cohere] key #${cohereKeyIdx + 1}/${COHERE_KEYS.length} is INVALID — dropping it`);
+        deadCohereKeys.add(COHERE_KEYS[cohereKeyIdx]);
+        cohereKeyIdx = (cohereKeyIdx + 1) % COHERE_KEYS.length;
+        continue;
+      }
+      if (isCohereQuotaError(err) && COHERE_KEYS.length > 1) {
+        console.warn(`[cohere] key #${cohereKeyIdx + 1}/${COHERE_KEYS.length} quota hit, rotating…`);
+        cohereKeyIdx = (cohereKeyIdx + 1) % COHERE_KEYS.length;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+function extractCohereText(response: any): string {
+  const content = response?.message?.content;
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  const parts: string[] = [];
+  for (const part of content) {
+    if (typeof part === 'string') parts.push(part);
+    else if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text);
+  }
+  return parts.join('');
+}
+
 /**
  * Clean and parse JSON from AI response
  */
@@ -152,7 +222,7 @@ export function parseJSON(text: string) {
 
 /**
  * Unified request handler with rotation + fallback + telemetry
- * Supports Gemini, Groq, and OpenAI (ChatGPT)
+ * Supports Gemini, Groq, OpenAI, and Cohere
  */
 export async function generateAIContent(prompt: string) {
   const providers = [];
@@ -210,8 +280,22 @@ export async function generateAIContent(prompt: string) {
     });
   }
 
+  if (COHERE_KEYS.length) {
+    providers.push({
+      name: 'cohere',
+      execute: async () => withCohereRotation(async (client) => {
+        const response = await client.chat({
+          model: COHERE_CHAT_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+        });
+        return { text: extractCohereText(response), engine: 'cohere', headers: null };
+      })
+    });
+  }
+
   if (providers.length === 0) {
-    throw new Error('No AI providers configured. Please check GEMINI_API_KEY, OPENAI_API_KEY, or GROQ_API_KEY.');
+    throw new Error('No AI providers configured. Please check GEMINI_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, or COHERE_API_KEY.');
   }
 
   // Shuffle providers to distribute load if both are available
@@ -305,4 +389,59 @@ export async function generateAIVisionContent(prompt: string, base64Data: string
       throw new Error(`Vision API failed: ${err.message} (Gemini 2.0 Lite fallback: ${fallbackErr.message}). No OpenAI key configured for further fallback.`);
     }
   }
+}
+
+/** Whether Cohere keys are available in this process. */
+export function hasCohere(): boolean {
+  return COHERE_KEYS.length > 0;
+}
+
+/**
+ * Embed texts with Cohere (float vectors). Batches of up to 96 texts recommended.
+ */
+export async function embedWithCohere(
+  texts: string[],
+  opts: { inputType?: 'search_document' | 'search_query' | 'classification' | 'clustering' } = {}
+): Promise<number[][]> {
+  if (!COHERE_KEYS.length) throw new Error('COHERE_API_KEY is not set.');
+  if (!texts.length) return [];
+
+  const response: any = await withCohereRotation((client) =>
+    client.embed({
+      model: COHERE_EMBED_MODEL,
+      texts,
+      inputType: opts.inputType || 'search_document',
+      embeddingTypes: ['float'],
+    })
+  );
+
+  const floats = response?.embeddings?.float;
+  if (!Array.isArray(floats)) throw new Error('Cohere embed response missing embeddings.float');
+  return floats;
+}
+
+/**
+ * Rerank documents for a query. Returns original indices + relevance scores, highest first.
+ */
+export async function rerankWithCohere(
+  query: string,
+  documents: string[],
+  opts: { topN?: number } = {}
+): Promise<Array<{ index: number; relevanceScore: number }>> {
+  if (!COHERE_KEYS.length) throw new Error('COHERE_API_KEY is not set.');
+  if (!documents.length) return [];
+
+  const response: any = await withCohereRotation((client) =>
+    client.rerank({
+      model: COHERE_RERANK_MODEL,
+      query,
+      documents,
+      topN: opts.topN ?? Math.min(documents.length, 20),
+    })
+  );
+
+  return (response?.results || []).map((r: any) => ({
+    index: r.index,
+    relevanceScore: r.relevanceScore ?? r.relevance_score ?? 0,
+  }));
 }

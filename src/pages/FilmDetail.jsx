@@ -368,6 +368,34 @@ export default function FilmDetail() {
   };
 
   const fetchRelated = async (film) => {
+    // Precomputed rail first (cast + Cohere embeddings + rare genre), built by
+    // scripts/build_related_films.ts. Fall back to live genre match only when
+    // a film has no rows yet.
+    try {
+      const { data: pre } = await supabase
+        .from('film_related')
+        .select('rank, reason, films:related_id (id, title, year, poster_url, backdrop_url, slug, view_count, content_type, film_genres(genres(name)))')
+        .eq('film_id', film.id)
+        .order('rank', { ascending: true })
+        .limit(12);
+
+      if (pre?.length) {
+        const mapped = pre
+          .filter((r) => r.films)
+          .map((r) => ({
+            ...r.films,
+            _reason: r.reason || null,
+            genres: dedupeGenres(r.films.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || []),
+          }));
+        if (mapped.length) {
+          setRelatedFilms(mapped);
+          return;
+        }
+      }
+    } catch {
+      // Table missing / read failed — live fallback below.
+    }
+
     const sourceGenreIds = (film.film_genres || []).map((row) => row.genre_id).filter(Boolean);
     let candidateIds = [];
 
@@ -1083,6 +1111,11 @@ export default function FilmDetail() {
                       <div className="text-[10px] font-bold text-text-muted mb-2">
                         {relatedFilm.year} • {relatedFilm.genres && relatedFilm.genres.length > 0 ? relatedFilm.genres[0] : 'Media'}
                       </div>
+                      {relatedFilm._reason && (
+                        <div className="text-[9px] font-bold text-brand/80 uppercase tracking-wide line-clamp-1">
+                          {relatedFilm._reason}
+                        </div>
+                      )}
                     </div>
                   </Link>
                 ))}
