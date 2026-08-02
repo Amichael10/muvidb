@@ -7,6 +7,7 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AwardsEditor from '../../components/admin/AwardsEditor';
+import YouTubeFilmImport from '../../components/admin/YouTubeFilmImport';
 import { ALL_ROLES, canonicalizeRole } from '../../lib/creditRoles';
 import { searchPeopleByName } from '../../lib/peopleSearch';
 import { extractYoutubeId } from '../../lib/youtube';
@@ -1809,6 +1810,17 @@ export default function AdminFilms() {
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-12">
+          <YouTubeFilmImport
+            disabled={isSubmitting}
+            onApply={(fields) => {
+              setFormData((prev) => ({
+                ...prev,
+                ...fields,
+                // Keep existing genres / awards / credits — import only fills media + copy.
+              }));
+            }}
+          />
+
           {/* Main Attributes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <section className="space-y-6">

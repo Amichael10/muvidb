@@ -433,3 +433,132 @@ export const fetchTrailerComments = async (videoId, maxResults = 10) => {
     return { disabled: true, comments: [] }
   }
 }
+
+// ─────────────────────────────────────────
+// FUNCTION: Import a full film from a YouTube URL
+// Used by the admin Add Movie drawer. Returns
+// title, description, play link, runtime, and
+// every thumbnail resolution that actually exists
+// so the admin can pick poster vs backdrop.
+// ─────────────────────────────────────────
+
+const YT_THUMB_VARIANTS = [
+  { key: 'maxres', label: 'Max (1280×720)', path: 'maxresdefault.jpg' },
+  { key: 'sd', label: 'SD (640×480)', path: 'sddefault.jpg' },
+  { key: 'hq', label: 'HQ (480×360)', path: 'hqdefault.jpg' },
+  { key: 'mq', label: 'MQ (320×180)', path: 'mqdefault.jpg' },
+]
+
+/** Resolve whether a YouTube thumbnail URL is a real image (maxres often 404s). */
+function probeImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      // YouTube's missing-maxres placeholder is a tiny 120×90 grey tile.
+      const real = img.naturalWidth >= 240 && img.naturalHeight >= 180
+      resolve(real ? { url, width: img.naturalWidth, height: img.naturalHeight } : null)
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+export const extractVideoId = (urlOrId) => {
+  if (!urlOrId) return null
+  const trimmed = String(urlOrId).trim()
+  if (/^[\w-]{11}$/.test(trimmed)) return trimmed
+  const match = trimmed.match(/(?:youtu\.be\/|v\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]{11})/)
+  return match?.[1] || null
+}
+
+/**
+ * Fetch YouTube video metadata + available thumbnail resolutions for film import.
+ * @returns {{ ok: true, data } | { ok: false, error: string }}
+ */
+export const fetchVideoDetailsForImport = async (urlOrId) => {
+  const videoId = extractVideoId(urlOrId)
+  if (!videoId) {
+    return { ok: false, error: 'Paste a YouTube watch URL, youtu.be link, or 11-character video ID.' }
+  }
+
+  try {
+    const data = await youtubeFetch('videos', {
+      part: 'snippet,contentDetails,statistics',
+      id: videoId,
+    })
+
+    if (data?.error) {
+      return { ok: false, error: data.error?.message || 'YouTube API rejected the request.' }
+    }
+    if (!data.items?.length) {
+      return { ok: false, error: 'No video found for that link. Check the URL and try again.' }
+    }
+
+    const video = data.items[0]
+    const snippet = video.snippet || {}
+    const durationInfo = parseDuration(video.contentDetails?.duration)
+    const publishedAt = snippet.publishedAt ? new Date(snippet.publishedAt) : null
+
+    // Probe static CDN variants first (covers maxres which the API often omits),
+    // then fall back to whatever the API returned.
+    const probed = (
+      await Promise.all(
+        YT_THUMB_VARIANTS.map(async (variant) => {
+          const url = `https://i.ytimg.com/vi/${videoId}/${variant.path}`
+          const hit = await probeImage(url)
+          if (!hit) return null
+          return { ...variant, ...hit }
+        }),
+      )
+    ).filter(Boolean)
+
+    const apiThumbs = snippet.thumbnails || {}
+    for (const [key, thumb] of Object.entries(apiThumbs)) {
+      if (!thumb?.url) continue
+      if (probed.some((p) => p.url === thumb.url)) continue
+      probed.push({
+        key,
+        label: key.toUpperCase(),
+        url: thumb.url,
+        width: thumb.width || 0,
+        height: thumb.height || 0,
+      })
+    }
+
+    probed.sort((a, b) => (b.width * b.height) - (a.width * a.height))
+
+    const best = probed[0]?.url || ''
+    // Prefer a mid-size square-ish option for poster when maxres exists —
+    // landscape maxres is better as backdrop. Admin can override either.
+    const posterDefault = probed.find((p) => p.key === 'hq' || p.key === 'sd')?.url || best
+    const backdropDefault = probed.find((p) => p.key === 'maxres')?.url || best
+
+    return {
+      ok: true,
+      data: {
+        videoId,
+        watchUrl: `https://www.youtube.com/watch?v=${videoId}`,
+        rawTitle: snippet.title || '',
+        title: (snippet.title || '').trim(),
+        description: snippet.description || '',
+        channelTitle: snippet.channelTitle || '',
+        publishedAt: publishedAt?.toISOString() || null,
+        year: publishedAt ? publishedAt.getFullYear() : null,
+        releaseDate: publishedAt ? publishedAt.toISOString().slice(0, 10) : null,
+        runtimeMinutes: durationInfo.totalSeconds
+          ? Math.max(1, Math.round(durationInfo.totalSeconds / 60))
+          : null,
+        durationFormatted: durationInfo.formatted,
+        viewCount: parseInt(video.statistics?.viewCount || 0, 10),
+        thumbnails: probed,
+        defaults: {
+          posterUrl: posterDefault,
+          backdropUrl: backdropDefault,
+        },
+      },
+    }
+  } catch (error) {
+    console.error('fetchVideoDetailsForImport error:', error)
+    return { ok: false, error: error.message || 'Could not reach YouTube.' }
+  }
+}
