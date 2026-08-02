@@ -65,3 +65,38 @@ export function tmdbLikedPercent(voteAverage: number, voteCount: number): number
 
 /** Same Bayesian + curve as TMDB — IMDb's official aggregate is also 0–10. */
 export const imdbLikedPercent = tmdbLikedPercent;
+
+/**
+ * Blend site likes/dislikes into a base liked % (TMDB / IMDb / YouTube).
+ *
+ * Mirrors `reaction_liked_blend()` in
+ * supabase/migrations/20260802224000_stricter_reaction_liked_blend.sql —
+ * SQL is authoritative for live updates; this helper is for tests/docs.
+ *
+ * Hard to move on purpose: 120 ghost votes, no-base anchor 40%, and at least
+ * 10 reactions before thumbs alone can mint a liked_percent. With a base,
+ * one like barely nudges; volume has to earn a climb.
+ */
+export const REACTION_PRIOR_WEIGHT = 120;
+export const REACTION_NO_BASE_ANCHOR = 40;
+export const REACTION_MIN_NO_BASE = 10;
+
+export function blendReactionLikedPercent(
+  baseLiked: number | null | undefined,
+  likes: number,
+  dislikes: number,
+): number | null {
+  const L = Math.max(0, likes | 0);
+  const D = Math.max(0, dislikes | 0);
+  const n = L + D;
+  if (n === 0) {
+    return baseLiked == null ? null : Math.round(baseLiked);
+  }
+  if (baseLiked == null && n < REACTION_MIN_NO_BASE) {
+    return null;
+  }
+  const anchor = baseLiked == null ? REACTION_NO_BASE_ANCHOR : Number(baseLiked);
+  const pct =
+    ((L + REACTION_PRIOR_WEIGHT * (anchor / 100)) / (n + REACTION_PRIOR_WEIGHT)) * 100;
+  return Math.round(Math.max(5, Math.min(97, pct)));
+}

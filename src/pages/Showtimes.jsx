@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
+import PopcornField from '../components/ui/PopcornField'
 import { Icon } from '@iconify/react'
 import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isFutureShowtime } from '../utils/showtimes'
 
@@ -260,7 +261,8 @@ const Showtimes = () => {
     }, {})
 
     return (
-        <div className="min-h-screen bg-bg">
+        <div className="min-h-screen bg-bg relative">
+            <PopcornField />
             {/* Page Header */}
             <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
                 <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>

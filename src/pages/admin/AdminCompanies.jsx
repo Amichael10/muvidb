@@ -13,6 +13,10 @@ export default function AdminCompanies() {
   const { user } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [logoFilter, setLogoFilter] = useState('all'); // all | has | missing
+  const [websiteFilter, setWebsiteFilter] = useState('all'); // all | has | missing
+  const [sortBy, setSortBy] = useState('az'); // az | za | founded_new | founded_old | newest
   
   // Modals/Drawers state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -32,7 +36,40 @@ export default function AdminCompanies() {
     });
   };
 
+  const q = search.trim().toLowerCase();
+  const filteredCompanies = companies
+    .filter((c) => {
+      if (q && !(c.name || '').toLowerCase().includes(q) && !(c.description || '').toLowerCase().includes(q)) {
+        return false;
+      }
+      if (logoFilter === 'has' && !c.logo_url) return false;
+      if (logoFilter === 'missing' && c.logo_url) return false;
+      if (websiteFilter === 'has' && !c.website) return false;
+      if (websiteFilter === 'missing' && c.website) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'za') return (b.name || '').localeCompare(a.name || '');
+      if (sortBy === 'founded_new') return (b.founded_year || 0) - (a.founded_year || 0);
+      if (sortBy === 'founded_old') return (a.founded_year || 9999) - (b.founded_year || 9999);
+      if (sortBy === 'newest') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
   const selectedCompanies = companies.filter((c) => selectedIds.has(c.id));
+
+  const toggleSelectAllFiltered = () => {
+    const allSelected = filteredCompanies.length > 0 && filteredCompanies.every((c) => selectedIds.has(c.id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        filteredCompanies.forEach((c) => next.delete(c.id));
+      } else {
+        filteredCompanies.forEach((c) => next.add(c.id));
+      }
+      return next;
+    });
+  };
 
   // Default the survivor to the richest record so films aren't lost visually.
   const openMerge = () => {
@@ -194,18 +231,23 @@ export default function AdminCompanies() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <p className="text-brand text-xs font-bold mb-1">Administration</p>
+          <p className="text-brand text-xs font-bold mb-1">Database</p>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Companies</h1>
+          <p className="text-text-muted text-sm mt-1">
+            {isLoading
+              ? 'Loading…'
+              : `${filteredCompanies.length} of ${companies.length} records`}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {selectedIds.size >= 2 && (
             <button
               onClick={openMerge}
-              className="bg-amber-500 text-white font-bold px-5 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+              className="bg-amber-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
             >
               <Icon icon="solar:posts-carousel-vertical-linear" className="w-4 h-4" />
               Merge {selectedIds.size} selected
@@ -221,38 +263,129 @@ export default function AdminCompanies() {
           )}
           <button
             onClick={openAddDrawer}
-            className="bg-brand text-white font-bold px-6 py-2 rounded-lg text-xs hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="bg-brand text-white font-black px-6 py-2.5 rounded-xl text-xs hover:scale-[1.05] active:scale-[0.95] transition-all flex items-center gap-2 shadow-lg shadow-brand/20"
           >
-            Add company record
+            <Icon icon="solar:plus-linear" className="text-lg" />
+            Add company
           </button>
         </div>
       </div>
 
+      {/* Search + filters */}
+      <div className="card-cal p-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-2 relative">
+            <Icon
+              icon="solar:magnifer-linear"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-lg pointer-events-none"
+            />
+            <input
+              type="search"
+              placeholder="Search by name or description…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-surface-2 border border-border rounded-md pl-10 pr-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
+            />
+          </div>
+          <select
+            value={logoFilter}
+            onChange={(e) => setLogoFilter(e.target.value)}
+            className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer"
+          >
+            <option value="all">Any logo</option>
+            <option value="has">Has logo</option>
+            <option value="missing">Missing logo</option>
+          </select>
+          <select
+            value={websiteFilter}
+            onChange={(e) => setWebsiteFilter(e.target.value)}
+            className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer"
+          >
+            <option value="all">Any website</option>
+            <option value="has">Has website</option>
+            <option value="missing">Missing website</option>
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer md:col-span-1"
+          >
+            <option value="az">Name A–Z</option>
+            <option value="za">Name Z–A</option>
+            <option value="founded_new">Founded (newest)</option>
+            <option value="founded_old">Founded (oldest)</option>
+            <option value="newest">Recently added</option>
+          </select>
+        </div>
+      </div>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between p-4 bg-brand/5 border border-brand/20 rounded-lg">
+          <span className="text-sm font-bold text-brand">{selectedIds.size} companies selected</span>
+          <div className="flex gap-2">
+            {selectedIds.size >= 2 && (
+              <button
+                onClick={openMerge}
+                className="bg-brand text-white px-4 py-1.5 rounded text-xs font-bold hover:scale-[1.02] transition-all"
+              >
+                Merge
+              </button>
+            )}
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="bg-surface border border-border text-text-primary px-4 py-1.5 rounded text-xs font-bold"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Data Table */}
-      <div className="bg-surface rounded-lg border border-border overflow-hidden">
+      <div className="card-cal p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-text-muted uppercase bg-surface-2/50 border-b border-border">
-              <tr>
-                <th className="px-4 py-4 font-medium w-10"></th>
-                <th className="px-6 py-4 font-medium">Logo</th>
-                <th className="px-6 py-4 font-medium">Name</th>
-                <th className="px-6 py-4 font-medium">Website</th>
-                <th className="px-6 py-4 font-medium">Founded</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
+            <thead>
+              <tr className="border-b border-border text-[10px] font-bold text-text-muted bg-surface-2/30 uppercase tracking-wider">
+                <th className="px-4 py-5 w-12">
+                  <input
+                    type="checkbox"
+                    checked={filteredCompanies.length > 0 && filteredCompanies.every((c) => selectedIds.has(c.id))}
+                    onChange={toggleSelectAllFiltered}
+                    className="w-4 h-4 rounded border-border accent-brand cursor-pointer"
+                    title="Select all filtered"
+                  />
+                </th>
+                <th className="px-6 py-5">Company</th>
+                <th className="px-6 py-5">Website</th>
+                <th className="px-6 py-5">Founded</th>
+                <th className="px-6 py-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 Array(5).fill(0).map((_, i) => <SkeletonRow key={i} columns={5} />)
-              ) : companies.length === 0 ? (
+              ) : filteredCompanies.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-8 text-center text-text-muted">
-                    No companies found.
+                  <td colSpan="5" className="px-6 py-12 text-center text-text-muted">
+                    {companies.length === 0 ? 'No companies found.' : 'No companies match your search or filters.'}
+                    {(search || logoFilter !== 'all' || websiteFilter !== 'all') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearch('');
+                          setLogoFilter('all');
+                          setWebsiteFilter('all');
+                        }}
+                        className="block mx-auto mt-3 text-xs font-bold uppercase tracking-widest text-brand hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
-                companies.map((company) => (
+                filteredCompanies.map((company) => (
                   <tr
                     key={company.id}
                     className={`transition-colors group ${selectedIds.has(company.id) ? 'bg-amber-500/10' : 'hover:bg-surface-2/50'}`}
@@ -267,16 +400,23 @@ export default function AdminCompanies() {
                       />
                     </td>
                     <td className="px-6 py-4">
-                      {company.logo_url ? (
-                        <img src={company.logo_url} alt={company.name} className="w-10 h-10 rounded-lg object-cover bg-white" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-lg">
-                          {getInitials(company.name)}
+                      <div className="flex items-center gap-3 min-w-0">
+                        {company.logo_url ? (
+                          <img src={company.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover bg-white border border-border shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-brand/15 text-brand flex items-center justify-center font-bold text-lg shrink-0 border border-brand/20">
+                            {getInitials(company.name)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-bold text-text-primary truncate">{company.name}</p>
+                          {company.description ? (
+                            <p className="text-[11px] text-text-muted truncate max-w-xs">{company.description}</p>
+                          ) : (
+                            <p className="text-[11px] text-text-muted/60">No description</p>
+                          )}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-text-primary">
-                      {company.name}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {company.website ? (
@@ -284,7 +424,7 @@ export default function AdminCompanies() {
                           href={company.website} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-brand hover:underline truncate max-w-[200px] inline-block align-bottom font-bold"
+                          className="text-brand hover:underline truncate max-w-[200px] inline-block align-bottom font-bold text-xs"
                         >
                           {company.website.replace(/^https?:\/\//, '')}
                         </a>
@@ -292,11 +432,11 @@ export default function AdminCompanies() {
                         <span className="text-text-muted">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-text-muted">
+                    <td className="px-6 py-4 text-text-muted font-medium">
                       {company.founded_year || '—'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1 md:opacity-70 md:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => openEditDrawer(company)}
                           className="p-2 text-text-muted hover:text-brand hover:bg-surface-2 rounded-lg transition-colors"

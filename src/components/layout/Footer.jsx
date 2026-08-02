@@ -27,6 +27,7 @@ const footerGroups = [
     title: 'Platform',
     links: [
       { label: 'About Us', to: '/about' },
+      { label: 'MuviDB Pro', comingSoon: true },
       { label: 'Add a Film', to: '/submit/film' },
       { label: 'Contribute', to: '/submit' },
       { label: 'Film Classification', to: '/classification' },
@@ -100,13 +101,24 @@ export default function Footer() {
                     link.guestOnly ? !isAuthenticated : !link.authOnly || isAuthenticated,
                   )
                   .map((link) => (
-                    <li key={link.to} className="leading-none">
-                      <Link
-                        to={link.to}
-                        className="block text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
-                      >
-                        {link.label}
-                      </Link>
+                    <li key={link.to || link.label} className="leading-none">
+                      {link.comingSoon ? (
+                        <span className="inline-flex items-center gap-2 text-xs font-semibold leading-none text-text-muted">
+                          <span
+                            className="rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white bg-red-600"
+                          >
+                            Coming soon
+                          </span>
+                          {link.label}
+                        </span>
+                      ) : (
+                        <Link
+                          to={link.to}
+                          className="block text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
+                        >
+                          {link.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
               </ul>

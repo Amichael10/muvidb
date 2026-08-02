@@ -205,13 +205,12 @@ export async function mineFilmComments(
     .upsert(rows, { onConflict: 'film_id,external_id', ignoreDuplicates: false });
   if (upErr) return { status: 'skipped', reason: `store:${upErr.message.slice(0, 60)}` };
 
-  // 5. persist the unified rating. liked_percent (0-100) is what the site shows;
-  //    audience_rating keeps the de-inflated 0-10 for continuity. Computed from
-  //    ALL opinions classified this run, criticism included.
+  // 5. Persist audience_rating (0-10) from mined opinions, then recompute
+  //    liked_percent via SQL so user likes/dislikes are blended in (dampened).
+  //    TMDB/IMDb still win as base when present; YouTube is the fallback base.
   const { error: filmErr } = await supabase
     .from('films')
     .update({
-      liked_percent: pct,
       audience_rating: s10,
       audience_rating_count: opinions.length,
       comments_synced_at: new Date().toISOString(),
@@ -219,7 +218,16 @@ export async function mineFilmComments(
     .eq('id', filmId);
   if (filmErr) console.warn(`[mine] film rating update failed for ${filmId}: ${filmErr.message}`);
 
-  return { status: 'ok', kept: kept.length, rating: s10, likedPercent: pct };
+  const { data: blended, error: blendErr } = await supabase.rpc(
+    'recompute_film_liked_percent',
+    { p_film_id: filmId },
+  );
+  if (blendErr) {
+    console.warn(`[mine] liked_percent recompute failed for ${filmId}: ${blendErr.message}`);
+  }
+
+  const likedPercent = typeof blended === 'number' ? blended : pct;
+  return { status: 'ok', kept: kept.length, rating: s10, likedPercent };
 }
 
 /**

@@ -50,13 +50,13 @@ const MobileNav = () => {
         />
       )}
 
-      {/* Slide-up Bottom Drawer Sheet */}
+      {/* Slide-up Bottom Drawer Sheet — always dark glass; force light text so light theme tokens don't wash out labels */}
       {isDrawerOpen && (
-        <div className="fixed bottom-0 left-0 right-0 z-[99] lg:hidden bg-black/85 backdrop-blur-2xl border-t border-border rounded-t-3xl px-6 pt-4 pb-28 animate-in slide-in-from-bottom-8 duration-300 ease-out">
+        <div className="fixed bottom-0 left-0 right-0 z-[99] lg:hidden bg-black/85 backdrop-blur-2xl border-t border-white/10 rounded-t-3xl px-6 pt-4 pb-28 animate-in slide-in-from-bottom-8 duration-300 ease-out">
           {/* Native Grab Handle */}
-          <div className="w-12 h-1.5 bg-border rounded-full mx-auto mb-6 opacity-60" />
+          <div className="w-12 h-1.5 bg-white/25 rounded-full mx-auto mb-6" />
           
-          <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-center mb-6">
+          <h3 className="text-[10px] font-bold text-white/50 uppercase tracking-widest text-center mb-6">
             Explore MuviDB
           </h3>
 
@@ -70,11 +70,11 @@ const MobileNav = () => {
                   to={item.path}
                   className={`flex items-center gap-3 p-4 border rounded-2xl transition-all duration-200 active:scale-95 ${
                     isItemActive 
-                      ? 'bg-brand/10 border-brand/40 text-brand shadow-lg shadow-brand/5' 
-                      : 'bg-white/5 border-border/40 hover:border-brand/40 text-text-primary hover:bg-white/10'
+                      ? 'bg-brand/15 border-brand/50 text-brand shadow-lg shadow-brand/10' 
+                      : 'bg-white/5 border-white/15 text-white hover:border-brand/40 hover:bg-white/10'
                   }`}
                 >
-                  <div className={`p-2 rounded-xl ${isItemActive ? 'bg-brand/20 text-brand' : 'bg-surface-2 text-text-muted'}`}>
+                  <div className={`p-2 rounded-xl ${isItemActive ? 'bg-brand/20 text-brand' : 'bg-white/10 text-white/70'}`}>
                     <Icon icon={item.icon} width="20" height="20" />
                   </div>
                   <span className="text-xs font-bold uppercase tracking-wider">{item.name}</span>

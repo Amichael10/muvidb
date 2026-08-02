@@ -20,46 +20,141 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const EBONY_URL = 'https://ebonylifeonplus.com/category/nollywood-gold';
+/**
+ * post-home redirects to a marketing wall when logged out, so we scrape the
+ * public category shelves that make up the catalog instead.
+ *
+ * Status: EbonyLife's "Coming Soon" category is a marketing shelf — titles there
+ * are usually already playable ("PLAY NOW"). We ingest everything as released
+ * unless the API row has a clear future release_date.
+ */
+type FilmStatus = 'released' | 'upcoming';
 
-async function scrapeEbonyLife() {
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  });
-  const page = await context.newPage();
-  
-  let moviesData = [];
+const EBONY_SOURCES: { url: string; label: string }[] = [
+  { url: 'https://ebonylifeonplus.com/category/nollywood-gold', label: 'nollywood-gold' },
+  { url: 'https://ebonylifeonplus.com/category/drama-series', label: 'drama-series' },
+  { url: 'https://ebonylifeonplus.com/category/feature-films', label: 'feature-films' },
+  { url: 'https://ebonylifeonplus.com/category/mo-abudu-films', label: 'mo-abudu-films' },
+  { url: 'https://ebonylifeonplus.com/category/drama', label: 'drama' },
+  { url: 'https://ebonylifeonplus.com/category/coming-soon', label: 'coming-soon' },
+  { url: 'https://ebonylifeonplus.com/category/yoruba', label: 'yoruba' },
+  { url: 'https://ebonylifeonplus.com/category/igbo', label: 'igbo' },
+  { url: 'https://ebonylifeonplus.com/category/hausa', label: 'hausa' },
+  { url: 'https://ebonylifeonplus.com/category/urban', label: 'urban' },
+  { url: 'https://ebonylifeonplus.com/category/epic', label: 'epic' },
+];
 
-  page.on('response', async (response) => {
-    const url = response.url();
-    if (url.includes('ebonylifeapi.muvi.com/content')) {
-      try {
-        const json = await response.json();
-        if (json?.data?.categoryContentList?.categories) {
-           const list = json.data.categoryContentList.categories[0]?.category_content_list?.content_list;
-           if (list && list.length > 0) {
-             moviesData = list;
-             console.log(`✅ Intercepted ${moviesData.length} movies from API.`);
-           }
-        }
-      } catch (e) {}
-    }
-  });
+type ScrapedItem = {
+  content_name?: string;
+  title?: string;
+  content_permalink?: string;
+  content_desc?: string;
+  posters?: { website?: { file_url?: string }[] };
+  banners?: { website?: { file_url?: string }[] };
+  video_details?: { duration?: string };
+  cast_details?: any[];
+  release_date?: string | null;
+  content_publish_date?: string | null;
+  _status: FilmStatus;
+  _sourceLabel: string;
+};
 
-  console.log(`🚀 Navigating to EbonyLife ON Plus: ${EBONY_URL}`);
-  await page.goto(EBONY_URL, { waitUntil: 'networkidle', timeout: 60000 });
-  await page.waitForTimeout(5000); 
-
-  await browser.close();
-  return moviesData;
+/** Only mark upcoming when API gives a clear future date; else released. */
+function statusFromApiRow(item: any): FilmStatus {
+  const raw =
+    item?.release_date
+    || item?.content_publish_date
+    || item?.publish_date
+    || item?.available_from
+    || null;
+  if (!raw || typeof raw !== 'string') return 'released';
+  const ts = Date.parse(raw);
+  if (Number.isNaN(ts)) return 'released';
+  // Future calendar day (UTC) → upcoming; anything else is already out
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  if (ts > today.getTime()) return 'upcoming';
+  return 'released';
 }
 
-async function upsertPerson(name) {
+function extractContentList(json: any): any[] {
+  const cats = json?.data?.categoryContentList?.categories;
+  if (Array.isArray(cats)) {
+    const list = cats[0]?.category_content_list?.content_list;
+    if (Array.isArray(list) && list.length) return list;
+  }
+  const direct = json?.data?.contentList?.content_list;
+  if (Array.isArray(direct) && direct.length) return direct;
+  return [];
+}
+
+async function scrapeEbonyLife(): Promise<ScrapedItem[]> {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  });
+  const page = await context.newPage();
+
+  // permalink → item (released wins over upcoming if seen on multiple shelves)
+  const byPermalink = new Map<string, ScrapedItem>();
+
+  for (const source of EBONY_SOURCES) {
+    let latestList: any[] = [];
+
+    const onResponse = async (response: any) => {
+      const url = response.url();
+      if (!url.includes('ebonylifeapi.muvi.com/content')) return;
+      try {
+        const json = await response.json();
+        const list = extractContentList(json);
+        if (list.length) latestList = list;
+      } catch {}
+    };
+
+    page.on('response', onResponse);
+    console.log(`🚀 ${source.label}: ${source.url}`);
+    try {
+      await page.goto(source.url, { waitUntil: 'networkidle', timeout: 90000 });
+      await page.waitForTimeout(4000);
+      for (let i = 0; i < 3; i++) {
+        await page.mouse.wheel(0, 1800);
+        await page.waitForTimeout(800);
+      }
+    } catch (e: any) {
+      console.log(`  ⚠️ navigate failed: ${e.message}`);
+    }
+    page.off('response', onResponse);
+
+    console.log(`  → intercepted ${latestList.length} titles`);
+    for (const item of latestList) {
+      const permalink = String(item.content_permalink || item.permalink || '').trim();
+      if (!permalink) continue;
+      const status = statusFromApiRow(item);
+      const existing = byPermalink.get(permalink);
+      // Never downgrade released → upcoming when the same title appears twice
+      if (existing?._status === 'released' && status === 'upcoming') {
+        continue;
+      }
+      byPermalink.set(permalink, {
+        ...item,
+        _status: status,
+        _sourceLabel: source.label,
+      });
+    }
+  }
+
+  await browser.close();
+  const all = [...byPermalink.values()];
+  console.log(`\n✅ Unique titles across shelves: ${all.length}`);
+  console.log(
+    `   upcoming (future API date): ${all.filter((x) => x._status === 'upcoming').length} · released: ${all.filter((x) => x._status === 'released').length}`,
+  );
+  return all;
+}
+
+async function upsertPerson(name: string) {
   if (!name) return null;
-  // // Shared matcher (migration 20260723112408): exact name, else
-  // people.name_key (order-insensitive + honorific-stripped), so
-  // "Kosoko Jide" / "Prince Jide Kosoko" resolve to the existing person.
   const { data: id, error } = await supabase.rpc('upsert_person_by_name', {
     p_name: name,
     p_extra: { nationality: 'Nigerian', source: 'ebonylife' },
@@ -68,97 +163,100 @@ async function upsertPerson(name) {
   return id;
 }
 
-function parseDurationStr(durationStr) {
+function parseDurationStr(durationStr?: string) {
   if (!durationStr) return null;
-  // e.g. "01:54:47"
   const parts = durationStr.split(':');
   if (parts.length === 3) {
-    const hours = parseInt(parts[0]);
-    const minutes = parseInt(parts[1]);
-    return hours * 60 + minutes;
-  } else if (parts.length === 2) {
-    const minutes = parseInt(parts[0]);
-    return minutes;
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  }
+  if (parts.length === 2) {
+    return parseInt(parts[0]);
   }
   return null;
 }
 
-async function syncToDatabase(scrapedMovies) {
-  let updatedCount = 0; let newCount = 0; let errorCount = 0;
+async function syncToDatabase(scrapedMovies: ScrapedItem[]) {
+  let updatedCount = 0;
+  let newCount = 0;
+  let errorCount = 0;
+  let comingSoonCount = 0;
 
   for (const movie of scrapedMovies) {
     const rawTitle = movie.content_name || movie.title;
-    const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(rawTitle);
+    const { isSeries, baseTitle, episodeNum, seasonNum } = detectAndNormalizeSeries(rawTitle || '');
     const cleanedTitle = cleanTitle(baseTitle);
     if (!cleanedTitle) continue;
-    
-    // year from tags if present, or leave null
-    let movieYear = null;
-    
+
+    const movieYear = null;
     const runtimeMinutes = parseDurationStr(movie.video_details?.duration);
-    
-    // get poster and backdrop
-    let poster_url = null;
-    let backdrop_url = null;
-    if (movie.posters?.website && movie.posters.website.length > 0) {
-        poster_url = movie.posters.website[0].file_url;
-    }
-    if (movie.banners?.website && movie.banners.website.length > 0) {
-        backdrop_url = movie.banners.website[0].file_url;
-    }
+    const filmStatus: FilmStatus = movie._status;
+    if (filmStatus === 'upcoming') comingSoonCount++;
+
+    let poster_url: string | null = null;
+    let backdrop_url: string | null = null;
+    if (movie.posters?.website?.length) poster_url = movie.posters.website[0].file_url || null;
+    if (movie.banners?.website?.length) backdrop_url = movie.banners.website[0].file_url || null;
     if (!poster_url && backdrop_url) poster_url = backdrop_url;
 
-    // construct the movie URL
     const watchUrl = `https://ebonylifeonplus.com/content/${movie.content_permalink}`;
 
-    console.log(`🔄 Processing: ${cleanedTitle} ${episodeNum ? `(Episode ${episodeNum})` : ''}`);
+    console.log(
+      `🔄 [${movie._sourceLabel}] ${cleanedTitle}${episodeNum ? ` (Ep ${episodeNum})` : ''}${filmStatus === 'upcoming' ? ' [coming soon]' : ''}`,
+    );
 
     try {
-      let filmId;
+      let filmId: string | undefined;
 
       if (isSeries) {
-        // Find or create parent series record
         const cleanedBase = cleanTitle(baseTitle);
-        let parentRecord;
+        let parentRecord: any;
 
-        // Search for existing parent series record in DB
-        let { data: parentResults } = await supabase.from('films')
-          .select('id, poster_url, backdrop_url, streaming_links')
+        const { data: parentResults } = await supabase
+          .from('films')
+          .select('id, poster_url, backdrop_url, streaming_links, status')
           .ilike('title', cleanedBase)
           .eq('content_type', 'series')
           .is('series_id', null);
 
-        let parentExisting = parentResults?.[0];
+        const parentExisting = parentResults?.[0];
 
         if (parentExisting) {
           parentRecord = parentExisting;
-          // Update parent poster / backdrop if missing
           const parentUpdate: any = {};
           if (!parentExisting.poster_url && poster_url) parentUpdate.poster_url = poster_url;
-          if (!parentExisting.backdrop_url && (backdrop_url || poster_url)) parentUpdate.backdrop_url = backdrop_url || poster_url;
-          
+          if (!parentExisting.backdrop_url && (backdrop_url || poster_url)) {
+            parentUpdate.backdrop_url = backdrop_url || poster_url;
+          }
           const existingLinks = parentExisting.streaming_links || {};
           if (!existingLinks.ebonylife) {
             parentUpdate.streaming_links = { ...existingLinks, ebonylife: watchUrl };
+          }
+          // Don't downgrade a released series parent to upcoming
+          if (filmStatus === 'upcoming' && parentExisting.status !== 'released') {
+            parentUpdate.status = 'upcoming';
           }
           if (Object.keys(parentUpdate).length > 0) {
             await supabase.from('films').update(parentUpdate).eq('id', parentExisting.id);
           }
         } else {
-          // Create new parent series record
-          const { data: newParent, error: parentError } = await supabase.from('films').insert({
-            title: cleanedBase,
-            year: movieYear,
-            release_type: 'ebonylife',
-            source: 'ebonylife',
-            content_type: 'series',
-            poster_url: poster_url,
-            backdrop_url: backdrop_url || poster_url,
-            synopsis: movie.content_desc || null,
-            needs_review: true,
-            status: 'released',
-            countries: ['Nigeria']
-          }).select('id').single();
+          const { data: newParent, error: parentError } = await supabase
+            .from('films')
+            .insert({
+              title: cleanedBase,
+              year: movieYear,
+              release_type: 'ebonylife',
+              source: 'ebonylife',
+              content_type: 'series',
+              poster_url,
+              backdrop_url: backdrop_url || poster_url,
+              synopsis: movie.content_desc || null,
+              needs_review: true,
+              status: filmStatus,
+              countries: ['Nigeria'],
+              streaming_links: { ebonylife: watchUrl },
+            })
+            .select('id')
+            .single();
 
           if (parentError) throw parentError;
           parentRecord = newParent;
@@ -168,10 +266,9 @@ async function syncToDatabase(scrapedMovies) {
 
         const parentId = parentRecord.id;
 
-        // If it's a specific episode
         if (episodeNum !== null) {
-          // Find if this specific episode record exists
-          let { data: epResults } = await supabase.from('films')
+          const { data: epResults } = await supabase
+            .from('films')
             .select('*')
             .eq('series_id', parentId)
             .eq('episode_number', episodeNum)
@@ -186,30 +283,36 @@ async function syncToDatabase(scrapedMovies) {
               synopsis: epExisting.synopsis || movie.content_desc,
               runtime_minutes: epExisting.runtime_minutes || runtimeMinutes,
               poster_url: epExisting.poster_url || poster_url,
-              backdrop_url: epExisting.backdrop_url || backdrop_url || poster_url
+              backdrop_url: epExisting.backdrop_url || backdrop_url || poster_url,
             };
+            if (filmStatus === 'upcoming' && epExisting.status !== 'released') {
+              updatePayload.status = 'upcoming';
+            }
             await supabase.from('films').update(updatePayload).eq('id', epExisting.id);
             updatedCount++;
           } else {
-            // Create new episode record
-            const { data: insertedEp, error: epError } = await supabase.from('films').insert({
-              title: movie.content_name || movie.title,
-              year: movieYear,
-              release_type: 'ebonylife',
-              source: 'ebonylife',
-              content_type: 'series',
-              series_id: parentId,
-              episode_number: episodeNum,
-              season_number: seasonNum || 1,
-              streaming_links: { ebonylife: watchUrl },
-              runtime_minutes: runtimeMinutes,
-              poster_url: poster_url,
-              backdrop_url: backdrop_url || poster_url,
-              synopsis: movie.content_desc || null,
-              status: 'released',
-              countries: ['Nigeria'],
-              needs_review: true
-            }).select('id').single();
+            const { data: insertedEp, error: epError } = await supabase
+              .from('films')
+              .insert({
+                title: movie.content_name || movie.title,
+                year: movieYear,
+                release_type: 'ebonylife',
+                source: 'ebonylife',
+                content_type: 'series',
+                series_id: parentId,
+                episode_number: episodeNum,
+                season_number: seasonNum || 1,
+                streaming_links: { ebonylife: watchUrl },
+                runtime_minutes: runtimeMinutes,
+                poster_url,
+                backdrop_url: backdrop_url || poster_url,
+                synopsis: movie.content_desc || null,
+                status: filmStatus,
+                countries: ['Nigeria'],
+                needs_review: true,
+              })
+              .select('id')
+              .single();
 
             if (epError) throw epError;
             filmId = insertedEp.id;
@@ -218,10 +321,10 @@ async function syncToDatabase(scrapedMovies) {
           }
         } else {
           filmId = parentId;
+          updatedCount++;
         }
-
       } else {
-        let { data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle);
+        const { data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle);
         const existing = results?.[0];
 
         if (existing) {
@@ -233,62 +336,94 @@ async function syncToDatabase(scrapedMovies) {
           if (!existing.runtime_minutes && runtimeMinutes) updatePayload.runtime_minutes = runtimeMinutes;
           if (!existing.poster_url && poster_url) updatePayload.poster_url = poster_url;
           if (!existing.backdrop_url && backdrop_url) updatePayload.backdrop_url = backdrop_url;
-          
-          const isSuperPrimary = existing.youtube_watch_url || ['kava', 'ironflix', 'prime_video'].includes(existing.release_type);
+
+          const isSuperPrimary =
+            existing.youtube_watch_url || ['kava', 'ironflix', 'prime_video'].includes(existing.release_type);
           if (!isSuperPrimary) updatePayload.release_type = 'ebonylife';
+
+          // Promote announced/upcoming → released when found on a released shelf;
+          // set upcoming only if the row isn't already released.
+          if (filmStatus === 'released' && ['announced', 'upcoming', 'in_production', 'filming', 'post-production'].includes(existing.status)) {
+            updatePayload.status = 'released';
+          } else if (filmStatus === 'upcoming' && existing.status !== 'released') {
+            updatePayload.status = 'upcoming';
+          }
 
           await supabase.from('films').update(updatePayload).eq('id', existing.id);
           updatedCount++;
         } else {
-          const { data: inserted, error } = await supabase.from('films').insert({
-            title: cleanedTitle, 
-            year: movieYear, 
-            synopsis: movie.content_desc, 
-            runtime_minutes: runtimeMinutes,
-            poster_url: poster_url, 
-            backdrop_url: backdrop_url || poster_url,
-            release_type: 'ebonylife',
-            streaming_links: { ebonylife: watchUrl }, 
-            source: 'ebonylife',
-            status: 'released', 
-            countries: ['Nigeria'], 
-            needs_review: true,
-            content_type: 'movie'
-          }).select('id').single();
-          
+          const { data: inserted, error } = await supabase
+            .from('films')
+            .insert({
+              title: cleanedTitle,
+              year: movieYear,
+              synopsis: movie.content_desc,
+              runtime_minutes: runtimeMinutes,
+              poster_url,
+              backdrop_url: backdrop_url || poster_url,
+              release_type: 'ebonylife',
+              streaming_links: { ebonylife: watchUrl },
+              source: 'ebonylife',
+              status: filmStatus,
+              countries: ['Nigeria'],
+              needs_review: true,
+              content_type: 'movie',
+            })
+            .select('id')
+            .single();
+
           if (error) throw error;
           filmId = inserted.id;
           newCount++;
+          console.log(`  ✨ New film: "${cleanedTitle}" (${filmStatus})`);
         }
       }
 
-      // Sync Cast
-      if (movie.cast_details) {
+      if (movie.cast_details && filmId) {
         for (const cast of movie.cast_details) {
-            const roleName = cast.cast_type_details?.cast_type_name?.toLowerCase();
-            const role = roleName === 'actor' || roleName === 'cast' ? 'actor' : roleName === 'director' ? 'director' : 'writer';
-            const pId = await upsertPerson(cast.cast_name);
-            if (pId) {
-                await supabase.from('credits').upsert({ film_id: filmId, person_id: pId, role: role }, { onConflict: 'film_id,person_id,role' });
-            }
+          const roleName = cast.cast_type_details?.cast_type_name?.toLowerCase();
+          const role =
+            roleName === 'actor' || roleName === 'cast'
+              ? 'actor'
+              : roleName === 'director'
+                ? 'director'
+                : 'writer';
+          const pId = await upsertPerson(cast.cast_name);
+          if (pId) {
+            await supabase
+              .from('credits')
+              .upsert({ film_id: filmId, person_id: pId, role }, { onConflict: 'film_id,person_id,role' });
+          }
         }
       }
-
-    } catch (e) {
+    } catch (e: any) {
       console.error(`  ❌ Error processing ${cleanedTitle}:`, e.message);
       errorCount++;
     }
   }
-  console.log(`\n📊 EbonyLife Sync Complete: Updated: ${updatedCount}, New: ${newCount}, Errors: ${errorCount}`);
+
+  console.log(
+    `\n📊 EbonyLife Sync Complete: Updated: ${updatedCount}, New: ${newCount}, Coming-soon shelf items: ${comingSoonCount}, Errors: ${errorCount}`,
+  );
 }
 
 async function run() {
   try {
+    const only = process.argv.find((a) => a.startsWith('--only='))?.split('=')[1];
+    if (only) {
+      const keep = new Set(only.split(',').map((s) => s.trim()));
+      for (let i = EBONY_SOURCES.length - 1; i >= 0; i--) {
+        if (!keep.has(EBONY_SOURCES[i].label)) EBONY_SOURCES.splice(i, 1);
+      }
+    }
+    console.log(
+      'ℹ️ post-home is membership-gated when logged out — scraping public category shelves instead.\n',
+    );
     const movies = await scrapeEbonyLife();
     if (movies.length > 0) {
-        await syncToDatabase(movies);
+      await syncToDatabase(movies);
     } else {
-        console.log('No movies found.');
+      console.log('No movies found.');
     }
   } catch (e) {
     console.error('💀 Fatal error:', e);

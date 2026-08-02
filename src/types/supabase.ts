@@ -948,6 +948,7 @@ export type Database = {
           id: string
           person_id: string
           role: string
+          source: string | null
         }
         Insert: {
           billing_order?: number | null
@@ -957,6 +958,7 @@ export type Database = {
           id?: string
           person_id: string
           role: string
+          source?: string | null
         }
         Update: {
           billing_order?: number | null
@@ -966,6 +968,7 @@ export type Database = {
           id?: string
           person_id?: string
           role?: string
+          source?: string | null
         }
         Relationships: [
           {
@@ -1356,6 +1359,9 @@ export type Database = {
           backdrop_url: string | null
           coming_soon: boolean | null
           comments_synced_at: string | null
+          content_kind: string | null
+          content_kind_checked_at: string | null
+          content_kind_confidence: number | null
           content_type: string | null
           countries: string[] | null
           created_at: string
@@ -1380,6 +1386,8 @@ export type Database = {
           mubi_slug: string | null
           needs_review: boolean | null
           nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          nfvcb_rating_source: string | null
+          nfvcb_rating_verified_at: string | null
           original_title: string | null
           poster_url: string | null
           release_date: string | null
@@ -1416,6 +1424,9 @@ export type Database = {
           backdrop_url?: string | null
           coming_soon?: boolean | null
           comments_synced_at?: string | null
+          content_kind?: string | null
+          content_kind_checked_at?: string | null
+          content_kind_confidence?: number | null
           content_type?: string | null
           countries?: string[] | null
           created_at?: string
@@ -1440,6 +1451,8 @@ export type Database = {
           mubi_slug?: string | null
           needs_review?: boolean | null
           nfvcb_rating?: Database["public"]["Enums"]["nfvcb_rating"] | null
+          nfvcb_rating_source?: string | null
+          nfvcb_rating_verified_at?: string | null
           original_title?: string | null
           poster_url?: string | null
           release_date?: string | null
@@ -1476,6 +1489,9 @@ export type Database = {
           backdrop_url?: string | null
           coming_soon?: boolean | null
           comments_synced_at?: string | null
+          content_kind?: string | null
+          content_kind_checked_at?: string | null
+          content_kind_confidence?: number | null
           content_type?: string | null
           countries?: string[] | null
           created_at?: string
@@ -1500,6 +1516,8 @@ export type Database = {
           mubi_slug?: string | null
           needs_review?: boolean | null
           nfvcb_rating?: Database["public"]["Enums"]["nfvcb_rating"] | null
+          nfvcb_rating_source?: string | null
+          nfvcb_rating_verified_at?: string | null
           original_title?: string | null
           poster_url?: string | null
           release_date?: string | null
@@ -1536,6 +1554,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      films_pg13_remap_backup: {
+        Row: {
+          film_id: string
+          previous_rating: string
+          remapped_at: string
+          remapped_to: string
+        }
+        Insert: {
+          film_id: string
+          previous_rating: string
+          remapped_at?: string
+          remapped_to: string
+        }
+        Update: {
+          film_id?: string
+          previous_rating?: string
+          remapped_at?: string
+          remapped_to?: string
+        }
+        Relationships: []
       }
       follows: {
         Row: {
@@ -1715,6 +1754,84 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      nfvcb_pending_matches: {
+        Row: {
+          approved_on: string | null
+          candidate_film_id: string | null
+          candidate_title: string | null
+          created_at: string
+          director: string | null
+          id: string
+          language: string | null
+          major_cast: string[]
+          official_title: string
+          producer: string | null
+          production_company: string | null
+          rating: string | null
+          reason: string
+          resolved_at: string | null
+          resolved_by: string | null
+          runtime_minutes: number | null
+          source_month: string
+          status: string
+        }
+        Insert: {
+          approved_on?: string | null
+          candidate_film_id?: string | null
+          candidate_title?: string | null
+          created_at?: string
+          director?: string | null
+          id?: string
+          language?: string | null
+          major_cast?: string[]
+          official_title: string
+          producer?: string | null
+          production_company?: string | null
+          rating?: string | null
+          reason: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          runtime_minutes?: number | null
+          source_month: string
+          status?: string
+        }
+        Update: {
+          approved_on?: string | null
+          candidate_film_id?: string | null
+          candidate_title?: string | null
+          created_at?: string
+          director?: string | null
+          id?: string
+          language?: string | null
+          major_cast?: string[]
+          official_title?: string
+          producer?: string | null
+          production_company?: string | null
+          rating?: string | null
+          reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          runtime_minutes?: number | null
+          source_month?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfvcb_pending_matches_candidate_film_id_fkey"
+            columns: ["candidate_film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfvcb_pending_matches_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pending_cinema_films: {
         Row: {
@@ -3388,6 +3505,16 @@ export type Database = {
         Args: { avg: number; votes: number }
         Returns: number
       }
+      film_base_liked_percent: {
+        Args: {
+          p_audience_rating: number
+          p_imdb_rating: number
+          p_imdb_vote_count: number
+          p_tmdb_rating: number
+          p_tmdb_vote_count: number
+        }
+        Returns: number
+      }
       find_person_by_name: { Args: { p_name: string }; Returns: string }
       force_promote_to_admin: {
         Args: { user_email: string }
@@ -3420,6 +3547,9 @@ export type Database = {
           backdrop_url: string | null
           coming_soon: boolean | null
           comments_synced_at: string | null
+          content_kind: string | null
+          content_kind_checked_at: string | null
+          content_kind_confidence: number | null
           content_type: string | null
           countries: string[] | null
           created_at: string
@@ -3444,6 +3574,8 @@ export type Database = {
           mubi_slug: string | null
           needs_review: boolean | null
           nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          nfvcb_rating_source: string | null
+          nfvcb_rating_verified_at: string | null
           original_title: string | null
           poster_url: string | null
           release_date: string | null
@@ -3617,6 +3749,14 @@ export type Database = {
         }
         Returns: string
       }
+      reaction_liked_blend: {
+        Args: { base_liked: number; dislikes: number; likes: number }
+        Returns: number
+      }
+      recompute_film_liked_percent: {
+        Args: { p_film_id: string }
+        Returns: number
+      }
       recover_stale_credit_harvest_jobs: {
         Args: { p_stale_after_minutes?: number }
         Returns: number
@@ -3636,6 +3776,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      score10_liked_pct: { Args: { score: number }; Returns: number }
       search_films_fuzzy: {
         Args: { lim?: number; q: string }
         Returns: {
@@ -3647,6 +3788,9 @@ export type Database = {
           backdrop_url: string | null
           coming_soon: boolean | null
           comments_synced_at: string | null
+          content_kind: string | null
+          content_kind_checked_at: string | null
+          content_kind_confidence: number | null
           content_type: string | null
           countries: string[] | null
           created_at: string
@@ -3671,6 +3815,8 @@ export type Database = {
           mubi_slug: string | null
           needs_review: boolean | null
           nfvcb_rating: Database["public"]["Enums"]["nfvcb_rating"] | null
+          nfvcb_rating_source: string | null
+          nfvcb_rating_verified_at: string | null
           original_title: string | null
           poster_url: string | null
           release_date: string | null
@@ -3809,7 +3955,7 @@ export type Database = {
         | "filming"
         | "completed"
         | "cancelled"
-      nfvcb_rating: "G" | "PG" | "PG-13" | "15" | "18"
+      nfvcb_rating: "G" | "PG" | "12" | "12A" | "PG-13" | "15" | "18" | "RE"
       social_asset_format:
         | "portrait_4_5"
         | "square_1_1"
@@ -4005,7 +4151,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
-      nfvcb_rating: ["G", "PG", "PG-13", "15", "18"],
+      nfvcb_rating: ["G", "PG", "12", "12A", "PG-13", "15", "18", "RE"],
       social_asset_format: [
         "portrait_4_5",
         "square_1_1",

@@ -299,7 +299,7 @@ export default function GenreRail({ variant = 'grid' }) {
       {/* Compact chip strip (homepage) */}
       {isChips ? (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 mb-2">
-          <div className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-hide touch-pan-x">
+          <div data-lenis-prevent className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-hide overscroll-x-contain">
             {activeGenres.map((genre) => {
               const isSelected = selectedGenre === genre.name;
               return (
@@ -446,7 +446,8 @@ export default function GenreRail({ variant = 'grid' }) {
               <div 
                 ref={scrollRef}
                 onScroll={checkScroll}
-                className="flex overflow-x-auto gap-4 md:gap-6 py-16 -my-16 px-4 sm:px-0 scrollbar-hide touch-pan-x"
+                data-lenis-prevent
+                className="flex overflow-x-auto gap-4 md:gap-6 py-4 md:py-16 md:-my-16 px-4 sm:px-0 scrollbar-hide overscroll-x-contain"
               >
                 {filteredFilms.map((film) => (
                   <div key={film.id} className="shrink-0">

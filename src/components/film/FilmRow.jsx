@@ -97,7 +97,8 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
           <div 
             ref={scrollRef}
             onScroll={checkScroll}
-            className="flex overflow-x-auto gap-4 md:gap-6 py-16 -my-16 px-4 sm:px-0 scrollbar-hide touch-pan-x"
+            data-lenis-prevent
+            className="flex overflow-x-auto gap-4 md:gap-6 py-4 md:py-16 md:-my-16 px-4 sm:px-0 scrollbar-hide overscroll-x-contain"
           >
             {isLoading ? (
               [...Array(6)].map((_, i) => (

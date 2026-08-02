@@ -12,6 +12,7 @@ import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { toTitleCase } from '../utils/format';
 import { getZonedClock, getNextDate, isFutureShowtime, compareShowtimes } from '../utils/showtimes';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import PopcornField from '../components/ui/PopcornField';
 
 // Below-fold sections — keep them out of the critical homepage JS chunk.
 const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
@@ -30,23 +31,13 @@ const cinemaFilmKey = (title = '') => title
   .normalize('NFKD')
   .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase()
+  // Drop parentheticals so "Apaara" and "Apaara (The Outcast)" collapse to one card
+  .replace(/\([^)]*\)/g, ' ')
+  .replace(/\[[^\]]*\]/g, ' ')
   .replace(/&/g, ' and ')
   .replace(/[^a-z0-9]+/g, ' ')
   .trim()
   .replace(/\s+/g, ' ');
-
-const POPCORN_KERNELS = [
-  { src: '/assets/popcorn/popcorn-01.svg', x: '6%', size: '24px', drift: '42px', duration: '24s', delay: '-2s', tilt: '-12deg' },
-  { src: '/assets/popcorn/popcorn-07.svg', x: '18%', size: '19px', drift: '-30px', duration: '30s', delay: '-18s', tilt: '18deg' },
-  { src: '/assets/popcorn/popcorn-03.svg', x: '31%', size: '27px', drift: '34px', duration: '27s', delay: '-9s', tilt: '9deg' },
-  { src: '/assets/popcorn/popcorn-13.svg', x: '44%', size: '18px', drift: '-44px', duration: '34s', delay: '-26s', tilt: '-24deg' },
-  { src: '/assets/popcorn/popcorn-05.svg', x: '57%', size: '25px', drift: '26px', duration: '25s', delay: '-5s', tilt: '15deg' },
-  { src: '/assets/popcorn/popcorn-12.svg', x: '68%', size: '20px', drift: '-22px', duration: '33s', delay: '-22s', tilt: '-8deg' },
-  { src: '/assets/popcorn/popcorn-02.svg', x: '79%', size: '29px', drift: '48px', duration: '28s', delay: '-13s', tilt: '26deg' },
-  { src: '/assets/popcorn/popcorn-10.svg', x: '90%', size: '18px', drift: '-38px', duration: '35s', delay: '-30s', tilt: '-16deg' },
-  { src: '/assets/popcorn/popcorn-15.svg', x: '12%', size: '27px', drift: '24px', duration: '31s', delay: '-24s', tilt: '12deg' },
-  { src: '/assets/popcorn/popcorn-04.svg', x: '72%', size: '22px', drift: '-46px', duration: '32s', delay: '-8s', tilt: '-20deg' },
-];
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
@@ -766,24 +757,7 @@ export default function Home() {
     <div className="muvi-landing w-full pb-20 min-h-screen">
       <div className="muvi-film-rail muvi-film-rail--left" aria-hidden="true" />
       <div className="muvi-film-rail muvi-film-rail--right" aria-hidden="true" />
-      <div className="muvi-popcorn-field" aria-hidden="true">
-        {POPCORN_KERNELS.map((kernel, index) => (
-          <span
-            key={`${kernel.x}-${index}`}
-            className="muvi-popcorn-kernel"
-            style={{
-              '--x': kernel.x,
-              '--kernel-size': kernel.size,
-              '--drift': kernel.drift,
-              '--duration': kernel.duration,
-              '--delay': kernel.delay,
-              '--tilt': kernel.tilt,
-            }}
-          >
-            <img src={kernel.src} alt="" draggable="false" />
-          </span>
-        ))}
-      </div>
+      <PopcornField />
 
       {/* 1. HERO (Progressive Above-the-Fold Loading) (Issue 1) */}
       <HeroSection
@@ -1251,7 +1225,7 @@ export default function Home() {
 
                 {/* Tab Content: Behind the Magic (Crew) */}
                 {featuredTalentTab === 'crew' && (
-                  <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x page-fade-in">
+                  <div data-lenis-prevent className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide overscroll-x-contain page-fade-in">
                     {isSecondaryLoading ? (
                       [...Array(6)].map((_, i) => (
                         <div key={i} className="shrink-0 w-44 bg-surface border border-hairline rounded-2xl p-5 text-center flex flex-col items-center gap-4">
@@ -1333,7 +1307,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x">
+              <div data-lenis-prevent className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide overscroll-x-contain">
                 {isSecondaryLoading ? (
                   [...Array(4)].map((_, i) => (
                     <div key={i} className="shrink-0 w-64 bg-surface border border-hairline rounded-2xl p-6 flex flex-col gap-4">

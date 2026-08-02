@@ -17,10 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return statusHandler(req, res);
   }
 
-  if (action === 'scrape-imdb-actor') {
-    return scrapeImdbActorHandler(req, res);
-  }
-
+  // Handlers that self-check auth internally (dedupe / enrichment).
   if (action === 'deduplicator') {
     return deduplicatorHandler(req, res);
   }
@@ -29,12 +26,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return peopleEnrichmentHandler(req, res);
   }
 
-  // The remaining actions write to the DB and consume paid AI/YouTube
-  // quota, so they require an authenticated admin/cron caller.
-  if (action === 'fetch-channels' || action === 'enrich-actors') {
+  // Write / paid-quota actions — require admin JWT or cron secret.
+  if (
+    action === 'scrape-imdb-actor'
+    || action === 'fetch-channels'
+    || action === 'enrich-actors'
+  ) {
     if (!(await isValidAuth(req)).valid) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    if (action === 'scrape-imdb-actor') return scrapeImdbActorHandler(req, res);
     return action === 'fetch-channels'
       ? fetchChannelsHandler(req, res)
       : enrichActorsHandler(req, res);

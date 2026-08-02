@@ -153,6 +153,8 @@ export default function FilmDetail() {
   // and SSR gains nothing.
   const [loading, setLoading] = useState(!seededFilm);
   const [episodes, setEpisodes] = useState([]);
+  const [episodeSearch, setEpisodeSearch] = useState('');
+  const [episodeSeasonFilter, setEpisodeSeasonFilter] = useState('all');
   const [parentSeries, setParentSeries] = useState(null);
 
   const fetchEpisodes = async (seriesId, showName) => {
@@ -218,6 +220,8 @@ export default function FilmDetail() {
   const seededSlug = useRef(seededFilm ? slug : null);
 
   useEffect(() => {
+    setEpisodeSearch('');
+    setEpisodeSeasonFilter('all');
     let preloaded = null;
     if (seededSlug.current === slug) {
       preloaded = loaderData?.film ?? null;
@@ -310,7 +314,10 @@ export default function FilmDetail() {
     try {
       const { col, val } = slugOrId(slug);
       const fetchDirect = async () => {
-        const { data, error } = await supabase
+        // Belt-and-suspenders with films RLS (is_published OR is_admin()).
+        // Non-admins must only see published rows; admins can preview drafts.
+        const isStaff = user?.role === 'admin' || user?.role === 'admin_limited';
+        let query = supabase
           .from('films')
           .select(`
             *,
@@ -319,8 +326,9 @@ export default function FilmDetail() {
               companies(id, name, logo_url)
             )
           `)
-          .eq(col, val)
-          .single();
+          .eq(col, val);
+        if (!isStaff) query = query.eq('is_published', true);
+        const { data, error } = await query.single();
         if (error) throw error;
         return data;
       };
@@ -474,7 +482,17 @@ export default function FilmDetail() {
       });
       return;
     }
-    await toggleReaction(type);
+    const ok = await toggleReaction(type);
+    if (!ok || !filmId) return;
+    // Trigger recomputes liked_percent in the DB; refresh popcorn % without reload.
+    const { data } = await supabase
+      .from('films')
+      .select('liked_percent')
+      .eq('id', filmId)
+      .maybeSingle();
+    if (data && Object.prototype.hasOwnProperty.call(data, 'liked_percent')) {
+      setFilm((prev) => (prev ? { ...prev, liked_percent: data.liked_percent } : prev));
+    }
   };
 
 
@@ -649,7 +667,19 @@ export default function FilmDetail() {
                 {availablePlatforms.map((platform) => {
                   const url = getWatchUrl(film, platform.id);
                   const className = 'shrink-0 inline-flex items-center gap-2 min-h-[40px] px-3 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary';
-                  const content = <><Icon icon={platform.icon} style={{ color: platform.color }} />{platform.name}</>;
+                  const mark = platform.logo ? (
+                    <span className="w-6 h-6 rounded-md bg-white overflow-hidden shrink-0 inline-flex items-center justify-center">
+                      <img src={platform.logo} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
+                    </span>
+                  ) : (
+                    <span
+                      className="w-6 h-6 rounded-md inline-flex items-center justify-center shrink-0"
+                      style={{ background: `${platform.color}22`, color: platform.color }}
+                    >
+                      <Icon icon={platform.icon} width="14" height="14" />
+                    </span>
+                  );
+                  const content = <>{mark}{platform.name}</>;
                   return url ? (
                     <a key={platform.id} href={url} target="_blank" rel="noopener noreferrer" className={className}>{content}</a>
                   ) : (
@@ -747,14 +777,82 @@ export default function FilmDetail() {
             </section>
 
             {/* Episodes (for series) */}
-            {episodes.length > 0 && (
+            {episodes.length > 0 && (() => {
+              const seasonOptions = [...new Set(
+                episodes.map((ep) => ep.season_number).filter((n) => n != null),
+              )].sort((a, b) => a - b);
+
+              const q = episodeSearch.trim().toLowerCase();
+              const filteredEpisodes = episodes.filter((ep) => {
+                if (episodeSeasonFilter !== 'all' && String(ep.season_number ?? '') !== episodeSeasonFilter) {
+                  return false;
+                }
+                if (!q) return true;
+                return (
+                  (ep.title || '').toLowerCase().includes(q)
+                  || String(ep.episode_number ?? '').includes(q)
+                  || (ep.synopsis || '').toLowerCase().includes(q)
+                );
+              });
+
+              return (
               <section className="p-8 md:p-12 border-b border-border bg-surface-2/5">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter flex items-center gap-2">
-                  <Icon icon="solar:playlist-play-bold" className="text-brand" />
-                  Episodes
-                </h2>
+                <div className="flex flex-col gap-5 mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                    <h2 className="font-heading font-bold text-2xl text-text-primary tracking-tighter flex items-center gap-2">
+                      <Icon icon="solar:playlist-play-bold" className="text-brand" />
+                      Episodes
+                      <span className="text-sm font-bold text-text-muted tracking-normal">
+                        ({filteredEpisodes.length}{filteredEpisodes.length !== episodes.length ? ` / ${episodes.length}` : ''})
+                      </span>
+                    </h2>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Icon
+                        icon="solar:magnifer-linear"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-lg pointer-events-none"
+                      />
+                      <input
+                        type="search"
+                        value={episodeSearch}
+                        onChange={(e) => setEpisodeSearch(e.target.value)}
+                        placeholder="Search episodes by title or number…"
+                        className="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-brand focus:outline-none transition-colors"
+                      />
+                    </div>
+                    {seasonOptions.length > 0 && (
+                      <select
+                        value={episodeSeasonFilter}
+                        onChange={(e) => setEpisodeSeasonFilter(e.target.value)}
+                        className="bg-surface border border-border rounded-lg px-4 py-2.5 text-sm font-bold text-text-primary focus:border-brand focus:outline-none sm:w-44"
+                      >
+                        <option value="all">All seasons</option>
+                        {seasonOptions.map((season) => (
+                          <option key={season} value={String(season)}>
+                            Season {season}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {filteredEpisodes.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-surface/60 px-6 py-12 text-center">
+                    <p className="text-sm font-bold text-text-muted">No episodes match your search.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setEpisodeSearch(''); setEpisodeSeasonFilter('all'); }}
+                      className="mt-3 text-xs font-bold uppercase tracking-widest text-brand hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : (
                 <div className="flex flex-col gap-4">
-                  {episodes.map((episode) => (
+                  {filteredEpisodes.map((episode) => (
                     <div 
                       key={episode.id} 
                       className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-xl border border-border hover:border-brand/40 hover:shadow-xl transition-all duration-300 group"
@@ -789,6 +887,11 @@ export default function FilmDetail() {
                       <div className="flex-1 flex flex-col justify-between py-1">
                         <div>
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            {episode.season_number != null && (
+                              <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                                S{episode.season_number}
+                              </span>
+                            )}
                             <span className="text-[10px] font-black uppercase tracking-wider text-brand">
                               Episode {episode.episode_number || 'N/A'}
                             </span>
@@ -802,7 +905,9 @@ export default function FilmDetail() {
                             )}
                           </div>
                           <h3 className="font-heading font-bold text-base text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors mb-2">
-                            {formatFilmTitle(episode.title)}
+                            <Link to={`/films/${episode.slug || episode.id}`}>
+                              {formatFilmTitle(episode.title)}
+                            </Link>
                           </h3>
                           <p className="text-xs text-text-muted line-clamp-2 leading-relaxed font-medium">
                             {toSentenceCase(episode.synopsis || film.synopsis)}
@@ -826,8 +931,10 @@ export default function FilmDetail() {
                     </div>
                   ))}
                 </div>
+                )}
               </section>
-            )}
+              );
+            })()}
 
             {/* Trailer */}
             {trailerVideoId && (
@@ -1066,12 +1173,18 @@ export default function FilmDetail() {
                     const inner = (
                       <>
                         <span className="flex items-center gap-3">
-                          <span
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 shrink-0"
-                            style={{ background: `${p.color}22`, color: p.color }}
-                          >
-                            <Icon icon={p.icon} className="text-base" />
-                          </span>
+                          {p.logo ? (
+                            <span className="w-6 h-6 rounded-md bg-white overflow-hidden flex items-center justify-center border border-border shrink-0">
+                              <img src={p.logo} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
+                            </span>
+                          ) : (
+                            <span
+                              className="w-6 h-6 rounded-md flex items-center justify-center border border-white/10 shrink-0"
+                              style={{ background: `${p.color}22`, color: p.color }}
+                            >
+                              <Icon icon={p.icon} width="14" height="14" />
+                            </span>
+                          )}
                           <span className="text-[11px] font-black uppercase tracking-widest text-text-primary">{p.name}</span>
                         </span>
                         <Icon icon={url ? 'solar:arrow-right-up-linear' : 'solar:alt-arrow-right-linear'} className="text-text-muted group-hover:text-brand transition-colors" />
