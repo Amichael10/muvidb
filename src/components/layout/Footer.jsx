@@ -1,9 +1,15 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 
+// A missing href renders the icon greyed out and inert rather than linking
+// nowhere — drop the URL in when the account exists.
 const socialLinks = [
+  { label: 'Instagram', href: 'https://www.instagram.com/muvidb_/', icon: 'ri:instagram-fill' },
   { label: 'TikTok', href: 'https://www.tiktok.com/@muvidb', icon: 'ri:tiktok-fill' },
+  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/muvidb/', icon: 'ri:linkedin-fill' },
+  { label: 'Facebook', href: null, icon: 'ri:facebook-fill' },
 ];
 
 const footerGroups = [
@@ -29,10 +35,11 @@ const footerGroups = [
     title: 'Platform',
     links: [
       { label: 'About Us', to: '/about' },
+      { label: 'Film Classification', to: '/classification' },
       { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/contact' },
-      { label: 'Sign In', to: '/login' },
-      { label: 'Join MuviDB', to: '/signup' },
+      { label: 'Sign In', to: '/login', guestOnly: true },
+      { label: 'Join MuviDB', to: '/signup', guestOnly: true },
       { label: 'Dashboard', to: '/dashboard' },
     ],
   },
@@ -40,6 +47,7 @@ const footerGroups = [
 
 export default function Footer() {
   const { theme } = useTheme();
+  const { isAuthenticated } = useAuth();
 
   return (
     <footer className="relative overflow-hidden bg-surface-2 text-text-primary border-t border-hairline transition-colors duration-300">
@@ -61,18 +69,29 @@ export default function Footer() {
             </p>
 
             <div className="flex items-center gap-3">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`MuviDB on ${social.label}`}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-text-muted transition-colors hover:border-brand hover:text-brand hover:bg-brand/5"
-                >
-                  <Icon icon={social.icon} className="text-lg" aria-hidden="true" />
-                </a>
-              ))}
+              {socialLinks.map((social) =>
+                social.href ? (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`MuviDB on ${social.label}`}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-text-muted transition-colors hover:border-brand hover:text-brand hover:bg-brand/5"
+                  >
+                    <Icon icon={social.icon} className="text-lg" aria-hidden="true" />
+                  </a>
+                ) : (
+                  <span
+                    key={social.label}
+                    role="img"
+                    aria-label={`${social.label} — coming soon`}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline/60 text-text-muted/40"
+                  >
+                    <Icon icon={social.icon} className="text-lg" aria-hidden="true" />
+                  </span>
+                ),
+              )}
             </div>
           </div>
 
@@ -82,16 +101,18 @@ export default function Footer() {
                 {group.title}
               </h3>
               <ul className="space-y-4">
-                {group.links.map((link) => (
-                  <li key={link.to} className="leading-none">
-                    <Link
-                      to={link.to}
-                      className="block text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {group.links
+                  .filter((link) => !(link.guestOnly && isAuthenticated))
+                  .map((link) => (
+                    <li key={link.to} className="leading-none">
+                      <Link
+                        to={link.to}
+                        className="block text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
               </ul>
             </nav>
           ))}
