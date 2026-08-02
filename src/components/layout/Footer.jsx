@@ -1,5 +1,10 @@
 import { Link } from 'react-router-dom';
+import { Icon } from '@iconify/react';
 import { useTheme } from '../../context/ThemeContext';
+
+const socialLinks = [
+  { label: 'TikTok', href: 'https://www.tiktok.com/@muvidb', icon: 'ri:tiktok-fill' },
+];
 
 const footerGroups = [
   {
@@ -54,6 +59,21 @@ export default function Footer() {
             <p className="text-sm font-medium leading-7 text-text-secondary">
               The premier film database for Nollywood. Preserving the legacy, celebrating the future.
             </p>
+
+            <div className="flex items-center gap-3">
+              {socialLinks.map((social) => (
+                <a
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`MuviDB on ${social.label}`}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-text-muted transition-colors hover:border-brand hover:text-brand hover:bg-brand/5"
+                >
+                  <Icon icon={social.icon} className="text-lg" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
           </div>
 
           {footerGroups.map((group) => (
