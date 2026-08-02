@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
 import { getFriendlyErrorMessage } from '../utils/errors';
@@ -13,6 +13,16 @@ export default function Login() {
   
   const { login, loginWithGoogle, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // `?next=` lets a page send someone here and get them back — used by the
+  // /submit wizard. Only same-origin absolute paths, so it can't be used as an
+  // open redirect.
+  const requestedNext = searchParams.get('next');
+  const nextPath =
+    requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+      ? requestedNext
+      : null;
 
   useEffect(() => {
     document.title = "MuviDB | Sign In";
@@ -21,7 +31,9 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      if (user.role === 'professional') {
+      if (nextPath) {
+        navigate(nextPath, { replace: true });
+      } else if (user.role === 'professional') {
         navigate('/pro-dashboard');
       } else if (user.role === 'admin' || user.role === 'admin_limited') {
         navigate('/admin');
@@ -29,7 +41,7 @@ export default function Login() {
         navigate('/dashboard');
       }
     }
-  }, [user, navigate]);
+  }, [user, navigate, nextPath]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

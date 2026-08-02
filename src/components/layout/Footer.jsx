@@ -27,6 +27,8 @@ const footerGroups = [
     title: 'Platform',
     links: [
       { label: 'About Us', to: '/about' },
+      { label: 'Add a Film', to: '/submit/film' },
+      { label: 'Contribute', to: '/submit' },
       { label: 'Film Classification', to: '/classification' },
       { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/contact' },

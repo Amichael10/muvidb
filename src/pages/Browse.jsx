@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useLoaderData } from 'react-router-dom';
+import { Link, useSearchParams, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getShowName } from '../utils/series';
 import FilmCard from '../components/film/FilmCard';
@@ -428,7 +428,25 @@ export default function Browse() {
             ) : (
               <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-32 text-center">
                 <p className="text-text-muted text-xs font-bold mb-6">No matching results found.</p>
-                <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">Reset Filters</button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">Reset Filters</button>
+                  <Link to="/submit/film" className="border border-border text-text-primary text-[10px] font-bold px-8 py-3 rounded-lg hover:border-brand hover:text-brand transition-all">Add a Missing Film</Link>
+                </div>
+              </div>
+            )}
+
+            {!loading && (
+              <div className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-6 py-5">
+                <div>
+                  <p className="text-text-primary text-sm font-bold">Something missing from this list?</p>
+                  <p className="text-text-muted text-xs mt-1">Send us the film and an editor will review it.</p>
+                </div>
+                <Link
+                  to="/submit"
+                  className="rounded-lg bg-brand px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:opacity-90 active:scale-95"
+                >
+                  Add to MuviDB
+                </Link>
               </div>
             )}
           </div>

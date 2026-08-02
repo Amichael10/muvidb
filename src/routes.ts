@@ -22,6 +22,11 @@ export default [
   route('tv-shows', 'routes/tv-shows.tsx'),
   route('watch/:platform', 'routes/watch-platform.tsx'),
   route('classification', 'pages/Classification.jsx'),
+  // Community submissions. The wizard is one schema-driven page for every
+  // `:kind` in SUBMIT_KINDS; it gates on sign-in itself rather than sitting
+  // under require-auth, so an unauthenticated visitor still gets the pitch.
+  route('submit', 'pages/SubmitHub.jsx'),
+  route('submit/:kind', 'pages/Submit.jsx'),
   route('login', 'pages/Login.jsx'),
   route('signup', 'pages/Signup.jsx'),
   route('people', 'routes/people-list.tsx'),
