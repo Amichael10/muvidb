@@ -2,15 +2,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-
-// A missing href renders the icon greyed out and inert rather than linking
-// nowhere — drop the URL in when the account exists.
-const socialLinks = [
-  { label: 'Instagram', href: 'https://www.instagram.com/muvidb_/', icon: 'ri:instagram-fill' },
-  { label: 'TikTok', href: 'https://www.tiktok.com/@muvidb', icon: 'ri:tiktok-fill' },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/muvidb/', icon: 'ri:linkedin-fill' },
-  { label: 'Facebook', href: null, icon: 'ri:facebook-fill' },
-];
+import { SOCIAL_LINKS } from '../../config/socialLinks';
 
 const footerGroups = [
   {
@@ -40,7 +32,7 @@ const footerGroups = [
       { label: 'Contact', to: '/contact' },
       { label: 'Sign In', to: '/login', guestOnly: true },
       { label: 'Join MuviDB', to: '/signup', guestOnly: true },
-      { label: 'Dashboard', to: '/dashboard' },
+      { label: 'Dashboard', to: '/dashboard', authOnly: true },
     ],
   },
 ];
@@ -69,7 +61,7 @@ export default function Footer() {
             </p>
 
             <div className="flex items-center gap-3">
-              {socialLinks.map((social) =>
+              {SOCIAL_LINKS.map((social) =>
                 social.href ? (
                   <a
                     key={social.label}
@@ -102,7 +94,9 @@ export default function Footer() {
               </h3>
               <ul className="space-y-4">
                 {group.links
-                  .filter((link) => !(link.guestOnly && isAuthenticated))
+                  .filter((link) =>
+                    link.guestOnly ? !isAuthenticated : !link.authOnly || isAuthenticated,
+                  )
                   .map((link) => (
                     <li key={link.to} className="leading-none">
                       <Link
