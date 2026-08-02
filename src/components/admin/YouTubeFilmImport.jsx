@@ -10,6 +10,7 @@ import { fetchVideoDetailsForImport } from '../../utils/youtube';
  * The admin still reviews and edits before saving; this only pre-fills.
  */
 export default function YouTubeFilmImport({ onApply, disabled = false }) {
+  const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -68,124 +69,146 @@ export default function YouTubeFilmImport({ onApply, disabled = false }) {
   };
 
   return (
-    <div className="rounded-xl border border-red-500/25 bg-red-500/[0.04] p-5 space-y-4">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/15 text-red-500">
-          <Icon icon="mdi:youtube" width="20" />
+    <div
+      className={`rounded-xl border transition-colors ${
+        open
+          ? 'border-red-500/25 bg-red-500/[0.04]'
+          : 'border-border bg-surface-2/40 hover:border-red-500/30'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/15 text-red-500">
+          <Icon icon="mdi:youtube" width="18" />
         </span>
-        <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-bold text-text-primary tracking-tight">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold text-text-primary tracking-tight">
             Import from YouTube
-          </h4>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
-            Paste a watch link. We pull the title, description, play URL, runtime and every
-            thumbnail resolution YouTube actually serves — you choose poster and backdrop,
-            then apply into the form below.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleFetch();
-            }
-          }}
-          disabled={disabled || loading}
-          placeholder="https://www.youtube.com/watch?v=… or youtu.be/…"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-text-primary outline-none transition-all placeholder:text-text-muted/60 focus:border-brand focus:ring-4 focus:ring-brand/5 disabled:opacity-50"
+          </span>
+          <span className="mt-0.5 block text-[11px] text-text-muted">
+            {open
+              ? 'Paste a link to pre-fill the form — or leave this closed and fill everything manually.'
+              : 'Optional. Click to paste a watch link and auto-fill title, images, description and play URL.'}
+          </span>
+        </span>
+        <Icon
+          icon={open ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+          width="18"
+          className="shrink-0 text-text-muted"
+          aria-hidden="true"
         />
-        <button
-          type="button"
-          onClick={handleFetch}
-          disabled={disabled || loading || !url.trim()}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {loading ? (
-            <>
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-              Fetching
-            </>
-          ) : (
-            <>
-              <Icon icon="solar:download-minimalistic-bold" width="16" />
-              Fetch
-            </>
-          )}
-        </button>
-      </div>
+      </button>
 
-      {preview && (
-        <div className="space-y-4 rounded-lg border border-border bg-surface p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                {preview.channelTitle}
-                {preview.durationFormatted ? ` · ${preview.durationFormatted}` : ''}
-                {preview.year ? ` · ${preview.year}` : ''}
-              </p>
-              <p className="mt-1 text-sm font-bold text-text-primary leading-snug">
-                {preview.title}
-              </p>
-              {preview.description && (
-                <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-text-muted whitespace-pre-wrap">
-                  {preview.description}
-                </p>
+      {open && (
+        <div className="space-y-4 border-t border-red-500/15 px-4 pb-4 pt-4">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleFetch();
+                }
+              }}
+              disabled={disabled || loading}
+              autoFocus
+              placeholder="https://www.youtube.com/watch?v=… or youtu.be/…"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm text-text-primary outline-none transition-all placeholder:text-text-muted/60 focus:border-brand focus:ring-4 focus:ring-brand/5 disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={handleFetch}
+              disabled={disabled || loading || !url.trim()}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {loading ? (
+                <>
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Fetching
+                </>
+              ) : (
+                <>
+                  <Icon icon="solar:download-minimalistic-bold" width="16" />
+                  Fetch
+                </>
               )}
-            </div>
-            <a
-              href={preview.watchUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 text-[11px] font-bold text-red-500 hover:underline"
-            >
-              Open on YouTube →
-            </a>
+            </button>
           </div>
 
-          {preview.thumbnails.length > 0 && (
-            <div className="space-y-3 border-t border-border pt-4">
-              <ThumbPicker
-                label="Poster"
-                value={posterUrl}
-                options={preview.thumbnails}
-                onChange={setPosterUrl}
-              />
-              <ThumbPicker
-                label="Backdrop"
-                value={backdropUrl}
-                options={preview.thumbnails}
-                onChange={setBackdropUrl}
-                preferWide
-              />
+          {preview && (
+            <div className="space-y-4 rounded-lg border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                    {preview.channelTitle}
+                    {preview.durationFormatted ? ` · ${preview.durationFormatted}` : ''}
+                    {preview.year ? ` · ${preview.year}` : ''}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-text-primary leading-snug">
+                    {preview.title}
+                  </p>
+                  {preview.description && (
+                    <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-text-muted whitespace-pre-wrap">
+                      {preview.description}
+                    </p>
+                  )}
+                </div>
+                <a
+                  href={preview.watchUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-[11px] font-bold text-red-500 hover:underline"
+                >
+                  Open on YouTube →
+                </a>
+              </div>
+
+              {preview.thumbnails.length > 0 && (
+                <div className="space-y-3 border-t border-border pt-4">
+                  <ThumbPicker
+                    label="Poster"
+                    value={posterUrl}
+                    options={preview.thumbnails}
+                    onChange={setPosterUrl}
+                  />
+                  <ThumbPicker
+                    label="Backdrop"
+                    value={backdropUrl}
+                    options={preview.thumbnails}
+                    onChange={setBackdropUrl}
+                    preferWide
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-95"
+                >
+                  <Icon icon="solar:check-circle-bold" width="16" />
+                  Apply to form
+                </button>
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="rounded-lg border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-text-muted transition-all hover:text-text-primary"
+                >
+                  Clear preview
+                </button>
+                <p className="ml-auto text-[10px] text-text-muted">
+                  Overwrites title, synopsis, play link, images and runtime if set.
+                </p>
+              </div>
             </div>
           )}
-
-          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-            <button
-              type="button"
-              onClick={handleApply}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-95"
-            >
-              <Icon icon="solar:check-circle-bold" width="16" />
-              Apply to form
-            </button>
-            <button
-              type="button"
-              onClick={reset}
-              className="rounded-lg border border-border px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-text-muted transition-all hover:border-border hover:text-text-primary"
-            >
-              Clear preview
-            </button>
-            <p className="ml-auto text-[10px] text-text-muted">
-              Overwrites title, synopsis, play link, images and runtime if set.
-            </p>
-          </div>
         </div>
       )}
     </div>
