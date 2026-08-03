@@ -1,5 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { getImageSrcSet, getProxiedImageUrl, normalizeImageUrl } from '../../lib/imageUrl';
+import { PERSON_PLACEHOLDER } from '../../lib/personImages';
+import { COMPANY_PLACEHOLDER } from '../../lib/companyImages';
 
 // Premium brand-aligned gradients for fallback backgrounds
 const PRESET_GRADIENTS = [
@@ -45,7 +47,7 @@ export default function ImageWithFallback({
   src,
   alt = '',
   className = '',
-  fallbackType = 'avatar', // 'avatar' | 'banner' | 'video'
+  fallbackType = 'avatar', // 'avatar' | 'company' | 'banner' | 'video'
   name = '',
   width, // optional: request an optimized image of this width (Supabase storage only)
   quality = 75,
@@ -59,16 +61,32 @@ export default function ImageWithFallback({
   onError,
   ...props
 }) {
-  const [imgSrc, setImgSrc] = useState(getHighResYoutubeThumbnail(src));
-  const [hasError, setHasError] = useState(!src);
+  const emptyPlaceholder =
+    fallbackType === 'avatar'
+      ? PERSON_PLACEHOLDER
+      : fallbackType === 'company'
+        ? COMPANY_PLACEHOLDER
+        : null;
+  const initialSrc = (!src && emptyPlaceholder)
+    ? emptyPlaceholder
+    : getHighResYoutubeThumbnail(src);
+  const [imgSrc, setImgSrc] = useState(initialSrc);
+  const [hasError, setHasError] = useState(!initialSrc);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Sync state if the src changes dynamically
+  // Sync state if the src changes dynamically.
+  // Avatar/company empties use branded placeholders (display-only).
   useEffect(() => {
+    if (!src && emptyPlaceholder) {
+      setImgSrc(emptyPlaceholder);
+      setHasError(false);
+      setIsLoaded(false);
+      return;
+    }
     setImgSrc(getHighResYoutubeThumbnail(src));
     setHasError(!src);
     setIsLoaded(false);
-  }, [src]);
+  }, [src, emptyPlaceholder]);
 
   const hash = getHash(name || alt || 'MuviDB');
   const gradient = PRESET_GRADIENTS[hash % PRESET_GRADIENTS.length];
@@ -99,6 +117,9 @@ export default function ImageWithFallback({
       // If hqdefault also fails, try standard default (mqdefault)
       const fallbackSrc = imgSrc.replace('/hqdefault.jpg', '/mqdefault.jpg');
       setImgSrc(fallbackSrc);
+    } else if (emptyPlaceholder && imgSrc !== emptyPlaceholder) {
+      // Broken / missing person or company image → branded empty state.
+      setImgSrc(emptyPlaceholder);
     } else {
       setHasError(true);
       onError?.(event);

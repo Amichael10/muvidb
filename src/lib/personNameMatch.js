@@ -1,19 +1,24 @@
 // Shared person-name matching for credit extractor / admin link flows.
 // Handles exact match, name-order swaps ("Adekola Odunlade" ↔ "Odunlade Adekola"),
-// OCR nicknames in parentheses ("Marian Abiodun (Supa)"), and soft Cohere-assisted
-// auto-link when the lexical path alone would miss a typo (Marian ↔ Mirian).
+// OCR numbering ("1. Marian Abiodun"), nicknames ("Marian Abiodun (Supa)"), and
+// soft near-typo / Cohere-assisted auto-link as a last resort.
 
 const PERSON_NOISE = new Set([
   'actor', 'actress', 'alhaji', 'alhaja', 'chief', 'comedian', 'director',
   'dr', 'engr', 'evangelist', 'hon', 'mr', 'mrs', 'ms', 'pastor', 'prince',
-  'princess', 'producer', 'sir', 'official', 'and',
+  'princess', 'producer', 'sir', 'official', 'and', 'as', 'with', 'feat',
+  'featuring', 'starring', 'also', 'aka', 'the', 'of', 'jr', 'jnr', 'snr',
+  'sr', 'ii', 'iii', 'iv',
 ]);
 
-/** Drop "(Supa)" / "[DJ]" style decorations that OCR/credits often append. */
+/** Drop "(Supa)" / "[DJ]" / "1." credit-roll decorations. */
 export function stripPersonNameDecorations(value) {
   return String(value || '')
     .replace(/\([^)]*\)/g, ' ')
-    .replace(/\[[^\]]*\]/g, ' ');
+    .replace(/\[[^\]]*\]/g, ' ')
+    // "1. Name", "12) Name", "#3 Name" at start or after whitespace
+    .replace(/(^|\s)[0-9]{1,3}[.)\-:]\s*/g, ' ')
+    .replace(/(^|\s)#\d{1,3}\s+/g, ' ');
 }
 
 export function foldPersonText(value) {
@@ -31,6 +36,8 @@ export function personNameTokens(name) {
     .trim()
     .split(/\s+/)
     .filter(Boolean)
+    .filter((t) => t.length > 1)
+    .filter((t) => !/^[0-9]+$/.test(t))
     .filter((t) => !PERSON_NOISE.has(t));
 }
 
@@ -88,8 +95,6 @@ function editDistance(a, b) {
 /**
  * True when query and candidate share the same token multiset modulo one
  * near-typo token (edit distance ≤ 2 on tokens longer than 3 chars).
- * Catches "Abiodun Mirian" ↔ "Marian Abiodun" without treating unrelated
- * names as matches.
  */
 export function namesNearMatch(a, b) {
   const ta = personNameTokens(a);
@@ -125,7 +130,6 @@ export function namesNearMatch(a, b) {
     }
     return false;
   }
-  // Extra nickname token on either side is ok if everything else lined up.
   return unused.length <= 1 && typoSlots <= 1 && (typoSlots === 1 || unused.length === 0);
 }
 
@@ -153,9 +157,6 @@ export function pickAutoMatch(query, candidates = [], { minSemantic = 0.42 } = {
   const near = candidates.filter((p) => namesNearMatch(q, p.name));
   if (near.length) return [...near].sort(rankPersonMatch)[0];
 
-  // Cohere (or any caller) may attach _semantic / _cohere. Only auto-link when
-  // the top hit is clearly ahead and above threshold — otherwise leave unmatched
-  // for the admin to pick from suggestions.
   const withScore = candidates
     .map((p) => ({ ...p, _sem: Number(p._semantic ?? p._cohere ?? 0) }))
     .filter((p) => p._sem >= minSemantic)
@@ -165,8 +166,6 @@ export function pickAutoMatch(query, candidates = [], { minSemantic = 0.42 } = {
   const top = withScore[0];
   const second = withScore[1];
   if (second && top._sem - second._sem < 0.08) return null;
-  // Require at least one shared strong token so "John Smith" cannot steal
-  // a Cohere hit meant for an unrelated popular "John".
   const qTokens = personNameTokens(q);
   const tTokens = personNameTokens(top.name);
   const shared = qTokens.some((t) => t.length >= 4 && tTokens.includes(t));

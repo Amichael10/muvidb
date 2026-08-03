@@ -4,9 +4,11 @@ import { supabase } from '../lib/supabase'
 import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { toTitleCase, toSentenceCase } from '../utils/format'
+import ImageWithFallback from '../components/ui/ImageWithFallback'
+import { getCompanyLogoStrict } from '../lib/companyImages'
 
 const CompanyCard = ({ company, filmCount }) => {
-  const initial = toTitleCase(company.name)?.charAt(0)
+  const hasLogo = Boolean(getCompanyLogoStrict(company))
 
   return (
     <Link
@@ -16,19 +18,18 @@ const CompanyCard = ({ company, filmCount }) => {
       <div className="p-6">
         <div className="flex items-start gap-5">
           <div className="flex-shrink-0">
-            {company.logo_url ? (
-              <div className="w-16 h-16 rounded-xl bg-white p-2 border border-border flex items-center justify-center overflow-hidden">
-                <img
-                    src={company.logo_url}
-                    alt={toTitleCase(company.name)}
-                    className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                />
-              </div>
-            ) : (
-              <div className="w-16 h-16 rounded-xl bg-surface-2 flex items-center justify-center text-2xl font-bold text-brand font-heading border border-border">
-                {initial}
-              </div>
-            )}
+            <div className={`w-16 h-16 rounded-xl border border-border flex items-center justify-center overflow-hidden ${hasLogo ? 'bg-white p-2' : 'bg-black'}`}>
+              <ImageWithFallback
+                src={company.logo_url}
+                alt={toTitleCase(company.name)}
+                fallbackType="company"
+                name={toTitleCase(company.name)}
+                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                width={128}
+                sizes="64px"
+                loading="lazy"
+              />
+            </div>
           </div>
 
           <div className="flex-1 min-w-0">

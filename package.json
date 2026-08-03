@@ -26,6 +26,7 @@
     "sync:kava": "tsx scripts/sync_feed_kappa.ts",
     "sync:circuits": "tsx scripts/circuits_sync.ts",
     "sync:nollistream": "tsx scripts/nollistream_sync.ts",
+    "sync:nollistream:dom": "tsx scripts/nollistream_dom_sync.ts",
     "sync:ugandan": "tsx scripts/ugandan_sync.ts",
     "sync:nollymeter": "tsx scripts/nollymeter_sync.ts",
     "cleanup:cinemas": "tsx scripts/cleanup-cinemas.ts",

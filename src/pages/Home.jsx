@@ -1323,7 +1323,6 @@ export default function Home() {
                   ))
                 ) : (
                   productionCompanies.map((company) => {
-                    const initial = company.name?.charAt(0);
                     const filmCount = company.film_companies?.length || 0;
                     return (
                       <div 
@@ -1332,24 +1331,18 @@ export default function Home() {
                         className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">
-                          {company.logo_url ? (
-                            <div className="w-12 h-12 rounded-xl bg-white p-1 border border-hairline flex items-center justify-center overflow-hidden shrink-0">
-                              <ImageWithFallback
-                                src={company.logo_url} 
-                                alt={company.name}
-                                fallbackType="avatar"
-                                name={company.name}
-                                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                                width={96}
-                                sizes="48px"
-                                loading="lazy"
-                              />
-                            </div>
-                          ) : (
-                            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-lg font-bold text-brand font-heading border border-hairline shrink-0">
-                              {initial}
-                            </div>
-                          )}
+                          <div className={`w-12 h-12 rounded-xl border border-hairline flex items-center justify-center overflow-hidden shrink-0 ${company.logo_url ? 'bg-white p-1' : 'bg-black'}`}>
+                            <ImageWithFallback
+                              src={company.logo_url}
+                              alt={company.name}
+                              fallbackType="company"
+                              name={company.name}
+                              className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                              width={96}
+                              sizes="48px"
+                              loading="lazy"
+                            />
+                          </div>
                           <div className="min-w-0">
                             <h3 className="font-bold text-text-primary text-xs tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
                               {toTitleCase(company.name)}

@@ -1,26 +1,36 @@
 /**
- * Sync NolliStream catalogue → MuviDB.
+ * NolliStream DOM scraper → MuviDB
  *
- * - Matches existing films by title and writes streaming_links.nollistream
- * - Creates missing titles (needs_review) with poster/thumbnail
- * - Cast is free text on NolliStream → resolve against people via upsert_person_by_name
- * - No backdrop on NolliStream → poster is used as backdrop (see docs/FILM_IMAGES.md)
+ * Opens a real browser, signs in, scrolls the home rails, intercepts catalogue
+ * API responses, and sweeps search so we catch everything the UI can see.
  *
- * Env:
- *   NOLLISTREAM_EMAIL / NOLLISTREAM_PASSWORD  (required for catalogue API)
+ * Env (.env.local):
+ *   NOLLISTREAM_EMAIL
+ *   NOLLISTREAM_PASSWORD
+ *   SUPABASE_URL / VITE_SUPABASE_URL
+ *   SUPABASE_SERVICE_ROLE_KEY
  *
- * Usage:
- *   npx tsx scripts/nollistream_sync.ts --dry-run
- *   npx tsx scripts/nollistream_sync.ts
+ * Run anytime:
+ *   npm run sync:nollistream:dom
+ *   npm run sync:nollistream:dom -- --dry-run
+ *   npm run sync:nollistream:dom -- --manual-login   # you sign in yourself
+ *   npm run sync:nollistream:dom -- --headless
  */
+import { chromium } from 'playwright-extra';
+import stealth from 'puppeteer-extra-plugin-stealth';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { supabase } from './lib/db';
 import { startSyncLog, type SyncCounters } from './lib/sync';
 
+chromium.use(stealth());
+
 const API_BASE = 'https://backend.nollistream.net';
 const WEB_BASE = 'https://nollistream.net';
-const DRY_RUN = process.argv.includes('--dry-run');
 const PLATFORM = 'nollistream';
+
+const DRY_RUN = process.argv.includes('--dry-run');
+const MANUAL_LOGIN = process.argv.includes('--manual-login');
+const HEADLESS = process.argv.includes('--headless');
 
 type NolliVideo = {
   _id: string;
@@ -62,6 +72,14 @@ type ExistingFilm = {
   needs_review: boolean | null;
 };
 
+const SEARCH_QUERIES = [
+  ...'abcdefghijklmnopqrstuvwxyz'.split(''),
+  ...'0123456789'.split(''),
+  'the', 'love', 'movie', 'part', 'man', 'woman', 'king', 'queen',
+  'Action', 'Crime', 'Comedy', 'Drama', 'Horror', 'Mystery', 'Family',
+  'Adventure', 'Western', 'History', 'Fantasy', 'Fanstasy', 'TV Movie',
+];
+
 function normalizeSourceTitle(value: string) {
   return cleanTitle(
     value
@@ -77,43 +95,10 @@ function normalizeSourceTitle(value: string) {
 function isTrailerOrPromo(title: string) {
   const t = title || '';
   if (/\btrailer\b/i.test(t) || /\bteaser\b/i.test(t)) return true;
-  // Platform promos / upload tests that show up in search but aren't features.
   if (/nollistream/i.test(t)) return true;
   if (/what'?s next|african stories deserve|wonders of nollywood/i.test(t)) return true;
   if (/^test\b|upload|resume file|mkmk|^wizkid$/i.test(t.trim())) return true;
   return false;
-}
-
-const SEARCH_QUERIES = [
-  ...'abcdefghijklmnopqrstuvwxyz'.split(''),
-  ...'0123456789'.split(''),
-  'the', 'love', 'movie', 'part', 'man', 'woman', 'king', 'queen',
-  'Action', 'Crime', 'Comedy', 'Drama', 'Horror', 'Mystery', 'Family',
-  'Adventure', 'Western', 'History', 'Fantasy', 'Fanstasy', 'TV Movie',
-];
-
-async function searchCatalog(token: string, byId: Map<string, NolliVideo>) {
-  for (const query of SEARCH_QUERIES) {
-    try {
-      const res = await fetch(`${API_BASE}/api/video/search`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
-      });
-      const json = await res.json() as any;
-      if (!res.ok || !json?.success) continue;
-      for (const video of json.data || json.videos || []) {
-        if (!video?._id || !video?.title) continue;
-        if (video.video_approve_status === false) continue;
-        byId.set(video._id, video);
-      }
-    } catch {
-      // Keep going — recommended feed is still usable if search flakes.
-    }
-  }
 }
 
 function parseRuntime(value?: string) {
@@ -139,46 +124,26 @@ function normalizePersonName(name: string) {
     .join(' ');
 }
 
-async function login() {
-  const email = process.env.NOLLISTREAM_EMAIL?.trim();
-  const password = process.env.NOLLISTREAM_PASSWORD?.trim();
-  if (!email || !password) {
-    throw new Error('Missing NOLLISTREAM_EMAIL or NOLLISTREAM_PASSWORD');
-  }
-  const res = await fetch(`${API_BASE}/api/user/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+function ingestVideo(byId: Map<string, NolliVideo>, video: any) {
+  if (!video?._id || !video?.title) return;
+  if (video.video_approve_status === false) return;
+  byId.set(String(video._id), {
+    _id: String(video._id),
+    title: video.title,
+    description: video.description,
+    category: video.category,
+    thumbnail: video.thumbnail,
+    duration: video.duration,
+    cast: video.cast,
+    director: video.director,
+    video_approve_status: video.video_approve_status,
   });
-  const json = await res.json() as any;
-  if (!res.ok || !json?.success || !json?.data?.accessToken) {
-    throw new Error(json?.message || `NolliStream login failed (${res.status})`);
-  }
-  return json.data.accessToken as string;
 }
 
-async function fetchCatalog(token: string) {
-  const byId = new Map<string, NolliVideo>();
-
-  // Home rails (subset) + search (broader — letter/category sweep).
-  const res = await fetch(`${API_BASE}/api/video/recommendedMovies`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const json = await res.json() as any;
-  if (!res.ok || !json?.success || !Array.isArray(json.sections)) {
-    throw new Error(json?.message || `Catalogue fetch failed (${res.status})`);
-  }
-  for (const section of json.sections) {
-    for (const video of section.videos || []) {
-      if (!video?._id || !video?.title) continue;
-      if (video.video_approve_status === false) continue;
-      byId.set(video._id, video);
-    }
-  }
-  await searchCatalog(token, byId);
-
+function normalizeCatalog(byId: Map<string, NolliVideo>) {
   const titles: NormalizedTitle[] = [];
   let skippedTrailers = 0;
+
   for (const video of byId.values()) {
     const rawTitle = video.title || '';
     if (isTrailerOrPromo(rawTitle)) {
@@ -190,21 +155,19 @@ async function fetchCatalog(token: string) {
       skippedTrailers += 1;
       continue;
     }
-    const posterUrl = video.thumbnail || null;
     titles.push({
       sourceId: video._id,
       title,
       synopsis: cleanSynopsis(video.description),
       runtimeMinutes: parseRuntime(video.duration),
       genres: [...new Set((video.category || []).map((g) => String(g).trim()).filter(Boolean))],
-      posterUrl,
+      posterUrl: video.thumbnail || null,
       watchUrl: `${WEB_BASE}/movie/${video._id}`,
       cast: [...new Set((video.cast || []).map(normalizePersonName).filter((n) => n.length >= 2))],
       directors: [...new Set((video.director || []).map(normalizePersonName).filter((n) => n.length >= 2))],
     });
   }
 
-  // Prefer longer runtime when the same title appears twice (e.g. "Downhill" vs cut).
   const byTitle = new Map<string, NormalizedTitle>();
   for (const t of titles) {
     const key = t.title.toLocaleLowerCase();
@@ -213,6 +176,145 @@ async function fetchCatalog(token: string) {
   }
 
   return { titles: [...byTitle.values()], discovered: byId.size, skippedTrailers };
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function scrapeWithBrowser() {
+  const email = process.env.NOLLISTREAM_EMAIL?.trim();
+  const password = process.env.NOLLISTREAM_PASSWORD?.trim();
+  if (!MANUAL_LOGIN && (!email || !password)) {
+    throw new Error('Set NOLLISTREAM_EMAIL / NOLLISTREAM_PASSWORD in .env.local (or pass --manual-login)');
+  }
+
+  const byId = new Map<string, NolliVideo>();
+  const browser = await chromium.launch({
+    headless: HEADLESS,
+    args: ['--disable-blink-features=AutomationControlled'],
+  });
+  const context = await browser.newContext({
+    viewport: { width: 1400, height: 900 },
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  });
+  const page = await context.newPage();
+
+  page.on('response', async (response) => {
+    try {
+      const url = response.url();
+      if (!url.includes('backend.nollistream.net/api/video/')) return;
+      if (response.status() !== 200) return;
+      const json = await response.json().catch(() => null);
+      if (!json) return;
+
+      if (Array.isArray(json.sections)) {
+        for (const section of json.sections) {
+          for (const video of section.videos || []) ingestVideo(byId, video);
+        }
+      }
+      for (const video of json.data || json.videos || []) ingestVideo(byId, video);
+    } catch {
+      // Ignore non-JSON / aborted responses while navigating.
+    }
+  });
+
+  try {
+    if (MANUAL_LOGIN) {
+      console.log('Opening login page — sign in in the browser window…');
+      await page.goto(`${WEB_BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+      await page.waitForURL(/\/home(\/|$|\?)/, { timeout: 5 * 60_000 });
+      console.log('Login detected.');
+    } else {
+      console.log(`Logging in as ${email}…`);
+      await page.goto(`${WEB_BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+      await page.getByPlaceholder('Email').fill(email!);
+      await page.getByPlaceholder('Password').fill(password!);
+      await page.getByRole('button', { name: 'Log In' }).click();
+      await page.waitForURL(/\/home(\/|$|\?)/, { timeout: 120_000 });
+      console.log('Logged in.');
+    }
+
+    // Home rails — scroll so lazy rows + network responses fire.
+    await page.goto(`${WEB_BASE}/home`, { waitUntil: 'networkidle', timeout: 120_000 }).catch(() => {});
+    await sleep(2500);
+    for (let i = 0; i < 18; i++) {
+      await page.evaluate(() => window.scrollBy(0, 700));
+      await sleep(350);
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    // DOM pass: poster alts often carry the title even when text is truncated.
+    const domTitles = await page.evaluate(() => {
+      const out: Array<{ title: string; src: string }> = [];
+      for (const img of Array.from(document.querySelectorAll('img'))) {
+        const title = (img.getAttribute('alt') || '').trim();
+        const src = img.currentSrc || img.src || '';
+        if (!title || title === 'logo' || title === 'User Avatar') continue;
+        if (!/nollibucket|cloudinary|thumbnail|images\//i.test(src)) continue;
+        out.push({ title, src });
+      }
+      return out;
+    });
+    for (const row of domTitles) {
+      // DOM alone has no id — keep as soft signal; API ingest is authoritative.
+      if (!row.title) continue;
+      const fakeKey = `dom:${row.title.toLocaleLowerCase()}`;
+      if (![...byId.values()].some((v) => (v.title || '').toLocaleLowerCase() === row.title.toLocaleLowerCase())) {
+        // Only add if we somehow have zero API hits for this title later; stash lightly.
+        ingestVideo(byId, {
+          _id: fakeKey,
+          title: row.title,
+          thumbnail: row.src,
+          video_approve_status: true,
+        });
+      }
+    }
+
+    // Search sweep inside the authenticated page context (uses the session cookie/token).
+    console.log('Sweeping search API from the logged-in session…');
+    const searchHits = await page.evaluate(async ({ apiBase, queries }) => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return { error: 'no accessToken in localStorage', videos: [] as any[] };
+      const videos: any[] = [];
+      for (const query of queries) {
+        try {
+          const res = await fetch(`${apiBase}/api/video/search`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query }),
+          });
+          const json = await res.json();
+          for (const v of json.data || json.videos || []) videos.push(v);
+        } catch {
+          // continue
+        }
+      }
+      return { error: null, videos };
+    }, { apiBase: API_BASE, queries: SEARCH_QUERIES });
+
+    if (searchHits.error) console.warn('Search sweep warning:', searchHits.error);
+    for (const video of searchHits.videos || []) ingestVideo(byId, video);
+
+    // Drop DOM-only fake ids if a real API id exists for the same title.
+    const realByTitle = new Map<string, string>();
+    for (const [id, video] of byId) {
+      if (id.startsWith('dom:')) continue;
+      realByTitle.set((video.title || '').toLocaleLowerCase(), id);
+    }
+    for (const [id, video] of [...byId.entries()]) {
+      if (!id.startsWith('dom:')) continue;
+      const real = realByTitle.get((video.title || '').toLocaleLowerCase());
+      if (real) byId.delete(id);
+    }
+
+    console.log(`Browser scrape collected ${byId.size} unique assets.`);
+    return normalizeCatalog(byId);
+  } finally {
+    await browser.close();
+  }
 }
 
 function candidateTitles(title: string) {
@@ -296,7 +398,6 @@ function mergeGenres(existing: string[] | null, incoming: string[]) {
   return [...new Set([...(existing || []), ...incoming])];
 }
 
-/** Poster fills missing backdrop — system rule (docs/FILM_IMAGES.md). */
 function imageFields(existing: ExistingFilm | null, posterUrl: string | null) {
   const poster = existing?.poster_url || posterUrl || null;
   const backdrop = existing?.backdrop_url || poster || null;
@@ -304,6 +405,12 @@ function imageFields(existing: ExistingFilm | null, posterUrl: string | null) {
 }
 
 async function syncTitle(title: NormalizedTitle, counters: SyncCounters) {
+  // Skip DOM-only stubs with no real movie id.
+  if (title.sourceId.startsWith('dom:')) {
+    console.log(`[skip-dom-only] ${title.title} (no API id — open the title once on NolliStream then re-run)`);
+    return 'skipped' as const;
+  }
+
   const existing = await findFilm(title.title);
   if (existing) {
     if (!DRY_RUN) {
@@ -350,14 +457,13 @@ async function syncTitle(title: NormalizedTitle, counters: SyncCounters) {
 }
 
 async function main() {
-  const log = DRY_RUN ? null : await startSyncLog(PLATFORM, 'Syncing NolliStream catalogue...');
+  const log = DRY_RUN ? null : await startSyncLog(PLATFORM, 'DOM syncing NolliStream catalogue…');
   const counters: SyncCounters = log?.counters || { processed: 0, created: 0, updated: 0, failed: 0 };
 
   try {
-    const token = await login();
-    const { titles, discovered, skippedTrailers } = await fetchCatalog(token);
+    const { titles, discovered, skippedTrailers } = await scrapeWithBrowser();
     console.log(
-      `NolliStream: ${discovered} unique assets, ${titles.length} feature titles `
+      `NolliStream DOM: ${discovered} unique assets, ${titles.length} feature titles `
       + `(${skippedTrailers} trailers/promos skipped).`,
     );
 
@@ -365,6 +471,7 @@ async function main() {
       counters.processed += 1;
       try {
         const action = await syncTitle(title, counters);
+        if (action === 'skipped') continue;
         const label = DRY_RUN ? (action === 'created' ? 'would-create' : 'would-update') : action;
         console.log(`[${label}] ${title.title} (${title.cast.length} cast)`);
       } catch (error) {
@@ -377,23 +484,23 @@ async function main() {
       try {
         await supabase.rpc('refresh_platform_new_releases', { p_platform: PLATFORM });
       } catch {
-        // RPC may not list every platform yet — non-fatal.
+        // non-fatal
       }
       await log?.finish(
-        `NolliStream sync complete. ${counters.created} created, ${counters.updated} updated.`,
+        `NolliStream DOM sync complete. ${counters.created} created, ${counters.updated} updated.`,
         { discovered },
       );
     }
 
     console.log(
-      `NolliStream sync ${DRY_RUN ? 'dry run' : 'complete'}: `
+      `NolliStream DOM sync ${DRY_RUN ? 'dry run' : 'complete'}: `
       + `${counters.created} new, ${counters.updated} linked/updated, ${counters.failed} failed.`,
     );
     if (counters.failed) process.exitCode = 1;
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     await log?.fail(err);
-    console.error('NolliStream sync failed:', err.message);
+    console.error('NolliStream DOM sync failed:', err.message);
     process.exitCode = 1;
   }
 }

@@ -24,6 +24,24 @@ Many Nollywood streaming sources (including NolliStream) only provide a poster/t
 Official platform id: `nollistream`  
 Watch URLs: `https://nollistream.net/movie/{id}` stored in `films.streaming_links.nollistream`.
 
-Sync: `npm run sync:nollistream` (needs `NOLLISTREAM_EMAIL` / `NOLLISTREAM_PASSWORD` in `.env.local`).
+Sync:
 
-Cast/director names arrive as plain text and are resolved into people/credits via `upsert_person_by_name`. Trailers are skipped. Thumbnails are posters only — backdrop follows the poster→backdrop rule above.
+```bash
+# Preferred — Playwright DOM + search sweep (opens a browser)
+npm run sync:nollistream:dom
+
+# API-only (no browser)
+npm run sync:nollistream
+```
+
+Needs `NOLLISTREAM_EMAIL` / `NOLLISTREAM_PASSWORD` in `.env.local`.
+
+Optional flags:
+
+```bash
+npm run sync:nollistream:dom -- --dry-run
+npm run sync:nollistream:dom -- --manual-login   # you sign in in the window
+npm run sync:nollistream:dom -- --headless
+```
+
+Cast/director names arrive as plain text and are resolved into people/credits via `upsert_person_by_name`. Trailers/promos/tests are skipped. Thumbnails are posters only — backdrop follows the poster→backdrop rule above.

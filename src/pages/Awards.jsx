@@ -534,13 +534,16 @@ function AwardCard({ row, winner = false, accent }) {
               className="flex min-w-0 items-center gap-2 transition-colors hover:text-brand"
             >
               <span className="h-7 w-7 shrink-0 overflow-hidden rounded-full border border-border bg-surface-2 ring-0 transition-all group-hover:ring-2 group-hover:ring-brand/30">
-                {person.photo_url ? (
-                  <img src={person.photo_url} alt="" className="h-full w-full object-cover" loading="lazy" />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-text-muted">
-                    {(person.name || '?').slice(0, 1)}
-                  </span>
-                )}
+                <ImageWithFallback
+                  src={person.photo_url}
+                  alt=""
+                  fallbackType="avatar"
+                  name={person.name}
+                  className="h-full w-full object-cover"
+                  width={56}
+                  sizes="28px"
+                  loading="lazy"
+                />
               </span>
               <span className="truncate text-sm font-bold">{formatPersonName(person.name)}</span>
             </Link>

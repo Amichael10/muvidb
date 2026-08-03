@@ -16,6 +16,7 @@ import {
   formatDepartment,
 } from '../lib/creditRoles'
 import { searchPeopleByName } from '../lib/peopleSearch'
+import ImageWithFallback from '../components/ui/ImageWithFallback'
 
 const PersonCard = ({ person, currentUser }) => {
   const navigate = useNavigate()
@@ -42,13 +43,6 @@ const PersonCard = ({ person, currentUser }) => {
     await toggleFollow()
   }
 
-  const initials = person.name
-    ?.split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-
   const creditCount = person.credits?.length || 0
   const primaryRole = formatDepartment(person.known_for_department) || 'Filmmaker'
 
@@ -57,20 +51,17 @@ const PersonCard = ({ person, currentUser }) => {
       to={`/people/${person.slug || person.id}`}
       className="group block bg-surface rounded-xl overflow-hidden border border-border hover:border-brand transition-all shadow-sm"
     >
-      <div className="relative aspect-[4/5] overflow-hidden">
-        {person.photo_url ? (
-          <img
-            src={person.photo_url}
-            alt={person.name}
-            className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
-          />
-        ) : (
-          <div className="w-full h-full bg-surface-2 flex items-center justify-center">
-            <span className="text-4xl font-heading font-bold text-brand/30">
-              {initials}
-            </span>
-          </div>
-        )}
+      <div className="relative aspect-[4/5] overflow-hidden bg-surface-2">
+        <ImageWithFallback
+          src={person.photo_url}
+          alt={person.name}
+          fallbackType="avatar"
+          name={person.name}
+          className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
+          width={400}
+          sizes="(max-width: 640px) 50vw, 240px"
+          loading="lazy"
+        />
 
         {person.is_verified && (
           <div className="absolute top-2 right-2 bg-brand text-white text-[8px] font-black px-2 py-0.5 rounded border border-brand/20 uppercase tracking-widest shadow-lg">

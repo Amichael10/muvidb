@@ -1,21 +1,25 @@
 # Person name matching
 
-## Why Cohere alone was not enough
+## What actually fixes order swaps
 
-Cohere was already wired for **film title** rerank (`/api/semantic-search`, used by global film search). It was **not** previously called for people / OCR credit linking — those paths used lexical `name_key` + optional trigram suggestions only.
+**Not Cohere.** Order-insensitive matching is done by `people.name_key` / `match_people_by_name` in Postgres:
 
-## Current flow
+- `Abiodun Marian` ↔ `Marian Abiodun` share key `2:abiodun|marian`
+- OCR noise is stripped first: `1. Marian Abiodun`, `(Supa)`, `starring …`
 
-`searchPeopleByName` (`src/lib/peopleSearch.js`) and OCR resolve (`AdminCreditsExtractor`):
+Cohere Rerank is optional polish for ranking typos when lexical is uncertain. Auto-link must succeed from `name_key` alone.
 
-1. **Lexical** — `name_key` order-insensitive (`Abiodun Marian` ↔ `Marian Abiodun`)
-2. **Fuzzy top-up** — `suggest_similar_people` (pg_trgm) for OCR typos (`Mirian` ↔ `Marian`)
-3. **Cohere Rerank** — `POST /api/semantic-search` with `entity: 'people'`
-4. **Auto-link** — `pickAutoMatch` accepts exact fold, order-swap, near-typo (edit distance ≤ 2 on one token), or high-confidence Cohere with a shared strong token. Low-confidence guesses stay unmatched for the admin to pick.
+## Flow
 
-Nicknames in parentheses / brackets (`(Supa)`, `[DJ]`) are stripped in JS and in SQL `person_name_key` so they do not break keys.
+1. **`match_people_by_name` RPC** — exact fold + `name_key` swap (OCR / auto-link)
+2. **Lexical search** — `name_key` eq + OR of strong tokens, then client rank
+3. **Fuzzy** — `suggest_similar_people` (trigram) for near-misses
+4. **Cohere** — only if the top hit is not already certain
+5. **`pickAutoMatch`** — exact → name_key swap → near-typo → high-confidence Cohere
 
-## Local vs production
+## Files
 
-- Production: Vercel `api/semantic-search.ts`
-- Vite dev: bypass in `vite.config.ts` calls Cohere Rerank with `COHERE_API_KEY` from `.env.local`
+- `src/lib/personNameMatch.js` — token fold / `sortedNameKey` / `pickAutoMatch`
+- `src/lib/peopleSearch.js` — search + `matchPeopleByNameKey`
+- `src/pages/admin/AdminCreditsExtractor.jsx` — OCR resolve uses RPC first
+- SQL: `person_name_key()`, `match_people_by_name()`, `find_person_by_name()`

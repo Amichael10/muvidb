@@ -11,18 +11,24 @@ import {
   foldPersonText,
 } from '../../lib/personNameMatch';
 import { canonicalizeRole } from '../../lib/creditRoles';
-import { searchPeopleByName } from '../../lib/peopleSearch';
+import { matchPeopleByNameKey, searchPeopleByName } from '../../lib/peopleSearch';
 
 const PEOPLE_SELECT = 'id, name, photo_url, film_count';
 
 /**
  * Resolve an OCR/typed credit name to an existing person.
- * Lexical order-swap + near-typo first; Cohere rerank soft-links when confident.
+ * Prefer Postgres name_key (order-insensitive) — Cohere is only a soft fallback.
  */
 async function resolvePersonMatch(rawName) {
   const name = String(rawName || '').trim();
   if (!name) return null;
 
+  // 1) Authoritative: exact fold + name_key swap in SQL
+  const keyed = await matchPeopleByNameKey(name, { limit: 5 });
+  const keyedHit = pickAutoMatch(name, keyed);
+  if (keyedHit) return keyedHit;
+
+  // 2) Broader lexical + optional Cohere ranking
   const hits = await searchPeopleByName(name, {
     limit: 16,
     select: PEOPLE_SELECT,
@@ -248,8 +254,8 @@ export default function AdminCreditsExtractor() {
   }, [filmSearch]);
 
 
-  // Fetch live matches from database whenever the name list changes.
-  // Exact match first (batch), then per-row token-order swap for leftovers.
+  // Fetch live matches whenever the name list changes.
+  // Uses name_key (order-insensitive) — not case-sensitive exact .in('name').
   const runLiveProfileVerification = async (rows, setter) => {
     if (!rows.length) return;
 
@@ -257,25 +263,10 @@ export default function AdminCreditsExtractor() {
     if (!nameStrings.length) return;
 
     try {
-      const { data: exactPeople, error } = await supabase
-        .from('people')
-        .select(PEOPLE_SELECT)
-        .in('name', nameStrings);
-      if (error) throw error;
-
-      const exactMap = new Map((exactPeople || []).map((p) => [foldPersonText(p.name), p]));
       const resolved = new Map(); // queryName → person
-
-      for (const n of nameStrings) {
-        const hit = exactMap.get(foldPersonText(n));
-        if (hit) resolved.set(n, hit);
-      }
-
-      const unmatched = nameStrings.filter((n) => !resolved.has(n));
-      // Resolve swaps in small parallel batches
-      const BATCH = 6;
-      for (let i = 0; i < unmatched.length; i += BATCH) {
-        const slice = unmatched.slice(i, i + BATCH);
+      const BATCH = 8;
+      for (let i = 0; i < nameStrings.length; i += BATCH) {
+        const slice = nameStrings.slice(i, i + BATCH);
         const found = await Promise.all(slice.map((n) => resolvePersonMatch(n).catch(() => null)));
         slice.forEach((n, idx) => {
           if (found[idx]) resolved.set(n, found[idx]);

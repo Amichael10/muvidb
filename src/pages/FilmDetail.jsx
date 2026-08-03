@@ -1049,21 +1049,17 @@ export default function FilmDetail() {
             <div className="p-8">
               {film.film_companies?.length > 0 ? (
                 <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4 group transition-all cursor-default">
-                  <div className="w-12 h-12 bg-surface-2 rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50">
-                    {film.film_companies[0].companies?.logo_url ? (
-                      <ImageWithFallback
-                        src={film.film_companies[0].companies.logo_url}
-                        alt={film.film_companies[0].companies?.name || 'Studio logo'}
-                        fallbackType="avatar"
-                        name={film.film_companies[0].companies?.name || 'Studio'}
-                        className="w-full h-full object-contain p-1"
-                        width={96}
-                        sizes="48px"
-                        loading="lazy"
-                      />
-                    ) : (
-                      film.film_companies[0].companies?.name?.charAt(0) || '?'
-                    )}
+                  <div className="w-12 h-12 bg-black rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50">
+                    <ImageWithFallback
+                      src={film.film_companies[0].companies?.logo_url}
+                      alt={film.film_companies[0].companies?.name || 'Studio logo'}
+                      fallbackType="company"
+                      name={film.film_companies[0].companies?.name || 'Studio'}
+                      className="w-full h-full object-contain"
+                      width={96}
+                      sizes="48px"
+                      loading="lazy"
+                    />
                   </div>
                   <div>
                     <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Studio</div>
