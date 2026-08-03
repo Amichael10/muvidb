@@ -5,6 +5,7 @@ import ImageWithFallback from '../ui/ImageWithFallback';
 import LikedScore from './LikedScore';
 import { formatFilmTitle } from '../../utils/format';
 import { getPlatform } from '../../lib/platforms';
+import { getFilmBackdrop } from '../../lib/filmImages';
 
 const formatDeltaViews = (views) => {
   if (!views) return null;
@@ -218,7 +219,7 @@ export default function FilmCard({
             className={`relative z-0 block aspect-video w-full shrink-0 overflow-hidden bg-surface-2/60 transition-all duration-500 hover:z-10 ${isYoutubeVariant ? 'border-b border-border' : 'rounded-lg border border-border shadow-sm group-hover:border-brand/40 group-hover:shadow-xl group-hover:shadow-brand/5'}`}
           >
             <ImageWithFallback
-              src={film.backdrop_url || film.poster_url || film.poster}
+              src={getFilmBackdrop(film)}
               alt={formatFilmTitle(film.title)}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               fallbackType="banner"

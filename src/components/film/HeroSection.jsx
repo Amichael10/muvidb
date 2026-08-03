@@ -5,6 +5,7 @@ import WatchOptions from './WatchOptions';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../ui/ImageWithFallback';
 import { formatFilmTitle } from '../../utils/format';
+import { getFilmBackdrop } from '../../lib/filmImages';
 
 export default function HeroSection({ featuredFilms: featuredFilmsProp, featuredFilm: singleFilmProp, isLoading }) {
   // Handle both array and single object props for backward compatibility and slice to 6 items
@@ -90,7 +91,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                 {/* Background Backdrop */}
                 <div className="absolute inset-0">
                   <ImageWithFallback
-                    src={featuredFilm.backdrop_url || featuredFilm.backdrop || featuredFilm.poster_url || featuredFilm.poster}
+                    src={getFilmBackdrop(featuredFilm)}
                     alt={formatFilmTitle(featuredFilm.title)}
                     className="w-full h-full object-cover animate-kenburns"
                     fallbackType="banner"

@@ -25,6 +25,7 @@
     "scrape:imdb-from-db": "tsx scripts/imdb_bulk_sync.ts --from-db --full-credits --skip-people-pages",
     "sync:kava": "tsx scripts/sync_feed_kappa.ts",
     "sync:circuits": "tsx scripts/circuits_sync.ts",
+    "sync:nollistream": "tsx scripts/nollistream_sync.ts",
     "sync:ugandan": "tsx scripts/ugandan_sync.ts",
     "sync:nollymeter": "tsx scripts/nollymeter_sync.ts",
     "cleanup:cinemas": "tsx scripts/cleanup-cinemas.ts",

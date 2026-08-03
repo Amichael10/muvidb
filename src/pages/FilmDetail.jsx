@@ -12,6 +12,7 @@ import FilmCard from '../components/film/FilmCard';
 import LikedScore from '../components/film/LikedScore';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
+import { getFilmBackdrop, getFilmPoster } from '../lib/filmImages';
 import { Skeleton } from '../components/ui/Skeleton';
 import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
@@ -521,7 +522,7 @@ export default function FilmDetail() {
       {/* 1. CINEMATIC HEADER */}
       <div className="relative w-full h-[60vh] min-h-[500px] border-b border-border overflow-hidden">
         <ImageWithFallback
-          src={film.backdrop_url || film.backdrop} 
+          src={getFilmBackdrop(film)}
           alt={`${formatFilmTitle(film.title)} Backdrop`} 
           className="absolute inset-0 w-full h-full object-cover"
           fallbackType="banner"
@@ -539,7 +540,7 @@ export default function FilmDetail() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-start md:items-end gap-6 md:gap-8 pb-8">
             <div className="hidden md:block w-64 shrink-0 translate-y-16 z-10">
               <ImageWithFallback
-                src={film.poster_url || film.poster} 
+                src={getFilmPoster(film)}
                 alt={`${formatFilmTitle(film.title)} Poster`} 
                 className="w-full rounded-xl shadow-2xl border border-white/10 object-cover aspect-[2/3]"
                 fallbackType="banner"

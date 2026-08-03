@@ -31,6 +31,7 @@ export default [
   route('signup', 'pages/Signup.jsx'),
   route('people', 'routes/people-list.tsx'),
   route('people/:slug', 'routes/person-detail.tsx'),
+  route('awards', 'pages/Awards.jsx'),
   route('showtimes', 'routes/showtimes.tsx'),
   route('cinemas', 'routes/cinemas-list.tsx'),
   route('cinemas/:id', 'routes/cinema-detail.tsx'),

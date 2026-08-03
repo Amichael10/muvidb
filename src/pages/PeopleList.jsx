@@ -6,6 +6,7 @@ import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
 import { formatViewCount } from '../utils/youtube'
 import { Skeleton } from '../components/ui/Skeleton'
+import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { formatPersonName, toTitleCase } from '../utils/format'
 import {
@@ -267,25 +268,21 @@ const PeopleList = () => {
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Page Header */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-          <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary mb-4 tracking-tighter uppercase italic">
-            The Talent
-          </h1>
-          <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6">
-            The actors, directors, and creatives shaping the future of Nollywood cinema. Explore their journey and filmography.
-          </p>
-          <button
-            onClick={() => setShowSuggest(true)}
-            className="mt-6 inline-flex items-center gap-2 bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
-          >
-            <Icon icon="solar:user-plus-linear" width="16" />
-            Suggest a missing person
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon="solar:users-group-rounded-bold"
+        eyebrow="Directory"
+        title="People"
+        description="The actors, directors, and creatives shaping the future of Nollywood cinema. Explore their journey and filmography."
+      >
+        <button
+          type="button"
+          onClick={() => setShowSuggest(true)}
+          className="mt-2 inline-flex items-center gap-2 bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
+        >
+          <Icon icon="solar:user-plus-linear" width="16" />
+          Suggest a missing person
+        </button>
+      </PageHeader>
       {showSuggest && <SuggestPersonModal onClose={() => setShowSuggest(false)} />}
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">

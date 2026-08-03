@@ -1,6 +1,7 @@
 // Shared person-name matching for credit extractor / admin link flows.
 // Handles exact match, name-order swaps ("Adekola Odunlade" ↔ "Odunlade Adekola"),
-// and loose search candidates for typeahead.
+// OCR nicknames in parentheses ("Marian Abiodun (Supa)"), and soft Cohere-assisted
+// auto-link when the lexical path alone would miss a typo (Marian ↔ Mirian).
 
 const PERSON_NOISE = new Set([
   'actor', 'actress', 'alhaji', 'alhaja', 'chief', 'comedian', 'director',
@@ -8,8 +9,15 @@ const PERSON_NOISE = new Set([
   'princess', 'producer', 'sir', 'official', 'and',
 ]);
 
-export function foldPersonText(value) {
+/** Drop "(Supa)" / "[DJ]" style decorations that OCR/credits often append. */
+export function stripPersonNameDecorations(value) {
   return String(value || '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ');
+}
+
+export function foldPersonText(value) {
+  return stripPersonNameDecorations(value)
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[’‘`]/g, "'")
@@ -47,14 +55,86 @@ export function rankPersonMatch(a, b) {
   if (films) return films;
   const photo = Number(Boolean(b.photo_url)) - Number(Boolean(a.photo_url));
   if (photo) return photo;
+  const sem =
+    Number(b._semantic || b._cohere || 0) - Number(a._semantic || a._cohere || 0);
+  if (sem) return sem;
   return String(a.name || '').localeCompare(String(b.name || ''));
+}
+
+/** Levenshtein distance for short given-name typos (Marian / Mirian). */
+function editDistance(a, b) {
+  const s = String(a || '');
+  const t = String(b || '');
+  if (s === t) return 0;
+  const m = s.length;
+  const n = t.length;
+  if (!m) return n;
+  if (!n) return m;
+  const row = new Array(n + 1);
+  for (let j = 0; j <= n; j++) row[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = row[j];
+      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+      prev = tmp;
+    }
+  }
+  return row[n];
+}
+
+/**
+ * True when query and candidate share the same token multiset modulo one
+ * near-typo token (edit distance ≤ 2 on tokens longer than 3 chars).
+ * Catches "Abiodun Mirian" ↔ "Marian Abiodun" without treating unrelated
+ * names as matches.
+ */
+export function namesNearMatch(a, b) {
+  const ta = personNameTokens(a);
+  const tb = personNameTokens(b);
+  if (ta.length < 2 || tb.length < 2) return false;
+  if (Math.abs(ta.length - tb.length) > 1) return false;
+
+  const unused = [...tb];
+  let typoSlots = 0;
+  for (const token of ta) {
+    const exact = unused.indexOf(token);
+    if (exact >= 0) {
+      unused.splice(exact, 1);
+      continue;
+    }
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < unused.length; i++) {
+      const u = unused[i];
+      if (Math.abs(u.length - token.length) > 2) continue;
+      if (token.length < 4 || u.length < 4) continue;
+      const d = editDistance(token, u);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    }
+    if (bestIdx >= 0 && bestDist > 0 && bestDist <= 2) {
+      typoSlots += 1;
+      if (typoSlots > 1) return false;
+      unused.splice(bestIdx, 1);
+      continue;
+    }
+    return false;
+  }
+  // Extra nickname token on either side is ok if everything else lined up.
+  return unused.length <= 1 && typoSlots <= 1 && (typoSlots === 1 || unused.length === 0);
 }
 
 /**
  * Pick the best auto-link from a candidate list for a typed/OCR name.
- * Exact (case-insensitive) wins, then token-order swap, else null.
+ * Exact (case-insensitive) wins, then token-order swap, then near-typo /
+ * high-confidence Cohere rerank — never a low-confidence guess.
  */
-export function pickAutoMatch(query, candidates = []) {
+export function pickAutoMatch(query, candidates = [], { minSemantic = 0.42 } = {}) {
   const q = String(query || '').trim();
   if (!q || !candidates.length) return null;
 
@@ -65,9 +145,31 @@ export function pickAutoMatch(query, candidates = []) {
   }
 
   const qKey = sortedNameKey(q);
-  if (!qKey) return null;
+  if (qKey) {
+    const swaps = candidates.filter((p) => sortedNameKey(p.name) === qKey);
+    if (swaps.length) return [...swaps].sort(rankPersonMatch)[0];
+  }
 
-  const swaps = candidates.filter((p) => sortedNameKey(p.name) === qKey);
-  if (!swaps.length) return null;
-  return [...swaps].sort(rankPersonMatch)[0];
+  const near = candidates.filter((p) => namesNearMatch(q, p.name));
+  if (near.length) return [...near].sort(rankPersonMatch)[0];
+
+  // Cohere (or any caller) may attach _semantic / _cohere. Only auto-link when
+  // the top hit is clearly ahead and above threshold — otherwise leave unmatched
+  // for the admin to pick from suggestions.
+  const withScore = candidates
+    .map((p) => ({ ...p, _sem: Number(p._semantic ?? p._cohere ?? 0) }))
+    .filter((p) => p._sem >= minSemantic)
+    .sort((a, b) => b._sem - a._sem || rankPersonMatch(a, b));
+
+  if (!withScore.length) return null;
+  const top = withScore[0];
+  const second = withScore[1];
+  if (second && top._sem - second._sem < 0.08) return null;
+  // Require at least one shared strong token so "John Smith" cannot steal
+  // a Cohere hit meant for an unrelated popular "John".
+  const qTokens = personNameTokens(q);
+  const tTokens = personNameTokens(top.name);
+  const shared = qTokens.some((t) => t.length >= 4 && tTokens.includes(t));
+  if (!shared && !namesNearMatch(q, top.name)) return null;
+  return top;
 }

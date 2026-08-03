@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { QuickViewProvider } from './context/QuickViewContext';
+import ErrorPage from './components/ErrorPage';
 
 // Eager: landing page only (keeps first paint / LCP fast)
 import Home from './pages/Home';
@@ -53,6 +54,7 @@ const Terms = lazyWithRetry(() => import('./pages/Terms'));
 const Privacy = lazyWithRetry(() => import('./pages/Privacy'));
 const Waitlist = lazyWithRetry(() => import('./pages/Waitlist'));
 const About = lazyWithRetry(() => import('./pages/About'));
+const Awards = lazyWithRetry(() => import('./pages/Awards'));
 const Contact = lazyWithRetry(() => import('./pages/Contact'));
 const Careers = lazyWithRetry(() => import('./pages/Careers'));
 const CareerDetail = lazyWithRetry(() => import('./pages/CareerDetail'));
@@ -190,17 +192,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
   render() {
     if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-5 bg-bg text-text-primary px-6 text-center">
-          <p className="text-text-secondary text-sm max-w-xs">Something went wrong loading this page.</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-brand text-white font-bold px-6 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity"
-          >
-            Reload
-          </button>
-        </div>
-      );
+      return <ErrorPage variant="error" />;
     }
     return this.props.children;
   }
@@ -254,6 +246,7 @@ export default function App() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/about" element={<About />} />
+                <Route path="/awards" element={<Awards />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/careers" element={<Careers />} />
                 <Route path="/careers/:slug" element={<CareerDetail />} />

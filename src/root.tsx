@@ -21,6 +21,7 @@ import MobileNav from './components/layout/MobileNav';
 import SmoothScroll from './components/layout/SmoothScroll';
 import CookieConsent from './components/CookieConsent';
 import QuickViewModal from './components/film/QuickViewModal';
+import ErrorPage from './components/ErrorPage';
 
 import './index.css';
 
@@ -239,21 +240,6 @@ export function HydrateFallback() {
 }
 
 export function ErrorBoundary({ error }: { error: unknown }) {
-  const message = isRouteErrorResponse(error)
-    ? error.status === 404
-      ? 'That page could not be found.'
-      : `${error.status} ${error.statusText}`
-    : 'Something went wrong loading this page.';
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-5 bg-bg text-text-primary px-6 text-center">
-      <p className="text-text-secondary text-sm max-w-xs">{message}</p>
-      <button
-        onClick={() => window.location.reload()}
-        className="bg-brand text-white font-bold px-6 py-3 rounded-xl text-sm hover:opacity-90 transition-opacity"
-      >
-        Reload
-      </button>
-    </div>
-  );
+  const is404 = isRouteErrorResponse(error) && error.status === 404;
+  return <ErrorPage variant={is404 ? '404' : 'error'} />;
 }

@@ -3,6 +3,7 @@ import { Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
 import PopcornField from '../components/ui/PopcornField'
+import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isFutureShowtime } from '../utils/showtimes'
 
@@ -263,18 +264,12 @@ const Showtimes = () => {
     return (
         <div className="min-h-screen bg-bg relative">
             <PopcornField />
-            {/* Page Header */}
-            <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-                <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-                <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-                    <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary mb-4 tracking-tighter uppercase italic">
-                        The Big Screen
-                    </h1>
-                    <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6">
-                        Experience Nollywood as it was meant to be seen. Real-time showtimes across all major cinema chains in Nigeria.
-                    </p>
-                </div>
-            </div>
+            <PageHeader
+                icon="solar:ticket-bold"
+                eyebrow="In theatres"
+                title="Showtimes"
+                description="Experience Nollywood as it was meant to be seen. Real-time showtimes across all major cinema chains in Nigeria."
+            />
 
             <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">
                 {/* Controls Section */}

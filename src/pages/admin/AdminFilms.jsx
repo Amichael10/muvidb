@@ -18,6 +18,7 @@ import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { authHeaders } from '../../lib/apiAuth';
 import { parseLanguages, AFRICAN_LANGUAGES } from '../../utils/languages';
+import { resolveFilmImageFields } from '../../lib/filmImages';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -842,8 +843,10 @@ export default function AdminFilms() {
         mubi_slug: formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
-        poster_url: (formData.poster_url || '').trim() || null,
-        backdrop_url: (formData.backdrop_url || '').trim() || null,
+        ...resolveFilmImageFields({
+          poster_url: formData.poster_url,
+          backdrop_url: formData.backdrop_url,
+        }),
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
         release_date: formData.release_date || null,
         release_type: formData.release_type || null,
@@ -1319,6 +1322,7 @@ export default function AdminFilms() {
             <option value="docuth">Docuth</option>
             <option value="ebonylife">EbonyLife</option>
             <option value="circuits">Circuits</option>
+            <option value="nollistream">NolliStream</option>
           </select>
 
           <select
@@ -1521,12 +1525,17 @@ export default function AdminFilms() {
                             <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
                           </a>
                         )}
+                        {film.streaming_links?.nollistream && (
+                          <a href={film.streaming_links.nollistream} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm" title="NolliStream Link">
+                            <Icon icon="solar:play-circle-bold" width="14" />
+                          </a>
+                        )}
                         {film.streaming_links?.circuits && (
                           <a href={film.streaming_links.circuits} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-orange-500/10 text-[#F0532B] hover:bg-[#F0532B] hover:text-white transition-all shadow-sm" title="Circuits.tv Link">
                             <Icon icon="solar:clapperboard-play-bold" className="w-4 h-4" />
                           </a>
                         )}
-                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && (
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && (
                           <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
                         )}
                       </div>
@@ -2246,7 +2255,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -2336,6 +2345,7 @@ export default function AdminFilms() {
                       { id: 'docuth', label: 'Docuth', placeholder: 'https://docuth.com/...' },
                       { id: 'ebonylife', label: 'EbonyLife', placeholder: 'https://ebonylifeonplus.com/...' },
                       { id: 'circuits', label: 'Circuits', placeholder: 'https://www.circuits.tv/...' },
+                      { id: 'nollistream', label: 'NolliStream', placeholder: 'https://nollistream.net/movie/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;

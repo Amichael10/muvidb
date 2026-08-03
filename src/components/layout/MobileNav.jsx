@@ -32,6 +32,7 @@ const MobileNav = () => {
     { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
     { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },
     { name: 'People', path: '/people', icon: 'solar:users-group-two-rounded-linear' },
+    { name: 'Awards', path: '/awards', icon: 'solar:cup-star-linear' },
     { name: 'Companies', path: '/companies', icon: 'solar:case-linear' },
   ];
 

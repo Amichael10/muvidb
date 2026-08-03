@@ -10,6 +10,7 @@ const footerGroups = [
     links: [
       { label: 'Home', to: '/' },
       { label: 'Browse Movies', to: '/browse' },
+      { label: 'Awards', to: '/awards' },
       { label: 'Top Rated', to: '/browse?sort=rating' },
       { label: 'New Releases', to: '/browse?sort=new' },
     ],

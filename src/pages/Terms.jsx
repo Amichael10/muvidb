@@ -47,10 +47,11 @@ export default function Terms() {
         <section className="space-y-4">
           <h2 className="text-xl md:text-2xl font-heading font-black text-text-primary tracking-tight">2. Eligibility</h2>
           <p>
-            You must be at least 13 years old (or the minimum age of digital consent in your
-            jurisdiction) to use MuviDB, and old enough to form a binding contract. By using the
-            Platform, you represent that you meet these requirements and that the information you
-            provide is accurate and truthful.
+            You must be at least 18 years old to create a MuviDB account and use member features.
+            This aligns with the meaning of a “child” under Nigeria’s Child’s Rights Act as
+            referenced by the Nigeria Data Protection Act 2023. By using the Platform, you
+            represent that you meet this requirement and that the information you provide is
+            accurate and truthful.
           </p>
         </section>
 

@@ -1,18 +1,13 @@
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
+import { supabase } from '../../lib/supabase';
 
 /**
  * Awards & nominations editor for the jsonb `awards` column, shared by the
  * person drawer (people.awards) and the film drawer (films.awards).
  *
- * The two columns hold the same shape except for who the award points at:
- *   person → work (film title) + film_id, so the person page can show a poster
- *   film   → recipients[], the names credited on the film's win
- *
- * @param {{
- *   value: Array<object>,
- *   onChange: (next: Array<object>) => void,
- *   variant: 'person' | 'film',
- * }} props
+ * Person awards can soft-link to a film via `film_id` (poster + route on the
+ * public person page). Film awards store recipient name strings.
  */
 export default function AwardsEditor({ value, onChange, variant }) {
   const awards = Array.isArray(value) ? value : [];
@@ -23,7 +18,7 @@ export default function AwardsEditor({ value, onChange, variant }) {
     season: '',
     category: '',
     won: false,
-    ...(variant === 'person' ? { work: '' } : { recipients: [] }),
+    ...(variant === 'person' ? { work: '', film_id: null } : { recipients: [] }),
   };
 
   const update = (idx, patch) => {
@@ -62,7 +57,6 @@ export default function AwardsEditor({ value, onChange, variant }) {
           {awards.map((award, idx) => (
             <div key={idx} className="rounded-lg border border-border bg-surface-2/30 p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                {/* Winner / Nominee is the key distinction on the public page */}
                 <div className="flex items-center gap-1 p-1 bg-surface rounded-lg border border-border">
                   <button
                     type="button"
@@ -126,20 +120,11 @@ export default function AwardsEditor({ value, onChange, variant }) {
               />
 
               {variant === 'person' ? (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Film / work title (must match the film exactly to link it)"
-                    value={award.work || ''}
-                    onChange={(e) => update(idx, { work: e.target.value, film_id: null })}
-                    className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
-                  />
-                  {award.film_id && (
-                    <p className="text-[10px] text-green-500 font-bold flex items-center gap-1">
-                      <Icon icon="solar:link-linear" width="12" /> Linked to a film — will show its poster
-                    </p>
-                  )}
-                </>
+                <FilmWorkPicker
+                  work={award.work || ''}
+                  filmId={award.film_id || null}
+                  onChange={({ work, film_id }) => update(idx, { work, film_id })}
+                />
               ) : (
                 <input
                   type="text"
@@ -161,5 +146,143 @@ export default function AwardsEditor({ value, onChange, variant }) {
         </div>
       )}
     </section>
+  );
+}
+
+function FilmWorkPicker({ work, filmId, onChange }) {
+  const [query, setQuery] = useState(work || '');
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [linkedTitle, setLinkedTitle] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(work || '');
+  }, [work]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!filmId) {
+      setLinkedTitle(null);
+      return undefined;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('films')
+        .select('id, title')
+        .eq('id', filmId)
+        .maybeSingle();
+      if (!cancelled) setLinkedTitle(data?.title || null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filmId]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setSearching(true);
+      const { data } = await supabase
+        .from('films')
+        .select('id, title, year, poster_url')
+        .ilike('title', `%${q}%`)
+        .order('view_count', { ascending: false })
+        .limit(8);
+      if (!cancelled) {
+        setResults(data || []);
+        setSearching(false);
+      }
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  return (
+    <div className="relative space-y-1.5" ref={wrapRef}>
+      <input
+        type="text"
+        placeholder="Search film to link (or type a work title)"
+        value={query}
+        onChange={(e) => {
+          const next = e.target.value;
+          setQuery(next);
+          setOpen(true);
+          // Typing freely clears the soft link until a result is picked
+          onChange({ work: next, film_id: null });
+        }}
+        onFocus={() => setOpen(true)}
+        className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+      />
+      {filmId ? (
+        <p className="text-[10px] text-green-500 font-bold flex items-center gap-1">
+          <Icon icon="solar:link-linear" width="12" />
+          Linked{linkedTitle ? `: ${linkedTitle}` : ''} — poster will show on the person page
+          <button
+            type="button"
+            className="ml-auto text-text-muted hover:text-red-500 font-bold"
+            onClick={() => onChange({ work: query, film_id: null })}
+          >
+            Unlink
+          </button>
+        </p>
+      ) : (
+        <p className="text-[10px] text-text-muted">
+          Pick a film from search to connect this award to the catalogue.
+        </p>
+      )}
+      {open && query.trim().length >= 2 && (
+        <div className="absolute z-30 left-0 right-0 top-full mt-1 rounded-lg border border-border bg-surface shadow-xl overflow-hidden">
+          {searching && (
+            <p className="px-3 py-2 text-[10px] text-text-muted font-bold">Searching…</p>
+          )}
+          {!searching && results.length === 0 && (
+            <p className="px-3 py-2 text-[10px] text-text-muted">No films found</p>
+          )}
+          {results.map((film) => (
+            <button
+              key={film.id}
+              type="button"
+              onClick={() => {
+                setQuery(film.title);
+                setOpen(false);
+                onChange({ work: film.title, film_id: film.id });
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-2 transition-colors"
+            >
+              {film.poster_url ? (
+                <img src={film.poster_url} alt="" className="w-7 h-10 object-cover rounded-sm bg-surface-2" />
+              ) : (
+                <span className="w-7 h-10 rounded-sm bg-surface-2 inline-flex items-center justify-center">
+                  <Icon icon="solar:clapperboard-linear" className="text-text-muted" width="14" />
+                </span>
+              )}
+              <span className="min-w-0">
+                <span className="block text-xs font-bold text-text-primary truncate">{film.title}</span>
+                {film.year != null && (
+                  <span className="block text-[10px] text-text-muted">{film.year}</span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

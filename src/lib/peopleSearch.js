@@ -1,16 +1,10 @@
-// Shared people directory search — order-insensitive + fast.
-// Used by global search, People list, claim flow, and admin typeaheads.
+// Shared people directory search — order-insensitive + Cohere-assisted.
+// Used by global search, People list, claim flow, OCR credits, and admin typeaheads.
 import { supabase } from './supabase';
 import { personNameTokens, sortedNameKey, foldPersonText } from './personNameMatch';
 
 const DEFAULT_SELECT = 'id, slug, name, photo_url, film_count, known_for_department, popularity_score, is_verified';
 
-/**
- * Search people by name.
- * - 1 token: substring ilike (trigram-indexed)
- * - 2+ tokens: name_key equality (order-insensitive) UNION AND-of-tokens
- * Results ranked: exact fold → token-key swap → all tokens present → popularity
- */
 /**
  * Fuzzy "did you mean…?" candidates — trigram similarity, plus an exact
  * token-set (order-insensitive) match scored as 1.0.
@@ -36,7 +30,58 @@ export async function suggestSimilarPeople(query, { limit = 8 } = {}) {
   return (data || []).map((p) => ({ ...p, _suggested: true }));
 }
 
-export async function searchPeopleByName(query, { limit = 24, select = DEFAULT_SELECT } = {}) {
+/**
+ * Cohere Rerank over people candidates (order swaps, OCR typos, nicknames).
+ * No-ops cleanly when Cohere is down or there aren't enough candidates.
+ */
+export async function rerankPeopleWithCohere(query, people, { limit } = {}) {
+  const list = Array.isArray(people) ? people : [];
+  if (list.length < 2) return list;
+  try {
+    const res = await fetch('/api/semantic-search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: query,
+        mode: 'rerank',
+        entity: 'people',
+        limit: Math.min(list.length, limit || 24),
+        candidates: list.slice(0, 40).map((p) => ({ id: p.id, name: p.name })),
+      }),
+    });
+    if (!res.ok) return list;
+    const body = await res.json();
+    const ranked = Array.isArray(body.people) ? body.people : [];
+    if (!ranked.length) return list;
+
+    const byId = new Map(list.map((p) => [p.id, p]));
+    const seen = new Set();
+    const out = [];
+    for (const r of ranked) {
+      const base = byId.get(r.id);
+      if (!base || seen.has(r.id)) continue;
+      seen.add(r.id);
+      out.push({
+        ...base,
+        _semantic: r._semantic,
+        _cohere: r._semantic,
+        _score: Math.max(Number(base._score || 0), Number(r._score || 0)),
+      });
+    }
+    // Keep any leftover lexical hits after Cohere's top-N.
+    for (const p of list) {
+      if (!seen.has(p.id)) out.push(p);
+    }
+    return out;
+  } catch {
+    return list;
+  }
+}
+
+export async function searchPeopleByName(
+  query,
+  { limit = 24, select = DEFAULT_SELECT, useCohere = true } = {},
+) {
   const q = String(query || '').trim();
   const tokens = personNameTokens(q);
   if (!tokens.length) return [];
@@ -70,7 +115,7 @@ export async function searchPeopleByName(query, { limit = 24, select = DEFAULT_S
     const tasks = [andQuery()];
     if (key) {
       tasks.push(
-        supabase.from('people').select(select).eq('name_key', key).limit(limit)
+        supabase.from('people').select(select).eq('name_key', key).limit(limit),
       );
     }
 
@@ -85,16 +130,14 @@ export async function searchPeopleByName(query, { limit = 24, select = DEFAULT_S
     }
   }
 
-  // Nothing matched by exact/substring — fall back to fuzzy suggestions so a
-  // near-miss ("Shola" vs "Sola") surfaces an existing person instead of looking
-  // like a brand-new name. Only on empty results, so ranked matches are never
-  // diluted by guesses.
-  if (!seen.size) {
-    addRows(await suggestSimilarPeople(q, { limit }));
+  // Fuzzy top-up: always for multi-token (OCR typos like Mirian/Marian), and
+  // for single-token when lexical returned nothing.
+  if (tokens.length >= 2 || !seen.size) {
+    addRows(await suggestSimilarPeople(q, { limit: Math.max(limit, 12) }));
   }
 
   const qFold = foldPersonText(q);
-  const ranked = [...seen.values()]
+  let ranked = [...seen.values()]
     .map((p) => {
       const pFold = foldPersonText(p.name);
       const pKey = sortedNameKey(p.name);
@@ -102,12 +145,29 @@ export async function searchPeopleByName(query, { limit = 24, select = DEFAULT_S
       if (pFold === qFold) score += 1000;
       else if (key && pKey === key) score += 800;
       else if (tokens.every((t) => pFold.includes(t))) score += 400;
+      else if (p._suggested) score += 120;
       else score += 50;
       if (p.photo_url) score += 5;
       return { ...p, _score: score };
     })
     .sort((a, b) => b._score - a._score)
-    .slice(0, limit);
+    .slice(0, Math.max(limit, 24));
+
+  if (useCohere && ranked.length >= 2) {
+    ranked = await rerankPeopleWithCohere(q, ranked, { limit });
+    ranked = ranked
+      .map((p) => ({
+        ...p,
+        _score: Math.max(
+          Number(p._score || 0),
+          Number(p._semantic || 0) * 500,
+        ),
+      }))
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit);
+  } else {
+    ranked = ranked.slice(0, limit);
+  }
 
   return ranked;
 }

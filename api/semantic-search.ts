@@ -5,12 +5,12 @@ import { supabase } from './_lib/supabase.js';
 export const maxDuration = 30;
 
 /**
- * Semantic film ranking without hammering Postgres IO.
+ * Semantic ranking without hammering Postgres IO.
  *
  * Default (Micro-safe): Cohere Rerank over caller-supplied lexical candidates.
- *   POST { q, mode?: 'rerank', candidates: [{ id, title }] }
+ *   POST { q, mode?: 'rerank', entity?: 'films'|'people', candidates: [{ id, title|name }] }
  *
- * Opt-in pgvector path (needs compute headroom + HNSW):
+ * Opt-in pgvector path (films only; needs compute headroom + HNSW):
  *   SEMANTIC_VECTOR_SEARCH=true
  *   POST { q, mode: 'vector', limit? }
  */
@@ -23,13 +23,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = req.method === 'GET' ? req.query : req.body || {};
   const q = String(body.q ?? '').trim();
   const mode = String(body.mode || 'rerank').toLowerCase();
+  const entity = String(body.entity || 'films').toLowerCase() === 'people' ? 'people' : 'films';
   const vectorEnabled = process.env.SEMANTIC_VECTOR_SEARCH === 'true';
 
-  if (q.length < 2) return res.status(400).json({ error: 'q too short', films: [] });
-  if (!hasCohere()) return res.status(503).json({ error: 'Cohere not configured', films: [] });
+  if (q.length < 2) {
+    return res.status(400).json({ error: 'q too short', films: [], people: [] });
+  }
+  if (!hasCohere()) {
+    return res.status(503).json({ error: 'Cohere not configured', films: [], people: [] });
+  }
 
   try {
     if (mode === 'vector') {
+      if (entity === 'people') {
+        return res.status(400).json({
+          error: 'vector mode is film-only; use mode=rerank with entity=people',
+          people: [],
+        });
+      }
       if (!vectorEnabled) {
         return res.status(503).json({
           error: 'pgvector search disabled (set SEMANTIC_VECTOR_SEARCH=true when compute allows)',
@@ -40,35 +51,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return await vectorSearch(q, body, res);
     }
 
-    return await rerankSearch(q, body, res);
+    return await rerankSearch(q, body, res, entity);
   } catch (err: any) {
     console.error('semantic-search:', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'semantic search failed', films: [] });
+    return res.status(500).json({
+      error: err?.message || 'semantic search failed',
+      films: [],
+      people: [],
+    });
   }
 }
 
-async function rerankSearch(q: string, body: any, res: VercelResponse) {
-  const candidates: Array<{ id: string; title?: string }> = Array.isArray(body.candidates)
+async function rerankSearch(
+  q: string,
+  body: any,
+  res: VercelResponse,
+  entity: 'films' | 'people',
+) {
+  const candidates: Array<{ id: string; title?: string; name?: string }> = Array.isArray(
+    body.candidates,
+  )
     ? body.candidates
     : [];
 
+  const emptyKey = entity === 'people' ? 'people' : 'films';
   if (candidates.length < 2) {
-    return res.json({ films: [], engine: 'cohere-rerank', note: 'need >=2 candidates' });
+    return res.json({
+      [emptyKey]: [],
+      films: entity === 'films' ? [] : undefined,
+      people: entity === 'people' ? [] : undefined,
+      engine: 'cohere-rerank',
+      note: 'need >=2 candidates',
+    });
   }
 
-  const docs = candidates.map((c) => String(c.title || c.id).slice(0, 500));
-  const ranked = await rerankWithCohere(q.slice(0, 500), docs, {
+  // People: nudge the model that order/typos/nicknames are the same person.
+  const query =
+    entity === 'people'
+      ? `Match this person name (order, nicknames in parentheses, and minor typos allowed): ${q}`.slice(
+          0,
+          500,
+        )
+      : q.slice(0, 500);
+
+  const docs = candidates.map((c) =>
+    String(c.name || c.title || c.id).slice(0, 500),
+  );
+  const ranked = await rerankWithCohere(query, docs, {
     topN: Math.min(candidates.length, Number(body.limit) || 24),
   });
 
-  const films = ranked.map((r) => ({
-    id: candidates[r.index]?.id,
-    title: candidates[r.index]?.title,
-    _score: Math.round(r.relevanceScore * 500),
-    _semantic: r.relevanceScore,
-  })).filter((f) => f.id);
+  const rows = ranked
+    .map((r) => {
+      const c = candidates[r.index];
+      if (!c?.id) return null;
+      return {
+        id: c.id,
+        title: c.title,
+        name: c.name || c.title,
+        _score: Math.round(r.relevanceScore * 500),
+        _semantic: r.relevanceScore,
+      };
+    })
+    .filter(Boolean);
 
-  return res.json({ films, engine: 'cohere-rerank' });
+  if (entity === 'people') {
+    return res.json({ people: rows, engine: 'cohere-rerank' });
+  }
+  return res.json({ films: rows, engine: 'cohere-rerank' });
 }
 
 async function vectorSearch(q: string, body: any, res: VercelResponse) {

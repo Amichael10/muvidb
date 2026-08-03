@@ -82,9 +82,10 @@ export default function CookieConsent() {
                 We value your privacy
               </h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                MuviDB uses essential cookies to keep you signed in, plus optional
-                analytics cookies to understand how the site is used so we can improve it.
-                You can accept or decline analytics — your choice is remembered. Read more in our{' '}
+                MuviDB uses essential cookies to keep you signed in. Optional analytics
+                cookies (PostHog) run only if you accept — under Nigeria’s Data Protection Act
+                2023, this is separate from reading our Privacy Policy. Your choice is
+                remembered. Details in our{' '}
                 <Link to="/privacy" className="text-brand hover:underline font-bold">
                   Privacy Policy
                 </Link>.

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
+import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { toTitleCase, toSentenceCase, formatPersonName } from '../utils/format'
 import { getZonedClock, isFutureShowtime } from '../utils/showtimes'
@@ -195,18 +196,12 @@ const Cinemas = () => {
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Page Header */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-          <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary mb-4 tracking-tighter uppercase italic">
-            Exhibition Hubs
-          </h1>
-          <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6">
-            Discover premier cinema locations across Nigeria and find where your favorite Nollywood blockbusters are playing today.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon="solar:city-bold"
+        eyebrow="Exhibition"
+        title="Cinemas"
+        description="Discover premier cinema locations across Nigeria and find where your favorite Nollywood blockbusters are playing today."
+      />
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">
         {/* Filters Section */}

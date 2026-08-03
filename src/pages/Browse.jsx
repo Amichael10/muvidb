@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useLoaderData } from 'react-router-dom';
+import { Icon } from '@iconify/react';
 import { supabase } from '../lib/supabase';
 import { getShowName } from '../utils/series';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Skeleton } from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import { PLATFORMS, platformFilter } from '../lib/platforms';
 
 export default function Browse() {
   const [searchParams] = useSearchParams();
@@ -136,6 +139,10 @@ export default function Browse() {
       // Filter: Only show non-mubi films OR mubi films from Nigeria
       query = query.or('source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}');
 
+      if (selectedPlatform) {
+        query = query.or(platformFilter(selectedPlatform));
+      }
+
       const sortMap = {
         'views': { column: 'view_count', ascending: false },
         'rating': { column: 'liked_percent', ascending: false },
@@ -159,22 +166,6 @@ export default function Browse() {
           countries: f.film_countries?.map(fc => fc.countries?.name).filter(Boolean) || []
         };
       });
-
-      // Filter by platform client-side to handle json checks easily
-      if (selectedPlatform) {
-        transformed = transformed.filter(f => {
-          if (f.release_type === selectedPlatform) return true;
-          if (selectedPlatform === 'youtube' && f.source === 'youtube') return true;
-          
-          let streamingLinks = {};
-          if (typeof f.streaming_links === 'string') {
-            try { streamingLinks = JSON.parse(f.streaming_links); } catch(e) {}
-          } else if (f.streaming_links) {
-            streamingLinks = f.streaming_links;
-          }
-          return !!streamingLinks[selectedPlatform];
-        });
-      }
 
       // Group TV Shows into Folders
       if (activeTab === 'series') {
@@ -282,30 +273,23 @@ export default function Browse() {
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Header Section */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary tracking-tighter transition-colors duration-300">
-                  Movies
-                </h1>
-                <p className="text-text-muted text-sm max-w-xl border-l-2 border-brand pl-6 transition-all duration-300">
-                  Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters.
-                </p>
-              </div>
-            </div>
-            <button 
-              className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-xs font-bold text-text-primary"
-              onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
-            >
-              Filters
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon="solar:clapperboard-play-bold"
+        eyebrow="Browse"
+        title="Movies"
+        description="Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters."
+        count={films.length}
+        countLabel="titles in view"
+        actions={
+          <button
+            className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-xs font-bold text-text-primary"
+            onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+          >
+            <Icon icon="solar:filter-linear" width="16" />
+            Filters
+          </button>
+        }
+      />
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-screen">
         <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
@@ -328,14 +312,15 @@ export default function Browse() {
 
             <div className="space-y-4">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Watch Platform</h4>
-              <select value={selectedPlatform} onChange={(e) => setSelectedPlatform(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all">
+              <select
+                value={selectedPlatform}
+                onChange={(e) => setSelectedPlatform(e.target.value)}
+                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+              >
                 <option value="">All Platforms</option>
-                <option value="netflix">Netflix</option>
-                <option value="kava">Kava</option>
-                <option value="docuth">Docuth</option>
-                <option value="prime_video">Prime Video</option>
-                <option value="youtube">YouTube</option>
-                <option value="showmax">Showmax</option>
+                {PLATFORMS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
               </select>
             </div>
 

@@ -15,12 +15,19 @@ import { searchPeopleByName } from '../../lib/peopleSearch';
 
 const PEOPLE_SELECT = 'id, name, photo_url, film_count';
 
-/** Exact + name-order-swap lookup for one talent string. */
+/**
+ * Resolve an OCR/typed credit name to an existing person.
+ * Lexical order-swap + near-typo first; Cohere rerank soft-links when confident.
+ */
 async function resolvePersonMatch(rawName) {
   const name = String(rawName || '').trim();
   if (!name) return null;
 
-  const hits = await searchPeopleByName(name, { limit: 12, select: PEOPLE_SELECT });
+  const hits = await searchPeopleByName(name, {
+    limit: 16,
+    select: PEOPLE_SELECT,
+    useCohere: true,
+  });
   const auto = pickAutoMatch(name, hits);
   if (auto) return auto;
 
