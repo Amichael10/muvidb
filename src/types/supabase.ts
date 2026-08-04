@@ -3321,16 +3321,22 @@ export type Database = {
           added_at: string
           film_id: string
           user_id: string
+          watched: boolean
+          watched_at: string | null
         }
         Insert: {
           added_at?: string
           film_id: string
           user_id: string
+          watched?: boolean
+          watched_at?: string | null
         }
         Update: {
           added_at?: string
           film_id?: string
           user_id?: string
+          watched?: boolean
+          watched_at?: string | null
         }
         Relationships: [
           {
@@ -3670,6 +3676,17 @@ export type Database = {
         Returns: {
           film_id: string
           similarity: number
+        }[]
+      }
+      match_people_by_name: {
+        Args: { p_limit?: number; p_name: string }
+        Returns: {
+          film_count: number
+          id: string
+          match_kind: string
+          name: string
+          photo_url: string
+          slug: string
         }[]
       }
       match_person_fuzzy: {

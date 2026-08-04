@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
+/** Persist watched flag on a watchlist row owned by `userId`. */
+export async function setWatchlistWatched(userId, filmId, watched) {
+  if (!userId || !filmId) return { error: new Error('Missing user or film') }
+  return supabase
+    .from('watchlist')
+    .update({
+      watched: !!watched,
+      watched_at: watched ? new Date().toISOString() : null,
+    })
+    .eq('user_id', userId)
+    .eq('film_id', filmId)
+}
+
 export const useWatchlist = (filmId, currentUser) => {
     const [inWatchlist, setInWatchlist] = useState(false)
     const [loading, setLoading] = useState(false)
