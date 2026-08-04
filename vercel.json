@@ -103,6 +103,10 @@
       "destination": "/api/data?_r=welcome-email"
     },
     {
+      "source": "/api/telegram",
+      "destination": "/api/data?_r=telegram"
+    },
+    {
       "source": "/api/youtube",
       "destination": "/api/external?provider=youtube"
     },

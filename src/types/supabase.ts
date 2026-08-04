@@ -145,6 +145,30 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_ips: {
+        Row: {
+          blocked_by: string
+          created_at: string
+          expires_at: string | null
+          ip: string
+          reason: string | null
+        }
+        Insert: {
+          blocked_by?: string
+          created_at?: string
+          expires_at?: string | null
+          ip: string
+          reason?: string | null
+        }
+        Update: {
+          blocked_by?: string
+          created_at?: string
+          expires_at?: string | null
+          ip?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       channel_flags: {
         Row: {
           channel_id: string

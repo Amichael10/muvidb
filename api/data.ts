@@ -5,6 +5,8 @@ import { handleChannels } from './_lib/channels_handler.js';
 import { handleContent } from './_lib/content_handler.js';
 import { handleJobApply } from './_lib/job_apply_handler.js';
 import { handleWelcomeEmail } from './_lib/welcome_email_handler.js';
+import { handleTelegramOps } from './_lib/telegram_ops_handler.js';
+import { rejectIfBlocked, trackPageHit } from './_lib/scrape_guard.js';
 
 // Consolidated data router (Hobby free-tier function budget — see
 // docs/SSR_MIGRATION.md). Public paths are preserved by vercel.json rewrites:
@@ -14,6 +16,7 @@ import { handleWelcomeEmail } from './_lib/welcome_email_handler.js';
 //   /api/content  -> /api/data?_r=content
 //   /api/job-apply -> /api/data?_r=job-apply
 //   /api/send-welcome-email -> /api/data?_r=welcome-email
+//   /api/telegram -> /api/data?_r=telegram
 //
 // The router param is `_r`, NOT `resource`: content.ts already owns `?resource=`
 // as its own dispatch key (film-credits, person-credits, person-films,
@@ -27,12 +30,26 @@ const ROUTES = {
   content: handleContent,
   'job-apply': handleJobApply,
   'welcome-email': handleWelcomeEmail,
+  telegram: handleTelegramOps,
 } as const;
+
+const TRACKED = new Set(['films', 'people', 'content', 'channels']);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const raw = req.query._r;
   const key = Array.isArray(raw) ? raw[0] : raw;
   const route = ROUTES[key as keyof typeof ROUTES];
   if (!route) return res.status(404).json({ error: 'Unknown resource' });
+
+  // Telegram webhook must never be blocked by IP rules
+  if (key !== 'telegram') {
+    if (await rejectIfBlocked(req)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (typeof key === 'string' && TRACKED.has(key)) {
+      trackPageHit(req, `/api/${key}`, 'api');
+    }
+  }
+
   return route(req, res);
 }
