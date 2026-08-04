@@ -13,6 +13,7 @@ import { toTitleCase } from '../utils/format';
 import { getZonedClock, getNextDate, isFutureShowtime, compareShowtimes } from '../utils/showtimes';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import PopcornField from '../components/ui/PopcornField';
+import { collapseSeriesFilms } from '../utils/series';
 
 // Below-fold sections — keep them out of the critical homepage JS chunk.
 const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
@@ -273,19 +274,21 @@ export default function Home() {
         runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
         is_featured, is_trending, release_type, streaming_links, source,
         youtube_watch_url, content_type, season_count, episode_count,
+        series_id, episode_number, season_number,
         film_genres(genres(name))
       `)
       .eq('content_type', 'series')
       .eq('is_trending', true)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('view_count', { ascending: false })
-      .limit(20);
+      .limit(40);
 
     if (!error && data) {
-      setFeaturedSeries(data.map(f => ({
+      const mapped = data.map(f => ({
         ...f,
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
+      }));
+      setFeaturedSeries(collapseSeriesFilms(mapped).slice(0, HOME_ROW_CAP));
     }
   };
 

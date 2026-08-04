@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 import { getFriendlyErrorMessage } from '../utils/errors';
+import { requestWelcomeEmail } from '../lib/welcomeEmail';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -61,6 +62,10 @@ export default function Signup() {
       const { user: signUpUser, session } = await signup(name, email, password, role, true);
       if (signUpUser && !session) {
         setError('Please check your email to verify your account.');
+      } else if (session) {
+        // Kick welcome email immediately when signup returns a live session
+        // (email confirmation disabled). AuthContext also retries on profile load.
+        void requestWelcomeEmail(name, { force: true });
       }
     } catch (err) {
       setError(getFriendlyErrorMessage(err));

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { Icon } from '@iconify/react';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
@@ -8,6 +9,7 @@ import { toTitleCase } from '../utils/format';
 import { searchAll } from '../lib/search';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { getCompanyLogoStrict } from '../lib/companyImages';
+import { collapseSeriesFilms } from '../utils/series';
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,7 +55,8 @@ export default function Search() {
       const { films: filmResults, people: peopleResults, companies: companyResults } =
         await searchAll(initialQuery);
 
-      // De-dupe films by title so re-uploads don't clutter results.
+      // De-dupe films by title so re-uploads don't clutter results, then
+      // collapse series episodes into a single folder-style card.
       const uniqueFilms = [];
       const titles = new Set();
       filmResults.forEach((f) => {
@@ -61,7 +64,7 @@ export default function Search() {
         if (!titles.has(key)) { uniqueFilms.push(f); titles.add(key); }
       });
 
-      setFilms(uniqueFilms);
+      setFilms(collapseSeriesFilms(uniqueFilms));
       setPeople(peopleResults);
       setCompanies(companyResults);
 
@@ -103,9 +106,7 @@ export default function Search() {
           <div className="max-w-3xl mx-auto">
             <form onSubmit={handleSearch} className="relative group">
               <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
-                <svg className="w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <Icon icon="solar:magnifer-linear" className="w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" />
               </div>
               <input 
                 type="text" 

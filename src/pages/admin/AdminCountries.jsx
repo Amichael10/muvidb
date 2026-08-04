@@ -170,7 +170,7 @@ export default function AdminCountries() {
             placeholder="Search countries or codes..."
             className="w-full h-12 bg-surface border border-border rounded-xl px-5 pl-11 text-text-primary text-sm focus:border-brand focus:outline-none transition-all shadow-xl"
           />
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-50">🔍</span>
+          <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-60 pointer-events-none" />
         </div>
       </div>
 

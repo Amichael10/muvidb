@@ -73,7 +73,7 @@ export async function getHeroCollage(): Promise<WelcomeCollage> {
 }
 
 export type SendWelcomeEmailResult =
-  | { ok: true; emailId?: string; skipped?: 'already_sent' | 'no_resend' | 'no_email' }
+  | { ok: true; emailId?: string; skipped?: 'already_sent' | 'no_email' }
   | { ok: false; error: string };
 
 /**
@@ -90,39 +90,64 @@ export async function sendWelcomeEmail(opts: {
 
   const resend = getResend();
   if (!resend) {
-    console.warn('[welcome-email] RESEND_API_KEY not configured — skipping');
-    return { ok: true, skipped: 'no_resend' };
+    console.error('[welcome-email] RESEND_API_KEY not configured');
+    return { ok: false, error: 'RESEND_API_KEY not configured on the server' };
   }
 
-  // Idempotency: already sent?
-  const { data: authUser, error: getErr } = await supabase.auth.admin.getUserById(opts.userId);
-  if (getErr) {
-    return { ok: false, error: getErr.message };
-  }
-  if (authUser?.user?.app_metadata?.welcome_email_sent) {
-    return { ok: true, skipped: 'already_sent' };
+  // Idempotency via auth app_metadata (needs service role). If admin API is
+  // unavailable we still send — the JWT already authenticated this user.
+  let existingMeta: Record<string, unknown> = {};
+  try {
+    const { data: authUser, error: getErr } = await supabase.auth.admin.getUserById(opts.userId);
+    if (getErr) {
+      console.warn('[welcome-email] admin getUserById failed (continuing):', getErr.message);
+    } else if (authUser?.user?.app_metadata?.welcome_email_sent) {
+      return { ok: true, skipped: 'already_sent' };
+    } else {
+      existingMeta = (authUser?.user?.app_metadata || {}) as Record<string, unknown>;
+    }
+  } catch (err: any) {
+    console.warn('[welcome-email] admin lookup threw (continuing):', err?.message || err);
   }
 
   const firstName =
-    (opts.firstName || '').trim()
-    || String(authUser?.user?.user_metadata?.name || '').split(/\s+/)[0]
+    (opts.firstName || '').trim().split(/\s+/).filter(Boolean)[0]
     || 'there';
 
   const from = (process.env.RESEND_FROM_EMAIL || '').trim() || DEFAULT_FROM;
   const replyTo = (process.env.RESEND_REPLY_TO || '').trim() || DEFAULT_REPLY_TO;
-  const collage = await getHeroCollage();
 
-  const html = await render(
-    React.createElement(MuviDbWelcomeEmail, {
-      firstName,
-      logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
-      exploreUrl: SITE,
-      helpUrl: `${SITE}/about`,
-      unsubscribeUrl: `${SITE}/dashboard`,
-      collage,
-      social: { ...WELCOME_EMAIL_ASSETS.social },
-    }),
-  );
+  let collage: WelcomeCollage;
+  try {
+    collage = await getHeroCollage();
+  } catch (err: any) {
+    console.warn('[welcome-email] collage failed, using placeholders:', err?.message || err);
+    collage = {
+      featuredPerson: FALLBACK_POSTER,
+      actor: FALLBACK_POSTER,
+      filmmaker: FALLBACK_POSTER,
+      moviePoster: FALLBACK_POSTER,
+      productionStill: FALLBACK_POSTER,
+    };
+  }
+
+  let html: string;
+  try {
+    html = await render(
+      React.createElement(MuviDbWelcomeEmail, {
+        firstName,
+        logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
+        exploreUrl: SITE,
+        helpUrl: `${SITE}/about`,
+        unsubscribeUrl: `${SITE}/dashboard`,
+        collage,
+        social: { ...WELCOME_EMAIL_ASSETS.social },
+      }),
+    );
+  } catch (err: any) {
+    console.error('[welcome-email] render failed:', err);
+    return { ok: false, error: `Email render failed: ${err?.message || err}` };
+  }
 
   const { data, error } = await resend.emails.send({
     from,
@@ -134,19 +159,26 @@ export async function sendWelcomeEmail(opts: {
 
   if (error) {
     console.error('[welcome-email] Resend error:', error);
-    return { ok: false, error: error.message };
+    return {
+      ok: false,
+      error: error.message || 'Resend rejected the send — check From domain and API key',
+    };
   }
 
   // Mark sent so retries / OAuth re-logins do not spam.
-  const { error: metaErr } = await supabase.auth.admin.updateUserById(opts.userId, {
-    app_metadata: {
-      ...(authUser?.user?.app_metadata || {}),
-      welcome_email_sent: true,
-      welcome_email_sent_at: new Date().toISOString(),
-    },
-  });
-  if (metaErr) {
-    console.warn('[welcome-email] sent but failed to mark metadata:', metaErr.message);
+  try {
+    const { error: metaErr } = await supabase.auth.admin.updateUserById(opts.userId, {
+      app_metadata: {
+        ...existingMeta,
+        welcome_email_sent: true,
+        welcome_email_sent_at: new Date().toISOString(),
+      },
+    });
+    if (metaErr) {
+      console.warn('[welcome-email] sent but failed to mark metadata:', metaErr.message);
+    }
+  } catch (err: any) {
+    console.warn('[welcome-email] sent but metadata update threw:', err?.message || err);
   }
 
   return { ok: true, emailId: data?.id };

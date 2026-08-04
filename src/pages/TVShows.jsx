@@ -6,19 +6,19 @@ import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Skeleton } from '../components/ui/Skeleton';
 import PageHeader from '../components/ui/PageHeader';
-import { getShowName } from '../utils/series';
-import { platformFilter } from '../lib/platforms';
+import { collapseSeriesFilms } from '../utils/series';
+import { PLATFORMS, platformFilter } from '../lib/platforms';
 
+// Public filters only — MUBI/Showmax stay scrape-only and are not in PLATFORMS.
 const PLATFORM_OPTIONS = [
   { value: '', label: 'All Platforms' },
-  { value: 'netflix', label: 'Netflix', icon: 'simple-icons:netflix', color: '#E50914' },
-  { value: 'prime_video', label: 'Prime Video', icon: 'simple-icons:primevideo', color: '#00A8E1' },
-  { value: 'showmax', label: 'Showmax', icon: 'solar:tv-linear', color: '#E10098' },
-  { value: 'youtube', label: 'YouTube', icon: 'simple-icons:youtube', color: '#FF0000' },
-  { value: 'kava', label: 'Kava', icon: 'solar:play-circle-bold', color: '#E84090' },
-  { value: 'mubi', label: 'MUBI', icon: 'solar:film-linear', color: '#E6C619' },
-  { value: 'ebonylife', label: 'EbonyLife', icon: 'solar:tv-bold', color: '#F8A008' },
-  { value: 'nollistream', label: 'NolliStream', icon: 'solar:play-circle-bold', color: '#D0A008' },
+  ...PLATFORMS.filter((p) => !p.isCinema).map((p) => ({
+    value: p.id,
+    label: p.name,
+    icon: p.icon,
+    color: p.color,
+    logo: p.logo,
+  })),
 ];
 
 // SeriesCard removed - using global FilmCard instead
@@ -71,6 +71,7 @@ export default function TVShows() {
           streaming_links, youtube_watch_url, view_count, average_rating, liked_percent, audience_rating,
           tmdb_rating, runtime_minutes, synopsis, tagline,
           season_count, episode_count, content_type, slug,
+          series_id, episode_number,
           film_genres(genres(name))
         `, { count: 'exact' })
         .eq('content_type', 'series')
@@ -98,80 +99,21 @@ export default function TVShows() {
       const { data, error: dbError, count } = await query;
       if (dbError) throw dbError;
 
-      let rawData = (data || []).map(film => ({
+      const rawData = (data || []).map(film => ({
         ...film,
         genres: (() => {
           const relatedGenres = film.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
           return relatedGenres.length > 0 ? relatedGenres : (Array.isArray(film.genres) ? film.genres.filter(Boolean) : []);
         })()
       }));
-      
-      // Grouping Logic
-      const groupedShows = {};
-      const getPrefixMatch = (str1, str2) => {
-        const words1 = str1.split(/[\s:-]+/);
-        const words2 = str2.split(/[\s:-]+/);
-        let prefix = [];
-        for (let i = 0; i < Math.min(words1.length, words2.length); i++) {
-          if (words1[i].toLowerCase() === words2[i].toLowerCase()) {
-            prefix.push(words1[i]);
-          } else {
-            break;
-          }
-        }
-        return prefix.join(' ');
-      };
 
-      // If pageNum > 0, we can just group the new page independently, 
-      // or we group the whole list. Since we only have `rawData` here, let's group it.
-      // (If some episodes of the same show are on different pages, they might appear as separate groups 
-      // per page, but for sorting by newest/popular, they usually cluster together).
-      rawData.forEach(film => {
-        let showName = getShowName(film.title);
-
-        let foundGroup = false;
-        if (!groupedShows[showName]) {
-          for (const existingShowName in groupedShows) {
-            const prefix = getPrefixMatch(existingShowName, showName);
-            if (prefix.length >= 6 && prefix.split(' ').length >= 1) {
-              if (prefix.length / existingShowName.length >= 0.4 && prefix.length / showName.length >= 0.4) {
-                const group = groupedShows[existingShowName];
-                group.episodes_list.push(film);
-                group.title = prefix;
-                if (prefix !== existingShowName) {
-                  groupedShows[prefix] = group;
-                  delete groupedShows[existingShowName];
-                }
-                foundGroup = true;
-                break;
-              }
-            }
-          }
-        } else {
-          groupedShows[showName].episodes_list.push(film);
-          foundGroup = true;
-        }
-
-        if (!foundGroup) {
-          groupedShows[showName] = { 
-            ...film, 
-            title: showName, 
-            original_title: film.title, 
-            episodes_list: [film] 
-          };
-        }
-      });
-
-      let transformed = Object.values(groupedShows).map(group => ({
-        ...group,
-        is_series_group: true,
-        episodes_count: group.episodes_list.length
-      }));
+      // Folder-style cards: one per show, badge uses episode_count when available.
+      const transformed = collapseSeriesFilms(rawData);
 
       if (pageNum === 0) {
         setShows(transformed);
       } else {
-        setShows(prev => [...prev, ...transformed]);
+        setShows(prev => collapseSeriesFilms([...prev, ...transformed]));
       }
       setTotalCount(count || 0);
     } catch (err) {
@@ -270,6 +212,7 @@ export default function TVShows() {
           <div className="flex-1 p-8 md:p-12">
             {/* Search Bar */}
             <div className="mb-8 relative max-w-md">
+              <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-lg pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -277,13 +220,14 @@ export default function TVShows() {
                 placeholder="Search TV shows by title..."
                 className="w-full h-12 bg-surface border border-border text-text-primary rounded-xl px-5 pl-11 text-sm focus:border-brand focus:outline-none transition-all shadow-md"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-50">🔍</span>
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-sm font-bold"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  aria-label="Clear search"
                 >
-                  ✕
+                  <Icon icon="solar:close-circle-linear" className="text-lg" />
                 </button>
               )}
             </div>

@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useLoaderData } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { supabase } from '../lib/supabase';
-import { getShowName } from '../utils/series';
+import { collapseSeriesFilms } from '../utils/series';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Skeleton } from '../components/ui/Skeleton';
 import PageHeader from '../components/ui/PageHeader';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
+import { NFVCB_RATING_OPTIONS } from '../lib/contributions';
 
 export default function Browse() {
   const [searchParams] = useSearchParams();
@@ -35,13 +36,17 @@ export default function Browse() {
   const [selectedGenres, setSelectedGenres] = useState(initialGenre ? [initialGenre] : []);
   const [selectedCountries, setSelectedCountries] = useState(initialCountry ? [initialCountry] : []);
   const [selectedPlatform, setSelectedPlatform] = useState(initialPlatform);
-  const [yearRange, setYearRange] = useState(2000);
+  const [selectedYear, setSelectedYear] = useState(''); // '' = any year; otherwise exact year
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [language, setLanguage] = useState('');
   const [sortBy, setSortBy] = useState(initialSort);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [genresExpanded, setGenresExpanded] = useState(false);
   const activeTab = 'movie';
+  const GENRE_PREVIEW = 10;
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 1979 }, (_, i) => currentYear - i);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -67,7 +72,7 @@ export default function Browse() {
       return;
     }
     fetchFilms();
-  }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy, debouncedSearchQuery]);
+  }, [selectedGenres, selectedCountries, selectedPlatform, selectedYear, selectedRatings, language, sortBy, debouncedSearchQuery]);
 
   const fetchGenres = async () => {
     try {
@@ -132,7 +137,7 @@ export default function Browse() {
         query = query.ilike('title', `%${debouncedSearchQuery.trim()}%`);
       }
 
-      if (yearRange > 1990) query = query.gte('year', yearRange);
+      if (selectedYear) query = query.eq('year', parseInt(selectedYear, 10));
       if (language) query = query.eq('language', language);
       if (selectedRatings.length > 0) query = query.in('nfvcb_rating', selectedRatings);
       
@@ -158,7 +163,7 @@ export default function Browse() {
       
       if (dbError) throw dbError;
 
-      let transformed = (data || []).map(f => {
+      const transformed = (data || []).map(f => {
         const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
         return {
           ...f,
@@ -167,71 +172,7 @@ export default function Browse() {
         };
       });
 
-      // Group TV Shows into Folders
-      if (activeTab === 'series') {
-        const groupedShows = {};
-        
-        const getPrefixMatch = (str1, str2) => {
-          const words1 = str1.split(/[\s:-]+/);
-          const words2 = str2.split(/[\s:-]+/);
-          let prefix = [];
-          for (let i = 0; i < Math.min(words1.length, words2.length); i++) {
-            if (words1[i].toLowerCase() === words2[i].toLowerCase()) {
-              prefix.push(words1[i]);
-            } else {
-              break;
-            }
-          }
-          return prefix.join(' ');
-        };
-
-        transformed.forEach(film => {
-          let showName = getShowName(film.title);
-
-          let foundGroup = false;
-          if (!groupedShows[showName]) {
-            for (const existingShowName in groupedShows) {
-              const prefix = getPrefixMatch(existingShowName, showName);
-              // if they share at least 1 word and the prefix is at least 6 chars
-              if (prefix.length >= 6 && prefix.split(' ').length >= 1) {
-                // Require the prefix to be a significant part of the title (> 50%)
-                if (prefix.length / existingShowName.length >= 0.4 && prefix.length / showName.length >= 0.4) {
-                  const group = groupedShows[existingShowName];
-                  group.episodes_list.push(film);
-                  group.title = prefix; // Update title to the broader prefix
-                  if (prefix !== existingShowName) {
-                    groupedShows[prefix] = group;
-                    delete groupedShows[existingShowName];
-                  }
-                  foundGroup = true;
-                  break;
-                }
-              }
-            }
-          } else {
-            groupedShows[showName].episodes_list.push(film);
-            foundGroup = true;
-          }
-
-          if (!foundGroup) {
-            groupedShows[showName] = { 
-              ...film, 
-              title: showName, // Use the base show name for display
-              original_title: film.title, // Keep original title just in case
-              episodes_list: [film] 
-            };
-          }
-        });
-
-        // Convert grouped object back to array
-        transformed = Object.values(groupedShows).map(group => ({
-          ...group,
-          is_series_group: true,
-          episodes_count: group.episodes_list.length
-        }));
-      }
-
-      setFilms(transformed);
+      setFilms(collapseSeriesFilms(transformed));
     } catch (err) {
       console.error('Fetch error:', err);
       setError('Could not connect to the movie database.');
@@ -240,7 +181,7 @@ export default function Browse() {
     }
   };
 
-  const nfvcbRatings = ['PG', '12', '15', '18'];
+  const nfvcbRatings = NFVCB_RATING_OPTIONS.map((o) => o.value);
   
   const toggleGenre = (genre) => {
     setSelectedGenres(prev => 
@@ -264,12 +205,16 @@ export default function Browse() {
     setSelectedGenres([]);
     setSelectedCountries([]);
     setSelectedPlatform('');
-    setYearRange(2000);
+    setSelectedYear('');
     setSelectedRatings([]);
     setLanguage('');
     setSortBy('views');
     setSearchQuery('');
+    setGenresExpanded(false);
   };
+
+  const visibleGenres = genresExpanded ? dbGenres : dbGenres.slice(0, GENRE_PREVIEW);
+  const hiddenGenreCount = Math.max(0, dbGenres.length - GENRE_PREVIEW);
 
   return (
     <div className="min-h-screen bg-bg">
@@ -326,8 +271,8 @@ export default function Browse() {
 
             <div className="space-y-6">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Genres</h4>
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-4 custom-scrollbar">
-                {dbGenres.map(genre => (
+              <div className="space-y-3">
+                {visibleGenres.map(genre => (
                   <label key={genre} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleGenre(genre)}>
                     <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedGenres.includes(genre) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
                       {selectedGenres.includes(genre) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -336,11 +281,20 @@ export default function Browse() {
                   </label>
                 ))}
               </div>
+              {hiddenGenreCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setGenresExpanded((v) => !v)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand hover:underline"
+                >
+                  {genresExpanded ? 'Show less' : `${hiddenGenreCount}+ more`}
+                </button>
+              )}
             </div>
 
             <div className="space-y-6">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Countries</h4>
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-4 custom-scrollbar">
+              <div className="space-y-3">
                 {dbCountries.map(country => (
                   <label key={country} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleCountry(country)}>
                     <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedCountries.includes(country) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
@@ -352,12 +306,18 @@ export default function Browse() {
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Timeline</h4>
-                <span className="text-[10px] font-bold text-brand">{yearRange}+</span>
-              </div>
-              <input type="range" min="1990" max="2025" value={yearRange} onChange={(e) => setYearRange(parseInt(e.target.value))} className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-brand" />
+            <div className="space-y-4">
+              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Year</h4>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+              >
+                <option value="">Any year</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-6">
@@ -376,6 +336,7 @@ export default function Browse() {
           <div className="flex-1 p-4 md:p-8 lg:p-12">
             {/* Search Bar */}
             <div className="mb-8 relative max-w-md">
+              <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-lg pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -383,13 +344,14 @@ export default function Browse() {
                 placeholder="Search movies by title..."
                 className="w-full h-12 bg-surface border border-border text-text-primary rounded-xl px-5 pl-11 text-sm focus:border-brand focus:outline-none transition-all shadow-md"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-50">🔍</span>
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-sm font-bold"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  aria-label="Clear search"
                 >
-                  ✕
+                  <Icon icon="solar:close-circle-linear" className="text-lg" />
                 </button>
               )}
             </div>

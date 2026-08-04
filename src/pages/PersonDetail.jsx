@@ -23,7 +23,7 @@ const PLATFORM_STYLES = {
   netflix:  { label: 'Netflix',  bg: 'bg-red-600/20',     text: 'text-red-400',     dot: 'bg-red-500'    },
   youtube:  { label: 'YouTube',  bg: 'bg-red-500/20',     text: 'text-red-400',     dot: 'bg-red-500'    },
   amazon:   { label: 'Prime',    bg: 'bg-blue-500/20',    text: 'text-blue-400',    dot: 'bg-blue-400'   },
-  showmax:  { label: 'Showmax',  bg: 'bg-purple-500/20',  text: 'text-purple-400',  dot: 'bg-purple-400' },
+  prime_video: { label: 'Prime', bg: 'bg-blue-500/20',    text: 'text-blue-400',    dot: 'bg-blue-400'   },
   iroko:    { label: 'iROKO',    bg: 'bg-green-500/20',   text: 'text-green-400',   dot: 'bg-green-400'  },
   kava:     { label: 'Kava',     bg: 'bg-pink-500/20',    text: 'text-pink-400',    dot: 'bg-pink-500'   },
   docuth:   { label: 'Docuth',   bg: 'bg-zinc-800/40',    text: 'text-zinc-200',    dot: 'bg-zinc-400'   },
@@ -32,6 +32,8 @@ const PLATFORM_STYLES = {
 function PlatformBadge({ releaseType }) {
   if (!releaseType) return null
   const key = releaseType.toLowerCase()
+  // Scrape-only platforms — never surface to the public.
+  if (key === 'showmax' || key === 'mubi') return null
   const style = PLATFORM_STYLES[key]
   if (!style) return (
     <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted bg-surface-2 px-1.5 py-0.5 rounded">

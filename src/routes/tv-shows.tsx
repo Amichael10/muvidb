@@ -1,7 +1,7 @@
 import { data } from 'react-router';
 import { supabaseServer } from '../lib/supabase.server';
 import { CACHE_OK } from '../lib/seo';
-import { getShowName } from '../utils/series';
+import { collapseSeriesFilms } from '../utils/series';
 
 /**
  * TV Shows: first 48 parent series by created_at — matches TVShows.jsx
@@ -15,11 +15,12 @@ const COLUMNS = `
   streaming_links, youtube_watch_url, view_count, average_rating, liked_percent,
   audience_rating, tmdb_rating, runtime_minutes, synopsis, tagline,
   season_count, episode_count, content_type, slug,
+  series_id, episode_number,
   film_genres(genres(name))
 `;
 
 function seedTransform(rows: any[]) {
-  return rows.map((film) => {
+  const mapped = rows.map((film) => {
     const related =
       film.film_genres?.map((fg: any) => fg.genres?.name).filter(Boolean) || [];
     const genres =
@@ -28,17 +29,9 @@ function seedTransform(rows: any[]) {
         : Array.isArray(film.genres)
           ? film.genres.filter(Boolean)
           : [];
-    const showName = getShowName(film.title);
-    return {
-      ...film,
-      genres,
-      title: showName,
-      original_title: film.title,
-      episodes_list: [{ ...film, genres }],
-      is_series_group: true,
-      episodes_count: 1,
-    };
+    return { ...film, genres };
   });
+  return collapseSeriesFilms(mapped);
 }
 
 export async function loader({ request }: { request: Request }) {

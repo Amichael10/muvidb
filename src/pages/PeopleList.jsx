@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { SuggestPersonModal } from '../components/contribute/ContributeModals'
-import { Link, useNavigate, useLoaderData } from 'react-router-dom'
+import { Link, useNavigate, useLoaderData, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
@@ -126,6 +126,7 @@ const PersonSkeleton = () => (
 const PeopleList = () => {
   const { user } = useAuth()
   const loaderData = useLoaderData()
+  const [searchParams, setSearchParams] = useSearchParams()
   const seeded = !!loaderData?.seeded && (loaderData.people?.length ?? 0) > 0
   const [showSuggest, setShowSuggest] = useState(false)
   const [people, setPeople] = useState(loaderData?.people ?? [])
@@ -140,14 +141,31 @@ const PeopleList = () => {
     return () => clearTimeout(timer)
   }, [search])
 
-  const [roleFilter, setRoleFilter] = useState('All')
+  const roles = PEOPLE_ROLE_FILTERS
+  const roleFromUrl = searchParams.get('role')
+  const initialRole = roleFromUrl && roles.includes(roleFromUrl) ? roleFromUrl : 'All'
+  const [roleFilter, setRoleFilter] = useState(initialRole)
   const [sortBy, setSortBy] = useState('popularity')
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
   const PAGE_SIZE = 20
-  const roles = PEOPLE_ROLE_FILTERS
-  const skipInitialFetch = useRef(seeded)
+  const skipInitialFetch = useRef(seeded && initialRole === 'All')
+
+  useEffect(() => {
+    const role = searchParams.get('role')
+    if (role && roles.includes(role) && role !== roleFilter) {
+      setRoleFilter(role)
+    }
+  }, [searchParams])
+
+  const selectRole = (role) => {
+    setRoleFilter(role)
+    const next = new URLSearchParams(searchParams)
+    if (role === 'All') next.delete('role')
+    else next.set('role', role)
+    setSearchParams(next, { replace: true })
+  }
 
   useEffect(() => {
     if (skipInitialFetch.current) {
@@ -281,12 +299,13 @@ const PeopleList = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-border border-b border-border">
           <div className="lg:col-span-1 p-8 space-y-4 bg-surface-2/5">
              <div className="relative">
+                <Icon icon="solar:magnifer-linear" className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-base pointer-events-none" />
                 <input
                   type="text"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="SEARCH ARCHIVE..."
-                  className="w-full bg-surface border border-border text-text-primary rounded-lg px-6 py-4 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
+                  className="w-full bg-surface border border-border text-text-primary rounded-lg pl-12 pr-6 py-4 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
                 />
              </div>
           </div>
@@ -295,7 +314,7 @@ const PeopleList = () => {
             {roles.map(role => (
               <button
                 key={role}
-                onClick={() => setRoleFilter(role)}
+                onClick={() => selectRole(role)}
                 className={`px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
                   roleFilter === role
                     ? 'bg-brand text-white shadow-lg shadow-brand/20'

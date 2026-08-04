@@ -12,16 +12,16 @@ const footerGroups = [
       { label: 'Browse Movies', to: '/browse' },
       { label: 'Awards', to: '/awards' },
       { label: 'Top Rated', to: '/browse?sort=rating' },
-      { label: 'New Releases', to: '/browse?sort=new' },
+      { label: 'New Releases', to: '/browse?sort=newest' },
     ],
   },
   {
     title: 'People',
     links: [
-      { label: 'Actors', to: '/browse?type=actors' },
-      { label: 'Directors', to: '/browse?type=directors' },
-      { label: 'Producers', to: '/browse?type=producers' },
-      { label: 'Writers', to: '/browse?type=writers' },
+      { label: 'Actors', to: '/people?role=Actor' },
+      { label: 'Directors', to: '/people?role=Director' },
+      { label: 'Producers', to: '/people?role=Producer' },
+      { label: 'Writers', to: '/people?role=Writer' },
     ],
   },
   {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 
@@ -225,7 +226,7 @@ export default function AdminCinemaScraping() {
             placeholder="Search facility signature..."
             className="w-full h-14 bg-surface border border-border rounded-md px-6 pl-14 text-text-primary text-sm focus:border-brand focus:outline-none transition-all placeholder:text-text-muted/30 shadow-xl group-hover:border-border-hover"
           />
-          <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl opacity-30">🔍</span>
+          <Icon icon="solar:magnifer-linear" className="absolute left-6 top-1/2 -translate-y-1/2 text-xl opacity-40 pointer-events-none" />
         </div>
       </div>
 
@@ -299,14 +300,14 @@ export default function AdminCinemaScraping() {
                           }`}
                           title={cinema.scrape_enabled ? 'Turn Off' : 'Turn On'}
                         >
-                           {cinema.scrape_enabled ? '⏸' : '▶'}
+                           <Icon icon={cinema.scrape_enabled ? 'solar:pause-bold' : 'solar:play-bold'} />
                         </button>
                         <button
                           onClick={() => window.open(`/admin/cinemas?edit=${cinema.id}`, '_blank')}
                           className="w-10 h-10 rounded-md bg-surface border border-border flex items-center justify-center text-text-muted hover:text-brand hover:border-brand/30 transition-all shadow-md active:scale-90"
                           title="Edit Details"
                         >
-                           🔍
+                           <Icon icon="solar:magnifer-linear" />
                         </button>
                      </div>
                   </td>

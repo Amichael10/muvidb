@@ -234,7 +234,7 @@ export default function AdminChannelDetail() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full h-14 bg-surface border border-border rounded-lg px-6 pl-14 text-text-primary text-sm focus:border-brand focus:outline-none transition-all placeholder:text-text-muted/30 group-hover:border-border-hover shadow-2xl"
                 />
-                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted opacity-50 text-xl">🔍</span>
+                <Icon icon="solar:magnifer-linear" className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-xl pointer-events-none" />
                </div>
             </div>
             <div className="flex gap-4">

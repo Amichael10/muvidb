@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 import FilmCard from './FilmCard';
+import { collapseSeriesFilms } from '../../utils/series';
 import ImageWithFallback from '../ui/ImageWithFallback';
 
 const GENRES = [
@@ -125,7 +126,8 @@ export default function GenreRail({ variant = 'grid' }) {
           id, slug, title, poster_url, backdrop_url, year, language,
           runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
           is_featured, is_trending, release_type, streaming_links, source,
-          youtube_watch_url, content_type, season_count, created_at, release_date,
+          youtube_watch_url, content_type, season_count, episode_count,
+          series_id, episode_number, created_at, release_date,
           film_genres!inner(genres!inner(name))
         `)
         .eq('film_genres.genres.name', selectedGenre)
@@ -134,14 +136,14 @@ export default function GenreRail({ variant = 'grid' }) {
         .limit(50);
       if (!active) return;
       if (!error && data) {
-        // Shuffle the array and take the first 20
-        const shuffled = [...data].sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 20);
-
-        setFilteredFilms(selected.map(f => ({
+        const mapped = data.map(f => ({
           ...f,
           genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-        })));
+        }));
+        // Collapse episodes first so shuffle/pick isn't all one show's parts.
+        const collapsed = collapseSeriesFilms(mapped);
+        const shuffled = [...collapsed].sort(() => 0.5 - Math.random());
+        setFilteredFilms(shuffled.slice(0, 20));
       } else {
         setFilteredFilms([]);
       }

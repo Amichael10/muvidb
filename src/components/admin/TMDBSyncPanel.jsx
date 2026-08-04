@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Icon } from '@iconify/react'
 import { supabase } from '../../lib/supabase'
 import {
   searchTmdbMovies,
@@ -386,7 +387,7 @@ const TMDBSyncPanel = () => {
               : 'text-text-muted hover:text-text-primary'
           }`}
         >
-          🔍 Search TMDB
+          <span className="inline-flex items-center justify-center gap-1.5"><Icon icon="solar:magnifer-linear" /> Search TMDB</span>
         </button>
         <button
           onClick={() => setActiveTab('discover')}
@@ -396,7 +397,7 @@ const TMDBSyncPanel = () => {
               : 'text-text-muted hover:text-text-primary'
           }`}
         >
-          🇳🇬 Discover Nigerian Films
+          <span className="inline-flex items-center justify-center gap-1.5"><Icon icon="solar:globus-linear" /> Discover Nigerian Films</span>
         </button>
       </div>
 

@@ -111,7 +111,6 @@ export const RELEASE_TYPE_OPTIONS = [
   { value: 'youtube_premium', label: 'YouTube (paid / members)' },
   { value: 'netflix', label: 'Netflix' },
   { value: 'prime_video', label: 'Prime Video' },
-  { value: 'showmax', label: 'Showmax' },
   { value: 'apple_tv', label: 'Apple TV' },
   { value: 'disney_plus', label: 'Disney+' },
   { value: 'hulu', label: 'Hulu' },

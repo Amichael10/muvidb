@@ -783,7 +783,7 @@ export default function AdminCreditsExtractor() {
                     {isSearchingFilms ? (
                       <div className="p-8 text-center text-sm text-text-muted font-medium flex items-center justify-center gap-2">
                         <div className="w-4.5 h-4.5 border-2 border-brand/30 border-t-brand rounded-full animate-spin"></div>
-                        <span>🔍 Searching database...</span>
+                        <span>Searching database...</span>
                       </div>
                     ) : filteredFilms.length === 0 ? (
                       <div className="p-8 text-center text-sm text-text-muted font-medium">No results found</div>
@@ -1106,7 +1106,7 @@ export default function AdminCreditsExtractor() {
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-surface-2 text-text-muted border border-border">
-                              🔍 Verification pending
+                              Verification pending
                             </span>
                           )}
                         </td>

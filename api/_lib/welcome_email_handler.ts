@@ -62,7 +62,9 @@ export async function handleWelcomeEmail(req: VercelRequest, res: VercelResponse
   });
 
   if (!result.ok) {
-    return res.status(500).json({ success: false, error: result.error });
+    const status = /RESEND_API_KEY/i.test(result.error || '') ? 503 : 500;
+    console.error('[welcome-email] failed:', result.error);
+    return res.status(status).json({ success: false, error: result.error });
   }
 
   return res.status(200).json({

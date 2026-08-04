@@ -447,7 +447,7 @@ function DiscoveryHub({ onMonitor }) {
         </div>
       ) : query && !loading && (
         <div className="text-center py-20 bg-surface-2/50 rounded-2xl border border-dashed border-border">
-          <p className="text-4xl mb-4 opacity-20">🔍</p>
+          <Icon icon="solar:magnifer-linear" className="text-4xl mb-4 opacity-20 mx-auto" />
           <h3 className="text-sm font-bold text-text-primary uppercase tracking-widest">No Sources Found</h3>
           <p className="text-xs text-text-muted mt-2">Try searching for generic keywords like "Nollywood" or "Nigerian Movies"</p>
         </div>
@@ -666,7 +666,7 @@ export default function AdminChannels() {
               placeholder="Search monitored sources..."
               className="w-full h-14 bg-surface border border-border rounded-xl px-6 pl-12 text-text-primary text-sm focus:border-brand focus:outline-none transition-all shadow-xl"
             />
-            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted opacity-50">🔍</span>
+            <Icon icon="solar:magnifer-linear" className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-lg pointer-events-none" />
           </div>
         </div>
       )}

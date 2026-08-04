@@ -160,21 +160,37 @@ export default function FilmDetail() {
 
   const fetchEpisodes = async (seriesId, showName) => {
     try {
-      let query = supabase
-        .from('films')
-        .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug');
-
-      if (showName) {
-         query = query.eq('content_type', 'series').ilike('title', `${showName}%`);
-      } else {
-         query = query.eq('series_id', seriesId);
+      // Prefer manually linked children (series_id), then fall back to title variants.
+      let linked = [];
+      if (seriesId) {
+        const { data, error } = await supabase
+          .from('films')
+          .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug')
+          .eq('series_id', seriesId)
+          .order('title', { ascending: true });
+        if (error) throw error;
+        linked = data || [];
       }
 
-      // Order by title so "Chapter 1" comes before "Chapter 2" etc.
-      const { data, error } = await query.order('title', { ascending: true });
+      let byTitle = [];
+      if (showName) {
+        const { data, error } = await supabase
+          .from('films')
+          .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug')
+          .eq('content_type', 'series')
+          .ilike('title', `${showName}%`)
+          .order('title', { ascending: true });
+        if (error) throw error;
+        byTitle = data || [];
+      }
 
-      if (error) throw error;
-      setEpisodes(data || []);
+      const seen = new Set();
+      const merged = [...linked, ...byTitle].filter((ep) => {
+        if (!ep?.id || seen.has(ep.id) || ep.id === seriesId) return false;
+        seen.add(ep.id);
+        return true;
+      });
+      setEpisodes(merged);
     } catch (error) {
       console.error('Error fetching episodes:', error);
     }
