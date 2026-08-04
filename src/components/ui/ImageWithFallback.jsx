@@ -2,6 +2,7 @@
 import { getImageSrcSet, getProxiedImageUrl, normalizeImageUrl } from '../../lib/imageUrl';
 import { PERSON_PLACEHOLDER } from '../../lib/personImages';
 import { COMPANY_PLACEHOLDER } from '../../lib/companyImages';
+import { FILM_PLACEHOLDER } from '../../lib/filmImages';
 
 // Premium brand-aligned gradients for fallback backgrounds
 const PRESET_GRADIENTS = [
@@ -47,7 +48,7 @@ export default function ImageWithFallback({
   src,
   alt = '',
   className = '',
-  fallbackType = 'avatar', // 'avatar' | 'company' | 'banner' | 'video'
+  fallbackType = 'avatar', // 'avatar' | 'company' | 'film' | 'banner' | 'video'
   name = '',
   width, // optional: request an optimized image of this width (Supabase storage only)
   quality = 75,
@@ -61,12 +62,16 @@ export default function ImageWithFallback({
   onError,
   ...props
 }) {
+  // 'film' = branded poster/backdrop empty-state. 'banner' stays gradient chrome
+  // (channels / non-film heroes) so we don't stamp film art onto channel cards.
   const emptyPlaceholder =
     fallbackType === 'avatar'
       ? PERSON_PLACEHOLDER
       : fallbackType === 'company'
         ? COMPANY_PLACEHOLDER
-        : null;
+        : fallbackType === 'film'
+          ? FILM_PLACEHOLDER
+          : null;
   const initialSrc = (!src && emptyPlaceholder)
     ? emptyPlaceholder
     : getHighResYoutubeThumbnail(src);
@@ -75,7 +80,7 @@ export default function ImageWithFallback({
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Sync state if the src changes dynamically.
-  // Avatar/company empties use branded placeholders (display-only).
+  // Avatar/company/film empties use branded placeholders (display-only).
   useEffect(() => {
     if (!src && emptyPlaceholder) {
       setImgSrc(emptyPlaceholder);
@@ -117,10 +122,10 @@ export default function ImageWithFallback({
       // If hqdefault also fails, try standard default (mqdefault)
       const fallbackSrc = imgSrc.replace('/hqdefault.jpg', '/mqdefault.jpg');
       setImgSrc(fallbackSrc);
-    } else if (emptyPlaceholder && imgSrc !== emptyPlaceholder) {
-      // Broken / missing person or company image → branded empty state.
-      setImgSrc(emptyPlaceholder);
     } else {
+      // Existing logos/photos must never be swapped for the branded empty-state
+      // asset. Only missing src uses the placeholder (set above); broken URLs
+      // fall back to initials / banner chrome.
       setHasError(true);
       onError?.(event);
     }
@@ -225,16 +230,27 @@ export default function ImageWithFallback({
   // Supabase Pro serves the tiny preview from its transformed-image CDN. For
   // YouTube, keep maxres as the final image while hqdefault paints underneath
   // immediately; failed maxres requests then reveal an already-warm fallback.
-  const mainUrl = getProxiedImageUrl(imgSrc, { width, quality });
-  const youtubePreview = getYoutubePreviewThumbnail(imgSrc);
-  const lqip = youtubePreview || getProxiedImageUrl(imgSrc, { width: 32, quality: 35 });
+  // Branded empty-state assets must fully replace the color fill (no letterboxed
+  // gradient peeking through object-contain / object-cover). Serve them as raw
+  // public URLs — never LQIP / srcset / proxy (avoids Vite resolving missing files).
+  const isBrandedPlaceholder =
+    imgSrc === PERSON_PLACEHOLDER
+    || imgSrc === COMPANY_PLACEHOLDER
+    || imgSrc === FILM_PLACEHOLDER;
+  const mainUrl = isBrandedPlaceholder ? imgSrc : getProxiedImageUrl(imgSrc, { width, quality });
+  const youtubePreview = isBrandedPlaceholder ? '' : getYoutubePreviewThumbnail(imgSrc);
+  const lqip = youtubePreview || (!isBrandedPlaceholder
+    ? getProxiedImageUrl(imgSrc, { width: 32, quality: 35 })
+    : '');
   const hasUsefulPreview = Boolean(lqip && lqip !== mainUrl);
-  const placeholderStyle = hasUsefulPreview
-    ? { backgroundImage: `url("${lqip}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` };
-  const generatedSrcSet = srcSet || (width
+  const placeholderStyle = isBrandedPlaceholder
+    ? { background: imgSrc === FILM_PLACEHOLDER ? '#111111' : '#e8e8e8' }
+    : hasUsefulPreview
+      ? { backgroundImage: `url("${lqip}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+      : { background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` };
+  const generatedSrcSet = (!isBrandedPlaceholder && (srcSet || (width
     ? getImageSrcSet(imgSrc, [Math.max(32, Math.round(width / 2)), width], quality)
-    : undefined);
+    : undefined))) || undefined;
   const revealStyle = {
     ...placeholderStyle,
     filter: isLoaded ? 'blur(0)' : hasUsefulPreview ? 'blur(7px)' : 'none',

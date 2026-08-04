@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { requestWelcomeEmail } from '../lib/welcomeEmail';
 
 const AuthContext = createContext();
 
@@ -45,6 +46,11 @@ export function AuthProvider({ children }) {
         role: finalRole,
         loading: false,
       }));
+
+      // New accounts only — server is idempotent; never blocks auth UX.
+      void requestWelcomeEmail(
+        authUser.user_metadata?.name || authUser.user_metadata?.full_name,
+      );
     } catch (err) {
       console.error('Error in fetchUserProfile:', err);
       setAuthState(prev => ({

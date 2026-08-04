@@ -18,13 +18,13 @@ const CompanyCard = ({ company, filmCount }) => {
       <div className="p-6">
         <div className="flex items-start gap-5">
           <div className="flex-shrink-0">
-            <div className={`w-16 h-16 rounded-xl border border-border flex items-center justify-center overflow-hidden ${hasLogo ? 'bg-white p-2' : 'bg-black'}`}>
+            <div className={`w-16 h-16 rounded-xl border border-border flex items-center justify-center overflow-hidden ${hasLogo ? 'bg-white p-2' : 'bg-surface-2'}`}>
               <ImageWithFallback
                 src={company.logo_url}
                 alt={toTitleCase(company.name)}
                 fallbackType="company"
                 name={toTitleCase(company.name)}
-                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                className={`w-full h-full group-hover:scale-110 transition-transform duration-500 ${hasLogo ? 'object-contain' : 'object-cover'}`}
                 width={128}
                 sizes="64px"
                 loading="lazy"
@@ -166,7 +166,6 @@ const Companies = () => {
       const count = filmCounts[c.id] || 0
       if (catalogFilter === 'with_films' && count < 1) return false
       if (catalogFilter === 'with_logo' && !c.logo_url) return false
-      if (catalogFilter === 'with_website' && !c.website) return false
       if (catalogFilter === 'founded' && !c.founded_year) return false
 
       return true
@@ -276,7 +275,6 @@ const Companies = () => {
                   { id: 'all', label: 'All studios' },
                   { id: 'with_films', label: 'Linked to films' },
                   { id: 'with_logo', label: 'Has logo' },
-                  { id: 'with_website', label: 'Has website' },
                   { id: 'founded', label: 'Has founded year' },
                 ].map((opt) => (
                   <button

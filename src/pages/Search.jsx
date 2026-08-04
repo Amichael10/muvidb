@@ -203,13 +203,13 @@ export default function Search() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                     {companies.map(company => (
                        <div key={company.id} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
-                         <div className={`w-14 h-14 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform border border-border/50 overflow-hidden ${getCompanyLogoStrict(company) ? 'bg-white' : 'bg-black'}`}>
+                         <div className={`w-14 h-14 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform border border-border/50 overflow-hidden ${getCompanyLogoStrict(company) ? 'bg-white' : 'bg-surface-2'}`}>
                             <ImageWithFallback
                               src={company.logo_url}
                               alt={toTitleCase(company.name)}
                               fallbackType="company"
                               name={toTitleCase(company.name)}
-                              className={`w-full h-full object-contain ${getCompanyLogoStrict(company) ? 'p-2' : ''}`}
+                              className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain p-2' : 'object-cover'}`}
                               width={112}
                               sizes="56px"
                               loading="lazy"

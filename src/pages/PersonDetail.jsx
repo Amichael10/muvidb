@@ -692,7 +692,7 @@ const PersonDetail = () => {
                     <ImageWithFallback
                       src={credit.films.poster_url}
                       alt={credit.films.title}
-                      fallbackType="poster"
+                      fallbackType="film"
                       name={credit.films.title}
                       className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
                       width={384}
@@ -762,22 +762,16 @@ const PersonDetail = () => {
                     className="group block"
                   >
                     <div className="relative overflow-hidden rounded-lg aspect-[2/3] bg-surface-2 border border-border group-hover:border-brand transition-all shadow-sm">
-                      {poster ? (
-                        <ImageWithFallback
-                          src={poster}
-                          alt={title}
-                          fallbackType="poster"
-                          name={title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          width={384}
-                          sizes="(max-width: 639px) calc(50vw - 24px), (max-width: 767px) calc(33vw - 24px), (max-width: 1023px) calc(25vw - 24px), 180px"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-text-muted/30" />
-                        </div>
-                      )}
+                      <ImageWithFallback
+                        src={poster}
+                        alt={title}
+                        fallbackType="film"
+                        name={title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        width={384}
+                        sizes="(max-width: 639px) calc(50vw - 24px), (max-width: 767px) calc(33vw - 24px), (max-width: 1023px) calc(25vw - 24px), 180px"
+                        loading="lazy"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-80" />
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <p className="text-text-primary text-[11px] font-bold tracking-tight line-clamp-2 leading-tight group-hover:text-brand transition-colors">
@@ -879,7 +873,7 @@ const PersonDetail = () => {
                                 <ImageWithFallback
                                   src={film.poster_url}
                                   alt={workTitle || ''}
-                                  fallbackType="banner"
+                                  fallbackType="film"
                                   name={workTitle || ''}
                                   className="w-full h-full object-cover"
                                   width={96}

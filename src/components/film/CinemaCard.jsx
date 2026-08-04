@@ -69,7 +69,7 @@ export default function CinemaCard({ film }) {
             src={film.poster_url || film.backdrop_url}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-            fallbackType="banner"
+            fallbackType="film"
             name={title}
             loading="lazy"
             width={640}

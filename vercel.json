@@ -31,6 +31,7 @@
       "maxDuration": 60
     },
     "api/data.ts": {
+      "includeFiles": "emails/**",
       "maxDuration": 60
     },
     "api/automation.ts": {
@@ -96,6 +97,10 @@
     {
       "source": "/api/job-apply",
       "destination": "/api/data?_r=job-apply"
+    },
+    {
+      "source": "/api/send-welcome-email",
+      "destination": "/api/data?_r=welcome-email"
     },
     {
       "source": "/api/youtube",

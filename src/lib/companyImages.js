@@ -6,7 +6,12 @@
  * accurate.
  */
 
-export const COMPANY_PLACEHOLDER = '/images/company-placeholder.png';
+export const COMPANY_PLACEHOLDER = '/images/company-placeholder.svg';
+
+const PLACEHOLDER_PATHS = new Set([
+  COMPANY_PLACEHOLDER,
+  '/images/company-placeholder.png', // legacy generated asset
+]);
 
 /** True logo URL only — does not fall back to the placeholder. */
 export function getCompanyLogoStrict(company) {
@@ -14,7 +19,7 @@ export function getCompanyLogoStrict(company) {
   const url = company.logo_url || company.logo || null;
   if (!url || typeof url !== 'string') return null;
   const trimmed = url.trim();
-  if (!trimmed || trimmed === COMPANY_PLACEHOLDER) return null;
+  if (!trimmed || PLACEHOLDER_PATHS.has(trimmed)) return null;
   return trimmed;
 }
 
@@ -24,5 +29,5 @@ export function getCompanyLogo(company) {
 }
 
 export function isCompanyPlaceholder(url) {
-  return !url || url === COMPANY_PLACEHOLDER;
+  return !url || PLACEHOLDER_PATHS.has(url);
 }

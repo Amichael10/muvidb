@@ -250,7 +250,7 @@ export default function GenreRail({ variant = 'grid' }) {
                   <ImageWithFallback
                     src={genre.coverImage}
                     alt=""
-                    fallbackType="banner"
+                    fallbackType="film"
                     name={genre.name}
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     width={640}
@@ -349,7 +349,7 @@ export default function GenreRail({ variant = 'grid' }) {
                     <ImageWithFallback
                       src={genre.coverImage} 
                       alt=""
-                      fallbackType="banner"
+                      fallbackType="film"
                       name={genre.name}
                       className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50 group-hover:scale-110 transition-all duration-700"
                       width={640}

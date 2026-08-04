@@ -525,7 +525,7 @@ export default function FilmDetail() {
           src={getFilmBackdrop(film)}
           alt={`${formatFilmTitle(film.title)} Backdrop`} 
           className="absolute inset-0 w-full h-full object-cover"
-          fallbackType="banner"
+          fallbackType="film"
           name={formatFilmTitle(film.title)}
           width={1600}
           quality={78}
@@ -543,7 +543,7 @@ export default function FilmDetail() {
                 src={getFilmPoster(film)}
                 alt={`${formatFilmTitle(film.title)} Poster`} 
                 className="w-full rounded-xl shadow-2xl border border-white/10 object-cover aspect-[2/3]"
-                fallbackType="banner"
+                fallbackType="film"
                 name={formatFilmTitle(film.title)}
                 width={512}
                 sizes="256px"
@@ -864,7 +864,7 @@ export default function FilmDetail() {
                           src={episode.poster_url || film.poster_url || film.poster}
                           alt={episode.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          fallbackType="banner"
+                          fallbackType="film"
                           name={episode.title}
                           width={384}
                           sizes="(max-width: 639px) 100vw, 192px"
@@ -1049,13 +1049,13 @@ export default function FilmDetail() {
             <div className="p-8">
               {film.film_companies?.length > 0 ? (
                 <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4 group transition-all cursor-default">
-                  <div className="w-12 h-12 bg-black rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50">
+                  <div className={`w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50 ${film.film_companies[0].companies?.logo_url ? 'bg-black' : 'bg-surface-2'}`}>
                     <ImageWithFallback
                       src={film.film_companies[0].companies?.logo_url}
                       alt={film.film_companies[0].companies?.name || 'Studio logo'}
                       fallbackType="company"
                       name={film.film_companies[0].companies?.name || 'Studio'}
-                      className="w-full h-full object-contain"
+                      className={`w-full h-full ${film.film_companies[0].companies?.logo_url ? 'object-contain' : 'object-cover'}`}
                       width={96}
                       sizes="48px"
                       loading="lazy"
@@ -1211,7 +1211,7 @@ export default function FilmDetail() {
                       src={relatedFilm.poster_url || relatedFilm.poster} 
                       alt={relatedFilm.title}
                       className="w-full aspect-[2/3] lg:w-12 lg:h-16 lg:aspect-auto object-cover rounded-md border border-border"
-                      fallbackType="poster"
+                      fallbackType="film"
                       name={relatedFilm.title}
                       width={192}
                       sizes="(max-width: 639px) 40vw, (max-width: 1023px) 20vw, 48px"

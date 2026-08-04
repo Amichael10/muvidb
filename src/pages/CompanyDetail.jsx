@@ -14,17 +14,13 @@ const FilmCard = ({ film }) => (
     className="group block"
   >
     <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[#13192B]">
-      {film.poster_url ? (
-        <img
-          src={film.poster_url}
-          alt={film.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-text-muted/30" />
-        </div>
-      )}
+      <ImageWithFallback
+        src={film.poster_url}
+        alt={film.title}
+        name={film.title}
+        fallbackType="film"
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
 
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
@@ -71,13 +67,13 @@ const PersonCard = ({ person, role }) => (
 
 const PartnerCard = ({ company }) => (
   <Link to={`/companies/${company.slug || company.id}`} className="block group text-center w-[120px] shrink-0">
-    <div className={`w-24 h-24 mx-auto rounded-xl shadow-sm border-2 border-transparent group-hover:border-brand transition-colors mb-3 flex items-center justify-center overflow-hidden ${getCompanyLogoStrict(company) ? 'bg-white p-3' : 'bg-black'}`}>
+    <div className={`w-24 h-24 mx-auto rounded-xl shadow-sm border-2 border-transparent group-hover:border-brand transition-colors mb-3 flex items-center justify-center overflow-hidden ${getCompanyLogoStrict(company) ? 'bg-white p-3' : 'bg-surface-2'}`}>
       <ImageWithFallback
         src={company.logo_url}
         alt={toTitleCase(company.name)}
         fallbackType="company"
         name={toTitleCase(company.name)}
-        className="max-w-full max-h-full object-contain"
+        className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain' : 'object-cover'}`}
         width={192}
         sizes="96px"
         loading="lazy"
@@ -265,13 +261,13 @@ const CompanyDetail = () => {
           {/* Left: Logo & Core Info */}
           <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
             <div className="shrink-0">
-              <div className={`w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border border-brand/30 flex items-center justify-center shadow-2xl relative ${getCompanyLogoStrict(company) ? 'bg-black/40 p-6' : 'bg-black'}`}>
+              <div className={`w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border border-brand/30 flex items-center justify-center shadow-2xl relative ${getCompanyLogoStrict(company) ? 'bg-black/40 p-6' : 'bg-surface-2'}`}>
                 <ImageWithFallback
                   src={company.logo_url}
                   alt={toTitleCase(company.name)}
                   fallbackType="company"
                   name={toTitleCase(company.name)}
-                  className="max-w-full max-h-full object-contain"
+                  className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain' : 'object-cover'}`}
                   width={448}
                   sizes="(max-width: 767px) 192px, 224px"
                   loading="eager"

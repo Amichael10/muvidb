@@ -19,6 +19,18 @@ Many Nollywood streaming sources (including NolliStream) only provide a poster/t
 
 ---
 
+## Empty poster / backdrop placeholder
+
+**Rule:** Films with no poster and no backdrop show the branded asset at `/images/film-placeholder.webp` at display time only.
+
+- Helpers: `getFilmPoster` / `getFilmBackdrop` (display), `getFilmPosterStrict` / `getFilmBackdropStrict` (real URLs only).
+- `ImageWithFallback` with `fallbackType="film"`.
+- Never write the placeholder into `poster_url` / `backdrop_url` (keeps “has poster” filters accurate).
+- Broken existing poster URLs still fall back to gradient chrome — they are not replaced by the placeholder.
+- Channel banners keep `fallbackType="banner"` (gradient), not the film placeholder.
+
+---
+
 ## NolliStream
 
 Official platform id: `nollistream`  

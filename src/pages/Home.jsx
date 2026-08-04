@@ -1131,7 +1131,7 @@ export default function Home() {
                                 <ImageWithFallback
                                   src={film.poster_url}
                                   alt={film.title}
-                                  fallbackType="banner"
+                                  fallbackType="film"
                                   name={film.title}
                                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                   width={256}
@@ -1331,13 +1331,13 @@ export default function Home() {
                         className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl border border-hairline flex items-center justify-center overflow-hidden shrink-0 ${company.logo_url ? 'bg-white p-1' : 'bg-black'}`}>
+                          <div className={`w-12 h-12 rounded-xl border border-hairline flex items-center justify-center overflow-hidden shrink-0 ${company.logo_url ? 'bg-white p-1' : 'bg-surface-2'}`}>
                             <ImageWithFallback
                               src={company.logo_url}
                               alt={company.name}
                               fallbackType="company"
                               name={company.name}
-                              className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                              className={`w-full h-full group-hover:scale-110 transition-transform duration-500 ${company.logo_url ? 'object-contain' : 'object-cover'}`}
                               width={96}
                               sizes="48px"
                               loading="lazy"

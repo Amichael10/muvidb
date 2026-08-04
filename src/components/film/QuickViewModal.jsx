@@ -142,7 +142,7 @@ export default function QuickViewModal() {
               src={getFilmBackdrop(selectedFilm)} 
               alt={formatFilmTitle(selectedFilm.title)} 
               className="w-full h-full object-cover"
-              fallbackType="banner"
+              fallbackType="film"
               name={formatFilmTitle(selectedFilm.title)}
             />
             {/* Gradients */}

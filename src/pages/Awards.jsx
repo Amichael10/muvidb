@@ -507,6 +507,7 @@ function AwardCard({ row, winner = false, accent }) {
             src={film?.poster_url}
             alt={film?.title || ''}
             name={film?.title || ''}
+            fallbackType="film"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
         </Link>

@@ -222,7 +222,7 @@ export default function FilmCard({
               src={getFilmBackdrop(film)}
               alt={formatFilmTitle(film.title)}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              fallbackType="banner"
+              fallbackType="film"
               name={formatFilmTitle(film.title)}
               loading="lazy"
               width={640}
@@ -297,7 +297,7 @@ export default function FilmCard({
             src={film.poster_url || film.poster}
             alt={formatFilmTitle(film.title)}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-            fallbackType="banner"
+            fallbackType="film"
             name={formatFilmTitle(film.title)}
             loading="lazy"
             width={384}

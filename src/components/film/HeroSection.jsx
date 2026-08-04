@@ -94,7 +94,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     src={getFilmBackdrop(featuredFilm)}
                     alt={formatFilmTitle(featuredFilm.title)}
                     className="w-full h-full object-cover animate-kenburns"
-                    fallbackType="banner"
+                    fallbackType="film"
                     name={formatFilmTitle(featuredFilm.title)}
                     width={1280}
                     quality={78}
@@ -120,7 +120,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       src={featuredFilm.poster_url || featuredFilm.poster}
                       alt={formatFilmTitle(featuredFilm.title)}
                       className="w-full h-full object-cover"
-                      fallbackType="banner"
+                      fallbackType="film"
                       name={formatFilmTitle(featuredFilm.title)}
                       width={384}
                       sizes="150px"
@@ -256,7 +256,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                           src={film.poster_url || film.poster}
                           alt={formatFilmTitle(film.title)}
                           className="w-full h-full object-cover"
-                          fallbackType="banner"
+                          fallbackType="film"
                           name={formatFilmTitle(film.title)}
                           width={256}
                           sizes="120px"

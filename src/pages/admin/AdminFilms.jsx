@@ -19,6 +19,7 @@ import { getFriendlyErrorMessage } from '../../utils/errors';
 import { authHeaders } from '../../lib/apiAuth';
 import { parseLanguages, AFRICAN_LANGUAGES } from '../../utils/languages';
 import { resolveFilmImageFields } from '../../lib/filmImages';
+import { NFVCB_RATING_OPTIONS } from '../../lib/contributions';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -2180,14 +2181,21 @@ export default function AdminFilms() {
                     <input type="number" name="runtime_minutes" value={formData.runtime_minutes} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Content Rating</label>
+                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">NFVCB classification</label>
                     <select
                       name="nfvcb_rating"
-                      value={formData.nfvcb_rating}
+                      value={formData.nfvcb_rating || ''}
                       onChange={handleChange}
                       className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
                     >
-                      {['G', 'PG', 'PG-13', '15', '18'].map(r => <option key={r} value={r}>{r}</option>)}
+                      <option value="">Select...</option>
+                      {NFVCB_RATING_OPTIONS.map((r) => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                      {/* Legacy MPAA value still in the DB enum until fully remapped */}
+                      {formData.nfvcb_rating === 'PG-13' && (
+                        <option value="PG-13">PG-13 — legacy (remap to 12 / 12A)</option>
+                      )}
                     </select>
                   </div>
                 </div>
