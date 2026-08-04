@@ -342,6 +342,19 @@ async function checkPrereqs() {
 }
 
 // --------------------------------------------------------------- enqueue ----
+type EnqueueFilmPriorityInput = {
+  updated_at?: string | null;
+  created_at?: string | null;
+  view_count?: number | null;
+};
+
+function latestYoutubeFilmPriority(f: EnqueueFilmPriorityInput) {
+  const timestampPriority = Math.floor(Date.parse(f.updated_at || f.created_at || '') / 1000);
+  return Number.isFinite(timestampPriority)
+    ? Math.min(timestampPriority, 2_000_000_000)
+    : Math.round(Math.log10((f.view_count ?? 0) + 1) * 10);
+}
+
 async function enqueueRecon(perChannel: number) {
   console.log(`📋 Recon enqueue: up to ${perChannel} films per channel…`);
   // Sample a few films per channel to learn WHICH CHANNELS EVEN HAVE CREDITS.
@@ -352,7 +365,7 @@ async function enqueueRecon(perChannel: number) {
   for (;;) {
     const { data, error } = await supabase
       .from('channel_videos')
-      .select('film_id, channel_id, films!inner(id, view_count, youtube_watch_url, is_published)')
+      .select('film_id, channel_id, films!inner(id, view_count, updated_at, created_at, youtube_watch_url, is_published)')
       .not('film_id', 'is', null)
       .range(from, from + 999);
     if (error) throw new Error(error.message);
@@ -364,7 +377,7 @@ async function enqueueRecon(perChannel: number) {
       const n = seen.get(ch) ?? 0;
       if (n >= perChannel) continue;
       seen.set(ch, n + 1);
-      rows.push({ film_id: r.film_id, channel_id: r.channel_id, priority: Math.round(Math.log10((f.view_count ?? 0) + 1) * 10) });
+      rows.push({ film_id: r.film_id, channel_id: r.channel_id, priority: latestYoutubeFilmPriority(f) });
     }
     if (data.length < 1000) break;
     from += 1000;
@@ -377,22 +390,22 @@ async function enqueuePopular(limit: number) {
   console.log(`📋 Popularity enqueue: top ${limit} YouTube films…`);
   const { data, error } = await supabase
     .from('films')
-    .select('id, view_count')
+    .select('id, view_count, updated_at, created_at')
     .eq('is_published', true)
     .not('youtube_watch_url', 'is', null)
     .order('view_count', { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error) throw new Error(error.message);
   await insertJobs((data ?? []).map((f: any) => ({
-    film_id: f.id, channel_id: null, priority: Math.round(Math.log10((f.view_count ?? 0) + 1) * 10),
+    film_id: f.id, channel_id: null, priority: latestYoutubeFilmPriority(f),
   })));
 }
 
 /**
  * Enqueue films that AREN'T already enriched — fewer than `minCredits` existing
  * cast+crew rows. This is the main targeting mode: ~5k films already have full
- * credits (>=4) and re-harvesting them is pure waste. Ordered like the Films
- * admin page ("Recently Added" first) so page-1 movies become approvable first.
+ * credits (>=4) and re-harvesting them is pure waste. Ordered by the latest
+ * updated YouTube films first, matching the worker claim and review queue.
  */
 async function enqueueSparse(minCredits: number) {
   console.log(`📋 Sparse enqueue: published YouTube films with < ${minCredits} existing credits…`);
@@ -415,22 +428,20 @@ async function enqueueSparse(minCredits: number) {
   for (;;) {
     const { data, error } = await supabase
       .from('films')
-      .select('id, view_count, created_at')
+      .select('id, view_count, updated_at, created_at')
       .eq('is_published', true)
       .not('youtube_watch_url', 'is', null)
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false, nullsFirst: false })
       .range(from, from + 999);
     if (error) throw new Error(`films: ${error.message}`);
     if (!data?.length) break;
     for (const f of data as any[]) {
       if ((creditCount.get(f.id) ?? 0) < minCredits) {
-        const createdPriority = Math.floor(Date.parse(f.created_at || '') / 1000);
         rows.push({
           film_id: f.id,
           channel_id: null,
-          priority: Number.isFinite(createdPriority)
-            ? Math.min(createdPriority, 2_000_000_000)
-            : Math.round(Math.log10((f.view_count ?? 0) + 1) * 10),
+          priority: latestYoutubeFilmPriority(f),
         });
       }
     }
@@ -1149,7 +1160,7 @@ async function finish(
   );
 }
 
-/** Claim the next pending job (highest priority first). */
+/** Claim the next pending job (latest updated YouTube film first). */
 async function claim(): Promise<Job | null> {
   const { data, error } = await supabase.rpc('claim_credit_harvest_job', {
     p_worker_id: WORKER_ID,
