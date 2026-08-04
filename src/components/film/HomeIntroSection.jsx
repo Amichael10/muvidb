@@ -10,6 +10,7 @@ const PILLARS = [
     body: 'See Netflix, Prime, YouTube, Kava, and more — plus what’s in cinemas now.',
     to: '/browse',
     cue: 'Stream & cinema',
+    image: '/images/home-intro/where-to-watch.png',
   },
   {
     icon: 'solar:ticket-linear',
@@ -17,6 +18,7 @@ const PILLARS = [
     body: 'Find cinema times, then dig into cast, crew, and filmographies.',
     to: '/showtimes',
     cue: 'Times & credits',
+    image: '/images/home-intro/showtimes-people.png',
   },
   {
     icon: 'solar:chat-round-like-linear',
@@ -24,6 +26,7 @@ const PILLARS = [
     body: 'Build your taste, leave reviews, and follow actors and filmmakers you care about.',
     to: '/signup',
     cue: 'Your taste',
+    image: '/images/home-intro/rate-review.png',
   },
 ];
 
@@ -165,28 +168,54 @@ export default function HomeIntroSection() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={reduceMotion ? undefined : { opacity: 0, y: -14, scale: 0.99 }}
                   transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                  className="relative overflow-hidden rounded-2xl border border-border/90 bg-surface/70 backdrop-blur-md shadow-[0_24px_60px_-28px_rgba(0,0,0,0.55)]"
+                  className="relative overflow-hidden rounded-2xl border border-border/90 bg-surface shadow-[0_24px_60px_-28px_rgba(0,0,0,0.55)]"
                 >
+                  {/* Right-aligned atmospheric image (blurred) */}
                   <div
-                    className="pointer-events-none absolute -right-6 -top-10 font-heading font-bold text-[7.5rem] leading-none tracking-tighter text-text-primary/[0.04] select-none"
+                    aria-hidden
+                    className="pointer-events-none absolute inset-y-0 right-0 w-[72%] sm:w-[55%]"
+                  >
+                    <img
+                      src={pillar.image}
+                      alt=""
+                      className="h-full w-full object-cover object-right scale-[1.12] blur-[3px] sm:blur-[3.5px]"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div className="absolute inset-0 bg-black/40" />
+                  </div>
+
+                  {/* Fade image into solid card on the left so text stays crisp */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background:
+                        'linear-gradient(270deg, transparent 0%, transparent 22%, color-mix(in srgb, var(--color-surface) 55%, transparent) 48%, var(--color-surface) 72%)',
+                    }}
+                  />
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-60"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 48%)',
+                    }}
+                  />
+
+                  <div
+                    className="pointer-events-none absolute -right-6 -top-10 font-heading font-bold text-[7.5rem] leading-none tracking-tighter text-text-primary/[0.05] select-none z-[1]"
                     aria-hidden
                   >
                     0{active + 1}
                   </div>
-                  <div
-                    className="pointer-events-none absolute inset-0 opacity-80"
-                    style={{
-                      background:
-                        'linear-gradient(135deg, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 45%)',
-                    }}
-                  />
 
                   <Link
                     to={pillar.to}
-                    className="relative z-10 flex flex-col gap-6 p-6 sm:p-8 min-h-[260px] sm:min-h-[280px]"
+                    className="relative z-10 flex flex-col gap-6 p-6 sm:p-8 min-h-[280px] sm:min-h-[300px] sm:pr-[48%]"
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <span className="w-12 h-12 rounded-xl bg-brand/12 border border-brand/25 flex items-center justify-center text-brand shadow-sm">
+                      <span className="w-12 h-12 rounded-xl bg-brand/12 border border-brand/25 flex items-center justify-center text-brand shadow-sm backdrop-blur-sm">
                         <Icon icon={pillar.icon} className="w-6 h-6" />
                       </span>
                       <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand/90 pt-1">
@@ -198,7 +227,7 @@ export default function HomeIntroSection() {
                       <h3 className="font-heading font-bold text-2xl sm:text-[1.75rem] text-text-primary tracking-tight leading-tight">
                         {pillar.title}
                       </h3>
-                      <p className="text-text-secondary text-sm sm:text-[15px] leading-relaxed max-w-md">
+                      <p className="text-text-secondary text-sm sm:text-[15px] leading-relaxed">
                         {pillar.body}
                       </p>
                     </div>
