@@ -1,0 +1,17 @@
+#!/bin/sh
+# Strip AI tool attribution trailers so GitHub Contributors stays human-only.
+# Enable for this repo: git config core.hooksPath .githooks
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+
+tmp="$MSG_FILE.strip"
+grep -viE '^[[:space:]]*Co-authored-by:[[:space:]]*.*(Cursor|Claude|Anthropic|v0|Copilot|OpenAI|ChatGPT|Codex|Gemini|Devin)|cursoragent@cursor\.com|noreply@anthropic\.com' "$MSG_FILE" \
+  | grep -viE '^[[:space:]]*(Made-with|Made with):[[:space:]]*' \
+  > "$tmp"
+
+if [ -s "$tmp" ]; then
+  mv "$tmp" "$MSG_FILE"
+else
+  rm -f "$tmp"
+fi
+exit 0
