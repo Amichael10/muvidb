@@ -55,6 +55,17 @@ export async function handleWelcomeEmail(req: VercelRequest, res: VercelResponse
     || String(user.user_metadata?.name || user.user_metadata?.full_name || '');
   const firstName = rawName.split(/\s+/).filter(Boolean)[0] || null;
 
+  // Ops alert — dynamic import only when this route runs (keeps api/data lean).
+  void import('./signup_notify.js')
+    .then(({ notifySignupOnce }) => notifySignupOnce({
+      userId: user.id,
+      email: user.email,
+      firstName,
+      role: typeof user.user_metadata?.role === 'string' ? user.user_metadata.role : null,
+      provider: typeof user.app_metadata?.provider === 'string' ? user.app_metadata.provider : null,
+    }))
+    .catch((err) => console.warn('[welcome-email] signup notify skipped:', err?.message || err));
+
   const result = await sendWelcomeEmail({
     userId: user.id,
     email: user.email,
