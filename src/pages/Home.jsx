@@ -927,7 +927,7 @@ export default function Home() {
                     <button
                       key={p.id}
                       onClick={() => setStreamTab(p.id)}
-                      className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 ${
+                      className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-200 ${
                         active ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-text-secondary hover:border-brand/40 hover:text-text-primary'
                       }`}
                     >
@@ -1257,7 +1257,7 @@ export default function Home() {
                             <h3 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-1">
                               {crew.name}
                             </h3>
-                            <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+                            <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl">
                               {crew.known_for_department || 'Crew'}
                             </span>
                           </div>

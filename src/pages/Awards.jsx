@@ -520,7 +520,7 @@ function AwardCard({ row, winner = false, accent }) {
       <div className="relative z-[1] flex min-w-0 flex-1 flex-col justify-center gap-1">
         {winner && (
           <span
-            className="inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white"
+            className="inline-flex w-fit items-center gap-1 rounded-xl px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white"
             style={{ background: accent }}
           >
             <Icon icon="solar:cup-star-bold" width="11" />

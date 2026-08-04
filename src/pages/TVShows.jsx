@@ -316,7 +316,7 @@ export default function TVShows() {
                     <button
                       onClick={loadMore}
                       disabled={loading}
-                      className="px-8 py-3 bg-surface border border-border hover:border-brand text-text-primary text-xs font-bold rounded-full transition-all hover:bg-brand hover:text-white disabled:opacity-50"
+                      className="px-8 py-3 bg-surface border border-border hover:border-brand text-text-primary text-xs font-bold rounded-xl transition-all hover:bg-brand hover:text-white disabled:opacity-50"
                     >
                       {loading ? 'Loading...' : `Load More (${totalCount - shows.length} remaining)`}
                     </button>

@@ -830,7 +830,7 @@ const PersonDetail = () => {
               if (wins) parts.push(`${wins} ${wins === 1 ? 'win' : 'wins'}`)
               if (noms) parts.push(`${noms} ${noms === 1 ? 'nomination' : 'nominations'}`)
               return (
-                <span className="text-[10px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-full px-3 py-1">
+                <span className="text-[10px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-xl px-3 py-1">
                   {parts.join(' & ')} total
                 </span>
               )

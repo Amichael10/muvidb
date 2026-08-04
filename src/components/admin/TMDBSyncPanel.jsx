@@ -633,7 +633,7 @@ const MovieList = ({ movies, importedTmdbIds, importingId, importProgress, onImp
                   {movie.genreNames.map(genre => (
                     <span
                       key={genre}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border"
+                      className="text-[10px] px-2 py-0.5 rounded-xl bg-surface text-text-muted border border-border"
                     >
                       {genre}
                     </span>

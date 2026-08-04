@@ -51,7 +51,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
             alt={formatPersonName(person.name)} 
             className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
           />
-          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-surface-2 border border-border text-text-primary text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-surface-2 border border-border text-text-primary text-[10px] font-bold px-2 py-0.5 rounded-xl whitespace-nowrap">
             {person.film_count || 0} Films
           </div>
         </div>
@@ -110,7 +110,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
             <span className="text-text-muted text-xs uppercase tracking-wider">Films</span>
           </div>
           
-          <button className="ml-auto sm:ml-6 bg-transparent border border-gold text-gold hover:bg-gold hover:text-bg px-6 py-2 rounded-full font-medium transition-all duration-300 active:scale-95 text-sm min-h-[44px]">
+          <button className="ml-auto sm:ml-6 bg-transparent border border-gold text-gold hover:bg-gold hover:text-bg px-6 py-2 rounded-xl font-medium transition-all duration-300 active:scale-95 text-sm min-h-[44px]">
             Follow
           </button>
         </div>

@@ -334,7 +334,7 @@ function FieldEditor({ def, value, onChange }) {
                     : [...selected, o.value]
                 )
               }
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-colors ${
                 on
                   ? 'bg-brand/15 border-brand/40 text-brand'
                   : 'bg-surface border-border text-text-muted hover:text-text-primary'
@@ -757,7 +757,7 @@ export default function AdminContributions() {
           <p className="text-brand text-xs font-bold mb-1">Review Queue</p>
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-text-primary tracking-tight">Community Contributions</h1>
-            <span className="bg-brand/10 text-brand px-3 py-1 rounded-full text-xs font-bold border border-brand/20">
+            <span className="bg-brand/10 text-brand px-3 py-1 rounded-xl text-xs font-bold border border-brand/20">
               {items.length} pending
             </span>
           </div>

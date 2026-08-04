@@ -102,10 +102,12 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     loading="eager"
                     fetchPriority="high"
                   />
-                  {/* Gradients */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-white/60 to-transparent dark:from-black dark:via-black/20" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-white/40 to-transparent dark:from-black/80 dark:via-black/20" />
-                  <div className="absolute bottom-0 inset-x-0 h-2/3 bg-gradient-to-t from-white via-white/40 to-transparent opacity-95 dark:from-[#000000] dark:via-transparent" />
+                  {/* Frosted black glass under the copy band — top of banner stays clear HD */}
+                  <div className="pointer-events-none absolute bottom-0 inset-x-0 h-[48%] bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
+                  <div
+                    className="pointer-events-none absolute bottom-0 inset-x-0 h-[38%] backdrop-blur-[2px] bg-gradient-to-t from-black/40 to-transparent"
+                    style={{ WebkitMaskImage: 'linear-gradient(to top, black 55%, transparent)', maskImage: 'linear-gradient(to top, black 55%, transparent)' }}
+                  />
                 </div>
 
                 {/* Bottom Overlay Content */}
@@ -114,7 +116,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                   {/* Small Embedded Poster */}
                   <Link 
                     to={`/films/${featuredFilm.slug || featuredFilm.id}`} 
-                    className="hidden md:block shrink-0 relative group/poster shadow-2xl rounded-md overflow-hidden border border-black/10 hover:border-black/30 dark:border-white/20 dark:hover:border-white/50 transition-colors w-[150px] aspect-[2/3] transform hover:scale-105 duration-300"
+                    className="hidden md:block shrink-0 relative group/poster shadow-2xl rounded-md overflow-hidden border border-white/25 hover:border-white/60 transition-colors w-[150px] aspect-[2/3] transform hover:scale-105 duration-300"
                   >
                     <ImageWithFallback
                       src={featuredFilm.poster_url || featuredFilm.poster}
@@ -139,29 +141,29 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                     {/* Tags / Meta */}
                     <div className="flex items-center gap-3 mb-2.5 flex-wrap">
                       {(featuredFilm.is_trending || featuredFilm.view_count > 100) && (
-                        <span className="flex items-center gap-1.5 bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">
+                        <span className="flex items-center gap-1.5 bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase shadow-sm">
                           <Icon icon="solar:fire-bold" />
                           Trending
                         </span>
                       )}
                       {featuredFilm.is_in_cinemas && (
-                        <span className="flex items-center gap-1.5 bg-black/5 text-gray-800 border border-black/10 dark:bg-white/10 dark:text-white dark:border-white/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase">
+                        <span className="flex items-center gap-1.5 bg-white/15 text-white border border-white/25 px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase backdrop-blur-sm">
                           <Icon icon="solar:ticket-bold" className="text-brand" />
                           In Cinemas
                         </span>
                       )}
                       {(featuredFilm.genres || []).slice(0, 2).map((genre) => (
-                        <span key={genre} className="text-gray-600 dark:text-white/70 text-xs font-semibold">
+                        <span key={genre} className="text-white/85 text-xs font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                           {genre}
                         </span>
                       ))}
                     </div>
 
-                    <h2 className="text-gray-900 dark:text-white text-3xl md:text-4xl lg:text-[42px] font-heading font-black tracking-tight mb-3 line-clamp-2 leading-[1.1]">
+                    <h2 className="text-white text-3xl md:text-4xl lg:text-[42px] font-heading font-black tracking-tight mb-3 line-clamp-2 leading-[1.1] drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)]">
                       {formatFilmTitle(featuredFilm.title)}
                     </h2>
 
-                    <p className="text-gray-700 dark:text-white/70 text-sm line-clamp-2 mb-6 max-w-2xl font-medium">
+                    <p className="text-white/85 text-sm line-clamp-2 mb-6 max-w-2xl font-medium drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
                       {featuredFilm.synopsis}
                     </p>
 
@@ -169,7 +171,7 @@ export default function HeroSection({ featuredFilms: featuredFilmsProp, featured
                       {/* Large Play/Watch Options */}
                       <WatchOptions film={featuredFilm} />
 
-                      <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="flex items-center gap-2 bg-black/5 hover:bg-black/10 text-gray-900 border border-black/10 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white dark:border-white/10 px-6 py-3.5 rounded-full font-bold text-sm tracking-wide transition-all duration-300 active:scale-95">
+                      <Link to={`/films/${featuredFilm.slug || featuredFilm.id}`} className="flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white border border-white/25 px-6 py-3.5 rounded-xl font-bold text-sm tracking-wide transition-all duration-300 active:scale-95 backdrop-blur-sm">
                         <Icon icon="solar:info-circle-bold" className="text-xl" />
                         Details
                       </Link>

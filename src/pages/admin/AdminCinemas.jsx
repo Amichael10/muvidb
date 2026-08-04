@@ -236,7 +236,7 @@ export default function AdminCinemas() {
           <p className="text-brand text-[10px] font-black uppercase tracking-[0.4em] mb-2 italic">Facility Management</p>
           <h1 className="text-4xl font-black text-text-primary tracking-tight mb-2">Theater Directory</h1>
           <div className="flex items-center gap-3">
-             <span className="px-3 py-1 rounded-full bg-surface-2 border border-border text-[10px] font-black text-text-muted uppercase tracking-widest">
+             <span className="px-3 py-1 rounded-xl bg-surface-2 border border-border text-[10px] font-black text-text-muted uppercase tracking-widest">
               {filteredCinemas.length} Locations Registered
             </span>
           </div>
@@ -382,7 +382,7 @@ export default function AdminCinemas() {
                       </td>
                       <td className="px-10 py-8 border-l border-border/10 text-center">
                         <div className="flex flex-col items-center gap-1.5">
-                          <span className={`inline-flex items-center px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.15em] border shadow-sm transition-all duration-300 ${
+                          <span className={`inline-flex items-center px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border shadow-sm transition-all duration-300 ${
                             cinema.is_active 
                               ? 'bg-green-500/10 text-green-400 border-green-500/20' 
                               : 'bg-red-500/10 text-red-500 border-red-500/20 opacity-50'

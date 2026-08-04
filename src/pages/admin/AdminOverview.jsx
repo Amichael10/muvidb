@@ -292,13 +292,13 @@ export default function AdminOverview() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-brand/10 rounded-full border border-brand/20">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-brand/10 rounded-xl border border-brand/20">
             <Icon icon={isLimitedAdmin ? "solar:shield-check-bold" : "solar:shield-up-bold"} className="text-brand text-xs" />
             <span className="text-[10px] font-bold text-brand uppercase">
               {isLimitedAdmin ? 'Role: Sub-Admin' : 'Role: Super-Admin'}
             </span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 rounded-full border border-green-500/20">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 rounded-xl border border-green-500/20">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
             <span className="text-[10px] font-bold text-green-600 dark:text-green-400">System online</span>
           </div>
@@ -527,7 +527,7 @@ export default function AdminOverview() {
                         <div className="flex items-center gap-2">
                           <p className="text-xs font-bold text-text-primary line-clamp-1">{job.name}</p>
                           {job.count > 0 && (
-                            <span className="text-[8px] font-bold bg-brand/10 text-brand px-1.5 py-0.5 rounded-full">
+                            <span className="text-[8px] font-bold bg-brand/10 text-brand px-1.5 py-0.5 rounded-xl">
                               +{job.count} recently
                             </span>
                           )}

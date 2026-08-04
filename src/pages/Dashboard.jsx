@@ -204,7 +204,7 @@ export default function Dashboard() {
                         <h2 className="text-3xl font-bold text-text-primary tracking-tight">Watchlist</h2>
                         <p className="text-xs font-medium text-text-muted opacity-60">Films you want to see</p>
                     </div>
-                    <span className="text-[10px] font-bold border border-border px-4 py-1.5 rounded-full bg-surface-2/10">
+                    <span className="text-[10px] font-bold border border-border px-4 py-1.5 rounded-xl bg-surface-2/10">
                       {watchlist.length} Movies
                     </span>
                   </div>

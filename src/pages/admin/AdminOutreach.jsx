@@ -313,7 +313,7 @@ export default function AdminOutreach() {
                 key={tab.id}
                 type="button"
                 onClick={() => setStatusFilter(tab.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
                   statusFilter === tab.id
                     ? 'bg-brand text-white border-brand'
                     : 'bg-surface border-border text-text-muted hover:text-text-primary'
@@ -427,7 +427,7 @@ export default function AdminOutreach() {
                                 {person.is_verified && (
                                   <Icon icon="solar:verified-check-bold" className="text-brand shrink-0" />
                                 )}
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusToneClass(meta.tone)}`}>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-xl border ${statusToneClass(meta.tone)}`}>
                                   {meta.label}
                                 </span>
                               </div>

@@ -143,7 +143,7 @@ export default function CinemaCard({ film }) {
         )}
 
         <div className="mt-auto pt-5">
-          <Link to="/showtimes" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-4 py-3 text-base font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+          <Link to="/showtimes" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-base font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <Icon icon="solar:ticket-bold" className="text-xl" />
             Showtimes
           </Link>

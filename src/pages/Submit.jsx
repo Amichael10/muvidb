@@ -209,7 +209,7 @@ function FieldInput({ field, value, onChange }) {
                 type="button"
                 aria-pressed={active}
                 onClick={() => toggle(option.value)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-[11px] font-bold transition-all ${
                   active
                     ? 'border-brand/40 bg-brand/15 text-brand'
                     : 'border-border bg-surface-2 text-text-secondary hover:border-brand/30'

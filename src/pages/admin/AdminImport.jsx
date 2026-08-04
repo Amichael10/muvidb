@@ -362,7 +362,7 @@ export default function AdminImport() {
             <div className="card-cal overflow-hidden">
               <div className="p-4 border-b border-border bg-surface-2/50 flex items-center justify-between">
                 <span className="text-[10px] font-black text-text-muted uppercase tracking-widest italic">In-Memory Buffer Preview</span>
-                <span className="text-[10px] font-bold text-brand bg-brand/10 px-3 py-1 rounded-full">{fileData.length} Rows Detected</span>
+                <span className="text-[10px] font-bold text-brand bg-brand/10 px-3 py-1 rounded-xl">{fileData.length} Rows Detected</span>
               </div>
               <div className="max-h-[500px] overflow-auto">
                 <table className="w-full text-left text-xs">

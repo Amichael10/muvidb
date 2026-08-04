@@ -110,7 +110,7 @@ const TrailerSearch = ({ film, onTrailerSaved, currentUserId }) => {
             <button
               key={s}
               onClick={() => setSource(s)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 source === s
                   ? 'bg-gold text-dark'
                   : 'bg-surface-2 text-text-muted hover:text-text-primary'

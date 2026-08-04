@@ -27,7 +27,7 @@ const FilmCard = ({ film }) => (
 
       {/* Rating */}
       {film.liked_percent != null && (
-        <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-bold px-3 py-1 rounded-full shadow-lg shadow-brand/20">
+        <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-bold px-3 py-1 rounded-xl shadow-lg shadow-brand/20">
           Official
         </div>
       )}

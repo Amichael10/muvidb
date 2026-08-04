@@ -34,7 +34,7 @@ export default function AwardsEditor({ value, onChange, variant }) {
           <span className="text-xl">🏆</span>
           <h4 className="text-xs font-bold text-text-muted">Awards &amp; Nominations</h4>
           {awards.length > 0 && (
-            <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-full px-2 py-0.5">
+            <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-xl px-2 py-0.5">
               {awards.length}
             </span>
           )}

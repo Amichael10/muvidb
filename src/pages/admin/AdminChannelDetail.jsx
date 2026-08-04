@@ -302,11 +302,11 @@ export default function AdminChannelDetail() {
                       </td>
                       <td className="px-10 py-8">
                         {vid.films?.needs_review ? (
-                          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-[9px] font-black uppercase tracking-widest shadow-sm">
+                          <span className="inline-flex items-center px-4 py-1.5 rounded-xl bg-brand/10 border border-brand/20 text-brand text-[9px] font-black uppercase tracking-widest shadow-sm">
                              <span className="w-1 h-1 rounded-full bg-brand animate-pulse mr-2" /> Needs Audit
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-[9px] font-black uppercase tracking-widest shadow-sm">
+                          <span className="inline-flex items-center px-4 py-1.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-[9px] font-black uppercase tracking-widest shadow-sm">
                              Approved
                           </span>
                         )}

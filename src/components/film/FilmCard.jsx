@@ -360,7 +360,7 @@ export default function FilmCard({
                     </span>
                   ))}
                   {activePlatforms.length > 3 && (
-                    <span className="text-[8px] font-black text-white bg-black/60 px-1 rounded-full border border-white/10 shrink-0">
+                    <span className="text-[8px] font-black text-white bg-black/60 px-1 rounded-xl border border-white/10 shrink-0">
                       +{activePlatforms.length - 3}
                     </span>
                   )}

@@ -150,7 +150,7 @@ export default function WatchPlatform() {
         <div className="flex flex-wrap items-center gap-3 p-6 md:p-8 border-b border-border bg-surface-2/5">
           <button
             onClick={() => setNewThisMonth((v) => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest border transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all ${
               newThisMonth ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-text-muted hover:border-brand/50'
             }`}
           >
@@ -160,7 +160,7 @@ export default function WatchPlatform() {
           <select
             value={selectedGenre}
             onChange={(e) => setSelectedGenre(e.target.value)}
-            className="bg-surface border border-border text-text-primary rounded-full px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
           >
             <option value="">All genres</option>
             {genres.map((g) => (
@@ -171,7 +171,7 @@ export default function WatchPlatform() {
           <select
             value={yearMin}
             onChange={(e) => setYearMin(parseInt(e.target.value, 10))}
-            className="bg-surface border border-border text-text-primary rounded-full px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
           >
             <option value={0}>Any year</option>
             <option value={2024}>2024 +</option>

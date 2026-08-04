@@ -129,7 +129,7 @@ export default function Navbar() {
               <Link
                 key={link.name}
                 to={link.path}
-                className={`px-4 xl:px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 whitespace-nowrap
+                className={`px-4 xl:px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap
                   ${isActive 
                     ? 'bg-brand text-white shadow-md' 
                     : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
@@ -147,7 +147,7 @@ export default function Navbar() {
               onClick={() => setIsMoreOpen((open) => !open)}
               aria-expanded={isMoreOpen}
               aria-haspopup="menu"
-              className={`inline-flex items-center gap-1.5 px-4 xl:px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 whitespace-nowrap
+              className={`inline-flex items-center gap-1.5 px-4 xl:px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap
                 ${isMoreOpen || isMoreActive
                   ? 'bg-brand text-white shadow-md'
                   : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
@@ -320,7 +320,7 @@ export default function Navbar() {
           ) : (
             <Link 
               to="/login"
-              className="px-6 py-2 border-2 border-brand text-brand rounded-full font-bold text-sm btn-hover shadow-lg shadow-brand/5"
+              className="px-6 py-2 border-2 border-brand text-brand rounded-xl font-bold text-sm btn-hover shadow-lg shadow-brand/5"
             >
               Sign In
             </Link>
@@ -373,7 +373,7 @@ export default function Navbar() {
                       navigate(`/search?q=${encodeURIComponent(term)}`);
                       setIsSearchOpen(false);
                     }}
-                    className="px-5 py-2.5 bg-white/5 hover:bg-brand hover:text-white border border-white/10 rounded-full text-sm text-text-secondary transition-all active:scale-95"
+                    className="px-5 py-2.5 bg-white/5 hover:bg-brand hover:text-white border border-white/10 rounded-xl text-sm text-text-secondary transition-all active:scale-95"
                   >
                     {term}
                   </button>

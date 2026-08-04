@@ -35,7 +35,7 @@ const TrailerPlayer = ({ film }) => {
             </div>
 
             {/* "Official Trailer" badge */}
-            <div className="absolute top-4 left-4 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
+            <div className="absolute top-4 left-4 bg-black/70 text-white text-xs px-3 py-1 rounded-xl">
               Official Trailer
             </div>
           </div>
@@ -72,7 +72,7 @@ const TrailerPlayer = ({ film }) => {
             href={film.trailer_external_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-gold text-dark font-semibold px-6 py-3 rounded-full hover:bg-gold/90 transition-colors"
+            className="inline-flex items-center gap-2 bg-gold text-dark font-semibold px-6 py-3 rounded-xl hover:bg-gold/90 transition-colors"
           >
             Watch Trailer
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

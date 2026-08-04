@@ -1234,7 +1234,7 @@ export default function AdminFilms() {
               <Icon icon="solar:tuning-2-linear" className="w-4 h-4" />
               More filters
               {advancedFilterCount > 0 && (
-                <span className="bg-brand text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-black">{advancedFilterCount}</span>
+                <span className="bg-brand text-white rounded-xl min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-black">{advancedFilterCount}</span>
               )}
               <Icon icon={showAdvancedFilters ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'} className="w-3.5 h-3.5" />
             </button>
@@ -1549,7 +1549,7 @@ export default function AdminFilms() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex flex-col items-center gap-1.5">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-xl text-[10px] font-bold border ${
                           film.status === 'released' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
                           film.status === 'post-production' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
                           film.status === 'in_production' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
@@ -1616,7 +1616,7 @@ export default function AdminFilms() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-brand/5 text-brand border-brand/20 uppercase tracking-tighter">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-xl text-[10px] font-bold border bg-brand/5 text-brand border-brand/20 uppercase tracking-tighter">
                         Unmapped Signal
                       </span>
                     </td>
@@ -1841,7 +1841,7 @@ export default function AdminFilms() {
                     type="button"
                     onClick={refreshFromTmdb}
                     disabled={isRefreshing}
-                    className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-full hover:bg-brand/10 transition-all flex items-center gap-1.5"
+                    className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-xl hover:bg-brand/10 transition-all flex items-center gap-1.5"
                   >
                     {isRefreshing ? 'Refreshing...' : (
                       <>
@@ -1861,7 +1861,7 @@ export default function AdminFilms() {
                       type="button"
                       onClick={handleAIPolishTitle}
                       disabled={isSummarizing}
-                      className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-full hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
+                      className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-xl hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
                     >
                       <Icon icon="solar:magic-stick-bold" />
                       AI Polish
@@ -1995,7 +1995,7 @@ export default function AdminFilms() {
                       type="button"
                       onClick={handleAISummarize}
                       disabled={isSummarizing}
-                      className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-full hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
+                      className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-xl hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
                     >
                       {isSummarizing ? 'Generating...' : (
                         <>

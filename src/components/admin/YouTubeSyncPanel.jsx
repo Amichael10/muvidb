@@ -320,7 +320,7 @@ const YouTubeSyncPanel = ({ currentUserId }) => {
                     }
                   </td>
                   <td className="p-4">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
+                    <span className={`text-xs px-2 py-1 rounded-xl ${
                       film.trailer_source === 'youtube' 
                         ? 'bg-red-900/40 text-red-400'
                         : film.trailer_source === 'external'

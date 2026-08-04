@@ -432,7 +432,7 @@ const CinemaDetail = () => {
                   <button
                     key={date}
                     onClick={() => setSelectedDate(date)}
-                    className={`px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shrink-0 border ${
+                    className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 border ${
                       active
                         ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20'
                         : 'bg-surface border-border text-text-muted hover:text-text-primary hover:border-brand/40'

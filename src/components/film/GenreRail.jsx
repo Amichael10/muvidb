@@ -306,7 +306,7 @@ export default function GenreRail({ variant = 'grid' }) {
                 <button
                   key={genre.name}
                   onClick={() => setSelectedGenre(genre.name)}
-                  className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap border transition-all duration-200 ${
+                  className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold whitespace-nowrap border transition-all duration-200 ${
                     isSelected
                       ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20'
                       : 'bg-surface border-border text-text-secondary hover:border-brand/50 hover:text-text-primary'
