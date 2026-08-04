@@ -68,6 +68,11 @@ project.tar.gz
 *.png
 *.jpg
 *.jpeg
+# Keep shipped site assets (homepage intro cards, etc.)
+!public/images/**/*.png
+!public/images/**/*.jpg
+!public/images/**/*.jpeg
+!public/images/**/*.webp
 *.bak
 
 # Playwright storageState — holds live login cookies (NetflixId/SecureNetflixId
