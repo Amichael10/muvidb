@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { requestWelcomeEmail } from '../lib/welcomeEmail';
 
 const AuthContext = createContext();
 
@@ -9,6 +10,27 @@ export function AuthProvider({ children }) {
     role: null,
     loading: true,
   });
+
+  const clearLocalAuth = async () => {
+    try {
+      // Local scope clears the browser session even if the auth user was already deleted.
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (_) {
+      /* ignore */
+    }
+    setAuthState({ user: null, role: null, loading: false });
+  };
+
+  /**
+   * getSession() only reads the cached JWT from storage — a deleted Supabase
+   * Auth user can still look "logged in" until the token expires. getUser()
+   * hits the Auth API and fails when the account no longer exists.
+   */
+  const validateAuthUser = async () => {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    return user;
+  };
 
   const fetchUserProfile = async (authUser) => {
     if (!authUser) {
@@ -45,6 +67,13 @@ export function AuthProvider({ children }) {
         role: finalRole,
         loading: false,
       }));
+
+      // New accounts only — server is idempotent; never blocks auth UX.
+      // Small delay so the access token is fully available right after signup.
+      const name = authUser.user_metadata?.name || authUser.user_metadata?.full_name;
+      setTimeout(() => {
+        void requestWelcomeEmail(name);
+      }, 600);
     } catch (err) {
       console.error('Error in fetchUserProfile:', err);
       setAuthState(prev => ({
@@ -70,11 +99,18 @@ export function AuthProvider({ children }) {
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await fetchUserProfile(session.user);
+        if (!session) return;
+
+        // Re-validate with Auth server so deleted users are logged out on refresh.
+        const user = await validateAuthUser();
+        if (!user) {
+          await clearLocalAuth();
+          return;
         }
+        await fetchUserProfile(user);
       } catch (err) {
         console.error('Session check failed:', err);
+        await clearLocalAuth();
       } finally {
         stopLoading();
       }
@@ -87,12 +123,44 @@ export function AuthProvider({ children }) {
     // onAuthStateChange will fill in the user once it eventually resolves.
     const safety = setTimeout(stopLoading, 5000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        fetchUserProfile(session.user);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
         settled = true;
         setAuthState({ user: null, role: null, loading: false });
+        return;
+      }
+
+      // TOKEN_REFRESHED / USER_UPDATED: re-check the account still exists.
+      if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        void (async () => {
+          const user = await validateAuthUser();
+          if (!user) {
+            await clearLocalAuth();
+            return;
+          }
+          await fetchUserProfile(user);
+        })();
+        return;
+      }
+
+      if (session) {
+        void (async () => {
+          const user = await validateAuthUser();
+          if (!user) {
+            await clearLocalAuth();
+            return;
+          }
+          await fetchUserProfile(user);
+        })();
+
+        // Email-confirm / OAuth return often lands as SIGNED_IN — force a welcome
+        // attempt in case an earlier in-tab attempt failed before the server was ready.
+        if (event === 'SIGNED_IN') {
+          const name = session.user.user_metadata?.name || session.user.user_metadata?.full_name;
+          setTimeout(() => {
+            void requestWelcomeEmail(name, { force: true });
+          }, 800);
+        }
       }
     });
 

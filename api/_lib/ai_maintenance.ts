@@ -23,10 +23,23 @@ export async function runCastExtraction() {
     .order('created_at', { ascending: false })
     .limit(20);
 
+  // Nollywood YouTube titles often list the cast in brackets rather than after
+  // a keyword — "Holy Romance (Eso Dike, Uche Montana) - Brand New". Neither
+  // selector above sees those; 172 films carry the pattern and were being
+  // skipped. Requiring both a bracket and a comma keeps out "(2026)" and
+  // "(Official Trailer)".
+  const { data: bracketFilms } = await supabase
+    .from('films')
+    .select('id, title')
+    .like('title', '%(%')
+    .like('title', '%,%')
+    .order('created_at', { ascending: false })
+    .limit(20);
+
   // Merge and deduplicate
   const allCastFilms = [...(starringFilms || [])];
   const seenIds = new Set(allCastFilms.map(f => f.id));
-  for (const f of (pipeFilms || [])) {
+  for (const f of [...(pipeFilms || []), ...(bracketFilms || [])]) {
     if (!seenIds.has(f.id)) {
       allCastFilms.push(f);
       seenIds.add(f.id);

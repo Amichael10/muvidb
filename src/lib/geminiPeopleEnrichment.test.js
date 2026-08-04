@@ -73,8 +73,44 @@ describe('reconcileCitations', () => {
       },
     }, grounding);
 
-    expect(result.candidateFields.bio).toMatch(/^AI-synthesized from cited sources/);
+    // The bio is stored as clean prose. The "AI-synthesized from cited sources"
+    // label is metadata carried separately (see bioLabel in
+    // api/_lib/gemini_people_enrichment.ts), not baked into the text.
+    expect(result.candidateFields.bio).toBe('She starred in progressive Nollywood features.');
     expect(result.evidence.length).toBeGreaterThan(0);
+  });
+
+  it('strips the synthesis label when the model prefixes the bio itself', () => {
+    const result = reconcileCitations({
+      candidate_fields: {
+        bio: {
+          value: 'AI-synthesized from cited sources. She starred in Nollywood features.',
+          sentence_evidence: [{
+            sentence: 'She starred in Nollywood features.',
+            evidence_urls: ['https://www.pulse.ng/entertainment/actor-bio'],
+          }],
+        },
+      },
+    }, grounding);
+
+    expect(result.candidateFields.bio).toBe('She starred in Nollywood features.');
+  });
+
+  it('drops a bio whose sentences cite nothing in the grounding set', () => {
+    const result = reconcileCitations({
+      candidate_fields: {
+        bio: {
+          value: 'She is rumoured to be retiring.',
+          sentence_evidence: [{
+            sentence: 'She is rumoured to be retiring.',
+            evidence_urls: ['https://totally-made-up.example/gossip'],
+          }],
+        },
+      },
+    }, grounding);
+
+    expect(result.candidateFields.bio).toBeUndefined();
+    expect(result.rejected.some((row) => row.field === 'bio')).toBe(true);
   });
 });
 

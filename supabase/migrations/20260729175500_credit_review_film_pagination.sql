@@ -1,3 +1,7 @@
+-- Reconstructed from remote supabase_migrations.schema_migrations.
+-- This migration was applied directly to the remote database and was never
+-- committed. The file is restored here so local and remote history match.
+
 -- One-film-at-a-time pagination for the credit review dashboard.
 -- Returning the distinct film page from SQL prevents candidate-level LIMITs
 -- from splitting one film's ensemble across several incomplete UI groups.
@@ -48,5 +52,7 @@ as $$
 $$;
 
 revoke all on function public.get_credit_candidate_review_films(text, real, integer, integer) from public;
+
 grant execute on function public.get_credit_candidate_review_films(text, real, integer, integer) to authenticated;
+
 grant execute on function public.get_credit_candidate_review_films(text, real, integer, integer) to service_role;

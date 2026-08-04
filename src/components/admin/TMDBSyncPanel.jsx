@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Icon } from '@iconify/react'
 import { supabase } from '../../lib/supabase'
 import {
   searchTmdbMovies,
@@ -131,7 +132,11 @@ const TMDBSyncPanel = () => {
         language: details.language,
         tmdb_id: details.tmdbId,
         tmdb_rating: details.rating || null,
-        nfvcb_rating: '18',
+        // NFVCB classification is a decision of the Censors Board, not something
+        // we can infer from TMDB. Defaulting every import to '18' stamped films
+        // with an official adult rating they were never given. Null means
+        // "not classified", which is the truthful state.
+        nfvcb_rating: null,
         view_count: 0,
       }
 
@@ -382,7 +387,7 @@ const TMDBSyncPanel = () => {
               : 'text-text-muted hover:text-text-primary'
           }`}
         >
-          🔍 Search TMDB
+          <span className="inline-flex items-center justify-center gap-1.5"><Icon icon="solar:magnifer-linear" /> Search TMDB</span>
         </button>
         <button
           onClick={() => setActiveTab('discover')}
@@ -392,7 +397,7 @@ const TMDBSyncPanel = () => {
               : 'text-text-muted hover:text-text-primary'
           }`}
         >
-          🇳🇬 Discover Nigerian Films
+          <span className="inline-flex items-center justify-center gap-1.5"><Icon icon="solar:globus-linear" /> Discover Nigerian Films</span>
         </button>
       </div>
 
@@ -629,7 +634,7 @@ const MovieList = ({ movies, importedTmdbIds, importingId, importProgress, onImp
                   {movie.genreNames.map(genre => (
                     <span
                       key={genre}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border"
+                      className="text-[10px] px-2 py-0.5 rounded-xl bg-surface text-text-muted border border-border"
                     >
                       {genre}
                     </span>

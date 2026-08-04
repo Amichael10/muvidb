@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
+import { Icon } from '@iconify/react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import { SOCIAL_LINKS } from '../../config/socialLinks';
 
 const footerGroups = [
   {
@@ -7,33 +10,40 @@ const footerGroups = [
     links: [
       { label: 'Home', to: '/' },
       { label: 'Browse Movies', to: '/browse' },
+      { label: 'Awards', to: '/awards' },
       { label: 'Top Rated', to: '/browse?sort=rating' },
-      { label: 'New Releases', to: '/browse?sort=new' },
+      { label: 'New Releases', to: '/browse?sort=newest' },
     ],
   },
   {
     title: 'People',
     links: [
-      { label: 'Actors', to: '/browse?type=actors' },
-      { label: 'Directors', to: '/browse?type=directors' },
-      { label: 'Producers', to: '/browse?type=producers' },
-      { label: 'Writers', to: '/browse?type=writers' },
+      { label: 'Actors', to: '/people?role=Actor' },
+      { label: 'Directors', to: '/people?role=Director' },
+      { label: 'Producers', to: '/people?role=Producer' },
+      { label: 'Writers', to: '/people?role=Writer' },
     ],
   },
   {
     title: 'Platform',
     links: [
       { label: 'About Us', to: '/about' },
+      { label: 'MuviDB Pro', comingSoon: true },
+      { label: 'Add a Film', to: '/submit/film' },
+      { label: 'Contribute', to: '/submit' },
+      { label: 'Film Classification', to: '/classification' },
+      { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/contact' },
-      { label: 'Sign In', to: '/login' },
-      { label: 'Join MuviDB', to: '/signup' },
-      { label: 'Dashboard', to: '/dashboard' },
+      { label: 'Sign In', to: '/login', guestOnly: true },
+      { label: 'Join MuviDB', to: '/signup', guestOnly: true },
+      { label: 'Dashboard', to: '/dashboard', authOnly: true },
     ],
   },
 ];
 
 export default function Footer() {
   const { theme } = useTheme();
+  const { isAuthenticated } = useAuth();
 
   return (
     <footer className="relative overflow-hidden bg-surface-2 text-text-primary border-t border-hairline transition-colors duration-300">
@@ -53,6 +63,32 @@ export default function Footer() {
             <p className="text-sm font-medium leading-7 text-text-secondary">
               The premier film database for Nollywood. Preserving the legacy, celebrating the future.
             </p>
+
+            <div className="flex items-center gap-3">
+              {SOCIAL_LINKS.map((social) =>
+                social.href ? (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`MuviDB on ${social.label}`}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline text-text-muted transition-colors hover:border-brand hover:text-brand hover:bg-brand/5"
+                  >
+                    <Icon icon={social.icon} className="text-lg" aria-hidden="true" />
+                  </a>
+                ) : (
+                  <span
+                    key={social.label}
+                    role="img"
+                    aria-label={`${social.label} — coming soon`}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-hairline/60 text-text-muted/40"
+                  >
+                    <Icon icon={social.icon} className="text-lg" aria-hidden="true" />
+                  </span>
+                ),
+              )}
+            </div>
           </div>
 
           {footerGroups.map((group) => (
@@ -61,16 +97,31 @@ export default function Footer() {
                 {group.title}
               </h3>
               <ul className="space-y-4">
-                {group.links.map((link) => (
-                  <li key={link.to} className="leading-none">
-                    <Link
-                      to={link.to}
-                      className="block text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {group.links
+                  .filter((link) =>
+                    link.guestOnly ? !isAuthenticated : !link.authOnly || isAuthenticated,
+                  )
+                  .map((link) => (
+                    <li key={link.to || link.label} className="leading-none">
+                      {link.comingSoon ? (
+                        <span className="inline-flex items-center gap-2 text-xs font-semibold leading-none text-text-muted">
+                          <span
+                            className="rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-white bg-red-600"
+                          >
+                            Coming soon
+                          </span>
+                          {link.label}
+                        </span>
+                      ) : (
+                        <Link
+                          to={link.to}
+                          className="block text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
+                        >
+                          {link.label}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
               </ul>
             </nav>
           ))}

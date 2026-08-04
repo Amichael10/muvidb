@@ -12,7 +12,7 @@
 import { supabase } from './supabase.js';
 import { ytGet } from './yt_service.js';
 import { generateAIContent, parseJSON } from './ai_service.js';
-import { pctLiked, shrinkCommentScore, MIN_RATING_SAMPLE } from './rating.js';
+import { pctLiked, shrinkCommentScore } from './rating.js';
 
 interface RawComment {
   id: string;
@@ -28,9 +28,6 @@ const NOISE = [
   /^\s*(first|1st|early|who('|)?s watching|who is (here|watching)|anybody \d{4}|am i early)/i,
   /^\s*\d{1,2}:\d{2}/, // starts with a timestamp
   /^[\s\p{Emoji}\p{Emoji_Presentation}❤🔥😂🙏👍💯✨🥰😍]+$/u, // only emoji/symbols
-  /\bgather here\b/i, // "fans of X gather here" roll-calls
-  /^\s*@[\w.-]+/, // starts by tagging someone
-  /\b(who|anyone|anybody)\s+(is|are|dey|de)\s+watch/i,
 ];
 const stripHtml = (html: string) =>
   html
@@ -73,128 +70,64 @@ const mapComment = (it: any): RawComment => {
 // popularity ranking that surfaces upbeat, heavily-liked comments; adding the
 // newest ones brings in unfiltered voices (including criticism) so the sample
 // reflects the good AND the bad — the point of dropping likes-based selection.
-async function fetchComments(videoId: string, max = 400): Promise<RawComment[]> {
+async function fetchComments(videoId: string, max = 120): Promise<RawComment[]> {
   const byId = new Map<string, RawComment>();
   for (const order of ['relevance', 'time'] as const) {
-    // Only ~1 comment in 12 is an actual assessment, so a 100-comment sample
-    // yields single digits. Pages are 1 quota unit each — far cheaper than the
-    // AI call they feed — so cast a wider net and let rankCandidates pick.
-    let pageToken: string | undefined;
-    for (let page = 0; page < 2 && byId.size < max; page++) {
-      try {
-        const data = await ytGet('commentThreads', {
-          part: 'snippet', videoId, order, maxResults: '100', textFormat: 'plainText',
-          ...(pageToken ? { pageToken } : {}),
-        });
-        for (const it of data.items ?? []) { const c = mapComment(it); if (!byId.has(c.id)) byId.set(c.id, c); }
-        pageToken = data.nextPageToken;
-        if (!pageToken) break;
-      } catch (e) {
-        // If the very first page fails (quota/comments-off) there's nothing to
-        // salvage; later failures keep whatever we already have.
-        if (order === 'relevance' && page === 0) throw e;
-        break;
-      }
+    try {
+      const data = await ytGet('commentThreads', { part: 'snippet', videoId, order, maxResults: '100', textFormat: 'plainText' });
+      for (const it of data.items ?? []) { const c = mapComment(it); if (!byId.has(c.id)) byId.set(c.id, c); }
+    } catch (e) {
+      // If the first pass fails (quota/comments-off) there's nothing to salvage;
+      // if the second fails, keep what the first returned.
+      if (order === 'relevance') throw e;
     }
   }
   return [...byId.values()].slice(0, max);
 }
 
-// Concrete things a viewer judges. Used only to decide WHICH comments are worth
-// paying the classifier for — deliberately aspect words, never sentiment words,
-// so this doesn't tilt the sample toward praise or toward criticism.
-const ASPECT_WORDS =
-  /\b(movie|film|story|storyline|plot|script|acting|acted|actor|actress|cast|character|role|scene|ending|end|part|directing|director|production|picture|sound|subtitle|edit|pace|slow|length|lesson|message|performance)\b/i;
-
-/**
- * Rank the noise-filtered pool so the classifier's 50 slots go to the comments
- * most likely to contain a verdict: ones that name something about the film,
- * longest first. Everything else keeps its natural order behind them.
- */
-function rankCandidates(pool: RawComment[]): RawComment[] {
-  const scored = pool.map((c, i) => ({
-    c,
-    i,
-    tier: ASPECT_WORDS.test(c.text) ? 0 : 1,
-  }));
-  scored.sort((a, b) => a.tier - b.tier || b.c.text.length - a.c.text.length || a.i - b.i);
-  return scored.map((s) => s.c);
-}
-
-interface Verdict {
-  score: number;
-  /** Gives a reason or concrete detail, rather than a bare thumbs-up. */
-  specific: boolean;
-}
-
-// Ceiling for an opinion with nothing behind it ("nice movie", "wow"). The
-// rubric already tells the model to score these 5-6 and it routinely returns 7+
-// anyway, so the cap is enforced here rather than requested in the prompt.
-const VAGUE_SCORE_CAP = 6;
-
 // Ask the AI to keep only genuine film opinions and score each 1-10.
-async function classify(comments: RawComment[]): Promise<Map<number, Verdict>> {
+async function classify(comments: RawComment[]): Promise<Map<number, number>> {
   const numbered = comments.map((c, i) => `${i}. ${c.text.replace(/\n/g, ' ').slice(0, 400)}`).join('\n');
   const prompt = `You are curating viewer comments on a Nollywood/African movie to (a) show a few as short audience reviews and (b) gauge how the film was ACTUALLY received.
 
-KEEP (keep=true) ONLY comments that ASSESS the film or a performance — that judge it good, bad, moving, boring, well-acted, badly written, worth watching. Criticism, disappointment and mixed takes count and we specifically WANT them ("the story dragged", "the acting was wooden", "great plot but terrible sound"). Plain verdicts count too ("nice movie", "this was a waste of time").
+KEEP (keep=true) any comment that gives a genuine opinion or reaction about the FILM ITSELF — its story, acting, characters, pacing, ending, message, production, or emotional impact. This INCLUDES criticism, disappointment and mixed takes ("the story dragged", "the acting was wooden", "great plot but terrible sound"). We specifically WANT these — do NOT keep only praise.
+REJECT (keep=false): greetings, "first"/"who's watching", requests for where to watch, tagging or shout-outs to people, self-promotion or channel plugs, pure emoji, spam, and anything not about this film.
 
-REJECT (keep=false) everything else, including things that mention the film but assess nothing:
-  - reactions to a character's antics or a catchphrase, with no judgement: "I like as oloye dey do", "see as this man dey behave 😂", "omoo as i see oloye for dis movie"
-  - exclamations and running commentary in Pidgin/Yoruba/Igbo that carry no verdict: "kosi wahala 😂", "wahala waa ooo", "chai!", "na so e be"
-  - ANTICIPATION rather than assessment — excitement about the cast, trailer or premise instead of what the film turned out to be: "since I see [actor] in the cast I know this will be interesting", "can't wait to watch this". The viewer must be judging what they SAW, not what they expect.
-  - roll-calls and fan check-ins: "fans of X gather here", "who else is watching", "2026 anybody?"
-  - tagging people, shout-outs, greetings, prayers, self-promotion, channel plugs
-  - questions about where to watch, part 2, or the cast list
-  - pure emoji or laughter, spam, anything not about this film
-A comment being sincere or enthusiastic is NOT enough — if it does not say something IS good or bad, reject it.
-
-For each kept comment also return specific=true if it gives a reason, an example, or names what worked/failed (acting, story, pacing, ending, sound, message). specific=false for a bare verdict with nothing behind it.
-
-Score 1-10 = how positively that viewer truly regards the film. Be strict and use the WHOLE range — most films are ordinary:
+For each kept comment, score 1-10 = how positively that viewer truly regards the film. Be strict and use the WHOLE range — most films are ordinary:
   9-10 = genuinely exceptional, specific, strong praise
-  7-8  = clearly liked it, and says why
+  7-8  = clearly liked it
   5-6  = mixed / lukewarm / "it was okay" — THIS IS THE DEFAULT for generic positivity like "nice movie", "wow", "🔥"
   3-4  = disappointed / notable criticism
   1-2  = disliked / hated it
 People who bother to comment are mostly fans, so treat vague hype as mild (5-6), not a 10.
 
-Return ONLY a JSON array, no prose: [{"i":<number>,"keep":<true|false>,"specific":<true|false>,"score":<1-10>}]
+Return ONLY a JSON array, no prose: [{"i":<number>,"keep":<true|false>,"score":<1-10>}]
 
 Comments:
 ${numbered}`;
 
   const { text } = await generateAIContent(prompt);
   const parsed = parseJSON(text);
-  // A short response means the model stopped early rather than judging every
-  // comment — that silently shrinks the sample and biases it toward whatever
-  // sat at the top of the list, so it must not pass unnoticed.
-  if (Array.isArray(parsed) && parsed.length < comments.length) {
-    console.warn(`[mine] classifier returned ${parsed.length}/${comments.length} verdicts`);
-  }
-  const verdicts = new Map<number, Verdict>();
+  const scores = new Map<number, number>();
   if (Array.isArray(parsed)) {
     for (const row of parsed) {
       const i = Number(row?.i);
       if (Number.isInteger(i) && row?.keep === true) {
-        const specific = row?.specific === true;
-        const raw = Math.max(1, Math.min(10, Number(row.score) || 5));
-        verdicts.set(i, { score: specific ? raw : Math.min(raw, VAGUE_SCORE_CAP), specific });
+        const s = Math.max(1, Math.min(10, Number(row.score) || 5));
+        scores.set(i, s);
       }
     }
   }
-  return verdicts;
+  return scores;
 }
 
 export interface MineResult {
   status: 'ok' | 'skipped';
   reason?: string;
-  screened?: number;             // candidates sent to the classifier
   kept?: number;
-  rated?: boolean;               // false = mined, but under MIN_RATING_SAMPLE
   rating?: number | null;        // de-inflated 0-10 (kept for continuity)
   likedPercent?: number | null;  // unified 0-100 "% liked"
-  samples?: { author: string; likes: number; score: number; specific: boolean; text: string }[];
+  samples?: { author: string; likes: number; score: number; text: string }[];
 }
 
 export async function mineFilmComments(
@@ -216,32 +149,29 @@ export async function mineFilmComments(
   // 2. cheap pre-filter → candidates. NO likes ranking: we keep the natural
   //    relevance+newest order so criticism isn't sorted out of the sample.
   const seen = new Set<string>();
-  const pool = raw.filter((c) => !isNoise(c.text) && !seen.has(c.text) && seen.add(c.text));
-  const candidates = rankCandidates(pool).slice(0, 50);
+  const candidates = raw
+    .filter((c) => !isNoise(c.text) && !seen.has(c.text) && seen.add(c.text))
+    .slice(0, 50);
   if (!candidates.length) return { status: 'skipped', reason: 'no-quality-candidates' };
 
   // 3. AI classify + score (AI down → skip, try again next sync)
-  let verdicts: Map<number, Verdict>;
+  let scores: Map<number, number>;
   try {
-    verdicts = await classify(candidates);
+    scores = await classify(candidates);
   } catch (e: any) {
     return { status: 'skipped', reason: `ai:${e.message.slice(0, 60)}` };
   }
   // EVERY classified opinion (praise AND criticism) feeds the rating — that
   // honest denominator is the core of the de-inflation.
   const opinions = candidates
-    .map((c, i) => ({ c, ...(verdicts.get(i) ?? {}) }))
-    .filter((x): x is { c: RawComment } & Verdict => typeof (x as Verdict).score === 'number');
+    .map((c, i) => ({ c, score: scores.get(i) }))
+    .filter((x): x is { c: RawComment; score: number } => x.score !== undefined);
   if (!opinions.length) return { status: 'skipped', reason: 'nothing-kept' };
-  const rated = opinions.length >= MIN_RATING_SAMPLE;
   const { pct, s10 } = ratingFrom(opinions.map(({ score }) => ({ score })));
 
-  // Display set: a representative spread, not a highlight reel. Comments that
-  // say WHY come first, then force-include a few critical takes so the shown
-  // reviews span good→bad.
-  const byScore = [...opinions].sort(
-    (a, b) => Number(b.specific) - Number(a.specific) || b.score - a.score,
-  );
+  // Display set: a representative spread, not a highlight reel. Order by score
+  // and force-include a few critical takes so the shown reviews span good→bad.
+  const byScore = [...opinions].sort((a, b) => b.score - a.score);
   const critical = byScore.filter((o) => o.score <= 4).slice(0, 3);
   const kept = [...new Set([...critical, ...byScore])].slice(0, maxKeep);
 
@@ -249,12 +179,10 @@ export async function mineFilmComments(
   if (opts.dryRun) {
     return {
       status: 'ok',
-      screened: candidates.length,
       kept: opinions.length,
-      rated,
-      rating: rated ? s10 : null,
-      likedPercent: rated ? pct : null,
-      samples: kept.map(({ c, score, specific }) => ({ author: c.author, likes: c.likes, score, specific, text: c.text.slice(0, 140) })),
+      rating: s10,
+      likedPercent: pct,
+      samples: kept.map(({ c, score }) => ({ author: c.author, likes: c.likes, score, text: c.text.slice(0, 140) })),
     };
   }
 
@@ -277,36 +205,29 @@ export async function mineFilmComments(
     .upsert(rows, { onConflict: 'film_id,external_id', ignoreDuplicates: false });
   if (upErr) return { status: 'skipped', reason: `store:${upErr.message.slice(0, 60)}` };
 
-  // Drop mined reviews this pass did NOT keep. Without this, comments a looser
-  // earlier run accepted stay on the page forever — a re-mine only ever adds.
-  // Scoped to source='youtube', so member-written reviews are never touched.
-  const { error: pruneErr } = await supabase
-    .from('reviews')
-    .delete()
-    .eq('film_id', filmId)
-    .eq('source', 'youtube')
-    .not('external_id', 'in', `(${kept.map(({ c }) => c.id).join(',')})`);
-  if (pruneErr) console.warn(`[mine] prune failed for ${filmId}: ${pruneErr.message}`);
-
-  // 5. persist the unified rating. liked_percent (0-100) is what the site shows;
-  //    audience_rating keeps the de-inflated 0-10 for continuity. Computed from
-  //    ALL opinions classified this run, criticism included.
-  //
-  //    Under MIN_RATING_SAMPLE we publish NOTHING and clear any rating a looser
-  //    earlier run left behind — a handful of comments is not a measurement, and
-  //    the film page has a "Be the first to rate" state for exactly this.
+  // 5. Persist audience_rating (0-10) from mined opinions, then recompute
+  //    liked_percent via SQL so user likes/dislikes are blended in (dampened).
+  //    TMDB/IMDb still win as base when present; YouTube is the fallback base.
   const { error: filmErr } = await supabase
     .from('films')
     .update({
-      liked_percent: rated ? pct : null,
-      audience_rating: rated ? s10 : null,
+      audience_rating: s10,
       audience_rating_count: opinions.length,
       comments_synced_at: new Date().toISOString(),
     })
     .eq('id', filmId);
   if (filmErr) console.warn(`[mine] film rating update failed for ${filmId}: ${filmErr.message}`);
 
-  return { status: 'ok', screened: candidates.length, kept: kept.length, rated, rating: rated ? s10 : null, likedPercent: rated ? pct : null };
+  const { data: blended, error: blendErr } = await supabase.rpc(
+    'recompute_film_liked_percent',
+    { p_film_id: filmId },
+  );
+  if (blendErr) {
+    console.warn(`[mine] liked_percent recompute failed for ${filmId}: ${blendErr.message}`);
+  }
+
+  const likedPercent = typeof blended === 'number' ? blended : pct;
+  return { status: 'ok', kept: kept.length, rating: s10, likedPercent };
 }
 
 /**

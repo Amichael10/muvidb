@@ -12,6 +12,9 @@ import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { toTitleCase } from '../utils/format';
 import { getZonedClock, getNextDate, isFutureShowtime, compareShowtimes } from '../utils/showtimes';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import PopcornField from '../components/ui/PopcornField';
+import HomeIntroSection from '../components/film/HomeIntroSection';
+import { collapseSeriesFilms } from '../utils/series';
 
 // Below-fold sections — keep them out of the critical homepage JS chunk.
 const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
@@ -22,7 +25,7 @@ const FilmCard = lazy(() => import('../components/film/FilmCard'));
 const HOME_ROW_CAP = 12;
 
 // Platforms shown in the homepage "New to Stream" tabbed rail.
-const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits'].includes(p.id));
+const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits', 'nollistream'].includes(p.id));
 const NEW_STREAM_IDS = NEW_STREAM.map(p => p.id);
 const CINEMA_SHOWTIME_PAGE_SIZE = 1000;
 
@@ -30,23 +33,13 @@ const cinemaFilmKey = (title = '') => title
   .normalize('NFKD')
   .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase()
+  // Drop parentheticals so "Apaara" and "Apaara (The Outcast)" collapse to one card
+  .replace(/\([^)]*\)/g, ' ')
+  .replace(/\[[^\]]*\]/g, ' ')
   .replace(/&/g, ' and ')
   .replace(/[^a-z0-9]+/g, ' ')
   .trim()
   .replace(/\s+/g, ' ');
-
-const POPCORN_KERNELS = [
-  { src: '/assets/popcorn/popcorn-01.svg', x: '6%', size: '24px', drift: '42px', duration: '24s', delay: '-2s', tilt: '-12deg' },
-  { src: '/assets/popcorn/popcorn-07.svg', x: '18%', size: '19px', drift: '-30px', duration: '30s', delay: '-18s', tilt: '18deg' },
-  { src: '/assets/popcorn/popcorn-03.svg', x: '31%', size: '27px', drift: '34px', duration: '27s', delay: '-9s', tilt: '9deg' },
-  { src: '/assets/popcorn/popcorn-13.svg', x: '44%', size: '18px', drift: '-44px', duration: '34s', delay: '-26s', tilt: '-24deg' },
-  { src: '/assets/popcorn/popcorn-05.svg', x: '57%', size: '25px', drift: '26px', duration: '25s', delay: '-5s', tilt: '15deg' },
-  { src: '/assets/popcorn/popcorn-12.svg', x: '68%', size: '20px', drift: '-22px', duration: '33s', delay: '-22s', tilt: '-8deg' },
-  { src: '/assets/popcorn/popcorn-02.svg', x: '79%', size: '29px', drift: '48px', duration: '28s', delay: '-13s', tilt: '26deg' },
-  { src: '/assets/popcorn/popcorn-10.svg', x: '90%', size: '18px', drift: '-38px', duration: '35s', delay: '-30s', tilt: '-16deg' },
-  { src: '/assets/popcorn/popcorn-15.svg', x: '12%', size: '27px', drift: '24px', duration: '31s', delay: '-24s', tilt: '12deg' },
-  { src: '/assets/popcorn/popcorn-04.svg', x: '72%', size: '22px', drift: '-46px', duration: '32s', delay: '-8s', tilt: '-20deg' },
-];
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
@@ -282,19 +275,21 @@ export default function Home() {
         runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
         is_featured, is_trending, release_type, streaming_links, source,
         youtube_watch_url, content_type, season_count, episode_count,
+        series_id, episode_number, season_number,
         film_genres(genres(name))
       `)
       .eq('content_type', 'series')
       .eq('is_trending', true)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
       .order('view_count', { ascending: false })
-      .limit(20);
+      .limit(40);
 
     if (!error && data) {
-      setFeaturedSeries(data.map(f => ({
+      const mapped = data.map(f => ({
         ...f,
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
+      }));
+      setFeaturedSeries(collapseSeriesFilms(mapped).slice(0, HOME_ROW_CAP));
     }
   };
 
@@ -766,24 +761,7 @@ export default function Home() {
     <div className="muvi-landing w-full pb-20 min-h-screen">
       <div className="muvi-film-rail muvi-film-rail--left" aria-hidden="true" />
       <div className="muvi-film-rail muvi-film-rail--right" aria-hidden="true" />
-      <div className="muvi-popcorn-field" aria-hidden="true">
-        {POPCORN_KERNELS.map((kernel, index) => (
-          <span
-            key={`${kernel.x}-${index}`}
-            className="muvi-popcorn-kernel"
-            style={{
-              '--x': kernel.x,
-              '--kernel-size': kernel.size,
-              '--drift': kernel.drift,
-              '--duration': kernel.duration,
-              '--delay': kernel.delay,
-              '--tilt': kernel.tilt,
-            }}
-          >
-            <img src={kernel.src} alt="" draggable="false" />
-          </span>
-        ))}
-      </div>
+      <PopcornField />
 
       {/* 1. HERO (Progressive Above-the-Fold Loading) (Issue 1) */}
       <HeroSection
@@ -791,107 +769,7 @@ export default function Home() {
         isLoading={isHeroLoading}
       />
 
-      {/* GOOGLE OAUTH VERIFICATION — temporary purpose block (safe to remove later) */}
-      <section
-        aria-label="About MuviDB"
-        className="relative border-y border-border/80 overflow-hidden"
-      >
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
-          style={{
-            background:
-              'radial-gradient(ellipse 80% 60% at 0% 50%, color-mix(in srgb, var(--color-brand) 18%, transparent), transparent 55%), radial-gradient(ellipse 50% 80% at 100% 0%, color-mix(in srgb, var(--color-brand) 10%, transparent), transparent 50%)',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(-12deg, transparent, transparent 11px, currentColor 11px, currentColor 12px)',
-          }}
-        />
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20">
-          <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
-            <div className="lg:col-span-7 space-y-6">
-              <p className="text-brand text-[10px] md:text-[11px] font-bold uppercase tracking-[0.28em]">
-                What is MuviDB
-              </p>
-              <h2 className="font-heading font-bold text-3xl sm:text-4xl md:text-[2.75rem] text-text-primary tracking-tighter leading-[1.05] max-w-2xl">
-                The database for Nollywood &amp; African film.
-              </h2>
-              <p className="text-text-secondary text-sm md:text-base leading-relaxed max-w-2xl">
-                MuviDB helps fans and industry professionals discover African movies and TV shows,
-                cinema showtimes, streaming availability, cast and crew, and free YouTube titles —
-                then rate, review, and follow the people who make them.
-              </p>
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <Link
-                  to="/privacy"
-                  className="inline-flex items-center gap-2 bg-brand text-white px-5 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest hover:bg-brand-hover transition-colors"
-                >
-                  Privacy Policy
-                  <Icon icon="solar:arrow-right-up-linear" className="w-4 h-4" />
-                </Link>
-                <Link
-                  to="/about"
-                  className="inline-flex items-center gap-2 border border-border bg-surface/60 text-text-primary px-5 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest hover:border-brand/50 transition-colors"
-                >
-                  About MuviDB
-                </Link>
-                <Link
-                  to="/terms"
-                  className="text-text-muted hover:text-brand text-[11px] font-bold uppercase tracking-widest transition-colors px-2"
-                >
-                  Terms
-                </Link>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5 space-y-4">
-              <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.22em]">
-                How we use Google services
-              </p>
-              <ul className="space-y-3">
-                {[
-                  {
-                    icon: 'solar:login-3-linear',
-                    title: 'Google Sign-In',
-                    body: 'If you choose “Sign in with Google,” we receive your name, email, and profile photo to create or access your MuviDB account.',
-                  },
-                  {
-                    icon: 'solar:videocamera-record-linear',
-                    title: 'YouTube public catalogue data',
-                    body: 'We use the YouTube Data API to show public film metadata — titles, thumbnails, view counts, and channel info — so you can find free African films and trailers.',
-                  },
-                  {
-                    icon: 'solar:shield-check-linear',
-                    title: 'Your data stays limited',
-                    body: 'We do not sell Google user data. Use is limited to running MuviDB as described in our Privacy Policy.',
-                  },
-                ].map((item) => (
-                  <li
-                    key={item.title}
-                    className="group flex gap-4 rounded-xl border border-border/80 bg-surface/40 backdrop-blur-sm p-4 md:p-5 hover:border-brand/35 transition-colors"
-                  >
-                    <span className="shrink-0 w-10 h-10 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
-                      <Icon icon={item.icon} className="w-5 h-5" />
-                    </span>
-                    <div className="min-w-0 space-y-1">
-                      <h3 className="font-heading font-bold text-text-primary text-sm tracking-tight">
-                        {item.title}
-                      </h3>
-                      <p className="text-text-muted text-xs md:text-[13px] leading-relaxed">
-                        {item.body}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HomeIntroSection />
 
       <div className="muvi-landing-shell max-w-7xl mx-auto">
         {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
@@ -953,7 +831,7 @@ export default function Home() {
                     <button
                       key={p.id}
                       onClick={() => setStreamTab(p.id)}
-                      className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 ${
+                      className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-200 ${
                         active ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-text-secondary hover:border-brand/40 hover:text-text-primary'
                       }`}
                     >
@@ -1157,7 +1035,7 @@ export default function Home() {
                                 <ImageWithFallback
                                   src={film.poster_url}
                                   alt={film.title}
-                                  fallbackType="banner"
+                                  fallbackType="film"
                                   name={film.title}
                                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                   width={256}
@@ -1251,7 +1129,7 @@ export default function Home() {
 
                 {/* Tab Content: Behind the Magic (Crew) */}
                 {featuredTalentTab === 'crew' && (
-                  <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x page-fade-in">
+                  <div data-lenis-prevent className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide overscroll-x-contain page-fade-in">
                     {isSecondaryLoading ? (
                       [...Array(6)].map((_, i) => (
                         <div key={i} className="shrink-0 w-44 bg-surface border border-hairline rounded-2xl p-5 text-center flex flex-col items-center gap-4">
@@ -1283,7 +1161,7 @@ export default function Home() {
                             <h3 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-1">
                               {crew.name}
                             </h3>
-                            <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+                            <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl">
                               {crew.known_for_department || 'Crew'}
                             </span>
                           </div>
@@ -1333,7 +1211,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide touch-pan-x">
+              <div data-lenis-prevent className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide overscroll-x-contain">
                 {isSecondaryLoading ? (
                   [...Array(4)].map((_, i) => (
                     <div key={i} className="shrink-0 w-64 bg-surface border border-hairline rounded-2xl p-6 flex flex-col gap-4">
@@ -1349,7 +1227,6 @@ export default function Home() {
                   ))
                 ) : (
                   productionCompanies.map((company) => {
-                    const initial = company.name?.charAt(0);
                     const filmCount = company.film_companies?.length || 0;
                     return (
                       <div 
@@ -1358,24 +1235,18 @@ export default function Home() {
                         className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
                       >
                         <div className="flex items-center gap-4">
-                          {company.logo_url ? (
-                            <div className="w-12 h-12 rounded-xl bg-white p-1 border border-hairline flex items-center justify-center overflow-hidden shrink-0">
-                              <ImageWithFallback
-                                src={company.logo_url} 
-                                alt={company.name}
-                                fallbackType="avatar"
-                                name={company.name}
-                                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
-                                width={96}
-                                sizes="48px"
-                                loading="lazy"
-                              />
-                            </div>
-                          ) : (
-                            <div className="w-12 h-12 rounded-xl bg-surface-2 flex items-center justify-center text-lg font-bold text-brand font-heading border border-hairline shrink-0">
-                              {initial}
-                            </div>
-                          )}
+                          <div className={`w-12 h-12 rounded-xl border border-hairline flex items-center justify-center overflow-hidden shrink-0 ${company.logo_url ? 'bg-white p-1' : 'bg-surface-2'}`}>
+                            <ImageWithFallback
+                              src={company.logo_url}
+                              alt={company.name}
+                              fallbackType="company"
+                              name={company.name}
+                              className={`w-full h-full group-hover:scale-110 transition-transform duration-500 ${company.logo_url ? 'object-contain' : 'object-cover'}`}
+                              width={96}
+                              sizes="48px"
+                              loading="lazy"
+                            />
+                          </div>
                           <div className="min-w-0">
                             <h3 className="font-bold text-text-primary text-xs tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
                               {toTitleCase(company.name)}

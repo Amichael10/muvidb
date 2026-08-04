@@ -14,6 +14,16 @@ export default function SmoothScroll({ children }: SmoothScrollProps) {
     const isAdminPath = location.pathname.startsWith('/admin');
     if (isAdminPath) return;
 
+    // On touch devices, native vertical scroll is more reliable over horizontal
+    // film rails (Lenis + nested overflow-x was trapping scroll mid-card).
+    const isCoarsePointer =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(pointer: coarse)').matches;
+    if (isCoarsePointer) {
+      (window as any).lenis = null;
+      return;
+    }
+
     const lenis = new Lenis({
       duration: 1.2,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -21,7 +31,9 @@ export default function SmoothScroll({ children }: SmoothScrollProps) {
       gestureOrientation: 'vertical',
       smoothWheel: true,
       wheelMultiplier: 1,
-      touchMultiplier: 2, // Improved for mobile response
+      // Never hijack touch — nested carousels need native gesture ownership
+      syncTouch: false,
+      touchMultiplier: 1,
       infinite: false,
     });
 

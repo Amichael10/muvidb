@@ -104,7 +104,7 @@ function FeatureCard({ film, featured = false }) {
             src={film.poster_url || film.backdrop_url}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            fallbackType="banner"
+            fallbackType="film"
             name={title}
             loading="lazy"
             width={featured ? 520 : 360}
@@ -165,7 +165,7 @@ function PosterCard({ film }) {
             src={film.poster_url || film.backdrop_url}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            fallbackType="banner"
+            fallbackType="film"
             name={title}
             loading="lazy"
             width={360}

@@ -11,16 +11,29 @@ import {
   foldPersonText,
 } from '../../lib/personNameMatch';
 import { canonicalizeRole } from '../../lib/creditRoles';
-import { searchPeopleByName } from '../../lib/peopleSearch';
+import { matchPeopleByNameKey, searchPeopleByName } from '../../lib/peopleSearch';
 
 const PEOPLE_SELECT = 'id, name, photo_url, film_count';
 
-/** Exact + name-order-swap lookup for one talent string. */
+/**
+ * Resolve an OCR/typed credit name to an existing person.
+ * Prefer Postgres name_key (order-insensitive) — Cohere is only a soft fallback.
+ */
 async function resolvePersonMatch(rawName) {
   const name = String(rawName || '').trim();
   if (!name) return null;
 
-  const hits = await searchPeopleByName(name, { limit: 12, select: PEOPLE_SELECT });
+  // 1) Authoritative: exact fold + name_key swap in SQL
+  const keyed = await matchPeopleByNameKey(name, { limit: 5 });
+  const keyedHit = pickAutoMatch(name, keyed);
+  if (keyedHit) return keyedHit;
+
+  // 2) Broader lexical + optional Cohere ranking
+  const hits = await searchPeopleByName(name, {
+    limit: 16,
+    select: PEOPLE_SELECT,
+    useCohere: true,
+  });
   const auto = pickAutoMatch(name, hits);
   if (auto) return auto;
 
@@ -241,8 +254,8 @@ export default function AdminCreditsExtractor() {
   }, [filmSearch]);
 
 
-  // Fetch live matches from database whenever the name list changes.
-  // Exact match first (batch), then per-row token-order swap for leftovers.
+  // Fetch live matches whenever the name list changes.
+  // Uses name_key (order-insensitive) — not case-sensitive exact .in('name').
   const runLiveProfileVerification = async (rows, setter) => {
     if (!rows.length) return;
 
@@ -250,25 +263,10 @@ export default function AdminCreditsExtractor() {
     if (!nameStrings.length) return;
 
     try {
-      const { data: exactPeople, error } = await supabase
-        .from('people')
-        .select(PEOPLE_SELECT)
-        .in('name', nameStrings);
-      if (error) throw error;
-
-      const exactMap = new Map((exactPeople || []).map((p) => [foldPersonText(p.name), p]));
       const resolved = new Map(); // queryName → person
-
-      for (const n of nameStrings) {
-        const hit = exactMap.get(foldPersonText(n));
-        if (hit) resolved.set(n, hit);
-      }
-
-      const unmatched = nameStrings.filter((n) => !resolved.has(n));
-      // Resolve swaps in small parallel batches
-      const BATCH = 6;
-      for (let i = 0; i < unmatched.length; i += BATCH) {
-        const slice = unmatched.slice(i, i + BATCH);
+      const BATCH = 8;
+      for (let i = 0; i < nameStrings.length; i += BATCH) {
+        const slice = nameStrings.slice(i, i + BATCH);
         const found = await Promise.all(slice.map((n) => resolvePersonMatch(n).catch(() => null)));
         slice.forEach((n, idx) => {
           if (found[idx]) resolved.set(n, found[idx]);
@@ -785,7 +783,7 @@ export default function AdminCreditsExtractor() {
                     {isSearchingFilms ? (
                       <div className="p-8 text-center text-sm text-text-muted font-medium flex items-center justify-center gap-2">
                         <div className="w-4.5 h-4.5 border-2 border-brand/30 border-t-brand rounded-full animate-spin"></div>
-                        <span>🔍 Searching database...</span>
+                        <span>Searching database...</span>
                       </div>
                     ) : filteredFilms.length === 0 ? (
                       <div className="p-8 text-center text-sm text-text-muted font-medium">No results found</div>
@@ -1108,7 +1106,7 @@ export default function AdminCreditsExtractor() {
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-surface-2 text-text-muted border border-border">
-                              🔍 Verification pending
+                              Verification pending
                             </span>
                           )}
                         </td>

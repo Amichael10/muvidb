@@ -33,6 +33,9 @@
   --radius-xl: 10px;
   --radius-2xl: 12px;
   --radius-pill: 9999px;
+  /* Text/CTA buttons — use Tailwind rounded-xl (not rounded-full pills).
+     Keep rounded-full only for true circles: avatars, icon-only controls, dots. */
+  --radius-button: var(--radius-xl);
 }
 
 /* Dark Theme (African Cinematic) */

@@ -138,7 +138,7 @@ export default function AdminClaims() {
           <p className="text-brand text-xs font-bold mb-1">Review Queue</p>
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-text-primary tracking-tight">Identity Claims</h1>
-            <span className="bg-brand/10 text-brand px-3 py-1 rounded-full text-xs font-bold border border-brand/20">
+            <span className="bg-brand/10 text-brand px-3 py-1 rounded-xl text-xs font-bold border border-brand/20">
               {claims.length} pending
             </span>
           </div>

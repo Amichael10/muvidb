@@ -5,6 +5,8 @@ import { formatViewCount } from '../utils/youtube'
 import { Icon } from '@iconify/react'
 import ShareAction from '../components/ui/ShareAction'
 import { toTitleCase, toSentenceCase } from '../utils/format'
+import ImageWithFallback from '../components/ui/ImageWithFallback'
+import { getCompanyLogoStrict } from '../lib/companyImages'
 
 const FilmCard = ({ film }) => (
   <Link
@@ -12,24 +14,20 @@ const FilmCard = ({ film }) => (
     className="group block"
   >
     <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[#13192B]">
-      {film.poster_url ? (
-        <img
-          src={film.poster_url}
-          alt={film.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-text-muted/30" />
-        </div>
-      )}
+      <ImageWithFallback
+        src={film.poster_url}
+        alt={film.title}
+        name={film.title}
+        fallbackType="film"
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
 
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
       {/* Rating */}
       {film.liked_percent != null && (
-        <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-bold px-3 py-1 rounded-full shadow-lg shadow-brand/20">
+        <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-bold px-3 py-1 rounded-xl shadow-lg shadow-brand/20">
           Official
         </div>
       )}
@@ -51,13 +49,16 @@ const FilmCard = ({ film }) => (
 const PersonCard = ({ person, role }) => (
   <Link to={`/people/${person.slug || person.id}`} className="block group text-center w-[120px] shrink-0">
     <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-surface-2 border-2 border-border group-hover:border-brand transition-colors mb-3">
-      {person.photo_url ? (
-        <img src={person.photo_url} alt={person.name} className="w-full h-full object-cover" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Icon icon="solar:user-linear" className="text-3xl text-text-muted/50" />
-        </div>
-      )}
+      <ImageWithFallback
+        src={person.photo_url}
+        alt={person.name}
+        fallbackType="avatar"
+        name={person.name}
+        className="w-full h-full object-cover"
+        width={192}
+        sizes="96px"
+        loading="lazy"
+      />
     </div>
     <p className="text-sm font-semibold text-text-primary line-clamp-1">{person.name}</p>
     <p className="text-[10px] text-text-muted font-bold tracking-wide mt-1 line-clamp-1">{role}</p>
@@ -66,12 +67,17 @@ const PersonCard = ({ person, role }) => (
 
 const PartnerCard = ({ company }) => (
   <Link to={`/companies/${company.slug || company.id}`} className="block group text-center w-[120px] shrink-0">
-    <div className="w-24 h-24 mx-auto rounded-xl bg-white p-3 shadow-sm border-2 border-transparent group-hover:border-brand transition-colors mb-3 flex items-center justify-center overflow-hidden">
-      {company.logo_url ? (
-        <img src={company.logo_url} alt={toTitleCase(company.name)} className="max-w-full max-h-full object-contain" />
-      ) : (
-        <span className="text-2xl font-heading font-bold text-black">{toTitleCase(company.name).charAt(0)}</span>
-      )}
+    <div className={`w-24 h-24 mx-auto rounded-xl shadow-sm border-2 border-transparent group-hover:border-brand transition-colors mb-3 flex items-center justify-center overflow-hidden ${getCompanyLogoStrict(company) ? 'bg-white p-3' : 'bg-surface-2'}`}>
+      <ImageWithFallback
+        src={company.logo_url}
+        alt={toTitleCase(company.name)}
+        fallbackType="company"
+        name={toTitleCase(company.name)}
+        className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain' : 'object-cover'}`}
+        width={192}
+        sizes="96px"
+        loading="lazy"
+      />
     </div>
     <p className="text-sm font-semibold text-text-primary line-clamp-2">{toTitleCase(company.name)}</p>
   </Link>
@@ -255,12 +261,18 @@ const CompanyDetail = () => {
           {/* Left: Logo & Core Info */}
           <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
             <div className="shrink-0">
-              <div className="w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border border-brand/30 bg-black/40 flex items-center justify-center p-6 shadow-2xl relative">
-                {company.logo_url ? (
-                  <img src={company.logo_url} alt={toTitleCase(company.name)} className="max-w-full max-h-full object-contain" />
-                ) : (
-                  <span className="text-6xl font-heading font-bold text-brand">{toTitleCase(company.name).charAt(0)}</span>
-                )}
+              <div className={`w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border border-brand/30 flex items-center justify-center shadow-2xl relative ${getCompanyLogoStrict(company) ? 'bg-black/40 p-6' : 'bg-surface-2'}`}>
+                <ImageWithFallback
+                  src={company.logo_url}
+                  alt={toTitleCase(company.name)}
+                  fallbackType="company"
+                  name={toTitleCase(company.name)}
+                  className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain' : 'object-cover'}`}
+                  width={448}
+                  sizes="(max-width: 767px) 192px, 224px"
+                  loading="eager"
+                  fetchPriority="high"
+                />
                 {/* Glow behind logo */}
                 <div className="absolute inset-0 bg-brand/10 blur-2xl -z-10 mix-blend-screen" />
               </div>

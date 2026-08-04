@@ -64,6 +64,7 @@ type AwardEntry = {
   season: number;
   won: boolean;
   work?: string | null;
+  film_id?: string | null;
   recipients?: string[];
 };
 
@@ -270,8 +271,14 @@ function mergeAwards(existing: any, incoming: AwardEntry[]): AwardEntry[] {
     const base = awardBaseKey(a);
     const idx = byBase.get(base);
     if (idx != null) {
-      // Upgrade nomination → win if needed; never downgrade
-      if (a.won && !list[idx].won) list[idx] = { ...list[idx], ...a, won: true };
+      const prev = list[idx];
+      // Upgrade nomination → win if needed; never downgrade. Fill film_id when missing.
+      list[idx] = {
+        ...prev,
+        ...a,
+        won: a.won || prev.won,
+        film_id: a.film_id || prev.film_id || null,
+      };
       continue;
     }
     list.push(a);
@@ -322,7 +329,7 @@ function pickBest<T>(matches: T[] | undefined, score: (row: T) => number): T | n
   return [...matches].sort((a, b) => score(b) - score(a))[0];
 }
 
-function toPersonAward(e: Entry): AwardEntry {
+function toPersonAward(e: Entry, filmId?: string | null): AwardEntry {
   return {
     title: e.work || e.category,
     category: e.category,
@@ -331,6 +338,7 @@ function toPersonAward(e: Entry): AwardEntry {
     season: e.season,
     won: e.won,
     work: e.work,
+    film_id: filmId ?? null,
   };
 }
 
@@ -599,7 +607,7 @@ async function main() {
         unmatchedPeople.push({ name: pname, category: e.category, season: e.season, work: e.work, won: e.won });
         continue;
       }
-      queueAward(personUpdates, person, toPersonAward(e));
+      queueAward(personUpdates, person, toPersonAward(e, filmRow?.id));
       if (filmRow) creditJobs.push({ filmId: filmRow.id, personId: person.id, role });
     }
 

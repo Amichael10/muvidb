@@ -12,7 +12,7 @@ export async function loader() {
   const { data: rows, error } = await supabaseServer
     .from('companies')
     .select(`
-      id, name, logo_url, founded_year, description, website,
+      id, name, logo_url, founded_year, description, website, company_type,
       film_companies(film_id)
     `)
     .order('name');

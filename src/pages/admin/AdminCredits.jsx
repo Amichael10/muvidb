@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
@@ -400,7 +401,7 @@ export default function AdminCredits() {
       {/* Filter Bar with SaaS Styling */}
       <div className="card-cal p-2 overflow-hidden flex flex-col md:flex-row items-center divide-y md:divide-y-0 md:divide-x divide-border">
         <div className="relative flex-1 w-full">
-          <span className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted">🔍</span>
+          <Icon icon="solar:magnifer-linear" className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted opacity-60 pointer-events-none" />
           <input
             type="text"
             placeholder="Search by talent, film production, or character..."

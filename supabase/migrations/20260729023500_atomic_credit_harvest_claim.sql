@@ -1,3 +1,7 @@
+-- Reconstructed from remote supabase_migrations.schema_migrations.
+-- This migration was applied directly to the remote database and was never
+-- committed. The file is restored here so local and remote history match.
+
 -- Atomically claim one credit-harvest job.
 --
 -- Multiple workers must not use a separate SELECT followed by UPDATE: two
@@ -36,4 +40,5 @@ end;
 $$;
 
 revoke all on function public.claim_credit_harvest_job() from public;
+
 grant execute on function public.claim_credit_harvest_job() to service_role;

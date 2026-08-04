@@ -31,9 +31,17 @@
       "maxDuration": 60
     },
     "api/data.ts": {
+      "includeFiles": "emails/**",
       "maxDuration": 60
     },
+    "api/telegram.ts": {
+      "maxDuration": 30
+    },
     "api/automation.ts": {
+      "maxDuration": 60
+    },
+    "api/social.ts": {
+      "includeFiles": "api/_lib/{fonts,decor}/**",
       "maxDuration": 60
     },
     "api/cron/sync.ts": {
@@ -41,6 +49,9 @@
     },
     "api/ai.ts": {
       "maxDuration": 60
+    },
+    "api/semantic-search.ts": {
+      "maxDuration": 30
     },
     "api/media.ts": {
       "maxDuration": 60
@@ -85,6 +96,14 @@
     {
       "source": "/api/content",
       "destination": "/api/data?_r=content"
+    },
+    {
+      "source": "/api/job-apply",
+      "destination": "/api/data?_r=job-apply"
+    },
+    {
+      "source": "/api/send-welcome-email",
+      "destination": "/api/data?_r=welcome-email"
     },
     {
       "source": "/api/youtube",

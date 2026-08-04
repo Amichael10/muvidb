@@ -171,17 +171,44 @@ export async function searchAll(query) {
     }
   }
 
-  // Merge title + cast films, dedupe, score (cast match gets a baseline), sort.
+  // Merge title + cast, score lexically first.
+  // Cohere Rerank (not pgvector) then reorders — zero vector IO on Supabase.
   const byId = new Map();
   for (const f of [...titleFilms, ...castFilms]) if (!byId.has(f.id)) byId.set(f.id, f);
-  const films = [...byId.values()]
+  let films = [...byId.values()]
     .map((f) => ({
       ...f,
-      genres: f.film_genres?.map((g) => g.genres?.name).filter(Boolean) || [],
+      genres: f.genres || f.film_genres?.map((g) => g.genres?.name).filter(Boolean) || [],
       _score: Math.max(scoreText(f.title, fullQ, terms), castFilmIds.has(f.id) ? 45 : 0),
     }))
     .sort((a, b) => b._score - a._score)
     .slice(0, 48);
+
+  if (!confidentPersonMatch && films.length >= 3) {
+    try {
+      const res = await fetch('/api/semantic-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q: query,
+          mode: 'rerank',
+          limit: Math.min(films.length, 24),
+          candidates: films.slice(0, 40).map((f) => ({ id: f.id, title: f.title })),
+        }),
+      });
+      if (res.ok) {
+        const body = await res.json();
+        const order = new Map((body.films || []).map((r, i) => [r.id, (r._semantic ?? 0) * 500 - i]));
+        if (order.size) {
+          films = films
+            .map((f) => (order.has(f.id) ? { ...f, _score: Math.max(f._score, order.get(f.id)) } : f))
+            .sort((a, b) => b._score - a._score);
+        }
+      }
+    } catch {
+      // Lexical order still works if Cohere rerank is down.
+    }
+  }
 
   const companies = (companyRes.data || [])
     .map((c) => ({ ...c, _score: scoreText(c.name, fullQ, terms) }))

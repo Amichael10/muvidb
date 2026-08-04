@@ -5,6 +5,7 @@ import ImageWithFallback from '../ui/ImageWithFallback';
 import LikedScore from './LikedScore';
 import { formatFilmTitle } from '../../utils/format';
 import { getPlatform } from '../../lib/platforms';
+import { getFilmBackdrop } from '../../lib/filmImages';
 
 const formatDeltaViews = (views) => {
   if (!views) return null;
@@ -162,11 +163,10 @@ export default function FilmCard({
     const platformMap = {
       netflix: { icon: 'simple-icons:netflix', color: 'text-[#E50914]', label: 'Watch on Netflix' },
       prime_video: { icon: 'simple-icons:primevideo', color: 'text-[#00A8E1]', label: 'Watch on Prime Video' },
-      kava: { icon: 'solar:play-circle-bold', color: 'text-[#FF5C00]', label: 'Watch on Kava' },
+      kava: { icon: 'solar:play-circle-bold', color: 'text-[#E84090]', label: 'Watch on Kava' },
       ironflix: { icon: 'solar:play-bold', color: 'text-[#D32F2F]', label: 'Watch on Ironflix' },
-      showmax: { icon: 'solar:tv-linear', color: 'text-[#E10098]', label: 'Watch on Showmax' },
-      docuth: { icon: 'solar:play-bold', color: 'text-zinc-200', label: 'Watch on Docuth' },
-      ebonylife: { icon: 'solar:play-circle-bold', color: 'text-[#800080]', label: 'Watch on EbonyLife' },
+      docuth: { icon: 'solar:play-bold', color: 'text-[#0048A8]', label: 'Watch on Docuth' },
+      ebonylife: { icon: 'solar:play-circle-bold', color: 'text-[#F8A008]', label: 'Watch on EbonyLife' },
       circuits: { icon: 'solar:clapperboard-play-bold', color: 'text-[#F0532B]', label: 'Watch on Circuits' },
     };
     
@@ -184,7 +184,11 @@ export default function FilmCard({
   const activePlatforms = getPlatforms();
   const runtimeLabel = formatRuntimeHours(film.runtime_minutes || film.runtime);
   const durationLabel = (film.content_type === 'series' || film.is_series_group)
-    ? (film.episodes_count > 1 ? `${film.episodes_count} Episodes` : (film.season_count ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`) : 'TV Series'))
+    ? (film.episodes_count > 1
+      ? `${film.episodes_count} videos`
+      : (film.season_count
+        ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`)
+        : 'TV Series'))
     : (runtimeLabel || '2h 5m');
   const youtubeRuntimeLabel = (film.content_type === 'series' || film.is_series_group) ? durationLabel : runtimeLabel;
   const formattedTotalViews = formatTotalViews(film.view_count);
@@ -218,10 +222,10 @@ export default function FilmCard({
             className={`relative z-0 block aspect-video w-full shrink-0 overflow-hidden bg-surface-2/60 transition-all duration-500 hover:z-10 ${isYoutubeVariant ? 'border-b border-border' : 'rounded-lg border border-border shadow-sm group-hover:border-brand/40 group-hover:shadow-xl group-hover:shadow-brand/5'}`}
           >
             <ImageWithFallback
-              src={film.backdrop_url || film.poster_url || film.poster}
+              src={getFilmBackdrop(film)}
               alt={formatFilmTitle(film.title)}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-              fallbackType="banner"
+              fallbackType="film"
               name={formatFilmTitle(film.title)}
               loading="lazy"
               width={640}
@@ -229,6 +233,12 @@ export default function FilmCard({
             />
             {likedPct != null && (
               <LikedScore percent={likedPct} variant="badge" className="absolute top-2.5 left-2.5 z-20" />
+            )}
+            {(film.content_type === 'series' || film.is_series_group) && film.episodes_count > 1 && (
+              <div className={`absolute top-2.5 ${likedPct != null ? 'left-[4.25rem]' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
+                <Icon icon="solar:folder-bold" className="text-white text-[9px]" />
+                <span>{film.episodes_count} videos</span>
+              </div>
             )}
             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors duration-300" />
             {getYoutubeId(film.youtube_watch_url) && (
@@ -296,7 +306,7 @@ export default function FilmCard({
             src={film.poster_url || film.poster}
             alt={formatFilmTitle(film.title)}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-            fallbackType="banner"
+            fallbackType="film"
             name={formatFilmTitle(film.title)}
             loading="lazy"
             width={384}
@@ -312,7 +322,7 @@ export default function FilmCard({
           {(film.content_type === 'series' || film.is_series_group) && (
             <div className={`absolute top-2.5 ${likedPct != null ? 'left-[4.25rem]' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
               <Icon icon={film.episodes_count > 1 ? "solar:folder-bold" : "solar:tv-bold"} className="text-white text-[9px]" />
-              <span>{film.episodes_count > 1 ? `${film.episodes_count} EPS` : 'TV'}</span>
+              <span>{film.episodes_count > 1 ? `${film.episodes_count} videos` : 'TV'}</span>
             </div>
           )}
 
@@ -359,7 +369,7 @@ export default function FilmCard({
                     </span>
                   ))}
                   {activePlatforms.length > 3 && (
-                    <span className="text-[8px] font-black text-white bg-black/60 px-1 rounded-full border border-white/10 shrink-0">
+                    <span className="text-[8px] font-black text-white bg-black/60 px-1 rounded-xl border border-white/10 shrink-0">
                       +{activePlatforms.length - 3}
                     </span>
                   )}

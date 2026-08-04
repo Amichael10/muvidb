@@ -21,10 +21,17 @@ export default [
   route('browse', 'routes/browse.tsx'),
   route('tv-shows', 'routes/tv-shows.tsx'),
   route('watch/:platform', 'routes/watch-platform.tsx'),
+  route('classification', 'pages/Classification.jsx'),
+  // Community submissions. The wizard is one schema-driven page for every
+  // `:kind` in SUBMIT_KINDS; it gates on sign-in itself rather than sitting
+  // under require-auth, so an unauthenticated visitor still gets the pitch.
+  route('submit', 'pages/SubmitHub.jsx'),
+  route('submit/:kind', 'pages/Submit.jsx'),
   route('login', 'pages/Login.jsx'),
   route('signup', 'pages/Signup.jsx'),
   route('people', 'routes/people-list.tsx'),
   route('people/:slug', 'routes/person-detail.tsx'),
+  route('awards', 'pages/Awards.jsx'),
   route('showtimes', 'routes/showtimes.tsx'),
   route('cinemas', 'routes/cinemas-list.tsx'),
   route('cinemas/:id', 'routes/cinema-detail.tsx'),
@@ -36,7 +43,10 @@ export default [
   route('privacy', 'pages/Privacy.jsx'),
   route('about', 'pages/About.jsx'),
   route('contact', 'pages/Contact.jsx'),
+  route('careers', 'pages/Careers.jsx'),
+  route('careers/:slug', 'pages/CareerDetail.jsx'),
   route('waitlist', 'pages/Waitlist.tsx'),
+  route('run-scanners', 'routes/api.run-scanners.tsx'),
 
   // ---- Authenticated ----
   layout('routes/require-auth.tsx', [
@@ -70,12 +80,14 @@ export default [
       route('deduplicator', 'pages/admin/AdminDeduplicator.jsx'),
       route('import', 'pages/admin/AdminImport.jsx'),
       route('spotlight', 'pages/admin/AdminSpotlight.jsx'),
+      route('jobs', 'pages/admin/AdminJobs.jsx'),
       route('top10', 'pages/admin/AdminTop10.jsx'),
       route('automation', 'pages/admin/AdminAutomation.jsx'),
       route('countries', 'pages/admin/AdminCountries.jsx'),
 
-      // Full admins only — these three carried a second, stricter guard.
+      // Full admins only — `admin_limited` must not reach these.
       layout('routes/require-admin-strict.tsx', [
+        route('social', 'pages/admin/AdminSocialStudio.jsx'),
         route('people-enrichment', 'pages/admin/AdminPeopleEnrichment.jsx'),
         route('outreach', 'pages/admin/AdminOutreach.jsx'),
         route('logs', 'pages/admin/AdminLogs.jsx'),

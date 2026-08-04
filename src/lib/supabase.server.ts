@@ -21,14 +21,16 @@ function readEnv(name: string): string {
 }
 
 function resolveUrl() {
-  return readEnv('SUPABASE_URL') || readEnv('VITE_SUPABASE_URL');
+  return readEnv('SUPABASE_URL') || readEnv('VITE_SUPABASE_URL') || 'https://pkenrmorywmuvnzfoylp.supabase.co';
 }
 
 function resolveKey() {
   return (
     readEnv('SUPABASE_SERVICE_ROLE_KEY') ||
+    readEnv('VITE_SUPABASE_SERVICE_ROLE_KEY') ||
     readEnv('SUPABASE_ANON_KEY') ||
-    readEnv('VITE_SUPABASE_ANON_KEY')
+    readEnv('VITE_SUPABASE_ANON_KEY') ||
+    'sb_publishable_fXxu9pH8yK8s6xEvEJWNgw_T3Nbbvdo'
   );
 }
 

@@ -3,6 +3,7 @@ import { Link, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatViewCount } from '../utils/youtube';
 import { Skeleton } from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { toTitleCase, toSentenceCase, formatPersonName } from '../utils/format';
@@ -185,26 +186,20 @@ export default function Channels() {
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Header */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 pt-32 border-x border-border relative z-10">
-          <h1 className="font-heading font-bold text-4xl md:text-6xl text-text-primary mb-4 tracking-tighter">
-            Creators & Studios
-          </h1>
-          <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6 mb-8">
-            The beating heart of Nollywood. Discover the visionary creators, independent studios, and global networks shaping the future of African entertainment.
-          </p>
-
-          {/* Search */}
-          <form onSubmit={handleSearch} className="flex gap-2 max-w-lg">
+      <PageHeader
+        icon="solar:videocamera-record-bold"
+        eyebrow="Creators"
+        title="Channels"
+        description="The beating heart of Nollywood. Discover the visionary creators, independent studios, and global networks shaping African entertainment."
+      >
+          <form onSubmit={handleSearch} className="flex gap-2 max-w-lg pt-2">
             <div className="relative flex-1">
               <input
                 type="text"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
-                placeholder="SEARCH ARCHIVE..."
-                className="w-full bg-surface border border-border rounded-lg px-6 py-4 pl-12 text-[10px] font-black tracking-widest text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-all"
+                placeholder="Search archive…"
+                className="w-full bg-surface border border-border rounded-lg px-6 py-4 pl-12 text-xs font-medium text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-all"
               />
               <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 text-text-primary" width="20" />
             </div>
@@ -215,8 +210,7 @@ export default function Channels() {
               Search Hubs
             </button>
           </form>
-        </div>
-      </div>
+      </PageHeader>
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">
         {/* Category tabs */}

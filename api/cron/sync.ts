@@ -2,10 +2,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../_lib/supabase.js';
 import { isValidAuth } from '../_lib/auth.js';
 import { runCastExtraction, runTitleCleanup } from '../_lib/ai_maintenance.js';
-import { runShowtimesSync, runVideosSync, runTMDBSync } from '../_lib/sync_service.js';
+import { runShowtimesSync, runVideosSync, runTMDBSync, purgeStaleUnmappedChannelVideos } from '../_lib/sync_service.js';
 import { sweepStaleCinemas } from '../_lib/cinema-adapters/index.js';
 import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
 import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
+import { pruneSocialAssets, runSocialPublisher } from '../_lib/social_studio.js';
+import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
+import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
 
 
 /**
@@ -115,6 +118,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'ai_maintenance': result = await runAIMaintenance(); break;
       case 'refresh_videos': return await refreshVideosHandler(req, res);
       case 'mirror_images':  return await mirrorImagesHandler(req, res);
+      case 'social_publish': result = await runSocialPublisher({ lockedBy: 'cron-sync' }); break;
+      // ~21s per person (upload, async add-on poll, download, store), against a
+      // 60s function budget — so two per run, not a big batch.
+      case 'people_cutouts': result = await runPeopleCutoutJob({ limit: 2 }); break;
+      case 'social_prune_assets': result = await pruneSocialAssets(); break;
+      // Advisory only — records a verdict, never hides or deletes a film.
+      case 'classify_film_kinds': result = await classifyFilmKinds({ limit: 100 }); break;
+      case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
       case 'kava':      
         return res.status(200).json({ 
           task: 'kava', 

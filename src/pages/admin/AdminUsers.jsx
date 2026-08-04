@@ -285,7 +285,7 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-6 py-6">
                       <div className="flex flex-col items-center gap-1.5">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${getRoleBadge(u.role)}`}>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-xl text-[10px] font-bold uppercase border ${getRoleBadge(u.role)}`}>
                           {u.role}
                         </span>
                         {u.is_banned && (

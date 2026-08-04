@@ -34,6 +34,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'extract_credits_from_image': return await extractCreditsFromImage(data, res);
       case 'people_enrichment_gemini': return await peopleEnrichmentGemini(data, res);
       case 'people_enrichment_gemini_batch': return await peopleEnrichmentGeminiBatch(data, res);
+      case 'enrich_film_gemini': return await enrichFilmGeminiTask(data, res);
+      case 'enrich_people_strict': return await enrichPeopleStrictTask(data, res);
       default: return res.status(400).json({ error: 'Invalid task' });
     }
   } catch (err: any) {
@@ -714,4 +716,125 @@ async function peopleEnrichmentGeminiBatch(data: any, res: VercelResponse) {
   }
 
   return res.status(200).json({ success: true, results });
+}
+
+async function enrichFilmGeminiTask(data: any, res: VercelResponse) {
+  const filmId = data?.filmId;
+  const limit = Math.min(Number(data?.limit || 20), 50);
+
+  let targetFilms: any[] = [];
+
+  if (filmId) {
+    const { data: film } = await supabase
+      .from('films')
+      .select('id, title, year, synopsis, genres, maturity_rating, youtube_watch_url, trailer_youtube_id, source_video_id')
+      .eq('id', filmId)
+      .single();
+    if (film) targetFilms = [film];
+  } else {
+    const { data: films } = await supabase
+      .from('films')
+      .select('id, title, year, synopsis, genres, maturity_rating, youtube_watch_url, trailer_youtube_id, source_video_id')
+      .or('synopsis.is.null,synopsis.eq.,genres.is.null,maturity_rating.is.null')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    targetFilms = films || [];
+  }
+
+  if (!targetFilms.length) {
+    return res.json({ success: true, message: 'No films requiring Gemini enrichment', results: [] });
+  }
+
+  const { enrichFilmWithGemini, applyFilmEnrichmentToDb } = await import('../src/lib/filmGeminiEnricher.server.js');
+
+  const results: any[] = [];
+
+  for (const film of targetFilms) {
+    try {
+      const enrichment = await enrichFilmWithGemini(film);
+      if (enrichment.synopsis) {
+        await applyFilmEnrichmentToDb(film.id, enrichment);
+        results.push({
+          filmId: film.id,
+          title: film.title,
+          synopsis: enrichment.synopsis,
+          genre: enrichment.genre,
+          age_rating: enrichment.age_rating,
+          status: 'ENRICHED',
+        });
+      }
+    } catch (e: any) {
+      results.push({
+        filmId: film.id,
+        title: film.title,
+        error: e.message,
+        status: 'FAILED',
+      });
+    }
+  }
+
+  return res.json({ success: true, count: results.length, results });
+}
+
+async function enrichPeopleStrictTask(data: any, res: VercelResponse) {
+  const personId = data?.personId;
+  const limit = Math.min(Number(data?.limit || 20), 50);
+
+  let targetPeople: any[] = [];
+
+  if (personId) {
+    const { data: person } = await supabase
+      .from('people')
+      .select('id, name, bio, photo_url, date_of_birth, gender, tmdb_id, instagram_url, twitter_url, facebook_url, tiktok_url, youtube_handle')
+      .eq('id', personId)
+      .single();
+    if (person) targetPeople = [person];
+  } else {
+    const { data: people } = await supabase
+      .from('people')
+      .select('id, name, bio, photo_url, date_of_birth, gender, tmdb_id, instagram_url, twitter_url, facebook_url, tiktok_url, youtube_handle')
+      .or('bio.is.null,photo_url.is.null,instagram_url.is.null')
+      .order('popularity_score', { ascending: false })
+      .limit(limit);
+    targetPeople = people || [];
+  }
+
+  if (!targetPeople.length) {
+    return res.json({ success: true, message: 'No people requiring strict enrichment', results: [] });
+  }
+
+  const { enrichPersonStrict, applyPersonStrictEnrichment } = await import('../src/lib/strictPeopleEnricher.server.js');
+
+  const results: any[] = [];
+
+  for (const person of targetPeople) {
+    try {
+      const enrichment = await enrichPersonStrict(person);
+      if (enrichment.verified) {
+        await applyPersonStrictEnrichment(person.id, enrichment.data);
+        results.push({
+          personId: person.id,
+          name: person.name,
+          enriched_fields: Object.keys(enrichment.data),
+          sources: enrichment.sources,
+          status: 'ENRICHED',
+        });
+      } else {
+        results.push({
+          personId: person.id,
+          name: person.name,
+          status: 'SKIPPED_NO_GROUNDED_MATCH',
+        });
+      }
+    } catch (e: any) {
+      results.push({
+        personId: person.id,
+        name: person.name,
+        error: e.message,
+        status: 'FAILED',
+      });
+    }
+  }
+
+  return res.json({ success: true, count: results.length, results });
 }

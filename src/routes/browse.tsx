@@ -51,7 +51,7 @@ export async function loader({ request }: { request: Request }) {
   if (country) query = query.in('film_countries.countries.name', [country]);
 
   query = query.eq('content_type', 'movie');
-  query = query.gte('year', 2000); // Browse.jsx's default yearRange
+  // Browse.jsx defaults yearRange to 1990 (= no year filter when <= 1990)
   query = query.or('source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}');
 
   const cfg = SORTS[sort] || SORTS.views;

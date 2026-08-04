@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { getPlatform, platformFilter } from '../lib/platforms';
+import { collapseSeriesFilms } from '../utils/series';
 
 // Reusable "Watch on [Platform]" browse page — owns the "where to watch Nollywood
 // on <platform>" search intent. Mirrors Browse's grid/filter UX but pinned to one platform.
@@ -47,6 +48,7 @@ export default function WatchPlatform() {
             runtime_minutes, view_count, average_rating, liked_percent, audience_rating, synopsis, tagline,
             tmdb_rating, nfvcb_rating, countries, content_type, youtube_watch_url,
             release_type, streaming_links, source, is_in_cinemas, created_at,
+            series_id, episode_number, season_number, episode_count, season_count,
             film_genres(genres(name))
           `)
           .or(platformFilter(platformId))
@@ -70,26 +72,11 @@ export default function WatchPlatform() {
         };
       });
 
-      setFilms(mapped);
-      setTotalCount(mapped.length); // provisional; refined by the count query below
-
-      // Best-effort exact total for the header — separate + non-blocking so a slow
-      // or timed-out count never affects the film grid.
-      (async () => {
-        const countOne = async (attempt = 0) => {
-          const { count, error: cErr } = await supabase
-            .from('films')
-            .select('id', { count: 'exact', head: true })
-            .or(platformFilter(platformId));
-          if (cErr && attempt < 2 && cErr.code === '57014') {
-            await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
-            return countOne(attempt + 1);
-          }
-          return cErr ? null : count;
-        };
-        const total = await countOne();
-        if (typeof total === 'number') setTotalCount(total);
-      })();
+      // One card per series — episodes live inside the detail page, not the grid.
+      const collapsed = collapseSeriesFilms(mapped);
+      setFilms(collapsed);
+      // Count grouped cards (not raw episode rows) so the header matches the grid.
+      setTotalCount(collapsed.length);
     } catch (err) {
       console.error('Error fetching platform films:', err);
     } finally {
@@ -150,7 +137,7 @@ export default function WatchPlatform() {
         <div className="flex flex-wrap items-center gap-3 p-6 md:p-8 border-b border-border bg-surface-2/5">
           <button
             onClick={() => setNewThisMonth((v) => !v)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest border transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all ${
               newThisMonth ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-text-muted hover:border-brand/50'
             }`}
           >
@@ -160,7 +147,7 @@ export default function WatchPlatform() {
           <select
             value={selectedGenre}
             onChange={(e) => setSelectedGenre(e.target.value)}
-            className="bg-surface border border-border text-text-primary rounded-full px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
           >
             <option value="">All genres</option>
             {genres.map((g) => (
@@ -171,7 +158,7 @@ export default function WatchPlatform() {
           <select
             value={yearMin}
             onChange={(e) => setYearMin(parseInt(e.target.value, 10))}
-            className="bg-surface border border-border text-text-primary rounded-full px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
           >
             <option value={0}>Any year</option>
             <option value={2024}>2024 +</option>

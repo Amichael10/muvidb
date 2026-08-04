@@ -11,7 +11,7 @@ import { formatViewCount } from '../../utils/youtube';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 
-const FILM_MIN = 60; // 1 min in seconds (includes skits)
+const FILM_MIN = 1800; // 30 min — film-length only
 
 function fmtDuration(s) {
   if (!s) return '—';
@@ -223,7 +223,7 @@ function EditFilmModal({ film, onSave, onClose }) {
                 type="button"
                 onClick={handleAIPolishTitle}
                 disabled={isSummarizing}
-                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-full hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
+                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-xl hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
               >
                 <Icon icon="solar:magic-stick-bold" />
                 AI Polish
@@ -255,7 +255,7 @@ function EditFilmModal({ film, onSave, onClose }) {
                 type="button"
                 onClick={handleAISummarize}
                 disabled={isSummarizing}
-                className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-full hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
+                className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-xl hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
               >
                 {isSummarizing ? 'Generating...' : (
                   <>

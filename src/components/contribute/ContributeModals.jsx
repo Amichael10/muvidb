@@ -240,7 +240,7 @@ export function SuggestEditModal({ onClose, target, targetId, targetName, curren
   };
 
   const chipCls = (active) =>
-    `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+    `inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
       active
         ? 'bg-brand/15 text-brand border-brand/40'
         : 'bg-surface-2 text-text-secondary border-border hover:border-brand/30'

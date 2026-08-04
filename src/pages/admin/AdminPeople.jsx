@@ -1052,7 +1052,7 @@ export default function AdminPeople() {
               <button
                 type="button"
                 onClick={handleFetchYoutube}
-                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-full hover:bg-brand/10 transition-all flex items-center gap-1.5"
+                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-xl hover:bg-brand/10 transition-all flex items-center gap-1.5"
               >
                 Refresh Stats
               </button>
@@ -1089,7 +1089,7 @@ export default function AdminPeople() {
                   <span className="text-xl">🎞️</span>
                   <h4 className="text-xs font-bold text-text-muted">Film Credits</h4>
                   {personCredits.length > 0 && (
-                    <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-full px-2 py-0.5">
+                    <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-xl px-2 py-0.5">
                       {personCredits.length}
                     </span>
                   )}

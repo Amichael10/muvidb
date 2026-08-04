@@ -68,8 +68,47 @@ function toWebRequest(req: VercelRequest): Request {
   return new Request(url, init);
 }
 
+function pathnameFromReq(req: VercelRequest): string {
+  const rawPath = req.query.__pathname;
+  const pathnameFromQuery = Array.isArray(rawPath) ? rawPath[0] : rawPath;
+  if (typeof pathnameFromQuery === 'string' && pathnameFromQuery.startsWith('/')) {
+    return pathnameFromQuery.split('?')[0];
+  }
+  try {
+    return new URL(req.url || '/', 'http://localhost').pathname;
+  } catch {
+    return '/';
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    const pathname = pathnameFromReq(req);
+
+    // Soft IP block + scrape tracking (dynamic import — never crash SSR shell).
+    try {
+      const { rejectIfBlocked, trackPageHit } = await import('./_lib/scrape_guard.js');
+      if (await rejectIfBlocked(req)) {
+        res.status(403);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-MuviDB-SSR', 'blocked');
+        res.end('Forbidden');
+        return;
+      }
+      if (
+        pathname.startsWith('/films/')
+        || pathname.startsWith('/people/')
+        || pathname === '/browse'
+        || pathname.startsWith('/browse/')
+        || pathname.startsWith('/watch/')
+      ) {
+        trackPageHit(req, pathname, 'page');
+      }
+    } catch (guardErr: any) {
+      console.warn('[api/ssr] scrape guard skipped:', guardErr?.message || guardErr);
+    }
+
     // Dynamic import — top-level import of react-router/rrHandler was crashing
     // the lambda before any response could be written.
     const { handleSsrRequest, resolveServerBuildPath } = await import(

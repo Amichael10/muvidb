@@ -260,7 +260,7 @@ export default function AdminSpotlight() {
                       <p className="text-sm text-text-secondary line-clamp-2">{s.story}</p>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium ${
                         s.is_active ? 'bg-green-500/10 text-green-500' : 'bg-surface-3 text-text-muted'
                       }`}>
                         {s.is_active ? 'Active' : 'Inactive'}

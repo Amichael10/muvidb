@@ -8,6 +8,7 @@ import FilmCard from './FilmCard';
 import { supabase } from '../../lib/supabase';
 import { formatFilmTitle } from '../../utils/format';
 import { formatRole } from '../../lib/creditRoles';
+import { getFilmBackdrop } from '../../lib/filmImages';
 
 const formatRuntimeHours = (minutes) => {
   if (!minutes) return null;
@@ -138,10 +139,10 @@ export default function QuickViewModal() {
           {/* Hero Section */}
           <div className="relative w-full h-[450px] shrink-0 bg-black">
             <ImageWithFallback 
-              src={selectedFilm.backdrop_url || selectedFilm.poster_url || selectedFilm.poster} 
+              src={getFilmBackdrop(selectedFilm)} 
               alt={formatFilmTitle(selectedFilm.title)} 
               className="w-full h-full object-cover"
-              fallbackType="banner"
+              fallbackType="film"
               name={formatFilmTitle(selectedFilm.title)}
             />
             {/* Gradients */}

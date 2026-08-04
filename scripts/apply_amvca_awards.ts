@@ -55,6 +55,7 @@ type AwardEntry = {
   season: number;
   won: boolean;
   work?: string | null;
+  film_id?: string | null;
   recipients?: string[];
 };
 
@@ -149,8 +150,14 @@ function mergeAwards(existing: any, incoming: AwardEntry[]): AwardEntry[] {
     const base = [a.organization, a.season, a.category, a.work || '', a.title].join('|').toLowerCase();
     const idx = byBase.get(base);
     if (idx != null) {
-      // Upgrade nomination → win if needed; never downgrade
-      if (a.won && !list[idx].won) list[idx] = { ...list[idx], ...a, won: true };
+      const prev = list[idx];
+      // Upgrade nomination → win if needed; never downgrade. Fill film_id when missing.
+      list[idx] = {
+        ...prev,
+        ...a,
+        won: a.won || prev.won,
+        film_id: a.film_id || prev.film_id || null,
+      };
       continue;
     }
     list.push(a);
@@ -413,6 +420,7 @@ async function main() {
         season: e.season,
         won: e.won,
         work: e.work,
+        film_id: filmRow?.id ?? null,
       };
       if (!personUpdates.has(person.id)) personUpdates.set(person.id, { row: person, add: [] });
       personUpdates.get(person.id)!.add.push(entry);

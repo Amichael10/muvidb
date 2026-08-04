@@ -7,6 +7,7 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AwardsEditor from '../../components/admin/AwardsEditor';
+import YouTubeFilmImport from '../../components/admin/YouTubeFilmImport';
 import { ALL_ROLES, canonicalizeRole } from '../../lib/creditRoles';
 import { searchPeopleByName } from '../../lib/peopleSearch';
 import { extractYoutubeId } from '../../lib/youtube';
@@ -17,6 +18,9 @@ import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { authHeaders } from '../../lib/apiAuth';
 import { parseLanguages, AFRICAN_LANGUAGES } from '../../utils/languages';
+import { resolveFilmImageFields } from '../../lib/filmImages';
+import { NFVCB_RATING_OPTIONS } from '../../lib/contributions';
+import { getShowName } from '../../utils/series';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -154,11 +158,22 @@ export default function AdminFilms() {
     youtube_watch_url: '',
     source_video_id: '',
     content_type: 'movie',
+    series_id: null,
+    episode_number: '',
+    season_number: '',
+    season_count: '',
+    episode_count: '',
     is_in_cinemas: false,
     streaming_links: {}
   };
 
   const [formData, setFormData] = useState(initialFormState);
+  const [parentSeriesQuery, setParentSeriesQuery] = useState('');
+  const [parentSeriesResults, setParentSeriesResults] = useState([]);
+  const [parentSeriesLabel, setParentSeriesLabel] = useState('');
+  const [similarSeries, setSimilarSeries] = useState([]);
+  const [selectedSimilarIds, setSelectedSimilarIds] = useState([]);
+  const [linkingSimilar, setLinkingSimilar] = useState(false);
 
   const draftKey = isDrawerOpen ? (editingFilm ? `MuviDB_draft_film_${editingFilm.id}` : 'MuviDB_draft_film_new') : null;
   const draftData = useMemo(() => ({ formData, credits, showtimes, selectedCompany }), [formData, credits, showtimes, selectedCompany]);
@@ -211,6 +226,13 @@ export default function AdminFilms() {
         if (film) {
           setEditingFilm(film);
           setFormData({ ...initialFormState, ...film });
+          setParentSeriesLabel('');
+          setSimilarSeries([]);
+          setSelectedSimilarIds([]);
+          if (film.series_id) {
+            supabase.from('films').select('id, title').eq('id', film.series_id).maybeSingle()
+              .then(({ data }) => { if (data) setParentSeriesLabel(data.title); });
+          }
           setIsDrawerOpen(true);
         }
         // Clear param after handling
@@ -398,12 +420,14 @@ export default function AdminFilms() {
   const fetchYoutubeBuffer = async () => {
     setLoading(true);
     try {
-      // Fetch videos that are NOT hidden and do NOT have a film_id
+      // Film-length unmapped signals only (≥30 min). Shorter clips are purged /
+      // never useful as "map to film" candidates (trailers, skits, promos).
       let query = supabase
         .from('channel_videos')
         .select('*, channels(name)', { count: 'exact' })
         .is('film_id', null)
-        .eq('is_hidden', false);
+        .eq('is_hidden', false)
+        .gte('duration_seconds', 1800);
 
       if (searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
 
@@ -602,6 +626,12 @@ export default function AdminFilms() {
     }
     setDraftRestoredMessage(draft ? 'Unsaved changes restored from draft.' : '');
 
+    setParentSeriesQuery('');
+    setParentSeriesResults([]);
+    setParentSeriesLabel('');
+    setSimilarSeries([]);
+    setSelectedSimilarIds([]);
+
     if (film) {
       setEditingFilm(film);
       const baseForm = {
@@ -614,6 +644,11 @@ export default function AdminFilms() {
         youtube_watch_url: film.youtube_watch_url || '',
         streaming_links: film.streaming_links || {},
         awards: Array.isArray(film.awards) ? film.awards : [],
+        series_id: film.series_id || null,
+        episode_number: film.episode_number ?? '',
+        season_number: film.season_number ?? '',
+        season_count: film.season_count ?? '',
+        episode_count: film.episode_count ?? '',
       };
       // Merge over the base rather than replacing it: a draft saved before a
       // field existed on this form has no key for it, and save would then write
@@ -627,6 +662,11 @@ export default function AdminFilms() {
             }
           : baseForm,
       );
+
+      if (film.series_id) {
+        supabase.from('films').select('id, title').eq('id', film.series_id).maybeSingle()
+          .then(({ data }) => { if (data) setParentSeriesLabel(data.title); });
+      }
       
       if (draft) {
         setCredits(draft.credits || []);
@@ -647,10 +687,102 @@ export default function AdminFilms() {
     setIsDrawerOpen(true);
   };
 
+  const searchParentSeries = async (q) => {
+    setParentSeriesQuery(q);
+    if (!q || q.trim().length < 2) {
+      setParentSeriesResults([]);
+      return;
+    }
+    const { data } = await supabase
+      .from('films')
+      .select('id, title, year, poster_url')
+      .eq('content_type', 'series')
+      .is('series_id', null)
+      .ilike('title', `%${q.trim()}%`)
+      .order('title')
+      .limit(12);
+    setParentSeriesResults((data || []).filter((f) => f.id !== editingFilm?.id));
+  };
+
+  const selectParentSeries = (parent) => {
+    setFormData((prev) => ({
+      ...prev,
+      series_id: parent.id,
+      content_type: prev.content_type === 'movie' ? 'series' : prev.content_type,
+    }));
+    setParentSeriesLabel(parent.title);
+    setParentSeriesQuery('');
+    setParentSeriesResults([]);
+  };
+
+  const clearParentSeries = () => {
+    setFormData((prev) => ({ ...prev, series_id: null }));
+    setParentSeriesLabel('');
+  };
+
+  const findSimilarSeriesToLink = async () => {
+    if (!editingFilm?.id || !formData.title) {
+      toast.error('Save/open a series first');
+      return;
+    }
+    const stem = getShowName(formData.title) || formData.title;
+    const { data, error } = await supabase
+      .from('films')
+      .select('id, title, year, poster_url, series_id')
+      .eq('content_type', 'series')
+      .ilike('title', `${stem}%`)
+      .neq('id', editingFilm.id)
+      .limit(60);
+    if (error) {
+      toast.error('Could not find similar titles');
+      return;
+    }
+    const rows = (data || []).filter((f) => f.series_id !== editingFilm.id);
+    setSimilarSeries(rows);
+    setSelectedSimilarIds(rows.filter((f) => !f.series_id).map((f) => f.id));
+    if (!rows.length) toast('No similar titles found');
+  };
+
+  const linkSelectedAsEpisodes = async () => {
+    if (!editingFilm?.id || selectedSimilarIds.length === 0) return;
+    setLinkingSimilar(true);
+    try {
+      // This film becomes the parent; clear its own series_id if set.
+      await supabase.from('films').update({
+        series_id: null,
+        content_type: 'series',
+      }).eq('id', editingFilm.id);
+
+      const { error } = await supabase
+        .from('films')
+        .update({ series_id: editingFilm.id, content_type: 'series' })
+        .in('id', selectedSimilarIds);
+      if (error) throw error;
+
+      setFormData((prev) => ({ ...prev, series_id: null, content_type: 'series' }));
+      setParentSeriesLabel('');
+      toast.success(`Linked ${selectedSimilarIds.length} titles under this series`);
+      setSimilarSeries((prev) => prev.map((f) =>
+        selectedSimilarIds.includes(f.id) ? { ...f, series_id: editingFilm.id } : f
+      ));
+      setSelectedSimilarIds([]);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to link series');
+    } finally {
+      setLinkingSimilar(false);
+    }
+  };
+
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
     setEditingFilm(null);
     setFormData(initialFormState);
+    setParentSeriesQuery('');
+    setParentSeriesResults([]);
+    setParentSeriesLabel('');
+    setSimilarSeries([]);
+    setSelectedSimilarIds([]);
     setCredits([]);
     setShowtimes([]);
     setSelectedCompany(null);
@@ -839,11 +971,22 @@ export default function AdminFilms() {
         mubi_slug: formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
-        poster_url: (formData.poster_url || '').trim() || null,
-        backdrop_url: (formData.backdrop_url || '').trim() || null,
+        ...resolveFilmImageFields({
+          poster_url: formData.poster_url,
+          backdrop_url: formData.backdrop_url,
+        }),
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
         release_date: formData.release_date || null,
         release_type: formData.release_type || null,
+        series_id: formData.series_id || null,
+        episode_number: formData.episode_number !== '' && formData.episode_number != null
+          ? parseInt(formData.episode_number, 10) : null,
+        season_number: formData.season_number !== '' && formData.season_number != null
+          ? parseInt(formData.season_number, 10) : null,
+        season_count: formData.season_count !== '' && formData.season_count != null
+          ? parseInt(formData.season_count, 10) : null,
+        episode_count: formData.episode_count !== '' && formData.episode_count != null
+          ? parseInt(formData.episode_count, 10) : null,
         // Multi-language: parse the language field ("English, Yoruba") into the
         // normalized languages[] array. `language` stays as the primary.
         languages: parseLanguages(formData.language),
@@ -1240,7 +1383,7 @@ export default function AdminFilms() {
               <Icon icon="solar:tuning-2-linear" className="w-4 h-4" />
               More filters
               {advancedFilterCount > 0 && (
-                <span className="bg-brand text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-black">{advancedFilterCount}</span>
+                <span className="bg-brand text-white rounded-xl min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-black">{advancedFilterCount}</span>
               )}
               <Icon icon={showAdvancedFilters ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'} className="w-3.5 h-3.5" />
             </button>
@@ -1329,6 +1472,7 @@ export default function AdminFilms() {
             <option value="docuth">Docuth</option>
             <option value="ebonylife">EbonyLife</option>
             <option value="circuits">Circuits</option>
+            <option value="nollistream">NolliStream</option>
           </select>
 
           <select
@@ -1531,12 +1675,17 @@ export default function AdminFilms() {
                             <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
                           </a>
                         )}
+                        {film.streaming_links?.nollistream && (
+                          <a href={film.streaming_links.nollistream} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-600 hover:text-white transition-all shadow-sm" title="NolliStream Link">
+                            <Icon icon="solar:play-circle-bold" width="14" />
+                          </a>
+                        )}
                         {film.streaming_links?.circuits && (
                           <a href={film.streaming_links.circuits} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-orange-500/10 text-[#F0532B] hover:bg-[#F0532B] hover:text-white transition-all shadow-sm" title="Circuits.tv Link">
                             <Icon icon="solar:clapperboard-play-bold" className="w-4 h-4" />
                           </a>
                         )}
-                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && (
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && (
                           <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
                         )}
                       </div>
@@ -1549,7 +1698,7 @@ export default function AdminFilms() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex flex-col items-center gap-1.5">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-xl text-[10px] font-bold border ${
                           film.status === 'released' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
                           film.status === 'post-production' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
                           film.status === 'in_production' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
@@ -1616,7 +1765,7 @@ export default function AdminFilms() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-brand/5 text-brand border-brand/20 uppercase tracking-tighter">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-xl text-[10px] font-bold border bg-brand/5 text-brand border-brand/20 uppercase tracking-tighter">
                         Unmapped Signal
                       </span>
                     </td>
@@ -1820,6 +1969,17 @@ export default function AdminFilms() {
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-12">
+          <YouTubeFilmImport
+            disabled={isSubmitting}
+            onApply={(fields) => {
+              setFormData((prev) => ({
+                ...prev,
+                ...fields,
+                // Keep existing genres / awards / credits — import only fills media + copy.
+              }));
+            }}
+          />
+
           {/* Main Attributes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <section className="space-y-6">
@@ -1830,7 +1990,7 @@ export default function AdminFilms() {
                     type="button"
                     onClick={refreshFromTmdb}
                     disabled={isRefreshing}
-                    className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-full hover:bg-brand/10 transition-all flex items-center gap-1.5"
+                    className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-xl hover:bg-brand/10 transition-all flex items-center gap-1.5"
                   >
                     {isRefreshing ? 'Refreshing...' : (
                       <>
@@ -1850,7 +2010,7 @@ export default function AdminFilms() {
                       type="button"
                       onClick={handleAIPolishTitle}
                       disabled={isSummarizing}
-                      className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-full hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
+                      className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1.5 rounded-xl hover:bg-brand/10 active:scale-95 transition-all flex items-center gap-1.5"
                     >
                       <Icon icon="solar:magic-stick-bold" />
                       AI Polish
@@ -1950,6 +2110,7 @@ export default function AdminFilms() {
                     >
                       <option value="movie">Movie</option>
                       <option value="series">Series</option>
+                      <option value="mini_series">Mini-series</option>
                     </select>
                   </div>
                   <div>
@@ -1977,6 +2138,139 @@ export default function AdminFilms() {
                     />
                   </div>
                 </div>
+
+                {(formData.content_type === 'series' || formData.content_type === 'mini_series' || formData.series_id) && (
+                  <div className="rounded-xl border border-border bg-surface-2/40 p-4 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-widest text-text-primary">Series linking</h4>
+                        <p className="text-[11px] text-text-muted mt-1">
+                          Tie episode / variant titles under one parent so they show as a single card.
+                        </p>
+                      </div>
+                      {editingFilm?.id && !formData.series_id && (
+                        <button
+                          type="button"
+                          onClick={findSimilarSeriesToLink}
+                          className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg border border-brand/40 text-brand hover:bg-brand/10 transition-all"
+                        >
+                          Find similar titles
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted mb-1.5">Season #</label>
+                        <input type="number" name="season_number" value={formData.season_number ?? ''} onChange={handleChange}
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text-primary outline-none focus:border-brand" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted mb-1.5">Episode #</label>
+                        <input type="number" name="episode_number" value={formData.episode_number ?? ''} onChange={handleChange}
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text-primary outline-none focus:border-brand" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted mb-1.5">Season count</label>
+                        <input type="number" name="season_count" value={formData.season_count ?? ''} onChange={handleChange}
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text-primary outline-none focus:border-brand" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted mb-1.5">Episode count</label>
+                        <input type="number" name="episode_count" value={formData.episode_count ?? ''} onChange={handleChange}
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm text-text-primary outline-none focus:border-brand" />
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <label className="block text-[10px] font-bold text-text-muted mb-1.5">Parent series (optional)</label>
+                      {formData.series_id ? (
+                        <div className="flex items-center justify-between gap-3 rounded-lg border border-brand/30 bg-brand/5 px-3 py-2.5">
+                          <span className="text-sm font-bold text-text-primary truncate">
+                            {parentSeriesLabel || 'Linked parent'}
+                          </span>
+                          <button type="button" onClick={clearParentSeries} className="text-[10px] font-bold uppercase text-brand hover:underline shrink-0">
+                            Unlink
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="relative">
+                            <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted opacity-60" />
+                            <input
+                              type="text"
+                              value={parentSeriesQuery}
+                              onChange={(e) => searchParentSeries(e.target.value)}
+                              placeholder="Search parent series by title…"
+                              className="w-full bg-surface border border-border rounded-md pl-10 pr-3 py-2.5 text-sm text-text-primary outline-none focus:border-brand"
+                            />
+                          </div>
+                          {parentSeriesResults.length > 0 && (
+                            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface divide-y divide-border">
+                              {parentSeriesResults.map((p) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => selectParentSeries(p)}
+                                  className="w-full text-left px-3 py-2.5 hover:bg-brand/10 transition-colors"
+                                >
+                                  <span className="text-sm font-bold text-text-primary">{p.title}</span>
+                                  {p.year ? <span className="text-[10px] text-text-muted ml-2">{p.year}</span> : null}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {similarSeries.length > 0 && (
+                      <div className="space-y-3 border-t border-border pt-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[11px] text-text-muted">
+                            Select titles to nest under <span className="font-bold text-text-primary">{formData.title}</span>
+                          </p>
+                          <button
+                            type="button"
+                            disabled={linkingSimilar || selectedSimilarIds.length === 0}
+                            onClick={linkSelectedAsEpisodes}
+                            className="text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg bg-brand text-white disabled:opacity-40"
+                          >
+                            {linkingSimilar ? 'Linking…' : `Link ${selectedSimilarIds.length} selected`}
+                          </button>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto space-y-1.5">
+                          {similarSeries.map((row) => {
+                            const already = row.series_id === editingFilm?.id;
+                            const checked = selectedSimilarIds.includes(row.id);
+                            return (
+                              <label
+                                key={row.id}
+                                className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer ${
+                                  already ? 'border-brand/40 bg-brand/5 opacity-70' : 'border-border bg-surface hover:border-brand/40'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  disabled={already}
+                                  checked={already || checked}
+                                  onChange={() => {
+                                    setSelectedSimilarIds((prev) =>
+                                      prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]
+                                    );
+                                  }}
+                                />
+                                <span className="text-sm text-text-primary flex-1 truncate">{row.title}</span>
+                                {already && <span className="text-[9px] font-bold uppercase text-brand">Linked</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-xs font-bold text-text-primary">Story Synopsis</label>
@@ -1984,7 +2278,7 @@ export default function AdminFilms() {
                       type="button"
                       onClick={handleAISummarize}
                       disabled={isSummarizing}
-                      className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-full hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
+                      className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-3 py-1.5 rounded-xl hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-brand/20"
                     >
                       {isSummarizing ? 'Generating...' : (
                         <>
@@ -2170,14 +2464,21 @@ export default function AdminFilms() {
                     <input type="number" name="runtime_minutes" value={formData.runtime_minutes} onChange={handleChange} className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Content Rating</label>
+                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">NFVCB classification</label>
                     <select
                       name="nfvcb_rating"
-                      value={formData.nfvcb_rating}
+                      value={formData.nfvcb_rating || ''}
                       onChange={handleChange}
                       className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
                     >
-                      {['G', 'PG', 'PG-13', '15', '18'].map(r => <option key={r} value={r}>{r}</option>)}
+                      <option value="">Select...</option>
+                      {NFVCB_RATING_OPTIONS.map((r) => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                      {/* Legacy MPAA value still in the DB enum until fully remapped */}
+                      {formData.nfvcb_rating === 'PG-13' && (
+                        <option value="PG-13">PG-13 — legacy (remap to 12 / 12A)</option>
+                      )}
                     </select>
                   </div>
                 </div>
@@ -2245,7 +2546,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -2335,6 +2636,7 @@ export default function AdminFilms() {
                       { id: 'docuth', label: 'Docuth', placeholder: 'https://docuth.com/...' },
                       { id: 'ebonylife', label: 'EbonyLife', placeholder: 'https://ebonylifeonplus.com/...' },
                       { id: 'circuits', label: 'Circuits', placeholder: 'https://www.circuits.tv/...' },
+                      { id: 'nollistream', label: 'NolliStream', placeholder: 'https://nollistream.net/movie/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;

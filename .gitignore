@@ -68,6 +68,11 @@ project.tar.gz
 *.png
 *.jpg
 *.jpeg
+# Keep shipped site assets (homepage intro cards, etc.)
+!public/images/**/*.png
+!public/images/**/*.jpg
+!public/images/**/*.jpeg
+!public/images/**/*.webp
 *.bak
 
 # Playwright storageState — holds live login cookies (NetflixId/SecureNetflixId
@@ -84,6 +89,9 @@ scratch/
 # React Router framework-mode generated typegen + build output
 .react-router/
 build/
+
+# Social Studio design mockups (large PNG references, kept local)
+docs/social-templates/*.png
 
 # Local credit-roll frame dumps from harvest_credits.ts --frames-only
 harvest_frames/

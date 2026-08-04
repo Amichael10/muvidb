@@ -1,3 +1,7 @@
+-- Reconstructed from remote supabase_migrations.schema_migrations.
+-- This migration was applied directly to the remote database and was never
+-- committed. The file is restored here so local and remote history match.
+
 -- Approve one harvested credit atomically.
 --
 -- The previous browser flow performed person creation, credit insertion, and
@@ -108,7 +112,9 @@ end;
 $$;
 
 revoke all on function public.approve_credit_candidate(uuid, text, text, text, uuid) from public;
+
 grant execute on function public.approve_credit_candidate(uuid, text, text, text, uuid) to authenticated;
+
 grant execute on function public.approve_credit_candidate(uuid, text, text, text, uuid) to service_role;
 
 comment on function public.approve_credit_candidate(uuid, text, text, text, uuid) is
