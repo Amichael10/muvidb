@@ -9,7 +9,14 @@ import {
   sendTelegramMessage,
   telegramConfigured,
 } from './telegram.js';
-import { blockIp, listBlockedIps, unblockIp } from './ip_blocklist.js';
+import {
+  allowIp,
+  blockIp,
+  listAllowlistedIps,
+  listBlockedIps,
+  unallowIp,
+  unblockIp,
+} from './ip_blocklist.js';
 import { recentHitsForIp, topHitters } from './scrape_guard.js';
 import { supabase } from './supabase.js';
 
@@ -28,9 +35,14 @@ function helpText() {
     '',
     '/block <ip> — refuse SSR + public API for this IP',
     '/unblock <ip> — remove from blocklist',
+    '/allow <ip> — whitelist (no alerts, cannot block)',
+    '/unallow <ip> — remove from whitelist',
+    '/allowed — list whitelisted IPs',
     '/hits [ip] — recent scrape buckets (or top offenders)',
     '/blocked — list blocked IPs',
     '/help — this message',
+    '',
+    'Tip: browse muvidb.com, then /hits to find your home IP → /allow <ip>',
   ].join('\n');
 }
 
@@ -92,6 +104,55 @@ async function handleCommand(chatId: string | number, text: string) {
     return;
   }
 
+  if (cmd === '/allow' || cmd === '/whitelist') {
+    const ip = arg.split(/\s+/)[0];
+    if (!ip || !IP_RE.test(ip)) {
+      await reply(chatId, 'Usage: /allow <ip>\nBrowse the site, run /hits, then allow your home IP.');
+      return;
+    }
+    const note = arg.split(/\s+/).slice(1).join(' ') || 'home/trusted';
+    const result = await allowIp({ ip, note });
+    await reply(
+      chatId,
+      result.ok
+        ? `Allowlisted ${ip}. No scrape alerts; /block will refuse this IP.`
+        : `Failed to allow: ${result.error}`,
+    );
+    return;
+  }
+
+  if (cmd === '/unallow' || cmd === '/unwhitelist') {
+    const ip = arg.split(/\s+/)[0];
+    if (!ip || !IP_RE.test(ip)) {
+      await reply(chatId, 'Usage: /unallow <ip>');
+      return;
+    }
+    const result = await unallowIp(ip);
+    await reply(
+      chatId,
+      result.ok ? `Removed ${ip} from allowlist.` : `Failed: ${result.error}`,
+    );
+    return;
+  }
+
+  if (cmd === '/allowed' || cmd === '/allowlist') {
+    const rows = await listAllowlistedIps(25);
+    const envRaw = (process.env.SCRAPE_IP_ALLOWLIST || '').trim();
+    const envLines = envRaw
+      ? envRaw.split(',').map((s) => s.trim()).filter(Boolean).map((ip) => `• ${ip} (env)`)
+      : [];
+    if (!rows.length && !envLines.length) {
+      await reply(chatId, 'No allowlisted IPs. Browse muvidb.com → /hits → /allow <ip>');
+      return;
+    }
+    const dbLines = rows.map((r) => {
+      const when = r.created_at ? new Date(r.created_at).toISOString().slice(0, 16) : '?';
+      return `• ${r.ip} (${when}${r.note ? ` — ${r.note}` : ''})`;
+    });
+    await reply(chatId, `Allowlisted IPs:\n${[...envLines, ...dbLines].join('\n')}`);
+    return;
+  }
+
   if (cmd === '/hits') {
     if (arg && IP_RE.test(arg.split(/\s+/)[0])) {
       const ip = arg.split(/\s+/)[0];
@@ -141,6 +202,19 @@ async function handleCallback(query: any) {
       await reply(
         chatId,
         result.ok ? `🚫 Blocked ${ip}` : `Failed to block ${ip}: ${result.error}`,
+      );
+    }
+    return;
+  }
+
+  if (data.startsWith('allow:')) {
+    const ip = data.slice('allow:'.length).trim();
+    const result = await allowIp({ ip, note: 'Telegram inline allow' });
+    await answerTelegramCallback(callbackId, result.ok ? `Allowlisted ${ip}` : 'Allow failed');
+    if (chatId) {
+      await reply(
+        chatId,
+        result.ok ? `✅ Allowlisted ${ip}` : `Failed to allow ${ip}: ${result.error}`,
       );
     }
     return;

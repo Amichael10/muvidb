@@ -5,7 +5,7 @@
  */
 import { supabase } from './supabase.js';
 import { sendTelegramMessage, telegramConfigured } from './telegram.js';
-import { isIpBlocked } from './ip_blocklist.js';
+import { isIpAllowlisted, isIpBlocked } from './ip_blocklist.js';
 
 const WINDOW_MS = 5 * 60 * 1000;
 const HIT_THRESHOLD = Number(process.env.SCRAPE_ALERT_THRESHOLD || 50);
@@ -74,6 +74,9 @@ async function recordAndMaybeAlert(
 
   const ip = clientIp(req);
   if (!ip || ip === 'unknown') return;
+
+  // Home / trusted IPs — never count or alert
+  if (await isIpAllowlisted(ip)) return;
 
   // Already blocked — no need to keep alerting
   if (await isIpBlocked(ip)) return;
@@ -148,6 +151,7 @@ async function recordAndMaybeAlert(
           { text: '🚫 Block IP', callback_data: `block:${ip}` },
           { text: 'Ignore 30m', callback_data: `ignore:${ip}` },
         ],
+        [{ text: '✅ Allowlist (trusted)', callback_data: `allow:${ip}` }],
       ],
     },
   });
