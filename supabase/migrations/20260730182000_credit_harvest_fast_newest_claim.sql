@@ -1,4 +1,6 @@
 -- Fast newest-first claiming for credit harvest workers.
+
+set statement_timeout = 0;
 --
 -- The previous newest-first claim joined every pending job to films and sorted
 -- by films.created_at on each worker claim. With a large queue this can hit the
@@ -6,13 +8,9 @@
 -- created_at timestamp into credit_harvest_jobs.priority and claim from the
 -- indexed jobs table.
 
-update public.credit_harvest_jobs as job
-set priority = least(floor(extract(epoch from film.created_at))::integer, 2000000000)
-from public.films as film
-where film.id = job.film_id
-  and job.status = 'pending'
-  and film.created_at is not null
-  and job.priority is distinct from least(floor(extract(epoch from film.created_at))::integer, 2000000000);
+-- Skip the one-shot priority backfill here: on the hosted DB it can exceed the
+-- statement window and block worker startup. New inserts get priority from the
+-- trigger below, and existing pending jobs can be backfilled later in chunks.
 
 create index if not exists credit_harvest_jobs_pending_newest_claim_idx
   on public.credit_harvest_jobs (priority desc, created_at asc, id)

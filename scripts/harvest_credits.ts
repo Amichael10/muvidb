@@ -88,6 +88,27 @@ type Job = {
   attempts: number;
 };
 
+type FilmSnapshot = {
+  id: string;
+  title: string | null;
+  youtube_watch_url: string | null;
+  runtime_minutes: number | null;
+  synopsis: string | null;
+  year: number | null;
+  language: string | null;
+  languages: string[] | null;
+  nfvcb_rating: string | null;
+};
+
+type YoutubeMetadata = {
+  title?: string;
+  fulltitle?: string;
+  description?: string;
+  channel?: string;
+  uploader?: string;
+  webpage_url?: string;
+};
+
 type WorkerStatus =
   | 'starting'
   | 'idle'
@@ -115,6 +136,18 @@ let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let heartbeatBusy = false;
 let stopRequested = false;
 let monitorWarningShown = false;
+function isTransientSupabaseError(error: unknown) {
+  const message = String(error instanceof Error ? error.message : error).toLowerCase();
+  return [
+    'fetch failed',
+    'upstream request timeout',
+    'timeout',
+    'cloudflare',
+    '522',
+    'connection terminated',
+    'pgrst002',
+  ].some((needle) => message.includes(needle));
+}
 
 function monitorWarning(label: string, error: unknown) {
   if (monitorWarningShown) return;
@@ -289,7 +322,16 @@ async function checkPrereqs() {
   if (!FRAMES_ONLY) need.push(['tesseract', ['--version']]);
   const missing: string[] = [];
   for (const [bin, args] of need) {
-    try { await run(bin, args); } catch { missing.push(bin); }
+    try {
+      await run(bin, args, { timeout: 30_000, maxBuffer: 1024 * 1024 });
+    } catch (error: any) {
+      const timedOut = error?.killed || error?.signal || /timeout|timed out/i.test(String(error?.message ?? error));
+      if (timedOut) {
+        console.warn(`   ⚠️  ${bin} prereq check timed out; continuing because the real command will report a concrete error if it cannot run.`);
+        continue;
+      }
+      missing.push(bin);
+    }
   }
   if (missing.length) {
     console.error(`\n💀 Missing required tools on PATH: ${missing.join(', ')}`);
@@ -467,6 +509,260 @@ function candidateKey(row: { raw_name: string; role_or_character?: string | null
   ].join('|');
 }
 
+
+// ------------------------------------------------------------- metadata ----
+// Text-only metadata extraction from the YouTube title/description. This avoids
+// frame/video storage and paid model calls; admins still approve before live data
+// changes.
+const METADATA_SOURCE = 'youtube_metadata';
+const METADATA_DESCRIPTION_LIMIT = 12_000;
+const METADATA_SYNOPSIS_LIMIT = 1_000;
+const METADATA_TIMEOUT = 120_000;
+const LANGUAGE_ALIASES: Array<[string, RegExp]> = [
+  ['English', /\benglish\b/i],
+  ['Pidgin', /\bpidgin\b/i],
+  ['Yoruba', /\byoruba\b/i],
+  ['Igbo', /\bigbo\b/i],
+  ['Hausa', /\bhausa\b/i],
+  ['Edo', /\bedo\b/i],
+  ['Ibibio', /\bibibio\b/i],
+  ['Efik', /\befik\b/i],
+  ['Twi', /\btwi\b/i],
+  ['Akan', /\bakan\b/i],
+  ['Swahili', /\bswahili\b/i],
+  ['French', /\bfrench\b/i],
+];
+
+function compactWhitespace(value: unknown): string {
+  return String(value ?? '')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanMetadataLine(line: string): string {
+  return line
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\bwww\.\S+/gi, ' ')
+    .replace(/(^|\s)[#@][\w.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isPromoMetadataLine(line: string): boolean {
+  const low = line.toLowerCase();
+  return [
+    'subscribe', 'follow us', 'follow me', 'click', 'download', 'watch more',
+    'latest nollywood', 'new nollywood', 'full movie', 'official trailer',
+    'like and share', 'turn on notification', 'youtube channel',
+  ].some((needle) => low.includes(needle));
+}
+
+function extractSynopsis(description: string): string | null {
+  const paragraphs = compactWhitespace(description)
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph
+      .split('\n')
+      .map(cleanMetadataLine)
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim())
+    .filter(Boolean);
+
+  const usable: string[] = [];
+  for (const paragraph of paragraphs) {
+    if (/^(starring|cast|featuring|producer|produced by|director|directed by|screenplay|crew|production company|music|editor)\b/i.test(paragraph)) break;
+    if (isPromoMetadataLine(paragraph)) continue;
+    if (paragraph.length < 80) continue;
+    if ((paragraph.match(/[.!?]/g) || []).length === 0 && paragraph.length < 160) continue;
+    usable.push(paragraph);
+    if (usable.join(' ').length >= METADATA_SYNOPSIS_LIMIT) break;
+  }
+
+  const synopsis = usable.join('\n\n').slice(0, METADATA_SYNOPSIS_LIMIT).trim();
+  return synopsis.length >= 80 ? synopsis : null;
+}
+
+function extractReleaseYear(text: string): number | null {
+  const currentYear = new Date().getFullYear();
+  const explicit = text.match(/\b(?:release(?:d)?|premiere(?:d)?|year|date)\D{0,20}((?:19|20)\d{2})\b/i);
+  const raw = explicit?.[1] || text.match(/\b((?:19|20)\d{2})\b/)?.[1];
+  const year = raw ? Number(raw) : NaN;
+  return Number.isInteger(year) && year >= 1888 && year <= currentYear + 2 ? year : null;
+}
+
+function extractAgeRating(text: string): string | null {
+  const match = text.match(/\b(?:nfvcb|rated|rating|age rating|content rating|classified)\D{0,16}(PG-13|PG|G|15|18)\b/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function extractLanguage(text: string): string | null {
+  const found: string[] = [];
+  const explicit = text.match(/\b(?:language|languages)\s*[:\-]\s*([^\n.;]+)/i)?.[1] || '';
+  const haystacks = [explicit, text].filter(Boolean);
+  for (const haystack of haystacks) {
+    for (const [label, pattern] of LANGUAGE_ALIASES) {
+      if (pattern.test(haystack) && !found.includes(label)) found.push(label);
+    }
+    if (found.length) break;
+  }
+  return found.slice(0, 3).join(', ') || null;
+}
+
+function cleanCompanyName(value: string | null | undefined): string | null {
+  let name = cleanMetadataLine(String(value ?? ''))
+    .replace(/\b(?:presents|present|production company|official)\b.*$/i, '')
+    .replace(/\b(?:produced by|production by|a film by)\b/i, '')
+    .replace(/[|,.;:]+$/g, '')
+    .trim();
+  if (!name || name.length < 3 || name.length > 90) return null;
+  if (/\b(subscribe|watch|latest|full movie|nollywood movie|trailer)\b/i.test(name)) return null;
+  if (/^\d+$/.test(name)) return null;
+  return name.replace(/\s+/g, ' ');
+}
+
+function extractProductionCompany(text: string): string | null {
+  const lines = compactWhitespace(text).split('\n').map(cleanMetadataLine).filter(Boolean);
+  const patterns = [
+    /\b(?:production company|company)\s*[:\-]\s*(.+)$/i,
+    /\b(?:produced by|production by)\s+(.+?(?:productions?|pictures|films?|studios?|tv|media|entertainment|motion pictures)?)(?:$|[|,.;])/i,
+    /^(.+?(?:productions?|pictures|films?|studios?|tv|media|entertainment|motion pictures))\s+(?:presents|present|production)\b/i,
+    /\b([A-Z][A-Za-z0-9&'. -]{2,70}\s+(?:Productions?|Pictures|Films?|Studios?|TV|Media|Entertainment|Motion Pictures))\b/,
+  ];
+
+  for (const line of lines) {
+    if (isPromoMetadataLine(line)) continue;
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      const company = cleanCompanyName(match?.[1]);
+      if (company) return company;
+    }
+  }
+  return null;
+}
+
+async function fetchYoutubeMetadata(url: string): Promise<YoutubeMetadata | null> {
+  const { stdout } = await run('yt-dlp', [
+    '--dump-json',
+    '--skip-download',
+    '--no-playlist',
+    '--no-warnings',
+    ...clientArgs(),
+    ...cookieArgs(),
+    url,
+  ], { timeout: METADATA_TIMEOUT, maxBuffer: 16 * 1024 * 1024 });
+
+  const text = stdout.trim();
+  if (!text) return null;
+  return JSON.parse(text.split('\n').at(-1) || text);
+}
+
+function buildMetadataCandidate(
+  job: Job,
+  film: FilmSnapshot,
+  metadata: YoutubeMetadata,
+): Record<string, any> | null {
+  const title = compactWhitespace(metadata.fulltitle || metadata.title || '');
+  const description = compactWhitespace(metadata.description || '');
+  const sourceText = [title, description].filter(Boolean).join('\n\n');
+  const synopsis = extractSynopsis(description);
+  const language = extractLanguage(sourceText);
+  const releaseYear = extractReleaseYear(sourceText);
+  const ageRating = extractAgeRating(sourceText);
+  const productionCompany = extractProductionCompany(sourceText);
+  const fields = [synopsis, language, releaseYear, ageRating, productionCompany]
+    .filter((value) => value !== null && value !== undefined && String(value).trim() !== '');
+
+  if (!fields.length) return null;
+
+  const confidence = Math.min(
+    0.9,
+    0.35
+      + (synopsis ? 0.22 : 0)
+      + (language ? 0.08 : 0)
+      + (releaseYear ? 0.08 : 0)
+      + (ageRating ? 0.08 : 0)
+      + (productionCompany ? 0.12 : 0),
+  );
+
+  return {
+    film_id: film.id,
+    job_id: job.id,
+    source: METADATA_SOURCE,
+    source_url: metadata.webpage_url || film.youtube_watch_url,
+    source_title: title || null,
+    source_description: description.slice(0, METADATA_DESCRIPTION_LIMIT) || null,
+    source_evidence: {
+      channel: metadata.channel || metadata.uploader || null,
+      had_description: Boolean(description),
+      extracted_fields: fields.length,
+    },
+    synopsis,
+    language,
+    release_year: releaseYear,
+    age_rating: ageRating,
+    production_company: productionCompany,
+    confidence: Number(confidence.toFixed(2)),
+    status: 'pending',
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function saveMetadataCandidate(job: Job, film: FilmSnapshot) {
+  if (FRAMES_ONLY || !film.youtube_watch_url) return;
+
+  try {
+    const metadata = await fetchYoutubeMetadata(film.youtube_watch_url);
+    if (!metadata) return;
+
+    const draft = buildMetadataCandidate(job, film, metadata);
+    if (!draft) return;
+
+    const { data: existing, error: existingError } = await supabase
+      .from('credit_metadata_candidates')
+      .select('id')
+      .eq('film_id', film.id)
+      .eq('source', METADATA_SOURCE)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (existingError) throw new Error(existingError.message);
+
+    const result = existing?.id
+      ? await supabase
+        .from('credit_metadata_candidates')
+        .update(draft)
+        .eq('id', existing.id)
+      : await supabase
+        .from('credit_metadata_candidates')
+        .insert(draft);
+    if (result.error) throw new Error(result.error.message);
+
+    console.log(`   metadata suggestion queued (${Object.keys(draft).filter((key) => ['synopsis', 'language', 'release_year', 'age_rating', 'production_company'].includes(key) && draft[key]).length} fields)`);
+    if (job.id) {
+      await writeWorkerLog(
+        'info',
+        'metadata_candidate',
+        `${film.title || film.id}: metadata suggestion queued`,
+        job,
+        { fields: draft.source_evidence.extracted_fields },
+      );
+    }
+  } catch (error) {
+    const message = String(error instanceof Error ? error.message : error);
+    console.warn(`   metadata skipped: ${message}`);
+    if (job.id) {
+      await writeWorkerLog(
+        'warning',
+        'metadata_skipped',
+        `${film.title || film.id}: metadata extraction skipped`,
+        job,
+        { error: message.slice(0, 300) },
+      );
+    }
+  }
+}
 // ------------------------------------------------------------- processing ---
 /** Run yt-dlp and, on failure, surface its actual stderr (not just "command failed"). */
 async function ytdlp(args: string[]): Promise<{ stdout: string; stderr: string }> {
@@ -621,7 +917,7 @@ function looksLikeName(s: string): boolean {
 async function processJob(job: Job) {
   const { data: film } = await supabase
     .from('films')
-    .select('id, title, youtube_watch_url, runtime_minutes')
+    .select('id, title, youtube_watch_url, runtime_minutes, synopsis, year, language, languages, nfvcb_rating')
     .eq('id', job.film_id)
     .single();
 
@@ -635,6 +931,8 @@ async function processJob(job: Job) {
     await finish(job, 'unavailable', 0, 'no youtube url', filmLabel);
     return;
   }
+
+  await saveMetadataCandidate(job, film as FilmSnapshot);
 
   // Queue runs are resumable and may be re-enqueued while an earlier debug run
   // already has candidates awaiting review. Do not download/OCR the same film
@@ -887,7 +1185,17 @@ async function main() {
   let wasPaused = false;
   try {
     while (!stopRequested) {
-      const paused = await isHarvestPaused();
+      let paused = false;
+      try {
+        paused = await isHarvestPaused();
+      } catch (error) {
+        if (!isTransientSupabaseError(error)) throw error;
+        const message = `Monitor database timeout; retrying in ${Math.round(PAUSE_POLL_MS / 1000)} seconds`;
+        console.warn(`   ⚠️  ${message}: ${String(error)}`);
+        await setWorkerActivity('idle', message, null);
+        await waitInterruptibly(PAUSE_POLL_MS);
+        continue;
+      }
       if (paused) {
         if (!wasPaused) {
           const message = 'Paused by the admin dashboard; waiting to resume';
@@ -910,7 +1218,18 @@ async function main() {
         await setWorkerActivity('idle', 'Waiting for the next movie', null);
       }
 
-      const job = await claim();
+      let job: Job | null = null;
+      try {
+        job = await claim();
+      } catch (error) {
+        if (!isTransientSupabaseError(error)) throw error;
+        const message = 'Database timeout while claiming a movie; checking again in 60 seconds';
+        console.warn(`   ⚠️  ${message}: ${String(error)}`);
+        await setWorkerActivity('idle', message, null);
+        await writeWorkerLog('warning', 'claim_retry', message, null, { error: String(error) });
+        await waitInterruptibly(60_000);
+        continue;
+      }
       if (!job) {
         if (arg('once') !== undefined) break;
         const message = 'Queue empty; checking again in 60 seconds';

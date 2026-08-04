@@ -3,17 +3,50 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
-import { pickAutoMatch } from '../../lib/personNameMatch';
+import { foldPersonText, pickAutoMatch, sortedNameKey } from '../../lib/personNameMatch';
 import { searchPeopleByName } from '../../lib/peopleSearch';
+import { AFRICAN_LANGUAGES, parseLanguages } from '../../utils/languages';
 
 const PEOPLE_SEARCH_SELECT = 'id, name, photo_url, film_count';
 const NFVCB_RATINGS = ['G', 'PG', 'PG-13', '15', '18'];
+const METADATA_FIELDS = [
+  ['Synopsis', 'synopsis'],
+  ['Language', 'language'],
+  ['Release year', 'release_year'],
+  ['Age rating', 'age_rating'],
+  ['Production company', 'production_company'],
+];
 const WORKER_COMMAND = [
   'cd C:\\Users\\User\\muvidb',
   'npx tsx scripts/harvest_credits.ts --cookies="C:\\Users\\User\\Downloads\\Cookies.txt"',
 ].join('\n');
 const WORKER_ONLINE_MS = 45_000;
 
+function compactInput(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function personMatchLabel(query, person) {
+  const q = compactInput(query);
+  if (q && foldPersonText(q) === foldPersonText(person.name)) return 'Exact existing profile';
+  const qKey = sortedNameKey(q);
+  if (qKey && qKey === sortedNameKey(person.name)) return 'Same name tokens';
+  if (person._suggested) return 'Similar existing profile';
+  return person.film_count ? `${person.film_count} credits` : 'Existing profile';
+}
+
+function metadataCandidateRows(candidate) {
+  return METADATA_FIELDS
+    .map(([label, key]) => ({ label, value: candidate?.[key] }))
+    .filter((row) => row.value !== null && row.value !== undefined && String(row.value).trim() !== '');
+}
+
+function numberOrNull(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
 function CandidatePersonNameCell({
   candidate,
   disabled,
@@ -136,11 +169,7 @@ function CandidatePersonNameCell({
                     {person.name}
                   </div>
                   <div className="text-[9px] text-text-muted font-bold uppercase tracking-wider">
-                    {person._suggested
-                      ? 'Similar existing profile'
-                      : person.film_count
-                        ? `${person.film_count} credits`
-                        : 'Existing profile'}
+                    {personMatchLabel(candidate.raw_name, person)}
                   </div>
                 </div>
                 {candidate.matched_person_id === person.id && (
@@ -205,6 +234,11 @@ export default function AdminCreditHarvest() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending');
     counts.pendingCandidates = pendingCands ?? 0;
+    const { count: pendingMetadata } = await supabase
+      .from('credit_metadata_candidates')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    counts.pendingMetadataCandidates = pendingMetadata ?? 0;
     setStats(counts);
   }, []);
 
@@ -233,7 +267,7 @@ export default function AdminCreditHarvest() {
 
       const { data, error } = await supabase
         .from('credit_candidates')
-        .select('*, films:film_id (id, title, slug, poster_url, year, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)')
+        .select('*, films:film_id (id, title, slug, poster_url, year, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, language, languages, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)')
         .eq('film_id', pageRow.film_id)
         .eq('status', statusFilter)
         .gte('confidence', minConfidence)
@@ -243,14 +277,38 @@ export default function AdminCreditHarvest() {
         .limit(500);
       if (error) throw error;
 
+      const [metadataResult, companyResult] = await Promise.all([
+        supabase
+          .from('credit_metadata_candidates')
+          .select('*')
+          .eq('film_id', pageRow.film_id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('film_companies')
+          .select('role, companies(id, name)')
+          .eq('film_id', pageRow.film_id)
+          .eq('role', 'production')
+          .limit(1),
+      ]);
+      if (metadataResult.error) throw metadataResult.error;
+      if (companyResult.error) throw companyResult.error;
+
       const film = data?.[0]?.films;
+      const productionCompany = companyResult.data?.[0]?.companies || null;
       setGroups(data?.length
         ? [{
             film: {
               ...film,
+              language: film?.language || (Array.isArray(film?.languages) ? film.languages.join(', ') : ''),
+              production_company: productionCompany?.name || '',
+              production_company_id: productionCompany?.id || null,
               genre_ids: (film?.film_genres || []).map((row) => row.genre_id),
               _metadataDirty: false,
             },
+            metadataCandidate: metadataResult.data || null,
             candidates: data,
           }]
         : []);
@@ -441,15 +499,165 @@ export default function AdminCreditHarvest() {
     });
   };
 
+  const applyMetadataCandidate = (group) => {
+    const candidate = group.metadataCandidate;
+    if (!candidate || !group.film?.id) return;
+
+    editFilmMetadata(group.film.id, {
+      synopsis: candidate.synopsis || group.film.synopsis || '',
+      language: candidate.language || group.film.language || '',
+      year: candidate.release_year ?? group.film.year ?? '',
+      nfvcb_rating: candidate.age_rating || group.film.nfvcb_rating || '',
+      production_company: candidate.production_company || group.film.production_company || '',
+    });
+    toast.success('Suggestion copied into movie details');
+  };
+
+  const ensureProductionCompany = async (companyName) => {
+    const name = compactInput(companyName);
+    if (!name) return null;
+
+    const { data: existing, error: searchError } = await supabase
+      .from('companies')
+      .select('id, name')
+      .ilike('name', name)
+      .limit(1);
+    if (searchError) throw searchError;
+    if (existing?.[0]) return existing[0];
+
+    const { data, error } = await supabase
+      .from('companies')
+      .insert([{
+        name,
+        description: '.',
+        website: '.',
+        logo_url: null,
+        company_type: 'production',
+      }])
+      .select('id, name')
+      .single();
+    if (error) throw error;
+    return data;
+  };
+
+  const syncProductionCompany = async (filmId, companyName) => {
+    const company = await ensureProductionCompany(companyName);
+    const { error: deleteError } = await supabase
+      .from('film_companies')
+      .delete()
+      .eq('film_id', filmId)
+      .eq('role', 'production');
+    if (deleteError) throw deleteError;
+
+    if (!company) return null;
+    const { error: insertError } = await supabase
+      .from('film_companies')
+      .insert([{
+        film_id: filmId,
+        company_id: company.id,
+        role: 'production',
+      }]);
+    if (insertError) throw insertError;
+    return company;
+  };
+
+  const approveMetadataCandidate = async (group) => {
+    const candidate = group.metadataCandidate;
+    if (!candidate || !group.film?.id) return;
+
+    setMetadataSaving(true);
+    try {
+      const { data, error } = await supabase.rpc('approve_credit_metadata_candidate', {
+        p_candidate_id: candidate.id,
+        p_synopsis: candidate.synopsis || null,
+        p_language: candidate.language || null,
+        p_release_year: numberOrNull(candidate.release_year),
+        p_age_rating: candidate.age_rating || null,
+        p_production_company: candidate.production_company || null,
+      });
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+      setGroups((current) => current.map((item) => (
+        item.film?.id === group.film.id
+          ? {
+              ...item,
+              metadataCandidate: null,
+              film: {
+                ...item.film,
+                synopsis: candidate.synopsis || item.film.synopsis || null,
+                language: candidate.language || item.film.language || null,
+                languages: candidate.language ? parseLanguages(candidate.language) : item.film.languages,
+                year: candidate.release_year ?? item.film.year ?? null,
+                nfvcb_rating: candidate.age_rating || item.film.nfvcb_rating || null,
+                production_company: candidate.production_company || item.film.production_company || '',
+                production_company_id: result?.company_id || item.film.production_company_id || null,
+                _metadataDirty: false,
+              },
+            }
+          : item
+      )));
+      setStats((current) => current
+        ? {
+            ...current,
+            pendingMetadataCandidates: Math.max(0, (current.pendingMetadataCandidates || 0) - 1),
+          }
+        : current);
+      toast.success('Approved movie metadata suggestion');
+    } catch (error) {
+      toast.error(`Could not approve metadata: ${error.message}`);
+    } finally {
+      setMetadataSaving(false);
+    }
+  };
+
+  const rejectMetadataCandidate = async (group) => {
+    const candidate = group.metadataCandidate;
+    if (!candidate) return;
+
+    setMetadataSaving(true);
+    try {
+      const { error } = await supabase.rpc('reject_credit_metadata_candidate', {
+        p_candidate_id: candidate.id,
+      });
+      if (error) throw error;
+
+      setGroups((current) => current.map((item) => (
+        item.metadataCandidate?.id === candidate.id
+          ? { ...item, metadataCandidate: null }
+          : item
+      )));
+      setStats((current) => current
+        ? {
+            ...current,
+            pendingMetadataCandidates: Math.max(0, (current.pendingMetadataCandidates || 0) - 1),
+          }
+        : current);
+      toast.success('Rejected movie metadata suggestion');
+    } catch (error) {
+      toast.error(`Could not reject metadata: ${error.message}`);
+    } finally {
+      setMetadataSaving(false);
+    }
+  };
+
   const saveFilmMetadata = async (film) => {
     const synopsis = String(film.synopsis || '').trim() || null;
     const runtimeText = String(film.runtime_minutes ?? '').trim();
     const runtime = runtimeText === '' ? null : Number(runtimeText);
+    const year = numberOrNull(film.year);
+    const language = compactInput(film.language) || null;
     const rating = String(film.nfvcb_rating || '').trim();
+    const productionCompanyName = compactInput(film.production_company);
     const genreIds = [...new Set(film.genre_ids || [])];
+    const maxYear = new Date().getFullYear() + 2;
 
     if (runtime !== null && (!Number.isInteger(runtime) || runtime < 1 || runtime > 600)) {
       toast.error('Runtime must be a whole number between 1 and 600 minutes.');
+      return;
+    }
+    if (year !== null && (!Number.isInteger(year) || year < 1888 || year > maxYear)) {
+      toast.error(`Release year must be between 1888 and ${maxYear}.`);
       return;
     }
     if (rating && !NFVCB_RATINGS.includes(rating)) {
@@ -462,14 +670,19 @@ export default function AdminCreditHarvest() {
       const filmUpdate = {
         synopsis,
         runtime_minutes: runtime,
+        year,
+        language,
+        languages: parseLanguages(language),
+        nfvcb_rating: rating || null,
       };
-      if (rating) filmUpdate.nfvcb_rating = rating;
 
       const { error: filmError } = await supabase
         .from('films')
         .update(filmUpdate)
         .eq('id', film.id);
       if (filmError) throw filmError;
+
+      const linkedCompany = await syncProductionCompany(film.id, productionCompanyName);
 
       const { data: currentLinks, error: linksError } = await supabase
         .from('film_genres')
@@ -509,7 +722,12 @@ export default function AdminCreditHarvest() {
                 ...group.film,
                 synopsis,
                 runtime_minutes: runtime,
-                nfvcb_rating: rating || group.film.nfvcb_rating || null,
+                year,
+                language,
+                languages: parseLanguages(language),
+                nfvcb_rating: rating || null,
+                production_company: linkedCompany?.name || '',
+                production_company_id: linkedCompany?.id || null,
                 genre_ids: genreIds,
                 _metadataDirty: false,
               },
@@ -866,14 +1084,15 @@ export default function AdminCreditHarvest() {
 
       {/* Pipeline progress — what the worker machine is doing */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
           {[
             ['Queued', stats.pending, 'text-text-primary'],
             ['Running', stats.running, 'text-brand'],
             ['Processed', stats.done, 'text-text-primary'],
             ['Rolls found', stats.credits_found, 'text-green-400'],
             ['No credits', stats.no_credits, 'text-text-muted'],
-            ['To review', stats.pendingCandidates, 'text-brand'],
+            ['Credit rows', stats.pendingCandidates, 'text-brand'],
+            ['Metadata', stats.pendingMetadataCandidates, 'text-amber-400'],
           ].map(([label, value, tone]) => (
             <div key={label} className="card-cal p-3">
               <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">{label}</div>
@@ -1044,7 +1263,65 @@ export default function AdminCreditHarvest() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_9rem_9rem] gap-3">
+                  {group.metadataCandidate && (
+                    <div className="mb-3 rounded-md border border-brand/25 bg-brand/10 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-brand">
+                            Harvested movie details
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {metadataCandidateRows(group.metadataCandidate).map((row) => (
+                              <div
+                                key={row.label}
+                                className="max-w-full rounded-md border border-border/70 bg-surface/80 px-2.5 py-1.5"
+                              >
+                                <div className="text-[8px] font-black uppercase tracking-widest text-text-muted">
+                                  {row.label}
+                                </div>
+                                <div className="max-w-xl truncate text-[10px] font-bold text-text-primary">
+                                  {row.value}
+                                </div>
+                              </div>
+                            ))}
+                            <span className="rounded-md border border-border/70 bg-surface/80 px-2.5 py-1.5 text-[10px] font-black text-text-muted">
+                              {Math.round((group.metadataCandidate.confidence || 0) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={metadataSaving}
+                            onClick={() => applyMetadataCandidate(group)}
+                            className="w-8 h-8 rounded-md border border-border text-text-primary hover:bg-surface-2 disabled:opacity-40 flex items-center justify-center"
+                            title="Copy suggestion into the editable fields"
+                          >
+                            <Icon icon="solar:copy-linear" className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={metadataSaving}
+                            onClick={() => approveMetadataCandidate(group)}
+                            className="w-8 h-8 rounded-md border border-green-500/30 text-green-400 hover:bg-green-500/15 disabled:opacity-40 flex items-center justify-center"
+                            title="Approve suggestion"
+                          >
+                            <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={metadataSaving}
+                            onClick={() => rejectMetadataCandidate(group)}
+                            className="w-8 h-8 rounded-md border border-border text-text-muted hover:bg-surface-2 disabled:opacity-40 flex items-center justify-center"
+                            title="Reject suggestion"
+                          >
+                            <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-3">
                     <label className="min-w-0">
                       <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
                         Synopsis
@@ -1054,60 +1331,116 @@ export default function AdminCreditHarvest() {
                         onChange={(event) => editFilmMetadata(group.film.id, {
                           synopsis: event.target.value,
                         })}
-                        rows={4}
+                        rows={6}
                         aria-label="Movie synopsis"
                         placeholder="Add or correct the movie synopsis"
-                        className="w-full resize-y bg-surface border border-border rounded-md px-3 py-2.5 text-xs leading-relaxed text-text-primary outline-none focus:border-brand"
+                        className="w-full h-full min-h-36 resize-y bg-surface border border-border rounded-md px-3 py-2.5 text-xs leading-relaxed text-text-primary outline-none focus:border-brand"
                       />
                     </label>
 
-                    <label>
-                      <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                        Runtime
-                      </span>
-                      <div className="relative">
+                    <div className="grid grid-cols-2 gap-3">
+                      <label>
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                          Release year
+                        </span>
                         <input
                           type="number"
-                          min="1"
-                          max="600"
+                          min="1888"
+                          max={new Date().getFullYear() + 2}
                           step="1"
-                          value={group.film?.runtime_minutes ?? ''}
+                          value={group.film?.year ?? ''}
                           onChange={(event) => editFilmMetadata(group.film.id, {
-                            runtime_minutes: event.target.value,
+                            year: event.target.value,
                           })}
-                          aria-label="Runtime in minutes"
-                          placeholder="120"
-                          className="w-full bg-surface border border-border rounded-md pl-3 pr-11 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                          aria-label="Release year"
+                          placeholder="2024"
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-muted pointer-events-none">
-                          min
-                        </span>
-                      </div>
-                    </label>
+                      </label>
 
-                    <label>
-                      <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                        Content rating
-                      </span>
-                      <select
-                        value={group.film?.nfvcb_rating || ''}
-                        onChange={(event) => editFilmMetadata(group.film.id, {
-                          nfvcb_rating: event.target.value,
-                        })}
-                        aria-label="Content rating"
-                        className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
-                      >
-                        <option value="" disabled>
-                          Choose
-                        </option>
-                        {NFVCB_RATINGS.map((rating) => (
-                          <option key={rating} value={rating}>
-                            {rating}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                      <label>
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                          Runtime
+                        </span>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="1"
+                            max="600"
+                            step="1"
+                            value={group.film?.runtime_minutes ?? ''}
+                            onChange={(event) => editFilmMetadata(group.film.id, {
+                              runtime_minutes: event.target.value,
+                            })}
+                            aria-label="Runtime in minutes"
+                            placeholder="120"
+                            className="w-full bg-surface border border-border rounded-md pl-3 pr-11 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-text-muted pointer-events-none">
+                            min
+                          </span>
+                        </div>
+                      </label>
+
+                      <label>
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                          Content rating
+                        </span>
+                        <select
+                          value={group.film?.nfvcb_rating || ''}
+                          onChange={(event) => editFilmMetadata(group.film.id, {
+                            nfvcb_rating: event.target.value,
+                          })}
+                          aria-label="Content rating"
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                        >
+                          <option value="">Unrated</option>
+                          {NFVCB_RATINGS.map((rating) => (
+                            <option key={rating} value={rating}>
+                              {rating}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                          Language
+                        </span>
+                        <input
+                          list="harvest-language-options"
+                          value={group.film?.language || ''}
+                          onChange={(event) => editFilmMetadata(group.film.id, {
+                            language: event.target.value,
+                          })}
+                          aria-label="Language"
+                          placeholder="English"
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                        />
+                      </label>
+
+                      <label className="col-span-2">
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                          Production company
+                        </span>
+                        <input
+                          value={group.film?.production_company || ''}
+                          onChange={(event) => editFilmMetadata(group.film.id, {
+                            production_company: event.target.value,
+                          })}
+                          aria-label="Production company"
+                          placeholder="Production company"
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                        />
+                      </label>
+                    </div>
                   </div>
+
+                  <datalist id="harvest-language-options">
+                    {AFRICAN_LANGUAGES.map((language) => (
+                      <option key={language} value={language} />
+                    ))}
+                  </datalist>
 
                   <fieldset className="mt-3">
                     <legend className="text-[9px] font-black uppercase tracking-wider text-text-muted mb-2">

@@ -136,6 +136,11 @@ Current lesson from `Ife Dun`: loose one-frame harvesting catches fast ensemble 
 can admit subtitles. The parser now needs credit-card context, not just "two words that
 look like a name." Keep examples like this; they are exactly the dataset we need.
 
+## Metadata extraction in the credit harvester (2026-08-04)
+
+The worker now also reads YouTube title/description metadata and writes text-only suggestions into `credit_metadata_candidates`: synopsis, release year, language, NFVCB age rating, and production company. This does not store video/images and does not call a paid LLM. Admin approval from `/admin/credits/harvest` applies the suggestion to `films` and links/creates a production company through `film_companies`.
+
+Actor/person matching on the review page and approval RPC already uses the shared order-insensitive `name_key` flow, so names like `Femi Adebayo` and `Adebayo Femi` resolve to the same existing profile when the tokens match.
 ## Worker tools + gotchas (laptop)
 
 - Needs `yt-dlp`, `ffmpeg`, `tesseract` on PATH. PATH only refreshes in a NEW terminal

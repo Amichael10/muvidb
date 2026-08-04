@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -79,6 +79,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      allowlisted_ips: {
+        Row: {
+          created_at: string
+          ip: string
+          note: string | null
+        }
+        Insert: {
+          created_at?: string
+          ip: string
+          note?: string | null
+        }
+        Update: {
+          created_at?: string
+          ip?: string
+          note?: string | null
+        }
+        Relationships: []
       }
       artist_outreach: {
         Row: {
@@ -957,6 +975,87 @@ export type Database = {
           {
             foreignKeyName: "credit_harvest_workers_current_job_id_fkey"
             columns: ["current_job_id"]
+            isOneToOne: false
+            referencedRelation: "credit_harvest_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_metadata_candidates: {
+        Row: {
+          age_rating: string | null
+          confidence: number
+          created_at: string
+          film_id: string
+          id: string
+          job_id: string | null
+          language: string | null
+          production_company: string | null
+          release_year: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          source_description: string | null
+          source_evidence: Json
+          source_title: string | null
+          source_url: string | null
+          status: string
+          synopsis: string | null
+          updated_at: string
+        }
+        Insert: {
+          age_rating?: string | null
+          confidence?: number
+          created_at?: string
+          film_id: string
+          id?: string
+          job_id?: string | null
+          language?: string | null
+          production_company?: string | null
+          release_year?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_description?: string | null
+          source_evidence?: Json
+          source_title?: string | null
+          source_url?: string | null
+          status?: string
+          synopsis?: string | null
+          updated_at?: string
+        }
+        Update: {
+          age_rating?: string | null
+          confidence?: number
+          created_at?: string
+          film_id?: string
+          id?: string
+          job_id?: string | null
+          language?: string | null
+          production_company?: string | null
+          release_year?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_description?: string | null
+          source_evidence?: Json
+          source_title?: string | null
+          source_url?: string | null
+          status?: string
+          synopsis?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_metadata_candidates_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_metadata_candidates_job_id_fkey"
+            columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "credit_harvest_jobs"
             referencedColumns: ["id"]
@@ -3501,6 +3600,21 @@ export type Database = {
           person_id: string
         }[]
       }
+      approve_credit_metadata_candidate: {
+        Args: {
+          p_age_rating?: string
+          p_candidate_id: string
+          p_language?: string
+          p_production_company?: string
+          p_release_year?: number
+          p_synopsis?: string
+        }
+        Returns: {
+          company_id: string
+          created_company: boolean
+          film_id: string
+        }[]
+      }
       batch_certify_films: { Args: { film_uuids: string[] }; Returns: number }
       batch_create_films_from_videos: {
         Args: { video_db_ids: string[] }
@@ -3806,6 +3920,10 @@ export type Database = {
       refresh_people_enrichment_queue: { Args: never; Returns: number }
       refresh_platform_new_releases: {
         Args: { p_platform: string }
+        Returns: undefined
+      }
+      reject_credit_metadata_candidate: {
+        Args: { p_candidate_id: string }
         Returns: undefined
       }
       review_people_enrichment_candidate: {
