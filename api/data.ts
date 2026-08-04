@@ -15,8 +15,9 @@ import { handleWelcomeEmail } from './_lib/welcome_email_handler.js';
 //   /api/job-apply -> /api/data?_r=job-apply
 //   /api/send-welcome-email -> /api/data?_r=welcome-email
 //
-// Telegram webhook lives in api/telegram.ts (separate function) so a bot
-// failure cannot crash this router.
+// Scrape IP blocking for catalogue APIs is enforced in api/ssr.ts (HTML) and
+// can be re-added here once the guard is proven not to crash this bundle.
+// Telegram webhook: api/telegram.ts
 //
 // The router param is `_r`, NOT `resource`: content.ts already owns `?resource=`
 // as its own dispatch key (film-credits, person-credits, person-films,
@@ -32,26 +33,10 @@ const ROUTES = {
   'welcome-email': handleWelcomeEmail,
 } as const;
 
-const TRACKED = new Set(['films', 'people', 'content', 'channels']);
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const raw = req.query._r;
   const key = Array.isArray(raw) ? raw[0] : raw;
   const route = ROUTES[key as keyof typeof ROUTES];
   if (!route) return res.status(404).json({ error: 'Unknown resource' });
-
-  // Soft guard — never take down public APIs if blocklist/scrape tracking fails.
-  try {
-    const { rejectIfBlocked, trackPageHit } = await import('./_lib/scrape_guard.js');
-    if (await rejectIfBlocked(req)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    if (typeof key === 'string' && TRACKED.has(key)) {
-      trackPageHit(req, `/api/${key}`, 'api');
-    }
-  } catch (err: any) {
-    console.warn('[api/data] scrape guard skipped:', err?.message || err);
-  }
-
   return route(req, res);
 }
