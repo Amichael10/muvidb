@@ -7,7 +7,6 @@
  * Node (req, res) signature — matches every other api/*.ts in this project.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { rejectIfBlocked, trackPageHit } from './_lib/scrape_guard.js';
 
 // Ensure the RR server bundle is copied into this function's deployment.
 export const config = {
@@ -84,24 +83,30 @@ function pathnameFromReq(req: VercelRequest): string {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    if (await rejectIfBlocked(req)) {
-      res.status(403);
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-store');
-      res.setHeader('X-MuviDB-SSR', 'blocked');
-      res.end('Forbidden');
-      return;
-    }
-
     const pathname = pathnameFromReq(req);
-    if (
-      pathname.startsWith('/films/')
-      || pathname.startsWith('/people/')
-      || pathname === '/browse'
-      || pathname.startsWith('/browse/')
-      || pathname.startsWith('/watch/')
-    ) {
-      trackPageHit(req, pathname, 'page');
+
+    // Soft IP block + scrape tracking (dynamic import — never crash SSR shell).
+    try {
+      const { rejectIfBlocked, trackPageHit } = await import('./_lib/scrape_guard.js');
+      if (await rejectIfBlocked(req)) {
+        res.status(403);
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-MuviDB-SSR', 'blocked');
+        res.end('Forbidden');
+        return;
+      }
+      if (
+        pathname.startsWith('/films/')
+        || pathname.startsWith('/people/')
+        || pathname === '/browse'
+        || pathname.startsWith('/browse/')
+        || pathname.startsWith('/watch/')
+      ) {
+        trackPageHit(req, pathname, 'page');
+      }
+    } catch (guardErr: any) {
+      console.warn('[api/ssr] scrape guard skipped:', guardErr?.message || guardErr);
     }
 
     // Dynamic import — top-level import of react-router/rrHandler was crashing

@@ -34,6 +34,9 @@
       "includeFiles": "emails/**",
       "maxDuration": 60
     },
+    "api/telegram.ts": {
+      "maxDuration": 30
+    },
     "api/automation.ts": {
       "maxDuration": 60
     },
@@ -101,10 +104,6 @@
     {
       "source": "/api/send-welcome-email",
       "destination": "/api/data?_r=welcome-email"
-    },
-    {
-      "source": "/api/telegram",
-      "destination": "/api/data?_r=telegram"
     },
     {
       "source": "/api/youtube",

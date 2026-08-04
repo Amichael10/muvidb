@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from './cors.js';
 import { checkRateLimit } from './rateLimit.js';
 import { sendWelcomeEmail } from './welcome_email.js';
-import { notifySignupOnce } from './signup_notify.js';
 
 function cors(req: VercelRequest, res: VercelResponse) {
   const headers = getCorsHeaders(req);
@@ -56,14 +55,16 @@ export async function handleWelcomeEmail(req: VercelRequest, res: VercelResponse
     || String(user.user_metadata?.name || user.user_metadata?.full_name || '');
   const firstName = rawName.split(/\s+/).filter(Boolean)[0] || null;
 
-  // Ops alert (idempotent). Fire-and-forget so email is not delayed.
-  void notifySignupOnce({
-    userId: user.id,
-    email: user.email,
-    firstName,
-    role: typeof user.user_metadata?.role === 'string' ? user.user_metadata.role : null,
-    provider: typeof user.app_metadata?.provider === 'string' ? user.app_metadata.provider : null,
-  });
+  // Ops alert (idempotent). Dynamic import so telegram code cannot crash this route.
+  void import('./signup_notify.js')
+    .then(({ notifySignupOnce }) => notifySignupOnce({
+      userId: user.id,
+      email: user.email,
+      firstName,
+      role: typeof user.user_metadata?.role === 'string' ? user.user_metadata.role : null,
+      provider: typeof user.app_metadata?.provider === 'string' ? user.app_metadata.provider : null,
+    }))
+    .catch((err) => console.warn('[welcome-email] signup notify skipped:', err?.message || err));
 
   const result = await sendWelcomeEmail({
     userId: user.id,
