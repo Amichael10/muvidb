@@ -15,10 +15,10 @@ const PLATFORM_OPTIONS = [
   { value: 'prime_video', label: 'Prime Video', icon: 'simple-icons:primevideo', color: '#00A8E1' },
   { value: 'showmax', label: 'Showmax', icon: 'solar:tv-linear', color: '#E10098' },
   { value: 'youtube', label: 'YouTube', icon: 'simple-icons:youtube', color: '#FF0000' },
-  { value: 'kava', label: 'Kava', icon: 'solar:play-circle-bold', color: '#FF5C00' },
+  { value: 'kava', label: 'Kava', icon: 'solar:play-circle-bold', color: '#E84090' },
   { value: 'mubi', label: 'MUBI', icon: 'solar:film-linear', color: '#E6C619' },
-  { value: 'ebonylife', label: 'EbonyLife', icon: 'solar:tv-bold', color: '#C2A45E' },
-  { value: 'nollistream', label: 'NolliStream', icon: 'solar:play-circle-bold', color: '#C9A227' },
+  { value: 'ebonylife', label: 'EbonyLife', icon: 'solar:tv-bold', color: '#F8A008' },
+  { value: 'nollistream', label: 'NolliStream', icon: 'solar:play-circle-bold', color: '#D0A008' },
 ];
 
 // SeriesCard removed - using global FilmCard instead

@@ -5,17 +5,20 @@
 // `icon` is the Iconify fallback; `logo` is the real brand logo asset (rendered
 // as an <img> when present). Netflix/Prime/YouTube use simple-icons, which are
 // already the official brand marks; the Nigerian platforms ship real logos.
+// `color` = solid brand fill for "Play on …" CTAs (no gradients). Picked from
+// each logo’s dominant mark so watch buttons match Netflix-style recognition.
+// MuviDB orange stays for MuviDB-native actions (Trailer, In Cinemas, etc.).
 export const PLATFORMS = [
   { id: 'netflix',     name: 'Netflix',     icon: 'simple-icons:netflix',    color: '#E50914' },
   { id: 'prime_video', name: 'Prime Video', icon: 'simple-icons:primevideo', color: '#00A8E1' },
   { id: 'youtube',     name: 'YouTube',     icon: 'simple-icons:youtube',    color: '#FF0000' },
   // Showmax removed: the service was discontinued and its catalogue moved to
   // DSTV Africa, so it's no longer a valid "where to watch" destination.
-  { id: 'kava',        name: 'Kava',        icon: 'solar:play-circle-bold',  color: '#FF5C00', logo: '/images/platforms/kava.png' },
-  { id: 'docuth',      name: 'Docuth',      icon: 'solar:play-stream-bold',  color: '#16A34A', logo: '/images/platforms/docuth.png' },
-  { id: 'ebonylife',   name: 'EbonyLife ON Plus', icon: 'solar:play-circle-bold', color: '#800080', logo: '/images/platforms/ebonylife.png' },
+  { id: 'kava',        name: 'Kava',        icon: 'solar:play-circle-bold',  color: '#E84090', logo: '/images/platforms/kava.png' },
+  { id: 'docuth',      name: 'Docuth',      icon: 'solar:play-stream-bold',  color: '#0048A8', logo: '/images/platforms/docuth.png' },
+  { id: 'ebonylife',   name: 'EbonyLife ON Plus', icon: 'solar:play-circle-bold', color: '#F8A008', logo: '/images/platforms/ebonylife.png' },
   { id: 'circuits',    name: 'Circuits.tv', icon: 'solar:clapperboard-play-bold', color: '#F0532B', logo: '/images/platforms/circuits.png' },
-  { id: 'nollistream', name: 'NolliStream', icon: 'solar:play-circle-bold',  color: '#C9A227', logo: '/images/platforms/nollistream.png' },
+  { id: 'nollistream', name: 'NolliStream', icon: 'solar:play-circle-bold',  color: '#D0A008', logo: '/images/platforms/nollistream.png' },
   { id: 'cinema',      name: 'In Cinemas',  icon: 'solar:ticket-bold',       color: '#FF5A1F', isCinema: true },
 ];
 
