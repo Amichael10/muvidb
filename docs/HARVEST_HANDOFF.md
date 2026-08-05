@@ -142,9 +142,9 @@ The worker now also reads YouTube title/description metadata and writes text-onl
 
 Actor/person matching on the review page and approval RPC already uses the shared order-insensitive `name_key` flow, so names like `Femi Adebayo` and `Adebayo Femi` resolve to the same existing profile when the tokens match.
 
-## Queue ordering in the credit harvester (2026-08-04)
+## Queue ordering in the credit harvester (2026-08-04, corrected 2026-08-05)
 
-Worker runs now start from the latest updated published YouTube movie in `films`, then move backward. `--enqueue-sparse` walks YouTube films by `updated_at desc`, all enqueue modes store an updated-at priority, pending jobs refresh when they are requeued, and `claim_credit_harvest_job` only claims pending YouTube-film jobs by that priority. The review pagination RPC uses the same film update timestamp so the admin approval page follows the worker order.
+Worker runs now match the frontend Recently Added order: newest `created_at` published YouTube movies first, then backward. The plain worker command auto-seeds missing jobs from the newest published YouTube films before claiming; `--enqueue-latest-sparse=N` can run that bounded seed manually. `--enqueue-sparse` walks YouTube films by `created_at desc`, all enqueue modes store a created-at priority, pending jobs refresh when they are requeued, and `claim_credit_harvest_job` only claims pending published YouTube-film jobs by that priority. The review pagination RPC uses the same film creation timestamp so the admin approval page follows the frontend order.
 
 ## Worker tools + gotchas (laptop)
 
@@ -158,7 +158,7 @@ Worker runs now start from the latest updated published YouTube movie in `films`
 
 ## Enqueue modes (once download+OCR confirmed)
 
-- `--enqueue-sparse` (default <4 credits) — **the main one**: latest-updated published YouTube films that actually
+- `--enqueue-sparse` (default <4 credits) — **the main one**: newest-created published YouTube films that actually
   need enrichment (~33k YouTube films qualify).
 - `--enqueue-recon=3` — sample per channel to learn which channels even have rolls.
 - `--enqueue-popular=N` — top by views.
