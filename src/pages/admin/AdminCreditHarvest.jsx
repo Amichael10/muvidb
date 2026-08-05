@@ -196,6 +196,10 @@ export default function AdminCreditHarvest() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [minConfidence, setMinConfidence] = useState(0);
+  const [filmSearchInput, setFilmSearchInput] = useState('');
+  const [filmSearch, setFilmSearch] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [creditTypeFilter, setCreditTypeFilter] = useState('all');
   const [selected, setSelected] = useState(new Set());
   const [busy, setBusy] = useState(false);
   const [approvalProgress, setApprovalProgress] = useState(null);
@@ -245,6 +249,9 @@ export default function AdminCreditHarvest() {
   const loadCandidates = useCallback(async () => {
     setLoading(true);
     try {
+      const search = compactInput(filmSearch);
+      const year = numberOrNull(yearFilter);
+      const creditType = creditTypeFilter === 'all' ? null : creditTypeFilter;
       const { data: filmPage, error: pageError } = await supabase.rpc(
         'get_credit_candidate_review_films',
         {
@@ -252,6 +259,9 @@ export default function AdminCreditHarvest() {
           p_min_confidence: minConfidence,
           p_limit: 1,
           p_offset: moviePage,
+          p_search: search || null,
+          p_year: year && year >= 1888 ? year : null,
+          p_credit_type: creditType,
         },
       );
       if (pageError) throw pageError;
@@ -265,12 +275,16 @@ export default function AdminCreditHarvest() {
         return;
       }
 
-      const { data, error } = await supabase
+      let candidateQuery = supabase
         .from('credit_candidates')
         .select('*, films:film_id (id, title, slug, poster_url, year, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, language, languages, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)')
         .eq('film_id', pageRow.film_id)
         .eq('status', statusFilter)
-        .gte('confidence', minConfidence)
+        .gte('confidence', minConfidence);
+      if (creditType) {
+        candidateQuery = candidateQuery.eq('credit_type', creditType);
+      }
+      const { data, error } = await candidateQuery
         .order('credit_type', { ascending: true })
         .order('role_or_character', { ascending: true, nullsFirst: false })
         .order('confidence', { ascending: false })
@@ -319,7 +333,7 @@ export default function AdminCreditHarvest() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, minConfidence, moviePage]);
+  }, [statusFilter, minConfidence, moviePage, filmSearch, yearFilter, creditTypeFilter]);
 
   const loadMonitor = useCallback(async (showLoading = false) => {
     if (showLoading) setMonitorLoading(true);
@@ -359,6 +373,13 @@ export default function AdminCreditHarvest() {
   }, []);
 
   useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMoviePage(0);
+      setFilmSearch(compactInput(filmSearchInput));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [filmSearchInput]);
   useEffect(() => { loadCandidates(); }, [loadCandidates]);
   useEffect(() => {
     loadMonitor();
@@ -934,6 +955,22 @@ export default function AdminCreditHarvest() {
         : 'bg-surface-2 text-text-muted border-border';
 
   const selCount = selected.size;
+  const hasReviewFilters = Boolean(
+    compactInput(filmSearchInput)
+    || compactInput(yearFilter)
+    || creditTypeFilter !== 'all'
+    || statusFilter !== 'pending'
+    || Number(minConfidence) > 0
+  );
+  const clearReviewFilters = () => {
+    setFilmSearchInput('');
+    setFilmSearch('');
+    setYearFilter('');
+    setCreditTypeFilter('all');
+    setStatusFilter('pending');
+    setMinConfidence(0);
+    setMoviePage(0);
+  };
   const now = Date.now();
   const onlineWorkers = workers.filter((worker) => (
     !['stopped', 'failed'].includes(worker.status)
@@ -1126,64 +1163,149 @@ export default function AdminCreditHarvest() {
       </div>
 
       {/* Filters + bulk actions */}
-      <div className="card-cal p-4 flex flex-wrap items-center gap-3">
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setMoviePage(0);
-          }}
-          className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
-        >
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
+      <div className="card-cal p-4 space-y-3">
+        <div className="flex flex-col xl:flex-row gap-3">
+          <label className="relative min-w-[16rem] flex-1">
+            <span className="sr-only">Search film</span>
+            <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+            <input
+              type="search"
+              value={filmSearchInput}
+              onChange={(event) => {
+                setFilmSearchInput(event.target.value);
+                setMoviePage(0);
+              }}
+              placeholder="Search film title"
+              className="w-full bg-surface border border-border rounded-lg pl-9 pr-9 py-2 text-xs text-text-primary focus:border-brand outline-none"
+            />
+            {filmSearchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilmSearchInput('');
+                  setFilmSearch('');
+                  setMoviePage(0);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-2 flex items-center justify-center"
+                title="Clear film search"
+              >
+                <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+              </button>
+            )}
+          </label>
 
-        <label className="flex items-center gap-2 text-xs text-text-muted">
-          Min confidence
-          <select
-            value={minConfidence}
-            onChange={(e) => {
-              setMinConfidence(Number(e.target.value));
-              setMoviePage(0);
-            }}
-            className="bg-surface border border-border rounded-lg px-2 py-2 text-xs text-text-primary focus:border-brand outline-none"
-          >
-            <option value={0}>Any</option>
-            <option value={0.5}>0.5+</option>
-            <option value={0.7}>0.7+ (high)</option>
-          </select>
-        </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-text-muted">
+              Status
+              <select
+                value={statusFilter}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value);
+                  setMoviePage(0);
+                }}
+                className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+              >
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
 
-        <div className="flex-1" />
+            <label className="flex items-center gap-2 text-xs text-text-muted">
+              Type
+              <select
+                value={creditTypeFilter}
+                onChange={(event) => {
+                  setCreditTypeFilter(event.target.value);
+                  setMoviePage(0);
+                }}
+                className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+              >
+                <option value="all">All</option>
+                <option value="actor">Actors</option>
+                <option value="crew">Crew</option>
+              </select>
+            </label>
 
-        {selCount > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-text-muted">{selCount} selected</span>
-            <button
-              disabled={busy}
-              onClick={() => approve(selectedRows())}
-              className="text-xs font-black px-3 py-2 rounded-lg bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40"
-            >
-              Approve
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => reject(selectedRows())}
-              className="text-xs font-black px-3 py-2 rounded-lg bg-surface-2 text-text-primary border border-border hover:bg-surface-3 disabled:opacity-40"
-            >
-              Reject
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => remove(selectedRows())}
-              className="text-xs font-black px-3 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-40"
-            >
-              Delete
-            </button>
+            <label className="flex items-center gap-2 text-xs text-text-muted">
+              Year
+              <input
+                type="number"
+                min="1888"
+                max={new Date().getFullYear() + 2}
+                step="1"
+                value={yearFilter}
+                onChange={(event) => {
+                  setYearFilter(event.target.value);
+                  setMoviePage(0);
+                }}
+                placeholder="Any"
+                className="w-24 bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+              />
+            </label>
+
+            <label className="flex items-center gap-2 text-xs text-text-muted">
+              Min confidence
+              <select
+                value={minConfidence}
+                onChange={(event) => {
+                  setMinConfidence(Number(event.target.value));
+                  setMoviePage(0);
+                }}
+                className="bg-surface border border-border rounded-lg px-2 py-2 text-xs text-text-primary focus:border-brand outline-none"
+              >
+                <option value={0}>Any</option>
+                <option value={0.5}>0.5+</option>
+                <option value={0.7}>0.7+ (high)</option>
+              </select>
+            </label>
           </div>
-        )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="text-[10px] font-bold text-text-muted">
+            {totalMovies} movie{totalMovies === 1 ? '' : 's'} match
+          </div>
+          {hasReviewFilters && (
+            <button
+              type="button"
+              onClick={clearReviewFilters}
+              className="text-[10px] font-black px-2.5 py-1.5 rounded-md border border-border text-text-primary hover:bg-surface-2 flex items-center gap-1.5"
+            >
+              <Icon icon="solar:restart-linear" className="w-3.5 h-3.5" />
+              Clear filters
+            </button>
+          )}
+
+          <div className="flex-1" />
+
+          {selCount > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-text-muted">{selCount} selected</span>
+              <button
+                disabled={busy}
+                onClick={() => approve(selectedRows())}
+                className="text-xs font-black px-3 py-2 rounded-lg bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40"
+              >
+                Approve
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => reject(selectedRows())}
+                className="text-xs font-black px-3 py-2 rounded-lg bg-surface-2 text-text-primary border border-border hover:bg-surface-3 disabled:opacity-40"
+              >
+                Reject
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => remove(selectedRows())}
+                className="text-xs font-black px-3 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-40"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {totalMovies > 0 && moviePager()}

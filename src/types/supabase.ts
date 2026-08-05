@@ -3668,10 +3668,13 @@ export type Database = {
       get_coming_soon_films: { Args: { p_limit?: number }; Returns: Json[] }
       get_credit_candidate_review_films: {
         Args: {
+          p_credit_type?: string
           p_limit?: number
           p_min_confidence?: number
           p_offset?: number
+          p_search?: string
           p_status?: string
+          p_year?: number
         }
         Returns: {
           candidate_count: number
