@@ -242,6 +242,7 @@ export default function AdminCreditHarvest() {
   const [workers, setWorkers] = useState([]);
   const [workerLogs, setWorkerLogs] = useState([]);
   const [errorsOnly, setErrorsOnly] = useState(false);
+  const autoResolveSignatureRef = useRef('');
 
   const loadStats = useCallback(async () => {
     // Pipeline progress — mirrors what the worker is doing on the other machine.
@@ -575,7 +576,7 @@ export default function AdminCreditHarvest() {
 
   const resolveSafeMatchesForRows = async (
     rows,
-    { quiet = false, persist = true } = {},
+    { quiet = false, persist = true, useCohere = false } = {},
   ) => {
     const pendingRows = rows
       .filter((row) => candidateIsPending(row, statusFilter))
@@ -599,9 +600,11 @@ export default function AdminCreditHarvest() {
           const hits = await searchPeopleByName(name, {
             limit: 8,
             select: PEOPLE_SEARCH_SELECT,
-            useCohere: false,
+            useCohere,
           });
-          searchCache.set(key, pickAutoMatch(name, hits, { minSemantic: 1 }));
+          searchCache.set(key, pickAutoMatch(name, hits, {
+            minSemantic: useCohere ? 0.42 : 1,
+          }));
         }
         const person = searchCache.get(key);
         if (person) directMatches.set(row.id, personSummary(person));
@@ -679,6 +682,39 @@ export default function AdminCreditHarvest() {
       setAutoResolving(false);
     }
   };
+
+  useEffect(() => {
+    if (loading || autoResolving || statusFilter !== 'pending') return undefined;
+
+    const rows = groups.flatMap((group) => group.candidates);
+    const pendingUnmatched = rows
+      .filter((row) => candidateIsPending(row, statusFilter))
+      .filter((row) => !row.matched_person_id)
+      .filter((row) => compactInput(row.raw_name).split(/\s+/).length >= 2);
+    if (!pendingUnmatched.length) return undefined;
+
+    const signature = pendingUnmatched
+      .map((row) => `${row.id}:${compactInput(row.raw_name).toLowerCase()}`)
+      .sort()
+      .join('|');
+    if (!signature || autoResolveSignatureRef.current === signature) return undefined;
+
+    autoResolveSignatureRef.current = signature;
+    const timer = setTimeout(async () => {
+      const result = await resolveSafeMatchesForRows(rows, {
+        quiet: true,
+        persist: true,
+      });
+      if (result.linked) {
+        toast.success(`Auto-linked ${result.linked} existing profile${result.linked === 1 ? '' : 's'}`);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+    // Run once per visible unmatched candidate set; resolver internals are
+    // intentionally excluded because they are recreated on each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, loading, statusFilter, autoResolving]);
 
   const editFilmMetadata = (filmId, patch) => {
     setGroups((current) => current.map((group) => (
@@ -1553,9 +1589,11 @@ export default function AdminCreditHarvest() {
                   <button
                     type="button"
                     disabled={busy || autoResolving || statusFilter !== 'pending' || pendingUnmatched === 0}
-                    onClick={() => resolveSafeMatchesForRows(group.candidates)}
+                    onClick={() => resolveSafeMatchesForRows(group.candidates, {
+                      useCohere: true,
+                    })}
                     className="text-[10px] font-black px-2.5 py-1.5 rounded-md bg-brand/15 text-brand border border-brand/30 hover:bg-brand/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                    title="Link safe existing-person matches before approval"
+                    title="Link safe existing-person matches before approval; uses AI ranking for harder names"
                   >
                     <Icon
                       icon={autoResolving ? 'solar:refresh-linear' : 'solar:link-circle-linear'}
