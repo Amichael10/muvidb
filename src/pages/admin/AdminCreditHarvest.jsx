@@ -3,7 +3,13 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
-import { foldPersonText, pickAutoMatch, sortedNameKey } from '../../lib/personNameMatch';
+import {
+  foldPersonText,
+  namesLookSame,
+  namesNearMatch,
+  pickAutoMatch,
+  sortedNameKey,
+} from '../../lib/personNameMatch';
 import { searchPeopleByName } from '../../lib/peopleSearch';
 import { AFRICAN_LANGUAGES, parseLanguages } from '../../utils/languages';
 
@@ -46,6 +52,26 @@ function numberOrNull(value) {
   if (!text) return null;
   const number = Number(text);
   return Number.isFinite(number) ? number : null;
+}
+
+function personSummary(person) {
+  return {
+    id: person.id,
+    name: person.name,
+    photo_url: person.photo_url || null,
+  };
+}
+
+function candidateNameCanUsePerson(candidateName, personName, anchorName = '') {
+  const name = compactInput(candidateName);
+  if (!name || compactInput(name).split(/\s+/).length < 2 || !personName) return false;
+  return namesLookSame(name, personName)
+    || namesNearMatch(name, personName)
+    || Boolean(anchorName && (namesLookSame(name, anchorName) || namesNearMatch(name, anchorName)));
+}
+
+function candidateIsPending(row, fallbackStatus) {
+  return (row.status || fallbackStatus) === 'pending';
 }
 function CandidatePersonNameCell({
   candidate,
@@ -202,6 +228,7 @@ export default function AdminCreditHarvest() {
   const [creditTypeFilter, setCreditTypeFilter] = useState('all');
   const [selected, setSelected] = useState(new Set());
   const [busy, setBusy] = useState(false);
+  const [autoResolving, setAutoResolving] = useState(false);
   const [approvalProgress, setApprovalProgress] = useState(null);
   const [moviePage, setMoviePage] = useState(0);
   const [totalMovies, setTotalMovies] = useState(0);
@@ -494,6 +521,163 @@ export default function AdminCreditHarvest() {
           : candidate
       )),
     })));
+  };
+
+  const applyCandidatePersonUpdates = (updates, { dirty = false, autoLinked = false } = {}) => {
+    const byId = updates instanceof Map
+      ? updates
+      : new Map(updates.map((update) => [update.id, update]));
+    if (!byId.size) return;
+
+    setGroups((current) => current.map((group) => ({
+      ...group,
+      candidates: group.candidates.map((candidate) => {
+        const update = byId.get(candidate.id);
+        if (!update) return candidate;
+        return {
+          ...candidate,
+          raw_name: update.raw_name,
+          matched_person_id: update.matched_person_id,
+          people: update.people,
+          _dirty: dirty || candidate._dirty || false,
+          _autoLinked: autoLinked || candidate._autoLinked || false,
+        };
+      }),
+    })));
+  };
+
+  const linkCandidateFamily = (id, person, { canonicalName = false } = {}) => {
+    const linkedPerson = personSummary(person);
+    setGroups((current) => current.map((group) => {
+      const anchor = group.candidates.find((candidate) => candidate.id === id);
+      if (!anchor) return group;
+
+      return {
+        ...group,
+        candidates: group.candidates.map((candidate) => {
+          const isAnchor = candidate.id === id;
+          const canInherit = !candidate.matched_person_id
+            && candidateNameCanUsePerson(candidate.raw_name, linkedPerson.name, anchor.raw_name);
+          if (!isAnchor && !canInherit) return candidate;
+
+          return {
+            ...candidate,
+            raw_name: canonicalName ? linkedPerson.name : candidate.raw_name,
+            matched_person_id: linkedPerson.id,
+            people: linkedPerson,
+            _dirty: true,
+            _autoLinked: !isAnchor || candidate._autoLinked || false,
+          };
+        }),
+      };
+    }));
+  };
+
+  const resolveSafeMatchesForRows = async (
+    rows,
+    { quiet = false, persist = true } = {},
+  ) => {
+    const pendingRows = rows
+      .filter((row) => candidateIsPending(row, statusFilter))
+      .filter((row) => !row.matched_person_id)
+      .filter((row) => compactInput(row.raw_name).split(/\s+/).length >= 2);
+
+    if (!pendingRows.length) {
+      if (!quiet) toast('No unmatched names to auto-link');
+      return { rows, linked: 0 };
+    }
+
+    setAutoResolving(true);
+    try {
+      const searchCache = new Map();
+      const directMatches = new Map();
+
+      for (const row of pendingRows) {
+        const name = compactInput(row.raw_name);
+        const key = foldPersonText(name);
+        if (!searchCache.has(key)) {
+          const hits = await searchPeopleByName(name, {
+            limit: 8,
+            select: PEOPLE_SEARCH_SELECT,
+            useCohere: false,
+          });
+          searchCache.set(key, pickAutoMatch(name, hits, { minSemantic: 1 }));
+        }
+        const person = searchCache.get(key);
+        if (person) directMatches.set(row.id, personSummary(person));
+      }
+
+      const anchors = pendingRows
+        .filter((row) => directMatches.has(row.id))
+        .map((row) => ({
+          row,
+          person: directMatches.get(row.id),
+        }));
+
+      const updates = new Map();
+      for (const row of pendingRows) {
+        let person = directMatches.get(row.id);
+        if (!person) {
+          const inherited = anchors.find(({ row: anchorRow, person: anchorPerson }) => (
+            candidateNameCanUsePerson(row.raw_name, anchorPerson.name, anchorRow.raw_name)
+          ));
+          person = inherited?.person || null;
+        }
+        if (!person) continue;
+
+        updates.set(row.id, {
+          id: row.id,
+          raw_name: person.name,
+          matched_person_id: person.id,
+          people: person,
+        });
+      }
+
+      if (!updates.size) {
+        if (!quiet) toast('No safe existing-person matches found');
+        return { rows, linked: 0 };
+      }
+
+      if (persist) {
+        for (const update of updates.values()) {
+          const { error } = await supabase
+            .from('credit_candidates')
+            .update({
+              raw_name: update.raw_name,
+              matched_person_id: update.matched_person_id,
+            })
+            .eq('id', update.id)
+            .eq('status', 'pending');
+          if (error) throw error;
+        }
+      }
+
+      applyCandidatePersonUpdates(updates, { dirty: !persist, autoLinked: true });
+      if (!quiet) {
+        toast.success(`Auto-linked ${updates.size} existing profile${updates.size === 1 ? '' : 's'}`);
+      }
+
+      return {
+        rows: rows.map((row) => {
+          const update = updates.get(row.id);
+          return update
+            ? {
+                ...row,
+                ...update,
+                _dirty: !persist || row._dirty || false,
+                _autoLinked: true,
+              }
+            : row;
+        }),
+        linked: updates.size,
+      };
+    } catch (error) {
+      if (quiet) throw error;
+      toast.error(`Could not auto-link names: ${error.message}`);
+      return { rows, linked: 0 };
+    } finally {
+      setAutoResolving(false);
+    }
   };
 
   const editFilmMetadata = (filmId, patch) => {
@@ -840,7 +1024,16 @@ export default function AdminCreditHarvest() {
     const failed = [];
 
     try {
-      for (const [index, row] of rows.entries()) {
+      const autoLinkResult = await resolveSafeMatchesForRows(rows, {
+        quiet: true,
+        persist: true,
+      });
+      const rowsToApprove = autoLinkResult.rows;
+      if (autoLinkResult.linked) {
+        toast.success(`Auto-linked ${autoLinkResult.linked} existing profile${autoLinkResult.linked === 1 ? '' : 's'} before approval`);
+      }
+
+      for (const [index, row] of rowsToApprove.entries()) {
         try {
           const { data, error } = await supabase.rpc('approve_credit_candidate', {
             p_candidate_id: row.id,
@@ -860,7 +1053,7 @@ export default function AdminCreditHarvest() {
             message: error.message,
           });
         } finally {
-          setApprovalProgress({ done: index + 1, total: rows.length });
+          setApprovalProgress({ done: index + 1, total: rowsToApprove.length });
         }
       }
 
@@ -868,7 +1061,7 @@ export default function AdminCreditHarvest() {
       // page 2 naturally becomes page 1 before approval controls unlock.
       await Promise.all([loadCandidates(), loadStats()]);
 
-      const approvedCount = rows.length - failed.length;
+      const approvedCount = rowsToApprove.length - failed.length;
       if (approvedCount) {
         toast.success(`Approved ${approvedCount} (${linked} linked, ${created} new people)`);
       }
@@ -880,6 +1073,8 @@ export default function AdminCreditHarvest() {
           { duration: 7000 },
         );
       }
+    } catch (error) {
+      toast.error(`Could not approve candidates: ${error.message}`);
     } finally {
       setApprovalProgress(null);
       setBusy(false);
@@ -1283,21 +1478,21 @@ export default function AdminCreditHarvest() {
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-text-muted">{selCount} selected</span>
               <button
-                disabled={busy}
+                disabled={busy || autoResolving}
                 onClick={() => approve(selectedRows())}
                 className="text-xs font-black px-3 py-2 rounded-lg bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40"
               >
                 Approve
               </button>
               <button
-                disabled={busy}
+                disabled={busy || autoResolving}
                 onClick={() => reject(selectedRows())}
                 className="text-xs font-black px-3 py-2 rounded-lg bg-surface-2 text-text-primary border border-border hover:bg-surface-3 disabled:opacity-40"
               >
                 Reject
               </button>
               <button
-                disabled={busy}
+                disabled={busy || autoResolving}
                 onClick={() => remove(selectedRows())}
                 className="text-xs font-black px-3 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-40"
               >
@@ -1328,6 +1523,9 @@ export default function AdminCreditHarvest() {
           {groups.map((group) => {
             const ids = group.candidates.map((c) => c.id);
             const allOn = ids.every((id) => selected.has(id));
+            const pendingUnmatched = group.candidates.filter((candidate) => (
+              candidateIsPending(candidate, statusFilter) && !candidate.matched_person_id
+            )).length;
             return (
               <div key={group.film?.id || Math.random()} className="card-cal overflow-visible">
                 <div className="flex items-center gap-3 p-4 border-b border-border bg-surface-2/30">
@@ -1353,7 +1551,24 @@ export default function AdminCreditHarvest() {
                     </div>
                   </div>
                   <button
-                    disabled={busy}
+                    type="button"
+                    disabled={busy || autoResolving || statusFilter !== 'pending' || pendingUnmatched === 0}
+                    onClick={() => resolveSafeMatchesForRows(group.candidates)}
+                    className="text-[10px] font-black px-2.5 py-1.5 rounded-md bg-brand/15 text-brand border border-brand/30 hover:bg-brand/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    title="Link safe existing-person matches before approval"
+                  >
+                    <Icon
+                      icon={autoResolving ? 'solar:refresh-linear' : 'solar:link-circle-linear'}
+                      className={`w-3.5 h-3.5 ${autoResolving ? 'animate-spin' : ''}`}
+                    />
+                    {autoResolving
+                      ? 'Matching…'
+                      : pendingUnmatched
+                        ? `Auto-link ${pendingUnmatched}`
+                        : 'All linked'}
+                  </button>
+                  <button
+                    disabled={busy || autoResolving}
                     onClick={() => approve(group.candidates)}
                     className="text-[10px] font-black px-2.5 py-1.5 rounded-md bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40"
                   >
@@ -1617,22 +1832,9 @@ export default function AdminCreditHarvest() {
                             candidate={c}
                             disabled={statusFilter !== 'pending'}
                             onTextChange={(name) => editCandidate(c.id, { raw_name: name })}
-                            onAutoLink={(person) => editCandidate(c.id, {
-                              matched_person_id: person.id,
-                              people: {
-                                id: person.id,
-                                name: person.name,
-                                photo_url: person.photo_url,
-                              },
-                            })}
-                            onPickPerson={(person) => editCandidate(c.id, {
-                              raw_name: person.name,
-                              matched_person_id: person.id,
-                              people: {
-                                id: person.id,
-                                name: person.name,
-                                photo_url: person.photo_url,
-                              },
+                            onAutoLink={(person) => linkCandidateFamily(c.id, person)}
+                            onPickPerson={(person) => linkCandidateFamily(c.id, person, {
+                              canonicalName: true,
                             })}
                           />
                         </div>
@@ -1679,6 +1881,14 @@ export default function AdminCreditHarvest() {
                               new person
                             </span>
                           )}
+                          {c._autoLinked && (
+                            <span
+                              className="text-[9px] font-black uppercase text-brand bg-brand/10 border border-brand/20 rounded px-1.5 py-0.5"
+                              title="Matched by safe auto-link"
+                            >
+                              auto
+                            </span>
+                          )}
 
                           <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${confidenceStyle(c.confidence)}`}>
                             {Math.round(c.confidence * 100)}%
@@ -1688,7 +1898,7 @@ export default function AdminCreditHarvest() {
                             <div className="flex items-center gap-1">
                               {c._dirty && (
                                 <button
-                                  disabled={busy}
+                                  disabled={busy || autoResolving}
                                   onClick={() => saveCandidate(c)}
                                   title="Save edits"
                                   className="w-7 h-7 rounded flex items-center justify-center text-brand hover:bg-brand/15 disabled:opacity-40"
@@ -1697,7 +1907,7 @@ export default function AdminCreditHarvest() {
                                 </button>
                               )}
                               <button
-                                disabled={busy}
+                                disabled={busy || autoResolving}
                                 onClick={() => approve([c])}
                                 title="Approve"
                                 className="w-7 h-7 rounded flex items-center justify-center text-green-400 hover:bg-green-500/15 disabled:opacity-40"
@@ -1705,7 +1915,7 @@ export default function AdminCreditHarvest() {
                                 <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
                               </button>
                               <button
-                                disabled={busy}
+                                disabled={busy || autoResolving}
                                 onClick={() => reject([c])}
                                 title="Reject"
                                 className="w-7 h-7 rounded flex items-center justify-center text-text-muted hover:bg-surface-3 disabled:opacity-40"
@@ -1713,7 +1923,7 @@ export default function AdminCreditHarvest() {
                                 <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
                               </button>
                               <button
-                                disabled={busy}
+                                disabled={busy || autoResolving}
                                 onClick={() => remove([c])}
                                 title="Delete"
                                 className="w-7 h-7 rounded flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-40"

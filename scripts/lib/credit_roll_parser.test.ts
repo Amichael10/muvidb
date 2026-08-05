@@ -28,6 +28,63 @@ function line(top: number, entries: Array<[string, number, number, number?]>): O
 }
 
 describe('credit roll layout parser', () => {
+  it('consolidates swapped and near OCR variants of the same credited name', () => {
+    const parsed = consolidateCreditObservations([
+      {
+        name: 'Adebayo Femi',
+        roleOrCharacter: 'Actor',
+        creditType: 'actor',
+        frameIndex: 1,
+        frameSec: 1,
+        videoSec: 101,
+        ocrConfidence: 0.82,
+        evidenceText: 'ADEBAYO FEMI',
+        layout: { mode: 'grouped-cast', personBox: [10, 10, 120, 24] },
+      },
+      {
+        name: 'Ferni Adebayo',
+        roleOrCharacter: 'Actor',
+        creditType: 'actor',
+        frameIndex: 2,
+        frameSec: 2,
+        videoSec: 102,
+        ocrConfidence: 0.78,
+        evidenceText: 'FERNI ADEBAYO',
+        layout: { mode: 'grouped-cast', personBox: [10, 10, 120, 24] },
+      },
+      {
+        name: 'Femi Adebayo',
+        roleOrCharacter: 'Actor',
+        creditType: 'actor',
+        frameIndex: 3,
+        frameSec: 3,
+        videoSec: 103,
+        ocrConfidence: 0.94,
+        evidenceText: 'FEMI ADEBAYO',
+        layout: { mode: 'grouped-cast', personBox: [10, 10, 120, 24] },
+      },
+      {
+        name: 'Femi Adebayo',
+        roleOrCharacter: 'Actor',
+        creditType: 'actor',
+        frameIndex: 4,
+        frameSec: 4,
+        videoSec: 104,
+        ocrConfidence: 0.91,
+        evidenceText: 'FEMI ADEBAYO',
+        layout: { mode: 'grouped-cast', personBox: [10, 10, 120, 24] },
+      },
+    ]);
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      name: 'Femi Adebayo',
+      roleOrCharacter: 'Actor',
+      creditType: 'actor',
+      frameSupport: 4,
+    });
+  });
+
   it('separates characters from actors in a repeated two-column cast card', () => {
     const lines = [
       line(100, [['CAST', 400, 55]]),

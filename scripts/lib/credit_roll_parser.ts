@@ -791,7 +791,65 @@ function editDistance(a: string, b: string): number {
   return previous[b.length];
 }
 
+function nameTokens(value: string): string[] {
+  return normalizeKey(value)
+    .split(/\s+/)
+    .filter((token) => token.length > 1 && !/^\d+$/.test(token));
+}
+
+function sortedNameKey(value: string): string | null {
+  const tokens = nameTokens(value);
+  if (tokens.length < 2) return null;
+  return `${tokens.length}:${[...tokens].sort().join('|')}`;
+}
+
+function tokenNamesAreNear(a: string, b: string): boolean {
+  const leftTokens = nameTokens(a);
+  const rightTokens = nameTokens(b);
+  if (leftTokens.length < 2 || rightTokens.length < 2) return false;
+  if (Math.abs(leftTokens.length - rightTokens.length) > 1) return false;
+
+  const unused = [...rightTokens];
+  let typoSlots = 0;
+  for (const token of leftTokens) {
+    const exactIndex = unused.indexOf(token);
+    if (exactIndex >= 0) {
+      unused.splice(exactIndex, 1);
+      continue;
+    }
+
+    let bestIndex = -1;
+    let bestDistance = Infinity;
+    for (let index = 0; index < unused.length; index++) {
+      const other = unused[index];
+      if (token.length < 4 || other.length < 4) continue;
+      if (Math.abs(token.length - other.length) > 2) continue;
+      const distance = editDistance(token, other);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    }
+
+    if (bestIndex >= 0 && bestDistance > 0 && bestDistance <= 2) {
+      typoSlots++;
+      if (typoSlots > 1) return false;
+      unused.splice(bestIndex, 1);
+      continue;
+    }
+
+    return false;
+  }
+
+  return unused.length <= 1 && typoSlots <= 1;
+}
+
 function namesAreNear(a: string, b: string): boolean {
+  const leftKey = sortedNameKey(a);
+  const rightKey = sortedNameKey(b);
+  if (leftKey && rightKey && leftKey === rightKey) return true;
+  if (tokenNamesAreNear(a, b)) return true;
+
   const left = normalizeKey(a).replace(/ /g, '');
   const right = normalizeKey(b).replace(/ /g, '');
   if (left === right) return true;
