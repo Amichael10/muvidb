@@ -22,6 +22,19 @@ export interface MuviDbWelcomeEmailProps {
   exploreUrl?: string;
   helpUrl?: string;
   unsubscribeUrl?: string;
+  /** Override preview line (inbox snippet). */
+  preview?: string;
+  /** Override hero eyebrow, e.g. CONFIRM YOUR EMAIL */
+  eyebrow?: string;
+  /** Override main heading (plain text; orange accent on brand name still applied in welcome mode). */
+  headline?: string;
+  /** Override intro paragraph under the heading. */
+  intro?: string;
+  /** Primary CTA — defaults to Explore MuviDB */
+  ctaLabel?: string;
+  ctaUrl?: string;
+  /** Hide feature grid + mission on shorter auth emails */
+  compact?: boolean;
   collage: {
     featuredPerson: string;
     actor: string;
@@ -50,13 +63,25 @@ export default function MuviDbWelcomeEmail({
   exploreUrl = 'https://muvidb.com',
   helpUrl = 'https://muvidb.com/about',
   unsubscribeUrl = 'https://muvidb.com',
+  preview = 'Welcome to MuviDB, the home of African cinema.',
+  eyebrow = 'WELCOME TO',
+  headline,
+  intro,
+  ctaLabel = 'Explore MuviDB →',
+  ctaUrl,
+  compact = false,
   collage,
   social = {},
 }: MuviDbWelcomeEmailProps) {
+  const actionUrl = ctaUrl || exploreUrl;
+  const heroIntro =
+    intro
+    ?? `Hi ${firstName}, thanks for joining MuviDB — the home of African films, television, and the people who bring those stories to life.`;
+
   return (
     <Html lang="en">
       <Head />
-      <Preview>Welcome to MuviDB, the home of African cinema.</Preview>
+      <Preview>{preview}</Preview>
       <Body style={styles.body}>
         <Container style={styles.container}>
           <Section style={styles.header}>
@@ -75,20 +100,23 @@ export default function MuviDbWelcomeEmail({
           <Section style={styles.hero}>
             <Row>
               <Column style={styles.heroCopy}>
-                <Text style={styles.eyebrow}>WELCOME TO</Text>
-                <Heading style={styles.heading}>
-                  Muvi<span style={{ color: ORANGE }}>DB</span>
-                  <br />
-                  You&apos;re in
-                  <span style={{ color: ORANGE }}>!</span>
-                </Heading>
-                <Text style={styles.intro}>
-                  Hi {firstName}, thanks for joining MuviDB — the home of African
-                  films, television, and the people who bring those stories to life.
-                </Text>
-                <Text style={styles.boldText}>We&apos;re excited to have you with us.</Text>
-                <Button href={exploreUrl} style={styles.button}>
-                  Explore MuviDB →
+                <Text style={styles.eyebrow}>{eyebrow}</Text>
+                {headline ? (
+                  <Heading style={styles.heading}>{headline}</Heading>
+                ) : (
+                  <Heading style={styles.heading}>
+                    Muvi<span style={{ color: ORANGE }}>DB</span>
+                    <br />
+                    You&apos;re in
+                    <span style={{ color: ORANGE }}>!</span>
+                  </Heading>
+                )}
+                <Text style={styles.intro}>{heroIntro}</Text>
+                {!compact && (
+                  <Text style={styles.boldText}>We&apos;re excited to have you with us.</Text>
+                )}
+                <Button href={actionUrl} style={styles.button}>
+                  {ctaLabel}
                 </Button>
               </Column>
               <Column style={styles.heroArt}>
@@ -97,6 +125,7 @@ export default function MuviDbWelcomeEmail({
             </Row>
           </Section>
 
+          {!compact && (
           <Section style={styles.featuresSection}>
             <Text style={styles.sectionEyebrow}>EVERYTHING YOU CAN DO ON MUVIDB</Text>
             <Hr style={styles.sectionRule} />
@@ -119,7 +148,9 @@ export default function MuviDbWelcomeEmail({
               />
             </Row>
           </Section>
+          )}
 
+          {!compact && (
           <Section style={styles.missionWrapper}>
             <Row style={styles.mission}>
               <Column style={styles.missionCopy}>
@@ -145,6 +176,7 @@ export default function MuviDbWelcomeEmail({
               </Column>
             </Row>
           </Section>
+          )}
 
           <Section style={styles.signoff}>
             <Text style={styles.signoffTitle}>

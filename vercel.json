@@ -37,6 +37,10 @@
     "api/telegram.ts": {
       "maxDuration": 30
     },
+    "api/auth-email.ts": {
+      "includeFiles": "emails/**",
+      "maxDuration": 30
+    },
     "api/automation.ts": {
       "maxDuration": 60
     },

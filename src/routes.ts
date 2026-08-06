@@ -29,6 +29,8 @@ export default [
   route('submit/:kind', 'pages/Submit.jsx'),
   route('login', 'pages/Login.jsx'),
   route('signup', 'pages/Signup.jsx'),
+  route('forgot-password', 'pages/ForgotPassword.jsx'),
+  route('reset-password', 'pages/ResetPassword.jsx'),
   route('people', 'routes/people-list.tsx'),
   route('people/:slug', 'routes/person-detail.tsx'),
   route('awards', 'pages/Awards.jsx'),

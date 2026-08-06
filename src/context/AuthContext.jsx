@@ -186,6 +186,22 @@ export function AuthProvider({ children }) {
     if (error) console.error('Google login error:', error);
   };
 
+  /** Send Supabase recovery email. Always resolve on success; do not leak whether the email exists. */
+  const requestPasswordReset = async (email) => {
+    const redirectTo = `${window.location.origin}/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo,
+    });
+    if (error) throw error;
+  };
+
+  /** Set a new password while in a PASSWORD_RECOVERY session. */
+  const updatePassword = async (newPassword) => {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    return data;
+  };
+
   const signup = async (name, email, password, userRole, onboarded = false) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -240,6 +256,8 @@ export function AuthProvider({ children }) {
     signup,
     logout,
     updateUserProfile,
+    requestPasswordReset,
+    updatePassword,
     isAuthenticated: !!user,
     role: formattedUser?.role || null,
     loading: authState.loading
