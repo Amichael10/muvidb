@@ -10,6 +10,7 @@ import {
   isSensationalizedYouTubeTitle,
   type YouTubeTitleDecision,
 } from './youtube_title_policy.js';
+import { notifyYouTubeUploads } from './youtube_upload_notify.js';
 
 /** Film-length floor for channel_videos ingest + admin buffer (30 minutes). */
 export const CHANNEL_VIDEO_MIN_SEC = 1800;
@@ -278,6 +279,19 @@ export async function runVideosSync() {
       const shortInBatch = videoRows.filter((row: any) => !isFilmLengthDuration(row.duration_seconds));
       shortSkipped += shortInBatch.length;
       const filmLengthRows = videoRows.filter((row: any) => isFilmLengthDuration(row.duration_seconds));
+
+      // Telegram alert for brand-new film-length uploads (before auto-import).
+      const brandNewUploads = filmLengthRows.filter((row: any) => !storedByVideo.has(row.video_id));
+      if (brandNewUploads.length > 0) {
+        try {
+          const alertRes = await notifyYouTubeUploads(ch, brandNewUploads);
+          if (alertRes.notified > 0) {
+            console.log(`[runVideosSync] Telegram alerted ${alertRes.notified} new upload(s) for ${ch.name}`);
+          }
+        } catch (e: any) {
+          console.warn(`[runVideosSync] youtube upload notify failed for ${ch.name}:`, e?.message || e);
+        }
+      }
 
       if (filmLengthRows.length > 0) {
         // Strip the _description helper — it's not a channel_videos column and

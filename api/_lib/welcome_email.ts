@@ -19,6 +19,47 @@ const DEFAULT_REPLY_TO = 'support@muvidb.com';
 
 const FALLBACK_POSTER = `${SITE}/images/film-placeholder.webp`;
 
+const SUPABASE_PROJECT = 'https://pkenrmorywmuvnzfoylp.supabase.co';
+// Hosts that serve stable, hotlinkable images directly. Everything else is
+// routed through our cached media proxy so email clients get an absolute,
+// reliable URL (third-party hosts often block hotlinking).
+const FRIENDLY_IMAGE_HOST =
+  /(^|\.)(tmdb\.org|ytimg\.com|youtube\.com|ggpht\.com|googleusercontent\.com|media-amazon\.com|muvidb\.com)$/i;
+
+/**
+ * Make a poster/backdrop URL safe to embed in an email:
+ *  - absolute (email clients cannot resolve relative or same-origin proxy paths);
+ *  - format-negotiated for Supabase-stored images — our /storage render rewrite
+ *    serves JPEG to clients that do not accept WebP (Outlook, Yahoo), which
+ *    otherwise show a broken image for the many `.webp` posters;
+ *  - unreliable third-party hosts routed through our cached /api/media proxy.
+ * The featured set is tiny and stable, so Supabase render transforms are cached
+ * per source and stay well within the Pro image-transformation quota.
+ */
+function emailImageUrl(raw: string): string {
+  const url = (raw || '').replace(/[\r\n\t]/g, '').trim();
+  if (!url) return FALLBACK_POSTER;
+  if (!/^https?:\/\//i.test(url)) return url;
+
+  if (url.startsWith(`${SUPABASE_PROJECT}/storage/v1/`)) {
+    const marker = '/public/';
+    const idx = url.indexOf(marker);
+    if (idx !== -1) {
+      const objectPath = url.slice(idx + marker.length).split('?')[0];
+      return `${SITE}/storage/v1/render/image/public/${objectPath}?width=320&quality=80`;
+    }
+  }
+
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return url;
+  }
+  if (FRIENDLY_IMAGE_HOST.test(host)) return url;
+  return `${SITE}/api/media?url=${encodeURIComponent(url)}`;
+}
+
 export const WELCOME_EMAIL_ASSETS = {
   logoUrl: `${SITE}/images/MuviDB%20Brand/Wordmark.png`,
   social: {
@@ -72,12 +113,13 @@ export async function getHeroCollage(): Promise<WelcomeCollage> {
   const unique = [...new Set(urls)].filter(Boolean);
   while (unique.length < 5) unique.push(FALLBACK_POSTER);
 
+  const safe = unique.map(emailImageUrl);
   return {
-    featuredPerson: unique[0],
-    actor: unique[1],
-    filmmaker: unique[2],
-    moviePoster: unique[3],
-    productionStill: unique[4],
+    featuredPerson: safe[0],
+    actor: safe[1],
+    filmmaker: safe[2],
+    moviePoster: safe[3],
+    productionStill: safe[4],
   };
 }
 
