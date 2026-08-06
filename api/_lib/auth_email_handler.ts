@@ -23,6 +23,12 @@ function normalizeHeaders(req: VercelRequest): Record<string, string> {
 
 export async function handleAuthEmailHook(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
+    const preview = typeof req.query.preview === 'string' ? req.query.preview : '';
+    if (preview) {
+      const { previewAuthEmailHtml } = await import('./auth_email.js');
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send(previewAuthEmailHtml(preview));
+    }
     return res.status(200).json({
       ok: true,
       resend: resendConfigured(),
