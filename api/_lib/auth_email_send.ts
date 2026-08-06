@@ -1,5 +1,5 @@
 /**
- * Auth confirm / reset email render + send — must run via api/data bundle (TSX).
+ * Auth confirm / reset email render + send — runs via api/data bundle.
  */
 import { getResend, resendConfigured } from './resend.js';
 import {
@@ -8,7 +8,6 @@ import {
   WELCOME_EMAIL_ASSETS,
   type WelcomeCollage,
 } from './email_assets.js';
-import { renderBrandedEmail } from './branded_email_render.js';
 
 const DEFAULT_FROM = 'MuviDB Welcome <support@muvidb.com>';
 const DEFAULT_REPLY_TO = 'support@muvidb.com';
@@ -127,9 +126,9 @@ function emailProps(
 
 /** GET /api/data?_r=auth-email&preview=signup */
 export async function previewAuthEmailHtml(action: AuthEmailAction = 'signup') {
-  const collage = await resolveCollage();
-  return renderBrandedEmail(
-    emailProps(action, 'there', `${SITE_URL}/auth/confirmed`, collage),
+  const { renderMuviDbEmail } = await import('./welcome_email.js');
+  return renderMuviDbEmail(
+    emailProps(action, 'there', `${SITE_URL}/auth/confirmed`, FALLBACK_COLLAGE),
   );
 }
 
@@ -156,7 +155,8 @@ export async function sendAuthEmail(payload: AuthEmailPayload) {
 
   let html: string;
   try {
-    html = await renderBrandedEmail(
+    const { renderMuviDbEmail } = await import('./welcome_email.js');
+    html = await renderMuviDbEmail(
       emailProps(action, firstName, actionUrl, collage),
     );
   } catch (err: any) {

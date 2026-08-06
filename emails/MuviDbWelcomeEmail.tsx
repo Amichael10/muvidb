@@ -312,7 +312,7 @@ function Feature({ title, text }: { title: string; text: string }) {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles = {
   body: {
     margin: 0,
     padding: 0,

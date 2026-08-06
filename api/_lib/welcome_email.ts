@@ -35,6 +35,13 @@ export type WelcomeCollage = {
   productionStill: string;
 };
 
+/** Render any MuviDbWelcomeEmail variant (welcome, confirm, reset). */
+export async function renderMuviDbEmail(
+  props: React.ComponentProps<typeof MuviDbWelcomeEmail>,
+): Promise<string> {
+  return render(React.createElement(MuviDbWelcomeEmail, props));
+}
+
 /**
  * Pull collage images from the same featured-film set as the Home hero
  * (`is_featured`, view_count ordered, limit 6). Prefer poster, then backdrop.
