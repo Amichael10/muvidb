@@ -7,6 +7,7 @@ import { SuggestEditModal, ReportModal } from '../components/contribute/Contribu
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useReactions } from '../hooks/useReactions';
 import ReviewSection from '../components/film/ReviewSection';
+import CriticReviewsSection from '../components/film/CriticReviewsSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 import LikedScore from '../components/film/LikedScore';
@@ -230,6 +231,7 @@ export default function FilmDetail() {
   const [showFilmEdit, setShowFilmEdit] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
+  const [awardsOpen, setAwardsOpen] = useState(false);
 
   // For the slug the loader seeded, hand the row straight to fetchFilm so it
   // skips the primary query but STILL runs the follow-on work (credits,
@@ -634,11 +636,6 @@ export default function FilmDetail() {
                     <span>Be the first to rate</span>
                   </button>
                 )}
-
-                <div className="flex items-center gap-1.5 text-white/60 pb-1">
-                  <Icon icon="solar:fire-bold" className="text-orange-500 text-lg" />
-                  <span className="text-[10px] font-bold tracking-wide">Trending</span>
-                </div>
               </div>
             </div>
           </div>
@@ -709,48 +706,11 @@ export default function FilmDetail() {
         </section>
         <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border">
 
-          {/* MAIN CONTENT (70%) */}
+          {/* MAIN CONTENT (70%) — story → media → people → reviews → awards */}
           <div className="lg:col-span-2">
-            {/* Awards */}
-            {Array.isArray(film.awards) && film.awards.length > 0 && (
-              <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Awards</h2>
-                <div className="space-y-3">
-                  {[...film.awards]
-                    .sort((a, b) => (b.year || 0) - (a.year || 0))
-                    .map((award, idx) => (
-                      <div
-                        key={`${award.organization}-${award.season}-${award.category}-${idx}`}
-                        className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3"
-                      >
-                        <Icon icon="solar:cup-star-bold" className="text-xl text-brand shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-text-primary text-sm font-bold">
-                            {award.category || award.title}
-                            {award.won === false ? (
-                              <span className="ml-2 text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-black">
-                                Nominated
-                              </span>
-                            ) : (
-                              <span className="ml-2 text-[10px] uppercase tracking-wider text-brand font-black">
-                                Winner
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-text-muted text-xs mt-0.5">
-                            {[award.organization || 'AMVCA', award.year].filter(Boolean).join(' · ')}
-                            {award.recipients?.length ? ` · ${award.recipients.join(', ')}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </section>
-            )}
-
             {/* Synopsis */}
             <section className="p-8 md:p-12 border-b border-border">
-              <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Synopsis</h2>
+              <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-6 tracking-tight leading-none">Synopsis</h2>
               <p className="text-text-muted text-lg leading-relaxed opacity-80 border-l-2 border-brand pl-6">
                 {toSentenceCase(film.synopsis)}
               </p>
@@ -816,7 +776,7 @@ export default function FilmDetail() {
               <section className="p-8 md:p-12 border-b border-border bg-surface-2/5">
                 <div className="flex flex-col gap-5 mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-                    <h2 className="font-heading font-bold text-2xl text-text-primary tracking-tighter flex items-center gap-2">
+                    <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none flex items-center gap-2">
                       <Icon icon="solar:playlist-play-bold" className="text-brand" />
                       Episodes
                       <span className="text-sm font-bold text-text-muted tracking-normal">
@@ -957,7 +917,7 @@ export default function FilmDetail() {
             {trailerVideoId && (
               <section id="trailer-section" className="p-8 md:p-12 border-b border-border bg-surface-2/10 relative overflow-hidden">
                 <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter relative z-10">Official Trailer</h2>
+                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-6 tracking-tight leading-none relative z-10">Official Trailer</h2>
                 <div className="relative z-10 aspect-video rounded-xl overflow-hidden border border-border bg-surface-2 shadow-sm">
                   <iframe
                     className="w-full h-full"
@@ -973,7 +933,8 @@ export default function FilmDetail() {
             {/* Cast */}
             {cast.length > 0 && (
               <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Cast</h2>
+                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-2 tracking-tight leading-none">Cast</h2>
+                <p className="text-xs text-text-muted mb-6">{cast.length} {cast.length === 1 ? 'credit' : 'credits'}</p>
                 <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2">
                   {(showAllCast ? cast : cast.slice(0, 8)).map(person => (
                     <Link 
@@ -1021,7 +982,8 @@ export default function FilmDetail() {
             {/* Crew */}
             {crew.length > 0 && (
               <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Crew</h2>
+                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-2 tracking-tight leading-none">Crew</h2>
+                <p className="text-xs text-text-muted mb-6">{crew.length} {crew.length === 1 ? 'member' : 'members'}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden">
                   {crew.map((member, idx) => (
                     <Link 
@@ -1051,6 +1013,79 @@ export default function FilmDetail() {
               </section>
             )}
 
+            {/* Awards — before reviews, collapsed by default */}
+            {Array.isArray(film.awards) && film.awards.length > 0 && (() => {
+              const wins = film.awards.filter((a) => a.won !== false).length;
+              const nominations = film.awards.filter((a) => a.won === false).length;
+              return (
+              <section className="p-8 md:p-12 border-b border-border">
+                <button
+                  type="button"
+                  onClick={() => setAwardsOpen((prev) => !prev)}
+                  aria-expanded={awardsOpen}
+                  className="w-full flex items-center justify-between gap-4 text-left group"
+                >
+                  <div className="flex flex-wrap items-center gap-3 min-w-0">
+                    <h2 className="font-heading font-bold text-xl md:text-2xl text-text-primary tracking-tight leading-none">
+                      Awards
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {wins > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-brand/25 bg-brand/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand">
+                          {wins} {wins === 1 ? 'win' : 'wins'}
+                        </span>
+                      )}
+                      {nominations > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                          {nominations} {nominations === 1 ? 'nomination' : 'nominations'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Icon
+                    icon={awardsOpen ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+                    className="text-xl text-text-muted group-hover:text-text-primary transition-colors shrink-0"
+                  />
+                </button>
+                {awardsOpen && (
+                  <ul className="mt-6 divide-y divide-border/70 border-y border-border/70">
+                    {[...film.awards]
+                      .sort((a, b) => (b.year || 0) - (a.year || 0))
+                      .map((award, idx) => (
+                        <li
+                          key={`${award.organization}-${award.season}-${award.category}-${idx}`}
+                          className="flex items-start gap-3 py-3.5"
+                        >
+                          <Icon icon="solar:cup-star-linear" className="text-base text-text-muted shrink-0 mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-text-primary text-sm font-semibold leading-snug">
+                              {award.category || award.title}
+                              <span
+                                className={`ml-2 text-[10px] font-bold uppercase tracking-wider ${
+                                  award.won === false ? 'text-text-muted' : 'text-brand'
+                                }`}
+                              >
+                                {award.won === false ? 'Nominated' : 'Winner'}
+                              </span>
+                            </p>
+                            <p className="text-text-muted text-xs mt-0.5">
+                              {[award.organization || 'AMVCA', award.year].filter(Boolean).join(' · ')}
+                              {award.recipients?.length ? ` · ${award.recipients.join(', ')}` : ''}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </section>
+              );
+            })()}
+
+            {/* Critic Reviews & Quotes */}
+            <div className="px-8 md:px-12 pt-4">
+              <CriticReviewsSection filmId={film.id} user={user} />
+            </div>
+
             {/* Reviews */}
             <section id="reviews-section" className="p-8 md:p-12">
               <ReviewSection
@@ -1060,78 +1095,8 @@ export default function FilmDetail() {
             </section>
           </div>
 
-          {/* SIDEBAR (30%) */}
+          {/* SIDEBAR (30%) — Watch first, then facts / platforms / related */}
           <div className="space-y-0 divide-y divide-border h-full">
-            <div className="p-8">
-              {film.film_companies?.length > 0 ? (
-                <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4 group transition-all cursor-default">
-                  <div className={`w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50 ${film.film_companies[0].companies?.logo_url ? 'bg-black' : 'bg-surface-2'}`}>
-                    <ImageWithFallback
-                      src={film.film_companies[0].companies?.logo_url}
-                      alt={film.film_companies[0].companies?.name || 'Studio logo'}
-                      fallbackType="company"
-                      name={film.film_companies[0].companies?.name || 'Studio'}
-                      className={`w-full h-full ${film.film_companies[0].companies?.logo_url ? 'object-contain' : 'object-cover'}`}
-                      width={96}
-                      sizes="48px"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Studio</div>
-                    <div className="font-bold text-text-primary text-sm line-clamp-1 tracking-tight">{film.film_companies[0].companies?.name}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4">
-                  <div className="w-12 h-12 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-bold text-xl shrink-0">
-                    {film.director?.charAt(0) || '?'}
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Director</div>
-                    <div className="font-bold text-text-primary text-sm tracking-tight">{film.director || 'Not Specified'}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-8 bg-surface-2/5">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider">About</h3>
-              <div className="space-y-4 text-[11px] font-bold">
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">Status</span>
-                  <span className="text-text-primary">{film.status}</span>
-                </div>
-                {film.countries && film.countries.length > 0 && (
-                  <div className="flex justify-between items-center border-b border-border pb-3">
-                    <span className="text-text-muted tracking-wider">Country</span>
-                    <span className="text-text-primary text-right">{film.countries.join(', ')}</span>
-                  </div>
-                )}
-                {/* Language row hidden until detection is accurate — re-enable with getFilmLanguages(film) */}
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>
-                  <span className="text-text-primary">
-                    {film.content_type === 'series'
-                      ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
-                      : `${film.runtime_minutes || film.runtime} min`}
-                  </span>
-                </div>
-                {film.content_type === 'series' && film.episode_count && (
-                  <div className="flex justify-between items-center border-b border-border pb-3">
-                    <span className="text-text-muted tracking-wider">Episodes</span>
-                    <span className="text-text-primary">{film.episode_count} Episodes</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center">
-                  <span className="text-text-muted tracking-wider">Rating</span>
-                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-bold">
-                    {film.nfvcb_rating}
-                  </span>
-                </div>
-              </div>
-            </div>
-
             <div className="hidden lg:block p-8 space-y-3">
               <WatchOptions film={film} isFullWidth />
               <button
@@ -1173,10 +1138,92 @@ export default function FilmDetail() {
               />
             </div>
 
+            <div className="p-8">
+              {film.film_companies?.length > 0 ? (
+                <div className="flex items-center gap-4">
+                  <div className={`w-11 h-11 rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-lg shrink-0 border border-border ${film.film_companies[0].companies?.logo_url ? 'bg-black' : 'bg-surface-2'}`}>
+                    <ImageWithFallback
+                      src={film.film_companies[0].companies?.logo_url}
+                      alt={film.film_companies[0].companies?.name || 'Studio logo'}
+                      fallbackType="company"
+                      name={film.film_companies[0].companies?.name || 'Studio'}
+                      className={`w-full h-full ${film.film_companies[0].companies?.logo_url ? 'object-contain' : 'object-cover'}`}
+                      width={96}
+                      sizes="44px"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Studio</div>
+                    <div className="font-bold text-text-primary text-sm line-clamp-1 tracking-tight">{film.film_companies[0].companies?.name}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-bold text-lg shrink-0 border border-border">
+                    {film.director?.charAt(0) || '?'}
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Director</div>
+                    <div className="font-bold text-text-primary text-sm tracking-tight">{film.director || 'Not Specified'}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8">
+              <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight">About</h3>
+              <div className="space-y-4 text-[11px] font-bold">
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-text-muted tracking-wider">Status</span>
+                  <span className="text-text-primary">{film.status}</span>
+                </div>
+                {film.countries && film.countries.length > 0 && (
+                  <div className="flex justify-between items-start gap-4 border-b border-border pb-3">
+                    <span className="text-text-muted tracking-wider shrink-0">Country</span>
+                    <span className="text-right flex flex-wrap justify-end gap-x-1 gap-y-1">
+                      {film.countries.map((country, i) => (
+                        <span key={country} className="inline-flex items-center">
+                          <Link
+                            to={`/browse?country=${encodeURIComponent(country)}`}
+                            className="text-text-primary hover:text-brand transition-colors underline-offset-2 hover:underline"
+                          >
+                            {country}
+                          </Link>
+                          {i < film.countries.length - 1 ? <span className="text-text-muted">,</span> : null}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                {/* Language row hidden until detection is accurate — re-enable with getFilmLanguages(film) */}
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>
+                  <span className="text-text-primary">
+                    {film.content_type === 'series'
+                      ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
+                      : `${film.runtime_minutes || film.runtime} min`}
+                  </span>
+                </div>
+                {film.content_type === 'series' && film.episode_count && (
+                  <div className="flex justify-between items-center border-b border-border pb-3">
+                    <span className="text-text-muted tracking-wider">Episodes</span>
+                    <span className="text-text-primary">{film.episode_count} Episodes</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-text-muted tracking-wider">Rating</span>
+                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-bold">
+                    {film.nfvcb_rating}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* WHERE TO WATCH — explicit per-platform list (answers the #1 query) */}
             {PLATFORMS.some((p) => isFilmOnPlatform(film, p.id)) && (
-              <div className="hidden lg:block p-8 border-t border-border">
-                <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider flex items-center gap-2">
+              <div className="hidden lg:block p-8">
+                <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight flex items-center gap-2">
                   <Icon icon="solar:tv-bold" className="text-brand" />
                   Where to Watch
                 </h3>
@@ -1215,7 +1262,7 @@ export default function FilmDetail() {
             )}
 
             <div className="p-8">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider">More Like This</h3>
+              <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight">More Like This</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-1 gap-3 lg:gap-0 lg:border lg:border-border lg:rounded-lg lg:overflow-hidden lg:shadow-sm">
                 {relatedFilms.map(relatedFilm => (
                   <Link

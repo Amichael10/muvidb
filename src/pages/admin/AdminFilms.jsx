@@ -7,6 +7,7 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AwardsEditor from '../../components/admin/AwardsEditor';
+import CriticReviewsEditor from '../../components/admin/CriticReviewsEditor';
 import YouTubeFilmImport from '../../components/admin/YouTubeFilmImport';
 import { ALL_ROLES, canonicalizeRole } from '../../lib/creditRoles';
 import { searchPeopleByName } from '../../lib/peopleSearch';
@@ -2730,6 +2731,13 @@ export default function AdminFilms() {
             value={formData.awards}
             onChange={(awards) => setFormData({ ...formData, awards })}
           />
+
+          {editingFilm?.id && (
+            <>
+              <hr className="border-border" />
+              <CriticReviewsEditor filmId={editingFilm.id} />
+            </>
+          )}
 
           <hr className="border-border" />
 
