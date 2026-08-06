@@ -35,11 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleWelcomeEmail(req, res);
     }
     if (key === 'auth-email') {
-      const { handleAuthEmailData } = await import('./_lib/auth_email_handler.js');
+      const { handleAuthEmailData } = await import('./_lib/auth_email_data.js');
       return handleAuthEmailData(req, res);
     }
     if (key === 'auth-email-send') {
-      const { handleAuthEmailSend } = await import('./_lib/auth_email_handler.js');
+      const { handleAuthEmailSend } = await import('./_lib/auth_email_data.js');
       return handleAuthEmailSend(req, res);
     }
 

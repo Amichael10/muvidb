@@ -1,5 +1,5 @@
 /**
- * Supabase Auth "Send Email" hook — webhook verify on api/auth-email, render/send via api/data.
+ * Supabase Send Email hook — webhook verify on api/auth-email, render/send via api/data.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { resendConfigured } from './resend.js';
@@ -58,7 +58,6 @@ export async function handleAuthEmailHook(req: VercelRequest, res: VercelRespons
   if (req.method === 'GET') {
     const preview = typeof req.query.preview === 'string' ? req.query.preview : '';
     if (preview) {
-      // TSX email template renders via api/data bundle (not this standalone function).
       return res.redirect(302, `${dataApiBase()}/api/data?_r=auth-email&preview=${encodeURIComponent(preview)}`);
     }
     return res.status(200).json({
@@ -66,7 +65,6 @@ export async function handleAuthEmailHook(req: VercelRequest, res: VercelRespons
       resend: resendConfigured(),
       hookSecret: Boolean(hookSecret()),
       previewUrl: `${SITE}/api/data?_r=auth-email&preview=signup`,
-      hint: 'Enable Send Email hook in Supabase → point here.',
     });
   }
 
@@ -104,7 +102,6 @@ export async function handleAuthEmailHook(req: VercelRequest, res: VercelRespons
   try {
     const result = await delegateSend(verified);
     if (!result.ok) {
-      console.error('[auth-email] send failed:', result.error);
       return res.status(500).json({ error: result.error });
     }
     return res.status(200).json({});
@@ -112,40 +109,4 @@ export async function handleAuthEmailHook(req: VercelRequest, res: VercelRespons
     console.error('[auth-email]', err?.message || err);
     return res.status(500).json({ error: err?.message || 'Send failed' });
   }
-}
-
-/** GET preview + internal POST send — api/data routes only. */
-export async function handleAuthEmailData(req: VercelRequest, res: VercelResponse) {
-  const preview = typeof req.query.preview === 'string' ? req.query.preview : '';
-  if (req.method === 'GET' && preview) {
-    const { previewAuthEmailHtml } = await import('./auth_email_send.js');
-    const html = await previewAuthEmailHtml(preview);
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(html);
-  }
-  return res.status(404).json({ error: 'Use ?preview=signup on GET' });
-}
-
-export async function handleAuthEmailSend(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const expected = (process.env.CRON_SECRET || process.env.VITE_CRON_SECRET || '').trim();
-  const auth = req.headers.authorization || '';
-  if (!expected || auth !== `Bearer ${expected}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const payload = req.body?.payload as AuthEmailPayload | undefined;
-  if (!payload?.user?.email || !payload?.email_data) {
-    return res.status(400).json({ error: 'Missing payload' });
-  }
-
-  const { sendAuthEmail } = await import('./auth_email_send.js');
-  const result = await sendAuthEmail(payload);
-  if (!result.ok) {
-    return res.status(500).json({ error: result.error });
-  }
-  return res.status(200).json({ success: true, emailId: result.emailId, action: result.action });
 }
