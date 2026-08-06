@@ -210,6 +210,18 @@ export default function AdminCreditsExtractor() {
     loadRecentFilms();
   }, []);
 
+  const filmDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (filmDropdownRef.current && !filmDropdownRef.current.contains(e.target)) {
+        setIsFilmDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Debounced dynamic server-side live film search
   useEffect(() => {
     let active = true;
@@ -738,10 +750,10 @@ export default function AdminCreditsExtractor() {
         {/* Left Panel: Film Selection & Upload */}
         <div className="space-y-6 lg:col-span-1">
           {/* Film Selection Card */}
-          <div className="card-cal p-6 space-y-4">
+          <div className={`card-cal p-6 space-y-4 relative ${isFilmDropdownOpen ? 'z-30' : 'z-10'}`}>
             <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">1. Select Target Film</h3>
             
-            <div className="relative">
+            <div className="relative" ref={filmDropdownRef}>
               <label className="block text-[10px] font-black text-text-muted uppercase tracking-[0.1em] mb-2">Film Asset *</label>
               
               <div 

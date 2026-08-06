@@ -69,8 +69,15 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (!filmId) {
+      toast.error('Film ID is missing. Please save the film first.');
+      return;
+    }
 
     if (!formData.quote.trim()) {
       toast.error('Review quote text is required');
@@ -159,8 +166,8 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
         </div>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-surface-2 p-4 rounded-xl border border-border space-y-4">
+      {/* Form Container — uses div instead of nested form tag to prevent closing parent Admin drawer */}
+      <div className="bg-surface-2 p-4 rounded-xl border border-border space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-brand">
             {editingReview ? 'Edit Critic Review' : 'Add New Critic Review'}
@@ -169,7 +176,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
             <button
               type="button"
               onClick={handleResetForm}
-              className="text-xs text-text-muted hover:text-text-primary underline"
+              className="text-xs text-text-muted hover:text-text-primary underline cursor-pointer"
             >
               Cancel Edit
             </button>
@@ -296,18 +303,19 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
           </div>
         </div>
 
-        {/* Submit */}
+        {/* Submit Button */}
         <div className="flex justify-end gap-2 pt-2">
           <button
-            type="submit"
+            type="button"
+            onClick={handleSubmit}
             disabled={isSaving}
-            className="px-4 py-2 bg-brand text-white font-bold text-xs rounded-lg hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            className="px-4 py-2 bg-brand text-white font-bold text-xs rounded-lg hover:opacity-90 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
           >
             <Icon icon="solar:check-circle-bold" className="text-sm" />
             {isSaving ? 'Saving...' : editingReview ? 'Update Quote' : 'Save Critic Quote'}
           </button>
         </div>
-      </form>
+      </div>
 
       {/* List of Existing Critic Reviews */}
       <div className="space-y-3">
@@ -393,7 +401,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
                   <button
                     type="button"
                     onClick={() => handleEdit(rev)}
-                    className="p-1.5 text-text-muted hover:text-brand transition-colors rounded-lg hover:bg-surface-2"
+                    className="p-1.5 text-text-muted hover:text-brand transition-colors rounded-lg hover:bg-surface-2 cursor-pointer"
                     title="Edit"
                   >
                     <Icon icon="solar:pen-bold" className="text-base" />
@@ -401,7 +409,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
                   <button
                     type="button"
                     onClick={() => handleDelete(rev.id)}
-                    className="p-1.5 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-surface-2"
+                    className="p-1.5 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-surface-2 cursor-pointer"
                     title="Delete"
                   >
                     <Icon icon="solar:trash-bin-trash-bold" className="text-base" />
