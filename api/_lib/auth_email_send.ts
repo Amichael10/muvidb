@@ -2,6 +2,7 @@
  * Auth confirm / reset email render + send — runs via api/data bundle.
  */
 import { getResend, resendConfigured } from './resend.js';
+import { renderMuviDbEmail } from './welcome_email.js';
 import {
   FALLBACK_COLLAGE,
   SITE_URL,
@@ -126,7 +127,6 @@ function emailProps(
 
 /** GET /api/data?_r=auth-email&preview=signup */
 export async function previewAuthEmailHtml(action: AuthEmailAction = 'signup') {
-  const { renderMuviDbEmail } = await import('./welcome_email.js');
   return renderMuviDbEmail(
     emailProps(action, 'there', `${SITE_URL}/auth/confirmed`, FALLBACK_COLLAGE),
   );
@@ -155,7 +155,6 @@ export async function sendAuthEmail(payload: AuthEmailPayload) {
 
   let html: string;
   try {
-    const { renderMuviDbEmail } = await import('./welcome_email.js');
     html = await renderMuviDbEmail(
       emailProps(action, firstName, actionUrl, collage),
     );

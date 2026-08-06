@@ -1,11 +1,11 @@
 /** Preview + internal send — loaded only from api/data (same bundle as welcome email). */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { previewAuthEmailHtml, sendAuthEmail } from './auth_email_send.js';
 
 export async function handleAuthEmailData(req: VercelRequest, res: VercelResponse) {
   const preview = typeof req.query.preview === 'string' ? req.query.preview : '';
   if (req.method === 'GET' && preview) {
     try {
-      const { previewAuthEmailHtml } = await import('./auth_email_send.js');
       const html = await previewAuthEmailHtml(preview);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       return res.status(200).send(html);
@@ -34,7 +34,6 @@ export async function handleAuthEmailSend(req: VercelRequest, res: VercelRespons
   }
 
   try {
-    const { sendAuthEmail } = await import('./auth_email_send.js');
     const result = await sendAuthEmail(payload);
     if (!result.ok) {
       return res.status(500).json({ error: result.error });

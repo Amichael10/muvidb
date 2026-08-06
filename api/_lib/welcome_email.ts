@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@react-email/render';
-import MuviDbWelcomeEmail from '../../emails/MuviDbWelcomeEmail';
+import MuviDbWelcomeEmail from '../../emails/MuviDbWelcomeEmail.js';
 import { getResend } from './resend.js';
 import { supabase } from './supabase.js';
 
