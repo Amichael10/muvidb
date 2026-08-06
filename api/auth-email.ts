@@ -10,12 +10,15 @@ export const config = {
   },
 };
 
-async function readRawBody(req: VercelRequest): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req as AsyncIterable<Buffer | string>) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  }
-  return Buffer.concat(chunks).toString('utf8');
+function readRawBody(req: VercelRequest): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer | string) => {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

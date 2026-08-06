@@ -1,24 +1,13 @@
 /**
- * Branded Supabase Auth emails via Resend — reuses MuviDbWelcomeEmail layout.
+ * Branded Supabase Auth emails via Resend — lightweight HTML (no React Email bundle).
  */
-import React from 'react';
-import { render } from '@react-email/render';
-import MuviDbWelcomeEmail from '../../emails/MuviDbWelcomeEmail';
 import { getResend, resendConfigured } from './resend.js';
-import { getHeroCollage, WELCOME_EMAIL_ASSETS, type WelcomeCollage } from './welcome_email.js';
 
 const SITE = 'https://muvidb.com';
+const LOGO = `${SITE}/images/MuviDB%20Brand/Black%20Wordmark.svg`;
+const ORANGE = '#FF5A1F';
 const DEFAULT_FROM = 'MuviDB Welcome <support@muvidb.com>';
 const DEFAULT_REPLY_TO = 'support@muvidb.com';
-const FALLBACK_POSTER = `${SITE}/images/film-placeholder.webp`;
-
-const COMPACT_COLLAGE: WelcomeCollage = {
-  featuredPerson: FALLBACK_POSTER,
-  actor: FALLBACK_POSTER,
-  filmmaker: FALLBACK_POSTER,
-  moviePoster: FALLBACK_POSTER,
-  productionStill: FALLBACK_POSTER,
-};
 
 export type AuthEmailAction =
   | 'signup'
@@ -44,6 +33,14 @@ export type AuthEmailPayload = {
     token_hash_new?: string;
   };
 };
+
+function esc(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 function firstNameFromUser(user: AuthEmailPayload['user']) {
   const meta = user.user_metadata || {};
@@ -72,73 +69,99 @@ function copyForAction(action: AuthEmailAction, firstName: string) {
     case 'signup':
       return {
         subject: 'Confirm your MuviDB account',
-        preview: 'Confirm your email to finish joining MuviDB.',
         eyebrow: 'CONFIRM YOUR EMAIL',
         headline: 'Almost there!',
         intro: `Hi ${firstName}, tap the button below to confirm your email and activate your MuviDB account.`,
         ctaLabel: 'Confirm email →',
-        compact: true,
       };
     case 'recovery':
       return {
         subject: 'Reset your MuviDB password',
-        preview: 'Reset your MuviDB password.',
         eyebrow: 'PASSWORD RESET',
         headline: 'Reset your password',
         intro: `Hi ${firstName}, we received a request to reset your password. If this was you, use the button below.`,
         ctaLabel: 'Reset password →',
-        compact: true,
       };
     case 'email_change':
       return {
         subject: 'Confirm your new email on MuviDB',
-        preview: 'Confirm your new MuviDB email address.',
         eyebrow: 'EMAIL CHANGE',
         headline: 'Confirm new email',
         intro: `Hi ${firstName}, confirm this change to update the email on your MuviDB account.`,
         ctaLabel: 'Confirm new email →',
-        compact: true,
       };
     case 'invite':
       return {
-        subject: 'You\'re invited to MuviDB',
-        preview: 'Accept your invitation to MuviDB.',
+        subject: "You're invited to MuviDB",
         eyebrow: 'INVITATION',
-        headline: 'You\'re invited',
+        headline: "You're invited",
         intro: `Hi ${firstName}, you've been invited to join MuviDB — the home of African cinema.`,
         ctaLabel: 'Accept invite →',
-        compact: true,
       };
     case 'magiclink':
       return {
         subject: 'Your MuviDB sign-in link',
-        preview: 'Sign in to MuviDB with this link.',
         eyebrow: 'SIGN IN',
         headline: 'Your sign-in link',
         intro: `Hi ${firstName}, use the button below to sign in to MuviDB. This link expires soon.`,
         ctaLabel: 'Sign in →',
-        compact: true,
       };
     default:
       return {
         subject: 'MuviDB account action',
-        preview: 'Complete your MuviDB account action.',
         eyebrow: 'MUVIDB',
         headline: 'Action required',
         intro: `Hi ${firstName}, use the button below to continue.`,
         ctaLabel: 'Continue →',
-        compact: true,
       };
   }
 }
 
-async function resolveCollage(compact: boolean): Promise<WelcomeCollage> {
-  if (compact) return COMPACT_COLLAGE;
-  try {
-    return await getHeroCollage();
-  } catch {
-    return COMPACT_COLLAGE;
-  }
+function renderAuthEmailHtml(opts: {
+  eyebrow: string;
+  headline: string;
+  intro: string;
+  ctaLabel: string;
+  actionUrl: string;
+}) {
+  const { eyebrow, headline, intro, ctaLabel, actionUrl } = opts;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MuviDB</title>
+</head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F3F4F6;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 32px 12px;">
+              <img src="${LOGO}" width="140" alt="MuviDB" style="display:block;border:0;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 32px 32px;">
+              <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:0.18em;color:${ORANGE};text-transform:uppercase;">${esc(eyebrow)}</p>
+              <h1 style="margin:0 0 16px;font-size:28px;line-height:1.15;color:#15171A;font-weight:800;">${esc(headline)}</h1>
+              <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#5F6368;">${esc(intro)}</p>
+              <a href="${esc(actionUrl)}" style="display:inline-block;background:${ORANGE};color:#FFFFFF;text-decoration:none;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;padding:14px 24px;border-radius:10px;">${esc(ctaLabel)}</a>
+              <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#5F6368;">If the button does not work, copy this link into your browser:<br /><a href="${esc(actionUrl)}" style="color:${ORANGE};word-break:break-all;">${esc(actionUrl)}</a></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px;background:#FFF9F5;border-top:1px solid #F0E8E2;">
+              <p style="margin:0;font-size:11px;color:#5F6368;">The <span style="color:${ORANGE};font-weight:700;">MuviDB</span> Team · <a href="${SITE}" style="color:${ORANGE};">muvidb.com</a></p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
 export async function sendAuthEmail(payload: AuthEmailPayload) {
@@ -150,38 +173,23 @@ export async function sendAuthEmail(payload: AuthEmailPayload) {
   if (!email) return { ok: false as const, error: 'Missing recipient email' };
 
   const firstName = firstNameFromUser(payload.user);
-  const action = payload.email_data.email_action_type;
+  const action = payload.email_data?.email_action_type || 'signup';
   const copy = copyForAction(action, firstName);
   const actionUrl = buildAuthActionUrl(payload);
 
+  if (!actionUrl.includes('/auth/v1/verify')) {
+    return { ok: false as const, error: 'Missing Supabase site_url for verify link' };
+  }
+
   const from = (process.env.RESEND_FROM_EMAIL || '').trim() || DEFAULT_FROM;
   const replyTo = (process.env.RESEND_REPLY_TO || '').trim() || DEFAULT_REPLY_TO;
-  const collage = await resolveCollage(copy.compact);
-
-  let html: string;
-  try {
-    html = await render(
-      React.createElement(MuviDbWelcomeEmail, {
-        firstName,
-        logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
-        exploreUrl: SITE,
-        helpUrl: `${SITE}/about`,
-        unsubscribeUrl: `${SITE}/dashboard`,
-        preview: copy.preview,
-        eyebrow: copy.eyebrow,
-        headline: copy.headline,
-        intro: copy.intro,
-        ctaLabel: copy.ctaLabel,
-        ctaUrl: actionUrl,
-        compact: copy.compact,
-        collage,
-        social: { ...WELCOME_EMAIL_ASSETS.social },
-      }),
-    );
-  } catch (err: any) {
-    console.error('[auth-email] render failed:', err?.message || err);
-    return { ok: false as const, error: `Email render failed: ${err?.message || err}` };
-  }
+  const html = renderAuthEmailHtml({
+    eyebrow: copy.eyebrow,
+    headline: copy.headline,
+    intro: copy.intro,
+    ctaLabel: copy.ctaLabel,
+    actionUrl,
+  });
 
   const resend = getResend()!;
   const { data, error } = await resend.emails.send({

@@ -68,6 +68,15 @@ export function getFriendlyErrorMessage(error) {
     return "An account with this email address already exists. Try signing in instead!";
   }
 
+  if (
+    message.includes('hook') ||
+    message.includes('confirmation email') ||
+    message.includes('error sending') ||
+    message.includes('email hook')
+  ) {
+    return "We couldn't send your confirmation email. Please try again in a few minutes, or contact support@muvidb.com if it keeps failing.";
+  }
+
   if (message.includes("password should be")) {
     return "Your password is too short. Please use a password with at least 6 characters.";
   }
