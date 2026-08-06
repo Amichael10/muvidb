@@ -90,11 +90,11 @@ export default function AdminLayout() {
                       visibleNavItems.find(item => location.pathname.startsWith(item.path));
 
   return (
-    <div className={`flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300`}>
+    <div className={`admin-workspace flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300`}>
       {/* Sidebar - Always Dark for Hybrid Look */}
       <aside 
-        className={`bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 h-screen sticky top-0 w-[64px] ${
-          isCollapsed ? 'md:w-[72px]' : 'md:w-[260px]'
+        className={`admin-sidebar bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 h-screen sticky top-0 w-[64px] ${
+          isCollapsed ? 'md:w-[72px]' : 'md:w-[284px]'
         }`}
       >
         {/* Toggle Button */}
@@ -126,7 +126,7 @@ export default function AdminLayout() {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 space-y-1 py-4 scrollbar-hide">
+        <nav className="admin-nav flex-1 overflow-y-auto px-3 space-y-1 py-4">
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
@@ -136,8 +136,8 @@ export default function AdminLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
                   isActive
-                    ? 'bg-brand/10 text-brand font-bold'
-                    : 'text-sidebar-text hover:bg-surface-2 hover:text-text-primary'
+                  ? 'bg-brand/10 text-brand font-bold shadow-[inset_3px_0_0_var(--color-brand)]'
+                    : 'text-sidebar-text hover:bg-sidebar-hover hover:text-text-primary'
                 } ${isCollapsed ? 'justify-center px-0' : 'justify-center md:justify-start'}`
               }
             >
@@ -198,7 +198,7 @@ export default function AdminLayout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header Bar */}
-        <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-3 md:px-8 flex-shrink-0 z-20">
+        <header className="admin-topbar h-16 bg-surface border-b border-border flex items-center justify-between px-3 md:px-6 flex-shrink-0 z-20">
           <div className="flex items-center gap-4">
             <h1 className="hidden sm:block text-lg font-bold text-text-primary tracking-tight">
               {currentPage?.label || 'Dashboard'}
@@ -292,8 +292,8 @@ export default function AdminLayout() {
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 min-w-0 overflow-y-auto p-3 md:p-10 custom-scrollbar relative">
-          <div className="max-w-[1600px] w-full mx-auto">
+        <main className="admin-content flex-1 min-w-0 overflow-y-auto p-3 md:p-6 xl:p-8 custom-scrollbar relative">
+          <div className="admin-main-inner w-full mx-auto">
             <Outlet />
           </div>
         </main>

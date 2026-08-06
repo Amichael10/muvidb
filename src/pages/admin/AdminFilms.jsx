@@ -1276,12 +1276,25 @@ export default function AdminFilms() {
 
 
   return (
-    <div className="p-4 md:p-8 lg:p-10 w-full max-w-full mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+    <div className="admin-page w-full max-w-full mx-auto space-y-6">
+      <div className="admin-page-header flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <p className="text-brand text-xs font-bold mb-1">Database</p>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Movies</h1>
           <p className="text-text-muted text-sm mt-1 font-medium">Manage and monitor the digital film library.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-text-muted">
+            <span className="rounded-md border border-border bg-surface-2 px-2.5 py-1">
+              {totalCount.toLocaleString()} records
+            </span>
+            <span className="rounded-md border border-border bg-surface-2 px-2.5 py-1">
+              {viewMode === 'library' ? 'Library' : 'YouTube buffer'}
+            </span>
+            {anyFilterActive && (
+              <span className="rounded-md border border-brand/25 bg-brand/10 px-2.5 py-1 text-brand">
+                Filters active
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
@@ -1311,8 +1324,8 @@ export default function AdminFilms() {
     </div>
 
       {/* Library Controls */}
-      <div className="flex flex-col gap-4 mb-8">
-        <div className="flex flex-col lg:flex-row gap-4 w-full">
+      <div className="admin-filter-card flex flex-col gap-4">
+        <div className="flex flex-col xl:flex-row gap-4 w-full">
           <div className="flex-1 relative group">
             <input
               type="text"
@@ -1379,7 +1392,7 @@ export default function AdminFilms() {
 
         {/* Advanced Filters (collapsible) */}
         {showAdvancedFilters && (
-        <div className="flex flex-wrap items-center gap-3 p-4 bg-surface-2/50 rounded-lg border border-border">
+        <div className="admin-filter-panel flex flex-wrap items-center gap-3">
           <div className="text-xs font-bold text-text-muted uppercase tracking-widest mr-2">Filters:</div>
 
           {/* Channel filter (searchable) */}
@@ -1513,7 +1526,7 @@ export default function AdminFilms() {
       </div>
 
       {selectedFilmIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 p-4 rounded-md bg-surface-2 border border-border">
+        <div className="admin-selection-bar flex flex-wrap items-center justify-between gap-3 p-4">
           <span className="text-sm text-text-primary font-bold">
             {selectedFilmIds.length} selected
           </span>
@@ -1539,9 +1552,9 @@ export default function AdminFilms() {
         </div>
       )}
 
-      <div className="card-cal overflow-hidden mb-12">
+      <div className="card-cal admin-table-card overflow-hidden mb-12">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left border-collapse">
+          <table className="admin-data-table w-full text-sm text-left border-collapse">
             <thead>
               <tr className="border-b border-border text-text-muted text-xs font-bold bg-surface-2/30">
                 <th className="pl-6 py-4 w-12">
@@ -1564,10 +1577,10 @@ export default function AdminFilms() {
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
-                <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">Loading records...</td></tr>
+                <tr><td colSpan="8" className="p-20 text-center text-text-muted italic">Loading records...</td></tr>
               ) : viewMode === 'library' ? (
                 films.length === 0 ? (
-                  <tr><td colSpan="5" className="p-20 text-center text-text-muted italic">No productions found in library.</td></tr>
+                  <tr><td colSpan="8" className="p-20 text-center text-text-muted italic">No productions found in library.</td></tr>
                 ) : films.map((film) => (
                   <tr key={film.id} className="group hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 py-4">
@@ -1585,7 +1598,7 @@ export default function AdminFilms() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <div className="font-bold text-text-primary text-sm truncate group-hover:text-brand transition-colors">{film.title}</div>
+                            <div className="font-bold text-text-primary text-sm leading-snug group-hover:text-brand transition-colors">{film.title}</div>
                             {film.is_featured && <Icon icon="solar:star-bold" className="w-3 h-3 text-brand" />}
                             {film.is_trending && <Icon icon="solar:fire-bold" className="w-3 h-3 text-amber-500" />}
                           </div>
@@ -1619,7 +1632,7 @@ export default function AdminFilms() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 min-w-[160px]">
                         {film.youtube_watch_url && (
                           <a href={film.youtube_watch_url} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white transition-all shadow-sm" title="YouTube Play Link">
                             <Icon icon="solar:play-circle-bold" className="w-5 h-5" />
@@ -1702,7 +1715,7 @@ export default function AdminFilms() {
                       </div>
                     </td>
                     <td className="pr-6 py-4 text-right">
-                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="admin-row-actions flex justify-end gap-1 transition-opacity">
                         <button
                           onClick={() => toggleFeatured(film)}
                           className={`p-2 hover:bg-surface rounded-lg transition-all border border-transparent hover:border-border hover:shadow-sm ${film.is_featured ? 'text-brand' : 'text-text-muted hover:text-brand'}`}
@@ -1730,7 +1743,7 @@ export default function AdminFilms() {
                 ))
               ) : (
                 youtubeVideos.length === 0 ? (
-                  <tr><td colSpan="6" className="p-20 text-center text-text-muted italic">No unmapped YouTube signals found.</td></tr>
+                  <tr><td colSpan="8" className="p-20 text-center text-text-muted italic">No unmapped YouTube signals found.</td></tr>
                 ) : youtubeVideos.map((vid) => (
                   <tr key={vid.id} className="group hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 py-4">
@@ -1742,7 +1755,7 @@ export default function AdminFilms() {
                           {vid.thumbnail_url && <img src={vid.thumbnail_url} alt="" className="w-full h-full object-cover" />}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-text-primary text-sm truncate group-hover:text-brand transition-colors">{vid.title}</p>
+                          <p className="font-bold text-text-primary text-sm leading-snug group-hover:text-brand transition-colors">{vid.title}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{vid.channels?.name || 'YouTube'}</p>
                             <span className="w-1 h-1 rounded-full bg-border"></span>
@@ -1763,7 +1776,7 @@ export default function AdminFilms() {
                        <div className="text-[10px] text-text-muted font-bold uppercase">{new Date(vid.published_at).toLocaleDateString()}</div>
                     </td>
                     <td className="pr-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="admin-row-actions flex justify-end gap-2 transition-opacity">
                            <button
                              onClick={() => {
                                setEditingFilm(null);

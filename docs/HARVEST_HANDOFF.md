@@ -111,6 +111,41 @@ Many round-trips were spent here. Confirmed facts:
   expect to iterate. `STOP_MARKERS` is the anti-advert guard (discards "coming soon",
   "subscribe", etc. so next-movie promos aren't mined as cast).
 
+## Dataset / localized Nollywood OCR note (2026-07-30)
+
+Owner wants to preserve the option of a localized Nollywood credit-roll extractor later.
+Do not jump straight to training OCR. The more realistic path is to build a labeled
+credit-layout dataset from the approval lane first.
+
+Capture/keep, when practical:
+- frame image or frame crop for the candidate row, especially rejected/edited rows;
+- OCR TSV/text with bounding boxes, confidence, frame index, and source video second;
+- parser guess: raw name, role/character, actor vs crew, layout mode;
+- reviewer decision: approved, rejected, deleted, corrected name, linked person, corrected
+  role/character, corrected type;
+- reason labels for common failures: subtitle/dialogue, promo/ad, role-as-name,
+  name+role merged, actor/character swapped, OCR misspelling, duplicate person.
+
+This gives three future options:
+1. improve rule-based parsing from real rejection/approval patterns;
+2. train a small line/layout classifier that sits after OCR;
+3. only later, if the OCR text itself is the bottleneck, evaluate PaddleOCR/custom OCR on
+   the saved Nollywood credit-frame corpus.
+
+Current lesson from `Ife Dun`: loose one-frame harvesting catches fast ensemble cards but
+can admit subtitles. The parser now needs credit-card context, not just "two words that
+look like a name." Keep examples like this; they are exactly the dataset we need.
+
+## Metadata extraction in the credit harvester (2026-08-04)
+
+The worker now also reads YouTube title/description metadata and writes text-only suggestions into `credit_metadata_candidates`: synopsis, release year, language, NFVCB age rating, and production company. This does not store video/images and does not call a paid LLM. Admin approval from `/admin/credits/harvest` applies the suggestion to `films` and links/creates a production company through `film_companies`.
+
+Actor/person matching on the review page and approval RPC already uses the shared order-insensitive `name_key` flow, so names like `Femi Adebayo` and `Adebayo Femi` resolve to the same existing profile when the tokens match.
+
+## Queue ordering in the credit harvester (2026-08-04, corrected 2026-08-05)
+
+Worker runs now match the frontend Recently Added order: newest `created_at` published YouTube movies first, then backward. The plain worker command auto-seeds missing jobs from the newest published YouTube films before claiming; `--enqueue-latest-sparse=N` can run that bounded seed manually. `--enqueue-sparse` walks YouTube films by `created_at desc`, all enqueue modes store a created-at priority, pending jobs refresh when they are requeued, and `claim_credit_harvest_job` only claims pending published YouTube-film jobs by that priority. The review pagination RPC uses the same film creation timestamp so the admin approval page follows the frontend order.
+
 ## Worker tools + gotchas (laptop)
 
 - Needs `yt-dlp`, `ffmpeg`, `tesseract` on PATH. PATH only refreshes in a NEW terminal
@@ -123,12 +158,26 @@ Many round-trips were spent here. Confirmed facts:
 
 ## Enqueue modes (once download+OCR confirmed)
 
-- `--enqueue-sparse` (default <4 credits) — **the main one**: only films that actually
+- `--enqueue-sparse` (default <4 credits) — **the main one**: newest-created published YouTube films that actually
   need enrichment (~33k YouTube films qualify).
 - `--enqueue-recon=3` — sample per channel to learn which channels even have rolls.
 - `--enqueue-popular=N` — top by views.
 - Then `npx tsx scripts/harvest_credits.ts --cookies=<path>` runs the worker loop
   (resumable; `outcome='no_credits'` is a valid result, not a failure).
+
+## Low-coverage second pass (2026-07-30)
+
+Do not discard harvested candidates just because a movie looks incomplete. Requeue the weak
+jobs and run an append-only second pass:
+
+```
+npx tsx scripts/harvest_credits.ts --requeue-low-coverage=12
+npx tsx scripts/harvest_credits.ts --format=18 --frame-every=1 --single-frame-min-ocr=0.65 --reharvest-existing --cookies="C:\Users\User\Downloads\Cookies.txt"
+```
+
+`--reharvest-existing` bypasses the old "pending candidates already exist" skip, but it
+deduplicates by name + role/character + credit type before inserting. Existing review rows
+stay intact; the second pass only appends genuinely new candidates.
 
 ## Other work parked on this same branch (NOT yet on main)
 

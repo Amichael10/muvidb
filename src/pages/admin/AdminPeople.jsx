@@ -640,50 +640,65 @@ export default function AdminPeople() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="admin-page space-y-6">
+      <div className="admin-page-header flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <p className="text-brand text-xs font-bold mb-1">Database</p>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">People</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-text-muted">
+            <span className="rounded-md border border-border bg-surface-2 px-2.5 py-1">
+              {totalCount.toLocaleString()} profiles
+            </span>
+            <span className="rounded-md border border-border bg-surface-2 px-2.5 py-1">
+              Page {page}
+            </span>
+            {debouncedSearch && (
+              <span className="rounded-md border border-brand/25 bg-brand/10 px-2.5 py-1 text-brand">
+                Search: {debouncedSearch}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleRecalculateScores} disabled={isRecalculating} className="bg-surface-2 border border-border px-4 py-2 rounded-lg text-xs font-bold text-text-primary hover:bg-surface-3 transition-colors">
+            <Icon icon="solar:refresh-linear" className="inline-block w-4 h-4 mr-1.5 align-[-3px]" />
             {isRecalculating ? 'Updating...' : 'Synchronize popularity'}
           </button>
           <button onClick={openAddDrawer} className="bg-brand text-white font-black px-6 py-2.5 rounded-xl text-xs hover:scale-[1.05] active:scale-[0.95] transition-all flex items-center gap-2 shadow-lg shadow-brand/20">
             <Icon icon="solar:plus-linear" className="text-lg" />
-            Add New Actor
+            Add person
           </button>
         </div>
       </div>
 
-      <div className="card-cal p-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2 relative">
+      <div className="admin-filter-card">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+          <div className="lg:col-span-4 relative">
+            <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
             <input
               type="text"
               placeholder="Search records..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
+              className="w-full bg-surface-2 border border-border rounded-md pl-10 pr-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
             />
           </div>
-          <select value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="All">All Status</option>
             <option value="Incomplete">Incomplete</option>
             <option value="Complete">Complete</option>
           </select>
-          <select value={spotlightFilter} onChange={(e) => setSpotlightFilter(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={spotlightFilter} onChange={(e) => setSpotlightFilter(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="All">Any Spotlight</option>
             <option value="Spotlight">Spotlight Only</option>
             <option value="Regular">Regular Only</option>
           </select>
-          <select value={verifiedFilter} onChange={(e) => setVerifiedFilter(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={verifiedFilter} onChange={(e) => setVerifiedFilter(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="All">Any Verification</option>
             <option value="Verified">Verified Only</option>
             <option value="Member">Members Only</option>
           </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="Recently Added">Recently Added</option>
             <option value="Most Popular">Most Popular</option>
             <option value="A-Z">Alphabetical (A-Z)</option>
@@ -694,7 +709,7 @@ export default function AdminPeople() {
       </div>
 
       {selectedPersonIds.length > 0 && (
-        <div className="flex items-center justify-between p-4 bg-brand/5 border border-brand/20 rounded-lg animate-in slide-in-from-top-2">
+        <div className="admin-selection-bar flex items-center justify-between p-4 animate-in slide-in-from-top-2">
           <span className="text-sm font-bold text-brand">{selectedPersonIds.length} profiles selected</span>
           <div className="flex gap-2">
             {selectedPersonIds.length >= 2 && (
@@ -705,8 +720,9 @@ export default function AdminPeople() {
         </div>
       )}
 
-      <div className="card-cal p-0 overflow-hidden">
-        <table className="w-full text-left">
+      <div className="card-cal admin-table-card p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="admin-data-table w-full text-left">
           <thead>
             <tr className="border-b border-border text-[10px] font-bold text-text-muted bg-surface-2/30 uppercase tracking-wider">
               <th className="px-6 py-5 w-12"><input type="checkbox" onChange={toggleSelectAllFilteredPeople} checked={people.length > 0 && people.every(p => selectedPersonIds.includes(p.id))} className="rounded border-border bg-surface-3 text-brand focus:ring-brand accent-brand" /></th>
@@ -731,7 +747,7 @@ export default function AdminPeople() {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     {p.photo_url ? <img src={p.photo_url} className="w-10 h-10 rounded object-cover shadow-sm grayscale group-hover:grayscale-0 transition-all" /> : <div className="w-10 h-10 rounded bg-surface-2 flex items-center justify-center text-[10px] font-bold text-text-muted">?</div>}
-                    <div>
+                    <div className="min-w-0 max-w-xl">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-text-primary block leading-tight">{formatPersonName(p.name)}</span>
                         {p.is_spotlight && (
@@ -764,7 +780,7 @@ export default function AdminPeople() {
                   </span>
                 </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="admin-row-actions flex justify-end gap-2">
                       <button 
                         onClick={() => handleToggleSpotlight(p)} 
                         className={`p-2 rounded-lg transition-all border border-transparent hover:border-border hover:shadow-sm ${p.is_spotlight ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted hover:text-brand'}`}
@@ -780,6 +796,7 @@ export default function AdminPeople() {
             ))}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination Footer */}
           {(() => {

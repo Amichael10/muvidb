@@ -74,6 +74,12 @@ export default defineConfig(({ mode, isSsrBuild }) => {
     server: {
       port: 3001,
       host: '0.0.0.0',
+      // Harvest workers append progress continuously. Keeping those files out
+      // of Vite's watcher prevents the approval UI from being starved by
+      // needless rescans while multiple workers are active.
+      watch: {
+        ignored: ['**/.codex-harvest-worker-*.log'],
+      },
       proxy: {
         // In production, /storage is reverse-proxied to Supabase via vercel.json.
         // Mirror that locally so relative storage paths (from getProxiedImageUrl)
