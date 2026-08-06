@@ -1,21 +1,17 @@
 /**
- * Branded Supabase Auth emails via Resend — uses MuviDbWelcomeEmail template.
+ * Auth confirm / reset email render + send — must run via api/data bundle (TSX).
  */
 import { getResend, resendConfigured } from './resend.js';
-import { getHeroCollage, WELCOME_EMAIL_ASSETS, type WelcomeCollage } from './welcome_email.js';
+import {
+  FALLBACK_COLLAGE,
+  SITE_URL,
+  WELCOME_EMAIL_ASSETS,
+  type WelcomeCollage,
+} from './email_assets.js';
+import { renderBrandedEmail } from './branded_email_render.js';
 
-const SITE = 'https://muvidb.com';
 const DEFAULT_FROM = 'MuviDB Welcome <support@muvidb.com>';
 const DEFAULT_REPLY_TO = 'support@muvidb.com';
-const FALLBACK_POSTER = `${SITE}/images/film-placeholder.webp';
-
-const FALLBACK_COLLAGE: WelcomeCollage = {
-  featuredPerson: FALLBACK_POSTER,
-  actor: FALLBACK_POSTER,
-  filmmaker: FALLBACK_POSTER,
-  moviePoster: FALLBACK_POSTER,
-  productionStill: FALLBACK_POSTER,
-};
 
 export type AuthEmailAction =
   | 'signup'
@@ -51,11 +47,10 @@ function firstNameFromUser(user: AuthEmailPayload['user']) {
   return raw.trim().split(/\s+/).filter(Boolean)[0] || 'there';
 }
 
-/** Supabase verify link — same shape as built-in confirm / recovery templates. */
 export function buildAuthActionUrl(payload: AuthEmailPayload): string {
   const { email_data: d } = payload;
   const base = (d.site_url || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-  const redirect = d.redirect_to || SITE;
+  const redirect = d.redirect_to || SITE_URL;
   const params = new URLSearchParams({
     token: d.token_hash,
     type: d.email_action_type,
@@ -84,33 +79,6 @@ function copyForAction(action: AuthEmailAction, firstName: string) {
         intro: `Hi ${firstName}, we received a request to reset your password. If this was you, use the button below.`,
         ctaLabel: 'Reset password →',
       };
-    case 'email_change':
-      return {
-        subject: 'Confirm your new email on MuviDB',
-        preview: 'Confirm your new MuviDB email address.',
-        eyebrow: 'EMAIL CHANGE',
-        headline: 'Confirm new email',
-        intro: `Hi ${firstName}, confirm this change to update the email on your MuviDB account.`,
-        ctaLabel: 'Confirm new email →',
-      };
-    case 'invite':
-      return {
-        subject: "You're invited to MuviDB",
-        preview: 'Accept your invitation to MuviDB.',
-        eyebrow: 'INVITATION',
-        headline: "You're invited",
-        intro: `Hi ${firstName}, you've been invited to join MuviDB — the home of African cinema.`,
-        ctaLabel: 'Accept invite →',
-      };
-    case 'magiclink':
-      return {
-        subject: 'Your MuviDB sign-in link',
-        preview: 'Sign in to MuviDB with this link.',
-        eyebrow: 'SIGN IN',
-        headline: 'Your sign-in link',
-        intro: `Hi ${firstName}, use the button below to sign in to MuviDB. This link expires soon.`,
-        ctaLabel: 'Sign in →',
-      };
     default:
       return {
         subject: 'MuviDB account action',
@@ -125,13 +93,14 @@ function copyForAction(action: AuthEmailAction, firstName: string) {
 
 async function resolveCollage(): Promise<WelcomeCollage> {
   try {
+    const { getHeroCollage } = await import('./welcome_email.js');
     return await getHeroCollage();
   } catch {
     return FALLBACK_COLLAGE;
   }
 }
 
-function emailPropsForAction(
+function emailProps(
   action: AuthEmailAction,
   firstName: string,
   actionUrl: string,
@@ -141,9 +110,9 @@ function emailPropsForAction(
   return {
     firstName,
     logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
-    exploreUrl: SITE,
-    helpUrl: `${SITE}/about`,
-    unsubscribeUrl: `${SITE}/dashboard`,
+    exploreUrl: SITE_URL,
+    helpUrl: `${SITE_URL}/about`,
+    unsubscribeUrl: `${SITE_URL}/dashboard`,
     preview: copy.preview,
     eyebrow: copy.eyebrow,
     headline: copy.headline,
@@ -156,27 +125,12 @@ function emailPropsForAction(
   };
 }
 
-/** Preview in browser: GET /api/auth-email?preview=signup */
+/** GET /api/data?_r=auth-email&preview=signup */
 export async function previewAuthEmailHtml(action: AuthEmailAction = 'signup') {
-  const { renderBrandedEmail } = await import('./branded_email_render.js');
-  const copy = copyForAction(action, 'there');
   const collage = await resolveCollage();
-  return renderBrandedEmail({
-    firstName: 'there',
-    logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
-    exploreUrl: SITE,
-    helpUrl: `${SITE}/about`,
-    unsubscribeUrl: `${SITE}/dashboard`,
-    preview: copy.preview,
-    eyebrow: copy.eyebrow,
-    headline: copy.headline,
-    intro: copy.intro,
-    ctaLabel: copy.ctaLabel,
-    ctaUrl: `${SITE}/auth/confirmed`,
-    compact: true,
-    collage,
-    social: { ...WELCOME_EMAIL_ASSETS.social },
-  });
+  return renderBrandedEmail(
+    emailProps(action, 'there', `${SITE_URL}/auth/confirmed`, collage),
+  );
 }
 
 export async function sendAuthEmail(payload: AuthEmailPayload) {
@@ -202,9 +156,8 @@ export async function sendAuthEmail(payload: AuthEmailPayload) {
 
   let html: string;
   try {
-    const { renderBrandedEmail } = await import('./branded_email_render.js');
     html = await renderBrandedEmail(
-      emailPropsForAction(action, firstName, actionUrl, collage),
+      emailProps(action, firstName, actionUrl, collage),
     );
   } catch (err: any) {
     console.error('[auth-email] render failed:', err?.message || err);

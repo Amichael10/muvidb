@@ -35,8 +35,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleWelcomeEmail(req, res);
     }
     if (key === 'auth-email') {
-      const { handleAuthEmailHook } = await import('./_lib/auth_email_handler.js');
-      return handleAuthEmailHook(req, res);
+      const { handleAuthEmailData } = await import('./_lib/auth_email_handler.js');
+      return handleAuthEmailData(req, res);
+    }
+    if (key === 'auth-email-send') {
+      const { handleAuthEmailSend } = await import('./_lib/auth_email_handler.js');
+      return handleAuthEmailSend(req, res);
     }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
