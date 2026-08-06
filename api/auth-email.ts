@@ -3,7 +3,6 @@
  * URL: https://muvidb.com/api/auth-email
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleAuthEmailHook } from './_lib/auth_email_handler.js';
 
 export const config = {
   api: {
@@ -20,9 +19,18 @@ async function readRawBody(req: VercelRequest): Promise<string> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === 'POST') {
-    const raw = await readRawBody(req);
-    (req as VercelRequest & { body: string }).body = raw;
+  try {
+    const { handleAuthEmailHook } = await import('./_lib/auth_email_handler.js');
+    if (req.method === 'POST') {
+      const raw = await readRawBody(req);
+      (req as VercelRequest & { body: string }).body = raw;
+    }
+    return handleAuthEmailHook(req, res);
+  } catch (err: any) {
+    console.error('[auth-email] handler failed:', err?.message || err);
+    return res.status(500).json({
+      error: 'auth-email failed',
+      message: err?.message || String(err),
+    });
   }
-  return handleAuthEmailHook(req, res);
 }

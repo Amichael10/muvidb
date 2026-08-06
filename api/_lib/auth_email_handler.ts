@@ -6,8 +6,6 @@
  * Secret env: SEND_EMAIL_HOOK_SECRET (v1,whsec_… from Supabase)
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyStandardWebhook } from './standard_webhook.js';
-import { sendAuthEmail, type AuthEmailPayload } from './auth_email.js';
 import { resendConfigured } from './resend.js';
 
 function hookSecret(): string | null {
@@ -49,20 +47,22 @@ export async function handleAuthEmailHook(req: VercelRequest, res: VercelRespons
     Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v ?? '']),
   );
 
-  let verified: AuthEmailPayload;
   try {
-    verified = verifyStandardWebhook(payloadText, headers, secret) as AuthEmailPayload;
-  } catch (err: any) {
-    console.warn('[auth-email] webhook verify failed:', err?.message || err);
-    return res.status(401).json({ error: 'Invalid hook signature' });
-  }
+    const { verifyStandardWebhook } = await import('./standard_webhook.js');
+    const { sendAuthEmail } = await import('./auth_email.js');
 
-  try {
+    let verified: import('./auth_email.js').AuthEmailPayload;
+    try {
+      verified = verifyStandardWebhook(payloadText, headers, secret) as import('./auth_email.js').AuthEmailPayload;
+    } catch (err: any) {
+      console.warn('[auth-email] webhook verify failed:', err?.message || err);
+      return res.status(401).json({ error: 'Invalid hook signature' });
+    }
+
     const result = await sendAuthEmail(verified);
     if (!result.ok) {
       return res.status(500).json({ error: result.error });
     }
-    // Supabase expects 200 — body can be empty JSON
     return res.status(200).json({ success: true, emailId: result.emailId, action: result.action });
   } catch (err: any) {
     console.error('[auth-email]', err?.message || err);

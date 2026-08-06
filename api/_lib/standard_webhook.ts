@@ -2,7 +2,7 @@
  * Minimal Standard Webhooks verifier (Supabase Auth Send Email hook).
  * https://github.com/standard-webhooks/standard-webhooks
  */
-import crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 const TOLERANCE_SEC = 5 * 60;
 
