@@ -20,7 +20,9 @@ const readHeader = (headers: any, name: string): string | undefined => {
 
 export function clientIp(req: any): string {
   const headers = req?.headers;
-  let ip = readHeader(headers, 'x-real-ip')?.trim();
+  // Cloudflare sets the real client IP in cf-connecting-ip.
+  let ip = readHeader(headers, 'cf-connecting-ip')?.trim()
+    || readHeader(headers, 'x-real-ip')?.trim();
   if (!ip) {
     const forwarded = readHeader(headers, 'x-forwarded-for') ?? '';
     const hops = forwarded.split(',').map((h: string) => h.trim()).filter(Boolean);
