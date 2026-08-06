@@ -750,7 +750,7 @@ export default function AdminCreditsExtractor() {
         {/* Left Panel: Film Selection & Upload */}
         <div className="space-y-6 lg:col-span-1">
           {/* Film Selection Card */}
-          <div className={`card-cal p-6 space-y-4 relative ${isFilmDropdownOpen ? 'z-30' : 'z-10'}`}>
+          <div className={`card-cal !overflow-visible p-6 space-y-4 relative ${isFilmDropdownOpen ? 'z-30' : 'z-10'}`}>
             <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">1. Select Target Film</h3>
             
             <div className="relative" ref={filmDropdownRef}>
