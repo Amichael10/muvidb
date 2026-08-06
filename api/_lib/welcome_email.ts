@@ -1,6 +1,8 @@
 import React from 'react';
 import { render } from '@react-email/render';
-import MuviDbWelcomeEmail from './MuviDbWelcomeEmail.js';
+// Precompiled by scripts/build_email_templates.mjs (prebuild). @vercel/node does
+// not bundle raw .tsx into the lambda, so we import the generated .js sibling.
+import MuviDbWelcomeEmail from './MuviDbWelcomeEmail.generated.js';
 import { getResend } from './resend.js';
 import { supabase } from './supabase.js';
 
