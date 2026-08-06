@@ -354,8 +354,8 @@ const ReviewSection = ({ filmId, currentUser }) => {
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-6">
                 <div>
-                    <h3 className="text-text-primary text-2xl font-bold tracking-tight">
-                        User Reviews
+                    <h3 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none">
+                        Reviews
                     </h3>
                     <p className="text-text-muted text-xs font-bold tracking-wide mt-1.5 flex items-center gap-2">
                         {reviews.length} User Review{reviews.length !== 1 ? 's' : ''} 

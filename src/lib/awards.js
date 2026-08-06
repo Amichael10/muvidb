@@ -6,6 +6,20 @@ import { supabase } from './supabase';
  */
 export const AWARD_ORGS = [
   {
+    id: 'YOMAFA',
+    label: 'YOMAFA',
+    full: 'Yomafa Global Awards',
+    accent: '#FAB80F',
+    about:
+      'Pan-African showbiz honours spanning film, music, media and culture — audience voting across dozens of categories each season.',
+    when:
+      'Season 18 (2026) voting is live on yomafaglobal.com. Past seasons are archived by the organisers.',
+    submissions:
+      'Nominees are registered through the Yomafa platform during the open nomination window each season.',
+    submitUrl: 'https://yomafaglobal.com/',
+    submitLabel: 'Yomafa Global Awards',
+  },
+  {
     id: 'AMVCA',
     label: 'AMVCA',
     full: 'Africa Magic Viewers’ Choice Awards',
@@ -53,6 +67,7 @@ function normOrg(raw) {
   const s = String(raw || '').trim();
   if (!s) return 'Other';
   const upper = s.toUpperCase();
+  if (upper.includes('YOMAFA') || upper.includes('YOMAFA GLOBAL')) return 'YOMAFA';
   if (upper.includes('AMVCA') || upper.includes('AFRICA MAGIC')) return 'AMVCA';
   if (upper.includes('AMAA') || upper.includes('AFRICA MOVIE ACADEMY')) return 'AMAA';
   if (upper.includes('TINFF') || upper.includes('INDUSTRY NOLLYWOOD')) return 'TINFF';

@@ -9,6 +9,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import PageHeader from '../components/ui/PageHeader';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { NFVCB_RATING_OPTIONS } from '../lib/contributions';
+import { AFRICAN_COUNTRY_NAMES } from '../utils/africanCountries';
 
 export default function Browse() {
   const [searchParams] = useSearchParams();
@@ -26,7 +27,7 @@ export default function Browse() {
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [films, setFilms] = useState(loaderData?.films ?? []);
   const [dbGenres, setDbGenres] = useState([]);
-  const [dbCountries, setDbCountries] = useState([]);
+  const [dbCountries, setDbCountries] = useState(AFRICAN_COUNTRY_NAMES);
   // Starts false when seeded, otherwise the server would render the skeleton and
   // SSR would buy us nothing.
   const [loading, setLoading] = useState(!seeded);
@@ -43,8 +44,10 @@ export default function Browse() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [genresExpanded, setGenresExpanded] = useState(false);
+  const [countriesExpanded, setCountriesExpanded] = useState(!!initialCountry && initialCountry !== 'Nigeria');
   const activeTab = 'movie';
   const GENRE_PREVIEW = 10;
+  const COUNTRY_PREVIEW = 8;
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: currentYear - 1979 }, (_, i) => currentYear - i);
 
@@ -78,15 +81,17 @@ export default function Browse() {
     try {
       const [genresRes, countriesRes] = await Promise.all([
         supabase.from('genres').select('name').order('name'),
-        supabase.from('countries').select('name').eq('name', 'Nigeria').order('name')
+        supabase.from('countries').select('name').eq('continent', 'Africa').order('name')
       ]);
       if (genresRes.error) throw genresRes.error;
       if (countriesRes.error) throw countriesRes.error;
       
       setDbGenres((genresRes.data || []).map(g => g.name));
-      setDbCountries((countriesRes.data || []).map(c => c.name));
+      const names = (countriesRes.data || []).map(c => c.name);
+      setDbCountries(names.length ? names : AFRICAN_COUNTRY_NAMES);
     } catch (err) {
       console.error('Error fetching filters:', err);
+      setDbCountries(AFRICAN_COUNTRY_NAMES);
     }
   };
   
@@ -215,6 +220,20 @@ export default function Browse() {
 
   const visibleGenres = genresExpanded ? dbGenres : dbGenres.slice(0, GENRE_PREVIEW);
   const hiddenGenreCount = Math.max(0, dbGenres.length - GENRE_PREVIEW);
+  // Keep Nigeria first when collapsed; still include any selected countries in the preview.
+  const orderedCountries = (() => {
+    const rest = dbCountries.filter((c) => c !== 'Nigeria');
+    return dbCountries.includes('Nigeria') ? ['Nigeria', ...rest] : dbCountries;
+  })();
+  const countryPreview = (() => {
+    const preview = orderedCountries.slice(0, COUNTRY_PREVIEW);
+    for (const c of selectedCountries) {
+      if (!preview.includes(c)) preview.push(c);
+    }
+    return preview;
+  })();
+  const visibleCountries = countriesExpanded ? orderedCountries : countryPreview;
+  const hiddenCountryCount = Math.max(0, orderedCountries.length - COUNTRY_PREVIEW);
 
   return (
     <div className="min-h-screen bg-bg">
@@ -295,7 +314,7 @@ export default function Browse() {
             <div className="space-y-6">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Countries</h4>
               <div className="space-y-3">
-                {dbCountries.map(country => (
+                {visibleCountries.map(country => (
                   <label key={country} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleCountry(country)}>
                     <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedCountries.includes(country) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
                       {selectedCountries.includes(country) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -304,6 +323,15 @@ export default function Browse() {
                   </label>
                 ))}
               </div>
+              {hiddenCountryCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCountriesExpanded((v) => !v)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand hover:underline"
+                >
+                  {countriesExpanded ? 'Show less' : `${hiddenCountryCount}+ more`}
+                </button>
+              )}
             </div>
 
             <div className="space-y-4">

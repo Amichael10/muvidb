@@ -127,23 +127,44 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="mt-16 flex flex-col gap-5 border-t border-hairline pt-8 md:flex-row md:items-center md:justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-text-muted">
-            Copyright {new Date().getFullYear()} MuviDB Database. All rights reserved.
-          </p>
+        <div className="mt-16 space-y-6 border-t border-hairline pt-8">
+          <a
+            href="https://www.themoviedb.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex max-w-xl flex-col gap-3 sm:flex-row sm:items-center"
+            aria-label="The Movie Database — opens in a new tab"
+          >
+            <img
+              src="/images/attribution/tmdb-logo.svg"
+              alt=""
+              className="h-7 w-auto opacity-80 transition-opacity group-hover:opacity-100"
+              width="140"
+              height="30"
+            />
+            <p className="text-[11px] leading-relaxed text-text-muted">
+              This product uses the TMDB API but is not endorsed or certified by TMDB.
+            </p>
+          </a>
 
-          <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-text-muted">
-            <Link to="/terms" className="transition-colors hover:text-brand">Terms</Link>
-            <span className="text-border">|</span>
-            <Link to="/privacy" className="transition-colors hover:text-brand">Privacy</Link>
-            <span className="text-border">|</span>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new Event('open-cookie-consent'))}
-              className="uppercase tracking-[0.18em] transition-colors hover:text-brand"
-            >
-              Cookie Settings
-            </button>
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-text-muted">
+              Copyright {new Date().getFullYear()} MuviDB Database. All rights reserved.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-[0.18em] text-text-muted">
+              <Link to="/terms" className="transition-colors hover:text-brand">Terms</Link>
+              <span className="text-border">|</span>
+              <Link to="/privacy" className="transition-colors hover:text-brand">Privacy</Link>
+              <span className="text-border">|</span>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event('open-cookie-consent'))}
+                className="uppercase tracking-[0.18em] transition-colors hover:text-brand"
+              >
+                Cookie Settings
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -461,6 +461,36 @@ export default function About() {
               and visibility for African film.
             </p>
           </Section>
+
+          <Section index={11} title="Data attribution">
+            <p>
+              Some catalogue metadata and images are sourced via{' '}
+              <a
+                href="https://www.themoviedb.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-brand hover:underline"
+              >
+                The Movie Database (TMDB)
+              </a>
+              . This product uses the TMDB API but is not endorsed or certified by TMDB.
+            </p>
+            <a
+              href="https://www.themoviedb.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center"
+              aria-label="The Movie Database — opens in a new tab"
+            >
+              <img
+                src="/images/attribution/tmdb-logo.svg"
+                alt="TMDB"
+                className="h-8 w-auto opacity-90"
+                width="160"
+                height="35"
+              />
+            </a>
+          </Section>
         </div>
 
         {/* ── Closing statement ────────────────────────────────── */}

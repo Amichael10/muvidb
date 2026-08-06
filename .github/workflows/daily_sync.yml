@@ -6,6 +6,8 @@ on:
     - cron: '0 5 * * *'
     # YouTube Sync: 3 times a day (every 8 hours)
     - cron: '0 */8 * * *'
+    # YouTube upload watch (Telegram alert before auto-import): every 2 hours
+    - cron: '0 */2 * * *'
     # 10:00 AM WAT (UTC+1) = 9:00 AM UTC (TMDB/Kava - Daily)
     - cron: '0 9 * * *'
     # AI Maintenance: Twice a day (every 12 hours)
@@ -26,6 +28,7 @@ on:
           - all
           - showtimes
           - videos
+          - youtube_watch
           - comments
           - tmdb
           - feed_kappa
@@ -153,6 +156,24 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
 
+      - name: Watch YouTube Uploads (Telegram, every 2 hours)
+        if: github.event.schedule == '0 */2 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'youtube_watch')
+        run: |
+          echo "Watching YouTube channels for new uploads..."
+          npx tsx scripts/youtube_upload_watch.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
+          VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
+          YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
+          YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
+          YOUTUBE_API_KEY_4: ${{ secrets.YOUTUBE_API_KEY_4 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
       - name: Sync YouTube Videos (Every 8 Hours)
         if: github.event.schedule == '0 */8 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'videos'))
         run: |
@@ -168,6 +189,8 @@ jobs:
           YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
           YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
           YOUTUBE_API_KEY_4: ${{ secrets.YOUTUBE_API_KEY_4 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           # AI keys (rotation) for inline film enrichment: title cleanup, cast +

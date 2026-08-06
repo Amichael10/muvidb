@@ -17,6 +17,7 @@ import ShareAction from '../components/ui/ShareAction'
 import ImageWithFallback from '../components/ui/ImageWithFallback'
 import { slugOrId } from '../utils/slug'
 import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatDateOfBirth } from '../utils/format'
+import { nationalityToCountryName } from '../utils/africanCountries'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -592,9 +593,20 @@ const PersonDetail = () => {
               )}
 
               <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
-                {person.nationality && (
-                  <span className="text-text-muted">Nationality: {toTitleCase(person.nationality)}</span>
-                )}
+                {person.nationality && (() => {
+                  const countryName = nationalityToCountryName(person.nationality);
+                  const label = toTitleCase(person.nationality);
+                  return countryName ? (
+                    <Link
+                      to={`/browse?country=${encodeURIComponent(countryName)}`}
+                      className="text-text-muted hover:text-brand transition-colors"
+                    >
+                      Nationality: <span className="underline underline-offset-2 decoration-border hover:decoration-brand">{label}</span>
+                    </Link>
+                  ) : (
+                    <span className="text-text-muted">Nationality: {label}</span>
+                  );
+                })()}
                 {person.date_of_birth && (
                   <span className="text-text-muted">
                     Born: {formatDateOfBirth(person.date_of_birth)}

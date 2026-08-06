@@ -42,6 +42,9 @@ function helpText() {
     '/blocked — list blocked IPs',
     '/help — this message',
     '',
+    'YouTube: new film-length uploads alert here before auto-import.',
+    'Use Hide on the alert to skip a video on the next sync.',
+    '',
     'Tip: browse muvidb.com, then /hits to find your home IP → /allow <ip>',
   ].join('\n');
 }
@@ -215,6 +218,38 @@ async function handleCallback(query: any) {
       await reply(
         chatId,
         result.ok ? `✅ Allowlisted ${ip}` : `Failed to allow ${ip}: ${result.error}`,
+      );
+    }
+    return;
+  }
+
+  if (data.startsWith('hide_yt:')) {
+    const parts = data.slice('hide_yt:'.length).split(':');
+    const channelId = parts[0]?.trim();
+    const videoId = parts.slice(1).join(':').trim();
+    if (!channelId || !videoId) {
+      await answerTelegramCallback(callbackId, 'Invalid hide payload');
+      return;
+    }
+    const { error } = await supabase
+      .from('channel_videos')
+      .upsert(
+        {
+          channel_id: channelId,
+          video_id: videoId,
+          title: '(hidden via Telegram)',
+          is_hidden: true,
+          match_status: 'rejected',
+        },
+        { onConflict: 'channel_id,video_id' },
+      );
+    await answerTelegramCallback(callbackId, error ? 'Hide failed' : 'Hidden — sync will skip');
+    if (chatId) {
+      await reply(
+        chatId,
+        error
+          ? `Failed to hide ${videoId}: ${error.message}`
+          : `🙈 Hidden ${videoId}. It will not auto-import on the next sync.`,
       );
     }
     return;

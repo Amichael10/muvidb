@@ -19,6 +19,7 @@ import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { useMemo } from 'react';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { AFRICAN_NATIONALITIES } from '../../utils/africanCountries';
 
 export default function AdminPeople() {
   const { user } = useAuth();
@@ -1005,12 +1006,19 @@ export default function AdminPeople() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-text-primary mb-2">Nationality</label>
-                  <input 
-                    value={formData.nationality} 
-                    onChange={e => setFormData({...formData, nationality: e.target.value})} 
-                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
-                    placeholder="e.g. Nigerian" 
-                  />
+                  <select
+                    value={formData.nationality || ''}
+                    onChange={e => setFormData({...formData, nationality: e.target.value})}
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none"
+                  >
+                    <option value="">Select nationality</option>
+                    {formData.nationality && !AFRICAN_NATIONALITIES.includes(formData.nationality) && (
+                      <option value={formData.nationality}>{formData.nationality}</option>
+                    )}
+                    {AFRICAN_NATIONALITIES.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>
