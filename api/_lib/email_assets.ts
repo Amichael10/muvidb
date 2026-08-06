@@ -1,7 +1,7 @@
 const SITE = 'https://muvidb.com';
 
 export const WELCOME_EMAIL_ASSETS = {
-  logoUrl: `${SITE}/images/MuviDB%20Brand/Black%20Wordmark.svg`,
+  logoUrl: `${SITE}/images/MuviDB%20Brand/Wordmark.png`,
   social: {
     instagram: 'https://www.instagram.com/muvidb_/',
     x: 'https://twitter.com/muvidb_',
