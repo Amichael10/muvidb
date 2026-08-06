@@ -8,9 +8,17 @@ import { getResend, resendConfigured } from './resend.js';
 import { getHeroCollage, WELCOME_EMAIL_ASSETS, type WelcomeCollage } from './welcome_email.js';
 
 const SITE = 'https://muvidb.com';
-const DEFAULT_FROM = 'MuviDB <support@muvidb.com>';
+const DEFAULT_FROM = 'MuviDB Welcome <support@muvidb.com>';
 const DEFAULT_REPLY_TO = 'support@muvidb.com';
 const FALLBACK_POSTER = `${SITE}/images/film-placeholder.webp`;
+
+const COMPACT_COLLAGE: WelcomeCollage = {
+  featuredPerson: FALLBACK_POSTER,
+  actor: FALLBACK_POSTER,
+  filmmaker: FALLBACK_POSTER,
+  moviePoster: FALLBACK_POSTER,
+  productionStill: FALLBACK_POSTER,
+};
 
 export type AuthEmailAction =
   | 'signup'
@@ -124,17 +132,12 @@ function copyForAction(action: AuthEmailAction, firstName: string) {
   }
 }
 
-async function resolveCollage(): Promise<WelcomeCollage> {
+async function resolveCollage(compact: boolean): Promise<WelcomeCollage> {
+  if (compact) return COMPACT_COLLAGE;
   try {
     return await getHeroCollage();
   } catch {
-    return {
-      featuredPerson: FALLBACK_POSTER,
-      actor: FALLBACK_POSTER,
-      filmmaker: FALLBACK_POSTER,
-      moviePoster: FALLBACK_POSTER,
-      productionStill: FALLBACK_POSTER,
-    };
+    return COMPACT_COLLAGE;
   }
 }
 
@@ -153,26 +156,32 @@ export async function sendAuthEmail(payload: AuthEmailPayload) {
 
   const from = (process.env.RESEND_FROM_EMAIL || '').trim() || DEFAULT_FROM;
   const replyTo = (process.env.RESEND_REPLY_TO || '').trim() || DEFAULT_REPLY_TO;
-  const collage = await resolveCollage();
+  const collage = await resolveCollage(copy.compact);
 
-  const html = await render(
-    React.createElement(MuviDbWelcomeEmail, {
-      firstName,
-      logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
-      exploreUrl: SITE,
-      helpUrl: `${SITE}/about`,
-      unsubscribeUrl: `${SITE}/dashboard`,
-      preview: copy.preview,
-      eyebrow: copy.eyebrow,
-      headline: copy.headline,
-      intro: copy.intro,
-      ctaLabel: copy.ctaLabel,
-      ctaUrl: actionUrl,
-      compact: copy.compact,
-      collage,
-      social: { ...WELCOME_EMAIL_ASSETS.social },
-    }),
-  );
+  let html: string;
+  try {
+    html = await render(
+      React.createElement(MuviDbWelcomeEmail, {
+        firstName,
+        logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
+        exploreUrl: SITE,
+        helpUrl: `${SITE}/about`,
+        unsubscribeUrl: `${SITE}/dashboard`,
+        preview: copy.preview,
+        eyebrow: copy.eyebrow,
+        headline: copy.headline,
+        intro: copy.intro,
+        ctaLabel: copy.ctaLabel,
+        ctaUrl: actionUrl,
+        compact: copy.compact,
+        collage,
+        social: { ...WELCOME_EMAIL_ASSETS.social },
+      }),
+    );
+  } catch (err: any) {
+    console.error('[auth-email] render failed:', err?.message || err);
+    return { ok: false as const, error: `Email render failed: ${err?.message || err}` };
+  }
 
   const resend = getResend()!;
   const { data, error } = await resend.emails.send({

@@ -4,6 +4,12 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 async function readRawBody(req: VercelRequest): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req as AsyncIterable<Buffer | string>) {
