@@ -61,6 +61,34 @@ export const AWARD_ORGS = [
     submitUrl: null,
     submitLabel: null,
   },
+  {
+    id: 'GOLDEN_STARS',
+    label: 'Golden Stars',
+    full: 'Golden Stars Awards',
+    accent: '#F59E0B',
+    about:
+      'Annual African entertainment and industry honours recognizing excellence across acting, Nollywood performances, music, and media personalities in Lagos, Nigeria.',
+    when:
+      'Annual ceremony held mid-year in Lagos. Past winners include prominent Nollywood actors, producers, and entertainment leaders.',
+    submissions:
+      'Nominees are registered and accredited via the official Golden Stars Awards platform.',
+    submitUrl: 'https://goldenstarsaward.com/',
+    submitLabel: 'Golden Stars Portal',
+  },
+  {
+    id: 'BON',
+    label: 'BON',
+    full: 'Best of Nollywood Awards',
+    accent: '#10B981',
+    about:
+      'One of Nigeria’s premier film award bodies honoring technical craft, lead acting, and supporting performances across Indigenous and English-language Nollywood cinema.',
+    when:
+      'Annual ceremony held in November. Honors theatrical and streaming films released in the eligibility window.',
+    submissions:
+      'Producers submit physical and digital film screeners to the BON panel.',
+    submitUrl: null,
+    submitLabel: null,
+  },
 ];
 
 function normOrg(raw) {
@@ -71,6 +99,8 @@ function normOrg(raw) {
   if (upper.includes('AMVCA') || upper.includes('AFRICA MAGIC')) return 'AMVCA';
   if (upper.includes('AMAA') || upper.includes('AFRICA MOVIE ACADEMY')) return 'AMAA';
   if (upper.includes('TINFF') || upper.includes('INDUSTRY NOLLYWOOD')) return 'TINFF';
+  if (upper.includes('GOLDEN STAR') || upper.includes('GOLDENSTARS')) return 'GOLDEN_STARS';
+  if (upper.includes('BON') || upper.includes('BEST OF NOLLYWOOD')) return 'BON';
   return s;
 }
 
