@@ -13,13 +13,76 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// High-confidence Golden Stars Awards and BON Nollywood Awards records
+// High-confidence Golden Stars Awards and BON Nollywood Awards records (Competitive + Special Honorary Categories)
 const GOLDEN_STARS_AWARDS_DATA = [
   {
     personName: 'Mide Martins',
     organization: 'GOLDEN_STARS',
     category: 'Nollywood Actress of the Year',
     title: 'Nollywood Actress of the Year',
+    year: 2023,
+    season: 2023,
+    won: true,
+    work: null,
+  },
+  {
+    personName: 'Biola Adebayo',
+    altNames: ['Abiola Adebayo'],
+    organization: 'GOLDEN_STARS',
+    category: 'Nollywood Personality of the Year',
+    title: 'Nollywood Personality of the Year',
+    year: 2023,
+    season: 2023,
+    won: true,
+    work: null,
+  },
+  {
+    personName: 'Nkem Owoh',
+    organization: 'GOLDEN_STARS',
+    category: 'Nollywood Legendary Pace Setter',
+    title: 'Nollywood Legendary Pace Setter',
+    year: 2023,
+    season: 2023,
+    won: true,
+    work: null,
+  },
+  {
+    personName: 'Kunle Afolayan',
+    organization: 'GOLDEN_STARS',
+    category: 'Most Influential Movie Icon',
+    title: 'Most Influential Movie Icon',
+    year: 2024,
+    season: 2024,
+    won: true,
+    work: null,
+  },
+  {
+    personName: 'Jide Kosoko',
+    organization: 'GOLDEN_STARS',
+    category: 'Lifetime Achievement Award',
+    title: 'Lifetime Achievement Award',
+    year: 2023,
+    season: 2023,
+    won: true,
+    work: null,
+  },
+  {
+    personName: 'Omotola Jalade-Ekeinde',
+    altNames: ['Omotola Jalade'],
+    organization: 'GOLDEN_STARS',
+    category: 'Most Influential Movie Icon',
+    title: 'Most Influential Movie Icon',
+    year: 2023,
+    season: 2023,
+    won: true,
+    work: null,
+  },
+  {
+    personName: 'Toyin Abraham',
+    altNames: ['Toyin Aimakhu', 'Toyin Abraham Ajeyemi'],
+    organization: 'GOLDEN_STARS',
+    category: 'Nollywood Movie Icon of the Year',
+    title: 'Nollywood Movie Icon of the Year',
     year: 2023,
     season: 2023,
     won: true,
@@ -76,7 +139,7 @@ async function syncGoldenStarsAndBonAwards() {
   for (const entry of GOLDEN_STARS_AWARDS_DATA) {
     const namesToSearch = [entry.personName, ...(entry.altNames || [])];
     
-    let personRecord = null;
+    let personRecord: any = null;
     for (const name of namesToSearch) {
       const { data } = await supabase
         .from('people')
