@@ -75,7 +75,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
           className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
         />
         <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 bg-black/60 backdrop-blur-md rounded border border-white/15 select-none pointer-events-none">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_4px_var(--brand)]" />
+          <img src="/images/muvidb-icon-watermark.png" alt="MuviDB" className="w-3.5 h-3.5 object-contain" />
           <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/90">MuviDB</span>
         </div>
       </Link>
