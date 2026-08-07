@@ -18,13 +18,13 @@ const CompanyCard = ({ company, filmCount }) => {
       <div className="p-6">
         <div className="flex items-start gap-5">
           <div className="flex-shrink-0">
-            <div className={`w-16 h-16 rounded-xl border border-border flex items-center justify-center overflow-hidden ${hasLogo ? 'bg-white p-2' : 'bg-surface-2'}`}>
+            <div className="w-16 h-16 rounded-xl border border-border flex items-center justify-center overflow-hidden bg-surface-2">
               <ImageWithFallback
                 src={company.logo_url}
                 alt={toTitleCase(company.name)}
                 fallbackType="company"
                 name={toTitleCase(company.name)}
-                className={`w-full h-full group-hover:scale-110 transition-transform duration-500 ${hasLogo ? 'object-contain' : 'object-cover'}`}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 width={128}
                 sizes="64px"
                 loading="lazy"

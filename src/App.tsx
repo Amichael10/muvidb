@@ -87,6 +87,8 @@ const AdminTop10 = lazyWithRetry(() => import('./pages/admin/AdminTop10'));
 const AdminLogs = lazyWithRetry(() => import('./pages/admin/AdminLogs'));
 const AdminAutomation = lazyWithRetry(() => import('./pages/admin/AdminAutomation'));
 const AdminCountries = lazyWithRetry(() => import('./pages/admin/AdminCountries'));
+const AdminCritics = lazyWithRetry(() => import('./pages/admin/AdminCritics'));
+const AdminPlays = lazyWithRetry(() => import('./pages/admin/AdminPlays'));
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -287,6 +289,8 @@ export default function App() {
                   <Route path="top10" element={<AdminTop10 />} />
                   <Route path="automation" element={<AdminAutomation />} />
                   <Route path="countries" element={<AdminCountries />} />
+                  <Route path="critics" element={<AdminCritics />} />
+                  <Route path="plays" element={<AdminPlays />} />
                   <Route path="logs" element={<ProtectedRoute allowedRoles={['admin']}><AdminLogs /></ProtectedRoute>} />
                 </Route>
 

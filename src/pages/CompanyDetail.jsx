@@ -1,561 +1,383 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import { formatViewCount } from '../utils/youtube'
-import { Icon } from '@iconify/react'
-import ShareAction from '../components/ui/ShareAction'
-import { toTitleCase, toSentenceCase } from '../utils/format'
-import ImageWithFallback from '../components/ui/ImageWithFallback'
-import { getCompanyLogoStrict } from '../lib/companyImages'
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { Icon } from '@iconify/react';
+import ShareAction from '../components/ui/ShareAction';
+import { toTitleCase, toSentenceCase } from '../utils/format';
+import ImageWithFallback from '../components/ui/ImageWithFallback';
+import SEO from '../components/SEO';
 
-const FilmCard = ({ film }) => (
-  <Link
-    to={`/films/${film.slug || film.id}`}
-    className="group block"
-  >
-    <div className="relative overflow-hidden rounded-xl aspect-[2/3] bg-[#13192B]">
-      <ImageWithFallback
-        src={film.poster_url}
-        alt={film.title}
-        name={film.title}
-        fallbackType="film"
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-      />
+function CompanyFilmCard({ film, role }) {
+  return (
+    <Link
+      to={`/films/${film.slug || film.id}`}
+      className="group bg-surface border border-border hover:border-brand/60 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-brand/5 flex flex-col justify-between"
+    >
+      <div>
+        {/* Poster Image */}
+        <div className="relative aspect-[2/3] bg-surface-2 overflow-hidden">
+          <ImageWithFallback
+            src={film.poster_url}
+            alt={film.title}
+            name={film.title}
+            fallbackType="film"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
 
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+          {/* Role / Type Badge */}
+          {role && (
+            <span className="absolute top-2.5 left-2.5 bg-brand text-on-brand text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shadow-lg z-10">
+              {role.replace('_', ' ')}
+            </span>
+          )}
 
-      {/* Rating */}
-      {film.liked_percent != null && (
-        <div className="absolute top-2 right-2 bg-brand text-bg text-[10px] font-bold px-3 py-1 rounded-xl shadow-lg shadow-brand/20">
-          Official
+          {/* Rating Badge */}
+          {film.liked_percent != null && (
+            <span className="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur-md text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-md z-10 flex items-center gap-1">
+              <Icon icon="solar:star-bold" className="w-3 h-3" />
+              {film.liked_percent}%
+            </span>
+          )}
         </div>
-      )}
 
-      {/* Info */}
-      <div className="absolute bottom-0 left-0 right-0 p-3">
-        <p className="text-[#F5F0E8] text-xs font-semibold line-clamp-2">
-          {toSentenceCase(film.title)}
-        </p>
-        <p className="text-[#7A8099] text-xs mt-0.5 flex items-center gap-1">
-          {film.film_genres?.[0]?.genres?.name && <span>{film.film_genres[0].genres.name} &bull;</span>}
-          <span>{film.year}</span>
-        </p>
+        {/* Title & Metadata */}
+        <div className="p-4">
+          <h3 className="text-text-primary text-sm font-bold leading-snug group-hover:text-brand transition-colors line-clamp-2 mb-1.5" title={toSentenceCase(film.title)}>
+            {toSentenceCase(film.title)}
+          </h3>
+
+          <div className="flex items-center gap-2 text-xs text-text-muted font-semibold">
+            <span>{film.year || 'N/A'}</span>
+            {film.film_genres?.[0]?.genres?.name && (
+              <>
+                <span>•</span>
+                <span className="truncate">{film.film_genres[0].genres.name}</span>
+              </>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
-  </Link>
-)
-
-const PersonCard = ({ person, role }) => (
-  <Link to={`/people/${person.slug || person.id}`} className="block group text-center w-[120px] shrink-0">
-    <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-surface-2 border-2 border-border group-hover:border-brand transition-colors mb-3">
-      <ImageWithFallback
-        src={person.photo_url}
-        alt={person.name}
-        fallbackType="avatar"
-        name={person.name}
-        className="w-full h-full object-cover"
-        width={192}
-        sizes="96px"
-        loading="lazy"
-      />
-    </div>
-    <p className="text-sm font-semibold text-text-primary line-clamp-1">{person.name}</p>
-    <p className="text-[10px] text-text-muted font-bold tracking-wide mt-1 line-clamp-1">{role}</p>
-  </Link>
-)
-
-const PartnerCard = ({ company }) => (
-  <Link to={`/companies/${company.slug || company.id}`} className="block group text-center w-[120px] shrink-0">
-    <div className={`w-24 h-24 mx-auto rounded-xl shadow-sm border-2 border-transparent group-hover:border-brand transition-colors mb-3 flex items-center justify-center overflow-hidden ${getCompanyLogoStrict(company) ? 'bg-white p-3' : 'bg-surface-2'}`}>
-      <ImageWithFallback
-        src={company.logo_url}
-        alt={toTitleCase(company.name)}
-        fallbackType="company"
-        name={toTitleCase(company.name)}
-        className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain' : 'object-cover'}`}
-        width={192}
-        sizes="96px"
-        loading="lazy"
-      />
-    </div>
-    <p className="text-sm font-semibold text-text-primary line-clamp-2">{toTitleCase(company.name)}</p>
-  </Link>
-)
+    </Link>
+  );
+}
 
 const Description = ({ text }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isLong = text.length > 280;
-  const displayText = isExpanded ? text : text.slice(0, 280) + (isLong ? '...' : '');
+  const isLong = text && text.length > 140;
+  const displayText = isExpanded ? text : text?.slice(0, 140) + (isLong ? '...' : '');
+
+  if (!text) return null;
 
   return (
-    <div className="space-y-4">
-      <p className="text-text-muted text-sm leading-relaxed max-w-2xl">
-        {displayText}
-      </p>
+    <div className="text-text-muted text-xs max-w-2xl leading-relaxed mt-3">
+      {displayText}
       {isLong && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-brand text-xs font-bold hover:underline transition-all flex items-center gap-1"
+          className="text-brand hover:underline font-bold ml-2 transition-colors"
         >
-          {isExpanded ? 'Read less' : 'Read more'}
-          <Icon icon={isExpanded ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} />
+          {isExpanded ? 'Show less' : 'Read more'}
         </button>
       )}
     </div>
   );
 };
 
-const CompanyDetail = () => {
-  const { id, slug: slugParam } = useParams()
-  const slug = slugParam || id
-  const navigate = useNavigate()
-  const [company, setCompany] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+export default function CompanyDetail() {
+  const { id, slug: slugParam } = useParams();
+  const slug = slugParam || id;
+  const navigate = useNavigate();
+
+  const [company, setCompany] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Filters & Search
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'production', 'distribution', 'top'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(16);
 
   useEffect(() => {
-    fetchCompany()
-  }, [slug])
+    fetchCompany();
+  }, [slug]);
 
   const fetchCompany = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
-    // Check if slug is UUID or string
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
 
-    const { data, error } = await supabase
+    // 1. Fetch Company
+    const { data: comp, error: compErr } = await supabase
       .from('companies')
-      .select(`
-        *,
-        channels ( channel_id, channel_url, channel_handle ),
-        film_companies(
-          role,
-          films(
-            id, title, year, poster_url,
-            view_count, average_rating, liked_percent,
-            film_genres(genres(name)),
-            credits(role, people(id, name, photo_url)),
-            film_companies(role, companies(id, name, logo_url))
-          )
-        )
-      `)
+      .select('*')
       .eq(isUUID ? 'id' : 'slug', slug)
-      .single()
+      .maybeSingle();
 
-    if (error) {
-      console.error(error)
-      setError('Company not found')
-      setLoading(false)
-      return
+    if (compErr || !comp) {
+      setError('Company not found');
+      setLoading(false);
+      return;
     }
 
-    setCompany(data)
-    setLoading(false)
-  }
+    // 2. Fetch Films linked via film_companies OR production_company_id
+    const { data: fcLinks } = await supabase
+      .from('film_companies')
+      .select('role, films(id, title, year, poster_url, liked_percent, average_rating, slug, film_genres(genres(name)))')
+      .eq('company_id', comp.id);
 
-  // Derived Data
-  const allFilms = useMemo(() => {
-    if (!company?.film_companies) return [];
-    return company.film_companies
-      .map(fc => fc.films)
-      .filter(Boolean)
-      // Deduplicate films
-      .filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
-  }, [company])
+    const { data: directProdFilms } = await supabase
+      .from('films')
+      .select('id, title, year, poster_url, liked_percent, average_rating, slug, film_genres(genres(name))')
+      .eq('production_company_id', comp.id);
 
-  const topFilms = useMemo(() => {
-    return [...allFilms].sort((a, b) => (b.liked_percent || 0) - (a.liked_percent || 0)).slice(0, 10);
-  }, [allFilms])
+    // Merge film entries with roles
+    const filmMap = new Map();
 
-  const recentReleases = useMemo(() => {
-    return [...allFilms].sort((a, b) => (b.year || 0) - (a.year || 0)).slice(0, 10);
-  }, [allFilms])
+    (directProdFilms || []).forEach(f => {
+      if (f && f.id) {
+        filmMap.set(f.id, { film: f, role: 'production' });
+      }
+    });
 
-  const associatedPeople = useMemo(() => {
-    const peopleMap = new Map();
-    allFilms.forEach(film => {
-      film.credits?.forEach(credit => {
-        if (!credit.people) return;
-        const p = credit.people;
-        if (!peopleMap.has(p.id)) {
-          peopleMap.set(p.id, { ...p, roles: new Set([credit.role]), count: 0 });
-        }
-        peopleMap.get(p.id).count += 1;
-        peopleMap.get(p.id).roles.add(credit.role);
-      })
-    })
-    return Array.from(peopleMap.values())
-      .sort((a, b) => b.count - a.count)
-      .map(p => ({
-        ...p,
-        displayRole: Array.from(p.roles)[0] // Pick primary role
-      }))
-      .slice(0, 10);
-  }, [allFilms])
+    (fcLinks || []).forEach(link => {
+      if (link.films && link.films.id) {
+        const existing = filmMap.get(link.films.id);
+        filmMap.set(link.films.id, {
+          film: link.films,
+          role: link.role || existing?.role || 'production'
+        });
+      }
+    });
 
-  const productionPartners = useMemo(() => {
-    const partnerMap = new Map();
-    allFilms.forEach(film => {
-      film.film_companies?.forEach(fc => {
-        if (!fc.companies || fc.companies.id === company?.id) return;
-        const c = fc.companies;
-        if (!partnerMap.has(c.id)) {
-          partnerMap.set(c.id, { ...c, roles: new Set([fc.role]), count: 0 });
-        }
-        partnerMap.get(c.id).count += 1;
-        partnerMap.get(c.id).roles.add(fc.role);
-      })
-    })
-    return Array.from(partnerMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-  }, [allFilms, company])
+    comp.filmsWithRole = Array.from(filmMap.values());
+    setCompany(comp);
+    document.title = `MuviDB | ${toTitleCase(comp.name)}`;
+    setLoading(false);
+  };
 
+  const allFilmsWithRole = useMemo(() => {
+    return company?.filmsWithRole || [];
+  }, [company]);
+
+  // Filter & Search Logic
+  const filteredFilms = useMemo(() => {
+    let result = [...allFilmsWithRole];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(item => item.film?.title?.toLowerCase().includes(q));
+    }
+
+    if (activeTab === 'production') {
+      result = result.filter(item => item.role === 'production' || item.role === 'co_production');
+    } else if (activeTab === 'distribution') {
+      result = result.filter(item => item.role === 'distribution' || item.role === 'international_distribution');
+    } else if (activeTab === 'top') {
+      result.sort((a, b) => (b.film?.liked_percent || 0) - (a.film?.liked_percent || 0));
+    }
+
+    return result;
+  }, [allFilmsWithRole, activeTab, searchQuery]);
+
+  const displayedFilms = useMemo(() => {
+    return filteredFilms.slice(0, visibleCount);
+  }, [filteredFilms, visibleCount]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg">
-        <div className="h-[400px] bg-surface-2/10 animate-shimmer" />
-        <div className="max-w-7xl mx-auto px-4 -mt-32 relative z-10 flex gap-8">
-          <div className="w-[300px] h-[400px] rounded-xl bg-surface-2 animate-shimmer shrink-0" />
-          <div className="flex-1 space-y-4 pt-32">
-            <div className="h-12 w-1/3 bg-surface-2 animate-shimmer rounded-lg" />
-            <div className="h-6 w-1/4 bg-surface-2 animate-shimmer rounded-md" />
-          </div>
-        </div>
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
       </div>
-    )
+    );
   }
 
   if (error || !company) {
     return (
-      <div className="min-h-screen bg-bg pt-20 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 text-lg mb-4">{error || 'Company not found'}</p>
+      <div className="min-h-screen bg-bg pt-20 flex items-center justify-center text-center p-6">
+        <div>
+          <p className="text-text-primary text-xl font-bold mb-4">{error || 'Company not found'}</p>
           <button
             onClick={() => navigate('/companies')}
-            className="text-brand font-bold hover:underline tracking-widest uppercase text-[10px]"
+            className="bg-brand text-on-brand px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-brand-hover"
           >
-            Back to Companies
+            Back to Companies Directory
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  const hasDetails = company.founded_year || company.company_type || company.headquarters || company.focus || company.years_active || company.employees || company.languages;
-  const youtubeUrl = company.youtube_url || company.channels?.[0]?.channel_url;
-
   return (
-    <div className="min-h-screen bg-bg font-sans pb-20">
-      
-      {/* Hero Section */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        {/* Background Grid */}
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        
-        <div className="max-w-7xl mx-auto border-x border-border relative z-10 pt-32 pb-16 px-4 md:px-8 flex flex-col lg:flex-row gap-12 items-start justify-between">
-          
-          {/* Left: Logo & Core Info */}
-          <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
-            <div className="shrink-0">
-              <div className={`w-48 h-48 md:w-56 md:h-56 rounded-full overflow-hidden border border-brand/30 flex items-center justify-center shadow-2xl relative ${getCompanyLogoStrict(company) ? 'bg-black/40 p-6' : 'bg-surface-2'}`}>
+    <div className="min-h-screen bg-bg text-text-primary pb-20">
+      <SEO 
+        title={`${toTitleCase(company.name)} - Studio & Production Company Profile | MuviDB`}
+        description={company.description || `Explore movies, productions, distribution partners, and studio history for ${company.name} on MuviDB.`}
+      />
+
+      {/* RICH HERO HEADER */}
+      <div className="relative border-b border-border bg-surface/30">
+        <div className="absolute inset-0 h-[280px] md:h-[360px] bg-gradient-to-r from-brand/10 to-amber-500/10">
+          <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-bg via-transparent to-transparent opacity-80" />
+        </div>
+
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8 relative z-10 pt-16 md:pt-28 pb-8">
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start justify-between">
+            
+            {/* Left Core Info */}
+            <div className="flex gap-6 items-start">
+              <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-2 border-border overflow-hidden bg-surface-2 shadow-2xl shrink-0">
                 <ImageWithFallback
                   src={company.logo_url}
                   alt={toTitleCase(company.name)}
                   fallbackType="company"
                   name={toTitleCase(company.name)}
-                  className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain' : 'object-cover'}`}
-                  width={448}
-                  sizes="(max-width: 767px) 192px, 224px"
+                  className="w-full h-full object-cover"
                   loading="eager"
-                  fetchPriority="high"
                 />
-                {/* Glow behind logo */}
-                <div className="absolute inset-0 bg-brand/10 blur-2xl -z-10 mix-blend-screen" />
-              </div>
-            </div>
-
-            <div className="space-y-4 max-w-xl pt-4">
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary tracking-tight">
-                  {toTitleCase(company.name)}
-                </h1>
-                <Icon icon="solar:verified-check-bold" className="text-brand text-2xl shrink-0" />
-              </div>
-              
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-text-muted text-sm font-medium">
-                {company.company_type && <span>{toTitleCase(company.company_type)}</span>}
-                {company.company_type && company.headquarters && <span className="w-1 h-1 rounded-full bg-border" />}
-                {company.headquarters && (
-                  <span className="flex items-center gap-1">
-                    <Icon icon="solar:map-point-linear" className="text-lg" />
-                    {toTitleCase(company.headquarters)}
-                  </span>
-                )}
               </div>
 
-              {company.description && (
-                <div className="pt-2 text-left">
-                  <Description text={toSentenceCase(company.description)} />
+              <div className="pt-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-2xl md:text-4xl font-heading font-bold text-text-primary tracking-tight">{toTitleCase(company.name)}</h1>
+                  <Icon icon="solar:verified-check-bold" className="text-brand text-xl" />
                 </div>
-              )}
+                
+                <div className="flex flex-wrap items-center gap-3 text-text-muted text-[11px] font-bold">
+                  {company.company_type && <span className="capitalize">{company.company_type}</span>}
+                  {company.company_type && company.headquarters && <span>•</span>}
+                  {company.headquarters && <span>📍 {company.headquarters}</span>}
+                  {company.founded_year && <span>• Est. {company.founded_year}</span>}
+                </div>
 
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 pt-4">
-                {company.website && (
-                  <a href={company.website} target="_blank" rel="noopener noreferrer" className="bg-brand text-bg font-bold text-xs px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-brand/90 transition-colors">
-                    <Icon icon="solar:global-linear" className="text-lg" />
-                    Visit Website
-                  </a>
-                )}
+                <Description text={toSentenceCase(company.description)} />
 
-                <ShareAction title={toTitleCase(company.name)} text={`Check out ${toTitleCase(company.name)} on MuviDB`} className="!w-auto !bg-transparent border border-border !px-4 !rounded-lg" />
+                <div className="flex items-center gap-3 mt-5">
+                  {company.website && (
+                    <a href={company.website} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 bg-brand hover:bg-brand-hover text-on-brand font-bold text-[11px] px-6 py-2.5 rounded-lg transition-all shadow-lg hover:scale-[1.02]">
+                      <Icon icon="solar:global-bold" className="text-sm" />
+                      Official Website <Icon icon="solar:arrow-right-up-linear" className="text-sm" />
+                    </a>
+                  )}
+                  <ShareAction title={toTitleCase(company.name)} text={`Check out ${toTitleCase(company.name)} on MuviDB`} className="!w-auto !bg-surface border border-border !px-4 !py-2.5 !rounded-lg text-text-primary text-xs font-bold" />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right: Quick Info Panel */}
-          {hasDetails && (
-            <div className="w-full lg:w-80 shrink-0 bg-surface/50 border border-border/50 rounded-2xl p-6 backdrop-blur-sm space-y-6">
+            {/* Right Quick Stats */}
+            <div className="flex items-center gap-8 md:gap-12 md:pr-12 pt-4 md:pt-6">
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-1.5 text-brand mb-1">
+                  <Icon icon="solar:clapperboard-play-bold" className="text-base" />
+                  <span className="text-text-primary font-heading font-bold text-lg">{allFilmsWithRole.length}</span>
+                </div>
+                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Films</span>
+              </div>
+
               {company.founded_year && (
-                <div>
-                  <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
-                    <Icon icon="solar:calendar-bold" className="text-brand text-base" /> Founded
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center gap-1.5 text-brand mb-1">
+                    <Icon icon="solar:calendar-bold" className="text-base" />
+                    <span className="text-text-primary font-heading font-bold text-lg">{company.founded_year}</span>
                   </div>
-                  <p className="text-text-primary text-sm font-medium">{company.founded_year}</p>
+                  <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Founded</span>
                 </div>
               )}
-              {company.company_type && (
-                <div>
-                  <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
-                    <Icon icon="solar:buildings-bold" className="text-brand text-base" /> Company Type
-                  </div>
-                  <p className="text-text-primary text-sm font-medium">{company.company_type}</p>
-                </div>
-              )}
-              {company.headquarters && (
-                <div>
-                  <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
-                    <Icon icon="solar:map-point-bold" className="text-brand text-base" /> Headquarters
-                  </div>
-                  <p className="text-text-primary text-sm font-medium flex items-center gap-2">
-                    {company.headquarters}
-                  </p>
-                </div>
-              )}
-              {company.focus && (
-                <div>
-                  <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
-                    <Icon icon="solar:target-bold" className="text-brand text-base" /> Focus
-                  </div>
-                  <p className="text-text-primary text-sm font-medium leading-relaxed">{company.focus}</p>
-                </div>
-              )}
-              {/* Optional static field matching mockup */}
-              <div>
-                <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
-                  <Icon icon="solar:star-bold" className="text-brand text-base" /> Known For
-                </div>
-                <p className="text-text-primary text-sm font-medium leading-relaxed">
-                  Emotional storytelling, strong characters, high production quality
-                </p>
-              </div>
-            </div>
-          )}
 
+              {company.company_type && (
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center gap-1.5 text-brand mb-1">
+                    <Icon icon="solar:buildings-bold" className="text-base" />
+                    <span className="text-text-primary font-heading font-bold text-sm capitalize">{company.company_type}</span>
+                  </div>
+                  <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Type</span>
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto border-x border-border px-4 md:px-8 py-12 space-y-16">
+      {/* MAIN CATALOG CONTENT */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-10">
         
-        {/* Top Films */}
-        {topFilms.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Top Films</h2>
-              <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
-                View all <Icon icon="solar:alt-arrow-right-linear" />
-              </Link>
-            </div>
-            <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-              {topFilms.map(film => (
-                <div key={film.id} className="w-[140px] md:w-[160px] shrink-0">
-                  <FilmCard film={film} />
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Recent Releases */}
-        {recentReleases.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Recent Releases</h2>
-              <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
-                View all <Icon icon="solar:alt-arrow-right-linear" />
-              </Link>
-            </div>
-            <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-              {recentReleases.map(film => (
-                <div key={film.id} className="w-[140px] md:w-[160px] shrink-0">
-                  <FilmCard film={film} />
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Associated People */}
-        {associatedPeople.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Associated People</h2>
-              <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
-                View all <Icon icon="solar:alt-arrow-right-linear" />
-              </Link>
-            </div>
-            <div className="flex overflow-x-auto gap-6 pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-              {associatedPeople.map(person => (
-                <PersonCard key={person.id} person={person} role={person.displayRole} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Production Partners */}
-        {productionPartners.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Production Partners</h2>
-              <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
-                View all <Icon icon="solar:alt-arrow-right-linear" />
-              </Link>
-            </div>
-            <div className="flex overflow-x-auto gap-6 pb-4 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-              {productionPartners.map(partner => (
-                <PartnerCard key={partner.id} company={partner} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Bottom Details Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 pt-8 border-t border-border/50">
-          
-          {/* Official Links */}
-          <div>
-            <h3 className="text-lg font-heading font-bold text-text-primary mb-6">Official Links</h3>
-            <div className="space-y-4">
-              {company.website && (
-                <a href={company.website} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3 text-text-primary group-hover:text-brand transition-colors">
-                    <Icon icon="mdi:web" className="text-xl text-text-muted group-hover:text-brand transition-colors" />
-                    <span className="text-sm font-medium">Website</span>
-                  </div>
-                  <Icon icon="solar:arrow-right-up-linear" className="text-text-muted group-hover:text-brand transition-colors" />
-                </a>
-              )}
-              {company.instagram_url && (
-                <a href={company.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3 text-text-primary group-hover:text-brand transition-colors">
-                    <Icon icon="mdi:instagram" className="text-xl text-text-muted group-hover:text-brand transition-colors" />
-                    <span className="text-sm font-medium">Instagram</span>
-                  </div>
-                  <Icon icon="solar:arrow-right-up-linear" className="text-text-muted group-hover:text-brand transition-colors" />
-                </a>
-              )}
-              {company.twitter_url && (
-                <a href={company.twitter_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3 text-text-primary group-hover:text-brand transition-colors">
-                    <Icon icon="mdi:twitter" className="text-xl text-text-muted group-hover:text-brand transition-colors" />
-                    <span className="text-sm font-medium">X (Twitter)</span>
-                  </div>
-                  <Icon icon="solar:arrow-right-up-linear" className="text-text-muted group-hover:text-brand transition-colors" />
-                </a>
-              )}
-              {youtubeUrl && (
-                <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3 text-text-primary group-hover:text-brand transition-colors">
-                    <Icon icon="mdi:youtube" className="text-xl text-text-muted group-hover:text-brand transition-colors" />
-                    <span className="text-sm font-medium">YouTube</span>
-                  </div>
-                  <Icon icon="solar:arrow-right-up-linear" className="text-text-muted group-hover:text-brand transition-colors" />
-                </a>
-              )}
-            </div>
+        {/* Filter & Control Bar */}
+        <div className="bg-surface border border-border p-4 rounded-2xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+          {/* Category Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {[
+              { id: 'all', label: `All Films (${allFilmsWithRole.length})` },
+              { id: 'production', label: `Production (${allFilmsWithRole.filter(f => f.role === 'production' || f.role === 'co_production').length})` },
+              { id: 'distribution', label: `Distribution (${allFilmsWithRole.filter(f => f.role === 'distribution' || f.role === 'international_distribution').length})` },
+              { id: 'top', label: 'Top Rated ⭐' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setVisibleCount(16);
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-brand text-on-brand shadow-md'
+                    : 'bg-surface-2 border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {/* About */}
-          <div className="md:col-span-1">
-            <h3 className="text-lg font-heading font-bold text-text-primary mb-6">About {toTitleCase(company.name)}</h3>
-            {company.description ? (
-              <div className="text-sm text-text-muted leading-relaxed space-y-4">
-                <p>{toSentenceCase(company.description)}</p>
-                <p>We believe in nurturing talent, elevating industry standards and building timeless stories for generations to come.</p>
-              </div>
-            ) : (
-              <p className="text-sm text-text-muted italic">No description available.</p>
-            )}
+          {/* Instant Search Bar */}
+          <div className="relative w-full md:w-64">
+            <Icon icon="solar:magnifer-linear" className="absolute left-3 top-2.5 text-text-muted w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search company films..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setVisibleCount(16);
+              }}
+              className="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-xl text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
+            />
           </div>
-
-          {/* Company Details Table */}
-          {hasDetails && (
-            <div>
-              <h3 className="text-lg font-heading font-bold text-white mb-6">Company Details</h3>
-              <div className="space-y-3 text-sm">
-                {company.founded_year && (
-                  <div className="flex gap-4">
-                    <span className="text-text-muted w-32 shrink-0">&middot; Founded</span>
-                    <span className="text-white font-medium">{company.founded_year}</span>
-                  </div>
-                )}
-                {company.company_type && (
-                  <div className="flex gap-4">
-                    <span className="text-text-muted w-32 shrink-0">&middot; Company Type</span>
-                    <span className="text-white font-medium">{toTitleCase(company.company_type)}</span>
-                  </div>
-                )}
-                {company.headquarters && (
-                  <div className="flex gap-4">
-                    <span className="text-text-muted w-32 shrink-0">&middot; Headquarters</span>
-                    <span className="text-white font-medium">{toTitleCase(company.headquarters)}</span>
-                  </div>
-                )}
-                {company.focus && (
-                  <div className="flex gap-4">
-                    <span className="text-text-muted w-32 shrink-0">&middot; Focus</span>
-                    <span className="text-white font-medium">{toSentenceCase(company.focus)}</span>
-                  </div>
-                )}
-                {company.years_active && (
-                  <div className="flex gap-4">
-                    <span className="text-text-muted w-32 shrink-0">&middot; Years Active</span>
-                    <span className="text-white font-medium">{company.years_active}</span>
-                  </div>
-                )}
-                {company.employees && (
-                  <div className="flex gap-4">
-                    <span className="text-text-muted w-32 shrink-0">&middot; Employees</span>
-                    <span className="text-white font-medium">{company.employees}</span>
-                  </div>
-                )}
-                {company.languages && (
-                  <div className="flex gap-4">
-                    <span className="text-text-muted w-32 shrink-0">&middot; Languages</span>
-                    <span className="text-white font-medium">{company.languages}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
         </div>
+
+        {/* Company Film Grid */}
+        {displayedFilms.length === 0 ? (
+          <div className="bg-surface border border-border p-16 rounded-2xl text-center">
+            <Icon icon="solar:clapperboard-line-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-40" />
+            <h3 className="text-lg font-bold text-text-primary mb-1">No films found</h3>
+            <p className="text-xs text-text-muted">No films match your selected filter or search query.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+              {displayedFilms.map(item => (
+                <CompanyFilmCard key={item.film.id} film={item.film} role={item.role} />
+              ))}
+            </div>
+
+            {/* Load More Button */}
+            {filteredFilms.length > visibleCount && (
+              <div className="mt-12 text-center">
+                <button
+                  onClick={() => setVisibleCount(prev => prev + 16)}
+                  className="px-8 py-3.5 bg-surface border border-border hover:border-brand/50 text-text-primary font-bold text-xs rounded-xl shadow-md hover:bg-surface-2 transition-all inline-flex items-center gap-2"
+                >
+                  <span>Load More Films ({filteredFilms.length - visibleCount} remaining)</span>
+                  <Icon icon="solar:alt-arrow-down-linear" className="w-4 h-4 text-brand" />
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
       </div>
     </div>
-  )
+  );
 }
-
-export default CompanyDetail

@@ -51,6 +51,8 @@ export default function AdminLayout() {
     { path: '/admin/users', label: 'Users', icon: 'solar:users-group-two-rounded-linear' },
     { path: '/admin/cinemas', label: 'Cinemas', icon: 'solar:buildings-2-linear' },
     { path: '/admin/channels', label: 'Channels', icon: 'solar:videocamera-record-linear' },
+    { path: '/admin/critics', label: 'Film Critics', icon: 'solar:chat-round-bold-linear' },
+    { path: '/admin/plays', label: 'Theatre Plays', icon: 'solar:mask-hamsa-linear' },
     { path: '/admin/countries', label: 'Countries', icon: 'solar:global-linear' },
     { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear', badge: isSuperAdmin ? pendingCount : 0 },
     { path: '/admin/cinema-scraping', label: 'Scraping', icon: 'solar:refresh-linear' },

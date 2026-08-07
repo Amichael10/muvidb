@@ -1138,37 +1138,92 @@ export default function FilmDetail() {
               />
             </div>
 
-            <div className="p-8">
-              {film.film_companies?.length > 0 ? (
-                <div className="flex items-center gap-4">
-                  <div className={`w-11 h-11 rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-lg shrink-0 border border-border ${film.film_companies[0].companies?.logo_url ? 'bg-black' : 'bg-surface-2'}`}>
-                    <ImageWithFallback
-                      src={film.film_companies[0].companies?.logo_url}
-                      alt={film.film_companies[0].companies?.name || 'Studio logo'}
-                      fallbackType="company"
-                      name={film.film_companies[0].companies?.name || 'Studio'}
-                      className={`w-full h-full ${film.film_companies[0].companies?.logo_url ? 'object-contain' : 'object-cover'}`}
-                      width={96}
-                      sizes="44px"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Studio</div>
-                    <div className="font-bold text-text-primary text-sm line-clamp-1 tracking-tight">{film.film_companies[0].companies?.name}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-bold text-lg shrink-0 border border-border">
-                    {film.director?.charAt(0) || '?'}
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Director</div>
-                    <div className="font-bold text-text-primary text-sm tracking-tight">{film.director || 'Not Specified'}</div>
-                  </div>
-                </div>
-              )}
+            <div className="p-8 space-y-6">
+              {(() => {
+                const prodCompanies = (film.film_companies || []).filter(
+                  (fc) => !fc.role || fc.role === 'production' || fc.role === 'co_production'
+                );
+                const distCompanies = (film.film_companies || []).filter(
+                  (fc) => fc.role === 'distribution' || fc.role === 'international_distribution'
+                );
+
+                return (
+                  <>
+                    {/* Production Companies */}
+                    <div>
+                      <div className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                        <Icon icon="solar:buildings-bold" className="text-brand text-xs" />
+                        <span>Production {prodCompanies.length > 1 ? 'Partners' : 'Company'}</span>
+                      </div>
+
+                      {prodCompanies.length > 0 ? (
+                        <div className="space-y-3">
+                          {prodCompanies.map((fc, idx) => (
+                            <Link
+                              key={idx}
+                              to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
+                              className="flex items-center gap-3 group"
+                            >
+                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
+                                <ImageWithFallback
+                                  src={fc.companies?.logo_url}
+                                  alt={fc.companies?.name || 'Studio'}
+                                  fallbackType="company"
+                                  name={fc.companies?.name || 'Studio'}
+                                  className="w-full h-full object-cover"
+                                  width={72}
+                                  sizes="36px"
+                                  loading="lazy"
+                                />
+                              </div>
+                              <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
+                                {fc.companies?.name}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-muted font-medium">Independent Production</p>
+                      )}
+                    </div>
+
+                    {/* Distribution Partners */}
+                    {distCompanies.length > 0 && (
+                      <div>
+                        <div className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <Icon icon="solar:delivery-bold" className="text-brand text-xs" />
+                          <span>Distribution {distCompanies.length > 1 ? 'Partners' : 'Partner'}</span>
+                        </div>
+                        <div className="space-y-3">
+                          {distCompanies.map((fc, idx) => (
+                            <Link
+                              key={idx}
+                              to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
+                              className="flex items-center gap-3 group"
+                            >
+                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
+                                <ImageWithFallback
+                                  src={fc.companies?.logo_url}
+                                  alt={fc.companies?.name || 'Distributor'}
+                                  fallbackType="company"
+                                  name={fc.companies?.name || 'Distributor'}
+                                  className="w-full h-full object-cover"
+                                  width={72}
+                                  sizes="36px"
+                                  loading="lazy"
+                                />
+                              </div>
+                              <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
+                                {fc.companies?.name}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="p-8">
