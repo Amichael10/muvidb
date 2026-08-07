@@ -160,6 +160,14 @@ export default function CompanyDetail() {
     return company?.filmsWithRole || [];
   }, [company]);
 
+  // Extract non-null poster images for Hero Movie Collage
+  const movieCollagePosters = useMemo(() => {
+    return allFilmsWithRole
+      .map(item => item.film?.poster_url)
+      .filter(Boolean)
+      .slice(0, 12);
+  }, [allFilmsWithRole]);
+
   // Filter & Search Logic
   const filteredFilms = useMemo(() => {
     let result = [...allFilmsWithRole];
@@ -215,14 +223,29 @@ export default function CompanyDetail() {
         description={company.description || `Explore movies, productions, distribution partners, and studio history for ${company.name} on MuviDB.`}
       />
 
-      {/* RICH HERO HEADER */}
-      <div className="relative border-b border-border bg-surface/30">
-        <div className="absolute inset-0 h-[280px] md:h-[360px] bg-gradient-to-r from-brand/10 to-amber-500/10">
-          <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-bg via-transparent to-transparent opacity-80" />
-        </div>
+      {/* RICH HERO HEADER WITH DYNAMIC MOVIE COLLAGE OR GRADIENT FALLBACK */}
+      <div className="relative border-b border-border bg-surface overflow-hidden">
+        
+        {/* HERO BACKGROUND: Movie Collage if films exist, else Gradient fallback */}
+        {movieCollagePosters.length > 0 ? (
+          <div className="absolute inset-0 overflow-hidden opacity-25 filter blur-[0.5px] scale-105 pointer-events-none">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 w-full h-full">
+              {movieCollagePosters.map((url, idx) => (
+                <div key={idx} className="relative aspect-[2/3] overflow-hidden rounded">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/85 to-bg/40" />
+            <div className="absolute inset-0 bg-gradient-to-r from-bg via-transparent to-bg/80" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-r from-brand/10 via-amber-500/10 to-transparent pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
+          </div>
+        )}
 
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-8 relative z-10 pt-16 md:pt-28 pb-8">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8 relative z-10 pt-12 md:pt-24 pb-12">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start justify-between">
             
             {/* Left Core Info */}
@@ -320,10 +343,10 @@ export default function CompanyDetail() {
                   setActiveTab(tab.id);
                   setVisibleCount(16);
                 }}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
                   activeTab === tab.id
-                    ? 'bg-brand text-on-brand shadow-md'
-                    : 'bg-surface-2 border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
+                    ? 'bg-brand text-on-brand font-extrabold shadow-md'
+                    : 'bg-surface-2 border border-border text-text-primary hover:border-brand/60 hover:text-brand'
                 }`}
               >
                 {tab.label}
