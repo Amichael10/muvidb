@@ -499,7 +499,7 @@ const PersonDetail = () => {
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
           <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative group overflow-hidden rounded-lg">
               <ImageWithFallback
                 src={person.photo_url || person.photo}
                 alt={formatPersonName(person.name)}
@@ -511,6 +511,13 @@ const PersonDetail = () => {
                 loading="eager"
                 fetchPriority="high"
               />
+              {/* Bottom-Left MuviDB Watermark Overlay */}
+              <div className="absolute bottom-2.5 left-2.5 z-20 flex items-center gap-1.5 px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-md border border-white/15 shadow-xl select-none pointer-events-none transition-opacity">
+                <span className="w-2 h-2 rounded-full bg-brand shadow-[0_0_6px_var(--brand)]" />
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-white/90 drop-shadow-sm">
+                  MuviDB
+                </span>
+              </div>
             </div>
 
             <div className="flex-1 space-y-6">

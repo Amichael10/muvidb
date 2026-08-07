@@ -68,12 +68,16 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
   // Full variant
   return (
     <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-      <Link to={`/people/${person.slug || person.id}`} className="shrink-0 group">
+      <Link to={`/people/${person.slug || person.id}`} className="shrink-0 group relative overflow-hidden rounded-lg">
         <img 
           src={person.photo_url || person.photo} 
           alt={formatPersonName(person.name)} 
           className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
         />
+        <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 bg-black/60 backdrop-blur-md rounded border border-white/15 select-none pointer-events-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_4px_var(--brand)]" />
+          <span className="text-[9px] font-extrabold uppercase tracking-widest text-white/90">MuviDB</span>
+        </div>
       </Link>
       
       <div className="flex-1">
