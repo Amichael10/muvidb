@@ -511,9 +511,9 @@ const PersonDetail = () => {
                 loading="eager"
                 fetchPriority="high"
               />
-              {/* Bottom-Left Circular MuviDB Logo Watermark */}
-              <div className="absolute bottom-2.5 left-2.5 z-20 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 shadow-xl flex items-center justify-center p-1.5 select-none pointer-events-none">
-                <img src="/images/muvidb-icon-watermark.png" alt="MuviDB" className="w-full h-full object-contain rounded-full" />
+              {/* Bottom-Left White Frosted Glass Circular Watermark */}
+              <div className="absolute bottom-3 left-3 z-20 w-9 h-9 rounded-full bg-white/75 backdrop-blur-md border border-white/50 shadow-2xl shadow-black/40 flex items-center justify-center p-1.5 select-none pointer-events-none">
+                <img src="/images/muvidb-icon-watermark.png" alt="MuviDB" className="w-full h-full object-contain" />
               </div>
             </div>
 
