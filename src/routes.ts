@@ -90,8 +90,10 @@ export default [
       route('top10', 'pages/admin/AdminTop10.jsx'),
       route('automation', 'pages/admin/AdminAutomation.jsx'),
       route('countries', 'pages/admin/AdminCountries.jsx'),
-      route('film-critics', 'pages/admin/AdminCritics.jsx'),
-      route('theatre-plays', 'pages/admin/AdminPlays.jsx'),
+      route('critics', 'pages/admin/AdminCritics.jsx'),
+      route('film-critics', 'pages/admin/AdminCritics.jsx', { id: 'admin-critics-alias' }),
+      route('plays', 'pages/admin/AdminPlays.jsx'),
+      route('theatre-plays', 'pages/admin/AdminPlays.jsx', { id: 'admin-plays-alias' }),
 
       // Full admins only — `admin_limited` must not reach these.
       layout('routes/require-admin-strict.tsx', [
