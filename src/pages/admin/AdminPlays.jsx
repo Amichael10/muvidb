@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { fetchPlays, upsertPlay, upsertStageCredit } from '../../lib/plays';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from '../../lib/supabase';
 import SEO from '../../components/SEO';
 
 export default function AdminPlays() {
