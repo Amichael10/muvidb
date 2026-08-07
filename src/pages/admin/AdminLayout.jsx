@@ -68,7 +68,7 @@ export default function AdminLayout() {
     { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear' },
   ];
 
-  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies'];
+  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/plays'];
   
   // Security guard for manual URL entry by admin_limited
   const isPathAllowed = (path) => {
