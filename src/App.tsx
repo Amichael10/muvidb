@@ -58,6 +58,10 @@ const Awards = lazyWithRetry(() => import('./pages/Awards'));
 const Contact = lazyWithRetry(() => import('./pages/Contact'));
 const Careers = lazyWithRetry(() => import('./pages/Careers'));
 const CareerDetail = lazyWithRetry(() => import('./pages/CareerDetail'));
+const CriticsList = lazyWithRetry(() => import('./pages/CriticsList'));
+const CriticDetail = lazyWithRetry(() => import('./pages/CriticDetail'));
+const PlaysList = lazyWithRetry(() => import('./pages/PlaysList'));
+const PlayDetail = lazyWithRetry(() => import('./pages/PlayDetail'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
@@ -252,6 +256,10 @@ export default function App() {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/careers" element={<Careers />} />
                 <Route path="/careers/:slug" element={<CareerDetail />} />
+                <Route path="/critics" element={<CriticsList />} />
+                <Route path="/critics/:slug" element={<CriticDetail />} />
+                <Route path="/plays" element={<PlaysList />} />
+                <Route path="/plays/:slug" element={<PlayDetail />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />
