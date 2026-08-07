@@ -134,24 +134,24 @@ export default function AdminPlays() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-dark text-text-primary p-6 md:p-10 max-w-7xl mx-auto">
-      <SEO title="Manage Stage Plays & Theatre | MuviDB Admin" />
+    <div className="min-h-screen bg-bg text-text-primary p-6 md:p-10 max-w-7xl mx-auto">
+      <SEO title="Manage Theatre Plays | MuviDB Admin" />
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold text-white flex items-center gap-2">
-            <Icon icon="solar:masks-bold" className="text-accent-yellow w-8 h-8" />
-            Manage Stage Plays & Theatre
+          <h1 className="text-3xl font-extrabold text-text-primary flex items-center gap-2">
+            <Icon icon="solar:masks-bold" className="text-brand w-8 h-8" />
+            Manage Theatre Plays & Stage Performances
           </h1>
-          <p className="text-xs text-text-muted mt-1">Add stage productions, playwrights, venues, and link performer stage credits.</p>
+          <p className="text-xs text-text-muted mt-1">Add, update, or archive theatrical productions and stage credits.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Play Form Column */}
-        <div className="bg-surface-dark border border-border-dark p-6 rounded-2xl h-fit">
-          <h2 className="text-lg font-bold text-white mb-4">
-            {editing ? 'Edit Stage Play' : 'Add New Stage Play'}
+        {/* Form Column */}
+        <div className="bg-surface border border-border p-6 rounded-2xl h-fit">
+          <h2 className="text-lg font-bold text-text-primary mb-4">
+            {editing ? 'Edit Play' : 'Add New Play'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
@@ -162,31 +162,79 @@ export default function AdminPlays() {
                 value={formData.title}
                 onChange={e => setFormData({ ...formData, title: e.target.value })}
                 placeholder="e.g. Saro The Musical"
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                 required
               />
             </div>
 
             <div>
-              <label className="text-text-muted font-bold block mb-1">Playwright</label>
+              <label className="text-text-muted font-bold block mb-1">URL Slug (Optional)</label>
               <input
                 type="text"
-                value={formData.playwright}
-                onChange={e => setFormData({ ...formData, playwright: e.target.value })}
-                placeholder="e.g. Wole Soyinka / Bolanle Austen-Peters"
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                value={formData.slug}
+                onChange={e => setFormData({ ...formData, slug: e.target.value })}
+                placeholder="e.g. saro-the-musical"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-text-muted font-bold block mb-1">Playwright</label>
+                <input
+                  type="text"
+                  value={formData.playwright}
+                  onChange={e => setFormData({ ...formData, playwright: e.target.value })}
+                  placeholder="e.g. Wole Soyinka"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
+                />
+              </div>
+
               <div>
                 <label className="text-text-muted font-bold block mb-1">Director</label>
                 <input
                   type="text"
                   value={formData.director}
                   onChange={e => setFormData({ ...formData, director: e.target.value })}
-                  placeholder="Director"
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                  placeholder="e.g. Bolanle Austen-Peters"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-text-muted font-bold block mb-1">Venue Name</label>
+                <input
+                  type="text"
+                  value={formData.venue}
+                  onChange={e => setFormData({ ...formData, venue: e.target.value })}
+                  placeholder="e.g. Muson Centre"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
+                />
+              </div>
+
+              <div>
+                <label className="text-text-muted font-bold block mb-1">City / Location</label>
+                <input
+                  type="text"
+                  value={formData.city}
+                  onChange={e => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="e.g. Lagos, Nigeria"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-text-muted font-bold block mb-1">Year</label>
+                <input
+                  type="number"
+                  value={formData.year}
+                  onChange={e => setFormData({ ...formData, year: Number(e.target.value) })}
+                  placeholder="2024"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                 />
               </div>
 
@@ -196,44 +244,8 @@ export default function AdminPlays() {
                   type="text"
                   value={formData.genre}
                   onChange={e => setFormData({ ...formData, genre: e.target.value })}
-                  placeholder="e.g. Musical Drama"
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Venue</label>
-                <input
-                  type="text"
-                  value={formData.venue}
-                  onChange={e => setFormData({ ...formData, venue: e.target.value })}
-                  placeholder="e.g. Terra Kulture"
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-text-muted font-bold block mb-1">City / Country</label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={e => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="e.g. Lagos, London"
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Year</label>
-                <input
-                  type="number"
-                  value={formData.year}
-                  onChange={e => setFormData({ ...formData, year: Number(e.target.value) })}
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                  placeholder="Musical"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                 />
               </div>
 
@@ -242,23 +254,23 @@ export default function AdminPlays() {
                 <select
                   value={formData.status}
                   onChange={e => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-bg border border-border rounded-xl px-2 py-2 text-text-primary"
                 >
-                  <option value="archived">Classic Archive</option>
-                  <option value="currently_running">Currently Running</option>
-                  <option value="upcoming">Upcoming Show</option>
+                  <option value="archived">Archived</option>
+                  <option value="currently_running">Running</option>
+                  <option value="upcoming">Upcoming</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="text-text-muted font-bold block mb-1">Poster Image URL</label>
+              <label className="text-text-muted font-bold block mb-1">Poster URL</label>
               <input
                 type="url"
                 value={formData.poster_url}
                 onChange={e => setFormData({ ...formData, poster_url: e.target.value })}
                 placeholder="https://..."
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
@@ -268,15 +280,15 @@ export default function AdminPlays() {
                 rows={3}
                 value={formData.synopsis}
                 onChange={e => setFormData({ ...formData, synopsis: e.target.value })}
-                placeholder="Play synopsis..."
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                placeholder="Brief synopsis of the production..."
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
             <div className="flex items-center gap-2 pt-4">
               <button
                 type="submit"
-                className="flex-1 bg-accent-yellow text-bg-dark font-bold py-2.5 rounded-xl hover:bg-accent-yellow/90 transition-colors"
+                className="flex-1 bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors"
               >
                 {editing ? 'Update Play' : 'Create Play'}
               </button>
@@ -285,7 +297,7 @@ export default function AdminPlays() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="bg-surface-light text-text-muted font-bold py-2.5 px-4 rounded-xl hover:text-white"
+                  className="bg-surface-2 text-text-muted font-bold py-2.5 px-4 rounded-xl hover:text-text-primary"
                 >
                   Cancel
                 </button>
@@ -297,9 +309,9 @@ export default function AdminPlays() {
         {/* List & Stage Credit Link Column */}
         <div className="lg:col-span-2 space-y-8">
           {/* Link Stage Credit Tool */}
-          <div className="bg-surface-dark border border-border-dark p-6 rounded-2xl">
-            <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2">
-              <Icon icon="solar:link-circle-bold" className="text-accent-yellow w-5 h-5" />
+          <div className="bg-surface border border-border p-6 rounded-2xl">
+            <h3 className="text-base font-bold text-text-primary mb-2 flex items-center gap-2">
+              <Icon icon="solar:link-circle-bold" className="text-brand w-5 h-5" />
               Link Actor to Stage Play
             </h3>
 
@@ -313,7 +325,7 @@ export default function AdminPlays() {
                       const p = plays.find(item => item.id === e.target.value);
                       setSelectedPlayForCredit(p || null);
                     }}
-                    className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                     required
                   >
                     <option value="">-- Select Play --</option>
@@ -330,10 +342,10 @@ export default function AdminPlays() {
                     value={peopleSearch}
                     onChange={e => searchActors(e.target.value)}
                     placeholder="Type actor name..."
-                    className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                   />
                   {peopleResults.length > 0 && (
-                    <div className="mt-1 bg-bg-dark border border-border-dark rounded-xl overflow-hidden shadow-lg">
+                    <div className="mt-1 bg-surface border border-border rounded-xl overflow-hidden shadow-lg">
                       {peopleResults.map(p => (
                         <div
                           key={p.id}
@@ -342,7 +354,7 @@ export default function AdminPlays() {
                             setPeopleSearch(p.name);
                             setPeopleResults([]);
                           }}
-                          className="px-3 py-2 hover:bg-surface-light cursor-pointer flex items-center gap-2 text-white"
+                          className="px-3 py-2 hover:bg-surface-2 cursor-pointer flex items-center gap-2 text-text-primary"
                         >
                           <img src={p.photo_url || ''} alt="" className="w-6 h-6 rounded-full object-cover" />
                           <span>{p.name}</span>
@@ -354,7 +366,7 @@ export default function AdminPlays() {
               </div>
 
               {selectedPerson && (
-                <div className="p-2 bg-accent-yellow/10 border border-accent-yellow/30 rounded-lg text-accent-yellow font-bold">
+                <div className="p-2 bg-brand/10 border border-brand/30 rounded-lg text-brand font-bold">
                   Selected Actor: {selectedPerson.name}
                 </div>
               )}
@@ -367,7 +379,7 @@ export default function AdminPlays() {
                     value={creditRole}
                     onChange={e => setCreditRole(e.target.value)}
                     placeholder="e.g. Actor, Director, Lead Performer"
-                    className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                   />
                 </div>
 
@@ -378,14 +390,14 @@ export default function AdminPlays() {
                     value={characterName}
                     onChange={e => setCharacterName(e.target.value)}
                     placeholder="e.g. Elesin Oba"
-                    className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="bg-accent-yellow text-bg-dark font-bold px-6 py-2 rounded-xl hover:bg-accent-yellow/90 transition-colors"
+                className="bg-brand text-on-brand font-bold px-6 py-2 rounded-xl hover:bg-brand-hover transition-colors"
               >
                 Add Stage Credit
               </button>
@@ -394,26 +406,26 @@ export default function AdminPlays() {
 
           {/* Plays Table */}
           <div>
-            <h2 className="text-lg font-bold text-white mb-4">Plays Catalog ({plays.length})</h2>
+            <h2 className="text-lg font-bold text-text-primary mb-4">Plays Catalog ({plays.length})</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {plays.map(play => (
-                <div key={play.id} className="bg-surface-dark/80 border border-border-dark p-4 rounded-xl flex gap-4 items-center justify-between">
+                <div key={play.id} className="bg-surface border border-border p-4 rounded-xl flex gap-4 items-center justify-between">
                   <div className="flex items-center gap-3">
                     <img
                       src={play.poster_url || 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=200'}
                       alt={play.title}
-                      className="w-12 h-16 rounded-lg object-cover border border-border-dark"
+                      className="w-12 h-16 rounded-lg object-cover border border-border"
                     />
                     <div>
-                      <h3 className="text-sm font-bold text-white">{play.title}</h3>
-                      <span className="text-[11px] text-accent-yellow font-semibold">{play.playwright || 'Theatre'}</span>
+                      <h3 className="text-sm font-bold text-text-primary">{play.title}</h3>
+                      <span className="text-[11px] text-brand font-semibold">{play.playwright || 'Theatre'}</span>
                       <span className="text-[10px] text-text-muted block">📍 {play.venue || play.city} ({play.year})</span>
                     </div>
                   </div>
 
                   <button
                     onClick={() => handleEdit(play)}
-                    className="p-2 rounded-lg bg-surface-light text-text-muted hover:text-accent-yellow transition-colors"
+                    className="p-2 rounded-lg bg-surface-2 text-text-muted hover:text-brand transition-colors"
                     title="Edit Play"
                   >
                     <Icon icon="solar:pen-bold" className="w-4 h-4" />

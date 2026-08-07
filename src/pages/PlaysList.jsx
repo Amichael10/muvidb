@@ -24,20 +24,20 @@ export default function PlaysList() {
   });
 
   return (
-    <div className="min-h-screen bg-bg-dark text-text-primary pb-20">
+    <div className="min-h-screen bg-bg text-text-primary pb-20">
       <SEO 
         title="Stage & Theatre Plays Index | MuviDB"
         description="Explore Nigerian and African stage plays, theatrical productions, musicals, and live performances worldwide. Track actor stage credits and venues."
       />
 
       {/* Hero Header */}
-      <section className="relative overflow-hidden border-b border-border-dark bg-gradient-to-b from-bg-darker via-bg-dark to-bg-dark py-16 px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden border-b border-border bg-surface/40 py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-accent-yellow/10 border border-accent-yellow/30 text-accent-yellow text-xs font-semibold uppercase tracking-wider mb-4">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-brand/10 border border-brand/30 text-brand text-xs font-semibold uppercase tracking-wider mb-4">
             <Icon icon="solar:masks-bold" className="w-4 h-4" />
             African Theatre & Performing Arts Archive
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-4">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-text-primary mb-4">
             Stage Plays & Musicals
           </h1>
           <p className="text-lg text-text-muted max-w-2xl mx-auto">
@@ -57,8 +57,8 @@ export default function PlaysList() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                   activeTab === tab.id
-                    ? 'bg-accent-yellow text-bg-dark shadow-md'
-                    : 'bg-surface-dark border border-border-dark text-text-muted hover:text-white hover:border-accent-yellow/40'
+                    ? 'bg-brand text-on-brand shadow-md'
+                    : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
                 }`}
               >
                 {tab.label}
@@ -72,12 +72,12 @@ export default function PlaysList() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <div className="w-10 h-10 border-4 border-accent-yellow border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 bg-surface-dark/50 rounded-2xl border border-border-dark">
+          <div className="text-center py-20 bg-surface/50 rounded-2xl border border-border">
             <Icon icon="solar:masks-line-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-50" />
-            <h3 className="text-xl font-bold text-white mb-1">No plays found</h3>
+            <h3 className="text-xl font-bold text-text-primary mb-1">No plays found</h3>
             <p className="text-sm text-text-muted">No stage productions match this filter tab.</p>
           </div>
         ) : (
@@ -86,24 +86,24 @@ export default function PlaysList() {
               <Link
                 key={play.id}
                 to={`/plays/${play.slug}`}
-                className="group relative bg-surface-dark/80 border border-border-dark hover:border-accent-yellow/50 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-accent-yellow/5 flex flex-col"
+                className="group relative bg-surface border border-border hover:border-brand/50 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-brand/5 flex flex-col"
               >
                 {/* Poster / Image Banner */}
-                <div className="relative h-48 w-full bg-surface-light overflow-hidden">
+                <div className="relative h-48 w-full bg-surface-2 overflow-hidden">
                   <img
                     src={play.poster_url || play.banner_url || 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=600'}
                     alt={play.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-bg-dark via-bg-dark/30 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/30 to-transparent" />
                   
                   {/* Status Badge */}
                   <span className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border shadow-md ${
                     play.status === 'currently_running'
-                      ? 'bg-green-500/20 text-green-400 border-green-500/40'
+                      ? 'bg-green-500/20 text-green-500 border-green-500/40'
                       : play.status === 'upcoming'
-                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
-                      : 'bg-surface-dark/80 text-text-muted border-border-dark'
+                      ? 'bg-blue-500/20 text-blue-500 border-blue-500/40'
+                      : 'bg-surface/80 text-text-muted border-border'
                   }`}>
                     {play.status === 'currently_running' ? 'Running' : play.status === 'upcoming' ? 'Upcoming' : 'Archive'}
                   </span>
@@ -112,11 +112,11 @@ export default function PlaysList() {
                 {/* Body Details */}
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
-                    <span className="text-xs font-semibold text-accent-yellow uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-brand uppercase tracking-wider">
                       {play.genre || 'Stage Play'} • {play.year || 'N/A'}
                     </span>
 
-                    <h2 className="text-xl font-bold text-white group-hover:text-accent-yellow transition-colors mt-1 mb-2">
+                    <h2 className="text-xl font-bold text-text-primary group-hover:text-brand transition-colors mt-1 mb-2">
                       {play.title}
                     </h2>
 
@@ -125,13 +125,13 @@ export default function PlaysList() {
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-border-dark/60 flex items-center justify-between text-xs text-text-muted">
+                  <div className="pt-4 border-t border-border/60 flex items-center justify-between text-xs text-text-muted">
                     <div className="flex items-center gap-1.5 truncate max-w-[200px]">
-                      <Icon icon="solar:map-point-bold" className="w-4 h-4 text-accent-yellow flex-shrink-0" />
+                      <Icon icon="solar:map-point-bold" className="w-4 h-4 text-brand flex-shrink-0" />
                       <span className="truncate">{play.venue || play.city || 'Lagos'}</span>
                     </div>
 
-                    <span className="flex items-center gap-1 font-semibold text-accent-yellow group-hover:translate-x-1 transition-transform flex-shrink-0">
+                    <span className="flex items-center gap-1 font-semibold text-brand group-hover:translate-x-1 transition-transform flex-shrink-0">
                       View Cast & Play
                       <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4" />
                     </span>

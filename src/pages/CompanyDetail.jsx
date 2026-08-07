@@ -280,7 +280,7 @@ const CompanyDetail = () => {
 
             <div className="space-y-4 max-w-xl pt-4">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                <h1 className="text-4xl md:text-5xl font-heading font-bold text-white tracking-tight">
+                <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary tracking-tight">
                   {toTitleCase(company.name)}
                 </h1>
                 <Icon icon="solar:verified-check-bold" className="text-brand text-2xl shrink-0" />
@@ -324,7 +324,7 @@ const CompanyDetail = () => {
                   <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
                     <Icon icon="solar:calendar-bold" className="text-brand text-base" /> Founded
                   </div>
-                  <p className="text-white text-sm font-medium">{company.founded_year}</p>
+                  <p className="text-text-primary text-sm font-medium">{company.founded_year}</p>
                 </div>
               )}
               {company.company_type && (
@@ -332,7 +332,7 @@ const CompanyDetail = () => {
                   <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
                     <Icon icon="solar:buildings-bold" className="text-brand text-base" /> Company Type
                   </div>
-                  <p className="text-white text-sm font-medium">{company.company_type}</p>
+                  <p className="text-text-primary text-sm font-medium">{company.company_type}</p>
                 </div>
               )}
               {company.headquarters && (
@@ -340,7 +340,7 @@ const CompanyDetail = () => {
                   <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
                     <Icon icon="solar:map-point-bold" className="text-brand text-base" /> Headquarters
                   </div>
-                  <p className="text-white text-sm font-medium flex items-center gap-2">
+                  <p className="text-text-primary text-sm font-medium flex items-center gap-2">
                     {company.headquarters}
                   </p>
                 </div>
@@ -350,7 +350,7 @@ const CompanyDetail = () => {
                   <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
                     <Icon icon="solar:target-bold" className="text-brand text-base" /> Focus
                   </div>
-                  <p className="text-white text-sm font-medium leading-relaxed">{company.focus}</p>
+                  <p className="text-text-primary text-sm font-medium leading-relaxed">{company.focus}</p>
                 </div>
               )}
               {/* Optional static field matching mockup */}
@@ -358,7 +358,7 @@ const CompanyDetail = () => {
                 <div className="flex items-center gap-2 text-text-muted text-xs font-bold uppercase tracking-wider mb-1">
                   <Icon icon="solar:star-bold" className="text-brand text-base" /> Known For
                 </div>
-                <p className="text-white text-sm font-medium leading-relaxed">
+                <p className="text-text-primary text-sm font-medium leading-relaxed">
                   Emotional storytelling, strong characters, high production quality
                 </p>
               </div>
@@ -374,7 +374,7 @@ const CompanyDetail = () => {
         {topFilms.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-white tracking-tight">Top Films</h2>
+              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Top Films</h2>
               <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
                 View all <Icon icon="solar:alt-arrow-right-linear" />
               </Link>
@@ -393,7 +393,7 @@ const CompanyDetail = () => {
         {recentReleases.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-white tracking-tight">Recent Releases</h2>
+              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Recent Releases</h2>
               <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
                 View all <Icon icon="solar:alt-arrow-right-linear" />
               </Link>
@@ -412,7 +412,7 @@ const CompanyDetail = () => {
         {associatedPeople.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-white tracking-tight">Associated People</h2>
+              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Associated People</h2>
               <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
                 View all <Icon icon="solar:alt-arrow-right-linear" />
               </Link>
@@ -429,7 +429,7 @@ const CompanyDetail = () => {
         {productionPartners.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-heading font-bold text-white tracking-tight">Production Partners</h2>
+              <h2 className="text-xl font-heading font-bold text-text-primary tracking-tight">Production Partners</h2>
               <Link to="#" className="text-xs font-bold text-brand hover:underline flex items-center gap-1">
                 View all <Icon icon="solar:alt-arrow-right-linear" />
               </Link>
@@ -447,7 +447,7 @@ const CompanyDetail = () => {
           
           {/* Official Links */}
           <div>
-            <h3 className="text-lg font-heading font-bold text-white mb-6">Official Links</h3>
+            <h3 className="text-lg font-heading font-bold text-text-primary mb-6">Official Links</h3>
             <div className="space-y-4">
               {company.website && (
                 <a href={company.website} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group">
@@ -490,7 +490,7 @@ const CompanyDetail = () => {
 
           {/* About */}
           <div className="md:col-span-1">
-            <h3 className="text-lg font-heading font-bold text-white mb-6">About {toTitleCase(company.name)}</h3>
+            <h3 className="text-lg font-heading font-bold text-text-primary mb-6">About {toTitleCase(company.name)}</h3>
             {company.description ? (
               <div className="text-sm text-text-muted leading-relaxed space-y-4">
                 <p>{toSentenceCase(company.description)}</p>

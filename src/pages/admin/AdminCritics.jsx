@@ -90,13 +90,13 @@ export default function AdminCritics() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-dark text-text-primary p-6 md:p-10 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-bg text-text-primary p-6 md:p-10 max-w-7xl mx-auto">
       <SEO title="Manage Film Critics | MuviDB Admin" />
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold text-white flex items-center gap-2">
-            <Icon icon="solar:pen-new-square-bold" className="text-accent-yellow w-8 h-8" />
+          <h1 className="text-3xl font-extrabold text-text-primary flex items-center gap-2">
+            <Icon icon="solar:pen-new-square-bold" className="text-brand w-8 h-8" />
             Manage Film Critics
           </h1>
           <p className="text-xs text-text-muted mt-1">Add, update, or edit verified film critic profiles and publications.</p>
@@ -105,8 +105,8 @@ export default function AdminCritics() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Form Column */}
-        <div className="bg-surface-dark border border-border-dark p-6 rounded-2xl h-fit">
-          <h2 className="text-lg font-bold text-white mb-4">
+        <div className="bg-surface border border-border p-6 rounded-2xl h-fit">
+          <h2 className="text-lg font-bold text-text-primary mb-4">
             {editing ? 'Edit Critic' : 'Add New Critic'}
           </h2>
 
@@ -118,7 +118,7 @@ export default function AdminCritics() {
                 value={formData.name}
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g. Tolu Fagbure"
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                 required
               />
             </div>
@@ -130,7 +130,7 @@ export default function AdminCritics() {
                 value={formData.slug}
                 onChange={e => setFormData({ ...formData, slug: e.target.value })}
                 placeholder="e.g. tolu-fagbure"
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
@@ -141,7 +141,7 @@ export default function AdminCritics() {
                 value={formData.title}
                 onChange={e => setFormData({ ...formData, title: e.target.value })}
                 placeholder="e.g. Film Critic & Culture Analyst"
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
@@ -152,7 +152,7 @@ export default function AdminCritics() {
                 value={formData.publication}
                 onChange={e => setFormData({ ...formData, publication: e.target.value })}
                 placeholder="e.g. Film Efiko / Melody FM"
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
@@ -163,7 +163,7 @@ export default function AdminCritics() {
                 value={formData.avatar_url}
                 onChange={e => setFormData({ ...formData, avatar_url: e.target.value })}
                 placeholder="https://..."
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
@@ -175,7 +175,7 @@ export default function AdminCritics() {
                   value={formData.platform}
                   onChange={e => setFormData({ ...formData, platform: e.target.value })}
                   placeholder="e.g. YouTube / X"
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                 />
               </div>
 
@@ -186,7 +186,7 @@ export default function AdminCritics() {
                   value={formData.handle}
                   onChange={e => setFormData({ ...formData, handle: e.target.value })}
                   placeholder="@handle"
-                  className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
                 />
               </div>
             </div>
@@ -198,7 +198,7 @@ export default function AdminCritics() {
                 value={formData.bio}
                 onChange={e => setFormData({ ...formData, bio: e.target.value })}
                 placeholder="Brief bio..."
-                className="w-full bg-bg-dark border border-border-dark rounded-xl px-3 py-2 text-white"
+                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary"
               />
             </div>
 
@@ -209,7 +209,7 @@ export default function AdminCritics() {
                 checked={formData.is_verified}
                 onChange={e => setFormData({ ...formData, is_verified: e.target.checked })}
               />
-              <label htmlFor="is_verified" className="text-white font-bold cursor-pointer">
+              <label htmlFor="is_verified" className="text-text-primary font-bold cursor-pointer">
                 Verified Critic Badge
               </label>
             </div>
@@ -217,7 +217,7 @@ export default function AdminCritics() {
             <div className="flex items-center gap-2 pt-4">
               <button
                 type="submit"
-                className="flex-1 bg-accent-yellow text-bg-dark font-bold py-2.5 rounded-xl hover:bg-accent-yellow/90 transition-colors"
+                className="flex-1 bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors"
               >
                 {editing ? 'Update Critic' : 'Create Critic'}
               </button>
@@ -226,7 +226,7 @@ export default function AdminCritics() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="bg-surface-light text-text-muted font-bold py-2.5 px-4 rounded-xl hover:text-white"
+                  className="bg-surface-2 text-text-muted font-bold py-2.5 px-4 rounded-xl hover:text-text-primary"
                 >
                   Cancel
                 </button>
@@ -237,23 +237,23 @@ export default function AdminCritics() {
 
         {/* List Column */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-lg font-bold text-white mb-4">Critics Directory ({critics.length})</h2>
+          <h2 className="text-lg font-bold text-text-primary mb-4">Critics Directory ({critics.length})</h2>
 
           {loading ? (
             <div className="py-12 text-center text-text-muted">Loading critics...</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {critics.map(critic => (
-                <div key={critic.id} className="bg-surface-dark/80 border border-border-dark p-4 rounded-xl flex gap-4 items-center justify-between">
+                <div key={critic.id} className="bg-surface border border-border p-4 rounded-xl flex gap-4 items-center justify-between">
                   <div className="flex items-center gap-3">
                     <img
                       src={critic.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
                       alt={critic.name}
-                      className="w-12 h-12 rounded-full object-cover border border-border-dark"
+                      className="w-12 h-12 rounded-full object-cover border border-border"
                     />
                     <div>
-                      <h3 className="text-sm font-bold text-white">{critic.name}</h3>
-                      <span className="text-[11px] text-accent-yellow font-semibold">{critic.publication || 'Critic'}</span>
+                      <h3 className="text-sm font-bold text-text-primary">{critic.name}</h3>
+                      <span className="text-[11px] text-brand font-semibold">{critic.publication || 'Critic'}</span>
                       <span className="text-[10px] text-text-muted block">{critic.review_count} Reviews</span>
                     </div>
                   </div>
@@ -261,14 +261,14 @@ export default function AdminCritics() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleEdit(critic)}
-                      className="p-2 rounded-lg bg-surface-light text-text-muted hover:text-accent-yellow transition-colors"
+                      className="p-2 rounded-lg bg-surface-2 text-text-muted hover:text-brand transition-colors"
                       title="Edit Critic"
                     >
                       <Icon icon="solar:pen-bold" className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(critic)}
-                      className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                      className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
                       title="Delete Critic"
                     >
                       <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
