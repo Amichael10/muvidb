@@ -9,11 +9,11 @@ const supabase = createClient(
 )
 
 async function run() {
-  console.log('Searching for Ile owo...')
+  console.log('Searching for Colors of Fire...')
   const { data, error } = await supabase
     .from('films')
-    .select('*')
-    .ilike('title', '%ile owo%')
+    .select('id, title, year, streaming_links, source, release_type, countries')
+    .or('title.ilike.%colors of fire%,title.ilike.%color of fire%')
   
   if (error) console.error(error)
   else console.log(data)

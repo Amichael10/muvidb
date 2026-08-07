@@ -16,12 +16,13 @@ const footerGroups = [
     ],
   },
   {
-    title: 'People',
+    title: 'People & Arts',
     links: [
       { label: 'Actors', to: '/people?role=Actor' },
       { label: 'Directors', to: '/people?role=Director' },
-      { label: 'Producers', to: '/people?role=Producer' },
-      { label: 'Writers', to: '/people?role=Writer' },
+      { label: 'Film Critics', to: '/critics' },
+      { label: 'Theatre Plays', to: '/plays' },
+      { label: 'Awards', to: '/awards' },
     ],
   },
   {

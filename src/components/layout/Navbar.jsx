@@ -95,6 +95,8 @@ export default function Navbar() {
     { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
     { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },
     { name: 'Awards', path: '/awards', icon: 'solar:cup-star-linear' },
+    { name: 'Critics', path: '/critics', icon: 'solar:pen-new-square-linear' },
+    { name: 'Theatre Plays', path: '/plays', icon: 'solar:masks-linear' },
     { name: 'Companies', path: '/companies', icon: 'solar:case-linear' },
   ];
 

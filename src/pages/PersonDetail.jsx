@@ -18,6 +18,7 @@ import ImageWithFallback from '../components/ui/ImageWithFallback'
 import { slugOrId } from '../utils/slug'
 import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatDateOfBirth } from '../utils/format'
 import { nationalityToCountryName } from '../utils/africanCountries'
+import { fetchPersonStageCredits } from '../lib/plays'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -145,6 +146,7 @@ const PersonDetail = () => {
     : null
 
   const [person, setPerson] = useState(seededPerson)
+  const [stageCredits, setStageCredits] = useState([])
   const [awardFilms, setAwardFilms] = useState({}) // film_id -> { slug, title, poster_url }
   const [personId, setPersonId] = useState(seededPerson?.id ?? null) // actual UUID
   const [channel, setChannel] = useState(null)
@@ -230,6 +232,9 @@ const PersonDetail = () => {
 
     setPerson(basePerson)
     setPersonId(data.id)
+
+    // Fetch Stage & Theatre Credits
+    fetchPersonStageCredits(data.id).then(sc => setStageCredits(sc || []));
     // Title comes from the route's `meta` export now — setting it here would
     // overwrite the server-rendered one after hydration.
 
@@ -832,6 +837,48 @@ const PersonDetail = () => {
             </div>
           )}
         </div>
+
+        {/* Stage & Theatre Credits */}
+        {stageCredits.length > 0 && (
+          <div className="p-4 md:p-8 lg:p-12 border-t border-border">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-text-primary text-3xl font-bold font-heading tracking-tighter flex items-center gap-2">
+                  <Icon icon="solar:masks-bold" className="text-brand w-7 h-7" />
+                  Stage & Theatre Credits ({stageCredits.length})
+                </h2>
+                <p className="text-text-muted text-xs font-semibold mt-1">Live theatrical performances, musicals, and stage plays</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {stageCredits.map((play) => (
+                <Link
+                  key={play.id}
+                  to={`/plays/${play.slug}`}
+                  className="group bg-surface border border-border hover:border-brand rounded-xl p-4 flex gap-4 items-center transition-all hover:-translate-y-0.5"
+                >
+                  <img
+                    src={play.poster_url || 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=200'}
+                    alt={play.title}
+                    className="w-14 h-20 rounded-lg object-cover border border-border flex-shrink-0"
+                  />
+                  <div>
+                    <h3 className="text-sm font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                      {play.title}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-brand block mt-0.5">
+                      {play.role || 'Actor'} {play.character_name ? `as ${play.character_name}` : ''}
+                    </span>
+                    <span className="text-[10px] text-text-muted block mt-1">
+                      📍 {play.venue || play.city || 'Theatre'} ({play.year || 'N/A'})
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Awards (people.awards jsonb) */}
         {Array.isArray(person.awards) && person.awards.length > 0 && (

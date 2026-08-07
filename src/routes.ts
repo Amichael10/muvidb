@@ -33,6 +33,10 @@ export default [
   route('reset-password', 'pages/ResetPassword.jsx'),
   route('people', 'routes/people-list.tsx'),
   route('people/:slug', 'routes/person-detail.tsx'),
+  route('critics', 'pages/CriticsList.jsx'),
+  route('critics/:slug', 'pages/CriticDetail.jsx'),
+  route('plays', 'pages/PlaysList.jsx'),
+  route('plays/:slug', 'pages/PlayDetail.jsx'),
   route('awards', 'pages/Awards.jsx'),
   route('showtimes', 'routes/showtimes.tsx'),
   route('cinemas', 'routes/cinemas-list.tsx'),
@@ -86,6 +90,8 @@ export default [
       route('top10', 'pages/admin/AdminTop10.jsx'),
       route('automation', 'pages/admin/AdminAutomation.jsx'),
       route('countries', 'pages/admin/AdminCountries.jsx'),
+      route('film-critics', 'pages/admin/AdminCritics.jsx'),
+      route('theatre-plays', 'pages/admin/AdminPlays.jsx'),
 
       // Full admins only — `admin_limited` must not reach these.
       layout('routes/require-admin-strict.tsx', [

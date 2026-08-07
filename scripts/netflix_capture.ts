@@ -46,10 +46,10 @@ async function captureState() {
     console.error(`
 Start Chrome like this (close ALL Chrome windows first):
 
-  $chrome = "$env:LOCALAPPDATA\\Google\\Chrome\\Application\\chrome.exe"
-  & $chrome --remote-debugging-port=9222 --profile-directory="Default"
+  $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+  & $chrome --remote-debugging-port=9222 --remote-allow-origins=* https://www.netflix.com/browse
 
-Then open https://www.netflix.com/browse , pick a profile, and re-run this script.
+Then sign into https://www.netflix.com/browse, pick a profile, and re-run this script.
 `);
     process.exit(1);
   }
