@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { formatViewCount, resolveChannelId, fetchRecentVideosFromChannel } from '../utils/youtube';
@@ -6,13 +6,6 @@ import { Icon } from '@iconify/react';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { toTitleCase, toSentenceCase } from '../utils/format';
 import SEO from '../components/SEO';
-
-const CATEGORY_LABELS = {
-  skit_maker: 'Skit Makers', movie_channel: 'Movie Channel',
-  Movies: 'Movies', Comedy: 'Comedy', Series: 'Series',
-  Faith: 'Faith', Yoruba: 'Yoruba', Celebrity: 'Celebrity',
-  Network: 'Network', Music: 'Music', Studio: 'Studio', actor: 'Actor',
-};
 
 function formatRelativeTime(dateString) {
   if (!dateString) return '';
@@ -39,75 +32,58 @@ function formatRelativeTime(dateString) {
   return `${years} year${years > 1 ? 's' : ''} ago`;
 }
 
-function VideoCard({ video, variant = 'default' }) {
+function VideoGridCard({ video }) {
   const youtubeUrl = `https://www.youtube.com/watch?v=${video.videoId}`;
-  
-  if (variant === 'featured') {
-    return (
-      <a href={youtubeUrl} target="_blank" rel="noopener noreferrer"
-        className="group relative block rounded-xl overflow-hidden border border-border hover:border-brand transition-all duration-500 shadow-sm shrink-0 w-[280px] sm:w-[320px] aspect-[16/9]">
-        <ImageWithFallback
-          src={video.thumbnail}
-          alt={toSentenceCase(video.title)}
-          fallbackType="video"
-          name={toSentenceCase(video.title)}
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
-        
-        {video.film_id && (
-           <span className="absolute top-3 left-3 bg-brand text-on-brand text-[9px] font-black px-2 py-0.5 rounded border border-brand/20 uppercase tracking-widest shadow-lg">
-             CHANNEL PREMIERE
-           </span>
-        )}
-        <div className="absolute bottom-3 left-3 right-3">
-           <h3 className="text-white font-bold text-sm sm:text-base leading-tight mb-1 line-clamp-2">{toSentenceCase(video.title)}</h3>
-           <div className="flex items-center gap-2 text-white/70 text-[10px] font-bold">
-              {video.film_genres && <span>{video.film_genres}</span>}
-              {video.film_genres && <span>•</span>}
-              {video.publishedAt && <span>{new Date(video.publishedAt).getFullYear()}</span>}
-              {video.duration && <span>• {video.duration}</span>}
-           </div>
-        </div>
-        <div className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/50 border border-white/20 flex items-center justify-center backdrop-blur-md">
-           <Icon icon="solar:play-bold" className="text-white text-sm" />
-        </div>
-      </a>
-    );
-  }
 
   return (
-    <a href={youtubeUrl} target="_blank" rel="noopener noreferrer"
-      className="group block rounded-xl overflow-hidden shrink-0 w-[220px] sm:w-[260px]">
-      <div className="relative aspect-video bg-surface-2 overflow-hidden rounded-xl border border-border group-hover:border-brand transition-all duration-500 shadow-sm mb-3">
-        <ImageWithFallback
-          src={video.thumbnail}
-          alt={toSentenceCase(video.title)}
-          fallbackType="video"
-          name={toSentenceCase(video.title)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-        />
-        {video.duration && (
-          <span className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-md text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">
-            {video.duration}
-          </span>
-        )}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 bg-black/20 backdrop-blur-[2px]">
-          <div className="w-10 h-10 bg-brand text-on-brand rounded-full flex items-center justify-center shadow-2xl scale-75 group-hover:scale-100 transition-transform">
-            <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
+    <a
+      href={youtubeUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group bg-surface border border-border hover:border-brand/60 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-brand/5 flex flex-col justify-between"
+    >
+      <div>
+        {/* Video Thumbnail Box */}
+        <div className="relative aspect-video bg-surface-2 overflow-hidden">
+          <ImageWithFallback
+            src={video.thumbnail}
+            alt={toSentenceCase(video.title)}
+            fallbackType="video"
+            name={toSentenceCase(video.title)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+          
+          {video.film_id && (
+            <span className="absolute top-2.5 left-2.5 bg-brand text-on-brand text-[9px] font-black px-2 py-0.5 rounded-md border border-brand/20 uppercase tracking-widest shadow-lg z-10">
+              CHANNEL PREMIERE
+            </span>
+          )}
+
+          {video.duration && (
+            <span className="absolute bottom-2.5 right-2.5 bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider z-10">
+              {video.duration}
+            </span>
+          )}
+
+          {/* Hover Play Button Overlay */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/30 backdrop-blur-[2px]">
+            <div className="w-12 h-12 bg-brand text-on-brand rounded-full flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform">
+              <Icon icon="solar:play-bold" className="w-5 h-5 ml-0.5" />
+            </div>
           </div>
         </div>
-      </div>
-      <div>
-        <h3 className="text-text-primary text-xs font-bold leading-tight group-hover:text-brand transition-colors line-clamp-2 mb-1.5">
-          {toSentenceCase(video.title)}
-        </h3>
-        <div className="flex items-center gap-2 text-[10px] text-text-muted font-bold">
-          {video.viewCount ? <span>{formatViewCount(video.viewCount)} views</span> : null}
-          {video.viewCount && video.publishedAt ? <span className="w-1 h-1 rounded-full bg-border"></span> : null}
-          {video.publishedAt ? <span>{formatRelativeTime(video.publishedAt)}</span> : null}
+
+        {/* Video Details */}
+        <div className="p-4">
+          <h3 className="text-text-primary text-sm font-bold leading-snug group-hover:text-brand transition-colors line-clamp-2 mb-2" title={toSentenceCase(video.title)}>
+            {toSentenceCase(video.title)}
+          </h3>
+
+          <div className="flex items-center gap-2 text-xs text-text-muted font-semibold">
+            {video.viewCount > 0 && <span>{formatViewCount(video.viewCount)} views</span>}
+            {video.viewCount > 0 && video.publishedAt && <span>•</span>}
+            {video.publishedAt && <span>{formatRelativeTime(video.publishedAt)}</span>}
+          </div>
         </div>
       </div>
     </a>
@@ -116,7 +92,7 @@ function VideoCard({ video, variant = 'default' }) {
 
 const ChannelDetailSkeleton = () => (
     <div className="min-h-screen bg-bg">
-        <div className="relative h-64 md:h-[400px] bg-surface-2/10 border-b border-border overflow-hidden">
+        <div className="relative h-64 md:h-[350px] bg-surface-2/10 border-b border-border overflow-hidden">
             <div className="absolute inset-0 bg-surface-2 animate-shimmer opacity-20" />
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -133,20 +109,20 @@ const ChannelDetailSkeleton = () => (
 
 const Description = ({ text }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isLong = text && text.length > 120;
-  const displayText = isExpanded ? text : text?.slice(0, 120) + (isLong ? '...' : '');
+  const isLong = text && text.length > 140;
+  const displayText = isExpanded ? text : text?.slice(0, 140) + (isLong ? '...' : '');
 
   if (!text) return null;
 
   return (
-    <div className="text-text-muted text-[11px] max-w-2xl leading-relaxed mt-3">
+    <div className="text-text-muted text-xs max-w-2xl leading-relaxed mt-3">
       {displayText}
       {isLong && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-text-primary hover:text-brand font-bold ml-2 transition-colors"
+          className="text-brand hover:underline font-bold ml-2 transition-colors"
         >
-          {isExpanded ? 'less' : 'more'}
+          {isExpanded ? 'Show less' : 'Read more'}
         </button>
       )}
     </div>
@@ -159,14 +135,17 @@ export default function ChannelDetail() {
   
   const [channel, setChannel] = useState(null);
   const [ytStats, setYtStats] = useState(null);
-  const [featuredVideos, setFeaturedVideos] = useState([]);
-  const [popularVideos, setPopularVideos] = useState([]);
-  const [latestVideos, setLatestVideos] = useState([]);
+  const [allVideos, setAllVideos] = useState([]);
   
   const [owner, setOwner] = useState(null);
   const [relatedChannels, setRelatedChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Filter & Pagination States
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'premieres', 'popular', 'latest'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(18);
 
   useEffect(() => {
     fetchChannelData();
@@ -176,7 +155,7 @@ export default function ChannelDetail() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch channel from DB using slug, mubi_slug, or ID
+      // 1. Fetch channel from DB
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       let channelData = null;
 
@@ -194,7 +173,6 @@ export default function ChannelDetail() {
       }
 
       if (!channelData) {
-        // Fallback search by ilike name or handle
         const { data: fallback } = await supabase
           .from('channels')
           .select('*')
@@ -226,7 +204,7 @@ export default function ChannelDetail() {
         .limit(3);
       setRelatedChannels(related || []);
 
-      // 4. Query DB channel_videos table directly for stored movies & uploads
+      // 4. Query DB channel_videos table directly
       const { data: dbVideos } = await supabase
         .from('channel_videos')
         .select('id, video_id, title, thumbnail_url, published_at, duration_seconds, film_id')
@@ -249,7 +227,7 @@ export default function ChannelDetail() {
         };
       });
 
-      // 5. Fetch live YouTube Stats & Videos if handle/url exists
+      // 5. Fetch live YouTube Stats & Videos if possible
       let liveYtVideos = [];
       if (ch.channel_handle || ch.channel_url || ch.channel_id) {
         const handleOrUrl = ch.channel_handle || ch.channel_url || ch.channel_id;
@@ -267,7 +245,7 @@ export default function ChannelDetail() {
         }
       }
 
-      // Merge DB videos with live YouTube videos (DB videos take precedence for film_id)
+      // Merge DB & YouTube videos
       const dbMapByVideoId = (formattedDbVideos || []).reduce((acc, v) => {
         acc[v.videoId] = v;
         return acc;
@@ -287,30 +265,7 @@ export default function ChannelDetail() {
         }
       });
 
-      const allChannelVideos = Object.values(combinedMap);
-
-      // Separate into Featured, Popular, and Latest
-      const mappedPremieres = allChannelVideos.filter(v => v.film_id);
-      let featured = [];
-      if (mappedPremieres.length > 0) {
-        featured = mappedPremieres.slice(0, 6);
-      } else {
-        featured = [...allChannelVideos].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 5);
-      }
-
-      const popular = [...allChannelVideos]
-        .filter(v => !featured.some(f => f.videoId === v.videoId))
-        .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-        .slice(0, 10);
-
-      const latest = [...allChannelVideos]
-        .filter(v => !featured.some(f => f.videoId === v.videoId) && !popular.some(p => p.videoId === v.videoId))
-        .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
-        .slice(0, 10);
-
-      setFeaturedVideos(featured);
-      setPopularVideos(popular);
-      setLatestVideos(latest.length > 0 ? latest : allChannelVideos.slice(0, 10));
+      setAllVideos(Object.values(combinedMap));
 
     } catch (err) {
       setError(err.message === 'Channel not found' ? 'Channel not found' : 'Failed to load channel');
@@ -318,6 +273,32 @@ export default function ChannelDetail() {
       setLoading(false);
     }
   };
+
+  // Filtered and Sorted Videos Computation
+  const filteredVideos = useMemo(() => {
+    let result = [...allVideos];
+
+    // 1. Text Search Filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(v => v.title?.toLowerCase().includes(query));
+    }
+
+    // 2. Tab Filter
+    if (activeTab === 'premieres') {
+      result = result.filter(v => v.film_id);
+    } else if (activeTab === 'popular') {
+      result.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+    } else if (activeTab === 'latest') {
+      result.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+    }
+
+    return result;
+  }, [allVideos, activeTab, searchQuery]);
+
+  const displayedVideos = useMemo(() => {
+    return filteredVideos.slice(0, visibleCount);
+  }, [filteredVideos, visibleCount]);
 
   if (loading) return <ChannelDetailSkeleton />;
 
@@ -342,7 +323,7 @@ export default function ChannelDetail() {
 
       {/* HEADER BANNER */}
       <div className="relative border-b border-border bg-surface/30">
-        <div className="absolute inset-0 h-[300px] md:h-[400px]">
+        <div className="absolute inset-0 h-[280px] md:h-[360px]">
           <ImageWithFallback
             src={channel.banner_url}
             alt=""
@@ -354,7 +335,7 @@ export default function ChannelDetail() {
           <div className="absolute inset-0 bg-gradient-to-r from-bg via-transparent to-transparent opacity-80" />
         </div>
 
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-8 relative z-10 pt-20 md:pt-32 pb-8">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8 relative z-10 pt-16 md:pt-28 pb-8">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start justify-between">
             
             {/* Left Info */}
@@ -395,9 +376,6 @@ export default function ChannelDetail() {
                     <Icon icon="solar:add-square-linear" className="text-sm" />
                     Follow
                   </button>
-                  <button className="flex items-center justify-center border border-border bg-surface hover:bg-surface-2 text-text-primary w-10 h-10 rounded-lg transition-all">
-                    <Icon icon="solar:bell-linear" className="text-lg" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -407,7 +385,7 @@ export default function ChannelDetail() {
               <div className="flex flex-col items-center">
                 <div className="flex items-center gap-1.5 text-brand mb-1">
                   <Icon icon="solar:clapperboard-play-bold" className="text-base" />
-                  <span className="text-text-primary font-heading font-bold text-lg">{formatViewCount(ytStats?.videoCount || featuredVideos.length + popularVideos.length + latestVideos.length)}+</span>
+                  <span className="text-text-primary font-heading font-bold text-lg">{formatViewCount(ytStats?.videoCount || allVideos.length)}+</span>
                 </div>
                 <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Uploads</span>
               </div>
@@ -425,15 +403,6 @@ export default function ChannelDetail() {
                 </div>
                 <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Total Views</span>
               </div>
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1.5 text-brand mb-1">
-                  <Icon icon="solar:calendar-bold" className="text-base" />
-                  <span className="text-text-primary font-heading font-bold text-lg">
-                    {ytStats?.joined ? new Date(ytStats.joined).getFullYear() : '2018'}
-                  </span>
-                </div>
-                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Joined</span>
-              </div>
             </div>
 
           </div>
@@ -444,66 +413,80 @@ export default function ChannelDetail() {
       <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-12">
           
-          {/* Left Column - Video Rails */}
-          <div className="space-y-12 overflow-hidden">
+          {/* Left Main Column - Scannable Grid */}
+          <div>
             
-            {/* Featured */}
-            {featuredVideos.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-brand text-base font-bold font-heading flex items-center gap-2">
-                    Featured Movies on Channel
-                    <Icon icon="solar:alt-arrow-right-linear" />
-                  </h2>
-                </div>
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-                  {featuredVideos.map(video => (
-                    <VideoCard key={video.videoId} video={video} variant="featured" />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Popular */}
-            {popularVideos.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-brand text-base font-bold font-heading flex items-center gap-2">
-                    Popular Uploads
-                    <Icon icon="solar:alt-arrow-right-linear" />
-                  </h2>
-                </div>
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-                  {popularVideos.map(video => (
-                    <VideoCard key={video.videoId} video={video} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Latest */}
-            {latestVideos.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-brand text-base font-bold font-heading flex items-center gap-2">
-                    Latest Channel Uploads
-                    <Icon icon="solar:alt-arrow-right-linear" />
-                  </h2>
-                </div>
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-                  {latestVideos.map(video => (
-                    <VideoCard key={video.videoId} video={video} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {featuredVideos.length === 0 && popularVideos.length === 0 && latestVideos.length === 0 && (
-              <div className="bg-surface border border-border p-12 rounded-2xl text-center">
-                <Icon icon="solar:videocamera-record-line-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-40" />
-                <h3 className="text-lg font-bold text-text-primary mb-1">No video uploads found</h3>
-                <p className="text-xs text-text-muted">Videos for this channel will appear here as they are synced.</p>
+            {/* Filter & Control Bar */}
+            <div className="bg-surface border border-border p-4 rounded-2xl mb-8 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+              {/* Category Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                {[
+                  { id: 'all', label: `All Movies & Uploads (${allVideos.length})` },
+                  { id: 'premieres', label: `Movie Premieres ⭐ (${allVideos.filter(v => v.film_id).length})` },
+                  { id: 'popular', label: 'Most Popular' },
+                  { id: 'latest', label: 'Latest Uploads' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setVisibleCount(18);
+                    }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-brand text-on-brand shadow-md'
+                        : 'bg-surface-2 border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
+
+              {/* Instant Search Bar */}
+              <div className="relative w-full md:w-64">
+                <Icon icon="solar:magnifer-linear" className="absolute left-3 top-2.5 text-text-muted w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search in channel..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setVisibleCount(18);
+                  }}
+                  className="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-xl text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Video Grid */}
+            {displayedVideos.length === 0 ? (
+              <div className="bg-surface border border-border p-16 rounded-2xl text-center">
+                <Icon icon="solar:videocamera-record-line-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-40" />
+                <h3 className="text-lg font-bold text-text-primary mb-1">No videos found</h3>
+                <p className="text-xs text-text-muted">No uploads match your selected filter or search term.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayedVideos.map(video => (
+                    <VideoGridCard key={video.videoId} video={video} />
+                  ))}
+                </div>
+
+                {/* Load More Button */}
+                {filteredVideos.length > visibleCount && (
+                  <div className="mt-12 text-center">
+                    <button
+                      onClick={() => setVisibleCount(prev => prev + 18)}
+                      className="px-8 py-3.5 bg-surface border border-border hover:border-brand/50 text-text-primary font-bold text-xs rounded-xl shadow-md hover:bg-surface-2 transition-all inline-flex items-center gap-2"
+                    >
+                      <span>Load More Movies ({filteredVideos.length - visibleCount} remaining)</span>
+                      <Icon icon="solar:alt-arrow-down-linear" className="w-4 h-4 text-brand" />
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
           </div>
@@ -512,11 +495,11 @@ export default function ChannelDetail() {
           <div className="space-y-6">
             
             {/* Genres */}
-            <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
+            <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
               <h3 className="text-text-primary text-sm font-bold mb-4 font-heading">Genres on this Channel</h3>
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2">
                 {['Drama', 'Thriller', 'Romance', 'Comedy', 'Action', 'Family'].map(genre => (
-                  <span key={genre} className="text-[10px] font-bold text-text-muted border border-border rounded-md px-3 py-1.5 flex items-center gap-1.5 bg-surface-2">
+                  <span key={genre} className="text-[10px] font-bold text-text-muted border border-border rounded-lg px-3 py-1.5 flex items-center gap-1.5 bg-surface-2">
                     <Icon icon="solar:clapperboard-play-linear" className="opacity-50" />
                     {genre}
                   </span>
@@ -525,11 +508,11 @@ export default function ChannelDetail() {
             </div>
 
             {/* Languages */}
-            <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
+            <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
               <h3 className="text-text-primary text-sm font-bold mb-4 font-heading">Languages</h3>
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2">
                 {['English', 'Yoruba', 'Igbo', 'Pidgin'].map(lang => (
-                  <span key={lang} className="text-[10px] font-bold text-text-muted border border-border rounded-md px-3 py-1.5 bg-surface-2">
+                  <span key={lang} className="text-[10px] font-bold text-text-muted border border-border rounded-lg px-3 py-1.5 bg-surface-2">
                     {lang}
                   </span>
                 ))}
@@ -538,19 +521,19 @@ export default function ChannelDetail() {
 
             {/* Related Channels */}
             {relatedChannels.length > 0 && (
-              <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
+              <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
                 <h3 className="text-text-primary text-sm font-bold mb-4 font-heading">Related Channels</h3>
-                <div className="space-y-4 mb-4">
+                <div className="space-y-4">
                   {relatedChannels.map(rc => (
                     <div key={rc.id} className="flex items-center justify-between group">
                       <Link to={`/channels/${rc.slug || rc.id}`} className="flex items-center gap-3 flex-1 overflow-hidden">
-                        <ImageWithFallback src={rc.thumbnail_url} alt={rc.name} fallbackType="avatar" name={rc.name} className="w-8 h-8 rounded-full border border-border shrink-0" />
+                        <ImageWithFallback src={rc.thumbnail_url} alt={rc.name} fallbackType="avatar" name={rc.name} className="w-9 h-9 rounded-full border border-border shrink-0" />
                         <div className="overflow-hidden">
-                          <h4 className="text-text-primary text-[11px] font-bold group-hover:text-brand transition-colors line-clamp-1">{rc.name}</h4>
-                          <div className="flex items-center gap-1.5 text-[9px] text-text-muted">
+                          <h4 className="text-text-primary text-xs font-bold group-hover:text-brand transition-colors line-clamp-1">{rc.name}</h4>
+                          <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
                             <span className="truncate">{rc.channel_handle || `@${rc.name.replace(/\s+/g,'').toLowerCase()}`}</span>
                             <span>•</span>
-                            <span className="shrink-0">{formatViewCount(rc.subscriber_count)} subscribers</span>
+                            <span className="shrink-0">{formatViewCount(rc.subscriber_count)} subs</span>
                           </div>
                         </div>
                       </Link>
@@ -562,15 +545,15 @@ export default function ChannelDetail() {
 
             {/* People & Partners */}
             {owner && (
-              <div className="bg-surface border border-border rounded-xl p-5 shadow-sm">
+              <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
                 <h3 className="text-text-primary text-sm font-bold mb-4 font-heading">People & Production Partners</h3>
-                <div className="flex flex-wrap gap-x-6 gap-y-4 mb-4">
+                <div className="flex flex-wrap gap-x-6 gap-y-4">
                   
                   <Link to={`/people/${owner.slug || owner.id}`} className="flex items-center gap-3 group">
                     <ImageWithFallback src={owner.photo_url} alt={owner.name} fallbackType="avatar" name={owner.name} className="w-10 h-10 rounded-full border border-border object-cover" />
                     <div>
-                      <h4 className="text-text-primary text-[11px] font-bold group-hover:text-brand transition-colors">{owner.name}</h4>
-                      <p className="text-[9px] text-brand font-bold">{owner.known_for_department || 'Producer'}</p>
+                      <h4 className="text-text-primary text-xs font-bold group-hover:text-brand transition-colors">{owner.name}</h4>
+                      <p className="text-[10px] text-brand font-bold">{owner.known_for_department || 'Producer'}</p>
                     </div>
                   </Link>
 
