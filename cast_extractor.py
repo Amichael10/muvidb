@@ -73,7 +73,6 @@ YT_BASE_FLAGS   = [
     "--js-runtimes", "node",
     "--retries", "5", 
     "--socket-timeout", "60",
-    "--extractor-args", "youtube:player_client=android,web",
     "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 ]
 
@@ -631,23 +630,36 @@ def extract(youtube_url: str, output_dir: str = "./output") -> str:
         title, duration = get_video_info(youtube_url)
         safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in title)
 
-        print("\n[2/6] Downloading intro (first 3 min)...")
+        print("\n[2/6] Downloading intro...")
         intro_path = BASE_TEMP_DIR / f"lumi_intro_{safe[:30].strip()}.mp4"
         temp_files.append(intro_path)
-        download_segment(youtube_url, 0, INTRO_DURATION, intro_path)
+        intro_dur = min(INTRO_DURATION, duration)
+        download_segment(youtube_url, 0, intro_dur, intro_path)
 
-        print("\n[3/6] Downloading outro (last 5 min)...")
-        outro_start = max(0, duration - OUTRO_DURATION)
-        outro_path  = BASE_TEMP_DIR / f"lumi_outro_{safe[:30].strip()}.mp4"
-        temp_files.append(outro_path)
-        download_segment(youtube_url, outro_start, OUTRO_DURATION, outro_path)
+        outro_path = None
+        outro_downloaded = False
+        if duration > INTRO_DURATION:
+            print("\n[3/6] Downloading outro...")
+            outro_start = max(0, duration - OUTRO_DURATION)
+            outro_dur = min(OUTRO_DURATION, duration - outro_start)
+            outro_path  = BASE_TEMP_DIR / f"lumi_outro_{safe[:30].strip()}.mp4"
+            temp_files.append(outro_path)
+            download_segment(youtube_url, outro_start, outro_dur, outro_path)
+            outro_downloaded = True
+        else:
+            print("\n[3/6] Video is short; skipping separate outro download...")
 
         print("\n[4/6] Extracting frames...")
         intro_dir    = FRAMES_DIR / "intro"
-        outro_dir    = FRAMES_DIR / "outro"
-        temp_files  += [intro_dir, outro_dir]
+        temp_files.append(intro_dir)
         intro_frames = extract_frames(intro_path, intro_dir, "intro")
-        outro_frames = extract_frames(outro_path, outro_dir, "outro")
+
+        if outro_downloaded and outro_path:
+            outro_dir    = FRAMES_DIR / "outro"
+            temp_files.append(outro_dir)
+            outro_frames = extract_frames(outro_path, outro_dir, "outro")
+        else:
+            outro_frames = []
 
         print("\n[5/6] Reading credits via Vision AI...")
         print(f"  -> Processing {len(intro_frames)} intro frames...")

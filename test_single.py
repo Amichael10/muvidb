@@ -34,7 +34,6 @@ cmd = [
     "--verbose",
     "--retries", "5",
     "--socket-timeout", "60",
-    "--extractor-args", "youtube:player_client=android,web",
     "--download-sections", "*0-300",
     "--force-keyframes-at-cuts",
     "-f", "worstvideo/worst",
