@@ -6,9 +6,18 @@ const STORAGE_RENDER_PREFIX = '/storage/v1/render/image/public/';
 // routed through our cached media proxy in production.
 const FRIENDLY_HOST = /(^|\.)(tmdb\.org|ytimg\.com|youtube\.com|ggpht\.com|googleusercontent\.com|ui-avatars\.com|muvidb\.com)$/i;
 
+// Under SSR this module is evaluated on the server too, where there is no
+// window — so the server would compute `false` and emit a /_vercel/image URL
+// while the browser on localhost computes `true` and emits the raw URL, which
+// React reports as a hydration mismatch. Treating a dev-mode server render as
+// localhost keeps both sides in agreement. In production both evaluate false.
 const isLocalhost =
-  typeof window !== 'undefined' &&
-  /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname);
+  typeof window !== 'undefined'
+    ? /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname)
+    // NB: must be the exact token `import.meta.env.DEV` — Vite substitutes it
+    // statically at build time, and optional chaining (`import.meta.env?.DEV`)
+    // defeats that replacement, leaving it undefined on the server.
+    : import.meta.env.DEV === true;
 
 export function normalizeImageUrl(value) {
   if (!value) return '';
@@ -48,7 +57,22 @@ function getSupabaseObjectPath(value) {
 }
 
 function buildSupabaseImageUrl(objectPath, width, quality) {
-  if (!width) return `${STORAGE_OBJECT_PREFIX}${objectPath}`;
+  // Supabase image transformations are metered per unique source image, and Pro
+  // includes only 100 per billing period. Routing the catalogue through them hit
+  // 2,088 in one cycle — a ~20x overage.
+  //
+  // Our stored images do not need it: posters average ~43 KB (908 MB across
+  // 21,592 objects), so a resize saves little and costs quota on every new image
+  // a visitor sees. Serving the stored object directly is both cheaper and one
+  // less hop.
+  //
+  // getImageSrcSet() degrades cleanly — when every width collapses to the same
+  // URL it returns undefined, and callers fall back to plain `src`.
+  //
+  // Set VITE_SUPABASE_IMAGE_TRANSFORMS=true to re-enable, e.g. if larger
+  // originals are stored later and resizing becomes worth the quota.
+  const transformsEnabled = import.meta.env.VITE_SUPABASE_IMAGE_TRANSFORMS === 'true';
+  if (!width || !transformsEnabled) return `${STORAGE_OBJECT_PREFIX}${objectPath}`;
 
   const params = new URLSearchParams({
     width: String(width),
@@ -86,9 +110,11 @@ export function getProxiedImageUrl(originalUrl, opts = {}) {
     }
 
     if (host && !FRIENDLY_HOST.test(host)) {
-      const mediaUrl = `/api/media?url=${encodeURIComponent(normalized)}`;
-      if (!width) return mediaUrl;
-      return `/_vercel/image?url=${encodeURIComponent(mediaUrl)}&w=${width}&q=${quality}`;
+      // Route through our media proxy. Do NOT wrap in /_vercel/image — Vercel
+      // image optimization rejects relative /api/media URLs
+      // (INVALID_IMAGE_OPTIMIZE_REQUEST), which blanked person photos on
+      // PersonDetail (width={512}) while PersonCard (raw src) still worked.
+      return `/api/media?url=${encodeURIComponent(normalized)}`;
     }
   }
 

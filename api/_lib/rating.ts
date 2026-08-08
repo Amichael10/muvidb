@@ -26,18 +26,28 @@ export function pctLiked(score10: number): number {
 /**
  * De-inflated comment score (0-10) before it hits `pctLiked`.
  *
- * Two corrections to the raw likes-weighted mean:
+ * Two corrections to the raw mean:
  *  1. Bayesian shrink toward a prior of 6.5 (an average film, NOT 8.0) — a
  *     handful of glowing comments shouldn't read as acclaim.
- *  2. The prior is worth only ~6 comments now (was 10) so real volume moves the
- *     score, but low-sample films still sit near "decent", not "amazing".
+ *  2. The prior is worth ~10 comments, so real volume moves the score but a
+ *     thin sample stays near "unremarkable".
  *
  * The rest of the de-inflation is upstream: we keep critical/commentary
  * comments (not just praise) and score them on a stricter rubric, so the raw
  * mean feeding this is honest in the first place.
  */
 export const COMMENT_PRIOR_MEAN = 6.5;
-export const COMMENT_PRIOR_WEIGHT = 6;
+export const COMMENT_PRIOR_WEIGHT = 10;
+
+/**
+ * Qualifying opinions required before a film may publish a rating at all.
+ *
+ * Shrinkage alone can't rescue a 3-comment film: it just parks it near the
+ * prior and presents that guess as a measurement. Below this floor we keep the
+ * mined reviews but leave liked_percent/audience_rating null, and the film
+ * detail page falls back to its "Be the first to rate" state.
+ */
+export const MIN_RATING_SAMPLE = 8;
 export function shrinkCommentScore(weightedMean: number, count: number): number {
   const n = Math.max(0, count);
   return (n * weightedMean + COMMENT_PRIOR_WEIGHT * COMMENT_PRIOR_MEAN) / (n + COMMENT_PRIOR_WEIGHT);
@@ -61,4 +71,42 @@ export function tmdbLikedPercent(voteAverage: number, voteCount: number): number
   const v = Math.max(0, voteCount);
   const wr = (v * voteAverage + TMDB_MIN_VOTES * TMDB_PRIOR_MEAN) / (v + TMDB_MIN_VOTES);
   return pctLiked(wr);
+}
+
+/** Same Bayesian + curve as TMDB — IMDb's official aggregate is also 0–10. */
+export const imdbLikedPercent = tmdbLikedPercent;
+
+/**
+ * Blend site likes/dislikes into a base liked % (TMDB / IMDb / YouTube).
+ *
+ * Mirrors `reaction_liked_blend()` in
+ * supabase/migrations/20260802224000_stricter_reaction_liked_blend.sql —
+ * SQL is authoritative for live updates; this helper is for tests/docs.
+ *
+ * Hard to move on purpose: 120 ghost votes, no-base anchor 40%, and at least
+ * 10 reactions before thumbs alone can mint a liked_percent. With a base,
+ * one like barely nudges; volume has to earn a climb.
+ */
+export const REACTION_PRIOR_WEIGHT = 120;
+export const REACTION_NO_BASE_ANCHOR = 40;
+export const REACTION_MIN_NO_BASE = 10;
+
+export function blendReactionLikedPercent(
+  baseLiked: number | null | undefined,
+  likes: number,
+  dislikes: number,
+): number | null {
+  const L = Math.max(0, likes | 0);
+  const D = Math.max(0, dislikes | 0);
+  const n = L + D;
+  if (n === 0) {
+    return baseLiked == null ? null : Math.round(baseLiked);
+  }
+  if (baseLiked == null && n < REACTION_MIN_NO_BASE) {
+    return null;
+  }
+  const anchor = baseLiked == null ? REACTION_NO_BASE_ANCHOR : Number(baseLiked);
+  const pct =
+    ((L + REACTION_PRIOR_WEIGHT * (anchor / 100)) / (n + REACTION_PRIOR_WEIGHT)) * 100;
+  return Math.round(Math.max(5, Math.min(97, pct)));
 }

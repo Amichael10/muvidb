@@ -304,3 +304,15 @@ export async function reviewPeopleEnrichment(queueId, status, note = null) {
   if (error) throw error;
   return { success: true };
 }
+
+export async function deletePersonProfile(personId) {
+  if (!personId) throw new Error('Person ID is required for deletion');
+  const remote = await apiRequest({ action: 'delete_person', personId });
+  if (remote) return remote;
+  await supabase.from('people_enrichment_queue').delete().eq('person_id', personId);
+  await supabase.from('credits').delete().eq('person_id', personId);
+  const { error } = await supabase.from('people').delete().eq('id', personId);
+  if (error) throw error;
+  return { success: true };
+}
+

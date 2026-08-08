@@ -35,7 +35,7 @@ export function getFriendlyErrorMessage(error) {
     message.includes("unique constraint") ||
     message.includes("already exists")
   ) {
-    return "This record has already been added to Ensembla! No need to duplicate it.";
+    return "This record has already been added to MuviDB! No need to duplicate it.";
   }
 
   // 3. Database Integrity / Foreign Key Deletion Blockers
@@ -68,14 +68,31 @@ export function getFriendlyErrorMessage(error) {
     return "An account with this email address already exists. Try signing in instead!";
   }
 
+  if (
+    message.includes('hook') ||
+    message.includes('confirmation email') ||
+    message.includes('error sending') ||
+    message.includes('email hook')
+  ) {
+    return "We couldn't send your confirmation email. Please try again in a few minutes, or contact support@muvidb.com if it keeps failing.";
+  }
+
   if (message.includes("password should be")) {
     return "Your password is too short. Please use a password with at least 6 characters.";
   }
 
-  // 5. Rate Limiting / Flooding
+  // Supabase Auth — default project email cap is 2/hour until custom SMTP is enabled
   if (
     status === 429 ||
     status === "429" ||
+    message.includes("over_email_send_rate_limit") ||
+    message.includes("email rate limit exceeded")
+  ) {
+    return "We've hit Supabase's email sending limit for now (usually 2 per hour on new projects). Wait about an hour and try again, or enable Custom SMTP under Supabase → Authentication to raise the limit.";
+  }
+
+  // Generic rate limits (APIs, etc.)
+  if (
     message.includes("too many requests") ||
     message.includes("429") ||
     message.includes("rate limit")

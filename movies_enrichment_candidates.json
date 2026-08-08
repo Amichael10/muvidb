@@ -1,0 +1,473 @@
+[
+  {
+    "film_id": "5a340f48-6f80-4bba-9557-cdf64cf04ee3",
+    "title": "Heavenly Awareness",
+    "year": 2017,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-6Rz_lRuXZ1g.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=6Rz_lRuXZ1g",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "1ba44c37-af75-4854-be06-89b71223b299",
+    "title": "The Same Love",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-VNznmVVfWbM.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=VNznmVVfWbM",
+    "already_have": [],
+    "discovered": [
+      "Synopsis",
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "A business owner brings a trusted associate into his company to offer him support and opportunity. However, their relationship turns bitter when the associate turns against him, inventing false financial claims and exposing a dark web of deceit.",
+    "proposed_genres": [
+      "Drama",
+      "Thriller"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Verified Pure Plot"
+  },
+  {
+    "film_id": "4b0b70d2-2a38-4dad-aa04-59021117e52a",
+    "title": "The Misplaced Affection",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-VHkPyEMQlNA.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=VHkPyEMQlNA",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "dfb98b62-e135-42c6-b44b-f079d2be9336",
+    "title": "Hall Of Illusion 1&2",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-GQ2DFO9n1Y0.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=GQ2DFO9n1Y0",
+    "already_have": [],
+    "discovered": [
+      "Synopsis",
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "Set in the kingdom of Omodi, royal court authority is thrown into turmoil by an arrogant prince whose reckless behavior toward village maidens triggers a widespread uprising. As traditional council elders intervene, ancient ancestral spirits are invoked to restore balance and justice.",
+    "proposed_genres": [
+      "Nollywood Epic",
+      "Drama"
+    ],
+    "proposed_age_rating": "15",
+    "confidence": "Verified Pure Plot"
+  },
+  {
+    "film_id": "d4c7c076-1c03-43b9-b75e-d7c729ccb987",
+    "title": "Bush Money PART 2",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-lmTTf410wIQ.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=lmTTf410wIQ",
+    "already_have": [],
+    "discovered": [
+      "Synopsis",
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "A group of ambitious villagers embarks on an illegal hunt for sudden wealth in dangerous, uncharted territory. Their desperate pursuit of riches triggers deadly betrayals, unearthly secrets, and a severe moral reckoning that threatens their entire community.",
+    "proposed_genres": [
+      "Drama",
+      "Nollywood Epic"
+    ],
+    "proposed_age_rating": "15",
+    "confidence": "Verified Pure Plot"
+  },
+  {
+    "film_id": "64defd3a-b8ef-4d68-bc4b-4c0212830f79",
+    "title": "The First Spark of Love ~ Maurice Sam, Uche Montana, Onyii Alex",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-Y4FVoJOH77c.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=Y4FVoJOH77c",
+    "already_have": [],
+    "discovered": [
+      "Synopsis",
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "A wealthy young man faces a strict family ultimatum after a tragic accident leaves a young woman disabled. Forced by his mother to marry her or risk being disinherited, he navigates bitter resentment, family duty, and unexpected romantic sparks as hidden motives come to light.",
+    "proposed_genres": [
+      "Romance",
+      "Family Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Verified Pure Plot"
+  },
+  {
+    "film_id": "93f219dd-8c9b-45f6-a0f5-f20943c0aa42",
+    "title": "We Took a Stroll Like Poor Men in Search of D Right Wife for My Rich Friend from Abroad - Movies",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-yiVbH_cg9ow.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=yiVbH_cg9ow",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "bd982dc7-9cba-4308-b8e8-6361c7a148eb",
+    "title": "Save the Maidens from the Prince -peace Onuoha/jennifer Obodo",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/series-new-save-the-maidens-from-the-prince-complet.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=UlGKUyr5-iY",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "3a8857e6-0645-4a07-96b1-3464009e0dad",
+    "title": "The Cold Double Love",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-Mux2q2oBm30.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=Mux2q2oBm30",
+    "already_have": [
+      "Synopsis"
+    ],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "658bc305-8a78-4272-a93b-bbf1ed8a2faa",
+    "title": "END of Love Affair 1&2",
+    "year": 2018,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-W671v1SSfsA.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=W671v1SSfsA",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "26fe7874-c1d7-474c-82b2-12ce3992cc38",
+    "title": "Ewiase YE SUM Twi",
+    "year": 2018,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-LBaYuH87sg8.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=LBaYuH87sg8",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "13df3b0c-35cf-4b14-b657-ec63660ba869",
+    "title": "Until YOU",
+    "year": 2025,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/13df3b0c-35cf-4b14-b657-ec63660ba869-poster.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=PCuiPMc8Fjc",
+    "already_have": [
+      "Synopsis"
+    ],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "ac3444cb-b357-4da9-86af-0ed5dd62523f",
+    "title": "Touched Deep Down",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-Vvm4pgv9E98.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=Vvm4pgv9E98",
+    "already_have": [
+      "Synopsis"
+    ],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "b3b84b0f-8f2a-405d-a7df-f1ac9fa0006b",
+    "title": "Secret Affair",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-bRLsY6QJbrk.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=bRLsY6QJbrk",
+    "already_have": [
+      "Synopsis"
+    ],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "0dc55189-2f3b-44fe-bb78-8ed9f4ac3379",
+    "title": "Ife Temi",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/0bdc7d94-d21d-4af5-a0ae-d416729d7b6e.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=9f4JPyooWH0",
+    "already_have": [],
+    "discovered": [
+      "Synopsis",
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "Two devoted lovers find their relationship tested by long-buried family grievances and intense societal expectations. As romantic rivalries flare and hidden motives surface, they are forced to choose between loyalty to tradition and fighting for their future together.",
+    "proposed_genres": [
+      "Romance",
+      "Yoruba Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Verified Pure Plot"
+  },
+  {
+    "film_id": "ff2383cb-8c45-4cb2-9bcc-f4ef6e09fd36",
+    "title": "Back from Hell",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-bEP8URfmjhw.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=bEP8URfmjhw",
+    "already_have": [],
+    "discovered": [
+      "Synopsis",
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "When the wealthy heiress to a lucrative oil empire mysteriously vanishes on her way to work, detectives launch a high-stakes search. As initial suspicions shift from her dismissed driver to her closest relatives, the investigation uncovers a dangerous web of betrayal, corporate greed, and marital secrets surrounding a prenuptial agreement.",
+    "proposed_genres": [
+      "Crime Drama",
+      "Mystery",
+      "Thriller"
+    ],
+    "proposed_age_rating": "15",
+    "confidence": "Verified Pure Plot"
+  },
+  {
+    "film_id": "59886899-74cd-4b2e-a8fb-9b7884a86095",
+    "title": "The Fire and the Moth - Recap / Review",
+    "year": 2025,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-GniA8NF0mY0.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=GniA8NF0mY0",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "b94ed805-36f6-4850-a24f-6ab63d1f680c",
+    "title": "Born Again Kumawood Ghana TWI Movie",
+    "year": 2022,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-4HzggmSXR-Y.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=4HzggmSXR-Y",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "25a72cbf-17fd-4fe8-beaa-e9bce4886159",
+    "title": "The Good Shepherd Methodist Church @ Woodvillage -kumasi",
+    "year": 2021,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-bV5UR4YKRwg.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=bV5UR4YKRwg",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "21f2f148-a5b5-4214-b22b-d75caf228a0f",
+    "title": "Agyapadie NTI 1&2",
+    "year": 2023,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-ce5R9Sw6Mhc.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=ce5R9Sw6Mhc",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "444debd9-7e06-47ec-b053-6e1f59515e06",
+    "title": "Agyapadie NTI 3&4",
+    "year": 2023,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-GZRhQS1Bqss.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=GZRhQS1Bqss",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "66823de1-806e-44b9-85e5-e2efa82d36c1",
+    "title": "Undercover PT 2",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-hPvFlLzg_m0.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=hPvFlLzg_m0",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "66458402-4c2b-4449-b40a-40e95196c0c7",
+    "title": "What Happened to Lionel Richie at 77, Try Not to CRY When You See This",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/movie-8sCB_p-jjbk.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=8sCB_p-jjbk",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "6725811b-8d81-47c7-b863-5ee4e0f04da1",
+    "title": "Battle of the Mother in Laws Ep.5",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/ep-gEkUNFmJvKI.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=gEkUNFmJvKI",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  },
+  {
+    "film_id": "f82b8426-5e16-4626-a0c8-7d4a76379660",
+    "title": "Save The Maidens From The Prince",
+    "year": 2026,
+    "poster_url": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/ep-UlGKUyr5-iY.jpg",
+    "youtube_url": "https://www.youtube.com/watch?v=UlGKUyr5-iY",
+    "already_have": [],
+    "discovered": [
+      "Genres",
+      "Age Rating"
+    ],
+    "proposed_synopsis": "",
+    "proposed_genres": [
+      "Drama"
+    ],
+    "proposed_age_rating": "PG-13",
+    "confidence": "Needs Manual Review"
+  }
+]

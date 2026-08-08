@@ -10,7 +10,7 @@ import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AddCreditModal from '../../components/admin/AddCreditModal';
 import AwardsEditor from '../../components/admin/AwardsEditor';
-import { formatRole } from '../../lib/creditRoles';
+import { ALL_ROLES, CAST_ROLE, formatRole, normalizeRole } from '../../lib/creditRoles';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
@@ -19,6 +19,7 @@ import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { useMemo } from 'react';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { AFRICAN_NATIONALITIES } from '../../utils/africanCountries';
 
 export default function AdminPeople() {
   const { user } = useAuth();
@@ -54,6 +55,9 @@ export default function AdminPeople() {
   const [isBatchDeletingPeople, setIsBatchDeletingPeople] = useState(false);
   const [personCredits, setPersonCredits] = useState([]);
   const [showAddCredit, setShowAddCredit] = useState(false);
+  const [deletingCredit, setDeletingCredit] = useState(null);
+  const [isDeletingCredit, setIsDeletingCredit] = useState(false);
+  const [updatingCreditId, setUpdatingCreditId] = useState(null);
 
   // Shared by the drawer's initial load and the add-credit modal's save.
   const refetchCredits = async (personId) => {
@@ -67,6 +71,76 @@ export default function AdminPeople() {
       .order('billing_order');
 
     setPersonCredits(data || []);
+  };
+
+  const updateCreditField = async (credit, patch) => {
+    if (!editingPerson) return;
+    setUpdatingCreditId(credit.id);
+
+    const nextRole = patch.role !== undefined ? normalizeRole(patch.role) : normalizeRole(credit.role);
+    if (patch.role !== undefined) {
+      const dupe = personCredits.some(
+        (c) =>
+          c.id !== credit.id &&
+          (c.films?.id || c.film_id) === credit.films?.id &&
+          normalizeRole(c.role) === nextRole,
+      );
+      if (dupe) {
+        setUpdatingCreditId(null);
+        return toast.error(`Already credited as ${formatRole(nextRole)} on this film.`);
+      }
+    }
+
+    const payload = { ...patch };
+    if (payload.role !== undefined) payload.role = nextRole;
+    // Character name only applies to cast; clear it when switching away from actor.
+    if (payload.role !== undefined && payload.role !== CAST_ROLE) {
+      payload.character_name = null;
+    }
+
+    const { error } = await supabase.from('credits').update(payload).eq('id', credit.id);
+    setUpdatingCreditId(null);
+
+    if (error) {
+      if (error.code === '23505') {
+        return toast.error(`Already credited as ${formatRole(nextRole)} on this film.`);
+      }
+      return toast.error(getFriendlyErrorMessage(error));
+    }
+
+    setPersonCredits((prev) =>
+      prev.map((c) => (c.id === credit.id ? { ...c, ...payload } : c)),
+    );
+    await logAdminAction(
+      user,
+      'update',
+      'credit',
+      credit.id,
+      `${editingPerson.name} → ${credit.films?.title || 'film'}`,
+      payload,
+    );
+    toast.success('Credit updated');
+  };
+
+  const handleDeleteCredit = async () => {
+    if (!deletingCredit || !editingPerson) return;
+    setIsDeletingCredit(true);
+    const { error } = await supabase.from('credits').delete().eq('id', deletingCredit.id);
+    setIsDeletingCredit(false);
+
+    if (error) return toast.error(getFriendlyErrorMessage(error));
+
+    setPersonCredits((prev) => prev.filter((c) => c.id !== deletingCredit.id));
+    await logAdminAction(
+      user,
+      'delete',
+      'credit',
+      deletingCredit.id,
+      `${editingPerson.name} → ${deletingCredit.films?.title || 'film'}`,
+      { role: deletingCredit.role },
+    );
+    toast.success('Credit removed');
+    setDeletingCredit(null);
   };
   const [youtubeFilmography, setYoutubeFilmography] = useState([]);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -567,50 +641,65 @@ export default function AdminPeople() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="admin-page space-y-6">
+      <div className="admin-page-header flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <p className="text-brand text-xs font-bold mb-1">Database</p>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">People</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-text-muted">
+            <span className="rounded-md border border-border bg-surface-2 px-2.5 py-1">
+              {totalCount.toLocaleString()} profiles
+            </span>
+            <span className="rounded-md border border-border bg-surface-2 px-2.5 py-1">
+              Page {page}
+            </span>
+            {debouncedSearch && (
+              <span className="rounded-md border border-brand/25 bg-brand/10 px-2.5 py-1 text-brand">
+                Search: {debouncedSearch}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={handleRecalculateScores} disabled={isRecalculating} className="bg-surface-2 border border-border px-4 py-2 rounded-lg text-xs font-bold text-text-primary hover:bg-surface-3 transition-colors">
+            <Icon icon="solar:refresh-linear" className="inline-block w-4 h-4 mr-1.5 align-[-3px]" />
             {isRecalculating ? 'Updating...' : 'Synchronize popularity'}
           </button>
           <button onClick={openAddDrawer} className="bg-brand text-white font-black px-6 py-2.5 rounded-xl text-xs hover:scale-[1.05] active:scale-[0.95] transition-all flex items-center gap-2 shadow-lg shadow-brand/20">
             <Icon icon="solar:plus-linear" className="text-lg" />
-            Add New Actor
+            Add person
           </button>
         </div>
       </div>
 
-      <div className="card-cal p-5">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2 relative">
+      <div className="admin-filter-card">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+          <div className="lg:col-span-4 relative">
+            <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
             <input
               type="text"
               placeholder="Search records..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
+              className="w-full bg-surface-2 border border-border rounded-md pl-10 pr-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
             />
           </div>
-          <select value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="All">All Status</option>
             <option value="Incomplete">Incomplete</option>
             <option value="Complete">Complete</option>
           </select>
-          <select value={spotlightFilter} onChange={(e) => setSpotlightFilter(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={spotlightFilter} onChange={(e) => setSpotlightFilter(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="All">Any Spotlight</option>
             <option value="Spotlight">Spotlight Only</option>
             <option value="Regular">Regular Only</option>
           </select>
-          <select value={verifiedFilter} onChange={(e) => setVerifiedFilter(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={verifiedFilter} onChange={(e) => setVerifiedFilter(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="All">Any Verification</option>
             <option value="Verified">Verified Only</option>
             <option value="Member">Members Only</option>
           </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="Recently Added">Recently Added</option>
             <option value="Most Popular">Most Popular</option>
             <option value="A-Z">Alphabetical (A-Z)</option>
@@ -621,7 +710,7 @@ export default function AdminPeople() {
       </div>
 
       {selectedPersonIds.length > 0 && (
-        <div className="flex items-center justify-between p-4 bg-brand/5 border border-brand/20 rounded-lg animate-in slide-in-from-top-2">
+        <div className="admin-selection-bar flex items-center justify-between p-4 animate-in slide-in-from-top-2">
           <span className="text-sm font-bold text-brand">{selectedPersonIds.length} profiles selected</span>
           <div className="flex gap-2">
             {selectedPersonIds.length >= 2 && (
@@ -632,8 +721,9 @@ export default function AdminPeople() {
         </div>
       )}
 
-      <div className="card-cal p-0 overflow-hidden">
-        <table className="w-full text-left">
+      <div className="card-cal admin-table-card p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="admin-data-table w-full text-left">
           <thead>
             <tr className="border-b border-border text-[10px] font-bold text-text-muted bg-surface-2/30 uppercase tracking-wider">
               <th className="px-6 py-5 w-12"><input type="checkbox" onChange={toggleSelectAllFilteredPeople} checked={people.length > 0 && people.every(p => selectedPersonIds.includes(p.id))} className="rounded border-border bg-surface-3 text-brand focus:ring-brand accent-brand" /></th>
@@ -658,7 +748,7 @@ export default function AdminPeople() {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     {p.photo_url ? <img src={p.photo_url} className="w-10 h-10 rounded object-cover shadow-sm grayscale group-hover:grayscale-0 transition-all" /> : <div className="w-10 h-10 rounded bg-surface-2 flex items-center justify-center text-[10px] font-bold text-text-muted">?</div>}
-                    <div>
+                    <div className="min-w-0 max-w-xl">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-text-primary block leading-tight">{formatPersonName(p.name)}</span>
                         {p.is_spotlight && (
@@ -691,7 +781,7 @@ export default function AdminPeople() {
                   </span>
                 </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="admin-row-actions flex justify-end gap-2">
                       <button 
                         onClick={() => handleToggleSpotlight(p)} 
                         className={`p-2 rounded-lg transition-all border border-transparent hover:border-border hover:shadow-sm ${p.is_spotlight ? 'bg-brand/10 text-brand' : 'bg-surface-2 text-text-muted hover:text-brand'}`}
@@ -707,6 +797,7 @@ export default function AdminPeople() {
             ))}
           </tbody>
         </table>
+        </div>
 
         {/* Pagination Footer */}
           {(() => {
@@ -915,12 +1006,19 @@ export default function AdminPeople() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-text-primary mb-2">Nationality</label>
-                  <input 
-                    value={formData.nationality} 
-                    onChange={e => setFormData({...formData, nationality: e.target.value})} 
-                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
-                    placeholder="e.g. Nigerian" 
-                  />
+                  <select
+                    value={formData.nationality || ''}
+                    onChange={e => setFormData({...formData, nationality: e.target.value})}
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none"
+                  >
+                    <option value="">Select nationality</option>
+                    {formData.nationality && !AFRICAN_NATIONALITIES.includes(formData.nationality) && (
+                      <option value={formData.nationality}>{formData.nationality}</option>
+                    )}
+                    {AFRICAN_NATIONALITIES.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>
@@ -962,7 +1060,7 @@ export default function AdminPeople() {
               <button
                 type="button"
                 onClick={handleFetchYoutube}
-                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-full hover:bg-brand/10 transition-all flex items-center gap-1.5"
+                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-xl hover:bg-brand/10 transition-all flex items-center gap-1.5"
               >
                 Refresh Stats
               </button>
@@ -999,7 +1097,7 @@ export default function AdminPeople() {
                   <span className="text-xl">🎞️</span>
                   <h4 className="text-xs font-bold text-text-muted">Film Credits</h4>
                   {personCredits.length > 0 && (
-                    <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-full px-2 py-0.5">
+                    <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-xl px-2 py-0.5">
                       {personCredits.length}
                     </span>
                   )}
@@ -1020,8 +1118,13 @@ export default function AdminPeople() {
               )}
 
               <div className="space-y-3">
-                {personCredits.map(credit => (
-                  <div key={credit.id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
+                {personCredits.map(credit => {
+                  const roleValue = normalizeRole(credit.role);
+                  const knownRole = ALL_ROLES.some((r) => r.value === roleValue);
+                  const busy = updatingCreditId === credit.id;
+
+                  return (
+                  <div key={credit.id} className="flex items-start gap-3 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
                     <div className="w-10 h-14 bg-surface rounded border border-border overflow-hidden flex-shrink-0">
                       {credit.films?.poster_url ? (
                         <img src={credit.films.poster_url} className="w-full h-full object-cover" alt="" />
@@ -1029,16 +1132,61 @@ export default function AdminPeople() {
                         <div className="w-full h-full flex items-center justify-center text-[8px] bg-surface-3 text-text-muted">NO POSTER</div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
-                      <div className="text-[10px] text-text-muted mt-0.5 font-medium">
-                        <span>{formatRole(credit.role)}</span>
-                        {credit.character_name && ` as ${credit.character_name}`}
-                        {credit.films?.year && ` (${credit.films.year})`}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
+                          {credit.films?.year && (
+                            <div className="text-[10px] text-text-muted mt-0.5 font-medium">{credit.films.year}</div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingCredit(credit)}
+                          disabled={busy}
+                          className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0"
+                          title="Remove credit"
+                        >
+                          <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={roleValue}
+                          onChange={(e) => updateCreditField(credit, { role: e.target.value })}
+                          disabled={busy}
+                          className="bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-bold focus:border-brand outline-none disabled:opacity-50"
+                        >
+                          {!knownRole && roleValue && (
+                            <option value={roleValue}>{formatRole(roleValue)}</option>
+                          )}
+                          {ALL_ROLES.map((r) => (
+                            <option key={r.value} value={r.value}>{r.label}</option>
+                          ))}
+                        </select>
+                        {roleValue === CAST_ROLE && (
+                          <input
+                            type="text"
+                            placeholder="Character name"
+                            defaultValue={credit.character_name || ''}
+                            key={`${credit.id}-${credit.character_name || ''}`}
+                            onBlur={(e) => {
+                              const next = e.target.value.trim();
+                              const prev = (credit.character_name || '').trim();
+                              if (next === prev) return;
+                              updateCreditField(credit, {
+                                character_name: next ? toTitleCase(next) : null,
+                              });
+                            }}
+                            disabled={busy}
+                            className="flex-1 min-w-[8rem] bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-medium focus:border-brand outline-none disabled:opacity-50"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -1198,6 +1346,16 @@ export default function AdminPeople() {
           existingCredits={personCredits}
           onClose={() => setShowAddCredit(false)}
           onSaved={() => refetchCredits(editingPerson.id)}
+        />
+      )}
+      {deletingCredit && (
+        <ConfirmModal
+          onCancel={() => !isDeletingCredit && setDeletingCredit(null)}
+          onConfirm={handleDeleteCredit}
+          title="Remove Credit"
+          message={`Remove ${formatRole(deletingCredit.role)} credit for “${deletingCredit.films?.title || 'this film'}”?`}
+          confirmLabel="Remove Credit"
+          isProcessing={isDeletingCredit}
         />
       )}
       {deletingPerson && (

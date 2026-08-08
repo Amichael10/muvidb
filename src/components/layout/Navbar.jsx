@@ -4,19 +4,28 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Icon } from '@iconify/react';
 
+const MOTION_STORAGE_KEY = 'MuviDB_motion_enabled';
+
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState(['King of Boys', 'Funke Akindele', 'Anikulapo']);
   const [unreadNotifications, setUnreadNotifications] = useState(false);
+  const [isMotionEnabled, setIsMotionEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem(MOTION_STORAGE_KEY) !== 'false';
+  });
   
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const searchInputRef = useRef(null);
+  const moreMenuRef = useRef(null);
+  const isHome = location.pathname === '/';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,11 +51,28 @@ export default function Navbar() {
     }
   }, [isSearchOpen]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    document.documentElement.classList.toggle('muvi-motion-paused', !isMotionEnabled);
+    localStorage.setItem(MOTION_STORAGE_KEY, isMotionEnabled ? 'true' : 'false');
+  }, [isMotionEnabled]);
+
   // Close search and menus on route change
   useEffect(() => {
     setIsSearchOpen(false);
     setIsUserMenuOpen(false);
+    setIsMoreOpen(false);
   }, [location]);
+
+  useEffect(() => {
+    if (!isMoreOpen) return undefined;
+    const onDoc = (e) => {
+      if (!moreMenuRef.current?.contains(e.target)) setIsMoreOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [isMoreOpen]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -57,15 +83,26 @@ export default function Navbar() {
     }
   };
 
-  const navLinks = [
+  // Keep the pill short — extras live in More (same idea as mobile drawer).
+  const primaryLinks = [
     { name: 'Movies', path: '/browse' },
     { name: 'TV Shows', path: '/tv-shows' },
     { name: 'Showtimes', path: '/showtimes' },
-    { name: 'Cinemas', path: '/cinemas' },
-    { name: 'Channels', path: '/channels' },
     { name: 'People', path: '/people' },
-    { name: 'Companies', path: '/companies' },
   ];
+
+  const moreLinks = [
+    { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
+    { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },
+    { name: 'Awards', path: '/awards', icon: 'solar:cup-star-linear' },
+    { name: 'Critics', path: '/critics', icon: 'solar:pen-new-square-linear' },
+    { name: 'Theatre Plays', path: '/plays', icon: 'solar:masks-linear' },
+    { name: 'Companies', path: '/companies', icon: 'solar:case-linear' },
+  ];
+
+  const isMoreActive = moreLinks.some(
+    (link) => location.pathname === link.path || location.pathname.startsWith(`${link.path}/`)
+  );
 
   return (
     <>
@@ -84,15 +121,17 @@ export default function Navbar() {
           />
         </Link>
 
-        {/* Center: Navigation Links (Desktop Only) */}
+        {/* Center: primary links + More (desktop) */}
         <div className="hidden lg:flex items-center gap-1 bg-surface-2/50 backdrop-blur-sm border border-border p-1 rounded-full">
-          {navLinks.map((link) => {
-            const isActive = location.pathname === link.path;
+          {primaryLinks.map((link) => {
+            const isActive =
+              location.pathname === link.path ||
+              (link.path !== '/' && location.pathname.startsWith(`${link.path}/`));
             return (
               <Link
                 key={link.name}
                 to={link.path}
-                className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 whitespace-nowrap
+                className={`px-4 xl:px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap
                   ${isActive 
                     ? 'bg-brand text-white shadow-md' 
                     : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
@@ -103,6 +142,64 @@ export default function Navbar() {
               </Link>
             );
           })}
+
+          <div className="relative" ref={moreMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsMoreOpen((open) => !open)}
+              aria-expanded={isMoreOpen}
+              aria-haspopup="menu"
+              className={`inline-flex items-center gap-1.5 px-4 xl:px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap
+                ${isMoreOpen || isMoreActive
+                  ? 'bg-brand text-white shadow-md'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
+                }
+              `}
+            >
+              More
+              <Icon
+                icon="solar:alt-arrow-down-linear"
+                width="16"
+                height="16"
+                className={`transition-transform duration-200 ${isMoreOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {isMoreOpen && (
+              <div
+                role="menu"
+                className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-56 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
+              >
+                <div className="px-4 py-3 border-b border-border bg-surface-2/40">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
+                    Explore
+                  </p>
+                </div>
+                <div className="p-2">
+                  {moreLinks.map((link) => {
+                    const isActive =
+                      location.pathname === link.path ||
+                      location.pathname.startsWith(`${link.path}/`);
+                    return (
+                      <Link
+                        key={link.name}
+                        to={link.path}
+                        role="menuitem"
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'bg-brand/10 text-brand'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
+                        }`}
+                      >
+                        <Icon icon={link.icon} width="18" height="18" />
+                        {link.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right: Actions */}
@@ -124,6 +221,27 @@ export default function Navbar() {
           >
             <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="22" height="22" />
           </button>
+
+          {isHome && (
+            <button
+              onClick={() => setIsMotionEnabled((enabled) => !enabled)}
+              className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 ${
+                isMotionEnabled
+                  ? 'bg-brand/10 text-brand hover:bg-brand/15'
+                  : 'text-text-muted hover:text-brand hover:bg-brand/10'
+              }`}
+              aria-label={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
+              aria-pressed={isMotionEnabled}
+              title={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
+            >
+              <span
+                className={`muvi-motion-toggle-kernel ${
+                  isMotionEnabled ? '' : 'muvi-motion-toggle-kernel--off'
+                }`}
+                aria-hidden="true"
+              />
+            </button>
+          )}
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2 md:gap-4">
@@ -204,7 +322,7 @@ export default function Navbar() {
           ) : (
             <Link 
               to="/login"
-              className="px-6 py-2 border-2 border-brand text-brand rounded-full font-bold text-sm btn-hover shadow-lg shadow-brand/5"
+              className="px-6 py-2 border-2 border-brand text-brand rounded-xl font-bold text-sm btn-hover shadow-lg shadow-brand/5"
             >
               Sign In
             </Link>
@@ -257,7 +375,7 @@ export default function Navbar() {
                       navigate(`/search?q=${encodeURIComponent(term)}`);
                       setIsSearchOpen(false);
                     }}
-                    className="px-5 py-2.5 bg-white/5 hover:bg-brand hover:text-white border border-white/10 rounded-full text-sm text-text-secondary transition-all active:scale-95"
+                    className="px-5 py-2.5 bg-white/5 hover:bg-brand hover:text-white border border-white/10 rounded-xl text-sm text-text-secondary transition-all active:scale-95"
                   >
                     {term}
                   </button>

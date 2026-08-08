@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate, Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
@@ -17,22 +16,26 @@ import { Skeleton } from '../components/ui/Skeleton'
 import ShareAction from '../components/ui/ShareAction'
 import ImageWithFallback from '../components/ui/ImageWithFallback'
 import { slugOrId } from '../utils/slug'
-import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle } from '../utils/format'
+import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatDateOfBirth } from '../utils/format'
+import { nationalityToCountryName } from '../utils/africanCountries'
+import { fetchPersonStageCredits } from '../lib/plays'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
   netflix:  { label: 'Netflix',  bg: 'bg-red-600/20',     text: 'text-red-400',     dot: 'bg-red-500'    },
   youtube:  { label: 'YouTube',  bg: 'bg-red-500/20',     text: 'text-red-400',     dot: 'bg-red-500'    },
   amazon:   { label: 'Prime',    bg: 'bg-blue-500/20',    text: 'text-blue-400',    dot: 'bg-blue-400'   },
-  showmax:  { label: 'Showmax',  bg: 'bg-purple-500/20',  text: 'text-purple-400',  dot: 'bg-purple-400' },
+  prime_video: { label: 'Prime', bg: 'bg-blue-500/20',    text: 'text-blue-400',    dot: 'bg-blue-400'   },
   iroko:    { label: 'iROKO',    bg: 'bg-green-500/20',   text: 'text-green-400',   dot: 'bg-green-400'  },
-  kava:     { label: 'Kava',     bg: 'bg-orange-500/20',  text: 'text-orange-400',  dot: 'bg-orange-400' },
+  kava:     { label: 'Kava',     bg: 'bg-pink-500/20',    text: 'text-pink-400',    dot: 'bg-pink-500'   },
   docuth:   { label: 'Docuth',   bg: 'bg-zinc-800/40',    text: 'text-zinc-200',    dot: 'bg-zinc-400'   },
 }
 
 function PlatformBadge({ releaseType }) {
   if (!releaseType) return null
   const key = releaseType.toLowerCase()
+  // Scrape-only platforms — never surface to the public.
+  if (key === 'showmax' || key === 'mubi') return null
   const style = PLATFORM_STYLES[key]
   if (!style) return (
     <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted bg-surface-2 px-1.5 py-0.5 rounded">
@@ -129,12 +132,27 @@ const PersonDetail = () => {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [person, setPerson] = useState(null)
+  // The route loader (src/routes/person-detail.tsx) already fetched this person
+  // server-side for the SEO head, so the same row seeds the page.
+  const loaderData = useLoaderData()
+  const seededPerson = loaderData?.person
+    ? {
+        ...loaderData.person,
+        credits: (loaderData.person.credits || []).map((credit) => ({
+          ...credit,
+          role: normalizeRole(credit.role),
+        })),
+      }
+    : null
+
+  const [person, setPerson] = useState(seededPerson)
+  const [stageCredits, setStageCredits] = useState([])
   const [awardFilms, setAwardFilms] = useState({}) // film_id -> { slug, title, poster_url }
-  const [personId, setPersonId] = useState(null) // actual UUID
+  const [personId, setPersonId] = useState(seededPerson?.id ?? null) // actual UUID
   const [channel, setChannel] = useState(null)
   const [channelVideos, setChannelVideos] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Starts false when seeded — otherwise the server renders the loading state.
+  const [loading, setLoading] = useState(!seededPerson)
   const [error, setError] = useState(null)
   const [showEdit, setShowEdit] = useState(false)
   const [activeRole, setActiveRole] = useState('actor')
@@ -149,23 +167,36 @@ const PersonDetail = () => {
     toggleFollow
   } = useFollow(personId, user)
 
+  // Hand the seeded row to fetchPerson so it skips the primary query but still
+  // runs everything after it (profile-view increment, channel, YouTube films).
+  const seededSlug = useRef(seededPerson ? slug : null)
+
   useEffect(() => {
-    fetchPerson()
+    let preloaded = null
+    if (seededSlug.current === slug) {
+      preloaded = loaderData?.person ?? null
+      seededSlug.current = null // one-shot
+    }
+    fetchPerson(preloaded)
   }, [slug])
 
   useEffect(() => {
     setVisibleCreditsCount(20)
   }, [activeRole])
 
-  const fetchPerson = async () => {
-    setLoading(true)
+  // `preloaded` is the row the route loader already fetched server-side. When
+  // present the primary query is skipped, but everything after it still runs.
+  const fetchPerson = async (preloaded = null) => {
+    if (!preloaded) setLoading(true)
     setError(null)
     setYoutubeVideoIds([])
     setChannel(null)
     setChannelVideos([])
 
     const { col, val } = slugOrId(slug);
-    const { data, error } = await supabase
+    const { data, error } = preloaded
+      ? { data: preloaded, error: null }
+      : await supabase
       .from('people')
       .select(`
         *,
@@ -201,7 +232,11 @@ const PersonDetail = () => {
 
     setPerson(basePerson)
     setPersonId(data.id)
-    document.title = `MuviDB | ${data.name}`
+
+    // Fetch Stage & Theatre Credits
+    fetchPersonStageCredits(data.id).then(sc => setStageCredits(sc || []));
+    // Title comes from the route's `meta` export now — setting it here would
+    // overwrite the server-rendered one after hydration.
 
     // Posters/slugs for the films an award was won/nominated for. They aren't
     // always in this person's credits (you can win for a film we don't credit
@@ -465,20 +500,13 @@ const PersonDetail = () => {
 
   return (
     <div className="min-h-screen bg-bg">
-      <Helmet>
-        <title>{`MuviDB | ${formatPersonName(person.name)}`}</title>
-        <meta name="description" content={toSentenceCase(person.biography)?.slice(0, 150) || `Discover ${formatPersonName(person.name)}'s filmography and videos on MuviDB.`} />
-        <meta property="og:title" content={`MuviDB | ${formatPersonName(person.name)}`} />
-        <meta property="og:description" content={toSentenceCase(person.biography)?.slice(0, 150) || `Discover ${formatPersonName(person.name)}'s filmography and videos on MuviDB.`} />
-        {person.photo_url && <meta property="og:image" content={person.photo_url} />}
-      </Helmet>
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
           <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative group overflow-hidden rounded-lg">
               <ImageWithFallback
-                src={person.photo_url}
+                src={person.photo_url || person.photo}
                 alt={formatPersonName(person.name)}
                 fallbackType="avatar"
                 name={formatPersonName(person.name)}
@@ -488,6 +516,10 @@ const PersonDetail = () => {
                 loading="eager"
                 fetchPriority="high"
               />
+              {/* Bottom-Left White Frosted Glass Circular Watermark */}
+              <div className="absolute bottom-3 left-3 z-20 w-9 h-9 rounded-full bg-white/75 backdrop-blur-md border border-white/50 shadow-2xl shadow-black/40 flex items-center justify-center p-1.5 select-none pointer-events-none">
+                <img src="/images/muvidb-icon-watermark.png" alt="MuviDB" className="w-full h-full object-contain" />
+              </div>
             </div>
 
             <div className="flex-1 space-y-6">
@@ -526,6 +558,19 @@ const PersonDetail = () => {
                     target="person"
                     targetId={personId}
                     targetName={formatPersonName(person.name)}
+                    current={{
+                      name: person.name,
+                      known_for_department: person.known_for_department,
+                      bio: person.bio,
+                      date_of_birth: person.date_of_birth,
+                      birthplace: person.birthplace,
+                      nationality: person.nationality,
+                      instagram_url: person.instagram_url,
+                      twitter_url: person.twitter_url,
+                      tiktok_url: person.tiktok_url,
+                      facebook_url: person.facebook_url,
+                      youtube_handle: person.youtube_handle,
+                    }}
                     onClose={() => setShowEdit(false)}
                   />
                 )}
@@ -557,16 +602,23 @@ const PersonDetail = () => {
               )}
 
               <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
-                {person.nationality && (
-                  <span className="text-text-muted">Nationality: {toTitleCase(person.nationality)}</span>
-                )}
+                {person.nationality && (() => {
+                  const countryName = nationalityToCountryName(person.nationality);
+                  const label = toTitleCase(person.nationality);
+                  return countryName ? (
+                    <Link
+                      to={`/browse?country=${encodeURIComponent(countryName)}`}
+                      className="text-text-muted hover:text-brand transition-colors"
+                    >
+                      Nationality: <span className="underline underline-offset-2 decoration-border hover:decoration-brand">{label}</span>
+                    </Link>
+                  ) : (
+                    <span className="text-text-muted">Nationality: {label}</span>
+                  );
+                })()}
                 {person.date_of_birth && (
                   <span className="text-text-muted">
-                    Born: {new Date(person.date_of_birth).toLocaleDateString('en-NG', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
+                    Born: {formatDateOfBirth(person.date_of_birth)}
                   </span>
                 )}
               </div>
@@ -663,7 +715,7 @@ const PersonDetail = () => {
                     <ImageWithFallback
                       src={credit.films.poster_url}
                       alt={credit.films.title}
-                      fallbackType="poster"
+                      fallbackType="film"
                       name={credit.films.title}
                       className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
                       width={384}
@@ -733,22 +785,16 @@ const PersonDetail = () => {
                     className="group block"
                   >
                     <div className="relative overflow-hidden rounded-lg aspect-[2/3] bg-surface-2 border border-border group-hover:border-brand transition-all shadow-sm">
-                      {poster ? (
-                        <ImageWithFallback
-                          src={poster}
-                          alt={title}
-                          fallbackType="poster"
-                          name={title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          width={384}
-                          sizes="(max-width: 639px) calc(50vw - 24px), (max-width: 767px) calc(33vw - 24px), (max-width: 1023px) calc(25vw - 24px), 180px"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-text-muted/30" />
-                        </div>
-                      )}
+                      <ImageWithFallback
+                        src={poster}
+                        alt={title}
+                        fallbackType="film"
+                        name={title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        width={384}
+                        sizes="(max-width: 639px) calc(50vw - 24px), (max-width: 767px) calc(33vw - 24px), (max-width: 1023px) calc(25vw - 24px), 180px"
+                        loading="lazy"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-80" />
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <p className="text-text-primary text-[11px] font-bold tracking-tight line-clamp-2 leading-tight group-hover:text-brand transition-colors">
@@ -792,6 +838,48 @@ const PersonDetail = () => {
           )}
         </div>
 
+        {/* Stage & Theatre Credits */}
+        {stageCredits.length > 0 && (
+          <div className="p-4 md:p-8 lg:p-12 border-t border-border">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-text-primary text-3xl font-bold font-heading tracking-tighter flex items-center gap-2">
+                  <Icon icon="solar:masks-bold" className="text-brand w-7 h-7" />
+                  Stage & Theatre Credits ({stageCredits.length})
+                </h2>
+                <p className="text-text-muted text-xs font-semibold mt-1">Live theatrical performances, musicals, and stage plays</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {stageCredits.map((play) => (
+                <Link
+                  key={play.id}
+                  to={`/plays/${play.slug}`}
+                  className="group bg-surface border border-border hover:border-brand rounded-xl p-4 flex gap-4 items-center transition-all hover:-translate-y-0.5"
+                >
+                  <img
+                    src={play.poster_url || 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=200'}
+                    alt={play.title}
+                    className="w-14 h-20 rounded-lg object-cover border border-border flex-shrink-0"
+                  />
+                  <div>
+                    <h3 className="text-sm font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                      {play.title}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-brand block mt-0.5">
+                      {play.role || 'Actor'} {play.character_name ? `as ${play.character_name}` : ''}
+                    </span>
+                    <span className="text-[10px] text-text-muted block mt-1">
+                      📍 {play.venue || play.city || 'Theatre'} ({play.year || 'N/A'})
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Awards (people.awards jsonb) */}
         {Array.isArray(person.awards) && person.awards.length > 0 && (
         <div className="p-4 md:p-8 lg:p-12 border-t border-border">
@@ -807,7 +895,7 @@ const PersonDetail = () => {
               if (wins) parts.push(`${wins} ${wins === 1 ? 'win' : 'wins'}`)
               if (noms) parts.push(`${noms} ${noms === 1 ? 'nomination' : 'nominations'}`)
               return (
-                <span className="text-[10px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-full px-3 py-1">
+                <span className="text-[10px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-xl px-3 py-1">
                   {parts.join(' & ')} total
                 </span>
               )
@@ -850,7 +938,7 @@ const PersonDetail = () => {
                                 <ImageWithFallback
                                   src={film.poster_url}
                                   alt={workTitle || ''}
-                                  fallbackType="banner"
+                                  fallbackType="film"
                                   name={workTitle || ''}
                                   className="w-full h-full object-cover"
                                   width={96}

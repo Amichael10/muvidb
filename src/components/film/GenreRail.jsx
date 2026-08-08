@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 import FilmCard from './FilmCard';
+import { collapseSeriesFilms } from '../../utils/series';
 import ImageWithFallback from '../ui/ImageWithFallback';
 
 const GENRES = [
@@ -102,16 +103,20 @@ export default function GenreRail({ variant = 'grid' }) {
     .filter(g => g.count > 0);
 
   // Auto-select top genre with most films once counts arrive.
+  // poster-grid never renders the film lineup — skip so the homepage doesn't
+  // pull 50 films for a UI it doesn't show.
   useEffect(() => {
+    if (isPosterGrid) return;
     if (!selectedGenre && activeGenres.length > 0) {
       const topGenre = [...activeGenres].sort((a, b) => b.count - a.count)[0].name;
       setSelectedGenre(topGenre);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [genreCounts]);
+  }, [genreCounts, isPosterGrid]);
 
   // Lazy-load the films for the selected genre only when it changes (top 20 by views).
   useEffect(() => {
+    if (isPosterGrid) return;
     if (!selectedGenre) return;
     let active = true;
     (async () => {
@@ -121,7 +126,8 @@ export default function GenreRail({ variant = 'grid' }) {
           id, slug, title, poster_url, backdrop_url, year, language,
           runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
           is_featured, is_trending, release_type, streaming_links, source,
-          youtube_watch_url, content_type, season_count, created_at, release_date,
+          youtube_watch_url, content_type, season_count, episode_count,
+          series_id, episode_number, created_at, release_date,
           film_genres!inner(genres!inner(name))
         `)
         .eq('film_genres.genres.name', selectedGenre)
@@ -130,20 +136,20 @@ export default function GenreRail({ variant = 'grid' }) {
         .limit(50);
       if (!active) return;
       if (!error && data) {
-        // Shuffle the array and take the first 20
-        const shuffled = [...data].sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 20);
-
-        setFilteredFilms(selected.map(f => ({
+        const mapped = data.map(f => ({
           ...f,
           genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-        })));
+        }));
+        // Collapse episodes first so shuffle/pick isn't all one show's parts.
+        const collapsed = collapseSeriesFilms(mapped);
+        const shuffled = [...collapsed].sort(() => 0.5 - Math.random());
+        setFilteredFilms(shuffled.slice(0, 20));
       } else {
         setFilteredFilms([]);
       }
     })();
     return () => { active = false; };
-  }, [selectedGenre]);
+  }, [selectedGenre, isPosterGrid]);
 
   // Scroll checking logic for lineup
   const checkScroll = () => {
@@ -246,7 +252,7 @@ export default function GenreRail({ variant = 'grid' }) {
                   <ImageWithFallback
                     src={genre.coverImage}
                     alt=""
-                    fallbackType="banner"
+                    fallbackType="film"
                     name={genre.name}
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     width={640}
@@ -295,14 +301,14 @@ export default function GenreRail({ variant = 'grid' }) {
       {/* Compact chip strip (homepage) */}
       {isChips ? (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 mb-2">
-          <div className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-hide touch-pan-x">
+          <div data-lenis-prevent className="flex gap-2.5 overflow-x-auto pb-4 scrollbar-hide overscroll-x-contain">
             {activeGenres.map((genre) => {
               const isSelected = selectedGenre === genre.name;
               return (
                 <button
                   key={genre.name}
                   onClick={() => setSelectedGenre(genre.name)}
-                  className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap border transition-all duration-200 ${
+                  className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold whitespace-nowrap border transition-all duration-200 ${
                     isSelected
                       ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20'
                       : 'bg-surface border-border text-text-secondary hover:border-brand/50 hover:text-text-primary'
@@ -345,7 +351,7 @@ export default function GenreRail({ variant = 'grid' }) {
                     <ImageWithFallback
                       src={genre.coverImage} 
                       alt=""
-                      fallbackType="banner"
+                      fallbackType="film"
                       name={genre.name}
                       className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-50 group-hover:scale-110 transition-all duration-700"
                       width={640}
@@ -442,7 +448,8 @@ export default function GenreRail({ variant = 'grid' }) {
               <div 
                 ref={scrollRef}
                 onScroll={checkScroll}
-                className="flex overflow-x-auto gap-4 md:gap-6 py-16 -my-16 px-4 sm:px-0 scrollbar-hide touch-pan-x"
+                data-lenis-prevent
+                className="flex overflow-x-auto gap-4 md:gap-6 py-4 md:py-16 md:-my-16 px-4 sm:px-0 scrollbar-hide overscroll-x-contain"
               >
                 {filteredFilms.map((film) => (
                   <div key={film.id} className="shrink-0">

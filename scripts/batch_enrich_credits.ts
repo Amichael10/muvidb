@@ -66,18 +66,16 @@ async function upsertPerson(tmdbPerson: { id: number; name: string; photoUrl: st
 
   if (existing) return existing.id;
 
-  const { data: byName } = await supabase
-    .from('people')
-    .select('id')
-    .ilike('name', tmdbPerson.name)
-    .maybeSingle();
-
+  // No tmdb_id hit -> fall back to the SHARED matcher (migration 20260723112408),
+  // not `ilike('name')`: that could not see order swaps or honorifics, so
+  // "Kosoko Jide" / "Prince Jide Kosoko" were inserted next to "Jide Kosoko".
+  const { data: byName } = await supabase.rpc('find_person_by_name', { p_name: tmdbPerson.name });
   if (byName) {
     await supabase
       .from('people')
       .update({ tmdb_id: tmdbPerson.id.toString() })
-      .eq('id', byName.id);
-    return byName.id;
+      .eq('id', byName as unknown as string);
+    return byName as unknown as string;
   }
 
   const { data: newPerson, error } = await supabase

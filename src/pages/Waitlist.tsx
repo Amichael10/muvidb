@@ -121,7 +121,7 @@ export default function Waitlist() {
           <div className="space-y-12 animate-fadeIn">
             {/* Value Proposition */}
             <div className="space-y-6 max-w-3xl mx-auto">
-              <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full ${isDark ? 'bg-surface-2 border-border' : 'bg-white border-gray-200'} border shadow-sm mb-4`}>
+              <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-xl ${isDark ? 'bg-surface-2 border-border' : 'bg-white border-gray-200'} border shadow-sm mb-4`}>
                 <div className={`w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_8px_var(--color-brand)] animate-pulse`}></div>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Join the growing community</span>
               </div>

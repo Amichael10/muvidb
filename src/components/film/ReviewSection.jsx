@@ -24,7 +24,7 @@ const StarRating = ({ value, onChange, readonly = false }) => {
                     <Icon icon={num <= (hover || value) ? "solar:star-bold" : "solar:star-linear"} className="text-xl" />
                 </button>
             ))}
-            <span className="text-xs font-black text-brand ml-3 bg-brand/5 px-2 py-0.5 rounded-full border border-brand/10">
+            <span className="text-xs font-black text-brand ml-3 bg-brand/5 px-2 py-0.5 rounded-xl border border-brand/10">
                 {value > 0 ? `${value}/10` : 'SCORE'}
             </span>
         </div>
@@ -159,7 +159,7 @@ const ExternalReviewCard = ({ review }) => {
                     <div>
                         {/* plain text — deliberately not a link */}
                         <p className="text-text-primary font-bold text-sm tracking-tight">{name}</p>
-                        <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-widest text-red-500/90 bg-red-500/5 border border-red-500/10 px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-widest text-red-500/90 bg-red-500/5 border border-red-500/10 px-2 py-0.5 rounded-xl">
                             <Icon icon="mdi:youtube" className="text-xs" /> via YouTube
                         </span>
                     </div>
@@ -354,8 +354,8 @@ const ReviewSection = ({ filmId, currentUser }) => {
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-6">
                 <div>
-                    <h3 className="text-text-primary text-2xl font-bold tracking-tight">
-                        User Reviews
+                    <h3 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none">
+                        Reviews
                     </h3>
                     <p className="text-text-muted text-xs font-bold tracking-wide mt-1.5 flex items-center gap-2">
                         {reviews.length} User Review{reviews.length !== 1 ? 's' : ''} 

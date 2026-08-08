@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, Link, useNavigate, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '@iconify/react';
@@ -8,11 +7,13 @@ import { SuggestEditModal, ReportModal } from '../components/contribute/Contribu
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useReactions } from '../hooks/useReactions';
 import ReviewSection from '../components/film/ReviewSection';
+import CriticReviewsSection from '../components/film/CriticReviewsSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 import LikedScore from '../components/film/LikedScore';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
+import { getFilmBackdrop, getFilmPoster } from '../lib/filmImages';
 import { Skeleton } from '../components/ui/Skeleton';
 import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
@@ -132,30 +133,65 @@ export default function FilmDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [film, setFilm] = useState(null);
-  const [filmId, setFilmId] = useState(null); // actual UUID for sub-queries
+
+  // The route loader (src/routes/film-detail.tsx) already fetched this film
+  // server-side to build the SEO head, so the same row seeds the page and the
+  // first paint has real content. Unpublished films aren't seeded (the loader
+  // filters on is_published) and fall back to the client fetch below.
+  const loaderData = useLoaderData();
+  const seededFilm = loaderData?.film
+    ? {
+        ...loaderData.film,
+        genres: dedupeGenres(
+          loaderData.film.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || []
+        ),
+      }
+    : null;
+
+  const [film, setFilm] = useState(seededFilm);
+  const [filmId, setFilmId] = useState(seededFilm?.id ?? null); // actual UUID for sub-queries
   const [relatedFilms, setRelatedFilms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Starts false when seeded — otherwise the server renders the loading state
+  // and SSR gains nothing.
+  const [loading, setLoading] = useState(!seededFilm);
   const [episodes, setEpisodes] = useState([]);
+  const [episodeSearch, setEpisodeSearch] = useState('');
+  const [episodeSeasonFilter, setEpisodeSeasonFilter] = useState('all');
   const [parentSeries, setParentSeries] = useState(null);
 
   const fetchEpisodes = async (seriesId, showName) => {
     try {
-      let query = supabase
-        .from('films')
-        .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug');
-
-      if (showName) {
-         query = query.eq('content_type', 'series').ilike('title', `${showName}%`);
-      } else {
-         query = query.eq('series_id', seriesId);
+      // Prefer manually linked children (series_id), then fall back to title variants.
+      let linked = [];
+      if (seriesId) {
+        const { data, error } = await supabase
+          .from('films')
+          .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug')
+          .eq('series_id', seriesId)
+          .order('title', { ascending: true });
+        if (error) throw error;
+        linked = data || [];
       }
 
-      // Order by title so "Chapter 1" comes before "Chapter 2" etc.
-      const { data, error } = await query.order('title', { ascending: true });
+      let byTitle = [];
+      if (showName) {
+        const { data, error } = await supabase
+          .from('films')
+          .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug')
+          .eq('content_type', 'series')
+          .ilike('title', `${showName}%`)
+          .order('title', { ascending: true });
+        if (error) throw error;
+        byTitle = data || [];
+      }
 
-      if (error) throw error;
-      setEpisodes(data || []);
+      const seen = new Set();
+      const merged = [...linked, ...byTitle].filter((ep) => {
+        if (!ep?.id || seen.has(ep.id) || ep.id === seriesId) return false;
+        seen.add(ep.id);
+        return true;
+      });
+      setEpisodes(merged);
     } catch (error) {
       console.error('Error fetching episodes:', error);
     }
@@ -195,9 +231,22 @@ export default function FilmDetail() {
   const [showFilmEdit, setShowFilmEdit] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
+  const [awardsOpen, setAwardsOpen] = useState(false);
+
+  // For the slug the loader seeded, hand the row straight to fetchFilm so it
+  // skips the primary query but STILL runs the follow-on work (credits,
+  // episodes, related). Navigating to another film refetches normally.
+  const seededSlug = useRef(seededFilm ? slug : null);
 
   useEffect(() => {
-    fetchFilm();
+    setEpisodeSearch('');
+    setEpisodeSeasonFilter('all');
+    let preloaded = null;
+    if (seededSlug.current === slug) {
+      preloaded = loaderData?.film ?? null;
+      seededSlug.current = null; // one-shot
+    }
+    fetchFilm(preloaded);
   }, [slug]);
 
   const fetchCredits = async (uuid) => {
@@ -277,12 +326,17 @@ export default function FilmDetail() {
     }
   };
 
-  const fetchFilm = async () => {
-    setLoading(true);
+  // `preloaded` is the row the route loader already fetched server-side. When
+  // present the primary query is skipped, but everything after it still runs.
+  const fetchFilm = async (preloaded = null) => {
+    if (!preloaded) setLoading(true);
     try {
       const { col, val } = slugOrId(slug);
       const fetchDirect = async () => {
-        const { data, error } = await supabase
+        // Belt-and-suspenders with films RLS (is_published OR is_admin()).
+        // Non-admins must only see published rows; admins can preview drafts.
+        const isStaff = user?.role === 'admin' || user?.role === 'admin_limited';
+        let query = supabase
           .from('films')
           .select(`
             *,
@@ -291,23 +345,26 @@ export default function FilmDetail() {
               companies(id, name, logo_url)
             )
           `)
-          .eq(col, val)
-          .single();
+          .eq(col, val);
+        if (!isStaff) query = query.eq('is_published', true);
+        const { data, error } = await query.single();
         if (error) throw error;
         return data;
       };
 
-      let data;
-      if (import.meta.env.DEV) {
-        data = await fetchDirect();
-      } else {
-        const response = await fetch(`/api/films?id=${encodeURIComponent(val)}`);
-        if (response.ok) {
-          ({ film: data } = await response.json());
-        } else if (response.status === 404) {
-          throw new Error('Film not found');
-        } else {
+      let data = preloaded;
+      if (!data) {
+        if (import.meta.env.DEV) {
           data = await fetchDirect();
+        } else {
+          const response = await fetch(`/api/films?id=${encodeURIComponent(val)}`);
+          if (response.ok) {
+            ({ film: data } = await response.json());
+          } else if (response.status === 404) {
+            throw new Error('Film not found');
+          } else {
+            data = await fetchDirect();
+          }
         }
       }
 
@@ -318,7 +375,8 @@ export default function FilmDetail() {
 
       setFilm(mappedFilm);
       setFilmId(data.id);
-      document.title = `MuviDB | ${formatFilmTitle(data.title)}`;
+      // Title comes from the route's `meta` export now — setting it here would
+      // overwrite the server-rendered one after hydration.
       // Render the page as soon as the main film row is in — everything below
       // (credits, episodes, related) loads in the background instead of blocking.
       setLoading(false);
@@ -337,6 +395,37 @@ export default function FilmDetail() {
   };
 
   const fetchRelated = async (film) => {
+    // Precomputed "More Like This" first — one indexed read of film_related,
+    // built offline by scripts/build_related_films.ts (shared cast > Cohere
+    // embedding similarity > rare genre > language > series, with popularity
+    // fallback and dup/franchise de-duping).
+    // Falls through to the live genre query below only when a film has no
+    // precomputed rows yet (e.g. added since the last rebuild).
+    try {
+      const { data: pre } = await supabase
+        .from('film_related')
+        .select('rank, reason, films:related_id (id, title, year, poster_url, backdrop_url, slug, view_count, content_type, film_genres(genres(name)))')
+        .eq('film_id', film.id)
+        .order('rank', { ascending: true })
+        .limit(12);
+
+      if (pre?.length) {
+        const mapped = pre
+          .filter((r) => r.films)
+          .map((r) => ({
+            ...r.films,
+            _reason: r.reason || null,
+            genres: dedupeGenres(r.films.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || []),
+          }));
+        if (mapped.length) {
+          setRelatedFilms(mapped);
+          return;
+        }
+      }
+    } catch {
+      // Table missing or read failed — fall back to the live logic below.
+    }
+
     const sourceGenreIds = (film.film_genres || []).map((row) => row.genre_id).filter(Boolean);
     let candidateIds = [];
 
@@ -412,7 +501,17 @@ export default function FilmDetail() {
       });
       return;
     }
-    await toggleReaction(type);
+    const ok = await toggleReaction(type);
+    if (!ok || !filmId) return;
+    // Trigger recomputes liked_percent in the DB; refresh popcorn % without reload.
+    const { data } = await supabase
+      .from('films')
+      .select('liked_percent')
+      .eq('id', filmId)
+      .maybeSingle();
+    if (data && Object.prototype.hasOwnProperty.call(data, 'liked_percent')) {
+      setFilm((prev) => (prev ? { ...prev, liked_percent: data.liked_percent } : prev));
+    }
   };
 
 
@@ -438,20 +537,13 @@ export default function FilmDetail() {
 
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
-      <Helmet>
-        <title>{`MuviDB | ${formatFilmTitle(film.title)}`}</title>
-        <meta name="description" content={film.synopsis?.slice(0, 150) || `Watch ${formatFilmTitle(film.title)} on MuviDB.`} />
-        <meta property="og:title" content={`MuviDB | ${formatFilmTitle(film.title)}`} />
-        <meta property="og:description" content={film.synopsis?.slice(0, 150) || `Watch ${formatFilmTitle(film.title)} on MuviDB.`} />
-        {(film.poster_url || film.poster) && <meta property="og:image" content={film.poster_url || film.poster} />}
-      </Helmet>
       {/* 1. CINEMATIC HEADER */}
       <div className="relative w-full h-[60vh] min-h-[500px] border-b border-border overflow-hidden">
         <ImageWithFallback
-          src={film.backdrop_url || film.backdrop} 
+          src={getFilmBackdrop(film)}
           alt={`${formatFilmTitle(film.title)} Backdrop`} 
           className="absolute inset-0 w-full h-full object-cover"
-          fallbackType="banner"
+          fallbackType="film"
           name={formatFilmTitle(film.title)}
           width={1600}
           quality={78}
@@ -466,10 +558,10 @@ export default function FilmDetail() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-start md:items-end gap-6 md:gap-8 pb-8">
             <div className="hidden md:block w-64 shrink-0 translate-y-16 z-10">
               <ImageWithFallback
-                src={film.poster_url || film.poster} 
+                src={getFilmPoster(film)}
                 alt={`${formatFilmTitle(film.title)} Poster`} 
                 className="w-full rounded-xl shadow-2xl border border-white/10 object-cover aspect-[2/3]"
-                fallbackType="banner"
+                fallbackType="film"
                 name={formatFilmTitle(film.title)}
                 width={512}
                 sizes="256px"
@@ -544,11 +636,6 @@ export default function FilmDetail() {
                     <span>Be the first to rate</span>
                   </button>
                 )}
-
-                <div className="flex items-center gap-1.5 text-white/60 pb-1">
-                  <Icon icon="solar:fire-bold" className="text-orange-500 text-lg" />
-                  <span className="text-[10px] font-bold tracking-wide">Trending</span>
-                </div>
               </div>
             </div>
           </div>
@@ -594,7 +681,19 @@ export default function FilmDetail() {
                 {availablePlatforms.map((platform) => {
                   const url = getWatchUrl(film, platform.id);
                   const className = 'shrink-0 inline-flex items-center gap-2 min-h-[40px] px-3 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary';
-                  const content = <><Icon icon={platform.icon} style={{ color: platform.color }} />{platform.name}</>;
+                  const mark = platform.logo ? (
+                    <span className="w-6 h-6 rounded-md bg-white overflow-hidden shrink-0 inline-flex items-center justify-center">
+                      <img src={platform.logo} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
+                    </span>
+                  ) : (
+                    <span
+                      className="w-6 h-6 rounded-md inline-flex items-center justify-center shrink-0"
+                      style={{ background: `${platform.color}22`, color: platform.color }}
+                    >
+                      <Icon icon={platform.icon} width="14" height="14" />
+                    </span>
+                  );
+                  const content = <>{mark}{platform.name}</>;
                   return url ? (
                     <a key={platform.id} href={url} target="_blank" rel="noopener noreferrer" className={className}>{content}</a>
                   ) : (
@@ -607,48 +706,11 @@ export default function FilmDetail() {
         </section>
         <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border">
 
-          {/* MAIN CONTENT (70%) */}
+          {/* MAIN CONTENT (70%) — story → media → people → reviews → awards */}
           <div className="lg:col-span-2">
-            {/* Awards */}
-            {Array.isArray(film.awards) && film.awards.length > 0 && (
-              <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Awards</h2>
-                <div className="space-y-3">
-                  {[...film.awards]
-                    .sort((a, b) => (b.year || 0) - (a.year || 0))
-                    .map((award, idx) => (
-                      <div
-                        key={`${award.organization}-${award.season}-${award.category}-${idx}`}
-                        className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3"
-                      >
-                        <Icon icon="solar:cup-star-bold" className="text-xl text-brand shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-text-primary text-sm font-bold">
-                            {award.category || award.title}
-                            {award.won === false ? (
-                              <span className="ml-2 text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-black">
-                                Nominated
-                              </span>
-                            ) : (
-                              <span className="ml-2 text-[10px] uppercase tracking-wider text-brand font-black">
-                                Winner
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-text-muted text-xs mt-0.5">
-                            {[award.organization || 'AMVCA', award.year].filter(Boolean).join(' · ')}
-                            {award.recipients?.length ? ` · ${award.recipients.join(', ')}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </section>
-            )}
-
             {/* Synopsis */}
             <section className="p-8 md:p-12 border-b border-border">
-              <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Synopsis</h2>
+              <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-6 tracking-tight leading-none">Synopsis</h2>
               <p className="text-text-muted text-lg leading-relaxed opacity-80 border-l-2 border-brand pl-6">
                 {toSentenceCase(film.synopsis)}
               </p>
@@ -669,7 +731,22 @@ export default function FilmDetail() {
                 </button>
               </div>
               {showFilmEdit && (
-                <SuggestEditModal target="film" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowFilmEdit(false)} />
+                <SuggestEditModal
+                  target="film"
+                  targetId={filmId}
+                  targetName={formatFilmTitle(film.title)}
+                  current={{
+                    title: film.title,
+                    year: film.year,
+                    synopsis: film.synopsis,
+                    runtime_minutes: film.runtime_minutes ?? film.duration,
+                    language: film.language,
+                    countries: film.countries,
+                    trailer_youtube_id: film.trailer_youtube_id,
+                    tagline: film.tagline,
+                  }}
+                  onClose={() => setShowFilmEdit(false)}
+                />
               )}
               {showReport && (
                 <ReportModal kind="link" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowReport(false)} />
@@ -677,14 +754,82 @@ export default function FilmDetail() {
             </section>
 
             {/* Episodes (for series) */}
-            {episodes.length > 0 && (
+            {episodes.length > 0 && (() => {
+              const seasonOptions = [...new Set(
+                episodes.map((ep) => ep.season_number).filter((n) => n != null),
+              )].sort((a, b) => a - b);
+
+              const q = episodeSearch.trim().toLowerCase();
+              const filteredEpisodes = episodes.filter((ep) => {
+                if (episodeSeasonFilter !== 'all' && String(ep.season_number ?? '') !== episodeSeasonFilter) {
+                  return false;
+                }
+                if (!q) return true;
+                return (
+                  (ep.title || '').toLowerCase().includes(q)
+                  || String(ep.episode_number ?? '').includes(q)
+                  || (ep.synopsis || '').toLowerCase().includes(q)
+                );
+              });
+
+              return (
               <section className="p-8 md:p-12 border-b border-border bg-surface-2/5">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter flex items-center gap-2">
-                  <Icon icon="solar:playlist-play-bold" className="text-brand" />
-                  Episodes
-                </h2>
+                <div className="flex flex-col gap-5 mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+                    <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none flex items-center gap-2">
+                      <Icon icon="solar:playlist-play-bold" className="text-brand" />
+                      Episodes
+                      <span className="text-sm font-bold text-text-muted tracking-normal">
+                        ({filteredEpisodes.length}{filteredEpisodes.length !== episodes.length ? ` / ${episodes.length}` : ''})
+                      </span>
+                    </h2>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Icon
+                        icon="solar:magnifer-linear"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-lg pointer-events-none"
+                      />
+                      <input
+                        type="search"
+                        value={episodeSearch}
+                        onChange={(e) => setEpisodeSearch(e.target.value)}
+                        placeholder="Search episodes by title or number…"
+                        className="w-full bg-surface border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-brand focus:outline-none transition-colors"
+                      />
+                    </div>
+                    {seasonOptions.length > 0 && (
+                      <select
+                        value={episodeSeasonFilter}
+                        onChange={(e) => setEpisodeSeasonFilter(e.target.value)}
+                        className="bg-surface border border-border rounded-lg px-4 py-2.5 text-sm font-bold text-text-primary focus:border-brand focus:outline-none sm:w-44"
+                      >
+                        <option value="all">All seasons</option>
+                        {seasonOptions.map((season) => (
+                          <option key={season} value={String(season)}>
+                            Season {season}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {filteredEpisodes.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-surface/60 px-6 py-12 text-center">
+                    <p className="text-sm font-bold text-text-muted">No episodes match your search.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setEpisodeSearch(''); setEpisodeSeasonFilter('all'); }}
+                      className="mt-3 text-xs font-bold uppercase tracking-widest text-brand hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : (
                 <div className="flex flex-col gap-4">
-                  {episodes.map((episode) => (
+                  {filteredEpisodes.map((episode) => (
                     <div 
                       key={episode.id} 
                       className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-xl border border-border hover:border-brand/40 hover:shadow-xl transition-all duration-300 group"
@@ -695,7 +840,7 @@ export default function FilmDetail() {
                           src={episode.poster_url || film.poster_url || film.poster}
                           alt={episode.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          fallbackType="banner"
+                          fallbackType="film"
                           name={episode.title}
                           width={384}
                           sizes="(max-width: 639px) 100vw, 192px"
@@ -719,6 +864,11 @@ export default function FilmDetail() {
                       <div className="flex-1 flex flex-col justify-between py-1">
                         <div>
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            {episode.season_number != null && (
+                              <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                                S{episode.season_number}
+                              </span>
+                            )}
                             <span className="text-[10px] font-black uppercase tracking-wider text-brand">
                               Episode {episode.episode_number || 'N/A'}
                             </span>
@@ -732,7 +882,9 @@ export default function FilmDetail() {
                             )}
                           </div>
                           <h3 className="font-heading font-bold text-base text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors mb-2">
-                            {formatFilmTitle(episode.title)}
+                            <Link to={`/films/${episode.slug || episode.id}`}>
+                              {formatFilmTitle(episode.title)}
+                            </Link>
                           </h3>
                           <p className="text-xs text-text-muted line-clamp-2 leading-relaxed font-medium">
                             {toSentenceCase(episode.synopsis || film.synopsis)}
@@ -756,14 +908,16 @@ export default function FilmDetail() {
                     </div>
                   ))}
                 </div>
+                )}
               </section>
-            )}
+              );
+            })()}
 
             {/* Trailer */}
             {trailerVideoId && (
               <section id="trailer-section" className="p-8 md:p-12 border-b border-border bg-surface-2/10 relative overflow-hidden">
                 <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter relative z-10">Official Trailer</h2>
+                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-6 tracking-tight leading-none relative z-10">Official Trailer</h2>
                 <div className="relative z-10 aspect-video rounded-xl overflow-hidden border border-border bg-surface-2 shadow-sm">
                   <iframe
                     className="w-full h-full"
@@ -779,7 +933,8 @@ export default function FilmDetail() {
             {/* Cast */}
             {cast.length > 0 && (
               <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Cast</h2>
+                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-2 tracking-tight leading-none">Cast</h2>
+                <p className="text-xs text-text-muted mb-6">{cast.length} {cast.length === 1 ? 'credit' : 'credits'}</p>
                 <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2">
                   {(showAllCast ? cast : cast.slice(0, 8)).map(person => (
                     <Link 
@@ -827,7 +982,8 @@ export default function FilmDetail() {
             {/* Crew */}
             {crew.length > 0 && (
               <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl text-text-primary mb-6 tracking-tighter">Crew</h2>
+                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-2 tracking-tight leading-none">Crew</h2>
+                <p className="text-xs text-text-muted mb-6">{crew.length} {crew.length === 1 ? 'member' : 'members'}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden">
                   {crew.map((member, idx) => (
                     <Link 
@@ -857,6 +1013,79 @@ export default function FilmDetail() {
               </section>
             )}
 
+            {/* Awards — before reviews, collapsed by default */}
+            {Array.isArray(film.awards) && film.awards.length > 0 && (() => {
+              const wins = film.awards.filter((a) => a.won !== false).length;
+              const nominations = film.awards.filter((a) => a.won === false).length;
+              return (
+              <section className="p-8 md:p-12 border-b border-border">
+                <button
+                  type="button"
+                  onClick={() => setAwardsOpen((prev) => !prev)}
+                  aria-expanded={awardsOpen}
+                  className="w-full flex items-center justify-between gap-4 text-left group"
+                >
+                  <div className="flex flex-wrap items-center gap-3 min-w-0">
+                    <h2 className="font-heading font-bold text-xl md:text-2xl text-text-primary tracking-tight leading-none">
+                      Awards
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {wins > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-brand/25 bg-brand/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand">
+                          {wins} {wins === 1 ? 'win' : 'wins'}
+                        </span>
+                      )}
+                      {nominations > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                          {nominations} {nominations === 1 ? 'nomination' : 'nominations'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Icon
+                    icon={awardsOpen ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+                    className="text-xl text-text-muted group-hover:text-text-primary transition-colors shrink-0"
+                  />
+                </button>
+                {awardsOpen && (
+                  <ul className="mt-6 divide-y divide-border/70 border-y border-border/70">
+                    {[...film.awards]
+                      .sort((a, b) => (b.year || 0) - (a.year || 0))
+                      .map((award, idx) => (
+                        <li
+                          key={`${award.organization}-${award.season}-${award.category}-${idx}`}
+                          className="flex items-start gap-3 py-3.5"
+                        >
+                          <Icon icon="solar:cup-star-linear" className="text-base text-text-muted shrink-0 mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-text-primary text-sm font-semibold leading-snug">
+                              {award.category || award.title}
+                              <span
+                                className={`ml-2 text-[10px] font-bold uppercase tracking-wider ${
+                                  award.won === false ? 'text-text-muted' : 'text-brand'
+                                }`}
+                              >
+                                {award.won === false ? 'Nominated' : 'Winner'}
+                              </span>
+                            </p>
+                            <p className="text-text-muted text-xs mt-0.5">
+                              {[award.organization || 'AMVCA', award.year].filter(Boolean).join(' · ')}
+                              {award.recipients?.length ? ` · ${award.recipients.join(', ')}` : ''}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </section>
+              );
+            })()}
+
+            {/* Critic Reviews & Quotes */}
+            <div className="px-8 md:px-12 pt-4">
+              <CriticReviewsSection filmId={film.id} user={user} />
+            </div>
+
             {/* Reviews */}
             <section id="reviews-section" className="p-8 md:p-12">
               <ReviewSection
@@ -866,82 +1095,8 @@ export default function FilmDetail() {
             </section>
           </div>
 
-          {/* SIDEBAR (30%) */}
+          {/* SIDEBAR (30%) — Watch first, then facts / platforms / related */}
           <div className="space-y-0 divide-y divide-border h-full">
-            <div className="p-8">
-              {film.film_companies?.length > 0 ? (
-                <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4 group transition-all cursor-default">
-                  <div className="w-12 h-12 bg-surface-2 rounded-lg overflow-hidden flex items-center justify-center text-brand font-bold text-xl shrink-0 border border-border/50">
-                    {film.film_companies[0].companies?.logo_url ? (
-                      <ImageWithFallback
-                        src={film.film_companies[0].companies.logo_url}
-                        alt={film.film_companies[0].companies?.name || 'Studio logo'}
-                        fallbackType="avatar"
-                        name={film.film_companies[0].companies?.name || 'Studio'}
-                        className="w-full h-full object-contain p-1"
-                        width={96}
-                        sizes="48px"
-                        loading="lazy"
-                      />
-                    ) : (
-                      film.film_companies[0].companies?.name?.charAt(0) || '?'
-                    )}
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Studio</div>
-                    <div className="font-bold text-text-primary text-sm line-clamp-1 tracking-tight">{film.film_companies[0].companies?.name}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-surface rounded-xl p-6 border border-border flex items-center gap-4">
-                  <div className="w-12 h-12 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-bold text-xl shrink-0">
-                    {film.director?.charAt(0) || '?'}
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-text-muted font-bold tracking-wider mb-0.5">Director</div>
-                    <div className="font-bold text-text-primary text-sm tracking-tight">{film.director || 'Not Specified'}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-8 bg-surface-2/5">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider">About</h3>
-              <div className="space-y-4 text-[11px] font-bold">
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">Status</span>
-                  <span className="text-text-primary">{film.status}</span>
-                </div>
-                {film.countries && film.countries.length > 0 && (
-                  <div className="flex justify-between items-center border-b border-border pb-3">
-                    <span className="text-text-muted tracking-wider">Country</span>
-                    <span className="text-text-primary text-right">{film.countries.join(', ')}</span>
-                  </div>
-                )}
-                {/* Language row hidden until detection is accurate — re-enable with getFilmLanguages(film) */}
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>
-                  <span className="text-text-primary">
-                    {film.content_type === 'series'
-                      ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
-                      : `${film.runtime_minutes || film.runtime} min`}
-                  </span>
-                </div>
-                {film.content_type === 'series' && film.episode_count && (
-                  <div className="flex justify-between items-center border-b border-border pb-3">
-                    <span className="text-text-muted tracking-wider">Episodes</span>
-                    <span className="text-text-primary">{film.episode_count} Episodes</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center">
-                  <span className="text-text-muted tracking-wider">Rating</span>
-                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-bold">
-                    {film.nfvcb_rating}
-                  </span>
-                </div>
-              </div>
-            </div>
-
             <div className="hidden lg:block p-8 space-y-3">
               <WatchOptions film={film} isFullWidth />
               <button
@@ -983,10 +1138,147 @@ export default function FilmDetail() {
               />
             </div>
 
+            <div className="p-8 space-y-6">
+              {(() => {
+                const prodCompanies = (film.film_companies || []).filter(
+                  (fc) => !fc.role || fc.role === 'production' || fc.role === 'co_production'
+                );
+                const distCompanies = (film.film_companies || []).filter(
+                  (fc) => fc.role === 'distribution' || fc.role === 'international_distribution'
+                );
+
+                return (
+                  <>
+                    {/* Production Companies */}
+                    <div>
+                      <div className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                        <Icon icon="solar:buildings-bold" className="text-brand text-xs" />
+                        <span>Production {prodCompanies.length > 1 ? 'Partners' : 'Company'}</span>
+                      </div>
+
+                      {prodCompanies.length > 0 ? (
+                        <div className="space-y-3">
+                          {prodCompanies.map((fc, idx) => (
+                            <Link
+                              key={idx}
+                              to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
+                              className="flex items-center gap-3 group"
+                            >
+                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
+                                <ImageWithFallback
+                                  src={fc.companies?.logo_url}
+                                  alt={fc.companies?.name || 'Studio'}
+                                  fallbackType="company"
+                                  name={fc.companies?.name || 'Studio'}
+                                  className="w-full h-full object-cover"
+                                  width={72}
+                                  sizes="36px"
+                                  loading="lazy"
+                                />
+                              </div>
+                              <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
+                                {fc.companies?.name}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-muted font-medium">Independent Production</p>
+                      )}
+                    </div>
+
+                    {/* Distribution Partners */}
+                    {distCompanies.length > 0 && (
+                      <div>
+                        <div className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <Icon icon="solar:delivery-bold" className="text-brand text-xs" />
+                          <span>Distribution {distCompanies.length > 1 ? 'Partners' : 'Partner'}</span>
+                        </div>
+                        <div className="space-y-3">
+                          {distCompanies.map((fc, idx) => (
+                            <Link
+                              key={idx}
+                              to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
+                              className="flex items-center gap-3 group"
+                            >
+                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
+                                <ImageWithFallback
+                                  src={fc.companies?.logo_url}
+                                  alt={fc.companies?.name || 'Distributor'}
+                                  fallbackType="company"
+                                  name={fc.companies?.name || 'Distributor'}
+                                  className="w-full h-full object-cover"
+                                  width={72}
+                                  sizes="36px"
+                                  loading="lazy"
+                                />
+                              </div>
+                              <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
+                                {fc.companies?.name}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            <div className="p-8">
+              <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight">About</h3>
+              <div className="space-y-4 text-[11px] font-bold">
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-text-muted tracking-wider">Status</span>
+                  <span className="text-text-primary">{film.status}</span>
+                </div>
+                {film.countries && film.countries.length > 0 && (
+                  <div className="flex justify-between items-start gap-4 border-b border-border pb-3">
+                    <span className="text-text-muted tracking-wider shrink-0">Country</span>
+                    <span className="text-right flex flex-wrap justify-end gap-x-1 gap-y-1">
+                      {film.countries.map((country, i) => (
+                        <span key={country} className="inline-flex items-center">
+                          <Link
+                            to={`/browse?country=${encodeURIComponent(country)}`}
+                            className="text-text-primary hover:text-brand transition-colors underline-offset-2 hover:underline"
+                          >
+                            {country}
+                          </Link>
+                          {i < film.countries.length - 1 ? <span className="text-text-muted">,</span> : null}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                {/* Language row hidden until detection is accurate — re-enable with getFilmLanguages(film) */}
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>
+                  <span className="text-text-primary">
+                    {film.content_type === 'series'
+                      ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
+                      : `${film.runtime_minutes || film.runtime} min`}
+                  </span>
+                </div>
+                {film.content_type === 'series' && film.episode_count && (
+                  <div className="flex justify-between items-center border-b border-border pb-3">
+                    <span className="text-text-muted tracking-wider">Episodes</span>
+                    <span className="text-text-primary">{film.episode_count} Episodes</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-text-muted tracking-wider">Rating</span>
+                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-bold">
+                    {film.nfvcb_rating}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* WHERE TO WATCH — explicit per-platform list (answers the #1 query) */}
             {PLATFORMS.some((p) => isFilmOnPlatform(film, p.id)) && (
-              <div className="hidden lg:block p-8 border-t border-border">
-                <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider flex items-center gap-2">
+              <div className="hidden lg:block p-8">
+                <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight flex items-center gap-2">
                   <Icon icon="solar:tv-bold" className="text-brand" />
                   Where to Watch
                 </h3>
@@ -996,12 +1288,18 @@ export default function FilmDetail() {
                     const inner = (
                       <>
                         <span className="flex items-center gap-3">
-                          <span
-                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 shrink-0"
-                            style={{ background: `${p.color}22`, color: p.color }}
-                          >
-                            <Icon icon={p.icon} className="text-base" />
-                          </span>
+                          {p.logo ? (
+                            <span className="w-6 h-6 rounded-md bg-white overflow-hidden flex items-center justify-center border border-border shrink-0">
+                              <img src={p.logo} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
+                            </span>
+                          ) : (
+                            <span
+                              className="w-6 h-6 rounded-md flex items-center justify-center border border-white/10 shrink-0"
+                              style={{ background: `${p.color}22`, color: p.color }}
+                            >
+                              <Icon icon={p.icon} width="14" height="14" />
+                            </span>
+                          )}
                           <span className="text-[11px] font-black uppercase tracking-widest text-text-primary">{p.name}</span>
                         </span>
                         <Icon icon={url ? 'solar:arrow-right-up-linear' : 'solar:alt-arrow-right-linear'} className="text-text-muted group-hover:text-brand transition-colors" />
@@ -1019,7 +1317,7 @@ export default function FilmDetail() {
             )}
 
             <div className="p-8">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-6 tracking-wider">More Like This</h3>
+              <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight">More Like This</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-1 gap-3 lg:gap-0 lg:border lg:border-border lg:rounded-lg lg:overflow-hidden lg:shadow-sm">
                 {relatedFilms.map(relatedFilm => (
                   <Link
@@ -1031,7 +1329,7 @@ export default function FilmDetail() {
                       src={relatedFilm.poster_url || relatedFilm.poster} 
                       alt={relatedFilm.title}
                       className="w-full aspect-[2/3] lg:w-12 lg:h-16 lg:aspect-auto object-cover rounded-md border border-border"
-                      fallbackType="poster"
+                      fallbackType="film"
                       name={relatedFilm.title}
                       width={192}
                       sizes="(max-width: 639px) 40vw, (max-width: 1023px) 20vw, 48px"
@@ -1041,9 +1339,14 @@ export default function FilmDetail() {
                       <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-2 mb-1 tracking-tight">
                         {formatFilmTitle(relatedFilm.title)}
                       </h4>
-                      <div className="text-[10px] font-bold text-text-muted mb-2">
+                      <div className="text-[10px] font-bold text-text-muted mb-1">
                         {relatedFilm.year} • {relatedFilm.genres && relatedFilm.genres.length > 0 ? relatedFilm.genres[0] : 'Media'}
                       </div>
+                      {relatedFilm._reason && (
+                        <div className="text-[9px] font-bold text-brand/80 uppercase tracking-wide line-clamp-1">
+                          {relatedFilm._reason}
+                        </div>
+                      )}
                     </div>
                   </Link>
                 ))}

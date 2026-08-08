@@ -65,7 +65,7 @@ export default function ComingSoonCard({ film }) {
             src={film.poster_url || film.backdrop_url}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-            fallbackType="banner"
+            fallbackType="film"
             name={title}
             loading="lazy"
             width={640}
@@ -112,7 +112,7 @@ export default function ComingSoonCard({ film }) {
         </div>
 
         <div className="mt-auto pt-4">
-          <Link to={filmPath} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-surface-2 px-4 py-2.5 text-sm font-medium text-brand transition-colors hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+          <Link to={filmPath} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-surface-2 px-4 py-2.5 text-sm font-medium text-brand transition-colors hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <Icon icon={primaryPlatform?.id === 'cinema' ? 'solar:ticket-linear' : 'solar:play-circle-linear'} className="text-lg" />
             {actionLabel}
           </Link>

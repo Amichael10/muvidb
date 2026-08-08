@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Ensembla Local OCR Cast & Crew Extractor
+MuviDB Local OCR Cast & Crew Extractor
 Extracts cast/crew from Nollywood YouTube videos using:
 1. Database Discovery: Self-targets YouTube films with 0-10 existing credits.
 2. Outro Download: yt-dlp + ffmpeg (last 10 min only — avoids bot detection).
@@ -611,7 +611,7 @@ def extract_frames(video_path: Path, out_dir: Path, label: str) -> list[Path]:
     return sorted(out_dir.glob(f"{label}_*.jpg"))
 
 # ── AI Formatting Prompts ─────────────────────────────────────────────────────
-AI_STRUCTURE_PROMPT = """You are building a Nollywood film database called Ensembla.
+AI_STRUCTURE_PROMPT = """You are building a Nollywood film database called MuviDB.
 Below is raw text extracted via Local OCR from the credit cards of a movie called '{title}'.
 Some characters may be garbled, misspelled, duplicated, or out of order due to video background noise.
 Clean it up using Nollywood industry knowledge. Deduplicate entries. Separate cast from crew.
@@ -661,13 +661,56 @@ _JUNK_NAME_TOKENS = (
     "n/a", "unknown", "no character", "misreading", "error", "see ocr",
 )
 
+# Job titles / departments lifted straight off the credit roll. These are ROLES,
+# not people — unfiltered they created thousands of fake "people" rows
+# (GAFFER, CAMERA ASSISTANT, POST PRODUCTION, CASTING DIRECTOR...).
+_CREW_ROLE_WORDS = {
+    "camera", "cameraman", "cam", "asst", "assistant", "assistance", "assist", "ass",
+    "editor", "editing", "edit", "production", "productions", "producer", "executive",
+    "exec", "director", "direction", "dir", "makeup", "make", "up", "costume",
+    "costumier", "wardrobe", "location", "manager", "mgr", "unit", "props", "prop",
+    "set", "design", "designer", "gaffer", "boom", "sound", "audio", "light",
+    "lighting", "script", "continuity", "driver", "security", "catering", "welfare",
+    "medic", "still", "stills", "photography", "photographer", "colorist", "color",
+    "colour", "grade", "dop", "cinematography", "cinematographer", "art", "graphics",
+    "vfx", "sfx", "effects", "music", "soundtrack", "score", "dance", "choreographer",
+    "stunt", "stunts", "transport", "logistics", "accountant", "publicity", "marketing",
+    "poster", "subtitle", "subtitles", "translator", "voice", "crew", "cast", "thanks",
+    "special", "end", "copyright", "rights", "reserved", "presents", "produced",
+    "written", "story", "screenplay", "coordinator", "supervisor", "operator",
+    "hairstylist", "hair", "stylist", "second", "first", "third", "by", "the", "of",
+    "and", "a", "an", "in", "on", "for", "with", "to",
+    "post", "casting", "co", "line", "associate", "chief", "head", "senior", "junior",
+    "1st", "2nd", "3rd", "4th", "st", "nd", "rd", "th", "best", "boy", "key", "grip",
+    "clapper", "loader", "focus", "puller", "scenic", "runner", "intern", "trainee",
+}
+_TITLE_CARD_RE = re.compile(r"^\s*\d+\s*(months?|years?|days?|weeks?|hours?|minutes?)\s*(later)?\s*$", re.I)
+_PART_CARD_RE = re.compile(r"^\s*(part|episode|ep|chapter|scene|act)\s*\d+\s*$", re.I)
+_COPYRIGHT_RE = re.compile(r"^\s*\(?\s*[c©e1]\s*\)?\s*\d{4}", re.I)
+
+
 def _looks_like_junk_name(name: str) -> bool:
-    """True if this 'name' is really prose/commentary, not a person to save."""
+    """True if this 'name' is really prose/commentary/a job title, not a person."""
     low = name.lower()
     if any(tok in low for tok in _JUNK_NAME_TOKENS):
         return True
     # Real credit names are short; a 7+ word 'name' is a sentence, not a person.
     if len(name.split()) > 6:
+        return True
+
+    stripped = name.strip()
+    # OCR noise: a person needs at least 3 letters ("Cj", "M E", "d", "K").
+    if len(re.sub(r"[^A-Za-z]", "", stripped)) < 3:
+        return True
+    # Mostly punctuation/symbols — OCR garbage like "» 'ee", "J, & 4", "-SY -".
+    if len(re.sub(r"[A-Za-z0-9\s]", "", stripped)) / max(len(stripped), 1) > 0.4:
+        return True
+    # Credit-roll furniture rather than a person.
+    if _COPYRIGHT_RE.match(stripped) or _TITLE_CARD_RE.match(stripped) or _PART_CARD_RE.match(stripped):
+        return True
+    # Every token is a crew-role/filler word => it's a job title, not a person.
+    toks = [t for t in re.sub(r"[^A-Za-z0-9\s]", " ", stripped.lower()).split() if t]
+    if toks and all(t in _CREW_ROLE_WORDS or t.isdigit() for t in toks):
         return True
     return False
 
@@ -963,18 +1006,28 @@ class SupabaseSync:
         return None
 
     def upsert_person(self, name: str) -> str:
-        # Rapidfuzz lookup fallback inside database can be done by standard lookup
-        query = f"{self.url}/rest/v1/people?name=ilike.{name}&select=id"
-        res = self._request("GET", query, headers=self.headers)
-        if res.status_code == 200 and res.json():
-            return res.json()[0]['id']
-            
-        payload = {"name": name, "nationality": "Nigerian"}
-        res = self._request("POST", f"{self.url}/rest/v1/people", headers=self.headers, json=payload)
-        if res.status_code in [201, 200] and res.json():
-            return res.json()[0]['id']
-        return ""
+        """Find-or-create via the shared DB matcher.
 
+        Was: `people?name=ilike.{name}` then INSERT on miss — which could not see
+        order swaps or honorifics, so "Kosoko Jide" / "Prince Jide Kosoko" became
+        NEW rows next to "Jide Kosoko". upsert_person_by_name matches on
+        people.name_key (order-insensitive, honorific-stripped) and only inserts
+        when there is genuinely no match.
+        """
+        clean = (name or "").strip()
+        if not clean:
+            return ""
+        res = self._request(
+            "POST",
+            f"{self.url}/rest/v1/rpc/upsert_person_by_name",
+            headers=self.headers,
+            json={"p_name": clean, "p_extra": {"nationality": "Nigerian", "source": "ocr"}},
+        )
+        if res.status_code in (200, 201):
+            pid = res.json()
+            if isinstance(pid, str) and pid:
+                return pid
+        return ""
     def link_credit(self, film_id: str, person_id: str, role: str, char_name: str = "", order: int = 0):
         q = f"{self.url}/rest/v1/credits?film_id=eq.{film_id}&person_id=eq.{person_id}&role=eq.{role}"
         if char_name: q += f"&character_name=eq.{char_name}"

@@ -6,6 +6,7 @@ import ImageWithFallback from '../../components/ui/ImageWithFallback';
 import {
   applyPeopleEnrichment,
   checkPeopleEnrichmentSetup,
+  deletePersonProfile,
   listPeopleEnrichment,
   refreshPeopleEnrichment,
   researchPeopleWithGemini,
@@ -347,6 +348,17 @@ export default function AdminPeopleEnrichment() {
     );
   };
 
+  const runDeletePerson = async (targetPerson) => {
+    if (!targetPerson?.id) return;
+    const confirmed = window.confirm(`Are you sure you want to permanently delete "${targetPerson.name}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    await runAction('delete', `Deleting ${targetPerson.name}...`, async (toastId) => {
+      await deletePersonProfile(targetPerson.id);
+      toast.success(`Deleted ${targetPerson.name}`, { id: toastId });
+    });
+  };
+
   const toggleField = (key) => {
     if (key === 'photo_url' && !selectedFields.includes(key) && !photoConfirmed) {
       toast.error('Confirm the photo visually before selecting it');
@@ -520,10 +532,24 @@ export default function AdminPeopleEnrichment() {
                         <span className="truncate text-sm font-bold text-text-primary">{rowPerson?.name || 'Unnamed person'}</span>
                         <span className="shrink-0 text-[10px] font-bold text-brand">{row.current_completeness}%</span>
                       </span>
-                      <span className="mt-2 flex flex-wrap items-center gap-2">
-                        <StatusBadge status={row.status} />
-                        {row.source_name && <SourceBadge source={row.source_name} />}
-                        <span className="text-[10px] text-text-muted">{rowPerson?.film_count || 0} credits</span>
+                      <span className="mt-[6px] flex items-center justify-between gap-2">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <StatusBadge status={row.status} />
+                          {row.source_name && <SourceBadge source={row.source_name} />}
+                          <span className="text-[10px] text-text-muted">{rowPerson?.film_count || 0} credits</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            runDeletePerson(rowPerson);
+                          }}
+                          disabled={Boolean(working)}
+                          title={`Delete ${rowPerson?.name || 'profile'}`}
+                          className="shrink-0 p-1 text-text-muted transition-colors hover:text-red-400 disabled:opacity-30"
+                        >
+                          <Icon icon="solar:trash-bin-trash-linear" width="15" />
+                        </button>
                       </span>
                       <span className="mt-3 block h-1 w-full bg-bg">
                         <span className="block h-full bg-brand" style={{ width: `${row.current_completeness || 0}%` }} />
@@ -594,6 +620,16 @@ export default function AdminPeopleEnrichment() {
                     <Icon icon="solar:pen-linear" width="16" />
                     Edit manually
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => runDeletePerson(person)}
+                    disabled={Boolean(working)}
+                    className="inline-flex h-9 items-center gap-2 border border-red-500/30 bg-red-500/10 px-3 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                    title={`Delete ${person.name}`}
+                  >
+                    <Icon icon={working === 'delete' ? 'solar:refresh-circle-linear' : 'solar:trash-bin-trash-linear'} className={working === 'delete' ? 'animate-spin' : ''} width="16" />
+                    Delete profile
+                  </button>
                 </div>
               </header>
 

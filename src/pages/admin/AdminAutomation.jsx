@@ -103,11 +103,11 @@ export default function AdminAutomation() {
                 </div>
               </div>
               {automationJobs.find(j => j.id === 'actor_enricher')?.status === 'running' ? (
-                <span className="flex items-center gap-2 text-xs font-bold bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full">
+                <span className="flex items-center gap-2 text-xs font-bold bg-amber-500/10 text-amber-500 px-3 py-1 rounded-xl">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Running
                 </span>
               ) : (
-                <span className="flex items-center gap-2 text-xs font-bold bg-green-500/10 text-green-500 px-3 py-1 rounded-full">
+                <span className="flex items-center gap-2 text-xs font-bold bg-green-500/10 text-green-500 px-3 py-1 rounded-xl">
                   <span className="w-2 h-2 rounded-full bg-green-500" /> Idle
                 </span>
               )}
@@ -164,11 +164,11 @@ export default function AdminAutomation() {
                 </div>
               </div>
               {automationJobs.find(j => j.id === 'channel_fetcher')?.status === 'running' ? (
-                <span className="flex items-center gap-2 text-xs font-bold bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full">
+                <span className="flex items-center gap-2 text-xs font-bold bg-amber-500/10 text-amber-500 px-3 py-1 rounded-xl">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" /> Running
                 </span>
               ) : (
-                <span className="flex items-center gap-2 text-xs font-bold bg-green-500/10 text-green-500 px-3 py-1 rounded-full">
+                <span className="flex items-center gap-2 text-xs font-bold bg-green-500/10 text-green-500 px-3 py-1 rounded-xl">
                   <span className="w-2 h-2 rounded-full bg-green-500" /> Idle
                 </span>
               )}

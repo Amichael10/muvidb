@@ -43,18 +43,22 @@ export default function AdminOverview() {
           }));
         } else {
           // Fetch global counts for full admin
-          const [films, people, credits, reviews] = 
+          const [films, people, credits, reviews, critics, plays] = 
             await Promise.all([
               supabase.from('films').select('*', { count: 'exact', head: true }),
               supabase.from('people').select('*', { count: 'exact', head: true }),
               supabase.from('credits').select('*', { count: 'exact', head: true }),
-              supabase.from('reviews').select('*', { count: 'exact', head: true })
+              supabase.from('reviews').select('*', { count: 'exact', head: true }),
+              supabase.from('critics').select('*', { count: 'exact', head: true }),
+              supabase.from('plays').select('*', { count: 'exact', head: true })
             ]);
           setCounts(prev => ({
             ...prev,
             films: films.count || 0,
             people: people.count || 0,
             credits: credits.count || 0,
+            critics: critics.count || 0,
+            plays: plays.count || 0,
             users: 1,
             reviews: reviews.count || 0
           }));
@@ -258,7 +262,8 @@ export default function AdminOverview() {
     { label: 'Movies', value: counts.films, icon: 'solar:clapperboard-play-linear' },
     { label: 'People', value: counts.people, icon: 'solar:user-linear' },
     { label: 'Credits', value: counts.credits, icon: 'solar:document-text-linear' },
-    { label: 'AI status', value: 'Active', icon: 'solar:cpu-linear', isStatic: true },
+    { label: 'Film Critics', value: counts.critics, icon: 'solar:chat-round-bold-linear' },
+    { label: 'Stage Plays', value: counts.plays, icon: 'solar:mask-hamsa-linear' },
     { label: 'Reviews', value: counts.reviews, icon: 'solar:star-linear' }
   ];
 
@@ -266,9 +271,13 @@ export default function AdminOverview() {
     { label: 'Add movie record', icon: 'solar:clapperboard-play-linear', path: '/admin/films' },
     { label: 'Manage people profiles', icon: 'solar:user-linear', path: '/admin/people' },
     { label: 'Manage cast & crew credits', icon: 'solar:document-text-linear', path: '/admin/credits' },
-    { label: 'Manage corporate partners', icon: 'solar:buildings-linear', path: '/admin/companies' }
+    { label: 'Manage corporate partners', icon: 'solar:buildings-linear', path: '/admin/companies' },
+    { label: 'Manage film critics', icon: 'solar:chat-round-bold-linear', path: '/admin/critics' },
+    { label: 'Manage theatre plays', icon: 'solar:mask-hamsa-linear', path: '/admin/plays' }
   ] : [
     { label: 'Add movie record', icon: 'solar:clapperboard-play-linear', path: '/admin/films' },
+    { label: 'Manage film critics', icon: 'solar:chat-round-bold-linear', path: '/admin/critics' },
+    { label: 'Manage theatre plays', icon: 'solar:mask-hamsa-linear', path: '/admin/plays' },
     { label: 'AI review center', icon: 'solar:magic-stick-linear', path: '/admin/ai' },
     { label: 'Sync cinema data', icon: 'solar:refresh-linear', path: '/admin/cinema-scraping' },
     { label: 'Review identity claims', icon: 'solar:clipboard-list-linear', path: '/admin/claims' }
@@ -292,13 +301,13 @@ export default function AdminOverview() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-brand/10 rounded-full border border-brand/20">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-brand/10 rounded-xl border border-brand/20">
             <Icon icon={isLimitedAdmin ? "solar:shield-check-bold" : "solar:shield-up-bold"} className="text-brand text-xs" />
             <span className="text-[10px] font-bold text-brand uppercase">
               {isLimitedAdmin ? 'Role: Sub-Admin' : 'Role: Super-Admin'}
             </span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 rounded-full border border-green-500/20">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 rounded-xl border border-green-500/20">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
             <span className="text-[10px] font-bold text-green-600 dark:text-green-400">System online</span>
           </div>
@@ -527,7 +536,7 @@ export default function AdminOverview() {
                         <div className="flex items-center gap-2">
                           <p className="text-xs font-bold text-text-primary line-clamp-1">{job.name}</p>
                           {job.count > 0 && (
-                            <span className="text-[8px] font-bold bg-brand/10 text-brand px-1.5 py-0.5 rounded-full">
+                            <span className="text-[8px] font-bold bg-brand/10 text-brand px-1.5 py-0.5 rounded-xl">
                               +{job.count} recently
                             </span>
                           )}

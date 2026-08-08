@@ -1,6 +1,6 @@
 /* Fonts are loaded via <link> in index.html (preconnect + stylesheet) so they are
    discovered immediately instead of after this CSS downloads — improves FCP/LCP. */
-@import "tailwindcss";
+@import "tailwindcss" source("./");
 
 :root {
   /* Spacing System */
@@ -33,6 +33,9 @@
   --radius-xl: 10px;
   --radius-2xl: 12px;
   --radius-pill: 9999px;
+  /* Text/CTA buttons — use Tailwind rounded-xl (not rounded-full pills).
+     Keep rounded-full only for true circles: avatars, icon-only controls, dots. */
+  --radius-button: var(--radius-xl);
 }
 
 /* Dark Theme (African Cinematic) */
@@ -136,6 +139,26 @@
   --font-heading: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ── Site container ────────────────────────────────────────────────────────
+   Every page/section wraps its content in `max-w-7xl mx-auto`, which Tailwind
+   resolves from --container-7xl. Overriding it here widens the whole site from
+   one place instead of touching ~70 files. It stays 1280px on laptops and steps
+   up on large displays so the layout doesn't float in a sea of margin. The film
+   rails are fixed-width horizontal scrollers, so the extra width shows more
+   posters rather than inflating the existing ones. */
+:root {
+  --container-7xl: 80rem; /* 1280px */
+}
+@media (min-width: 1536px) {
+  :root { --container-7xl: 90rem; } /* 1440px */
+}
+@media (min-width: 1800px) {
+  :root { --container-7xl: 100rem; } /* 1600px */
+}
+@media (min-width: 2200px) {
+  :root { --container-7xl: 108rem; } /* 1728px */
+}
+
 @layer base {
   html {
     scroll-behavior: auto !important; /* Disable CSS smooth scroll for Lenis */
@@ -194,6 +217,39 @@
     background-size: 1000px 100%;
   }
 
+  @keyframes muvi-footer-film-flow {
+    from { background-position-x: 0; }
+    to { background-position-x: -18px; }
+  }
+
+  .footer-film-strip-perfs {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background-image: linear-gradient(
+      90deg,
+      var(--color-brand) 0,
+      var(--color-brand) 6px,
+      transparent 6px,
+      transparent 18px
+    );
+    background-repeat: repeat-x;
+    background-size: 18px 6px;
+    background-position-y: center;
+    animation: muvi-footer-film-flow 0.9s linear infinite;
+  }
+
+  .footer-film-strip-perfs--reverse {
+    animation-direction: reverse;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .footer-film-strip-perfs {
+      animation: none;
+    }
+  }
+
   .grid-bg {
     background-image:
       linear-gradient(var(--color-grid) 1px, transparent 1px),
@@ -202,6 +258,11 @@
   }
 
   .muvi-landing {
+    --muvi-celluloid: #070606;
+    --muvi-rail-width: clamp(12px, 1.15vw, 18px);
+    --muvi-popcorn-cream: #fff3cf;
+    --muvi-popcorn-gold: #e8bb64;
+    --muvi-popcorn-shadow: rgba(255, 90, 31, 0.24);
     --landing-grid: rgba(255, 255, 255, 0.055);
     --landing-panel: rgba(20, 20, 20, 0.72);
     --landing-band: rgba(255, 255, 255, 0.018);
@@ -217,6 +278,8 @@
   }
 
   .light .muvi-landing {
+    --muvi-celluloid: #E5E7EB;
+    --muvi-popcorn-shadow: rgba(255, 90, 31, 0.16);
     --landing-grid: rgba(17, 24, 39, 0.07);
     --landing-panel: rgba(255, 255, 255, 0.86);
     --landing-band: rgba(248, 250, 252, 0.84);
@@ -226,6 +289,173 @@
       radial-gradient(circle at 12% 0%, rgba(255, 90, 31, 0.12), transparent 29rem),
       radial-gradient(circle at 86% 6%, rgba(34, 197, 94, 0.06), transparent 28rem),
       #f7f8f5;
+  }
+
+  @keyframes muvi-film-rail-roll {
+    from { background-position-y: 0; }
+    to { background-position-y: 22px; }
+  }
+
+  @keyframes muvi-popcorn-fall {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, -14vh, 0) rotate(0deg) scale(0.86);
+    }
+    8% {
+      opacity: 0.56;
+    }
+    88% {
+      opacity: 0.56;
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(var(--drift), 116vh, 0) rotate(540deg) scale(1.04);
+    }
+  }
+
+  .muvi-film-rail {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: 45;
+    width: var(--muvi-rail-width);
+    pointer-events: none;
+    background: var(--muvi-celluloid);
+    transition: background-color 0.5s ease, opacity 0.3s ease;
+  }
+
+  .muvi-film-rail::before {
+    content: '';
+    position: absolute;
+    top: -22px;
+    bottom: -22px;
+    left: 50%;
+    width: clamp(6px, 0.58vw, 9px);
+    transform: translateX(-50%);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      var(--color-brand) 0,
+      var(--color-brand) 8px,
+      transparent 8px,
+      transparent 22px
+    );
+    background-repeat: repeat-y;
+    filter: drop-shadow(0 0 4px rgba(255, 90, 31, 0.28));
+    animation: muvi-film-rail-roll 2.4s linear infinite;
+  }
+
+  .muvi-film-rail--left {
+    left: 0;
+    box-shadow: 1px 0 0 var(--color-hairline), 8px 0 24px rgba(0, 0, 0, 0.16);
+  }
+
+  .light .muvi-film-rail--left {
+    box-shadow: 1px 0 0 var(--color-hairline), 6px 0 16px rgba(0, 0, 0, 0.05);
+  }
+
+  .muvi-film-rail--right {
+    right: 0;
+    box-shadow: -1px 0 0 var(--color-hairline), -8px 0 24px rgba(0, 0, 0, 0.16);
+  }
+
+  .light .muvi-film-rail--right {
+    box-shadow: -1px 0 0 var(--color-hairline), -6px 0 16px rgba(0, 0, 0, 0.05);
+  }
+
+  .muvi-film-rail--right::before {
+    animation-direction: reverse;
+  }
+
+  .muvi-popcorn-field {
+    position: fixed;
+    inset: 0;
+    z-index: 44;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0.92;
+  }
+
+  .muvi-popcorn-kernel {
+    position: absolute;
+    top: 0;
+    left: var(--x);
+    width: var(--kernel-size);
+    opacity: 0;
+    filter: drop-shadow(0 8px 14px var(--muvi-popcorn-shadow));
+    animation: muvi-popcorn-fall var(--duration) linear infinite;
+    animation-delay: var(--delay);
+    will-change: transform, opacity;
+  }
+
+  .muvi-popcorn-kernel img {
+    display: block;
+    width: 100%;
+    height: auto;
+    user-select: none;
+    transform: rotate(var(--tilt));
+    transform-origin: 50% 50%;
+  }
+
+  .muvi-motion-toggle-kernel {
+    position: relative;
+    display: block;
+    width: 17px;
+    aspect-ratio: 1;
+    border-radius: 56% 44% 62% 38% / 47% 58% 42% 53%;
+    background:
+      radial-gradient(circle at 34% 28%, #fffdf2 0 18%, transparent 19%),
+      radial-gradient(circle at 68% 38%, #fff3cf 0 28%, transparent 29%),
+      radial-gradient(circle at 42% 70%, #f6d98b 0 24%, transparent 25%),
+      linear-gradient(145deg, #fff3cf, #e8bb64);
+    box-shadow: inset -2px -2px 3px rgba(130, 78, 24, 0.18), 0 0 0 1px rgba(255, 90, 31, 0.25);
+  }
+
+  .muvi-motion-toggle-kernel::before {
+    content: '';
+    position: absolute;
+    inset: 22% 14% 14% 24%;
+    border-radius: 58% 42% 44% 56% / 48% 45% 55% 52%;
+    background: var(--color-brand);
+    opacity: 0.48;
+    transform: rotate(18deg);
+    transform-origin: 50% 50%;
+  }
+
+  .muvi-motion-toggle-kernel--off::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    width: 2px;
+    height: 25px;
+    border-radius: 999px;
+    background: currentColor;
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  .muvi-motion-paused .muvi-popcorn-field {
+    display: none;
+  }
+
+  .muvi-motion-paused .muvi-film-rail::before,
+  .muvi-motion-paused .footer-film-strip-perfs,
+  .muvi-motion-paused .animate-kenburns,
+  .muvi-motion-paused .film-grain {
+    animation: none !important;
+  }
+
+  @media (max-width: 900px) {
+    .muvi-film-rail {
+      display: none;
+    }
+
+    .muvi-popcorn-field {
+      opacity: 0.56;
+    }
+
+    .muvi-popcorn-kernel:nth-child(n+9) {
+      display: none;
+    }
   }
 
   .muvi-landing::before {
@@ -305,6 +535,15 @@
     opacity: 0.7;
   }
 
+  .light .watch-platform-band {
+    --landing-grid: rgba(17, 24, 39, 0.06);
+    background:
+      linear-gradient(110deg, rgba(255, 90, 31, 0.06), transparent 34%),
+      var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    border-bottom-color: var(--color-border);
+  }
+
   .landing-zone-label {
     display: flex;
     align-items: center;
@@ -372,6 +611,164 @@
     box-shadow: rgba(19, 19, 22, 0.1) 0px 2px 8px -4px, rgba(34, 42, 53, 0.12) 0px 0px 0px 1px, rgba(34, 42, 53, 0.08) 0px 8px 16px 0px;
   }
 
+  .admin-workspace {
+    --admin-table-min-width: 1120px;
+    --admin-control-height: 44px;
+    background:
+      linear-gradient(180deg, var(--color-surface-2) 0, transparent 340px),
+      var(--color-bg);
+  }
+
+  .admin-workspace .admin-sidebar {
+    box-shadow: 1px 0 0 var(--color-hairline);
+  }
+
+  .admin-workspace .admin-nav {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+
+  .admin-workspace .admin-nav::-webkit-scrollbar,
+  .admin-workspace .admin-content::-webkit-scrollbar,
+  .admin-workspace .overflow-x-auto::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .admin-workspace .admin-nav::-webkit-scrollbar-thumb,
+  .admin-workspace .admin-content::-webkit-scrollbar-thumb,
+  .admin-workspace .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  .admin-workspace .admin-topbar {
+    backdrop-filter: blur(14px);
+  }
+
+  .admin-workspace .admin-main-inner {
+    max-width: none;
+  }
+
+  .admin-workspace .admin-page {
+    width: 100%;
+  }
+
+  .admin-workspace .admin-page-header {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    padding: clamp(1rem, 1.6vw, 1.5rem);
+  }
+
+  .admin-workspace .admin-filter-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    padding: clamp(1rem, 1.4vw, 1.25rem);
+  }
+
+  .admin-workspace .admin-filter-panel {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+  }
+
+  .admin-workspace .admin-selection-bar {
+    background: var(--color-brand-muted);
+    border: 1px solid rgba(255, 90, 31, 0.28);
+    border-radius: var(--radius-lg);
+  }
+
+  .admin-workspace :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+    min-height: var(--admin-control-height);
+    border-color: var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .admin-workspace :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus {
+    outline: none;
+    border-color: var(--color-brand);
+    box-shadow: 0 0 0 4px var(--color-brand-muted);
+  }
+
+  .admin-workspace .admin-table-card,
+  .admin-workspace .card-cal {
+    border-color: var(--color-border);
+    overflow: hidden;
+  }
+
+  .admin-workspace table {
+    min-width: var(--admin-table-min-width);
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+  }
+
+  .admin-workspace table thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .admin-workspace table th {
+    background: var(--color-surface-2);
+    color: var(--color-text-secondary);
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    padding: 0.9rem 1rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .admin-workspace table td {
+    border-bottom: 1px solid var(--color-hairline);
+    line-height: 1.45;
+    padding: 1rem;
+    vertical-align: top;
+  }
+
+  .admin-workspace table tbody tr {
+    transition: background-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .admin-workspace table tbody tr:hover {
+    background: var(--color-surface-2);
+  }
+
+  .admin-workspace table td .truncate,
+  .admin-workspace table td.truncate {
+    max-width: min(36rem, 54vw);
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-workspace table td a.truncate,
+  .admin-workspace table td span.truncate,
+  .admin-workspace table td p.truncate,
+  .admin-workspace table td div.truncate {
+    display: inline;
+  }
+
+  .admin-workspace table td .admin-row-actions,
+  .admin-workspace table td .group-hover\:opacity-100 {
+    opacity: 1;
+  }
+
+  .admin-workspace .admin-table-meta {
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+  }
+
   .link-underline {
     @apply relative inline-block;
   }
@@ -389,6 +786,23 @@
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Consent banner entrance. Deliberately transform-only: page-fade-in starts at
+     opacity 0, so any stall (hidden tab, throttled timeline) leaves the banner
+     ghosted over the page instead of sitting on top of it. Sliding a fully
+     opaque panel has no such failure mode. */
+  .consent-rise {
+    animation: consent-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes consent-rise {
+    from { transform: translateY(16px); }
+    to { transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .consent-rise {
+      animation: none;
+    }
   }
 
   /* Hide scrollbar utility */

@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl!, supabaseKey!);
 
@@ -85,17 +85,36 @@ async function syncFeedKappa() {
       const url = urls[i];
       const page = await browser.newPage();
       
-      let apiTitle, apiSynopsis, apiPoster;
+      let apiTitle: string | undefined;
+      let apiSynopsis: string | undefined;
+      let apiPoster: string | undefined;
+      let apiRuntimeMinutes: number | null = null;
       let apiGenres: string[] = [];
       let apiCast: any[] = [];
+
+      const parseApiDuration = (raw: string | undefined | null): number | null => {
+        if (!raw) return null;
+        // "01:38:54" or "1:38:54"
+        const m = String(raw).match(/^(?:(\d+):)?(\d+):(\d+)$/);
+        if (!m) return parseRuntime(String(raw));
+        const h = m[1] ? parseInt(m[1], 10) : 0;
+        const min = parseInt(m[2], 10);
+        return h * 60 + min;
+      };
       
       page.on('response', async response => {
         const apiHost = process.env.FEED_KAPPA_API_HOST || 'kavaapi.muvi.com';
         if (response.url().includes(apiHost + '/content') && response.request().method() === 'POST') {
           try {
             const json = await response.json();
-            if (json?.data?.contentList?.content_list && json.data.contentList.content_list.length > 0) {
-              const movieData = json.data.contentList.content_list[0];
+            const list = json?.data?.contentList?.content_list;
+            if (Array.isArray(list) && list.length > 0) {
+              const movieData = list[0];
+              if (movieData?.content_name) apiTitle = movieData.content_name;
+              if (movieData?.content_desc) apiSynopsis = movieData.content_desc;
+              if (movieData?.poster_url || movieData?.content_poster) {
+                apiPoster = movieData.poster_url || movieData.content_poster;
+              }
               if (movieData?.cast_details && movieData.cast_details.length > 0) {
                 apiCast = movieData.cast_details.map((c: any) => ({
                   name: c.cast_name,
@@ -106,42 +125,73 @@ async function syncFeedKappa() {
                 apiGenres = movieData.categories.map((c: any) => c.category_name);
               }
             }
+            const child = json?.data?.childList?.child_list;
+            if (child?.content_name && !apiTitle) apiTitle = child.content_name;
+            if (child?.content_desc && !apiSynopsis) apiSynopsis = child.content_desc;
+            const addons = json?.data?.addons?.addons;
+            if (Array.isArray(addons)) {
+              for (const a of addons) {
+                const dur = a?.media_details?.duration;
+                const mins = parseApiDuration(dur);
+                if (mins != null) { apiRuntimeMinutes = mins; break; }
+              }
+            }
           } catch (e) {}
         }
       });
 
-      try {
-        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-        await page.waitForTimeout(10000);
-      } catch (navError) {
-        console.warn(`Navigation or timeout error for ${url}`);
-      }
+      let title: string | null = null;
+      let description = '';
+      let posterUrl: string | null = null;
+      let slug = url.split('/').pop() || '';
+      let runtime_minutes: number | null = null;
 
-      const html = await page.content();
-      const getMeta = (prop: string) => {
-        const regex = new RegExp(`<meta\\s+property="${prop}"\\s+content="([^"]+)"`, 'i');
-        const m = html.match(regex);
-        return m ? decodeHtmlEntities(m[1]) : null;
-      };
+      try {
+        try {
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+          await page.waitForTimeout(5000);
+        } catch (navError) {
+          console.warn(`Navigation or timeout error for ${url}`);
+        }
+
+        const html = await page.content();
+        const getMeta = (prop: string) => {
+          const regex = new RegExp(`<meta\\s+property="${prop}"\\s+content="([^"]+)"`, 'i');
+          const m = html.match(regex);
+          return m ? decodeHtmlEntities(m[1]) : null;
+        };
       
-      const title = getMeta('og:title');
-      const description = getMeta('og:description') || '';
-      const posterUrl = getMeta('og:image');
-      const slug = url.split('/').pop();
+        title = getMeta('og:title');
+        description = getMeta('og:description') || '';
+        posterUrl = getMeta('og:image');
       
-      const runtime_minutes = await page.evaluate(() => {
-         const text = document.body.innerText;
-         const match = text.match(/(\d+)h\s*(\d+)m|(\d+)m\s*(\d+)s|(\d+)m/);
-         if (!match) return null;
-         if (match[1] && match[2]) return parseInt(match[1]) * 60 + parseInt(match[2]);
-         if (match[3]) return parseInt(match[3]);
-         if (match[5]) return parseInt(match[5]);
-         return null;
-      });
+        // Never read document.body blindly — after a soft nav timeout body can
+        // still be null and page.evaluate throws, aborting the whole sync.
+        runtime_minutes = await page.evaluate(() => {
+          const body = document.body;
+          if (!body) return null;
+          const text = body.innerText || '';
+          const match = text.match(/(\d+)h\s*(\d+)m|(\d+)m\s*(\d+)s|(\d+)m/);
+          if (!match) return null;
+          if (match[1] && match[2]) return parseInt(match[1]) * 60 + parseInt(match[2]);
+          if (match[3]) return parseInt(match[3]);
+          if (match[5]) return parseInt(match[5]);
+          return null;
+        }).catch(() => null);
+      } catch (pageErr: any) {
+        console.warn(`Skipping ${url}: ${pageErr?.message || pageErr}`);
+        await page.close().catch(() => {});
+        errors++;
+        continue;
+      }
 
       await page.close();
 
-      if (!title || !slug) continue;
+      if ((!title && !apiTitle) || !slug) {
+        console.warn(`No title for ${url}, skipping`);
+        errors++;
+        continue;
+      }
       
       const m = {
         title: title || apiTitle,
@@ -151,7 +201,7 @@ async function syncFeedKappa() {
         synopsis: apiSynopsis || description,
         genres: apiGenres,
         cast: apiCast,
-        runtime_minutes
+        runtime_minutes: runtime_minutes ?? apiRuntimeMinutes,
       };
       
       const source_video_id = `kava-${m.slug}`;

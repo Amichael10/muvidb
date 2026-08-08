@@ -68,14 +68,31 @@ project.tar.gz
 *.png
 *.jpg
 *.jpeg
+# Keep shipped site assets (homepage intro cards, attribution logos, etc.)
+!public/images/**/*.png
+!public/images/**/*.jpg
+!public/images/**/*.jpeg
+!public/images/**/*.webp
+!public/images/**/*.svg
 *.bak
 
 # Playwright storageState — holds live login cookies (NetflixId/SecureNetflixId
 # are a full Netflix session). Never commit these.
 netflix_playwright_state.json
+.netflix-chrome-profile/
 *_playwright_state.json
 .playwright-cli/
 
 # Local agent tooling + throwaway repair/inspection scripts.
 .agents/
 scratch/
+
+# React Router framework-mode generated typegen + build output
+.react-router/
+build/
+
+# Social Studio design mockups (large PNG references, kept local)
+docs/social-templates/*.png
+
+# Local credit-roll frame dumps from harvest_credits.ts --frames-only
+harvest_frames/

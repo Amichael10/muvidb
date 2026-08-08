@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Skeleton } from '../components/ui/Skeleton'
+import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { toTitleCase, toSentenceCase, formatPersonName } from '../utils/format'
 import { getZonedClock, isFutureShowtime } from '../utils/showtimes'
@@ -116,17 +117,24 @@ const CinemaSkeleton = () => (
 )
 
 const Cinemas = () => {
-  const [cinemas, setCinemas] = useState([])
-  const [showCounts, setShowCounts] = useState({})
-  const [loading, setLoading] = useState(true)
+  const loaderData = useLoaderData()
+  const seeded = !!loaderData?.seeded && (loaderData.cinemas?.length ?? 0) > 0
+  const [cinemas, setCinemas] = useState(loaderData?.cinemas ?? [])
+  const [showCounts, setShowCounts] = useState(loaderData?.showCounts ?? {})
+  const [loading, setLoading] = useState(!seeded)
   const [selectedCity, setSelectedCity] = useState('All')
   const [selectedChain, setSelectedChain] = useState('All')
   const [search, setSearch] = useState('')
+  const skipInitialFetch = useRef(seeded)
 
   const CHAINS = ['All', 'Filmhouse', 'Genesis', 'Silverbird', 'Ozone', 'Blu Star', 'Kada', 'Viva']
 
   useEffect(() => {
-    document.title = 'MuviDB | Cinemas'
+    // Title comes from the route `meta` export.
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false
+      return
+    }
     fetchCinemas()
   }, [])
 
@@ -188,18 +196,12 @@ const Cinemas = () => {
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Page Header */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-          <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary mb-4 tracking-tighter uppercase italic">
-            Exhibition Hubs
-          </h1>
-          <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6">
-            Discover premier cinema locations across Nigeria and find where your favorite Nollywood blockbusters are playing today.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon="solar:city-bold"
+        eyebrow="Exhibition"
+        title="Cinemas"
+        description="Discover premier cinema locations across Nigeria and find where your favorite Nollywood blockbusters are playing today."
+      />
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">
         {/* Filters Section */}

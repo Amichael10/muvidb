@@ -102,12 +102,20 @@ async function scrapePrime() {
 
   console.log(`🚀 Navigating to Prime Search: ${PRIME_SEARCH_URL}`);
   await page.goto(PRIME_SEARCH_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(3000); // Allow results to settle
-
   try {
     const cookieButton = await page.waitForSelector('#sp-cc-accept, #pv-nav-accept-cookies', { timeout: 3000 });
     if (cookieButton) await cookieButton.click();
   } catch (e) {}
+
+  // Current Prime markup uses relative /detail/<id> anchors (hashed class names
+  // like detailLink-zyfcZQ change). Wait for those instead of the old Amazon
+  // search grid containers, which now match empty placeholders and hide results.
+  try {
+    await page.waitForSelector('a[href*="/detail/"]', { timeout: 20000 });
+  } catch {
+    console.warn('⚠️ No detail links appeared — page may be blocked or empty.');
+  }
+  await page.waitForTimeout(2000);
 
   let movieUrls = new Set<string>();
   let pageNumber = 1;
@@ -129,30 +137,21 @@ async function scrapePrime() {
       scrollAttempts++;
     }
 
-    // Extract all links on the current page
+    // Extract all detail links on the current page (absolute or relative).
     const links = await page.evaluate(() => {
-      const containers = Array.from(document.querySelectorAll('.s-result-list-placeholder, .av-grid-container, .f-grid-container, div[data-automation-id="grid"]'));
-      let allLinks: string[] = [];
-      
-      containers.forEach(container => {
-        const rowLinks = Array.from(container.querySelectorAll('a.detailLink-zyfcZQ, a[href*="/detail/"], a[href*="/gp/video/detail/"]'));
-        rowLinks.forEach(a => {
-          const href = (a as HTMLAnchorElement).href.split('?')[0];
-          if (href && !href.includes('javascript:')) allLinks.push(href);
-        });
-      });
-
-      if (allLinks.length === 0) {
-        const allElements = Array.from(document.querySelectorAll('a.detailLink-zyfcZQ, a[href*="/detail/"], h2, h3'));
-        for (const el of allElements) {
-          if (el.tagName.startsWith('H') && (el.textContent?.toLowerCase().includes('related') || el.textContent?.toLowerCase().includes('customers also watched'))) break;
-          if (el.tagName === 'A') {
-            const href = (el as HTMLAnchorElement).href.split('?')[0];
-            if (href && !href.includes('javascript:')) allLinks.push(href);
+      const anchors = Array.from(
+        document.querySelectorAll('a[href*="/detail/"], a[href*="/gp/video/detail/"]'),
+      ) as HTMLAnchorElement[];
+      const urls = anchors
+        .map((a) => {
+          try {
+            return new URL(a.getAttribute('href') || a.href, location.origin).href.split('?')[0];
+          } catch {
+            return '';
           }
-        }
-      }
-      return [...new Set(allLinks)];
+        })
+        .filter((href) => href.includes('/detail/') && !href.includes('javascript:'));
+      return [...new Set(urls)];
     });
     
     links.forEach(url => movieUrls.add(url));

@@ -4,6 +4,8 @@ temp_lumi/
 output/
 scratch/
 scripts/
+!scripts/write_spa_index.mjs
+!scripts/build_email_templates.mjs
 .git/
 node_modules/
 dist/

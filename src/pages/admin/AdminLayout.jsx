@@ -43,26 +43,32 @@ export default function AdminLayout() {
     { path: '/admin/people', label: 'People', icon: 'solar:user-linear' },
     { path: '/admin/people-enrichment', label: 'People Enrichment', icon: 'solar:user-check-linear' },
     { path: '/admin/credits', label: 'Credits', icon: 'solar:case-linear' },
+    { path: '/admin/credits/harvest', label: 'Credit Harvest', icon: 'solar:magnifer-zoom-in-linear' },
     { path: '/admin/companies', label: 'Companies', icon: 'solar:buildings-linear' },
     { path: '/admin/claims', label: 'Pending Claims', icon: 'solar:clipboard-list-linear' },
+    { path: '/admin/outreach', label: 'Artist Outreach', icon: 'solar:chat-round-line-linear' },
     { path: '/admin/contributions', label: 'Contributions', icon: 'solar:users-group-rounded-linear' },
     { path: '/admin/users', label: 'Users', icon: 'solar:users-group-two-rounded-linear' },
     { path: '/admin/cinemas', label: 'Cinemas', icon: 'solar:buildings-2-linear' },
     { path: '/admin/channels', label: 'Channels', icon: 'solar:videocamera-record-linear' },
+    { path: '/admin/critics', label: 'Film Critics', icon: 'solar:chat-round-bold-linear' },
+    { path: '/admin/plays', label: 'Theatre Plays', icon: 'solar:mask-hamsa-linear' },
     { path: '/admin/countries', label: 'Countries', icon: 'solar:global-linear' },
     { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear', badge: isSuperAdmin ? pendingCount : 0 },
     { path: '/admin/cinema-scraping', label: 'Scraping', icon: 'solar:refresh-linear' },
     { path: '/admin/logs', label: 'Activity Logs', icon: 'solar:history-linear' },
     { path: '/admin/deduplicator', label: 'Deduplicator', icon: 'solar:radar-2-linear' },
     { path: '/admin/ai', label: 'AI Agent', icon: 'solar:cpu-linear' },
+    { path: '/admin/social', label: 'Social Studio', icon: 'solar:share-linear' },
     { path: '/admin/spotlight', label: 'Spotlight', icon: 'solar:star-fall-linear' },
+    { path: '/admin/jobs', label: 'Careers', icon: 'solar:case-round-linear' },
     { path: '/admin/top10', label: 'Top 10', icon: 'solar:medal-star-linear' },
     { path: '/admin/new-releases', label: 'New to Stream', icon: 'solar:tv-linear' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
     { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear' },
   ];
 
-  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies'];
+  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/plays'];
   
   // Security guard for manual URL entry by admin_limited
   const isPathAllowed = (path) => {
@@ -86,11 +92,11 @@ export default function AdminLayout() {
                       visibleNavItems.find(item => location.pathname.startsWith(item.path));
 
   return (
-    <div className={`flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300`}>
+    <div className={`admin-workspace flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300`}>
       {/* Sidebar - Always Dark for Hybrid Look */}
       <aside 
-        className={`bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 h-screen sticky top-0 w-[64px] ${
-          isCollapsed ? 'md:w-[72px]' : 'md:w-[260px]'
+        className={`admin-sidebar bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 h-screen sticky top-0 w-[64px] ${
+          isCollapsed ? 'md:w-[72px]' : 'md:w-[284px]'
         }`}
       >
         {/* Toggle Button */}
@@ -122,7 +128,7 @@ export default function AdminLayout() {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 space-y-1 py-4 scrollbar-hide">
+        <nav className="admin-nav flex-1 overflow-y-auto px-3 space-y-1 py-4">
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
@@ -132,8 +138,8 @@ export default function AdminLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
                   isActive
-                    ? 'bg-brand/10 text-brand font-bold'
-                    : 'text-sidebar-text hover:bg-surface-2 hover:text-text-primary'
+                  ? 'bg-brand/10 text-brand font-bold shadow-[inset_3px_0_0_var(--color-brand)]'
+                    : 'text-sidebar-text hover:bg-sidebar-hover hover:text-text-primary'
                 } ${isCollapsed ? 'justify-center px-0' : 'justify-center md:justify-start'}`
               }
             >
@@ -194,7 +200,7 @@ export default function AdminLayout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header Bar */}
-        <header className="h-16 bg-surface border-b border-border flex items-center justify-between px-3 md:px-8 flex-shrink-0 z-20">
+        <header className="admin-topbar h-16 bg-surface border-b border-border flex items-center justify-between px-3 md:px-6 flex-shrink-0 z-20">
           <div className="flex items-center gap-4">
             <h1 className="hidden sm:block text-lg font-bold text-text-primary tracking-tight">
               {currentPage?.label || 'Dashboard'}
@@ -288,8 +294,8 @@ export default function AdminLayout() {
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 min-w-0 overflow-y-auto p-3 md:p-10 custom-scrollbar relative">
-          <div className="max-w-[1600px] w-full mx-auto">
+        <main className="admin-content flex-1 min-w-0 overflow-y-auto p-3 md:p-6 xl:p-8 custom-scrollbar relative">
+          <div className="admin-main-inner w-full mx-auto">
             <Outlet />
           </div>
         </main>

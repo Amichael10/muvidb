@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { Icon } from '@iconify/react';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { toTitleCase } from '../utils/format';
 import { searchAll } from '../lib/search';
+import ImageWithFallback from '../components/ui/ImageWithFallback';
+import { getCompanyLogoStrict } from '../lib/companyImages';
+import { collapseSeriesFilms } from '../utils/series';
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,7 +24,8 @@ export default function Search() {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    document.title = "MuviDB | Search";
+    // Title comes from the route's `meta` export now — setting it here too would
+    // overwrite the server-rendered one after hydration.
     fetchGenres();
     if (initialQuery) {
       fetchAll();
@@ -50,7 +55,8 @@ export default function Search() {
       const { films: filmResults, people: peopleResults, companies: companyResults } =
         await searchAll(initialQuery);
 
-      // De-dupe films by title so re-uploads don't clutter results.
+      // De-dupe films by title so re-uploads don't clutter results, then
+      // collapse series episodes into a single folder-style card.
       const uniqueFilms = [];
       const titles = new Set();
       filmResults.forEach((f) => {
@@ -58,7 +64,7 @@ export default function Search() {
         if (!titles.has(key)) { uniqueFilms.push(f); titles.add(key); }
       });
 
-      setFilms(uniqueFilms);
+      setFilms(collapseSeriesFilms(uniqueFilms));
       setPeople(peopleResults);
       setCompanies(companyResults);
 
@@ -100,9 +106,7 @@ export default function Search() {
           <div className="max-w-3xl mx-auto">
             <form onSubmit={handleSearch} className="relative group">
               <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
-                <svg className="w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <Icon icon="solar:magnifer-linear" className="w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" />
               </div>
               <input 
                 type="text" 
@@ -200,8 +204,17 @@ export default function Search() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                     {companies.map(company => (
                        <div key={company.id} className="bg-surface border border-border p-8 rounded-xl flex items-center gap-6 group hover:border-brand transition-all shadow-sm">
-                         <div className="w-14 h-14 bg-surface-2 rounded-lg flex items-center justify-center text-brand font-heading font-bold text-xl shrink-0 group-hover:scale-110 transition-transform border border-border/50">
-                            {company.logo_url ? <img src={company.logo_url} className="w-full h-full object-contain p-2" /> : toTitleCase(company.name).charAt(0)}
+                         <div className={`w-14 h-14 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform border border-border/50 overflow-hidden ${getCompanyLogoStrict(company) ? 'bg-white' : 'bg-surface-2'}`}>
+                            <ImageWithFallback
+                              src={company.logo_url}
+                              alt={toTitleCase(company.name)}
+                              fallbackType="company"
+                              name={toTitleCase(company.name)}
+                              className={`w-full h-full ${getCompanyLogoStrict(company) ? 'object-contain p-2' : 'object-cover'}`}
+                              width={112}
+                              sizes="56px"
+                              loading="lazy"
+                            />
                          </div>
                          <div className="min-w-0">
                              <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors tracking-tight truncate leading-tight">{toTitleCase(company.name)}</h3>

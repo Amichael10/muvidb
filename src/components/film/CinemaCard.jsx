@@ -69,7 +69,7 @@ export default function CinemaCard({ film }) {
             src={film.poster_url || film.backdrop_url}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-            fallbackType="banner"
+            fallbackType="film"
             name={title}
             loading="lazy"
             width={640}
@@ -143,7 +143,7 @@ export default function CinemaCard({ film }) {
         )}
 
         <div className="mt-auto pt-5">
-          <Link to="/showtimes" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-4 py-3 text-base font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+          <Link to="/showtimes" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-base font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
             <Icon icon="solar:ticket-bold" className="text-xl" />
             Showtimes
           </Link>

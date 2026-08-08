@@ -27,6 +27,7 @@ jobs:
         run: npm run scrape:netflix
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NETFLIX_EMAIL: ${{ secrets.NETFLIX_EMAIL }}
           NETFLIX_PASSWORD: ${{ secrets.NETFLIX_PASSWORD }}
@@ -36,6 +37,7 @@ jobs:
         run: npm run scrape:prime
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PRIME_EMAIL: ${{ secrets.PRIME_EMAIL }}
           PRIME_PASSWORD: ${{ secrets.PRIME_PASSWORD }}
@@ -44,6 +46,7 @@ jobs:
         run: npm run scrape:docuth
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FEED_ZETA_URL: ${{ secrets.FEED_ZETA_URL }}
 
@@ -51,6 +54,7 @@ jobs:
         run: npm run sync:circuits
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           CIRCUITS_EMAIL: ${{ secrets.CIRCUITS_EMAIL }}
           CIRCUITS_PASSWORD: ${{ secrets.CIRCUITS_PASSWORD }}

@@ -274,14 +274,16 @@ async function upsertActor(name: string) {
     return existing.id;
   }
 
-  const { data: inserted, error } = await supabase
-    .from('people')
-    .insert({ name, source: 'circuits' })
-    .select('id')
-    .single();
+  // // Shared matcher (migration 20260723112408): exact name, else
+  // people.name_key (order-insensitive + honorific-stripped), so
+  // "Kosoko Jide" / "Prince Jide Kosoko" resolve to the existing person.
+  const { data: id, error } = await supabase.rpc('upsert_person_by_name', {
+    p_name: name,
+    p_extra: { source: 'circuits' },
+  });
   if (error) throw error;
-  peopleCache.set(cacheKey, inserted.id);
-  return inserted.id;
+  peopleCache.set(cacheKey, id as unknown as string);
+  return id as unknown as string;
 }
 
 async function syncCast(filmId: string, cast: string[]) {

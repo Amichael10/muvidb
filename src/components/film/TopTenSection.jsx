@@ -97,18 +97,18 @@ function FeatureCard({ film, featured = false }) {
   const synopsis = film.synopsis || 'Explore the story, cast, and where to watch this title on MuviDB.';
 
   return (
-    <article className={`group relative grid min-w-0 gap-3 overflow-hidden rounded-lg border border-border bg-surface/95 p-3 shadow-sm transition-colors duration-200 hover:border-brand/50 ${featured ? 'grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] lg:min-h-[340px]' : 'grid-cols-[minmax(104px,0.78fr)_minmax(0,1fr)] lg:min-h-[300px]'}`}>
-      <div className="relative min-h-0 overflow-hidden rounded-md bg-surface-2">
-        <Link to={filmPath} className="block h-full min-h-[235px] lg:min-h-full" title={title}>
+    <article className="group relative flex h-full min-w-0 gap-3.5 overflow-hidden rounded-lg border border-border bg-surface/95 p-3 shadow-sm transition-colors duration-200 hover:border-brand/50">
+      <div className="relative w-[110px] sm:w-[125px] shrink-0 aspect-[2/3] overflow-hidden rounded-md bg-surface-2">
+        <Link to={filmPath} className="block h-full w-full" title={title}>
           <ImageWithFallback
             src={film.poster_url || film.backdrop_url}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            fallbackType="banner"
+            fallbackType="film"
             name={title}
             loading="lazy"
             width={featured ? 520 : 360}
-            sizes={featured ? '(max-width: 1024px) 50vw, 260px' : '(max-width: 1024px) 34vw, 180px'}
+            sizes="(max-width: 1024px) 34vw, 180px"
           />
         </Link>
         <div className="absolute left-2 top-2 z-20">
@@ -116,34 +116,36 @@ function FeatureCard({ film, featured = false }) {
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-col py-1">
-        <RankTab rank={film.rank} />
-        <Link to={filmPath} className="mt-2 line-clamp-2 font-heading text-base font-bold leading-tight text-text-primary transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" title={title}>
-          {title}
-        </Link>
+      <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+        <div>
+          <RankTab rank={film.rank} />
+          <Link to={filmPath} className="mt-2 line-clamp-2 font-heading text-base font-bold leading-tight text-text-primary transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" title={title}>
+            {title}
+          </Link>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium leading-relaxed text-text-secondary">
-          {formatRelease(film) && <span>{formatRelease(film)}</span>}
-          {getFormat(film) && <span>{getFormat(film)}</span>}
-          {film.content_type === 'series' && film.year && <span>{film.year}</span>}
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium leading-relaxed text-text-secondary">
+            {formatRelease(film) && <span>{formatRelease(film)}</span>}
+            {getFormat(film) && <span>• {getFormat(film)}</span>}
+            {film.content_type === 'series' && film.year && <span>• {film.year}</span>}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold">
+            {rating != null ? (
+              <span className="inline-flex items-center gap-1 text-text-primary">
+                <Icon icon="mdi:popcorn" className="text-[#FA320A]" />
+                {rating}% <span className="font-medium text-text-muted">liked</span>
+              </span>
+            ) : (
+              <span className="text-text-muted">Not yet rated</span>
+            )}
+          </div>
+
+          <div className="mt-2.5">
+            <FilmActions film={film} />
+          </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold">
-          {rating != null ? (
-            <span className="inline-flex items-center gap-1 text-text-primary">
-              <Icon icon="mdi:popcorn" className="text-[#FA320A]" />
-              {rating}% <span className="font-medium text-text-muted">liked</span>
-            </span>
-          ) : (
-            <span className="text-text-muted">Not yet rated</span>
-          )}
-        </div>
-
-        <div className="mt-3">
-          <FilmActions film={film} />
-        </div>
-
-        <p className={`mt-5 text-sm leading-snug text-text-secondary ${featured ? 'line-clamp-5' : 'line-clamp-4'}`}>
+        <p className="mt-3 text-xs leading-snug text-text-secondary line-clamp-2 sm:line-clamp-3">
           {synopsis}
         </p>
       </div>
@@ -163,7 +165,7 @@ function PosterCard({ film }) {
             src={film.poster_url || film.backdrop_url}
             alt={title}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            fallbackType="banner"
+            fallbackType="film"
             name={title}
             loading="lazy"
             width={360}
@@ -183,7 +185,17 @@ function PosterCard({ film }) {
 }
 
 function LoadingFeature({ featured = false }) {
-  return <div className={`grid min-h-[300px] gap-3 rounded-lg border border-border bg-surface/90 p-3 ${featured ? 'grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] lg:min-h-[340px]' : 'grid-cols-[minmax(104px,0.78fr)_minmax(0,1fr)]'}`}><div className="animate-shimmer rounded-md" /><div className="space-y-3 py-1"><div className="h-6 w-10 animate-shimmer rounded-md" /><div className="h-5 w-4/5 animate-shimmer rounded-md" /><div className="h-4 w-3/5 animate-shimmer rounded-md" /><div className="mt-6 h-20 w-full animate-shimmer rounded-md" /></div></div>;
+  return (
+    <div className="flex h-full gap-3.5 rounded-lg border border-border bg-surface/90 p-3">
+      <div className="w-[110px] sm:w-[125px] shrink-0 aspect-[2/3] animate-shimmer rounded-md" />
+      <div className="flex-1 space-y-2.5 py-0.5">
+        <div className="h-5 w-10 animate-shimmer rounded-md" />
+        <div className="h-5 w-4/5 animate-shimmer rounded-md" />
+        <div className="h-4 w-3/5 animate-shimmer rounded-md" />
+        <div className="mt-4 h-12 w-full animate-shimmer rounded-md" />
+      </div>
+    </div>
+  );
 }
 
 export default function TopTenSection({ title, subtitle, films, isLoading = false }) {
@@ -206,7 +218,7 @@ export default function TopTenSection({ title, subtitle, films, isLoading = fals
 
         {isLoading ? (
           <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               <LoadingFeature featured />
               <LoadingFeature />
               <LoadingFeature />
@@ -217,7 +229,7 @@ export default function TopTenSection({ title, subtitle, films, isLoading = fals
           </>
         ) : (
           <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {topThree.map((film, index) => <FeatureCard key={film.id} film={{ ...film, rank: film.rank || index + 1 }} featured={index === 0} />)}
             </div>
             {remaining.length > 0 && (

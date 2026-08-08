@@ -1,13 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { SuggestPersonModal } from '../components/contribute/ContributeModals'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLoaderData, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
 import { formatViewCount } from '../utils/youtube'
 import { Skeleton } from '../components/ui/Skeleton'
+import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { formatPersonName, toTitleCase } from '../utils/format'
+import {
+  PEOPLE_ROLE_FILTERS,
+  PEOPLE_FILTER_TO_ROLE,
+  canonicalizeRole,
+  formatDepartment,
+} from '../lib/creditRoles'
+import { searchPeopleByName } from '../lib/peopleSearch'
+import ImageWithFallback from '../components/ui/ImageWithFallback'
 
 const PersonCard = ({ person, currentUser }) => {
   const navigate = useNavigate()
@@ -34,43 +43,25 @@ const PersonCard = ({ person, currentUser }) => {
     await toggleFollow()
   }
 
-  const initials = person.name
-    ?.split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-
   const creditCount = person.credits?.length || 0
-  const primaryRole = person.known_for_department || 'filmmaker'
-
-  const roleLabels = {
-    actor: 'Actor',
-    director: 'Director',
-    writer: 'Writer',
-    producer: 'Producer',
-    filmmaker: 'Filmmaker'
-  }
+  const primaryRole = formatDepartment(person.known_for_department) || 'Filmmaker'
 
   return (
     <Link
       to={`/people/${person.slug || person.id}`}
       className="group block bg-surface rounded-xl overflow-hidden border border-border hover:border-brand transition-all shadow-sm"
     >
-      <div className="relative aspect-[4/5] overflow-hidden">
-        {person.photo_url ? (
-          <img
-            src={person.photo_url}
-            alt={person.name}
-            className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
-          />
-        ) : (
-          <div className="w-full h-full bg-surface-2 flex items-center justify-center">
-            <span className="text-4xl font-heading font-bold text-brand/30">
-              {initials}
-            </span>
-          </div>
-        )}
+      <div className="relative aspect-[4/5] overflow-hidden bg-surface-2">
+        <ImageWithFallback
+          src={person.photo_url}
+          alt={person.name}
+          fallbackType="avatar"
+          name={person.name}
+          className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-700"
+          width={400}
+          sizes="(max-width: 640px) 50vw, 240px"
+          loading="lazy"
+        />
 
         {person.is_verified && (
           <div className="absolute top-2 right-2 bg-brand text-white text-[8px] font-black px-2 py-0.5 rounded border border-brand/20 uppercase tracking-widest shadow-lg">
@@ -87,7 +78,7 @@ const PersonCard = ({ person, currentUser }) => {
         </h3>
 
         <p className="text-text-muted text-[10px] font-black tracking-widest mt-1 opacity-60">
-          {toTitleCase(roleLabels[primaryRole] || primaryRole)}
+          {toTitleCase(primaryRole)}
         </p>
 
         <div className="flex items-center justify-between mt-4">
@@ -134,9 +125,12 @@ const PersonSkeleton = () => (
 
 const PeopleList = () => {
   const { user } = useAuth()
+  const loaderData = useLoaderData()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const seeded = !!loaderData?.seeded && (loaderData.people?.length ?? 0) > 0
   const [showSuggest, setShowSuggest] = useState(false)
-  const [people, setPeople] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [people, setPeople] = useState(loaderData?.people ?? [])
+  const [loading, setLoading] = useState(!seeded)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
@@ -147,15 +141,37 @@ const PeopleList = () => {
     return () => clearTimeout(timer)
   }, [search])
 
-  const [roleFilter, setRoleFilter] = useState('All')
+  const roles = PEOPLE_ROLE_FILTERS
+  const roleFromUrl = searchParams.get('role')
+  const initialRole = roleFromUrl && roles.includes(roleFromUrl) ? roleFromUrl : 'All'
+  const [roleFilter, setRoleFilter] = useState(initialRole)
   const [sortBy, setSortBy] = useState('popularity')
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
   const PAGE_SIZE = 20
-  const roles = ['All', 'Actor', 'Director', 'Writer', 'Producer', 'Cinematographer', 'Costume Designer', 'Gaffer', 'Editor', 'Sound']
+  const skipInitialFetch = useRef(seeded && initialRole === 'All')
 
   useEffect(() => {
+    const role = searchParams.get('role')
+    if (role && roles.includes(role) && role !== roleFilter) {
+      setRoleFilter(role)
+    }
+  }, [searchParams])
+
+  const selectRole = (role) => {
+    setRoleFilter(role)
+    const next = new URLSearchParams(searchParams)
+    if (role === 'All') next.delete('role')
+    else next.set('role', role)
+    setSearchParams(next, { replace: true })
+  }
+
+  useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false
+      return
+    }
     setPeople([])
     setPage(0)
     setHasMore(true)
@@ -165,51 +181,92 @@ const PeopleList = () => {
   const fetchPeople = async (pageNum, reset = false) => {
     setLoading(true)
 
-    let query = supabase
-      .from('people')
-      .select(`
-        id, slug, name, photo_url,
-        popularity_score, is_verified,
-        known_for_department,
-        credits(id)
-      `)
+    const roleValue = roleFilter !== 'All' ? PEOPLE_FILTER_TO_ROLE[roleFilter] : null
+    const roleLabel = roleFilter !== 'All' ? (formatDepartment(roleValue) || roleFilter) : null
+    const fetchSize = roleValue ? PAGE_SIZE * 3 : PAGE_SIZE
 
-    if (debouncedSearch) {
-      query = query.ilike('name', `%${debouncedSearch}%`)
-    }
+    try {
+      if (debouncedSearch.trim()) {
+        // Order-insensitive name search (Adekola Odunlade ≡ Odunlade Adekola)
+        const rows = await searchPeopleByName(debouncedSearch, {
+          limit: 80,
+          select: `
+            id, slug, name, photo_url,
+            popularity_score, is_verified,
+            known_for_department,
+            credits(id, role)
+          `,
+        })
 
-    if (sortBy === 'popularity') {
-      query = query.order('popularity_score', { ascending: false })
-    } else if (sortBy === 'name') {
-      query = query.order('name', { ascending: true })
-    }
+        let filtered = rows
+        if (roleValue) {
+          filtered = filtered.filter((p) => {
+            const dept = canonicalizeRole(p.known_for_department)
+            if (dept === roleValue) return true
+            return (p.credits || []).some((c) => canonicalizeRole(c.role) === roleValue)
+          })
+        }
 
-    query = query.range(
-      pageNum * PAGE_SIZE,
-      (pageNum + 1) * PAGE_SIZE - 1
-    )
+        if (sortBy === 'name') {
+          filtered = [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        } else if (sortBy === 'popularity') {
+          filtered = [...filtered].sort(
+            (a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0)
+          )
+        }
 
-    const { data } = await query
+        const slice = filtered.slice(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE)
+        setHasMore((pageNum + 1) * PAGE_SIZE < filtered.length)
+        setPeople(reset ? slice : (prev) => [...prev, ...slice])
+        return
+      }
 
-    if (!data || data.length < PAGE_SIZE) {
+      // Browse mode (no text query)
+      let query = supabase
+        .from('people')
+        .select(`
+          id, slug, name, photo_url,
+          popularity_score, is_verified,
+          known_for_department,
+          credits(id, role)
+        `)
+
+      if (roleLabel) {
+        query = query.ilike('known_for_department', roleLabel)
+      }
+
+      if (sortBy === 'popularity') {
+        query = query.order('popularity_score', { ascending: false })
+      } else if (sortBy === 'name') {
+        query = query.order('name', { ascending: true })
+      }
+
+      query = query.range(pageNum * fetchSize, (pageNum + 1) * fetchSize - 1)
+
+      const { data } = await query
+
+      let filtered = data || []
+      if (roleValue) {
+        filtered = filtered
+          .filter((p) => {
+            const dept = canonicalizeRole(p.known_for_department)
+            if (dept === roleValue) return true
+            return (p.credits || []).some((c) => canonicalizeRole(c.role) === roleValue)
+          })
+          .slice(0, PAGE_SIZE)
+      }
+
+      if (!data || data.length < fetchSize || filtered.length < PAGE_SIZE) {
+        setHasMore(false)
+      }
+
+      setPeople(reset ? filtered : (prev) => [...prev, ...filtered])
+    } catch (err) {
+      console.error('fetchPeople failed:', err)
       setHasMore(false)
+    } finally {
+      setLoading(false)
     }
-
-    let filtered = data || []
-    if (roleFilter !== 'All') {
-      const roleKey = roleFilter.toLowerCase()
-      filtered = filtered.filter(p =>
-        p.known_for_department?.toLowerCase().includes(roleKey)
-      )
-    }
-
-    if (reset) {
-      setPeople(filtered)
-    } else {
-      setPeople(prev => [...prev, ...filtered])
-    }
-
-    setLoading(false)
   }
 
   const loadMore = () => {
@@ -220,25 +277,21 @@ const PeopleList = () => {
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Page Header */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-          <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary mb-4 tracking-tighter uppercase italic">
-            The Talent
-          </h1>
-          <p className="text-text-muted text-sm max-w-xl italic border-l-2 border-brand pl-6">
-            The actors, directors, and creatives shaping the future of Nollywood cinema. Explore their journey and filmography.
-          </p>
-          <button
-            onClick={() => setShowSuggest(true)}
-            className="mt-6 inline-flex items-center gap-2 bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
-          >
-            <Icon icon="solar:user-plus-linear" width="16" />
-            Suggest a missing person
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon="solar:users-group-rounded-bold"
+        eyebrow="Directory"
+        title="People"
+        description="The actors, directors, and creatives shaping the future of Nollywood cinema. Explore their journey and filmography."
+      >
+        <button
+          type="button"
+          onClick={() => setShowSuggest(true)}
+          className="mt-2 inline-flex items-center gap-2 bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
+        >
+          <Icon icon="solar:user-plus-linear" width="16" />
+          Suggest a missing person
+        </button>
+      </PageHeader>
       {showSuggest && <SuggestPersonModal onClose={() => setShowSuggest(false)} />}
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">
@@ -246,12 +299,13 @@ const PeopleList = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-border border-b border-border">
           <div className="lg:col-span-1 p-8 space-y-4 bg-surface-2/5">
              <div className="relative">
+                <Icon icon="solar:magnifer-linear" className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-base pointer-events-none" />
                 <input
                   type="text"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="SEARCH ARCHIVE..."
-                  className="w-full bg-surface border border-border text-text-primary rounded-lg px-6 py-4 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
+                  className="w-full bg-surface border border-border text-text-primary rounded-lg pl-12 pr-6 py-4 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
                 />
              </div>
           </div>
@@ -260,7 +314,7 @@ const PeopleList = () => {
             {roles.map(role => (
               <button
                 key={role}
-                onClick={() => setRoleFilter(role)}
+                onClick={() => selectRole(role)}
                 className={`px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
                   roleFilter === role
                     ? 'bg-brand text-white shadow-lg shadow-brand/20'

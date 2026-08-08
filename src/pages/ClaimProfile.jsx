@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 import PersonCard from '../components/person/PersonCard';
+import { searchPeopleByName } from '../lib/peopleSearch';
 
 export default function ClaimProfile() {
   const { user } = useAuth();
@@ -40,12 +41,13 @@ export default function ClaimProfile() {
   useEffect(() => {
     if (searchQuery.length > 2) {
       const delaySearch = setTimeout(async () => {
-        const { data } = await supabase
-          .from('people')
-          .select('*')
-          .ilike('name', `%${searchQuery}%`)
-          .limit(8);
-        setFilteredPeople(data || []);
+        try {
+          const data = await searchPeopleByName(searchQuery, { limit: 8, select: '*' });
+          setFilteredPeople(data || []);
+        } catch (err) {
+          console.error(err);
+          setFilteredPeople([]);
+        }
       }, 300);
       return () => clearTimeout(delaySearch);
     } else {

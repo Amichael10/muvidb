@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useSearchParams, useLoaderData } from 'react-router-dom';
+import { Icon } from '@iconify/react';
 import { supabase } from '../lib/supabase';
-import { getShowName } from '../utils/series';
+import { collapseSeriesFilms } from '../utils/series';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Skeleton } from '../components/ui/Skeleton';
+import PageHeader from '../components/ui/PageHeader';
+import { PLATFORMS, platformFilter } from '../lib/platforms';
+import { NFVCB_RATING_OPTIONS } from '../lib/contributions';
+import { AFRICAN_COUNTRY_NAMES } from '../utils/africanCountries';
 
 export default function Browse() {
   const [searchParams] = useSearchParams();
@@ -14,24 +19,37 @@ export default function Browse() {
 
   const initialPlatform = searchParams.get('platform') || '';
 
+  // First page of results is server-rendered and edge-cached by the route loader
+  // in src/routes/browse.tsx, so it's already in the HTML on first paint.
+  const loaderData = useLoaderData();
+  const seeded = !!loaderData?.seeded && (loaderData.films?.length ?? 0) > 0;
+
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
-  const [films, setFilms] = useState([]);
+  const [films, setFilms] = useState(loaderData?.films ?? []);
   const [dbGenres, setDbGenres] = useState([]);
-  const [dbCountries, setDbCountries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [dbCountries, setDbCountries] = useState(AFRICAN_COUNTRY_NAMES);
+  // Starts false when seeded, otherwise the server would render the skeleton and
+  // SSR would buy us nothing.
+  const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState(null);
   
   // Filters state
   const [selectedGenres, setSelectedGenres] = useState(initialGenre ? [initialGenre] : []);
   const [selectedCountries, setSelectedCountries] = useState(initialCountry ? [initialCountry] : []);
   const [selectedPlatform, setSelectedPlatform] = useState(initialPlatform);
-  const [yearRange, setYearRange] = useState(2000);
+  const [selectedYear, setSelectedYear] = useState(''); // '' = any year; otherwise exact year
   const [selectedRatings, setSelectedRatings] = useState([]);
   const [language, setLanguage] = useState('');
   const [sortBy, setSortBy] = useState(initialSort);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [genresExpanded, setGenresExpanded] = useState(false);
+  const [countriesExpanded, setCountriesExpanded] = useState(!!initialCountry && initialCountry !== 'Nigeria');
   const activeTab = 'movie';
+  const GENRE_PREVIEW = 10;
+  const COUNTRY_PREVIEW = 8;
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 1979 }, (_, i) => currentYear - i);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -41,28 +59,39 @@ export default function Browse() {
   }, [searchQuery]);
 
   useEffect(() => {
-    document.title = "MuviDB | Movies";
+    // Title now comes from the route's `meta` export — setting it here too would
+    // overwrite the server-rendered one after hydration.
     fetchGenres();
   }, []);
 
+  // Skip only the on-mount fetch when the loader already seeded results; every
+  // later filter change still refetches through the normal client path.
+  const skipInitialFetch = useRef(seeded);
+
   useEffect(() => {
     setError(null);
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
     fetchFilms();
-  }, [selectedGenres, selectedCountries, selectedPlatform, yearRange, selectedRatings, language, sortBy, debouncedSearchQuery]);
+  }, [selectedGenres, selectedCountries, selectedPlatform, selectedYear, selectedRatings, language, sortBy, debouncedSearchQuery]);
 
   const fetchGenres = async () => {
     try {
       const [genresRes, countriesRes] = await Promise.all([
         supabase.from('genres').select('name').order('name'),
-        supabase.from('countries').select('name').eq('name', 'Nigeria').order('name')
+        supabase.from('countries').select('name').eq('continent', 'Africa').order('name')
       ]);
       if (genresRes.error) throw genresRes.error;
       if (countriesRes.error) throw countriesRes.error;
       
       setDbGenres((genresRes.data || []).map(g => g.name));
-      setDbCountries((countriesRes.data || []).map(c => c.name));
+      const names = (countriesRes.data || []).map(c => c.name);
+      setDbCountries(names.length ? names : AFRICAN_COUNTRY_NAMES);
     } catch (err) {
       console.error('Error fetching filters:', err);
+      setDbCountries(AFRICAN_COUNTRY_NAMES);
     }
   };
   
@@ -113,12 +142,16 @@ export default function Browse() {
         query = query.ilike('title', `%${debouncedSearchQuery.trim()}%`);
       }
 
-      if (yearRange > 1990) query = query.gte('year', yearRange);
+      if (selectedYear) query = query.eq('year', parseInt(selectedYear, 10));
       if (language) query = query.eq('language', language);
       if (selectedRatings.length > 0) query = query.in('nfvcb_rating', selectedRatings);
       
       // Filter: Only show non-mubi films OR mubi films from Nigeria
       query = query.or('source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}');
+
+      if (selectedPlatform) {
+        query = query.or(platformFilter(selectedPlatform));
+      }
 
       const sortMap = {
         'views': { column: 'view_count', ascending: false },
@@ -135,7 +168,7 @@ export default function Browse() {
       
       if (dbError) throw dbError;
 
-      let transformed = (data || []).map(f => {
+      const transformed = (data || []).map(f => {
         const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
         return {
           ...f,
@@ -144,87 +177,7 @@ export default function Browse() {
         };
       });
 
-      // Filter by platform client-side to handle json checks easily
-      if (selectedPlatform) {
-        transformed = transformed.filter(f => {
-          if (f.release_type === selectedPlatform) return true;
-          if (selectedPlatform === 'youtube' && f.source === 'youtube') return true;
-          
-          let streamingLinks = {};
-          if (typeof f.streaming_links === 'string') {
-            try { streamingLinks = JSON.parse(f.streaming_links); } catch(e) {}
-          } else if (f.streaming_links) {
-            streamingLinks = f.streaming_links;
-          }
-          return !!streamingLinks[selectedPlatform];
-        });
-      }
-
-      // Group TV Shows into Folders
-      if (activeTab === 'series') {
-        const groupedShows = {};
-        
-        const getPrefixMatch = (str1, str2) => {
-          const words1 = str1.split(/[\s:-]+/);
-          const words2 = str2.split(/[\s:-]+/);
-          let prefix = [];
-          for (let i = 0; i < Math.min(words1.length, words2.length); i++) {
-            if (words1[i].toLowerCase() === words2[i].toLowerCase()) {
-              prefix.push(words1[i]);
-            } else {
-              break;
-            }
-          }
-          return prefix.join(' ');
-        };
-
-        transformed.forEach(film => {
-          let showName = getShowName(film.title);
-
-          let foundGroup = false;
-          if (!groupedShows[showName]) {
-            for (const existingShowName in groupedShows) {
-              const prefix = getPrefixMatch(existingShowName, showName);
-              // if they share at least 1 word and the prefix is at least 6 chars
-              if (prefix.length >= 6 && prefix.split(' ').length >= 1) {
-                // Require the prefix to be a significant part of the title (> 50%)
-                if (prefix.length / existingShowName.length >= 0.4 && prefix.length / showName.length >= 0.4) {
-                  const group = groupedShows[existingShowName];
-                  group.episodes_list.push(film);
-                  group.title = prefix; // Update title to the broader prefix
-                  if (prefix !== existingShowName) {
-                    groupedShows[prefix] = group;
-                    delete groupedShows[existingShowName];
-                  }
-                  foundGroup = true;
-                  break;
-                }
-              }
-            }
-          } else {
-            groupedShows[showName].episodes_list.push(film);
-            foundGroup = true;
-          }
-
-          if (!foundGroup) {
-            groupedShows[showName] = { 
-              ...film, 
-              title: showName, // Use the base show name for display
-              original_title: film.title, // Keep original title just in case
-              episodes_list: [film] 
-            };
-          }
-        });
-
-        // Convert grouped object back to array
-        transformed = Object.values(groupedShows).map(group => ({
-          ...group,
-          is_series_group: true,
-          episodes_count: group.episodes_list.length
-        }));
-      }
-
-      setFilms(transformed);
+      setFilms(collapseSeriesFilms(transformed));
     } catch (err) {
       console.error('Fetch error:', err);
       setError('Could not connect to the movie database.');
@@ -233,7 +186,7 @@ export default function Browse() {
     }
   };
 
-  const nfvcbRatings = ['PG', '12', '15', '18'];
+  const nfvcbRatings = NFVCB_RATING_OPTIONS.map((o) => o.value);
   
   const toggleGenre = (genre) => {
     setSelectedGenres(prev => 
@@ -257,39 +210,50 @@ export default function Browse() {
     setSelectedGenres([]);
     setSelectedCountries([]);
     setSelectedPlatform('');
-    setYearRange(2000);
+    setSelectedYear('');
     setSelectedRatings([]);
     setLanguage('');
     setSortBy('views');
     setSearchQuery('');
+    setGenresExpanded(false);
   };
+
+  const visibleGenres = genresExpanded ? dbGenres : dbGenres.slice(0, GENRE_PREVIEW);
+  const hiddenGenreCount = Math.max(0, dbGenres.length - GENRE_PREVIEW);
+  // Keep Nigeria first when collapsed; still include any selected countries in the preview.
+  const orderedCountries = (() => {
+    const rest = dbCountries.filter((c) => c !== 'Nigeria');
+    return dbCountries.includes('Nigeria') ? ['Nigeria', ...rest] : dbCountries;
+  })();
+  const countryPreview = (() => {
+    const preview = orderedCountries.slice(0, COUNTRY_PREVIEW);
+    for (const c of selectedCountries) {
+      if (!preview.includes(c)) preview.push(c);
+    }
+    return preview;
+  })();
+  const visibleCountries = countriesExpanded ? orderedCountries : countryPreview;
+  const hiddenCountryCount = Math.max(0, orderedCountries.length - COUNTRY_PREVIEW);
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* Header Section */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <h1 className="text-4xl md:text-6xl font-heading font-bold text-text-primary tracking-tighter transition-colors duration-300">
-                  Movies
-                </h1>
-                <p className="text-text-muted text-sm max-w-xl border-l-2 border-brand pl-6 transition-all duration-300">
-                  Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters.
-                </p>
-              </div>
-            </div>
-            <button 
-              className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-xs font-bold text-text-primary"
-              onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
-            >
-              Filters
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon="solar:clapperboard-play-bold"
+        eyebrow="Browse"
+        title="Movies"
+        description="Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters."
+        count={films.length}
+        countLabel="titles in view"
+        actions={
+          <button
+            className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-xs font-bold text-text-primary"
+            onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+          >
+            <Icon icon="solar:filter-linear" width="16" />
+            Filters
+          </button>
+        }
+      />
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-screen">
         <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
@@ -312,21 +276,22 @@ export default function Browse() {
 
             <div className="space-y-4">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Watch Platform</h4>
-              <select value={selectedPlatform} onChange={(e) => setSelectedPlatform(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all">
+              <select
+                value={selectedPlatform}
+                onChange={(e) => setSelectedPlatform(e.target.value)}
+                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+              >
                 <option value="">All Platforms</option>
-                <option value="netflix">Netflix</option>
-                <option value="kava">Kava</option>
-                <option value="docuth">Docuth</option>
-                <option value="prime_video">Prime Video</option>
-                <option value="youtube">YouTube</option>
-                <option value="showmax">Showmax</option>
+                {PLATFORMS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
               </select>
             </div>
 
             <div className="space-y-6">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Genres</h4>
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-4 custom-scrollbar">
-                {dbGenres.map(genre => (
+              <div className="space-y-3">
+                {visibleGenres.map(genre => (
                   <label key={genre} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleGenre(genre)}>
                     <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedGenres.includes(genre) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
                       {selectedGenres.includes(genre) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -335,12 +300,21 @@ export default function Browse() {
                   </label>
                 ))}
               </div>
+              {hiddenGenreCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setGenresExpanded((v) => !v)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand hover:underline"
+                >
+                  {genresExpanded ? 'Show less' : `${hiddenGenreCount}+ more`}
+                </button>
+              )}
             </div>
 
             <div className="space-y-6">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Countries</h4>
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-4 custom-scrollbar">
-                {dbCountries.map(country => (
+              <div className="space-y-3">
+                {visibleCountries.map(country => (
                   <label key={country} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleCountry(country)}>
                     <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedCountries.includes(country) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
                       {selectedCountries.includes(country) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -349,14 +323,29 @@ export default function Browse() {
                   </label>
                 ))}
               </div>
+              {hiddenCountryCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCountriesExpanded((v) => !v)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand hover:underline"
+                >
+                  {countriesExpanded ? 'Show less' : `${hiddenCountryCount}+ more`}
+                </button>
+              )}
             </div>
 
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Timeline</h4>
-                <span className="text-[10px] font-bold text-brand">{yearRange}+</span>
-              </div>
-              <input type="range" min="1990" max="2025" value={yearRange} onChange={(e) => setYearRange(parseInt(e.target.value))} className="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-brand" />
+            <div className="space-y-4">
+              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Year</h4>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+              >
+                <option value="">Any year</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-6">
@@ -375,6 +364,7 @@ export default function Browse() {
           <div className="flex-1 p-4 md:p-8 lg:p-12">
             {/* Search Bar */}
             <div className="mb-8 relative max-w-md">
+              <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-lg pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -382,13 +372,14 @@ export default function Browse() {
                 placeholder="Search movies by title..."
                 className="w-full h-12 bg-surface border border-border text-text-primary rounded-xl px-5 pl-11 text-sm focus:border-brand focus:outline-none transition-all shadow-md"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-50">🔍</span>
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-sm font-bold"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  aria-label="Clear search"
                 >
-                  ✕
+                  <Icon icon="solar:close-circle-linear" className="text-lg" />
                 </button>
               )}
             </div>
@@ -412,7 +403,25 @@ export default function Browse() {
             ) : (
               <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-32 text-center">
                 <p className="text-text-muted text-xs font-bold mb-6">No matching results found.</p>
-                <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">Reset Filters</button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">Reset Filters</button>
+                  <Link to="/submit/film" className="border border-border text-text-primary text-[10px] font-bold px-8 py-3 rounded-lg hover:border-brand hover:text-brand transition-all">Add a Missing Film</Link>
+                </div>
+              </div>
+            )}
+
+            {!loading && (
+              <div className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-6 py-5">
+                <div>
+                  <p className="text-text-primary text-sm font-bold">Something missing from this list?</p>
+                  <p className="text-text-muted text-xs mt-1">Send us the film and an editor will review it.</p>
+                </div>
+                <Link
+                  to="/submit"
+                  className="rounded-lg bg-brand px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:opacity-90 active:scale-95"
+                >
+                  Add to MuviDB
+                </Link>
               </div>
             )}
           </div>

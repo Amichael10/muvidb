@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" role="img" aria-label="The Movie Database">
+  <!-- Compact TMDB attribution mark using official brand colours (#0d253f / #01b4e4). -->
+  <rect x="0" y="4" width="40" height="40" rx="8" fill="#0d253f"/>
+  <path fill="#01b4e4" d="M16 14v20l18-10z"/>
+  <text
+    x="52"
+    y="34"
+    fill="#01b4e4"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="28"
+    font-weight="800"
+    letter-spacing="1.5"
+  >TMDB</text>
+</svg>

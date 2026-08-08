@@ -99,7 +99,7 @@ Follow these instructions to configure and run the MuviDB development server loc
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Amichael10/ensembla.git
+   git clone https://github.com/Amichael10/muvidb.git
    cd MuviDB
    ```
 

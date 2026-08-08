@@ -17,9 +17,9 @@ export function checkRateLimit(req: any): boolean {
     // Resolve the client IP from a trusted source. A caller can put arbitrary
     // values in x-forwarded-for, and Vercel APPENDS the real client IP as the
     // last hop — so the spoofable leftmost value must not be used as the key.
-    // Prefer x-real-ip (set by Vercel to the immediate client), then fall back
-    // to the LAST entry of x-forwarded-for.
-    let ip = readHeader(headers, 'x-real-ip')?.trim();
+    // Prefer cf-connecting-ip (Cloudflare), then x-real-ip (Vercel), then last entry of x-forwarded-for.
+    let ip = readHeader(headers, 'cf-connecting-ip')?.trim()
+      || readHeader(headers, 'x-real-ip')?.trim();
     if (!ip) {
       const forwarded = readHeader(headers, 'x-forwarded-for') ?? '';
       const hops = forwarded.split(',').map((h) => h.trim()).filter(Boolean);

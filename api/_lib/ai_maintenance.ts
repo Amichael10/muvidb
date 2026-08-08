@@ -23,10 +23,23 @@ export async function runCastExtraction() {
     .order('created_at', { ascending: false })
     .limit(20);
 
+  // Nollywood YouTube titles often list the cast in brackets rather than after
+  // a keyword — "Holy Romance (Eso Dike, Uche Montana) - Brand New". Neither
+  // selector above sees those; 172 films carry the pattern and were being
+  // skipped. Requiring both a bracket and a comma keeps out "(2026)" and
+  // "(Official Trailer)".
+  const { data: bracketFilms } = await supabase
+    .from('films')
+    .select('id, title')
+    .like('title', '%(%')
+    .like('title', '%,%')
+    .order('created_at', { ascending: false })
+    .limit(20);
+
   // Merge and deduplicate
   const allCastFilms = [...(starringFilms || [])];
   const seenIds = new Set(allCastFilms.map(f => f.id));
-  for (const f of (pipeFilms || [])) {
+  for (const f of [...(pipeFilms || []), ...(bracketFilms || [])]) {
     if (!seenIds.has(f.id)) {
       allCastFilms.push(f);
       seenIds.add(f.id);
@@ -101,12 +114,14 @@ export async function runCastExtraction() {
       // Tier 3: Create new person
       let personId = person?.id;
       if (!personId) {
-        const { data: newP } = await supabase
-          .from('people')
-          .insert({ name: actorName, nationality: 'Nigerian', created_at: new Date().toISOString() })
-          .select('id').single();
-        personId = newP?.id;
-        console.log(`[AI Maintenance] Created: "${actorName}"`);
+        // // Shared matcher (migration 20260723112408): exact name, else
+  // people.name_key (order-insensitive + honorific-stripped), so
+  // "Kosoko Jide" / "Prince Jide Kosoko" resolve to the existing person.
+        const { data: rpcId } = await supabase.rpc('upsert_person_by_name', {
+          p_name: actorName,
+          p_extra: { nationality: 'Nigerian', source: 'ai-maintenance' },
+        });
+        personId = rpcId as unknown as string;
       }
       if (personId) {
         personIds.set(actorName, personId);

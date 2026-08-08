@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
@@ -6,6 +6,160 @@ import { getFriendlyErrorMessage } from '../../utils/errors';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toast } from 'react-hot-toast';
+import {
+  pickAutoMatch,
+  foldPersonText,
+} from '../../lib/personNameMatch';
+import { canonicalizeRole } from '../../lib/creditRoles';
+import { matchPeopleByNameKey, searchPeopleByName } from '../../lib/peopleSearch';
+
+const PEOPLE_SELECT = 'id, name, photo_url, film_count';
+
+/**
+ * Resolve an OCR/typed credit name to an existing person.
+ * Prefer Postgres name_key (order-insensitive) — Cohere is only a soft fallback.
+ */
+async function resolvePersonMatch(rawName) {
+  const name = String(rawName || '').trim();
+  if (!name) return null;
+
+  // 1) Authoritative: exact fold + name_key swap in SQL
+  const keyed = await matchPeopleByNameKey(name, { limit: 5 });
+  const keyedHit = pickAutoMatch(name, keyed);
+  if (keyedHit) return keyedHit;
+
+  // 2) Broader lexical + optional Cohere ranking
+  const hits = await searchPeopleByName(name, {
+    limit: 16,
+    select: PEOPLE_SELECT,
+    useCohere: true,
+  });
+  const auto = pickAutoMatch(name, hits);
+  if (auto) return auto;
+
+  const folded = foldPersonText(name);
+  return hits.find((p) => foldPersonText(p.name) === folded) || null;
+}
+
+/** Typeahead: partial name search, ranked. */
+async function searchPeopleSuggestions(rawQuery, limit = 8) {
+  return searchPeopleByName(rawQuery, { limit, select: PEOPLE_SELECT });
+}
+
+/** Typeahead name cell for credit roster rows. */
+function PersonNameCell({ row, disabled, onTextChange, onAutoLink, onPickPerson, onResolve }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const wrapRef = useRef(null);
+  const debounceRef = useRef(null);
+  const blurTimer = useRef(null);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  useEffect(() => {
+    if (disabled) return undefined;
+    const q = row.name.trim();
+    clearTimeout(debounceRef.current);
+    if (q.length < 2) {
+      setSuggestions([]);
+      setSearching(false);
+      return undefined;
+    }
+
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const hits = await searchPeopleSuggestions(q);
+        setSuggestions(hits);
+        // Auto-link exact / name-order swap without rewriting the typed string
+        const auto = pickAutoMatch(q, hits);
+        if (auto) onAutoLink(auto);
+      } catch (err) {
+        console.error('People suggestion search failed:', err);
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(debounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-search when the typed name changes
+  }, [row.name, disabled]);
+
+  const handleBlur = () => {
+    clearTimeout(blurTimer.current);
+    blurTimer.current = setTimeout(() => {
+      setOpen(false);
+      if (row.name.trim() && !row.matchId) onResolve(row.name);
+    }, 150);
+  };
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <input
+        type="text"
+        value={row.name}
+        disabled={disabled}
+        autoComplete="off"
+        onFocus={() => setOpen(true)}
+        onBlur={handleBlur}
+        onChange={(e) => {
+          onTextChange(e.target.value);
+          setOpen(true);
+        }}
+        className="w-full bg-transparent border-b border-transparent focus:border-brand/40 text-text-primary text-sm font-bold focus:outline-none focus:ring-0 py-0.5 placeholder:text-text-muted/30"
+        placeholder="Type a name to search…"
+      />
+      {open && !disabled && row.name.trim().length >= 2 && (
+        <div className="absolute left-0 top-full mt-1 w-[min(100%,22rem)] min-w-[16rem] bg-surface border border-border rounded-lg shadow-2xl z-40 overflow-hidden ring-1 ring-black/5">
+          {searching ? (
+            <div className="px-3 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest">
+              Searching…
+            </div>
+          ) : suggestions.length === 0 ? (
+            <div className="px-3 py-3 text-xs text-text-muted">
+              No matches — will create a new profile
+            </div>
+          ) : (
+            suggestions.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPickPerson(p);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-2 transition-colors border-b border-border/50 last:border-0 ${
+                  row.matchId === p.id ? 'bg-blue-500/5' : ''
+                }`}
+              >
+                <div className="w-7 h-7 rounded-full bg-surface-2 border border-border overflow-hidden shrink-0">
+                  {p.photo_url ? (
+                    <img src={p.photo_url} alt="" className="w-full h-full object-cover" />
+                  ) : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-text-primary truncate">{p.name}</p>
+                  <p className="text-[9px] text-text-muted font-bold uppercase tracking-wider">
+                    {p.film_count ? `${p.film_count} credits` : 'Existing profile'}
+                  </p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminCreditsExtractor() {
   const { user } = useAuth();
@@ -20,8 +174,9 @@ export default function AdminCreditsExtractor() {
   const [ocrLogs, setOcrLogs] = useState([]);
 
   // Upload/Image State
-  const [screenshotPreview, setScreenshotPreview] = useState(null);
-  const [screenshotBase64, setScreenshotBase64] = useState('');
+  // Multiple screenshots: a credit roll rarely fits in one frame. Each entry is
+  // { id, name, base64 }; extraction runs them in order and pools the rows.
+  const [screenshots, setScreenshots] = useState([]);
 
   // Roster Rows (editable)
   const [castRows, setCastRows] = useState([]);
@@ -53,6 +208,18 @@ export default function AdminCreditsExtractor() {
 
   useEffect(() => {
     loadRecentFilms();
+  }, []);
+
+  const filmDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (filmDropdownRef.current && !filmDropdownRef.current.contains(e.target)) {
+        setIsFilmDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Debounced dynamic server-side live film search
@@ -99,44 +266,45 @@ export default function AdminCreditsExtractor() {
   }, [filmSearch]);
 
 
-  // Fetch live matches from database whenever the name list changes
+  // Fetch live matches whenever the name list changes.
+  // Uses name_key (order-insensitive) — not case-sensitive exact .in('name').
   const runLiveProfileVerification = async (rows, setter) => {
     if (!rows.length) return;
-    
-    // Extract unique name strings
-    const nameStrings = rows.map(r => r.name.trim()).filter(Boolean);
+
+    const nameStrings = [...new Set(rows.map((r) => r.name.trim()).filter(Boolean))];
     if (!nameStrings.length) return;
 
     try {
-      // Direct exact match query
-      const { data: matchedPeople, error } = await supabase
-        .from('people')
-        .select('id, name, photo_url')
-        .in('name', nameStrings);
+      const resolved = new Map(); // queryName → person
+      const BATCH = 8;
+      for (let i = 0; i < nameStrings.length; i += BATCH) {
+        const slice = nameStrings.slice(i, i + BATCH);
+        const found = await Promise.all(slice.map((n) => resolvePersonMatch(n).catch(() => null)));
+        slice.forEach((n, idx) => {
+          if (found[idx]) resolved.set(n, found[idx]);
+        });
+      }
 
-      if (error) throw error;
-
-      const matchMap = new Map(matchedPeople.map(p => [p.name.toLowerCase(), p]));
-
-      // Update match status for each row
-      setter(prevRows =>
-        prevRows.map(row => {
-          const match = matchMap.get(row.name.toLowerCase());
+      setter((prevRows) =>
+        prevRows.map((row) => {
+          const match = resolved.get(row.name.trim());
           if (match) {
             return {
               ...row,
               matchId: match.id,
+              matchName: match.name,
               photoUrl: match.photo_url,
-              status: 'matched'
-            };
-          } else {
-            return {
-              ...row,
-              matchId: null,
-              photoUrl: null,
-              status: 'new'
+              status: row.forceCreate ? 'new' : 'matched',
             };
           }
+          return {
+            ...row,
+            matchId: null,
+            matchName: null,
+            photoUrl: null,
+            forceCreate: false,
+            status: 'new',
+          };
         })
       );
     } catch (err) {
@@ -144,20 +312,15 @@ export default function AdminCreditsExtractor() {
     }
   };
 
-  // Convert and compress uploaded image file to lightweight Base64
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (PNG/JPG).');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
+  // Compress one file to a lightweight Base64 JPEG.
+  const compressToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error(`${file.name} is not a readable image`));
+        img.onload = () => {
         // Target maximum dimension to keep OCR highly legible but extremely lightweight
         const MAX_WIDTH = 1200;
         const MAX_HEIGHT = 1200;
@@ -185,126 +348,256 @@ export default function AdminCreditsExtractor() {
 
         // Compress to high-quality JPEG (0.8 quality yields extremely small files ~100KB-200KB)
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-        setScreenshotPreview(compressedBase64);
-        setScreenshotBase64(compressedBase64);
-        
         const sizeKB = Math.round((compressedBase64.length * 3) / 4 / 1024);
-        console.log(`[OCR Harvester] Image compressed from ${Math.round(file.size / 1024)}KB down to ${sizeKB}KB (Resolution: ${width}x${height})`);
+        console.log(`[OCR Harvester] ${file.name}: ${Math.round(file.size / 1024)}KB -> ${sizeKB}KB (${width}x${height})`);
+          resolve(compressedBase64);
+        };
+        img.src = event.target.result;
       };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    });
+
+  // Accept several screenshots at once — a credit roll rarely fits in one frame.
+  const handleFileChange = async (e) => {
+    const picked = Array.from(e.target.files || []);
+    // Let the same file be chosen again after removal.
+    e.target.value = '';
+    if (!picked.length) return;
+
+    const images = picked.filter((f) => f.type.startsWith('image/'));
+    if (images.length < picked.length) {
+      toast.error(`Skipped ${picked.length - images.length} non-image file(s).`);
+    }
+    if (!images.length) return;
+
+    const results = await Promise.allSettled(images.map(compressToBase64));
+    const added = [];
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        added.push({
+          id: `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+          name: images[i].name,
+          base64: r.value,
+        });
+      } else {
+        // One unreadable file must not discard the rest of the batch.
+        toast.error(r.reason?.message || `Could not process ${images[i].name}`);
+      }
+    });
+
+    if (added.length) {
+      setScreenshots((prev) => [...prev, ...added]);
+      toast.success(`Added ${added.length} image${added.length > 1 ? 's' : ''}.`);
+    }
   };
+
+  const removeScreenshot = (id) =>
+    setScreenshots((prev) => prev.filter((s) => s.id !== id));
 
   // Run Vision AI OCR to extract cast or crew
   const handleExtractCredits = async () => {
-    if (!screenshotBase64) {
-      toast.error('Please upload a screenshot first.');
+    if (!screenshots.length) {
+      toast.error('Please upload at least one screenshot first.');
       return;
     }
 
     setIsProcessingOCR(true);
-    setOcrLogs(['Parsing base64 image data...', 'Initializing Vision connection...', 'Running Gemini Flash OCR...']);
+    setOcrLogs([`Queued ${screenshots.length} image${screenshots.length > 1 ? 's' : ''} for extraction...`]);
+
+    // Rows already on screen — used to drop repeats, since consecutive frames of
+    // a credit roll usually overlap.
+    const existing = activeTab === 'cast' ? castRows : crewRows;
+    const dedupeKey = (n, r) =>
+      `${String(n || '').trim().toLowerCase()}|${String(r || '').trim().toLowerCase()}`;
+    const seenKeys = new Set(existing.map((r) => dedupeKey(r.name, r.roleOrCharacter)));
+
+    const newRows = [];
+    let failedImages = 0;
+    let duplicatesSkipped = 0;
 
     try {
-      const response = await fetch('/api/ai', {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify({
-          task: 'extract_credits_from_image',
-          data: {
-            image: screenshotBase64,
-            creditType: activeTab
-          }
-        })
-      });
+      // Sequential, not parallel: the Vision endpoint rotates API keys and
+      // parallel calls burn quota far faster than they save wall-clock time.
+      for (let i = 0; i < screenshots.length; i++) {
+        const shot = screenshots[i];
+        const label = `Image ${i + 1}/${screenshots.length}`;
+        setOcrLogs((prev) => [...prev, `🔍 ${label} (${shot.name}): running Vision OCR...`]);
 
-      if (!response.ok) {
-        const errJson = await response.json();
-        throw new Error(errJson.error || 'Server returned an error');
+        try {
+          const response = await fetch('/api/ai', {
+            method: 'POST',
+            headers: await authHeaders(),
+            body: JSON.stringify({
+              task: 'extract_credits_from_image',
+              data: { image: shot.base64, creditType: activeTab },
+            }),
+          });
+
+          if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(errJson.error || 'Server returned an error');
+          }
+
+          const resData = await response.json();
+          const extracted = resData.results || [];
+
+          if (!extracted.length) {
+            setOcrLogs((prev) => [...prev, `⚠️ ${label}: no credits found.`]);
+            continue;
+          }
+
+          let addedHere = 0;
+          extracted.forEach((item, idx) => {
+            const k = dedupeKey(item.name, item.role_or_character);
+            if (seenKeys.has(k)) { duplicatesSkipped++; return; }
+            seenKeys.add(k);
+            addedHere++;
+            newRows.push({
+              key: `${activeTab}-${i}-${idx}-${Date.now()}`,
+              name: item.name || '',
+              roleOrCharacter: item.role_or_character || '',
+              selected: true,
+              status: 'checking', // 'checking', 'matched', 'new'
+              matchId: null,
+              matchName: null,
+              photoUrl: null,
+              forceCreate: false,
+            });
+          });
+
+          setOcrLogs((prev) => [
+            ...prev,
+            `✅ ${label}: ${addedHere} new row${addedHere === 1 ? '' : 's'}` +
+              (extracted.length - addedHere > 0 ? ` (${extracted.length - addedHere} duplicate)` : ''),
+          ]);
+        } catch (err) {
+          // One bad image must never discard rows already harvested from others.
+          failedImages++;
+          console.error(`OCR Error on ${shot.name}:`, err);
+          setOcrLogs((prev) => [...prev, `❌ ${label} failed: ${err.message}`]);
+        }
       }
 
-      const resData = await response.json();
-      const extracted = resData.results || [];
-
-      if (!extracted.length) {
-        toast.error('Vision could not find any text listings in this screenshot. Please try a clearer crop.');
-        setOcrLogs(prev => [...prev, '❌ Extraction finished with 0 credits.']);
-        setIsProcessingOCR(false);
+      if (!newRows.length) {
+        toast.error(
+          failedImages === screenshots.length
+            ? 'Every image failed to process.'
+            : 'No new credits found — try a clearer crop.'
+        );
         return;
       }
 
-      // Map raw OCR records into row objects with a local unique key
-      const formattedRows = extracted.map((item, idx) => ({
-        key: `${activeTab}-${idx}-${Date.now()}`,
-        name: item.name || '',
-        roleOrCharacter: item.role_or_character || '',
-        selected: true,
-        status: 'checking', // 'checking', 'matched', 'new'
-        matchId: null,
-        photoUrl: null
-      }));
-
+      // Verify against the full list so matching sees rows from every image.
+      const merged = [...existing, ...newRows];
       if (activeTab === 'cast') {
-        setCastRows(prev => [...prev, ...formattedRows]);
-        await runLiveProfileVerification([...castRows, ...formattedRows], setCastRows);
+        setCastRows(merged);
+        await runLiveProfileVerification(merged, setCastRows);
       } else {
-        setCrewRows(prev => [...prev, ...formattedRows]);
-        await runLiveProfileVerification([...crewRows, ...formattedRows], setCrewRows);
+        setCrewRows(merged);
+        await runLiveProfileVerification(merged, setCrewRows);
       }
 
-      toast.success(`Extracted ${extracted.length} credit entries!`);
-      setOcrLogs(prev => [...prev, `✅ Successfully parsed ${extracted.length} rows.`]);
+      const parts = [`Extracted ${newRows.length} credit entries`];
+      if (duplicatesSkipped) parts.push(`${duplicatesSkipped} duplicate skipped`);
+      if (failedImages) parts.push(`${failedImages} image failed`);
+      toast.success(`${parts.join(' · ')}!`);
+      setOcrLogs((prev) => [...prev, `✅ Done: ${newRows.length} rows from ${screenshots.length} image(s).`]);
     } catch (err) {
       console.error('OCR Error:', err);
       toast.error(`OCR Extraction failed: ${getFriendlyErrorMessage(err)}`);
-      setOcrLogs(prev => [...prev, `❌ Error: ${err.message}`]);
+      setOcrLogs((prev) => [...prev, `❌ Error: ${err.message}`]);
     } finally {
       setIsProcessingOCR(false);
     }
   };
 
-  // Re-run matching if an admin edits a name input cell manually
-  const handleNameCellChange = async (key, newName, type) => {
+  // Update name text + clear stale link until autocomplete / resolve finishes
+  const handleNameTextChange = (key, newName, type) => {
     const setter = type === 'cast' ? setCastRows : setCrewRows;
-    setter(prev =>
-      prev.map(row => (row.key === key ? { ...row, name: newName, status: 'checking' } : row))
+    setter((prev) =>
+      prev.map((row) =>
+        row.key === key
+          ? {
+              ...row,
+              name: newName,
+              matchId: null,
+              matchName: null,
+              photoUrl: null,
+              forceCreate: false,
+              status: newName.trim() ? 'checking' : 'new',
+            }
+          : row
+      )
     );
+  };
 
-    // Debounce/Trigger live search for this edited row
-    try {
-      const { data: matched, error } = await supabase
-        .from('people')
-        .select('id, name, photo_url')
-        .ilike('name', newName)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      setter(prev =>
-        prev.map(row => {
-          if (row.key === key) {
-            if (matched) {
-              return {
-                ...row,
-                matchId: matched.id,
-                photoUrl: matched.photo_url,
-                status: 'matched'
-              };
-            } else {
-              return {
+  const applyPersonMatch = (key, person, type, typedName) => {
+    const setter = type === 'cast' ? setCastRows : setCrewRows;
+    if (!person) {
+      setter((prev) =>
+        prev.map((row) =>
+          row.key === key
+            ? {
                 ...row,
                 matchId: null,
+                matchName: null,
                 photoUrl: null,
-                status: 'new'
-              };
-            }
-          }
-          return row;
-        })
+                status: 'new',
+              }
+            : row
+        )
       );
+      return;
+    }
+    setter((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        const pickedFromDropdown = typedName != null && foldPersonText(typedName) === foldPersonText(person.name);
+        // Auto-link while "create new" is chosen: keep candidate, stay on create
+        if (row.forceCreate && !pickedFromDropdown) {
+          return {
+            ...row,
+            matchId: person.id,
+            matchName: person.name,
+            photoUrl: person.photo_url,
+            status: 'new',
+          };
+        }
+        return {
+          ...row,
+          name: typedName != null ? typedName : row.name,
+          matchId: person.id,
+          matchName: person.name,
+          photoUrl: person.photo_url,
+          forceCreate: false,
+          status: 'matched',
+        };
+      })
+    );
+  };
+
+  const setRowLinkMode = (key, mode, type) => {
+    const setter = type === 'cast' ? setCastRows : setCrewRows;
+    setter((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        if (mode === 'create') {
+          return { ...row, forceCreate: true, status: 'new' };
+        }
+        // Link to existing — only if we have a candidate
+        if (!row.matchId) return row;
+        return { ...row, forceCreate: false, status: 'matched' };
+      })
+    );
+  };
+
+  const resolveRowName = async (key, name, type) => {
+    try {
+      const matched = await resolvePersonMatch(name);
+      applyPersonMatch(key, matched, type, name);
     } catch (err) {
       console.error(err);
+      applyPersonMatch(key, null, type, name);
     }
   };
 
@@ -349,7 +642,8 @@ export default function AdminCreditsExtractor() {
 
     for (const row of selectedRows) {
       try {
-        let personId = row.matchId;
+        // forceCreate = admin rejected a near-match and wants a brand-new person
+        let personId = row.forceCreate ? null : row.matchId;
 
         // Step A: If new profile, insert to people first
         if (!personId) {
@@ -369,7 +663,10 @@ export default function AdminCreditsExtractor() {
         }
 
         // Step B: Connect Credit link
-        const creditRole = activeTab === 'cast' ? 'actor' : row.roleOrCharacter.toLowerCase().trim().replace(/\s+/g, '_');
+        const creditRole =
+          activeTab === 'cast'
+            ? 'actor'
+            : canonicalizeRole(row.roleOrCharacter) || row.roleOrCharacter.toLowerCase().trim();
         const characterName = activeTab === 'cast' ? row.roleOrCharacter.trim() : null;
 
         // Check if exact credit link exists to prevent database exceptions
@@ -453,10 +750,10 @@ export default function AdminCreditsExtractor() {
         {/* Left Panel: Film Selection & Upload */}
         <div className="space-y-6 lg:col-span-1">
           {/* Film Selection Card */}
-          <div className="card-cal p-6 space-y-4">
+          <div className={`card-cal !overflow-visible p-6 space-y-4 relative ${isFilmDropdownOpen ? 'z-30' : 'z-10'}`}>
             <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">1. Select Target Film</h3>
             
-            <div className="relative">
+            <div className="relative" ref={filmDropdownRef}>
               <label className="block text-[10px] font-black text-text-muted uppercase tracking-[0.1em] mb-2">Film Asset *</label>
               
               <div 
@@ -498,7 +795,7 @@ export default function AdminCreditsExtractor() {
                     {isSearchingFilms ? (
                       <div className="p-8 text-center text-sm text-text-muted font-medium flex items-center justify-center gap-2">
                         <div className="w-4.5 h-4.5 border-2 border-brand/30 border-t-brand rounded-full animate-spin"></div>
-                        <span>🔍 Searching database...</span>
+                        <span>Searching database...</span>
                       </div>
                     ) : filteredFilms.length === 0 ? (
                       <div className="p-8 text-center text-sm text-text-muted font-medium">No results found</div>
@@ -533,7 +830,7 @@ export default function AdminCreditsExtractor() {
 
           {/* Screenshot Upload Card */}
           <div className="card-cal p-6 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">2. Upload Credit Screen</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">2. Upload Credit Screens</h3>
             
             {/* Upload Area */}
             <div className="border-2 border-dashed border-border/80 hover:border-brand/40 rounded-xl p-6 transition-all flex flex-col items-center justify-center text-center cursor-pointer relative bg-surface-2/20 group">
@@ -542,29 +839,67 @@ export default function AdminCreditsExtractor() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 onChange={handleFileChange}
                 accept="image/*"
+                multiple
               />
-              {screenshotPreview ? (
-                <div className="space-y-3 w-full">
-                  <img src={screenshotPreview} alt="Credits Screenshot" className="max-h-48 object-contain rounded-lg mx-auto border border-border shadow-md" />
-                  <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest group-hover:text-brand transition-colors">Click to replace screenshot</p>
+              <div className="space-y-3">
+                <div className="w-12 h-12 bg-surface-2 border border-border rounded-full flex items-center justify-center mx-auto text-text-muted group-hover:scale-110 transition-transform shadow-sm">
+                  📷
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="w-12 h-12 bg-surface-2 border border-border rounded-full flex items-center justify-center mx-auto text-text-muted group-hover:scale-110 transition-transform shadow-sm">
-                    📷
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-text-primary">Drag or Drop Image</p>
-                    <p className="text-[10px] text-text-muted font-semibold uppercase tracking-widest mt-1">Supports PNG, JPG, JPEG</p>
-                  </div>
+                <div>
+                  <p className="text-sm font-bold text-text-primary">
+                    {screenshots.length ? 'Add more images' : 'Drag or drop images'}
+                  </p>
+                  <p className="text-[10px] text-text-muted font-semibold uppercase tracking-widest mt-1">
+                    PNG, JPG — select several at once
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
+
+            {/* Queued screenshots */}
+            {screenshots.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                    {screenshots.length} image{screenshots.length > 1 ? 's' : ''} queued
+                  </p>
+                  <button
+                    onClick={() => setScreenshots([])}
+                    disabled={isProcessingOCR}
+                    className="text-[10px] font-bold uppercase tracking-widest text-text-muted hover:text-red-400 transition-colors disabled:opacity-40"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {screenshots.map((shot, i) => (
+                    <div key={shot.id} className="relative group/thumb">
+                      <img
+                        src={shot.base64}
+                        alt={shot.name}
+                        className="h-20 w-full object-cover rounded-lg border border-border shadow-sm"
+                      />
+                      <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                        {i + 1}
+                      </span>
+                      <button
+                        onClick={() => removeScreenshot(shot.id)}
+                        disabled={isProcessingOCR}
+                        title={`Remove ${shot.name}`}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-black flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity shadow-lg disabled:hidden"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Run Extraction Button */}
             <button
               onClick={handleExtractCredits}
-              disabled={isProcessingOCR || !screenshotBase64}
+              disabled={isProcessingOCR || !screenshots.length}
               className="w-full bg-brand text-white font-black py-3.5 rounded-lg text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 disabled:opacity-40 disabled:hover:scale-100 flex items-center justify-center gap-2"
             >
               {isProcessingOCR ? (
@@ -573,7 +908,7 @@ export default function AdminCreditsExtractor() {
                   Harvesting Credits...
                 </>
               ) : (
-                '🚀 Run AI Vision Extraction'
+                `🚀 Run AI Vision Extraction${screenshots.length > 1 ? ` (${screenshots.length} images)` : ''}`
               )}
             </button>
 
@@ -643,7 +978,7 @@ export default function AdminCreditsExtractor() {
             </div>
 
             {/* Editable Table */}
-            <div className="overflow-x-auto">
+            <div className="overflow-visible">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="border-b border-border bg-surface-2/10 text-text-muted text-[10px] font-black uppercase tracking-[0.2em]">
@@ -702,15 +1037,17 @@ export default function AdminCreditsExtractor() {
                           />
                         </td>
 
-                        {/* Editable Name */}
-                        <td className="px-4 py-4">
-                          <input
-                            type="text"
-                            value={row.name}
+                        {/* Editable Name + typeahead */}
+                        <td className="px-4 py-4 relative overflow-visible">
+                          <PersonNameCell
+                            row={row}
                             disabled={savedRows.has(row.key) || savingRows.has(row.key)}
-                            onChange={(e) => handleNameCellChange(row.key, e.target.value, activeTab)}
-                            className="w-full bg-transparent border-b border-transparent focus:border-brand/40 text-text-primary text-sm font-bold focus:outline-none focus:ring-0 py-0.5 placeholder:text-text-muted/30"
-                            placeholder="Enter full name..."
+                            onTextChange={(val) => handleNameTextChange(row.key, val, activeTab)}
+                            onAutoLink={(person) => applyPersonMatch(row.key, person, activeTab)}
+                            onPickPerson={(person) =>
+                              applyPersonMatch(row.key, person, activeTab, person.name)
+                            }
+                            onResolve={(name) => resolveRowName(row.key, name, activeTab)}
                           />
                         </td>
 
@@ -737,13 +1074,42 @@ export default function AdminCreditsExtractor() {
                               <div className="w-2.5 h-2.5 border border-brand/30 border-t-brand rounded-full animate-spin"></div>
                               Saving...
                             </span>
-                          ) : row.status === 'matched' ? (
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                Link to existing profile
-                              </span>
-                              {row.photoUrl && (
-                                <img src={row.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover border border-border shadow-sm" />
+                          ) : row.matchId ? (
+                            <div className="flex flex-col gap-1.5 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setRowLinkMode(row.key, 'link', activeTab)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                    !row.forceCreate
+                                      ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                      : 'bg-surface-2 text-text-muted border-border hover:border-blue-500/30 hover:text-blue-400'
+                                  }`}
+                                  title={row.matchName ? `Link to ${row.matchName}` : 'Link to existing'}
+                                >
+                                  {row.photoUrl && (
+                                    <img src={row.photoUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+                                  )}
+                                  Link existing
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setRowLinkMode(row.key, 'create', activeTab)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border transition-all ${
+                                    row.forceCreate
+                                      ? 'bg-purple-500/10 text-purple-500 border-purple-500/20'
+                                      : 'bg-surface-2 text-text-muted border-border hover:border-purple-500/30 hover:text-purple-400'
+                                  }`}
+                                  title="Create a new person instead of linking this match"
+                                >
+                                  ✨ Create new
+                                </button>
+                              </div>
+                              {row.matchName && (
+                                <p className="text-[10px] text-text-muted truncate" title={row.matchName}>
+                                  {row.forceCreate ? 'Ignoring match: ' : '→ '}
+                                  {row.matchName}
+                                </p>
                               )}
                             </div>
                           ) : row.status === 'new' ? (
@@ -752,7 +1118,7 @@ export default function AdminCreditsExtractor() {
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-surface-2 text-text-muted border border-border">
-                              🔍 Verification pending
+                              Verification pending
                             </span>
                           )}
                         </td>

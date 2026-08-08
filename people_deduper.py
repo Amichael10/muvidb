@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""people_deduper.py — safe duplicate-actor merger for the Ensembla/muvidb people table.
+"""people_deduper.py — safe duplicate-actor merger for the MuviDB people table.
 
 Runs SEPARATELY from the cast enricher (ideally on its own Kaggle account) so the
 two never interfere. It finds people whose names are near-duplicates (misspellings,

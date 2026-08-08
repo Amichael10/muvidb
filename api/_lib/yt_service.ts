@@ -6,16 +6,14 @@
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 
 // Collect every configured YouTube API key. Supports a comma-separated list in
-// YOUTUBE_API_KEY and numbered fallbacks (YOUTUBE_API_KEY_2, _3, ...). Each key
+// YOUTUBE_API_KEY and numbered fallbacks (YOUTUBE_API_KEY_2 … _10). Each key
 // carries its own daily quota, so rotating across them multiplies the ceiling.
 function collectYtKeys(): string[] {
-  const raw = [
+  const raw: (string | undefined)[] = [
     process.env.YOUTUBE_API_KEY,
-    process.env.YOUTUBE_API_KEY_2,
-    process.env.YOUTUBE_API_KEY_3,
-    process.env.YOUTUBE_API_KEY_4,
     process.env.VITE_YOUTUBE_API_KEY,
   ];
+  for (let i = 2; i <= 10; i++) raw.push(process.env[`YOUTUBE_API_KEY_${i}`]);
   return [
     ...new Set(
       raw.filter(Boolean).flatMap((k) => k!.split(',')).map((k) => k.trim()).filter(Boolean)
@@ -94,7 +92,10 @@ export function cleanTitle(raw: string): string {
   // 0. Pre-capture and temporarily remove EP info to prevent it from "protecting" noise
   // Handles EP 1, EPISODE 1, EP. 1, E1, E01, SEASON 1, etc.
   // We use a more permissive regex for episode numbers to catch "EP 205" etc.
-  const epMatch = title.match(/\b(EP|EPISODE|EP\.|E|SEASON|PART|VOL|VOLUME|V)\s*(\d+)/i);
+  // Longest alternatives lead: with EP before EPS, "EPS 6" matches EP, then
+  // looks for a digit, finds the S and fails the whole match — so the marker
+  // was dropped as noise and every episode collapsed onto one title.
+  const epMatch = title.match(/\b(EPISODE|EPS|EP\.|EP|SEASON|PART|PT|VOLUME|VOL|E|V)\s*(\d+)/i);
   const epInfo = epMatch ? epMatch[0] : null;
   
   if (epInfo) {
@@ -152,7 +153,7 @@ export function cleanTitle(raw: string): string {
 
   // 7. Title Case conversion (except for short acronyms)
   const minorWords = ['A', 'AN', 'THE', 'AND', 'BUT', 'OR', 'FOR', 'NOR', 'ON', 'AT', 'TO', 'BY', 'OF', 'IN', 'WITH', 'FROM', 'AS'];
-  const preservedAcronyms = ['EP', 'EPISODE', 'EP.', 'E', 'SEASON', 'PART', 'VOL', 'VOLUME'];
+  const preservedAcronyms = ['EP', 'EPS', 'EPISODE', 'EP.', 'E', 'SEASON', 'PART', 'PT', 'VOL', 'VOLUME'];
   
   return title.split(/\s+/).map((w, i) => {
     const upper = w.toUpperCase();

@@ -234,7 +234,7 @@ export default function AdminChannelDetail() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full h-14 bg-surface border border-border rounded-lg px-6 pl-14 text-text-primary text-sm focus:border-brand focus:outline-none transition-all placeholder:text-text-muted/30 group-hover:border-border-hover shadow-2xl"
                 />
-                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted opacity-50 text-xl">🔍</span>
+                <Icon icon="solar:magnifer-linear" className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-xl pointer-events-none" />
                </div>
             </div>
             <div className="flex gap-4">
@@ -302,11 +302,11 @@ export default function AdminChannelDetail() {
                       </td>
                       <td className="px-10 py-8">
                         {vid.films?.needs_review ? (
-                          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-[9px] font-black uppercase tracking-widest shadow-sm">
+                          <span className="inline-flex items-center px-4 py-1.5 rounded-xl bg-brand/10 border border-brand/20 text-brand text-[9px] font-black uppercase tracking-widest shadow-sm">
                              <span className="w-1 h-1 rounded-full bg-brand animate-pulse mr-2" /> Needs Audit
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-[9px] font-black uppercase tracking-widest shadow-sm">
+                          <span className="inline-flex items-center px-4 py-1.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-[9px] font-black uppercase tracking-widest shadow-sm">
                              Approved
                           </span>
                         )}

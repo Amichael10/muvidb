@@ -1,4 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { handleHealth } from './_lib/health.js';
+import { handleMirrorImages } from './_lib/mirror_images_admin.js';
+
+// Consolidated media/system router (Hobby free-tier function budget — see
+// docs/SSR_MIGRATION.md). Public paths are preserved by vercel.json rewrites:
+//   /api/health        -> /api/media?op=health
+//   /api/mirror-images -> /api/media?op=mirror
+//   /api/media?url=…    -> image proxy (default op)
+export const config = { maxDuration: 60 }; // mirror-images batch needs the headroom
 
 // Image proxy. Fetches a remote image server-side (with the *source site's own*
 // Referer so hotlink protection lets it through) and streams it back from our
@@ -23,6 +32,11 @@ function sniffImageType(buf: Buffer): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Route consolidated ops to their handlers; default (no op) is the image proxy.
+  const op = req.query.op;
+  if (op === 'health') return handleHealth(req, res);
+  if (op === 'mirror') return handleMirrorImages(req, res);
+
   const raw = req.query.url;
   const url = Array.isArray(raw) ? raw[0] : raw;
   if (!url) return res.status(400).send('Missing url');
