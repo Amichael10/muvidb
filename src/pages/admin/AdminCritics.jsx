@@ -41,15 +41,14 @@ export default function AdminCritics() {
   const [criticFormMsg, setCriticFormMsg] = useState(null);
   const [savingCritic, setSavingCritic] = useState(false);
 
-  // -- Review Linker Drawer state --------------------------------------------
-  const [isReviewDrawerOpen, setIsReviewDrawerOpen] = useState(false);
+  // -- Review Linker state inside drawer -------------------------------------
   const [reviewForm, setReviewForm] = useState(BLANK_REVIEW);
   const [reviewMsg, setReviewMsg] = useState(null);
   const [savingReview, setSavingReview] = useState(false);
   const [existingReviews, setExistingReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
 
-  // -- Film search for review drawer ----------------------------------------
+  // -- Film search for review section ---------------------------------------
   const [filmSearch, setFilmSearch] = useState('');
   const [filmResults, setFilmResults] = useState([]);
   const [isSearchingFilms, setIsSearchingFilms] = useState(false);
@@ -57,13 +56,6 @@ export default function AdminCritics() {
   const [selectedFilm, setSelectedFilm] = useState(null);
   const filmSearchTimeout = useRef(null);
   const filmDropdownRef = useRef(null);
-
-  // -- Critic search for review drawer ---------------------------------------
-  const [reviewCriticSearch, setReviewCriticSearch] = useState('');
-  const [reviewCriticResults, setReviewCriticResults] = useState([]);
-  const [showCriticDropdown, setShowCriticDropdown] = useState(false);
-  const [selectedCritic, setSelectedCritic] = useState(null);
-  const criticDropdownRef = useRef(null);
 
   async function loadData() {
     setLoading(true);
@@ -76,11 +68,10 @@ export default function AdminCritics() {
     loadData();
   }, []);
 
-  // Close search dropdowns on outside click
+  // Close dropdown on outside click
   useEffect(() => {
     function handler(e) {
       if (filmDropdownRef.current && !filmDropdownRef.current.contains(e.target)) setShowFilmDropdown(false);
-      if (criticDropdownRef.current && !criticDropdownRef.current.contains(e.target)) setShowCriticDropdown(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -89,6 +80,13 @@ export default function AdminCritics() {
   // Open Critic Drawer
   const handleOpenCriticDrawer = (critic = null) => {
     setCriticFormMsg(null);
+    setReviewMsg(null);
+    setReviewForm(BLANK_REVIEW);
+    setSelectedFilm(null);
+    setFilmSearch('');
+    setFilmResults([]);
+    setShowFilmDropdown(false);
+
     if (critic) {
       setEditingCritic(critic);
       setCriticFormData({
@@ -103,9 +101,12 @@ export default function AdminCritics() {
         profile_url: critic.profile_url || '',
         is_verified: critic.is_verified ?? true,
       });
+      setReviewForm(prev => ({ ...prev, critic_id: critic.id, source_publication: critic.publication || '' }));
+      loadExistingReviews(critic.id);
     } else {
       setEditingCritic(null);
       setCriticFormData(BLANK_CRITIC);
+      setExistingReviews([]);
     }
     setIsCriticDrawerOpen(true);
   };
@@ -115,39 +116,11 @@ export default function AdminCritics() {
     setEditingCritic(null);
     setCriticFormData(BLANK_CRITIC);
     setCriticFormMsg(null);
-  };
-
-  // Open Review Linker Drawer
-  const handleOpenReviewDrawer = (critic = null) => {
-    setReviewMsg(null);
     setReviewForm(BLANK_REVIEW);
     setSelectedFilm(null);
     setFilmSearch('');
-    setFilmResults([]);
-    setShowFilmDropdown(false);
-
-    if (critic) {
-      setSelectedCritic(critic);
-      setReviewCriticSearch(critic.name);
-      setReviewForm(prev => ({ ...prev, critic_id: critic.id, source_publication: critic.publication || '' }));
-      loadExistingReviews(critic.id);
-    } else {
-      setSelectedCritic(null);
-      setReviewCriticSearch('');
-      setExistingReviews([]);
-    }
-    setIsReviewDrawerOpen(true);
-  };
-
-  const handleCloseReviewDrawer = () => {
-    setIsReviewDrawerOpen(false);
-    setReviewForm(BLANK_REVIEW);
-    setSelectedCritic(null);
-    setSelectedFilm(null);
-    setReviewCriticSearch('');
-    setFilmSearch('');
-    setReviewMsg(null);
     setExistingReviews([]);
+    setReviewMsg(null);
   };
 
   // Load reviews linked to a critic
@@ -191,25 +164,6 @@ export default function AdminCritics() {
     setShowFilmDropdown(false);
   }
 
-  // ---- Critic Search (Review Drawer) ---------------------------------------
-  function handleReviewCriticSearch(query) {
-    setReviewCriticSearch(query);
-    setShowCriticDropdown(true);
-    setSelectedCritic(null);
-    setReviewForm(prev => ({ ...prev, critic_id: '' }));
-    const q = query.trim().toLowerCase();
-    setReviewCriticResults(critics.filter(c => c.name.toLowerCase().includes(q)).slice(0, 6));
-  }
-
-  function selectCritic(c) {
-    setSelectedCritic(c);
-    setReviewCriticSearch(c.name);
-    setReviewForm(prev => ({ ...prev, critic_id: c.id, source_publication: prev.source_publication || c.publication || '' }));
-    setReviewCriticResults([]);
-    setShowCriticDropdown(false);
-    loadExistingReviews(c.id);
-  }
-
   // ---- Save Critic ---------------------------------------------------------
   async function handleCriticSubmit(e) {
     e.preventDefault();
@@ -221,10 +175,13 @@ export default function AdminCritics() {
     setCriticFormMsg(null);
     try {
       const payload = editingCritic ? { ...criticFormData, id: editingCritic.id } : criticFormData;
-      await upsertCritic(payload);
+      const saved = await upsertCritic(payload);
       setCriticFormMsg({ type: 'success', text: editingCritic ? 'Critic profile updated!' : 'Critic created!' });
+      if (!editingCritic) {
+        setEditingCritic(saved);
+        setReviewForm(prev => ({ ...prev, critic_id: saved.id, source_publication: saved.publication || '' }));
+      }
       loadData();
-      setTimeout(() => handleCloseCriticDrawer(), 1200);
     } catch (err) {
       setCriticFormMsg({ type: 'error', text: 'Failed to save critic: ' + err.message });
     } finally {
@@ -245,8 +202,9 @@ export default function AdminCritics() {
   // ---- Save Review ---------------------------------------------------------
   async function handleReviewSubmit(e) {
     e.preventDefault();
-    if (!reviewForm.critic_id) {
-      setReviewMsg({ type: 'error', text: 'Please select a critic.' });
+    const criticId = editingCritic?.id || reviewForm.critic_id;
+    if (!criticId) {
+      setReviewMsg({ type: 'error', text: 'Please save the critic profile first.' });
       return;
     }
     if (!reviewForm.film_id) {
@@ -261,20 +219,20 @@ export default function AdminCritics() {
     setReviewMsg(null);
     try {
       const payload = {
-        critic_id: reviewForm.critic_id,
+        critic_id: criticId,
         film_id: reviewForm.film_id,
         quote: reviewForm.quote.trim(),
         rating: reviewForm.rating !== '' ? Number(reviewForm.rating) : null,
         review_url: reviewForm.review_url?.trim() || null,
-        source_publication: reviewForm.source_publication?.trim() || null,
-        critic_name: selectedCritic?.name || '',
+        source_publication: reviewForm.source_publication?.trim() || criticFormData.publication || null,
+        critic_name: criticFormData.name || '',
       };
       await upsertCriticReview(payload);
       setReviewMsg({ type: 'success', text: 'Film review linked successfully!' });
       setReviewForm(prev => ({ ...prev, quote: '', rating: '', review_url: '' }));
       setSelectedFilm(null);
       setFilmSearch('');
-      loadExistingReviews(reviewForm.critic_id);
+      loadExistingReviews(criticId);
       loadData();
     } catch (err) {
       setReviewMsg({ type: 'error', text: 'Failed to link review: ' + err.message });
@@ -288,7 +246,7 @@ export default function AdminCritics() {
     if (!window.confirm('Delete this review?')) return;
     try {
       await deleteCriticReview(review.id);
-      loadExistingReviews(reviewForm.critic_id);
+      loadExistingReviews(editingCritic?.id);
       loadData();
     } catch (err) {
       setReviewMsg({ type: 'error', text: 'Failed to delete review: ' + err.message });
@@ -324,26 +282,16 @@ export default function AdminCritics() {
           <p className="text-xs text-text-muted mt-1">Manage verified film critic profiles, publications, and linked film reviews.</p>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          <button
-            onClick={() => handleOpenReviewDrawer()}
-            className="inline-flex items-center gap-2 bg-surface border border-border hover:border-brand text-text-primary font-bold px-4 py-2.5 rounded-xl transition-all text-xs"
-          >
-            <Icon icon="solar:star-bold" className="text-brand w-4 h-4" />
-            Link Film Review
-          </button>
-
-          <button
-            onClick={() => handleOpenCriticDrawer()}
-            className="inline-flex items-center gap-2 bg-brand text-on-brand font-bold px-5 py-2.5 rounded-xl hover:bg-brand-hover transition-all shadow-lg shadow-brand/20 text-xs"
-          >
-            <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
-            Add New Critic
-          </button>
-        </div>
+        <button
+          onClick={() => handleOpenCriticDrawer()}
+          className="inline-flex items-center gap-2 bg-brand text-on-brand font-bold px-5 py-2.5 rounded-xl hover:bg-brand-hover transition-all shadow-lg shadow-brand/20 text-xs self-start md:self-auto"
+        >
+          <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
+          Add New Critic
+        </button>
       </div>
 
-      {/* Summary KPI Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-surface border border-border p-4 rounded-xl text-center">
           <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Total Critics</span>
@@ -393,7 +341,7 @@ export default function AdminCritics() {
         </div>
       </div>
 
-      {/* Main Critics Catalog Grid */}
+      {/* Main Critics Grid */}
       {loading ? (
         <div className="py-24 text-center">
           <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-2" />
@@ -460,16 +408,9 @@ export default function AdminCritics() {
 
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => handleOpenReviewDrawer(critic)}
-                      className="p-1.5 rounded-lg bg-surface-2 text-text-muted hover:text-brand transition-colors"
-                      title="Link Review for this Critic"
-                    >
-                      <Icon icon="solar:star-bold" className="w-4 h-4" />
-                    </button>
-                    <button
                       onClick={() => handleOpenCriticDrawer(critic)}
                       className="p-1.5 rounded-lg bg-surface-2 text-text-muted hover:text-brand transition-colors"
-                      title="Edit Critic"
+                      title="Edit Critic & Reviews"
                     >
                       <Icon icon="solar:pen-bold" className="w-4 h-4" />
                     </button>
@@ -488,137 +429,173 @@ export default function AdminCritics() {
         </div>
       )}
 
-      {/* ── Critic Edit/Add Drawer Side Panel ──────────────────────────── */}
+      {/* ── Wide Side Panel Drawer (Matching Edit Movie Profile) ──────────── */}
       <Drawer
         isOpen={isCriticDrawerOpen}
         onClose={handleCloseCriticDrawer}
-        title={editingCritic ? `Edit Critic: ${editingCritic.name}` : 'Add New Film Critic'}
-        width="560px"
+        title={editingCritic ? 'Edit Critic Profile' : 'Add New Film Critic'}
+        width="820px"
       >
-        <form onSubmit={handleCriticSubmit} className="space-y-4 text-xs">
-          {/* Full Name */}
-          <div>
-            <label className="text-text-muted font-bold block mb-1">Critic Full Name *</label>
-            <input
-              type="text"
-              value={criticFormData.name}
-              onChange={e => setCriticFormData({ ...criticFormData, name: e.target.value })}
-              placeholder="e.g. Tolu Fagbure"
-              className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-              required
-            />
+        <form onSubmit={handleCriticSubmit} className="space-y-10">
+
+          {/* Two Column Layout: Core Information vs Media & Presentation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* Left Column: Core Information */}
+            <section className="space-y-5">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Core Information</h4>
+              </div>
+
+              <div className="space-y-4">
+                {/* Full Name */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-text-primary">Critic Full Name *</label>
+                    <span className="text-[10px] font-bold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Icon icon="solar:magic-stick-bold" className="w-3 h-3" />
+                      AI Polish
+                    </span>
+                  </div>
+                  <input
+                    required
+                    type="text"
+                    value={criticFormData.name}
+                    onChange={e => setCriticFormData({ ...criticFormData, name: e.target.value })}
+                    className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2.5 text-sm text-text-primary focus:border-brand outline-none transition-all"
+                    placeholder="e.g. Tolu Fagbure"
+                  />
+                </div>
+
+                {/* Slug */}
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-1.5">URL Slug (Optional)</label>
+                  <input
+                    type="text"
+                    value={criticFormData.slug}
+                    onChange={e => setCriticFormData({ ...criticFormData, slug: e.target.value })}
+                    className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                    placeholder="e.g. tolu-fagbure"
+                  />
+                </div>
+
+                {/* Professional Title & Publication */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Professional Title</label>
+                    <input
+                      type="text"
+                      value={criticFormData.title}
+                      onChange={e => setCriticFormData({ ...criticFormData, title: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="Senior Film Critic"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Publication / Outlet</label>
+                    <input
+                      type="text"
+                      value={criticFormData.publication}
+                      onChange={e => setCriticFormData({ ...criticFormData, publication: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="e.g. Film Efiko"
+                    />
+                  </div>
+                </div>
+
+                {/* Platform & Social Handle */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Primary Platform</label>
+                    <input
+                      type="text"
+                      value={criticFormData.platform}
+                      onChange={e => setCriticFormData({ ...criticFormData, platform: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="YouTube / X"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Social Handle</label>
+                    <input
+                      type="text"
+                      value={criticFormData.handle}
+                      onChange={e => setCriticFormData({ ...criticFormData, handle: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="@handle"
+                    />
+                  </div>
+                </div>
+
+                {/* Biography */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-text-primary">Biography</label>
+                    <span className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <Icon icon="solar:stars-minimalistic-bold" className="w-3 h-3" />
+                      AI Summarize
+                    </span>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={criticFormData.bio}
+                    onChange={e => setCriticFormData({ ...criticFormData, bio: e.target.value })}
+                    className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2.5 text-xs text-text-primary focus:border-brand outline-none resize-none leading-relaxed"
+                    placeholder="Enter critic bio..."
+                  />
+                </div>
+
+                {/* Verified toggle switch */}
+                <div className="p-4 bg-surface-2/60 border border-border rounded-lg flex items-center justify-between">
+                  <div>
+                    <h5 className="text-xs font-bold text-text-primary">Verified Critic Status</h5>
+                    <p className="text-[11px] text-text-muted mt-0.5">Displays verified checkmark on profile and reviews.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCriticFormData({ ...criticFormData, is_verified: !criticFormData.is_verified })}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none focus:ring-2 focus:ring-brand/20 ${
+                      criticFormData.is_verified ? 'bg-brand' : 'bg-slate-200 dark:bg-slate-800'
+                    }`}
+                  >
+                    <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      criticFormData.is_verified ? 'translate-x-5' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* Right Column: Media & Presentation */}
+            <section className="space-y-6">
+              <div className="pb-2 border-b border-border">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Media & Presentation</h4>
+              </div>
+
+              <div className="space-y-5">
+                <ImageField
+                  label="Profile Headshot"
+                  value={criticFormData.avatar_url}
+                  onChange={url => setCriticFormData(prev => ({ ...prev, avatar_url: url }))}
+                  bucket="film-images"
+                  aspect="square"
+                  hint="Upload or paste image link (square format)"
+                />
+
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-1.5">Official Outlet Website</label>
+                  <input
+                    type="url"
+                    value={criticFormData.profile_url}
+                    onChange={e => setCriticFormData({ ...criticFormData, profile_url: e.target.value })}
+                    className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2.5 text-xs text-text-primary focus:border-brand outline-none"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+            </section>
           </div>
 
-          {/* Slug */}
-          <div>
-            <label className="text-text-muted font-bold block mb-1">URL Slug (Optional)</label>
-            <input
-              type="text"
-              value={criticFormData.slug}
-              onChange={e => setCriticFormData({ ...criticFormData, slug: e.target.value })}
-              placeholder="e.g. tolu-fagbure"
-              className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-            />
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="text-text-muted font-bold block mb-1">Professional Title</label>
-            <input
-              type="text"
-              value={criticFormData.title}
-              onChange={e => setCriticFormData({ ...criticFormData, title: e.target.value })}
-              placeholder="e.g. Senior Film Critic & Culture Journalist"
-              className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-            />
-          </div>
-
-          {/* Publication */}
-          <div>
-            <label className="text-text-muted font-bold block mb-1">Publication / Outlet</label>
-            <input
-              type="text"
-              value={criticFormData.publication}
-              onChange={e => setCriticFormData({ ...criticFormData, publication: e.target.value })}
-              placeholder="e.g. Film Efiko / Melody FM"
-              className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-            />
-          </div>
-
-          {/* Profile Photo */}
-          <ImageField
-            label="Profile Headshot"
-            value={criticFormData.avatar_url}
-            onChange={url => setCriticFormData(prev => ({ ...prev, avatar_url: url }))}
-            bucket="film-images"
-            aspect="square"
-            hint="Upload or paste link (square portrait)"
-          />
-
-          {/* Platform + Handle */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-text-muted font-bold block mb-1">Primary Platform</label>
-              <input
-                type="text"
-                value={criticFormData.platform}
-                onChange={e => setCriticFormData({ ...criticFormData, platform: e.target.value })}
-                placeholder="YouTube / X"
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-text-muted font-bold block mb-1">Social Handle</label>
-              <input
-                type="text"
-                value={criticFormData.handle}
-                onChange={e => setCriticFormData({ ...criticFormData, handle: e.target.value })}
-                placeholder="@handle"
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Profile URL */}
-          <div>
-            <label className="text-text-muted font-bold block mb-1">Official Outlet URL</label>
-            <input
-              type="url"
-              value={criticFormData.profile_url}
-              onChange={e => setCriticFormData({ ...criticFormData, profile_url: e.target.value })}
-              placeholder="https://..."
-              className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-            />
-          </div>
-
-          {/* Bio */}
-          <div>
-            <label className="text-text-muted font-bold block mb-1">Biography</label>
-            <textarea
-              rows={3}
-              value={criticFormData.bio}
-              onChange={e => setCriticFormData({ ...criticFormData, bio: e.target.value })}
-              placeholder="Brief critic bio..."
-              className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none resize-none"
-            />
-          </div>
-
-          {/* Verified toggle */}
-          <label className="flex items-center gap-3 cursor-pointer py-1">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={criticFormData.is_verified}
-                onChange={e => setCriticFormData({ ...criticFormData, is_verified: e.target.checked })}
-                className="sr-only"
-              />
-              <div className={`w-10 h-5 rounded-full transition-all ${criticFormData.is_verified ? 'bg-brand' : 'bg-surface-2 border border-border'}`} />
-              <div className={`absolute top-1 w-3 h-3 rounded-full transition-all ${criticFormData.is_verified ? 'left-6 bg-white' : 'left-1 bg-text-muted'}`} />
-            </div>
-            <span className="text-xs font-bold text-text-primary">Verified Critic Badge</span>
-          </label>
-
-          {/* Feedback message */}
+          {/* Form Save Button */}
           {criticFormMsg && (
             <div className={`p-3 rounded-xl text-xs font-bold ${criticFormMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
               {criticFormMsg.text}
@@ -628,220 +605,176 @@ export default function AdminCritics() {
           <button
             type="submit"
             disabled={savingCritic}
-            className="w-full bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors disabled:opacity-60 text-xs shadow-md"
+            className="w-full bg-brand text-on-brand font-bold py-3 rounded-xl hover:bg-brand-hover transition-colors disabled:opacity-60 text-xs shadow-lg shadow-brand/20"
           >
-            {savingCritic ? 'Saving Critic…' : editingCritic ? 'Update Critic Profile' : 'Save Critic Profile'}
+            {savingCritic ? 'Saving Critic Profile…' : editingCritic ? 'Update Critic Profile' : 'Save Critic Profile'}
           </button>
-        </form>
-      </Drawer>
 
-      {/* ── Review Linker Drawer Side Panel ──────────────────────────────── */}
-      <Drawer
-        isOpen={isReviewDrawerOpen}
-        onClose={handleCloseReviewDrawer}
-        title={selectedCritic ? `Link Review: ${selectedCritic.name}` : 'Link Film Review to Critic'}
-        width="580px"
-      >
-        <div className="space-y-6 text-xs">
-          <form onSubmit={handleReviewSubmit} className="space-y-4">
-            {/* Critic Search / Select */}
-            <div ref={criticDropdownRef} className="relative">
-              <label className="text-text-muted font-bold block mb-1">Select Critic *</label>
-              <div className="flex items-center gap-2 bg-bg border border-border rounded-xl px-3 py-2 focus-within:border-brand transition-colors">
-                <Icon icon="solar:pen-new-square-linear" className="w-4 h-4 text-text-muted flex-shrink-0" />
-                <input
-                  type="text"
-                  value={reviewCriticSearch}
-                  onChange={e => handleReviewCriticSearch(e.target.value)}
-                  onFocus={() => reviewCriticSearch && setShowCriticDropdown(true)}
-                  placeholder="Search critic name..."
-                  className="flex-1 bg-transparent outline-none text-xs text-text-primary placeholder-text-muted"
-                />
-                {selectedCritic && (
-                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500 flex-shrink-0" />
+          {/* Full Width Bottom Section: Linked Film Reviews */}
+          <div className="pt-8 border-t border-border space-y-4 text-xs">
+            <div>
+              <h4 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Icon icon="solar:star-bold" className="text-brand w-4 h-4" />
+                Linked Film Reviews
+              </h4>
+              <p className="text-[11px] text-text-muted mt-0.5">
+                {editingCritic ? `Attach published film reviews to ${editingCritic.name}` : 'Save critic profile first to attach film reviews.'}
+              </p>
+            </div>
+
+            {/* Film Search & Add Review Form */}
+            <div className="p-4 bg-surface-2/40 border border-border rounded-xl space-y-4">
+              <div ref={filmDropdownRef} className="relative">
+                <label className="block text-xs font-bold text-text-primary mb-1">Select Film to Review *</label>
+                <div className="flex items-center gap-2 bg-surface border border-border rounded-xl px-3.5 py-2.5 focus-within:border-brand transition-colors">
+                  <Icon icon="solar:videocamera-record-linear" className="w-4 h-4 text-text-muted flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={filmSearch}
+                    onChange={e => handleFilmSearch(e.target.value)}
+                    onFocus={() => filmSearch.length >= 2 && setShowFilmDropdown(true)}
+                    placeholder="Search film title..."
+                    disabled={!editingCritic}
+                    className="flex-1 bg-transparent outline-none text-xs text-text-primary placeholder-text-muted disabled:opacity-50"
+                  />
+                  {isSearchingFilms && (
+                    <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  )}
+                  {selectedFilm && !isSearchingFilms && (
+                    <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  )}
+                </div>
+
+                {showFilmDropdown && filmSearch.trim().length >= 2 && filmResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl z-30 overflow-hidden">
+                    {filmResults.map(f => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => selectFilm(f)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
+                      >
+                        <div className="w-8 h-12 rounded-md bg-surface-2 overflow-hidden border border-border flex-shrink-0">
+                          {f.poster_url && <img src={f.poster_url} alt="" className="w-full h-full object-cover" />}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-text-primary">{f.title}</p>
+                          <p className="text-[10px] text-text-muted">{f.year}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-              {showCriticDropdown && reviewCriticResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl z-20 overflow-hidden">
-                  {reviewCriticResults.map(c => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => selectCritic(c)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden border border-border flex-shrink-0">
-                        {c.avatar_url && <img src={c.avatar_url} alt="" className="w-full h-full object-cover" />}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-text-primary">{c.name}</p>
-                        <p className="text-[10px] text-text-muted">{c.publication || 'Critic'}</p>
-                      </div>
-                    </button>
-                  ))}
+
+              {/* Review Quote */}
+              <div>
+                <label className="block text-xs font-bold text-text-primary mb-1">Review Quote *</label>
+                <textarea
+                  rows={3}
+                  value={reviewForm.quote}
+                  onChange={e => setReviewForm(prev => ({ ...prev, quote: e.target.value }))}
+                  placeholder="Paste key pull-quote from the review..."
+                  disabled={!editingCritic}
+                  className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-xs text-text-primary focus:border-brand outline-none resize-none leading-relaxed disabled:opacity-50"
+                />
+              </div>
+
+              {/* Rating + Source URL */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-1">Star Rating (1–5)</label>
+                  <select
+                    value={reviewForm.rating}
+                    onChange={e => setReviewForm(prev => ({ ...prev, rating: e.target.value }))}
+                    disabled={!editingCritic}
+                    className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text-primary focus:border-brand outline-none disabled:opacity-50"
+                  >
+                    <option value="">— No Rating —</option>
+                    <option value="1">1 ★</option>
+                    <option value="2">2 ★★</option>
+                    <option value="3">3 ★★★</option>
+                    <option value="4">4 ★★★★</option>
+                    <option value="5">5 ★★★★★</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-1">Original Review URL</label>
+                  <input
+                    type="url"
+                    value={reviewForm.review_url}
+                    onChange={e => setReviewForm(prev => ({ ...prev, review_url: e.target.value }))}
+                    placeholder="https://..."
+                    disabled={!editingCritic}
+                    className="w-full bg-surface border border-border rounded-xl px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {reviewMsg && (
+                <div className={`p-3 rounded-xl text-xs font-bold ${reviewMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
+                  {reviewMsg.text}
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={handleReviewSubmit}
+                disabled={savingReview || !editingCritic}
+                className="w-full bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors text-xs disabled:opacity-50"
+              >
+                {savingReview ? 'Linking Review…' : 'Link Review to Critic'}
+              </button>
             </div>
 
-            {/* Film Search */}
-            <div ref={filmDropdownRef} className="relative">
-              <label className="text-text-muted font-bold block mb-1">Select Film *</label>
-              <div className="flex items-center gap-2 bg-bg border border-border rounded-xl px-3 py-2 focus-within:border-brand transition-colors">
-                <Icon icon="solar:videocamera-record-linear" className="w-4 h-4 text-text-muted flex-shrink-0" />
-                <input
-                  type="text"
-                  value={filmSearch}
-                  onChange={e => handleFilmSearch(e.target.value)}
-                  onFocus={() => filmSearch.length >= 2 && setShowFilmDropdown(true)}
-                  placeholder="Search film title..."
-                  className="flex-1 bg-transparent outline-none text-xs text-text-primary placeholder-text-muted"
-                />
-                {isSearchingFilms && (
-                  <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                )}
-                {selectedFilm && !isSearchingFilms && (
-                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500 flex-shrink-0" />
-                )}
-              </div>
-              {showFilmDropdown && filmSearch.trim().length >= 2 && filmResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl z-20 overflow-hidden">
-                  {filmResults.map(f => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => selectFilm(f)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
-                    >
-                      <div className="w-8 h-12 rounded-md bg-surface-2 overflow-hidden border border-border flex-shrink-0">
-                        {f.poster_url && <img src={f.poster_url} alt="" className="w-full h-full object-cover" />}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-text-primary">{f.title}</p>
-                        <p className="text-[10px] text-text-muted">{f.year}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Review Quote */}
-            <div>
-              <label className="text-text-muted font-bold block mb-1">Review Quote *</label>
-              <textarea
-                rows={3}
-                value={reviewForm.quote}
-                onChange={e => setReviewForm(prev => ({ ...prev, quote: e.target.value }))}
-                placeholder="Paste the key pull-quote from the critic's review..."
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none resize-none"
-                required
-              />
-            </div>
-
-            {/* Rating + Source Publication */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* List of existing linked reviews */}
+            {editingCritic && (
               <div>
-                <label className="text-text-muted font-bold block mb-1">Star Rating (1–5)</label>
-                <select
-                  value={reviewForm.rating}
-                  onChange={e => setReviewForm(prev => ({ ...prev, rating: e.target.value }))}
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                >
-                  <option value="">— No Rating —</option>
-                  <option value="1">1 ★</option>
-                  <option value="2">2 ★★</option>
-                  <option value="3">3 ★★★</option>
-                  <option value="4">4 ★★★★</option>
-                  <option value="5">5 ★★★★★</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Source Publication</label>
-                <input
-                  type="text"
-                  value={reviewForm.source_publication}
-                  onChange={e => setReviewForm(prev => ({ ...prev, source_publication: e.target.value }))}
-                  placeholder="e.g. Film Efiko"
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Original Review Link */}
-            <div>
-              <label className="text-text-muted font-bold block mb-1">Link to Original Review</label>
-              <input
-                type="url"
-                value={reviewForm.review_url}
-                onChange={e => setReviewForm(prev => ({ ...prev, review_url: e.target.value }))}
-                placeholder="https://..."
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-              />
-            </div>
-
-            {/* Review feedback */}
-            {reviewMsg && (
-              <div className={`p-3 rounded-xl text-xs font-bold ${reviewMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
-                {reviewMsg.text}
+                {loadingReviews ? (
+                  <div className="py-4 text-center">
+                    <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
+                  </div>
+                ) : existingReviews.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Linked Film Reviews ({existingReviews.length})</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {existingReviews.map(rev => {
+                        const film = rev.film || {};
+                        return (
+                          <div key={rev.id} className="flex items-start gap-3 bg-surface-2 border border-border rounded-xl p-3">
+                            {film.poster_url && (
+                              <img src={film.poster_url} alt={film.title} className="w-8 h-12 rounded-md object-cover border border-border flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-text-primary truncate">{film.title} {film.year && `(${film.year})`}</p>
+                              {rev.rating && (
+                                <p className="text-[10px] text-brand font-bold">{'★'.repeat(rev.rating)} {rev.rating}/5</p>
+                              )}
+                              <p className="text-[10px] text-text-muted italic line-clamp-2 mt-0.5">"{rev.quote}"</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReview(rev)}
+                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                              title="Delete review"
+                            >
+                              <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-text-muted text-center py-4 border border-dashed border-border rounded-xl">
+                    No film reviews attached yet — search above to link reviews.
+                  </p>
+                )}
               </div>
             )}
-
-            <button
-              type="submit"
-              disabled={savingReview}
-              className="w-full bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors disabled:opacity-60 text-xs shadow-md"
-            >
-              {savingReview ? 'Linking Review…' : 'Link Review to Critic'}
-            </button>
-          </form>
-
-          {/* List of existing linked reviews for selected critic */}
-          {selectedCritic && (
-            <div className="pt-5 border-t border-border">
-              <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">
-                Reviews by {selectedCritic.name} ({existingReviews.length})
-              </h4>
-              {loadingReviews ? (
-                <div className="py-6 text-center">
-                  <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
-                </div>
-              ) : existingReviews.length === 0 ? (
-                <p className="text-xs text-text-muted text-center py-4 border border-dashed border-border rounded-xl">
-                  No film reviews linked yet for this critic.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {existingReviews.map(rev => {
-                    const film = rev.film || {};
-                    return (
-                      <div key={rev.id} className="flex items-start gap-3 bg-surface-2 border border-border rounded-xl p-3">
-                        {film.poster_url && (
-                          <img src={film.poster_url} alt={film.title} className="w-8 h-12 rounded-md object-cover border border-border flex-shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-text-primary truncate">{film.title} {film.year && `(${film.year})`}</p>
-                          {rev.rating && (
-                            <p className="text-[10px] text-brand font-bold">{'★'.repeat(rev.rating)} {rev.rating}/5</p>
-                          )}
-                          <p className="text-[10px] text-text-muted italic line-clamp-2 mt-0.5">"{rev.quote}"</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteReview(rev)}
-                          className="p-1 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                          title="Remove review"
-                        >
-                          <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        </form>
       </Drawer>
     </div>
   );

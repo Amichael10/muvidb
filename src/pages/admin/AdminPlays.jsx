@@ -23,6 +23,11 @@ const BLANK_FORM = {
   status: 'archived',
 };
 
+const ALL_PLAY_GENRES = [
+  'Drama', 'Musical', 'Tragedy', 'Comedy', 'Historical',
+  'Satire', 'Folklore', 'Dance Drama', 'Opera', 'Experimental'
+];
+
 export default function AdminPlays() {
   const [plays, setPlays] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +239,7 @@ export default function AdminPlays() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!formData.title.trim()) {
-      setFormMsg({ type: 'error', text: 'Title is required.' });
+      setFormMsg({ type: 'error', text: 'Play title is required.' });
       return;
     }
     setSaving(true);
@@ -242,7 +247,7 @@ export default function AdminPlays() {
     try {
       const payload = editingPlay ? { ...formData, id: editingPlay.id } : formData;
       const saved = await upsertPlay(payload);
-      setFormMsg({ type: 'success', text: editingPlay ? 'Play updated!' : 'Play created!' });
+      setFormMsg({ type: 'success', text: editingPlay ? 'Play updated successfully!' : 'Play created successfully!' });
       if (!editingPlay) {
         setEditingPlay(saved);
         loadSavedCredits(saved.id);
@@ -292,7 +297,7 @@ export default function AdminPlays() {
         </button>
       </div>
 
-      {/* Summary KPI Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="bg-surface border border-border p-4 rounded-xl text-center">
           <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Total Plays</span>
@@ -312,7 +317,7 @@ export default function AdminPlays() {
         </div>
       </div>
 
-      {/* Filter / Search Bar */}
+      {/* Search & Status Filter */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 bg-surface border border-border p-4 rounded-xl">
         <div className="relative flex-1 w-full">
           <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
@@ -347,7 +352,7 @@ export default function AdminPlays() {
         </div>
       </div>
 
-      {/* Main Catalog View (Grid) */}
+      {/* Main Catalog View */}
       {loading ? (
         <div className="py-24 text-center">
           <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-2" />
@@ -374,7 +379,6 @@ export default function AdminPlays() {
               className="group bg-surface border border-border hover:border-brand/40 rounded-2xl overflow-hidden transition-all flex flex-col justify-between"
             >
               <div className="p-5 flex gap-4 items-start">
-                {/* Poster Thumbnail */}
                 <div className="w-20 h-28 rounded-xl overflow-hidden border border-border bg-surface-2 flex-shrink-0 shadow-md">
                   {play.poster_url ? (
                     <img src={play.poster_url} alt={play.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
@@ -385,7 +389,6 @@ export default function AdminPlays() {
                   )}
                 </div>
 
-                {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-[10px] font-bold text-brand uppercase tracking-wider truncate">
@@ -429,7 +432,6 @@ export default function AdminPlays() {
                 </div>
               </div>
 
-              {/* Card Footer Actions */}
               <div className="px-5 py-3 bg-surface-2/60 border-t border-border flex items-center justify-between">
                 <a
                   href={`/plays/${play.slug}`}
@@ -454,206 +456,279 @@ export default function AdminPlays() {
         </div>
       )}
 
-      {/* ── Slide-Over Side Panel Drawer ─────────────────────────────────── */}
+      {/* ── Wide Side Panel Drawer (Matching Edit Movie Profile) ──────────── */}
       <Drawer
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
-        title={editingPlay ? `Edit Play: ${editingPlay.title}` : 'Add New Stage Play'}
-        width="620px"
+        title={editingPlay ? 'Edit Play Profile' : 'Add New Stage Play'}
+        width="820px"
       >
-        <div className="space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-10">
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Title */}
-            <div>
-              <label className="text-text-muted font-bold block mb-1">Play Title *</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={e => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g. Saro The Musical"
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                required
-              />
-            </div>
+          {/* Two Column Layout: Core Information vs Media & Presentation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* Left Column: Core Information */}
+            <section className="space-y-5">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Core Information</h4>
+              </div>
 
-            {/* Slug */}
-            <div>
-              <label className="text-text-muted font-bold block mb-1">URL Slug (Optional)</label>
-              <input
-                type="text"
-                value={formData.slug}
-                onChange={e => setFormData({ ...formData, slug: e.target.value })}
-                placeholder="e.g. saro-the-musical"
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-              />
-            </div>
+              <div className="space-y-4">
+                {/* Title */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-text-primary">Play Title *</label>
+                    <span className="text-[10px] font-bold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Icon icon="solar:magic-stick-bold" className="w-3 h-3" />
+                      AI Polish
+                    </span>
+                  </div>
+                  <input
+                    required
+                    type="text"
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2.5 text-sm text-text-primary focus:border-brand outline-none transition-all"
+                    placeholder="e.g. Saro The Musical"
+                  />
+                </div>
 
-            {/* Playwright + Director */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Playwright</label>
-                <input
-                  type="text"
-                  value={formData.playwright}
-                  onChange={e => setFormData({ ...formData, playwright: e.target.value })}
-                  placeholder="e.g. Wole Soyinka"
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
+                {/* Slug */}
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-1.5">URL Slug (Optional)</label>
+                  <input
+                    type="text"
+                    value={formData.slug}
+                    onChange={e => setFormData({ ...formData, slug: e.target.value })}
+                    className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                    placeholder="e.g. saro-the-musical"
+                  />
+                </div>
+
+                {/* Playwright & Director */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Playwright</label>
+                    <input
+                      type="text"
+                      value={formData.playwright}
+                      onChange={e => setFormData({ ...formData, playwright: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="e.g. Wole Soyinka"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Director</label>
+                    <input
+                      type="text"
+                      value={formData.director}
+                      onChange={e => setFormData({ ...formData, director: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="e.g. Bolanle Austen-Peters"
+                    />
+                  </div>
+                </div>
+
+                {/* Producer & Venue */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Producer</label>
+                    <input
+                      type="text"
+                      value={formData.producer}
+                      onChange={e => setFormData({ ...formData, producer: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="e.g. Terra Kulture"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Venue</label>
+                    <input
+                      type="text"
+                      value={formData.venue}
+                      onChange={e => setFormData({ ...formData, venue: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="e.g. Muson Centre"
+                    />
+                  </div>
+                </div>
+
+                {/* Year, Status */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Year</label>
+                    <input
+                      type="number"
+                      value={formData.year}
+                      onChange={e => setFormData({ ...formData, year: Number(e.target.value) })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">City</label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={e => setFormData({ ...formData, city: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="Lagos"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={e => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-2 py-2 text-xs text-text-primary focus:border-brand outline-none cursor-pointer"
+                    >
+                      <option value="archived">Archived</option>
+                      <option value="currently_running">Running</option>
+                      <option value="upcoming">Upcoming</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Synopsis */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-text-primary">Story Synopsis</label>
+                    <span className="text-[10px] font-bold text-white bg-brand border border-brand/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <Icon icon="solar:stars-minimalistic-bold" className="w-3 h-3" />
+                      AI Summarize
+                    </span>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={formData.synopsis}
+                    onChange={e => setFormData({ ...formData, synopsis: e.target.value })}
+                    className="w-full bg-surface-2 border border-border rounded-md px-3.5 py-2.5 text-xs text-text-primary focus:border-brand outline-none resize-none leading-relaxed"
+                    placeholder="Enter synopsis of the stage production..."
+                  />
+                </div>
+
+                {/* Intelligence Box */}
+                <div className="p-4 bg-surface-2/60 border border-border rounded-lg space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>
+                    <h5 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">PRODUCTION INTELLIGENCE</h5>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Country</label>
+                      <input
+                        type="text"
+                        value={formData.country}
+                        onChange={e => setFormData({ ...formData, country: e.target.value })}
+                        className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Genre Category</label>
+                      <input
+                        type="text"
+                        value={formData.genre}
+                        onChange={e => setFormData({ ...formData, genre: e.target.value })}
+                        className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary outline-none"
+                        placeholder="e.g. Musical"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Right Column: Media & Presentation */}
+            <section className="space-y-6">
+              <div className="pb-2 border-b border-border">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Media & Presentation</h4>
+              </div>
+
+              <div className="space-y-5">
+                <ImageField
+                  label="Poster Asset"
+                  value={formData.poster_url}
+                  onChange={url => setFormData(prev => ({ ...prev, poster_url: url }))}
+                  bucket="film-images"
+                  aspect="poster"
+                />
+
+                <ImageField
+                  label="Landscape Backdrop"
+                  value={formData.banner_url}
+                  onChange={url => setFormData(prev => ({ ...prev, banner_url: url }))}
+                  bucket="film-images"
+                  aspect="backdrop"
                 />
               </div>
+
+              {/* Classification Genres Checkbox Grid */}
+              <div className="p-4 bg-surface-2/60 border border-border rounded-lg space-y-3">
+                <label className="block text-[10px] font-bold text-text-muted uppercase tracking-widest">CLASSIFICATION GENRES</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_PLAY_GENRES.map(g => {
+                    const isChecked = formData.genre?.toLowerCase().includes(g.toLowerCase());
+                    return (
+                      <label key={g} className="flex items-center gap-2 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setFormData(prev => ({ ...prev, genre: prev.genre ? `${prev.genre}, ${g}` : g }));
+                            } else {
+                              setFormData(prev => ({ ...prev, genre: prev.genre.replace(g, '').replace(/^,\s*|,\s*$/g, '') }));
+                            }
+                          }}
+                          className="w-3.5 h-3.5 rounded border-border text-brand bg-surface focus:ring-brand/30 accent-brand"
+                        />
+                        <span className="text-xs text-text-muted group-hover:text-text-primary transition-colors">{g}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* Save Button for Play Form */}
+          {formMsg && (
+            <div className={`p-3 rounded-xl text-xs font-bold ${formMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
+              {formMsg.text}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-brand text-on-brand font-bold py-3 rounded-xl hover:bg-brand-hover transition-colors disabled:opacity-60 text-xs shadow-lg shadow-brand/20"
+          >
+            {saving ? 'Saving Play Profile…' : editingPlay ? 'Update Play Profile' : 'Save Play Profile'}
+          </button>
+
+          {/* Full Width Bottom Section: Stage Performers & Crew */}
+          <div className="pt-8 border-t border-border space-y-4">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="text-text-muted font-bold block mb-1">Director</label>
-                <input
-                  type="text"
-                  value={formData.director}
-                  onChange={e => setFormData({ ...formData, director: e.target.value })}
-                  placeholder="e.g. Bolanle Austen-Peters"
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                />
+                <h4 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                  <Icon icon="solar:users-group-two-rounded-bold" className="text-brand w-4 h-4" />
+                  Stage Performers & Crew
+                </h4>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  {editingPlay ? `Cast credits attached to "${editingPlay.title}"` : 'Save play profile first to attach ensemble cast credits.'}
+                </p>
               </div>
             </div>
-
-            {/* Producer */}
-            <div>
-              <label className="text-text-muted font-bold block mb-1">Producer</label>
-              <input
-                type="text"
-                value={formData.producer}
-                onChange={e => setFormData({ ...formData, producer: e.target.value })}
-                placeholder="e.g. Terra Kulture"
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-              />
-            </div>
-
-            {/* Venue + City */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Venue</label>
-                <input
-                  type="text"
-                  value={formData.venue}
-                  onChange={e => setFormData({ ...formData, venue: e.target.value })}
-                  placeholder="e.g. Muson Centre"
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-text-muted font-bold block mb-1">City</label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={e => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="e.g. Lagos"
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Year + Genre + Status */}
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Year</label>
-                <input
-                  type="number"
-                  value={formData.year}
-                  onChange={e => setFormData({ ...formData, year: Number(e.target.value) })}
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Genre</label>
-                <input
-                  type="text"
-                  value={formData.genre}
-                  onChange={e => setFormData({ ...formData, genre: e.target.value })}
-                  placeholder="Musical"
-                  className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-text-muted font-bold block mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={e => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full bg-bg border border-border rounded-xl px-2 py-2 text-text-primary focus:border-brand outline-none"
-                >
-                  <option value="archived">Archived</option>
-                  <option value="currently_running">Running</option>
-                  <option value="upcoming">Upcoming</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Poster Upload/Link */}
-            <ImageField
-              label="Poster Artwork"
-              value={formData.poster_url}
-              onChange={url => setFormData(prev => ({ ...prev, poster_url: url }))}
-              bucket="film-images"
-              aspect="poster"
-              hint="Upload or paste image URL (2:3 aspect ratio)"
-            />
-
-            {/* Banner Upload/Link */}
-            <ImageField
-              label="Landscape Banner"
-              value={formData.banner_url}
-              onChange={url => setFormData(prev => ({ ...prev, banner_url: url }))}
-              bucket="film-images"
-              aspect="backdrop"
-            />
-
-            {/* Synopsis */}
-            <div>
-              <label className="text-text-muted font-bold block mb-1">Synopsis</label>
-              <textarea
-                rows={3}
-                value={formData.synopsis}
-                onChange={e => setFormData({ ...formData, synopsis: e.target.value })}
-                placeholder="Synopsis of the stage production..."
-                className="w-full bg-bg border border-border rounded-xl px-3 py-2 text-text-primary focus:border-brand outline-none resize-none"
-              />
-            </div>
-
-            {/* Form feedback */}
-            {formMsg && (
-              <div className={`p-3 rounded-xl text-xs font-bold ${formMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
-                {formMsg.text}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors disabled:opacity-60 text-xs shadow-md"
-            >
-              {saving ? 'Saving Play…' : editingPlay ? 'Update Play Details' : 'Save New Play'}
-            </button>
-          </form>
-
-          {/* ── Stage Ensemble / Credits Management (Inside Drawer) ─────── */}
-          <div className="pt-6 border-t border-border">
-            <h3 className="text-sm font-bold text-text-primary mb-1 flex items-center gap-2">
-              <Icon icon="solar:users-group-two-rounded-bold" className="text-brand w-4 h-4" />
-              Stage Performers & Crew
-            </h3>
-            <p className="text-[11px] text-text-muted mb-4">
-              {editingPlay
-                ? `Manage performers for "${editingPlay.title}"`
-                : 'Save the play first to link stage credits.'}
-            </p>
 
             {/* People search input */}
-            <div className="relative mb-4" ref={searchRef}>
-              <div className="flex items-center gap-2 bg-bg border border-border rounded-xl px-3 py-2 focus-within:border-brand transition-colors">
+            <div className="relative" ref={searchRef}>
+              <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3.5 py-2.5 focus-within:border-brand transition-colors">
                 <Icon icon="solar:magnifer-linear" className="w-4 h-4 text-text-muted flex-shrink-0" />
                 <input
                   type="text"
                   value={peopleSearch}
                   onChange={e => handlePeopleSearch(e.target.value)}
                   onFocus={() => peopleSearch.length >= 2 && setShowPeopleDropdown(true)}
-                  placeholder="Search actor or crew name..."
+                  placeholder="Search actor or crew member by name..."
                   disabled={!editingPlay}
                   className="flex-1 bg-transparent outline-none text-xs text-text-primary placeholder-text-muted disabled:opacity-50"
                 />
@@ -662,9 +737,9 @@ export default function AdminPlays() {
                 )}
               </div>
 
-              {/* Results dropdown */}
+              {/* Search dropdown */}
               {showPeopleDropdown && peopleSearch.trim().length >= 2 && (
-                <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl z-20 overflow-hidden">
+                <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl z-30 overflow-hidden">
                   {isSearchingPeople ? (
                     <div className="p-6 text-center text-xs text-text-muted">Searching directory...</div>
                   ) : (
@@ -706,52 +781,52 @@ export default function AdminPlays() {
               )}
             </div>
 
-            {/* Pending credits list */}
+            {/* Pending credits */}
             {credits.length > 0 && (
-              <div className="space-y-3 mb-4">
-                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                  Pending ({credits.length})
-                </p>
-                {credits.map((c, idx) => (
-                  <div key={idx} className="flex items-start gap-3 bg-brand/5 border border-brand/20 rounded-xl p-3">
-                    <div className="w-8 h-8 rounded-full bg-surface-2 overflow-hidden border border-border flex-shrink-0 mt-0.5">
-                      {c.photo_url && <img src={c.photo_url} alt="" className="w-full h-full object-cover" />}
-                    </div>
-                    <div className="flex-1 space-y-2 min-w-0">
-                      <p className="text-xs font-bold text-text-primary truncate">{c.name}</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[9px] text-text-muted font-bold block mb-0.5">Role</label>
-                          <input
-                            type="text"
-                            value={c.role}
-                            onChange={e => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: e.target.value } : cr))}
-                            placeholder="Actor / Director"
-                            className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-[11px] text-text-primary focus:border-brand outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-text-muted font-bold block mb-0.5">Character Name</label>
-                          <input
-                            type="text"
-                            value={c.character_name}
-                            onChange={e => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, character_name: e.target.value } : cr))}
-                            placeholder="e.g. Lead"
-                            className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-[11px] text-text-primary focus:border-brand outline-none"
-                          />
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Pending Credits ({credits.length})</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {credits.map((c, idx) => (
+                    <div key={idx} className="flex items-start gap-3 bg-brand/5 border border-brand/20 rounded-xl p-3">
+                      <div className="w-9 h-9 rounded-full bg-surface-2 overflow-hidden border border-border flex-shrink-0 mt-0.5">
+                        {c.photo_url && <img src={c.photo_url} alt="" className="w-full h-full object-cover" />}
+                      </div>
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <p className="text-xs font-bold text-text-primary truncate">{c.name}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[9px] text-text-muted font-bold block mb-0.5">Role</label>
+                            <input
+                              type="text"
+                              value={c.role}
+                              onChange={e => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: e.target.value } : cr))}
+                              placeholder="Actor"
+                              className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-text-muted font-bold block mb-0.5">Character Name</label>
+                            <input
+                              type="text"
+                              value={c.character_name}
+                              onChange={e => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, character_name: e.target.value } : cr))}
+                              placeholder="e.g. Lead"
+                              className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none"
+                            />
+                          </div>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCredit(idx)}
+                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                        title="Remove"
+                      >
+                        <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeCredit(idx)}
-                      className="p-1 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                      title="Remove"
-                    >
-                      <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
 
                 <button
                   type="button"
@@ -764,7 +839,7 @@ export default function AdminPlays() {
               </div>
             )}
 
-            {/* Saved credits list */}
+            {/* Saved credits */}
             {editingPlay && (
               <div>
                 {loadingCredits ? (
@@ -772,17 +847,15 @@ export default function AdminPlays() {
                     <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
                   </div>
                 ) : savedCredits.length > 0 ? (
-                  <div>
-                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2.5">
-                      Linked Credits ({savedCredits.length})
-                    </p>
-                    <div className="space-y-2">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Saved Performers ({savedCredits.length})</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {savedCredits.map(c => {
                         const person = c.person || {};
                         return (
-                          <div key={c.id} className="flex items-center justify-between gap-3 bg-surface-2 border border-border rounded-xl p-2.5">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-full bg-surface overflow-hidden border border-border flex-shrink-0">
+                          <div key={c.id} className="flex items-center justify-between gap-3 bg-surface-2 border border-border rounded-xl p-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-full bg-surface overflow-hidden border border-border flex-shrink-0">
                                 {person.photo_url && <img src={person.photo_url} alt="" className="w-full h-full object-cover" />}
                               </div>
                               <div className="min-w-0">
@@ -795,10 +868,10 @@ export default function AdminPlays() {
                             <button
                               type="button"
                               onClick={() => removeSavedCredit(c)}
-                              className="p-1 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
                               title="Remove credit"
                             >
-                              <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
+                              <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
                             </button>
                           </div>
                         );
@@ -807,20 +880,19 @@ export default function AdminPlays() {
                   </div>
                 ) : (
                   <p className="text-[11px] text-text-muted text-center py-4 border border-dashed border-border rounded-xl">
-                    No performers linked yet — search above to add cast.
+                    No performers attached yet — search above to add cast credits.
                   </p>
                 )}
               </div>
             )}
 
-            {/* Credit feedback */}
             {creditMsg && (
-              <div className={`mt-3 p-3 rounded-xl text-xs font-bold ${creditMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
+              <div className={`p-3 rounded-xl text-xs font-bold ${creditMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
                 {creditMsg.text}
               </div>
             )}
           </div>
-        </div>
+        </form>
       </Drawer>
     </div>
   );
