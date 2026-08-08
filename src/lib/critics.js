@@ -105,3 +105,31 @@ export async function deleteCritic(criticId) {
   if (error) throw error;
   return true;
 }
+
+/**
+ * Upsert a critic review (Admin)
+ * Links a critic to a film with a quote, star rating, and optional source URL.
+ */
+export async function upsertCriticReview(reviewData) {
+  const { data, error } = await supabase
+    .from('critic_reviews')
+    .upsert(reviewData, { onConflict: 'critic_id,film_id' })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Delete a single critic review by id (Admin)
+ */
+export async function deleteCriticReview(reviewId) {
+  const { error } = await supabase
+    .from('critic_reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) throw error;
+  return true;
+}

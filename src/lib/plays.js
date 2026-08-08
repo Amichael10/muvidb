@@ -132,3 +132,16 @@ export async function upsertStageCredit(creditData) {
   if (error) throw error;
   return data;
 }
+
+/**
+ * Delete a stage credit by id (Admin)
+ */
+export async function deleteStageCredit(creditId) {
+  const { error } = await supabase
+    .from('stage_credits')
+    .delete()
+    .eq('id', creditId);
+
+  if (error) throw error;
+  return true;
+}
