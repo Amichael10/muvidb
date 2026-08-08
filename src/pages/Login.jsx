@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout from '../components/layout/AuthLayout';
@@ -55,10 +55,22 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      await login(email, password);
+      const data = await login(email, password);
+      const authUser = data?.user;
+      const role = authUser?.user_metadata?.role;
+      
+      let target = '/dashboard';
+      if (nextPath) {
+        target = nextPath;
+      } else if (role === 'professional') {
+        target = '/pro-dashboard';
+      } else if (role === 'admin' || role === 'admin_limited') {
+        target = '/admin';
+      }
+      
+      navigate(target, { replace: true });
     } catch (err) {
       setError(getFriendlyErrorMessage(err));
-    } finally {
       setIsLoading(false);
     }
   };

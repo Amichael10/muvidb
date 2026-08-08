@@ -165,7 +165,12 @@ export default function AdminFilms() {
     season_count: '',
     episode_count: '',
     is_in_cinemas: false,
-    streaming_links: {}
+    streaming_links: {},
+    box_office_domestic: '',
+    budget: '',
+    box_office_worldwide: '',
+    box_office_currency: 'NGN',
+    box_office_source: 'CEAN Official'
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -991,6 +996,11 @@ export default function AdminFilms() {
         // Multi-language: parse the language field ("English, Yoruba") into the
         // normalized languages[] array. `language` stays as the primary.
         languages: parseLanguages(formData.language),
+        box_office_domestic: formData.box_office_domestic && !isNaN(parseFloat(formData.box_office_domestic)) ? parseFloat(formData.box_office_domestic) : null,
+        budget: formData.budget && !isNaN(parseFloat(formData.budget)) ? parseFloat(formData.budget) : null,
+        box_office_worldwide: formData.box_office_worldwide && !isNaN(parseFloat(formData.box_office_worldwide)) ? parseFloat(formData.box_office_worldwide) : null,
+        box_office_currency: formData.box_office_currency || 'NGN',
+        box_office_source: formData.box_office_source || null,
         // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
         // the film page's sorting and win/nomination tally stay sane.
         awards: (formData.awards || [])

@@ -173,6 +173,9 @@ export function AuthProvider({ children }) {
       password,
     });
     if (error) throw error;
+    if (data?.user) {
+      await fetchUserProfile(data.user);
+    }
     return data;
   };
 

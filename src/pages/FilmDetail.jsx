@@ -596,6 +596,25 @@ export default function FilmDetail() {
                 <span className="bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold">
                   {film.nfvcb_rating}
                 </span>
+                {(() => {
+                  const domGross = film.box_office_domestic || film.streaming_links?.box_office?.domestic;
+                  if (!domGross) return null;
+                  const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
+                  const symbol = currency === 'NGN' ? '₦' : `${currency} `;
+                  const formatted = domGross >= 1_000_000_000 
+                    ? `${(domGross / 1_000_000_000).toFixed(2)}B` 
+                    : `${(domGross / 1_000_000).toFixed(1)}M`;
+
+                  return (
+                    <>
+                      <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/30 to-brand/30 border border-amber-500/50 text-amber-300 px-2.5 py-0.5 rounded text-[10px] font-black shadow-lg backdrop-blur-md">
+                        <Icon icon="solar:ticket-bold" className="text-amber-400 text-xs" />
+                        <span>Box Office: {symbol}{formatted}</span>
+                      </span>
+                    </>
+                  );
+                })()}
                 {film.is_in_cinemas && (
                   <span className="bg-gold text-bg px-2 py-0.5 rounded text-[10px] font-bold border border-gold uppercase tracking-wider">
                     In Cinemas
@@ -638,6 +657,38 @@ export default function FilmDetail() {
                 )}
               </div>
             </div>
+
+            {/* Right-Hand Side Box inside Hero Section */}
+            {(() => {
+              const domGross = film.box_office_domestic || film.streaming_links?.box_office?.domestic;
+              if (!domGross) return null;
+              const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
+              const symbol = currency === 'NGN' ? '₦' : `${currency} `;
+              const formatted = domGross >= 1_000_000_000 
+                ? `${(domGross / 1_000_000_000).toFixed(2)} Billion` 
+                : `${(domGross / 1_000_000).toFixed(1)} Million`;
+              const rawFormatted = Number(domGross).toLocaleString('en-NG');
+
+              return (
+                <div className="hidden lg:flex flex-col items-end justify-end shrink-0 z-10 self-end mb-1">
+                  <div className="p-4 rounded-2xl bg-black/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-500/20 max-w-xs w-full text-right space-y-2">
+                    <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                      <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
+                      <span>Box Office Revenue</span>
+                    </div>
+                    <p className="text-2xl font-black text-white font-heading tracking-tight leading-none">
+                      {symbol}{rawFormatted}
+                    </p>
+                    <div className="flex items-center justify-between pt-2 border-t border-amber-500/20 text-[10px] font-bold">
+                      <span className="text-amber-300/90 font-mono">({symbol}{formatted})</span>
+                      <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded uppercase text-[9px] border border-amber-500/30">
+                        Verified CEAN
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

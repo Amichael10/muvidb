@@ -576,26 +576,47 @@ const PersonDetail = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden bg-surface max-w-sm mx-auto md:mx-0 shadow-sm">
-                <div className="p-4 border-r border-border text-center">
-                  <p className="text-brand text-xl font-bold font-heading">
-                    {formatViewCount(person.profile_views || person.popularity_score || totalViews)}
-                  </p>
-                  <p className="text-text-muted text-[9px] font-bold">Views</p>
-                </div>
-                <div className="p-4 border-r border-border text-center">
-                  <p className="text-text-primary text-xl font-bold font-heading">
-                    {totalFilms}
-                  </p>
-                  <p className="text-text-muted text-[9px] font-bold">Credits</p>
-                </div>
-                <div className="p-4 text-center">
-                  <p className="text-text-primary text-xl font-bold font-heading">
-                    {followerCount.toLocaleString()}
-                  </p>
-                  <p className="text-text-muted text-[9px] font-bold">Followers</p>
-                </div>
-              </div>
+              {(() => {
+                const totalBoxOffice = (person.credits || []).reduce((acc, c) => {
+                  const dom = c.films?.box_office_domestic || c.films?.streaming_links?.box_office?.domestic || 0;
+                  return acc + (typeof dom === 'number' ? dom : parseFloat(dom) || 0);
+                }, 0);
+
+                return (
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className={`grid ${totalBoxOffice > 0 ? 'grid-cols-4 max-w-md' : 'grid-cols-3 max-w-sm'} gap-0 border border-border rounded-lg overflow-hidden bg-surface w-full md:mx-0 shadow-sm`}>
+                      <div className="p-4 border-r border-border text-center">
+                        <p className="text-brand text-xl font-bold font-heading">
+                          {formatViewCount(person.profile_views || person.popularity_score || totalViews)}
+                        </p>
+                        <p className="text-text-muted text-[9px] font-bold">Views</p>
+                      </div>
+                      <div className="p-4 border-r border-border text-center">
+                        <p className="text-text-primary text-xl font-bold font-heading">
+                          {totalFilms}
+                        </p>
+                        <p className="text-text-muted text-[9px] font-bold">Credits</p>
+                      </div>
+                      <div className={`p-4 ${totalBoxOffice > 0 ? 'border-r border-border' : ''} text-center`}>
+                        <p className="text-text-primary text-xl font-bold font-heading">
+                          {followerCount.toLocaleString()}
+                        </p>
+                        <p className="text-text-muted text-[9px] font-bold">Followers</p>
+                      </div>
+                      {totalBoxOffice > 0 && (
+                        <div className="p-4 bg-gradient-to-br from-amber-500/15 via-surface to-surface text-center">
+                          <p className="text-amber-400 text-xl font-bold font-heading">
+                            {totalBoxOffice >= 1_000_000_000
+                              ? `₦${(totalBoxOffice / 1_000_000_000).toFixed(2)}B`
+                              : `₦${(totalBoxOffice / 1_000_000).toFixed(1)}M`}
+                          </p>
+                          <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">Box Office</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {(person.biography || person.bio) && (
                 <Biography text={toSentenceCase(person.biography || person.bio)} />

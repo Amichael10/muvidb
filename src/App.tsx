@@ -204,12 +204,94 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+const ROUTE_TITLES: Record<string, string> = {
+  '/': 'MuviDB | The Digital Database of African Cinema',
+  '/login': 'MuviDB | Sign In',
+  '/signup': 'MuviDB | Join',
+  '/dashboard': 'MuviDB | Dashboard',
+  '/pro-dashboard': 'MuviDB Pro | Dashboard',
+  '/admin': 'MuviDB | Admin Overview',
+  '/admin/films': 'MuviDB | Admin Films',
+  '/admin/people': 'MuviDB | Admin People',
+  '/admin/people-enrichment': 'MuviDB | People Enrichment',
+  '/admin/credits': 'MuviDB | Admin Credits',
+  '/admin/companies': 'MuviDB | Admin Companies',
+  '/admin/claims': 'MuviDB | Profile Claims',
+  '/admin/outreach': 'MuviDB | Admin Outreach',
+  '/admin/contributions': 'MuviDB | Contributions',
+  '/admin/new-releases': 'MuviDB | New Releases',
+  '/admin/users': 'MuviDB | User Management',
+  '/admin/cinemas': 'MuviDB | Admin Cinemas',
+  '/admin/channels': 'MuviDB | Admin Channels',
+  '/admin/cinema-films': 'MuviDB | Admin Cinema Films',
+  '/admin/cinema-scraping': 'MuviDB | Cinema Scraping',
+  '/admin/ai': 'MuviDB | AI Suite',
+  '/admin/deduplicator': 'MuviDB | Deduplicator',
+  '/admin/import': 'MuviDB | Data Import',
+  '/admin/spotlight': 'MuviDB | Spotlight',
+  '/admin/jobs': 'MuviDB | Admin Jobs',
+  '/admin/top10': 'MuviDB | Admin Top 10',
+  '/admin/automation': 'MuviDB | Automation',
+  '/admin/countries': 'MuviDB | Admin Countries',
+  '/admin/critics': 'MuviDB | Admin Critics',
+  '/admin/plays': 'MuviDB | Admin Plays',
+  '/admin/logs': 'MuviDB | System Logs',
+  '/search': 'MuviDB | Search',
+  '/browse': 'MuviDB | Browse Movies',
+  '/tv-shows': 'MuviDB | TV Shows',
+  '/people': 'MuviDB | People',
+  '/showtimes': 'MuviDB | Showtimes',
+  '/cinemas': 'MuviDB | Cinemas',
+  '/channels': 'MuviDB | Channels',
+  '/companies': 'MuviDB | Companies',
+  '/terms': 'MuviDB | Terms of Service',
+  '/privacy': 'MuviDB | Privacy Policy',
+  '/about': 'MuviDB | About Us',
+  '/awards': 'MuviDB | Awards',
+  '/contact': 'MuviDB | Contact Us',
+  '/careers': 'MuviDB | Careers',
+  '/critics': 'MuviDB | Critics',
+  '/plays': 'MuviDB | Plays',
+  '/onboarding': 'MuviDB | Complete Your Profile',
+  '/waitlist': 'MuviDB | The Home of African Cinema',
+};
+
+function PageTitleHandler() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (ROUTE_TITLES[path]) {
+      document.title = ROUTE_TITLES[path];
+      return;
+    }
+    if (path.startsWith('/films/') || path.startsWith('/film/')) {
+      document.title = 'MuviDB | Film Details';
+    } else if (path.startsWith('/people/')) {
+      document.title = 'MuviDB | Person Details';
+    } else if (path.startsWith('/cinemas/')) {
+      document.title = 'MuviDB | Cinema Details';
+    } else if (path.startsWith('/channels/')) {
+      document.title = 'MuviDB | Channel Details';
+    } else if (path.startsWith('/companies/')) {
+      document.title = 'MuviDB | Company Details';
+    } else if (path.startsWith('/admin')) {
+      document.title = 'MuviDB | Admin';
+    } else {
+      document.title = 'MuviDB | The Digital Database of African Cinema';
+    }
+  }, [location.pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
         <QuickViewProvider>
           <Router>
+            <PageTitleHandler />
             <SmoothScroll>
               <Toaster 
               position="top-center" 
