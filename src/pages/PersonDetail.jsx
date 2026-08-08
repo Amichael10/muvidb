@@ -19,6 +19,7 @@ import { slugOrId } from '../utils/slug'
 import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatDateOfBirth } from '../utils/format'
 import { nationalityToCountryName } from '../utils/africanCountries'
 import { fetchPersonStageCredits } from '../lib/plays'
+import InstagramHighlights from '../components/person/InstagramHighlights'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -621,6 +622,11 @@ const PersonDetail = () => {
               {(person.biography || person.bio) && (
                 <Biography text={toSentenceCase(person.biography || person.bio)} />
               )}
+
+              <InstagramHighlights 
+                highlights={person.instagram_highlights || person.youtube_stats?.instagram_highlights} 
+                instagramHandle={person.instagram_url} 
+              />
 
               <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
                 {person.nationality && (() => {

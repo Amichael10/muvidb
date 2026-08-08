@@ -164,6 +164,7 @@ export default function AdminPeople() {
     instagram_url: '',
     facebook_url: '',
     twitter_url: '',
+    instagram_highlights: ['', '', ''],
     awards: [] // [{ organization, year, season, category, work, film_id, won }]
   });
 
@@ -352,6 +353,7 @@ export default function AdminPeople() {
       instagram_url: '',
       facebook_url: '',
       twitter_url: '',
+      instagram_highlights: ['', '', ''],
       awards: []
     });
     setIsDrawerOpen(true);
@@ -377,6 +379,8 @@ export default function AdminPeople() {
       .single();
     
     const p = fullPerson || person;
+    const highlightsRaw = p.instagram_highlights || p.youtube_stats?.instagram_highlights || [];
+    const highlightsArr = Array.isArray(highlightsRaw) ? highlightsRaw : [];
 
     const baseForm = {
       name: p.name || '',
@@ -395,6 +399,11 @@ export default function AdminPeople() {
       instagram_url: p.instagram_url || '',
       facebook_url: p.facebook_url || '',
       twitter_url: p.twitter_url || '',
+      instagram_highlights: [
+        highlightsArr[0] || '',
+        highlightsArr[1] || '',
+        highlightsArr[2] || ''
+      ],
       awards: Array.isArray(p.awards) ? p.awards : []
     };
     // Merge over the base rather than replacing it: a draft saved before a field
@@ -486,10 +495,14 @@ export default function AdminPeople() {
         mubi_slug: formData.mubi_slug || formData.slug || (formData.name ? formData.name.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         youtube_channel_id,
         youtube_handle,
-        youtube_stats,
         instagram_url: formData.instagram_url?.trim() || null,
         facebook_url: formData.facebook_url?.trim() || null,
         twitter_url: formData.twitter_url?.trim() || null,
+        instagram_highlights: (formData.instagram_highlights || []).map(h => (h || '').trim()).filter(Boolean),
+        youtube_stats: {
+          ...(youtube_stats || {}),
+          instagram_highlights: (formData.instagram_highlights || []).map(h => (h || '').trim()).filter(Boolean)
+        },
         // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
         // the person page's sorting and "N wins & N nominations" tally stay sane.
         awards: (formData.awards || [])
@@ -1251,6 +1264,33 @@ export default function AdminPeople() {
                   placeholder="https://x.com/username"
                   className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
                 />
+              </div>
+
+              <div className="pt-3 border-t border-border/60 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-1">
+                    Featured Instagram Highlights (Max 3 Posts)
+                  </label>
+                  <p className="text-[10px] text-text-muted">
+                    Paste public Instagram photo or Reel URLs to curate 3 clean highlight cards on their profile.
+                  </p>
+                </div>
+                {[0, 1, 2].map((idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-text-muted w-14 shrink-0">Post {idx + 1}</span>
+                    <input
+                      type="url"
+                      value={(formData.instagram_highlights || [])[idx] || ''}
+                      onChange={(e) => {
+                        const next = [...(formData.instagram_highlights || ['', '', ''])];
+                        next[idx] = e.target.value;
+                        setFormData({ ...formData, instagram_highlights: next });
+                      }}
+                      placeholder="https://www.instagram.com/p/..."
+                      className="flex-1 bg-surface-2 border border-border p-2.5 rounded-lg text-xs focus:border-brand outline-none"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           </section>
