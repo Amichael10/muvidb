@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import CriticReviewsEditor from '../admin/CriticReviewsEditor';
@@ -24,7 +25,7 @@ export default function CriticReviewsSection({ filmId, user }) {
     try {
       const { data, error } = await supabase
         .from('critic_reviews')
-        .select('*')
+        .select('*, critic:critics(id, name, slug, avatar_url, publication, is_verified)')
         .eq('film_id', filmId)
         .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false });
@@ -82,12 +83,17 @@ export default function CriticReviewsSection({ filmId, user }) {
         <div className="bg-surface/50 border border-dashed border-border rounded-2xl p-8 text-center">
           <Icon icon="solar:quote-up-bold-duotone" className="text-4xl text-text-muted mx-auto mb-2 opacity-50" />
           <p className="text-sm font-semibold text-text-primary">No critic reviews added yet</p>
-          <p className="text-xs text-text-muted mt-1">As an admin, click "Manage Critic Quotes" above to add quotes from critics like Tolu Fagboro.</p>
+          <p className="text-xs text-text-muted mt-1">As an admin, click "Manage Critic Quotes" above to add quotes from critics like Tolu Fagbure.</p>
         </div>
       ) : (
         <div className={`grid grid-cols-1 ${reviews.length > 1 ? 'md:grid-cols-2' : ''} gap-6`}>
           {reviews.map((rev) => {
-            const displayName = rev.is_anonymous ? 'Anonymous Critic' : (rev.critic_name || 'Critic');
+            const criticObj = rev.critic || {};
+            const displayName = rev.is_anonymous
+              ? 'Anonymous Critic'
+              : (rev.critic_name || criticObj.name || 'Critic');
+            
+            const avatar = rev.avatar_url || criticObj.avatar_url;
             const initials = displayName
               .split(' ')
               .map((n) => n[0])
@@ -96,6 +102,8 @@ export default function CriticReviewsSection({ filmId, user }) {
               .slice(0, 2);
 
             const hasRating = rev.rating != null && rev.rating !== '' && !isNaN(Number(rev.rating));
+            const criticSlug = criticObj.slug;
+            const isVerified = criticObj.is_verified || Boolean(rev.critic_id);
 
             return (
               <div
@@ -139,11 +147,25 @@ export default function CriticReviewsSection({ filmId, user }) {
                 {/* Author Info & External Link Footer */}
                 <div className="relative z-10 flex items-center justify-between pt-6 mt-4 border-t border-border/60">
                   <div className="flex items-center gap-3">
-                    {rev.avatar_url ? (
+                    {criticSlug ? (
+                      <Link to={`/critics/${criticSlug}`} className="shrink-0">
+                        {avatar ? (
+                          <img
+                            src={avatar}
+                            alt={displayName}
+                            className="w-11 h-11 rounded-full object-cover border-2 border-surface-2 group-hover:border-brand/50 transition-all shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-full bg-brand/10 border-2 border-brand/20 flex items-center justify-center text-brand font-black text-xs shadow-sm">
+                            {initials}
+                          </div>
+                        )}
+                      </Link>
+                    ) : avatar ? (
                       <img
-                        src={rev.avatar_url}
+                        src={avatar}
                         alt={displayName}
-                        className="w-11 h-11 rounded-full object-cover border-2 border-surface-2 group-hover:border-brand/30 transition-all shadow-sm"
+                        className="w-11 h-11 rounded-full object-cover border-2 border-surface-2 shadow-sm"
                       />
                     ) : (
                       <div className="w-11 h-11 rounded-full bg-brand/10 border-2 border-brand/20 flex items-center justify-center text-brand font-black text-xs shadow-sm">
@@ -153,7 +175,16 @@ export default function CriticReviewsSection({ filmId, user }) {
 
                     <div>
                       <h4 className="text-sm font-bold text-text-primary tracking-tight flex items-center gap-1.5">
-                        {displayName}
+                        {criticSlug ? (
+                          <Link to={`/critics/${criticSlug}`} className="hover:text-brand transition-colors">
+                            {displayName}
+                          </Link>
+                        ) : (
+                          displayName
+                        )}
+                        {isVerified && !rev.is_anonymous && (
+                          <Icon icon="solar:verified-check-bold" className="text-brand text-sm" title="Verified Critic" />
+                        )}
                       </h4>
                       {rev.critic_title && (
                         <p className="text-xs text-text-muted font-medium">
