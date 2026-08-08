@@ -498,7 +498,6 @@ export default function AdminPeople() {
         instagram_url: formData.instagram_url?.trim() || null,
         facebook_url: formData.facebook_url?.trim() || null,
         twitter_url: formData.twitter_url?.trim() || null,
-        instagram_highlights: (formData.instagram_highlights || []).map(h => (h || '').trim()).filter(Boolean),
         youtube_stats: {
           ...(youtube_stats || {}),
           instagram_highlights: (formData.instagram_highlights || []).map(h => (h || '').trim()).filter(Boolean)
