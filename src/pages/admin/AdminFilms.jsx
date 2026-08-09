@@ -962,10 +962,13 @@ export default function AdminFilms() {
     setIsSubmitting(true);
 
     try {
-      const filmPayload = {
-        ...formData,
+      const selectedGenreIds = formData.genres || [];
+      const channel_video_id = formData.channel_video_id || null;
+
+      const cleanFilmPayload = {
         title: formData.title ? toSentenceCase(formData.title.trim()) : '',
         synopsis: formData.synopsis ? toSentenceCase(formData.synopsis.trim()) : '',
+        tagline: formData.tagline ? formData.tagline.trim() : null,
         year: formData.year && !isNaN(parseInt(formData.year)) ? parseInt(formData.year) : null,
         runtime_minutes: formData.runtime_minutes && !isNaN(parseInt(formData.runtime_minutes)) ? parseInt(formData.runtime_minutes) : null,
         tmdb_id: formData.tmdb_id && !isNaN(parseInt(formData.tmdb_id)) ? parseInt(formData.tmdb_id) : null,
@@ -977,28 +980,25 @@ export default function AdminFilms() {
         mubi_slug: formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
+        youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
+        release_date: formData.release_date || null,
+        release_type: formData.release_type || null,
+        content_type: formData.content_type || 'movie',
+        series_id: formData.series_id || null,
+        episode_number: formData.episode_number !== '' && formData.episode_number != null ? parseInt(formData.episode_number, 10) : null,
+        season_number: formData.season_number !== '' && formData.season_number != null ? parseInt(formData.season_number, 10) : null,
+        season_count: formData.season_count !== '' && formData.season_count != null ? parseInt(formData.season_count, 10) : null,
+        episode_count: formData.episode_count !== '' && formData.episode_count != null ? parseInt(formData.episode_count, 10) : null,
+        languages: parseLanguages(formData.language),
+        language: formData.language || null,
+        status: formData.status || 'released',
         ...resolveFilmImageFields({
           poster_url: formData.poster_url,
           backdrop_url: formData.backdrop_url,
         }),
-        youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
-        release_date: formData.release_date || null,
-        release_type: formData.release_type || null,
-        series_id: formData.series_id || null,
-        episode_number: formData.episode_number !== '' && formData.episode_number != null
-          ? parseInt(formData.episode_number, 10) : null,
-        season_number: formData.season_number !== '' && formData.season_number != null
-          ? parseInt(formData.season_number, 10) : null,
-        season_count: formData.season_count !== '' && formData.season_count != null
-          ? parseInt(formData.season_count, 10) : null,
-        episode_count: formData.episode_count !== '' && formData.episode_count != null
-          ? parseInt(formData.episode_count, 10) : null,
-        // Multi-language: parse the language field ("English, Yoruba") into the
-        // normalized languages[] array. `language` stays as the primary.
-        languages: parseLanguages(formData.language),
         streaming_links: {
           ...(typeof formData.streaming_links === 'object' && formData.streaming_links !== null ? formData.streaming_links : {}),
-          ...( (formData.box_office_domestic || formData.box_office_worldwide) ? {
+          ...((formData.box_office_domestic || formData.box_office_worldwide) ? {
             box_office: {
               domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : 0,
               worldwide: formData.box_office_worldwide ? parseFloat(formData.box_office_worldwide) : 0,
@@ -1007,10 +1007,8 @@ export default function AdminFilms() {
               budget: formData.budget ? parseFloat(formData.budget) : 0,
               updated_at: new Date().toISOString()
             }
-          } : {} )
+          } : {})
         },
-        // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
-        // the film page's sorting and win/nomination tally stay sane.
         awards: (formData.awards || [])
           .filter((a) => (a.organization || '').trim() || (a.category || '').trim())
           .map((a) => ({
@@ -1022,17 +1020,6 @@ export default function AdminFilms() {
             won: a.won === true,
           })),
       };
-
-      const {
-        genres: selectedGenreIds,
-        channel_video_id,
-        box_office_domestic,
-        box_office_worldwide,
-        box_office_currency,
-        box_office_source,
-        budget,
-        ...cleanFilmPayload
-      } = filmPayload;
 
       let filmId = editingFilm?.id;
 

@@ -482,20 +482,15 @@ export default function AdminPeople() {
         }
       }
 
-      const {
-        biography: _omitBiography,
-        instagram_highlights: _omitHighlights,
-        film_count: _omitFilmCount,
-        created_at: _omitCreatedAt,
-        updated_at: _omitUpdatedAt,
-        ...restFormData
-      } = formData;
       const dataToSave = {
-        ...restFormData,
         name: toTitleCase(formData.name),
-        bio: formData.biography ? toSentenceCase(formData.biography) : null,
+        bio: formData.biography ? toSentenceCase(formData.biography) : (formData.bio || null),
         date_of_birth: formData.date_of_birth || null,
+        gender: formData.gender || 'Prefer not to say',
+        nationality: formData.nationality || 'Nigerian',
         photo_url: formData.photo_url || null,
+        is_verified: Boolean(formData.is_verified),
+        is_spotlight: Boolean(formData.is_spotlight),
         popularity_score: parseInt(formData.popularity_score) || 0,
         tmdb_id: formData.tmdb_id || null,
         slug: formData.slug || (formData.name ? formData.name.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
