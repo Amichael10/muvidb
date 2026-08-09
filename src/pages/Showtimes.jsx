@@ -5,7 +5,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import PopcornField from '../components/ui/PopcornField'
 import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
-import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isFutureShowtime } from '../utils/showtimes'
+import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isPublicCinemaShowtime } from '../utils/showtimes'
 
 const formatTime = (timeStr) => {
     if (!timeStr) return ''
@@ -214,6 +214,7 @@ const Showtimes = () => {
         films(
           id, slug, title, year, poster_url,
           backdrop_url, average_rating, liked_percent,
+          status, coming_soon, is_in_cinemas,
           film_genres(genres(name))
         ),
         cinemas(
@@ -238,7 +239,7 @@ const Showtimes = () => {
             s.cinema_id === selectedCinema
         const matchFormat = selectedFormat === 'All' ||
             s.format === selectedFormat
-        const isUpcoming = isFutureShowtime(s, cinemaClock)
+        const isUpcoming = isPublicCinemaShowtime(s, cinemaClock)
         return matchCity && matchDate && matchCinema && matchFormat && isUpcoming
     })
 

@@ -1,0 +1,29 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>FlipHtml5 Online Service Error</title>
+</head>
+<script language="javascript" type="text/javascript">
+
+var url=window.location.href;;
+var urlHost=window.location.host.toLowerCase();
+var protocol = window.location.protocol;
+if(urlHost=="online.fliphtml5.com"){
+	var a=url.substring(url.indexOf("com/")+4);
+	window.location.href=protocol+"//fliphtml5.com/check/"+a;
+}if(urlHost=="e.fliphtml5.com"){
+	var a=url.substring(url.indexOf("com/")+4);
+	window.location.href=protocol+"//fliphtml5.com/exh_check/"+a;
+}else{
+	var str=urlHost+"/books/";
+	var a=url.substring(url.indexOf(str)+str.length);
+	var mathArr = a.match(/\/check\//igm);
+	if(mathArr && mathArr.length > 1) {
+		window.location.href=protocol+"//"+urlHost+"/";
+	} else {
+	window.location.href=protocol+"//"+urlHost+"/check/"+a;
+	}
+}
+</script>
+</html>

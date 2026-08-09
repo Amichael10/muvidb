@@ -10,7 +10,7 @@ import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { toTitleCase } from '../utils/format';
-import { getZonedClock, getNextDate, isFutureShowtime, compareShowtimes } from '../utils/showtimes';
+import { getZonedClock, getNextDate, isPublicCinemaShowtime, compareShowtimes, isLiveCinemaFilm } from '../utils/showtimes';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import PopcornField from '../components/ui/PopcornField';
 import HomeIntroSection from '../components/film/HomeIntroSection';
@@ -389,7 +389,7 @@ export default function Home() {
       const pageStart = showtimePage * CINEMA_SHOWTIME_PAGE_SIZE;
       const { data: pageRows, error: showtimeError } = await supabase
         .from('showtimes')
-        .select('film_id, cinema_id, show_date, show_time, cinemas(id, name, city, chain)')
+        .select('film_id, cinema_id, show_date, show_time, films(id, status, coming_soon, is_in_cinemas), cinemas(id, name, city, chain)')
         .gte('show_date', cinemaClock.date)
         .eq('is_available', true)
         .order('show_date', { ascending: true })
@@ -408,7 +408,7 @@ export default function Home() {
 
     // Showtimes are stored as local cinema dates/times. Compare them with the
     // current WAT clock, then find the earliest remaining show across cinemas.
-    const futureShowtimes = (stRows || []).filter(showtime => isFutureShowtime(showtime, cinemaClock));
+    const futureShowtimes = (stRows || []).filter(showtime => isPublicCinemaShowtime(showtime, cinemaClock));
     const nowIds = new Set(futureShowtimes.map(r => r.film_id).filter(Boolean));
     const nextShowByFilm = {};
     const todayShowtimesByFilm = {};
@@ -441,12 +441,14 @@ export default function Home() {
         // Newest cinema arrivals first: a freshly-fetched title leads the slider
         // so viewers slide right to reach the ones already showing.
         .order('created_at', { ascending: false });
-      const candidates = (data || []).map(film => ({
-        ...withGenres(film),
-        next_showtime: nextShowByFilm[film.id] || null,
-        remaining_today_showtime_count: todayShowtimesByFilm[film.id]?.size || 0,
-        future_showtime_count: futureShowtimeCountByFilm[film.id] || 0
-      }));
+      const candidates = (data || [])
+        .filter(isLiveCinemaFilm)
+        .map(film => ({
+          ...withGenres(film),
+          next_showtime: nextShowByFilm[film.id] || null,
+          remaining_today_showtime_count: todayShowtimesByFilm[film.id]?.size || 0,
+          future_showtime_count: futureShowtimeCountByFilm[film.id] || 0
+        }));
 
       // Cinema chains frequently spell the same title differently (for example,
       // "Remi & Nneoma" versus "Remi And Nneoma"). Keep one card per title and

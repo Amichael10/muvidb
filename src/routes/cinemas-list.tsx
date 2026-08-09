@@ -1,7 +1,7 @@
 import { data } from 'react-router';
 import { supabaseServer } from '../lib/supabase.server';
 import { CACHE_OK } from '../lib/seo';
-import { getZonedClock, isFutureShowtime } from '../utils/showtimes';
+import { getZonedClock, isPublicCinemaShowtime } from '../utils/showtimes';
 
 /**
  * Cinemas list: active venues + unique-film show counts from today onward.
@@ -27,7 +27,7 @@ export async function loader() {
   const cinemaClock = getZonedClock();
   const { data: showtimes } = await supabaseServer
     .from('showtimes')
-    .select('cinema_id, film_id, show_date, show_time')
+    .select('cinema_id, film_id, show_date, show_time, films(id, status, coming_soon, is_in_cinemas)')
     .gte('show_date', cinemaClock.date)
     .eq('is_available', true);
 
@@ -35,7 +35,7 @@ export async function loader() {
   if (showtimes?.length) {
     const sets: Record<string, Set<string>> = {};
     for (const s of showtimes) {
-      if (!isFutureShowtime(s, cinemaClock)) continue;
+      if (!isPublicCinemaShowtime(s, cinemaClock)) continue;
       if (!sets[s.cinema_id]) sets[s.cinema_id] = new Set();
       sets[s.cinema_id].add(s.film_id);
     }

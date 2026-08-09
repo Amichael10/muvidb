@@ -5,7 +5,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Icon } from '@iconify/react'
 import ShareAction from '../components/ui/ShareAction'
 import { toTitleCase, toSentenceCase } from '../utils/format'
-import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isFutureShowtime } from '../utils/showtimes'
+import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isPublicCinemaShowtime } from '../utils/showtimes'
 
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
@@ -247,6 +247,7 @@ const CinemaDetail = () => {
         films(
           id, slug, title, year, poster_url,
           backdrop_url, average_rating, liked_percent,
+          status, coming_soon, is_in_cinemas,
           synopsis,
           film_genres(genres(name))
         )
@@ -287,7 +288,7 @@ const CinemaDetail = () => {
   // Get unique dates
   const uniqueDates = [...new Set(
     showtimes
-      .filter(showtime => isFutureShowtime(showtime, cinemaClock))
+      .filter(showtime => isPublicCinemaShowtime(showtime, cinemaClock))
       .map(s => s.show_date)
   )].slice(0, 7)
 
@@ -295,7 +296,7 @@ const CinemaDetail = () => {
 
   // Filter by selected date
   const todayShowtimes = showtimes.filter(
-    s => s.show_date === selectedDate && isFutureShowtime(s, cinemaClock)
+    s => s.show_date === selectedDate && isPublicCinemaShowtime(s, cinemaClock)
   )
 
   // Group by film

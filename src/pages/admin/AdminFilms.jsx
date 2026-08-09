@@ -601,7 +601,11 @@ export default function AdminFilms() {
         date: s.show_date,
         time: s.show_time?.substring(0, 5) || '12:00',
         format: s.format,
-        ticket_url: s.ticket_url
+        ticket_url: s.ticket_url,
+        screen_name: s.screen_name ?? null,
+        price: s.price ?? null,
+        source: s.source || 'manual',
+        last_seen_at: s.last_seen_at ?? null
       })));
     }
 
@@ -945,7 +949,8 @@ export default function AdminFilms() {
       date: new Date().toISOString().split('T')[0],
       time: '12:00',
       format: '2D',
-      ticket_url: ''
+      ticket_url: '',
+      source: 'manual'
     }]);
   };
 
@@ -1136,7 +1141,8 @@ export default function AdminFilms() {
         }
       }
 
-      if (showtimes.length > 0) {
+      const shouldPersistShowtimes = cleanFilmPayload.status === 'released' && cleanFilmPayload.is_in_cinemas === true;
+      if (shouldPersistShowtimes && showtimes.length > 0) {
         const showtimePayload = showtimes.map(s => ({
           film_id: filmId,
           cinema_id: s.cinema_id,
@@ -1144,6 +1150,10 @@ export default function AdminFilms() {
           show_time: s.time,
           format: s.format,
           ticket_url: s.ticket_url,
+          screen_name: s.screen_name ?? null,
+          price: s.price === '' || s.price == null ? null : Number(s.price),
+          source: s.source || 'manual',
+          last_seen_at: s.last_seen_at || new Date().toISOString(),
           is_available: true
         }));
         insertPromises.push(supabase.from('showtimes').insert(showtimePayload));

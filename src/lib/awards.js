@@ -89,6 +89,34 @@ export const AWARD_ORGS = [
     submitUrl: null,
     submitLabel: null,
   },
+  {
+    id: 'LIFACC',
+    label: 'LIFACC',
+    full: 'Lagos International Film and Cinema Convention',
+    accent: '#14B8A6',
+    about:
+      'Industry-facing honours recognizing the business, exhibition, distribution, infrastructure, leadership, and regulatory work that powers African cinema.',
+    when:
+      'Held as part of the Lagos International Film and Cinema Convention; the 2026 Cinema Achievement Awards were announced for July 15, 2026 in Lagos.',
+    submissions:
+      'LIFACC recognition categories are announced by the convention organisers and focus on measurable industry contribution rather than open public voting.',
+    submitUrl: 'https://lifacc.com/',
+    submitLabel: 'LIFACC',
+  },
+  {
+    id: 'EKO_STAR',
+    label: 'Eko Star',
+    full: 'Eko Star Film & TV Awards',
+    accent: '#DB2777',
+    about:
+      'A Nigerian International Film Summit-linked recognition platform spotlighting women and leaders across Nigerian film and television.',
+    when:
+      'The NIFS gallery archives the Eko Star Film & TV Awards edition dated April 16, 2021.',
+    submissions:
+      'Awardee profiles are published by the Nigerian International Film Summit. Check NIFS channels for current recognition cycles.',
+    submitUrl: 'https://nifsummit.com/eko-star/awardees',
+    submitLabel: 'Eko Star awardees',
+  },
 ];
 
 function normOrg(raw) {
@@ -101,6 +129,8 @@ function normOrg(raw) {
   if (upper.includes('TINFF') || upper.includes('INDUSTRY NOLLYWOOD')) return 'TINFF';
   if (upper.includes('GOLDEN STAR') || upper.includes('GOLDENSTARS')) return 'GOLDEN_STARS';
   if (upper.includes('BON') || upper.includes('BEST OF NOLLYWOOD')) return 'BON';
+  if (upper.includes('LIFACC') || upper.includes('LAGOS INTERNATIONAL FILM AND CINEMA')) return 'LIFACC';
+  if (upper.includes('EKO STAR')) return 'EKO_STAR';
   return s;
 }
 
@@ -130,9 +160,11 @@ async function pageTable(table, cols) {
  * already has a person entry (person rows carry richer person links).
  */
 export async function loadAwardsCatalog() {
-  const [people, films] = await Promise.all([
+  const [people, films, companies, cinemas] = await Promise.all([
     pageTable('people', 'id, name, slug, photo_url, awards'),
     pageTable('films', 'id, title, slug, poster_url, year, awards'),
+    pageTable('companies', 'id, name, slug, logo_url, awards'),
+    pageTable('cinemas', 'id, name, city, state, logo_url, awards'),
   ]);
 
   const filmById = new Map(films.map((f) => [f.id, f]));
@@ -158,6 +190,27 @@ export async function loadAwardsCatalog() {
       : fallbackTitle
         ? { id: null, title: fallbackTitle, slug: null, poster_url: null, year: null }
         : null;
+
+  const companyPayload = (company) =>
+    company
+      ? {
+          id: company.id,
+          name: company.name,
+          slug: company.slug,
+          logo_url: company.logo_url,
+        }
+      : null;
+
+  const cinemaPayload = (cinema) =>
+    cinema
+      ? {
+          id: cinema.id,
+          name: cinema.name,
+          city: cinema.city,
+          state: cinema.state,
+          logo_url: cinema.logo_url,
+        }
+      : null;
 
   for (const person of people) {
     const awards = Array.isArray(person.awards) ? person.awards : [];
@@ -240,6 +293,58 @@ export async function loadAwardsCatalog() {
     }
   }
 
+  for (const company of companies) {
+    const awards = Array.isArray(company.awards) ? company.awards : [];
+    for (const a of awards) {
+      const org = normOrg(a.organization);
+      const year = Number(a.year) || null;
+      const season = a.season != null && a.season !== '' ? Number(a.season) : null;
+      const category = String(a.category || a.title || 'Award').trim();
+      const work = String(a.work || a.title || company.name || '').trim() || null;
+      const k = rowKey(org, year, season, category, work, `company:${company.id}`);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      rows.push({
+        org,
+        year,
+        season,
+        category,
+        work,
+        won: !!a.won,
+        person: null,
+        film: null,
+        company: companyPayload(company),
+        cinema: null,
+      });
+    }
+  }
+
+  for (const cinema of cinemas) {
+    const awards = Array.isArray(cinema.awards) ? cinema.awards : [];
+    for (const a of awards) {
+      const org = normOrg(a.organization);
+      const year = Number(a.year) || null;
+      const season = a.season != null && a.season !== '' ? Number(a.season) : null;
+      const category = String(a.category || a.title || 'Award').trim();
+      const work = String(a.work || a.title || cinema.name || '').trim() || null;
+      const k = rowKey(org, year, season, category, work, `cinema:${cinema.id}`);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      rows.push({
+        org,
+        year,
+        season,
+        category,
+        work,
+        won: !!a.won,
+        person: null,
+        film: null,
+        company: null,
+        cinema: cinemaPayload(cinema),
+      });
+    }
+  }
+
   // Hydrate any missing film posters referenced only by film_id on people
   const missingIds = [
     ...new Set(
@@ -276,7 +381,18 @@ export async function loadAwardsCatalog() {
 
   const years = [...new Set(rows.map((r) => r.year).filter(Boolean))].sort((a, b) => b - a);
 
-  return { rows, orgs, years, stats: { people: people.length, films: films.length, entries: rows.length } };
+  return {
+    rows,
+    orgs,
+    years,
+    stats: {
+      people: people.length,
+      films: films.length,
+      companies: companies.length,
+      cinemas: cinemas.length,
+      entries: rows.length,
+    },
+  };
 }
 
 /** Group flat rows into org → year → category → { winners, nominees }. */

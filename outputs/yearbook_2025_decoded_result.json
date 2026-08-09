@@ -1,0 +1,1999 @@
+{
+  "pages": null,
+  "fliphtml5_pages": "string",
+  "pageEditor": [
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.216141",
+          "y": "0.275276",
+          "width": "0.012206",
+          "height": "0.011645",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:91107122",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.216141",
+          "y": "0.170203",
+          "width": "0.012206",
+          "height": "0.018539",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:91107122",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.216141",
+          "y": "0.069027",
+          "width": "0.012002",
+          "height": "0.017970",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:91107122",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.288033",
+          "y": "0.678082",
+          "width": "0.012237",
+          "height": "0.018636",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:218237253",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.288049",
+          "y": "0.575942",
+          "width": "0.012206",
+          "height": "0.019811",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:218237253",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.288049",
+          "y": "0.474359",
+          "width": "0.012206",
+          "height": "0.020017",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:218237253",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.288049",
+          "y": "0.372860",
+          "width": "0.012206",
+          "height": "0.019690",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:275288352",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.288033",
+          "y": "0.270720",
+          "width": "0.012237",
+          "height": "0.020756",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:275288352",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.288049",
+          "y": "0.169669",
+          "width": "0.012206",
+          "height": "0.020199",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:275288352",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.519967",
+          "y": "0.676719",
+          "width": "0.012237",
+          "height": "0.021580",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:308132181",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.519983",
+          "y": "0.576880",
+          "width": "0.012206",
+          "height": "0.018018",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:308132181",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.519967",
+          "y": "0.475835",
+          "width": "0.012237",
+          "height": "0.016649",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:308132181",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.519983",
+          "y": "0.373567",
+          "width": "0.012206",
+          "height": "0.018272",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:215194204",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.519983",
+          "y": "0.271445",
+          "width": "0.012206",
+          "height": "0.018963",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:215194204",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.519983",
+          "y": "0.168675",
+          "width": "0.012206",
+          "height": "0.021496",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:215194204",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.690071",
+          "y": "0.618114",
+          "width": "0.035261",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://0.90",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.640852",
+          "y": "0.321067",
+          "width": "0.030130",
+          "height": "0.009418",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://1.33",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.640852",
+          "y": "0.466804",
+          "width": "0.031165",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://1.30",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.350724",
+          "y": "0.851938",
+          "width": "0.022949",
+          "height": "0.007544",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://1.30",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.483029",
+          "y": "0.851938",
+          "width": "0.022120",
+          "height": "0.007544",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://1.33",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.615333",
+          "y": "0.852074",
+          "width": "0.018417",
+          "height": "0.007282",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://1.11",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.681423",
+          "y": "0.851938",
+          "width": "0.026037",
+          "height": "0.007544",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://0.90",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.495507",
+          "y": "0.607780",
+          "width": "0.050652",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://644.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.492589",
+          "y": "0.637468",
+          "width": "0.051844",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://300.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.493484",
+          "y": "0.667143",
+          "width": "0.047860",
+          "height": "0.009452",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://198.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.481797",
+          "y": "0.696843",
+          "width": "0.051923",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://900.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.481154",
+          "y": "0.726518",
+          "width": "0.048817",
+          "height": "0.009452",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://875.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.477640",
+          "y": "0.756218",
+          "width": "0.052425",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.473718",
+          "y": "0.785906",
+          "width": "0.048723",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://100.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.475240",
+          "y": "0.815593",
+          "width": "0.051562",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://500.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.522597",
+          "y": "0.667131",
+          "width": "0.140807",
+          "height": "0.009476",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:00532827",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.485495",
+          "y": "0.721018",
+          "width": "0.053699",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.487833",
+          "y": "0.749806",
+          "width": "0.052836",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://500.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.488445",
+          "y": "0.778593",
+          "width": "0.052146",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://700.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.479093",
+          "y": "0.807381",
+          "width": "0.053699",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.465283",
+          "y": "0.836169",
+          "width": "0.052836",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://500.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.470933",
+          "y": "0.864957",
+          "width": "0.053699",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.470211",
+          "y": "0.893745",
+          "width": "0.053699",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.466774",
+          "y": "0.922533",
+          "width": "0.053699",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.692413",
+          "y": "0.200812",
+          "width": "0.032530",
+          "height": "0.009103",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://11.41",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.365009",
+          "y": "0.569212",
+          "width": "0.031620",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://2.60",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.062522",
+          "y": "0.704958",
+          "width": "0.031557",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://2.80",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.568825",
+          "y": "0.627129",
+          "width": "0.154634",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:100200300",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.758865",
+          "y": "0.627129",
+          "width": "0.156332",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:400500600",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.292852",
+          "y": "0.813948",
+          "width": "0.050113",
+          "height": "0.008801",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.292837",
+          "y": "0.834251",
+          "width": "0.050113",
+          "height": "0.008801",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.293526",
+          "y": "0.854554",
+          "width": "0.050113",
+          "height": "0.008801",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.286452",
+          "y": "0.874857",
+          "width": "0.050113",
+          "height": "0.008801",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.284256",
+          "y": "0.895160",
+          "width": "0.050113",
+          "height": "0.008801",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.284183",
+          "y": "0.915463",
+          "width": "0.050113",
+          "height": "0.008801",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.277637",
+          "y": "0.935766",
+          "width": "0.050113",
+          "height": "0.008801",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.623098",
+          "y": "0.268244",
+          "width": "0.050686",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://525.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.627696",
+          "y": "0.321859",
+          "width": "0.051550",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://025.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.625986",
+          "y": "0.375474",
+          "width": "0.050075",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://953.20",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.621137",
+          "y": "0.438180",
+          "width": "0.050027",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://275.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.620666",
+          "y": "0.473983",
+          "width": "0.050090",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://575.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.617669",
+          "y": "0.509882",
+          "width": "0.050294",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://675.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.617276",
+          "y": "0.734284",
+          "width": "0.050891",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://625.00",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.659477",
+          "y": "0.212328",
+          "width": "0.051267",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://308.68",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.655538",
+          "y": "0.291840",
+          "width": "0.047705",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://693.14",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.657405",
+          "y": "0.411088",
+          "width": "0.046497",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://712.66",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.655758",
+          "y": "0.592297",
+          "width": "0.049227",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://658.25",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.654769",
+          "y": "0.711545",
+          "width": "0.050137",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://665.68",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.665997",
+          "y": "0.215210",
+          "width": "0.050025",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://540.55",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.654232",
+          "y": "0.307623",
+          "width": "0.051986",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://620.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.654609",
+          "y": "0.365839",
+          "width": "0.051907",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://650.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.655660",
+          "y": "0.424446",
+          "width": "0.051907",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://605.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.653165",
+          "y": "0.448857",
+          "width": "0.050668",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://525.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.655801",
+          "y": "0.592315",
+          "width": "0.051641",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://205.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.656460",
+          "y": "0.660317",
+          "width": "0.051907",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://650.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.657762",
+          "y": "0.684728",
+          "width": "0.051531",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://025.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.655142",
+          "y": "0.710036",
+          "width": "0.050699",
+          "height": "0.009452",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://824.80",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.655409",
+          "y": "0.803775",
+          "width": "0.053680",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.653652",
+          "y": "0.879231",
+          "width": "0.050276",
+          "height": "0.009428",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://675.00",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.679122",
+          "y": "0.207509",
+          "width": "0.050043",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://540.55",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.660746",
+          "y": "0.292900",
+          "width": "0.048207",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://133.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.667352",
+          "y": "0.435220",
+          "width": "0.052005",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://620.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.668890",
+          "y": "0.492135",
+          "width": "0.050310",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://608.33",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.667729",
+          "y": "0.577539",
+          "width": "0.051926",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://650.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.670271",
+          "y": "0.605991",
+          "width": "0.051267",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://308.68",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.666097",
+          "y": "0.691383",
+          "width": "0.050200",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://898.70",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.666740",
+          "y": "0.719846",
+          "width": "0.049619",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://378.66",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.668780",
+          "y": "0.748322",
+          "width": "0.051926",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://605.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.668827",
+          "y": "0.805238",
+          "width": "0.051393",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://298.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.668922",
+          "y": "0.884628",
+          "width": "0.051659",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://205.00",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.628599",
+          "y": "0.160194",
+          "width": "0.047093",
+          "height": "0.009273",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://242.41",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.626199",
+          "y": "0.190194",
+          "width": "0.050686",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://525.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.626246",
+          "y": "0.228679",
+          "width": "0.047705",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://693.14",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.628223",
+          "y": "0.280194",
+          "width": "0.048835",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://014.90",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.627799",
+          "y": "0.340194",
+          "width": "0.046638",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://271.20",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.629494",
+          "y": "0.588603",
+          "width": "0.051926",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://650.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.630796",
+          "y": "0.670118",
+          "width": "0.051550",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://025.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.628176",
+          "y": "0.708591",
+          "width": "0.050718",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://824.80",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.626089",
+          "y": "0.738591",
+          "width": "0.050153",
+          "height": "0.009455",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://358.68",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.628443",
+          "y": "0.867087",
+          "width": "0.053699",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.117946",
+          "y": "0.472823",
+          "width": "0.089682",
+          "height": "0.009261",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://structure.As",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.846927",
+          "y": "0.725397",
+          "width": "0.044410",
+          "height": "0.008173",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://963.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.909195",
+          "y": "0.754121",
+          "width": "0.046109",
+          "height": "0.008173",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://000.00",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.743155",
+          "y": "0.287351",
+          "width": "0.112728",
+          "height": "0.008215",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:80100120",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.634306",
+          "y": "0.446377",
+          "width": "0.188024",
+          "height": "0.008173",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:100200300",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.308436",
+          "y": "0.280152",
+          "width": "0.158305",
+          "height": "0.009261",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://behaviour.Admissions",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.133804",
+          "y": "0.911097",
+          "width": "0.197866",
+          "height": "0.011552",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "https://www.nfvcb.gov.ng/",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.095496",
+          "y": "0.876394",
+          "width": "0.097167",
+          "height": "0.009430",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "tel:+234906370",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.144813",
+          "y": "0.896852",
+          "width": "0.200568",
+          "height": "0.013745",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "http://www.ceannigeria.com",
+          "linkTarget": "_blank"
+        }
+      }
+    ],
+    [],
+    [],
+    [],
+    [],
+    [
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.099609",
+          "y": "0.306223",
+          "width": "0.203643",
+          "height": "0.012488",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "mailto:kokwuosa@filmoneng.com",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.415497",
+          "y": "0.306223",
+          "width": "0.216110",
+          "height": "0.012488",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "mailto:oawobokun@filmoneng.com",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.099107",
+          "y": "0.546142",
+          "width": "0.198573",
+          "height": "0.012488",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "mailto:cshurn@filmhouseng.com",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.415095",
+          "y": "0.744529",
+          "width": "0.171028",
+          "height": "0.012488",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "mailto:vogar@filmoneng.com",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.090991",
+          "y": "0.746891",
+          "width": "0.226402",
+          "height": "0.012488",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "mailto:amachado@filmhouseng.com",
+          "linkTarget": "_blank"
+        }
+      },
+      {
+        "annotype": "com.mobiano.flipbook.pageeditor.TAnnoLink",
+        "location": {
+          "x": "0.420022",
+          "y": "0.551440",
+          "width": "0.221703",
+          "height": "0.012488",
+          "pageWidth": "1911",
+          "pageHeight": "2475"
+        },
+        "action": {
+          "triggerEventType": "mouseDown",
+          "actionType": "com.mobiano.flipbook.pageeditor.TAnnoActionOpenURL",
+          "url": "mailto:moladapo@filmhouseng.com",
+          "linkTarget": "_blank"
+        }
+      }
+    ]
+  ]
+}

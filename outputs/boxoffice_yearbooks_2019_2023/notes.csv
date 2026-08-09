@@ -1,0 +1,6 @@
+topic,detail,url
+Source hub,"FilmOne Yearbook public hub lists previous yearbooks for 2024, 2023, 2022, 2021, 2020, and 2019. The 2025 yearbook is form-gated on the public page and was not extracted.",https://yearbook.filmoneng.com/
+Scope,This package extracts public older yearbook movie box-office rankings and actor/actress box-office milestone pages from 2019-2023. The 2024 extract already exists separately in outputs/boxoffice_yearbook_2024.,
+Gross fields,gross_label preserves the printed source value. gross_ngn converts rounded labels such as N303M to numeric naira estimates for sorting/import.,
+2019 people,The 2019 actor/actress milestone page only states that listed films grossed N20M upwards; it does not show per-person totals.,https://online.fliphtml5.com/ogfbg/euke/#p=28
+2021 Deyemi Okanlawon,"The source row lists Lockdown, The Ghost & The Tout Too, and Prophetess with a trailing hyphen but no printed gross total; gross fields are intentionally blank.",https://online.fliphtml5.com/ogfbg/ffuo/#p=78

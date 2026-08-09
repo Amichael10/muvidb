@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import { AWARD_ORGS, groupAwards, loadAwardsCatalog } from '../lib/awards';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
-import { formatFilmTitle, formatPersonName } from '../utils/format';
+import { formatFilmTitle, formatPersonName, toTitleCase } from '../utils/format';
 
 function orgMeta(id) {
   return (
@@ -473,8 +473,56 @@ function CategorySection({ cat, index, accent }) {
 function AwardCard({ row, winner = false, accent }) {
   const person = row.person;
   const film = row.film;
+  const company = row.company;
+  const cinema = row.cinema;
   const personTo = person?.slug || person?.id ? `/people/${person.slug || person.id}` : null;
   const filmTo = film?.slug || film?.id ? `/films/${film.slug || film.id}` : null;
+  const companyTo = company?.slug || company?.id ? `/companies/${company.slug || company.id}` : null;
+  const cinemaTo = cinema?.id ? `/cinemas/${cinema.id}` : null;
+  const entity = person
+    ? {
+        to: personTo,
+        image: person.photo_url,
+        imageType: 'avatar',
+        name: formatPersonName(person.name),
+        label: 'Person',
+        icon: 'solar:user-linear',
+      }
+    : company
+      ? {
+          to: companyTo,
+          image: company.logo_url,
+          imageType: 'company',
+          name: toTitleCase(company.name),
+          label: 'Company',
+          icon: 'solar:buildings-2-linear',
+        }
+      : cinema
+        ? {
+            to: cinemaTo,
+            image: cinema.logo_url,
+            imageType: 'company',
+            name: toTitleCase(cinema.name),
+            label: 'Cinema',
+            icon: 'solar:city-linear',
+          }
+        : film
+          ? {
+              to: filmTo,
+              image: film.poster_url,
+              imageType: 'film',
+              name: formatFilmTitle(film.title),
+              label: 'Film',
+              icon: 'solar:clapperboard-linear',
+            }
+          : null;
+  const detail = film && !entity?.to?.startsWith('/films/')
+    ? formatFilmTitle(film.title)
+    : cinema
+      ? [toTitleCase(cinema.city), toTitleCase(cinema.state)].filter(Boolean).join(', ')
+      : row.work && String(row.work).toLowerCase() !== String(entity?.name || '').toLowerCase()
+        ? row.work
+        : null;
 
   return (
     <article
@@ -498,22 +546,22 @@ function AwardCard({ row, winner = false, accent }) {
         aria-hidden="true"
       />
 
-      {filmTo ? (
+      {entity?.to ? (
         <Link
-          to={filmTo}
+          to={entity.to}
           className="relative z-[1] h-[88px] w-[60px] shrink-0 overflow-hidden rounded-xl border border-border bg-surface-2"
         >
           <ImageWithFallback
-            src={film?.poster_url}
-            alt={film?.title || ''}
-            name={film?.title || ''}
-            fallbackType="film"
+            src={entity.image}
+            alt={entity.name || ''}
+            name={entity.name || ''}
+            fallbackType={entity.imageType}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
         </Link>
       ) : (
         <div className="relative z-[1] flex h-[88px] w-[60px] shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2">
-          <Icon icon="solar:clapperboard-linear" className="text-xl text-text-muted/40" />
+          <Icon icon={entity?.icon || 'solar:cup-star-linear'} className="text-xl text-text-muted/40" />
         </div>
       )}
 
@@ -528,48 +576,22 @@ function AwardCard({ row, winner = false, accent }) {
           </span>
         )}
 
-        {person ? (
-          personTo ? (
-            <Link
-              to={personTo}
-              className="flex min-w-0 items-center gap-2 transition-colors hover:text-brand"
-            >
-              <span className="h-7 w-7 shrink-0 overflow-hidden rounded-full border border-border bg-surface-2 ring-0 transition-all group-hover:ring-2 group-hover:ring-brand/30">
-                <ImageWithFallback
-                  src={person.photo_url}
-                  alt=""
-                  fallbackType="avatar"
-                  name={person.name}
-                  className="h-full w-full object-cover"
-                  width={56}
-                  sizes="28px"
-                  loading="lazy"
-                />
-              </span>
-              <span className="truncate text-sm font-bold">{formatPersonName(person.name)}</span>
+        {entity ? (
+          entity.to ? (
+            <Link to={entity.to} className="min-w-0 transition-colors hover:text-brand">
+              <span className="truncate text-sm font-bold">{entity.name}</span>
             </Link>
           ) : (
-            <p className="truncate text-sm font-bold">{formatPersonName(person.name)}</p>
+            <p className="truncate text-sm font-bold">{entity.name}</p>
           )
         ) : (
-          <p className="text-[10px] font-black uppercase tracking-widest text-brand">Film award</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-brand">Award</p>
         )}
 
-        {film ? (
-          filmTo ? (
-            <Link
-              to={filmTo}
-              className="line-clamp-2 text-xs leading-snug text-text-muted transition-colors hover:text-text-primary"
-            >
-              {formatFilmTitle(film.title)}
-            </Link>
-          ) : (
-            <p className="line-clamp-2 text-xs leading-snug text-text-muted">
-              {formatFilmTitle(film.title)}
-            </p>
-          )
+        {detail ? (
+          <p className="line-clamp-2 text-xs leading-snug text-text-muted">{detail}</p>
         ) : (
-          <p className="text-xs italic text-text-muted/60">Work not linked</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-brand">{entity?.label || 'Recognition'}</p>
         )}
       </div>
     </article>

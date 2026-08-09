@@ -58,6 +58,17 @@ export const isFutureShowtime = (showtime, clock) => {
   return showtimeSeconds !== null && showtimeSeconds >= clock.seconds;
 };
 
+export const isLiveCinemaFilm = (film) => {
+  return Boolean(film)
+    && film.status === 'released'
+    && film.is_in_cinemas === true
+    && film.coming_soon !== true;
+};
+
+export const isPublicCinemaShowtime = (showtime, clock) => {
+  return isFutureShowtime(showtime, clock) && isLiveCinemaFilm(showtime?.films);
+};
+
 export const compareShowtimes = (first, second) => {
   const dateCompare = String(first.show_date).localeCompare(String(second.show_date));
   if (dateCompare !== 0) return dateCompare;

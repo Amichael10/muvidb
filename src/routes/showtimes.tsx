@@ -1,7 +1,7 @@
 import { data } from 'react-router';
 import { supabaseServer } from '../lib/supabase.server';
 import { CACHE_OK } from '../lib/seo';
-import { getZonedClock } from '../utils/showtimes';
+import { getZonedClock, isLiveCinemaFilm } from '../utils/showtimes';
 
 /**
  * Showtimes: all available rows from today Lagos + active cinemas filter list.
@@ -20,6 +20,7 @@ export async function loader() {
         films(
           id, slug, title, year, poster_url,
           backdrop_url, average_rating, liked_percent,
+          status, coming_soon, is_in_cinemas,
           film_genres(genres(name))
         ),
         cinemas(
@@ -38,7 +39,9 @@ export async function loader() {
       .order('name'),
   ]);
 
-  const showtimes = !showsRes.error && showsRes.data ? showsRes.data : [];
+  const showtimes = !showsRes.error && showsRes.data
+    ? showsRes.data.filter((showtime: any) => isLiveCinemaFilm(showtime.films))
+    : [];
   const cinemas = !cinemasRes.error && cinemasRes.data ? cinemasRes.data : [];
   const seeded = showtimes.length > 0;
 

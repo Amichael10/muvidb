@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -375,6 +375,7 @@ export type Database = {
       cinemas: {
         Row: {
           address: string | null
+          awards: Json
           booking_url: string | null
           chain: string | null
           city: string
@@ -398,6 +399,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          awards?: Json
           booking_url?: string | null
           chain?: string | null
           city: string
@@ -421,6 +423,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          awards?: Json
           booking_url?: string | null
           chain?: string | null
           city?: string
@@ -518,6 +521,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          awards: Json
           company_type: string | null
           created_at: string
           description: string | null
@@ -540,6 +544,7 @@ export type Database = {
           youtube_url: string | null
         }
         Insert: {
+          awards?: Json
           company_type?: string | null
           created_at?: string
           description?: string | null
@@ -562,6 +567,7 @@ export type Database = {
           youtube_url?: string | null
         }
         Update: {
+          awards?: Json
           company_type?: string | null
           created_at?: string
           description?: string | null
@@ -1173,6 +1179,117 @@ export type Database = {
         }
         Relationships: []
       }
+      critic_reviews: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          critic_id: string | null
+          critic_name: string | null
+          critic_title: string | null
+          film_id: string
+          id: string
+          is_anonymous: boolean
+          is_featured: boolean
+          quote: string
+          rating: number | null
+          review_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          critic_id?: string | null
+          critic_name?: string | null
+          critic_title?: string | null
+          film_id: string
+          id?: string
+          is_anonymous?: boolean
+          is_featured?: boolean
+          quote: string
+          rating?: number | null
+          review_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          critic_id?: string | null
+          critic_name?: string | null
+          critic_title?: string | null
+          film_id?: string
+          id?: string
+          is_anonymous?: boolean
+          is_featured?: boolean
+          quote?: string
+          rating?: number | null
+          review_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "critic_reviews_critic_id_fkey"
+            columns: ["critic_id"]
+            isOneToOne: false
+            referencedRelation: "critics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "critic_reviews_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      critics: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          handle: string | null
+          id: string
+          is_verified: boolean
+          name: string
+          platform: string | null
+          profile_url: string | null
+          publication: string | null
+          slug: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          handle?: string | null
+          id?: string
+          is_verified?: boolean
+          name: string
+          platform?: string | null
+          profile_url?: string | null
+          publication?: string | null
+          slug: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          handle?: string | null
+          id?: string
+          is_verified?: boolean
+          name?: string
+          platform?: string | null
+          profile_url?: string | null
+          publication?: string | null
+          slug?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dedupe_ignored_pairs: {
         Row: {
           created_at: string
@@ -1480,6 +1597,13 @@ export type Database = {
           awards: Json
           backdrop: string | null
           backdrop_url: string | null
+          box_office_currency: string | null
+          box_office_domestic: number | null
+          box_office_opening_weekend: number | null
+          box_office_source: string | null
+          box_office_updated_at: string | null
+          box_office_worldwide: number | null
+          budget: number | null
           coming_soon: boolean | null
           comments_synced_at: string | null
           content_kind: string | null
@@ -1545,6 +1669,13 @@ export type Database = {
           awards?: Json
           backdrop?: string | null
           backdrop_url?: string | null
+          box_office_currency?: string | null
+          box_office_domestic?: number | null
+          box_office_opening_weekend?: number | null
+          box_office_source?: string | null
+          box_office_updated_at?: string | null
+          box_office_worldwide?: number | null
+          budget?: number | null
           coming_soon?: boolean | null
           comments_synced_at?: string | null
           content_kind?: string | null
@@ -1610,6 +1741,13 @@ export type Database = {
           awards?: Json
           backdrop?: string | null
           backdrop_url?: string | null
+          box_office_currency?: string | null
+          box_office_domestic?: number | null
+          box_office_opening_weekend?: number | null
+          box_office_source?: string | null
+          box_office_updated_at?: string | null
+          box_office_worldwide?: number | null
+          budget?: number | null
           coming_soon?: boolean | null
           comments_synced_at?: string | null
           content_kind?: string | null
@@ -2493,6 +2631,68 @@ export type Database = {
           },
         ]
       }
+      person_box_office_rankings: {
+        Row: {
+          category: string
+          created_at: string
+          criteria: string | null
+          film_ids: string[]
+          films: string[]
+          gross_label: string
+          gross_ngn_estimate: number
+          id: string
+          person_id: string
+          rank: number
+          source_name: string
+          source_page: number | null
+          source_url: string | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          criteria?: string | null
+          film_ids?: string[]
+          films?: string[]
+          gross_label: string
+          gross_ngn_estimate: number
+          id?: string
+          person_id: string
+          rank: number
+          source_name: string
+          source_page?: number | null
+          source_url?: string | null
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          criteria?: string | null
+          film_ids?: string[]
+          films?: string[]
+          gross_label?: string
+          gross_ngn_estimate?: number
+          id?: string
+          person_id?: string
+          rank?: number
+          source_name?: string
+          source_page?: number | null
+          source_url?: string | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_box_office_rankings_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_new_releases: {
         Row: {
           created_at: string
@@ -2533,6 +2733,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plays: {
+        Row: {
+          banner_url: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          director: string | null
+          genre: string | null
+          id: string
+          playwright: string | null
+          poster_url: string | null
+          producer: string | null
+          run_end_date: string | null
+          run_start_date: string | null
+          slug: string
+          status: string
+          synopsis: string | null
+          title: string
+          updated_at: string
+          venue: string | null
+          year: number | null
+        }
+        Insert: {
+          banner_url?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          director?: string | null
+          genre?: string | null
+          id?: string
+          playwright?: string | null
+          poster_url?: string | null
+          producer?: string | null
+          run_end_date?: string | null
+          run_start_date?: string | null
+          slug: string
+          status?: string
+          synopsis?: string | null
+          title: string
+          updated_at?: string
+          venue?: string | null
+          year?: number | null
+        }
+        Update: {
+          banner_url?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          director?: string | null
+          genre?: string | null
+          id?: string
+          playwright?: string | null
+          poster_url?: string | null
+          producer?: string | null
+          run_end_date?: string | null
+          run_start_date?: string | null
+          slug?: string
+          status?: string
+          synopsis?: string | null
+          title?: string
+          updated_at?: string
+          venue?: string | null
+          year?: number | null
+        }
+        Relationships: []
       }
       profile_claims: {
         Row: {
@@ -3240,6 +3506,51 @@ export type Database = {
           },
         ]
       }
+      stage_credits: {
+        Row: {
+          billing_order: number | null
+          character_name: string | null
+          created_at: string
+          id: string
+          person_id: string
+          play_id: string
+          role: string
+        }
+        Insert: {
+          billing_order?: number | null
+          character_name?: string | null
+          created_at?: string
+          id?: string
+          person_id: string
+          play_id: string
+          role?: string
+        }
+        Update: {
+          billing_order?: number | null
+          character_name?: string | null
+          created_at?: string
+          id?: string
+          person_id?: string
+          play_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_credits_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_credits_play_id_fkey"
+            columns: ["play_id"]
+            isOneToOne: false
+            referencedRelation: "plays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_logs: {
         Row: {
           created_at: string
@@ -3566,6 +3877,35 @@ export type Database = {
           },
         ]
       }
+      youtube_upload_alert_log: {
+        Row: {
+          channel_id: string
+          notified_at: string
+          title: string | null
+          video_id: string
+        }
+        Insert: {
+          channel_id: string
+          notified_at?: string
+          title?: string | null
+          video_id: string
+        }
+        Update: {
+          channel_id?: string
+          notified_at?: string
+          title?: string | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youtube_upload_alert_log_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3692,6 +4032,13 @@ export type Database = {
           awards: Json
           backdrop: string | null
           backdrop_url: string | null
+          box_office_currency: string | null
+          box_office_domestic: number | null
+          box_office_opening_weekend: number | null
+          box_office_source: string | null
+          box_office_updated_at: string | null
+          box_office_worldwide: number | null
+          budget: number | null
           coming_soon: boolean | null
           comments_synced_at: string | null
           content_kind: string | null
@@ -3948,6 +4295,13 @@ export type Database = {
           awards: Json
           backdrop: string | null
           backdrop_url: string | null
+          box_office_currency: string | null
+          box_office_domestic: number | null
+          box_office_opening_weekend: number | null
+          box_office_source: string | null
+          box_office_updated_at: string | null
+          box_office_worldwide: number | null
+          budget: number | null
           coming_soon: boolean | null
           comments_synced_at: string | null
           content_kind: string | null
