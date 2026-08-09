@@ -996,11 +996,19 @@ export default function AdminFilms() {
         // Multi-language: parse the language field ("English, Yoruba") into the
         // normalized languages[] array. `language` stays as the primary.
         languages: parseLanguages(formData.language),
-        box_office_domestic: formData.box_office_domestic && !isNaN(parseFloat(formData.box_office_domestic)) ? parseFloat(formData.box_office_domestic) : null,
-        budget: formData.budget && !isNaN(parseFloat(formData.budget)) ? parseFloat(formData.budget) : null,
-        box_office_worldwide: formData.box_office_worldwide && !isNaN(parseFloat(formData.box_office_worldwide)) ? parseFloat(formData.box_office_worldwide) : null,
-        box_office_currency: formData.box_office_currency || 'NGN',
-        box_office_source: formData.box_office_source || null,
+        streaming_links: {
+          ...(typeof formData.streaming_links === 'object' && formData.streaming_links !== null ? formData.streaming_links : {}),
+          ...( (formData.box_office_domestic || formData.box_office_worldwide) ? {
+            box_office: {
+              domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : 0,
+              worldwide: formData.box_office_worldwide ? parseFloat(formData.box_office_worldwide) : 0,
+              currency: formData.box_office_currency || 'NGN',
+              source: formData.box_office_source || null,
+              budget: formData.budget ? parseFloat(formData.budget) : 0,
+              updated_at: new Date().toISOString()
+            }
+          } : {} )
+        },
         // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
         // the film page's sorting and win/nomination tally stay sane.
         awards: (formData.awards || [])
@@ -1015,7 +1023,16 @@ export default function AdminFilms() {
           })),
       };
 
-      const { genres: selectedGenreIds, channel_video_id, ...cleanFilmPayload } = filmPayload;
+      const {
+        genres: selectedGenreIds,
+        channel_video_id,
+        box_office_domestic,
+        box_office_worldwide,
+        box_office_currency,
+        box_office_source,
+        budget,
+        ...cleanFilmPayload
+      } = filmPayload;
 
       let filmId = editingFilm?.id;
 

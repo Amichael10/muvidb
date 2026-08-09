@@ -78,7 +78,7 @@ export async function personSeo(slug: string, base: string) {
         films(
           id, title, year, poster_url, trailer_youtube_id,
           view_count, average_rating, liked_percent, slug,
-          release_type,
+          release_type, streaming_links,
           film_genres(genres(name))
         )
       )

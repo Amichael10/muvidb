@@ -78,14 +78,18 @@ export async function fetchCriticBySlug(slug) {
  * Upsert a critic record (Admin)
  */
 export async function upsertCritic(criticData) {
+  const { review_count, created_at, updated_at, ...validData } = criticData;
   const payload = {
-    ...criticData,
-    slug: criticData.slug || criticData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    ...validData,
+    slug: validData.slug || (validData.name ? validData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : 'critic'),
+    updated_at: new Date().toISOString()
   };
+
+  const onConflict = validData.id ? 'id' : 'slug';
 
   const { data, error } = await supabase
     .from('critics')
-    .upsert(payload, { onConflict: 'slug' })
+    .upsert(payload, { onConflict })
     .select()
     .single();
 

@@ -206,7 +206,7 @@ const PersonDetail = () => {
           films(
             id, title, year, poster_url, trailer_youtube_id,
             view_count, average_rating, liked_percent, slug,
-            release_type, trailer_youtube_id,
+            release_type, streaming_links,
             film_genres(genres(name))
           )
         )
@@ -578,40 +578,85 @@ const PersonDetail = () => {
               </div>
 
               {(() => {
-                const totalBoxOffice = (person.credits || []).reduce((acc, c) => {
-                  const dom = c.films?.box_office_domestic || c.films?.streaming_links?.box_office?.domestic || 0;
+                const boxOfficeFilms = (person.credits || []).filter(c => {
+                  const dom = c.films?.streaming_links?.box_office?.domestic || c.films?.box_office_domestic || 0;
+                  return (typeof dom === 'number' ? dom : parseFloat(dom) || 0) > 0;
+                });
+                const boxOfficeFilmCount = boxOfficeFilms.length;
+                const totalBoxOffice = boxOfficeFilms.reduce((acc, c) => {
+                  const dom = c.films?.streaming_links?.box_office?.domestic || c.films?.box_office_domestic || 0;
                   return acc + (typeof dom === 'number' ? dom : parseFloat(dom) || 0);
                 }, 0);
 
+                // Local test restriction for the 2 requested profiles
+                const isTestProfile = ['funke-akindele', 'ruth-kadiri', 'odunlade-adekola'].includes(person.slug);
+
+                const totalYoutubeViews = (person.credits || []).reduce((acc, c) => {
+                  const v = c.films?.view_count || 0;
+                  return acc + (typeof v === 'number' ? v : parseInt(v, 10) || 0);
+                }, 0) + (channelVideos || []).reduce((acc, v) => acc + (v.view_count || 0), 0);
+
+                const hasBoxOffice = totalBoxOffice > 0;
+                const showYtReach = isTestProfile && totalYoutubeViews > 0;
+
+                const gridColsClass = (hasBoxOffice && showYtReach) 
+                  ? 'grid-cols-2 sm:grid-cols-5 max-w-xl' 
+                  : (hasBoxOffice || showYtReach) 
+                  ? 'grid-cols-2 sm:grid-cols-4 max-w-md' 
+                  : 'grid-cols-3 max-w-sm';
+
+                const fmtYtViews = (num) => {
+                  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+                  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+                  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+                  return String(num);
+                };
+
                 return (
                   <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className={`grid ${totalBoxOffice > 0 ? 'grid-cols-4 max-w-md' : 'grid-cols-3 max-w-sm'} gap-0 border border-border rounded-lg overflow-hidden bg-surface w-full md:mx-0 shadow-sm`}>
-                      <div className="p-4 border-r border-border text-center">
+                    <div className={`grid ${gridColsClass} gap-0 border border-border rounded-lg overflow-hidden bg-surface w-full md:mx-0 shadow-sm`}>
+                      <div className="p-4 border-r border-b sm:border-b-0 border-border text-center">
                         <p className="text-brand text-xl font-bold font-heading">
                           {formatViewCount(person.profile_views || person.popularity_score || totalViews)}
                         </p>
-                        <p className="text-text-muted text-[9px] font-bold">Views</p>
+                        <p className="text-text-muted text-[9px] font-bold">Profile Views</p>
                       </div>
-                      <div className="p-4 border-r border-border text-center">
+                      <div className="p-4 border-r border-b sm:border-b-0 border-border text-center">
                         <p className="text-text-primary text-xl font-bold font-heading">
                           {totalFilms}
                         </p>
                         <p className="text-text-muted text-[9px] font-bold">Credits</p>
                       </div>
-                      <div className={`p-4 ${totalBoxOffice > 0 ? 'border-r border-border' : ''} text-center`}>
+                      <div className={`p-4 ${(hasBoxOffice || showYtReach) ? 'border-r' : ''} border-border text-center`}>
                         <p className="text-text-primary text-xl font-bold font-heading">
                           {followerCount.toLocaleString()}
                         </p>
                         <p className="text-text-muted text-[9px] font-bold">Followers</p>
                       </div>
-                      {totalBoxOffice > 0 && (
-                        <div className="p-4 bg-gradient-to-br from-amber-500/15 via-surface to-surface text-center">
+                      {hasBoxOffice && (
+                        <div 
+                          className={`p-4 bg-gradient-to-br from-amber-500/15 via-surface to-surface text-center relative group cursor-help ${showYtReach ? 'border-r border-border' : ''}`}
+                          title={`Grossed across ${boxOfficeFilmCount} theatrical ${boxOfficeFilmCount === 1 ? 'movie' : 'movies'}`}
+                        >
                           <p className="text-amber-400 text-xl font-bold font-heading">
                             {totalBoxOffice >= 1_000_000_000
                               ? `₦${(totalBoxOffice / 1_000_000_000).toFixed(2)}B`
                               : `₦${(totalBoxOffice / 1_000_000).toFixed(1)}M`}
                           </p>
                           <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">Box Office</p>
+                          
+                          {/* Tooltip on hover */}
+                          <div className="absolute left-1/2 -translate-x-1/2 -top-9 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-bg border border-amber-500/30 text-amber-300 text-[10px] font-bold px-2.5 py-1 rounded shadow-xl whitespace-nowrap pointer-events-none z-30">
+                            Across {boxOfficeFilmCount} cinema {boxOfficeFilmCount === 1 ? 'movie' : 'movies'}
+                          </div>
+                        </div>
+                      )}
+                      {showYtReach && (
+                        <div className="p-4 bg-gradient-to-br from-red-500/15 via-surface to-surface text-center">
+                          <p className="text-red-400 text-xl font-bold font-heading">
+                            {fmtYtViews(totalYoutubeViews)}
+                          </p>
+                          <p className="text-red-400 text-[9px] font-bold uppercase tracking-wider">YouTube Reach</p>
                         </div>
                       )}
                     </div>
@@ -823,6 +868,19 @@ const PersonDetail = () => {
                         loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-80" />
+                      {(() => {
+                        const dom = film?.streaming_links?.box_office?.domestic || film?.box_office_domestic || 0;
+                        if (!dom) return null;
+                        const num = typeof dom === 'number' ? dom : parseFloat(dom) || 0;
+                        if (num <= 0) return null;
+                        const fmt = num >= 1_000_000_000 ? `₦${(num / 1_000_000_000).toFixed(2)}B` : `₦${(num / 1_000_000).toFixed(0)}M`;
+                        return (
+                          <div className="absolute top-2 right-2 bg-amber-500/90 text-bg text-[8px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-0.5 z-10 backdrop-blur-sm">
+                            <span>🎟️</span>
+                            <span>{fmt}</span>
+                          </div>
+                        );
+                      })()}
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <p className="text-text-primary text-[11px] font-bold tracking-tight line-clamp-2 leading-tight group-hover:text-brand transition-colors">
                           {formatFilmTitle(title)}

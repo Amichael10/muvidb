@@ -482,7 +482,14 @@ export default function AdminPeople() {
         }
       }
 
-      const { biography: _omitBiography, ...restFormData } = formData;
+      const {
+        biography: _omitBiography,
+        instagram_highlights: _omitHighlights,
+        film_count: _omitFilmCount,
+        created_at: _omitCreatedAt,
+        updated_at: _omitUpdatedAt,
+        ...restFormData
+      } = formData;
       const dataToSave = {
         ...restFormData,
         name: toTitleCase(formData.name),
