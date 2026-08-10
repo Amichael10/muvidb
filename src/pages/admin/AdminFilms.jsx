@@ -170,7 +170,8 @@ export default function AdminFilms() {
     budget: '',
     box_office_worldwide: '',
     box_office_currency: 'NGN',
-    box_office_source: 'CEAN Official'
+    box_office_source: 'CEAN Official',
+    distributor: ''
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -659,6 +660,7 @@ export default function AdminFilms() {
         season_number: film.season_number ?? '',
         season_count: film.season_count ?? '',
         episode_count: film.episode_count ?? '',
+        distributor: film.distributor || film.streaming_links?.distributor || '',
       };
       // Merge over the base rather than replacing it: a draft saved before a
       // field existed on this form has no key for it, and save would then write
@@ -1003,6 +1005,7 @@ export default function AdminFilms() {
         }),
         streaming_links: {
           ...(typeof formData.streaming_links === 'object' && formData.streaming_links !== null ? formData.streaming_links : {}),
+          distributor: (formData.distributor || '').trim() || null,
           ...((formData.box_office_domestic || formData.box_office_worldwide) ? {
             box_office: {
               domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : 0,
@@ -2159,6 +2162,17 @@ export default function AdminFilms() {
                       name="release_date"
                       value={formData.release_date || ''}
                       onChange={handleChange}
+                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <label className="block text-xs font-bold text-text-primary mb-2">Distributor / Distribution Partner</label>
+                    <input
+                      type="text"
+                      name="distributor"
+                      value={formData.distributor || ''}
+                      onChange={handleChange}
+                      placeholder="e.g. FilmOne Entertainment, Cinemax, Nile Entertainment, Silverbird..."
                       className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all"
                     />
                   </div>

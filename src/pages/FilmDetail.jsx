@@ -1238,38 +1238,47 @@ export default function FilmDetail() {
                       )}
                     </div>
 
-                    {/* Distribution Partners */}
-                    {distCompanies.length > 0 && (
+                    {/* Distribution Partners / Distributor */}
+                    {(distCompanies.length > 0 || film.distributor || film.streaming_links?.distributor) && (
                       <div>
                         <div className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
                           <Icon icon="solar:delivery-bold" className="text-brand text-xs" />
-                          <span>Distribution {distCompanies.length > 1 ? 'Partners' : 'Partner'}</span>
+                          <span>Distribution {distCompanies.length > 1 ? 'Partners' : 'Partner / Distributor'}</span>
                         </div>
-                        <div className="space-y-3">
-                          {distCompanies.map((fc, idx) => (
-                            <Link
-                              key={idx}
-                              to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
-                              className="flex items-center gap-3 group"
-                            >
-                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
-                                <ImageWithFallback
-                                  src={fc.companies?.logo_url}
-                                  alt={fc.companies?.name || 'Distributor'}
-                                  fallbackType="company"
-                                  name={fc.companies?.name || 'Distributor'}
-                                  className="w-full h-full object-cover"
-                                  width={72}
-                                  sizes="36px"
-                                  loading="lazy"
-                                />
-                              </div>
-                              <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
-                                {fc.companies?.name}
-                              </span>
-                            </Link>
-                          ))}
-                        </div>
+                        {distCompanies.length > 0 ? (
+                          <div className="space-y-3">
+                            {distCompanies.map((fc, idx) => (
+                              <Link
+                                key={idx}
+                                to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
+                                className="flex items-center gap-3 group"
+                              >
+                                <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
+                                  <ImageWithFallback
+                                    src={fc.companies?.logo_url}
+                                    alt={fc.companies?.name || 'Distributor'}
+                                    fallbackType="company"
+                                    name={fc.companies?.name || 'Distributor'}
+                                    className="w-full h-full object-cover"
+                                    width={72}
+                                    sizes="36px"
+                                    loading="lazy"
+                                  />
+                                </div>
+                                <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
+                                  {fc.companies?.name}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-text-primary text-xs bg-surface-2/80 border border-border px-3 py-2 rounded-lg inline-flex items-center gap-2">
+                              <Icon icon="solar:box-minimalistic-bold" className="text-brand text-sm shrink-0" />
+                              <span>{film.distributor || film.streaming_links?.distributor}</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
@@ -1284,6 +1293,12 @@ export default function FilmDetail() {
                   <span className="text-text-muted tracking-wider">Status</span>
                   <span className="text-text-primary">{film.status}</span>
                 </div>
+                {(film.distributor || film.streaming_links?.distributor) && (
+                  <div className="flex justify-between items-center border-b border-border pb-3">
+                    <span className="text-text-muted tracking-wider">Distributor</span>
+                    <span className="text-text-primary font-bold">{film.distributor || film.streaming_links?.distributor}</span>
+                  </div>
+                )}
                 {film.countries && film.countries.length > 0 && (
                   <div className="flex justify-between items-start gap-4 border-b border-border pb-3">
                     <span className="text-text-muted tracking-wider shrink-0">Country</span>
