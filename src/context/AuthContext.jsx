@@ -1,8 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { createContext, useContext, useRef, useState, useEffect } from 'react';
+import { SUPABASE_AUTH_STORAGE_KEY, supabase } from '../lib/supabase';
 import { requestWelcomeEmail } from '../lib/welcomeEmail';
 
 const AuthContext = createContext();
+const SESSION_ONLY_AUTH_KEY = 'MuviDB_session_only_auth';
 
 function getAuthErrorStatus(error) {
   return Number(error?.status || error?.statusCode || error?.code || 0);
@@ -26,9 +27,19 @@ function isInvalidAuthError(error) {
 
   const status = getAuthErrorStatus(error);
   const message = getAuthErrorMessage(error);
+  const refreshTokenGone =
+    /refresh.*token.*(not found|invalid|expired|revoked|reuse|already used)|invalid.*refresh.*token|session.*(missing|not found)|user.*not found|user from sub claim/.test(message);
+
+  if (refreshTokenGone) return true;
+
+  // Plain 401/403 responses can happen during temporary auth/service edges.
+  // Keep the cached session unless Supabase says the refresh token/session is
+  // actually gone.
+  if ([401, 403].includes(status)) return false;
+
   return (
-    [400, 401, 403, 404].includes(status) ||
-    /invalid.*jwt|jwt.*expired|invalid.*token|refresh.*token|session.*missing|session.*not found|user.*not found|user from sub claim|not authenticated/.test(message)
+    [400, 404].includes(status) ||
+    /invalid.*jwt|invalid.*access.*token/.test(message)
   );
 }
 
@@ -37,6 +48,7 @@ function roleFromUser(authUser) {
 }
 
 export function AuthProvider({ children }) {
+  const manualSignOutRef = useRef(false);
   const [authState, setAuthState] = useState({
     user: null,
     role: null,
@@ -51,6 +63,18 @@ export function AuthProvider({ children }) {
       /* ignore */
     }
     setAuthState({ user: null, role: null, loading: false });
+  };
+
+  const setRememberedSession = (remember) => {
+    if (typeof window === 'undefined') return;
+
+    if (remember) {
+      window.sessionStorage.removeItem(SESSION_ONLY_AUTH_KEY);
+      return;
+    }
+
+    window.sessionStorage.setItem(SESSION_ONLY_AUTH_KEY, 'true');
+    window.localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
   };
 
   /**
@@ -194,9 +218,28 @@ export function AuthProvider({ children }) {
     const safety = setTimeout(stopLoading, 5000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
+      if (event === 'SIGNED_OUT') {
         settled = true;
-        setAuthState({ user: null, role: null, loading: false });
+        if (manualSignOutRef.current) {
+          manualSignOutRef.current = false;
+          setAuthState({ user: null, role: null, loading: false });
+          return;
+        }
+        void (async () => {
+          const { data: { session: cachedSession } } = await supabase.auth.getSession();
+          if (cachedSession?.user) {
+            applyCachedAuthUser(cachedSession.user);
+            await fetchUserProfile(cachedSession.user);
+            return;
+          }
+          setAuthState({ user: null, role: null, loading: false });
+        })();
+        return;
+      }
+
+      if (!session) {
+        settled = true;
+        setAuthState(prev => ({ ...prev, loading: false }));
         return;
       }
 
@@ -245,12 +288,49 @@ export function AuthProvider({ children }) {
     return () => { clearTimeout(safety); subscription.unsubscribe(); };
   }, []);
 
-  const login = async (email, password) => {
+  useEffect(() => {
+    const isAdminRoute = () => typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
+    const keepAdminSessionFresh = async () => {
+      if (!isAdminRoute() || document.hidden) return;
+      try {
+        const { data: { session }, error } = await supabase.auth.refreshSession();
+        if (error && !isTransientAuthError(error) && isInvalidAuthError(error)) {
+          await clearLocalAuth();
+          return;
+        }
+        const activeSession = session || (await supabase.auth.getSession()).data?.session;
+        if (activeSession?.user) {
+          applyCachedAuthUser(activeSession.user);
+          await fetchUserProfile(activeSession.user);
+        }
+      } catch (error) {
+        if (!isTransientAuthError(error) && isInvalidAuthError(error)) {
+          await clearLocalAuth();
+        }
+      }
+    };
+
+    const interval = window.setInterval(keepAdminSessionFresh, 10 * 60 * 1000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) void keepAdminSessionFresh();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
+  const login = async (email, password, options = {}) => {
+    const remember = options.remember !== false;
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
+    setRememberedSession(remember);
     if (data?.user) {
       await fetchUserProfile(data.user);
     }
@@ -313,9 +393,14 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setAuthState({ user: null, role: null, loading: false });
+    manualSignOutRef.current = true;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setAuthState({ user: null, role: null, loading: false });
+    } finally {
+      manualSignOutRef.current = false;
+    }
   };
 
   const user = authState.user;

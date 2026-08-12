@@ -148,6 +148,7 @@ async function main() {
 
   const plans: Plan[] = [];
   let skippedConflict = 0;
+  let skippedHasCredits = 0;
 
   for (const { key, list } of groups) {
     const sorted = [...list].sort((a, b) => rank(a, b, credits));
@@ -160,6 +161,14 @@ async function main() {
       }
       if (hasIdConflict(survivor, p)) {
         skippedConflict++;
+        return false;
+      }
+      // ⛔ SAFETY GUARD: never auto-merge a duplicate that has real credits.
+      // "Funke Olatunji" and "Olatunji Funke" share the same sorted token
+      // multiset but may be two completely different people. If the person
+      // we'd delete has credits, a human must review it in the admin UI.
+      if ((credits.get(p.id) || 0) > 0) {
+        skippedHasCredits++;
         return false;
       }
       return true;
@@ -207,6 +216,7 @@ async function main() {
   console.log(`Mergeable swap groups: ${plans.length}`);
   console.log(`People to absorb: ${stubCount}`);
   console.log(`Skipped conflicts: ${skippedConflict}`);
+  if (skippedHasCredits) console.log(`\u26d4  skipped (duplicate has real credits \u2014 manual review required in admin UI): ${skippedHasCredits}`);
   console.log(`Plan: ${OUT}`);
   for (const p of plans.slice(0, 25)) {
     console.log(

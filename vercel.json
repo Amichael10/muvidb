@@ -176,6 +176,22 @@
       "destination": "/api/seo?type=sitemap&slug=channels"
     },
     {
+      "source": "/sitemap-critics.xml",
+      "destination": "/api/seo?type=sitemap&slug=critics"
+    },
+    {
+      "source": "/sitemap-plays.xml",
+      "destination": "/api/seo?type=sitemap&slug=plays"
+    },
+    {
+      "source": "/sitemap-careers.xml",
+      "destination": "/api/seo?type=sitemap&slug=careers"
+    },
+    {
+      "source": "/sitemap-:slug.xml",
+      "destination": "/api/seo?type=sitemap&slug=:slug"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/api/ssr?__pathname=/$1"
     }

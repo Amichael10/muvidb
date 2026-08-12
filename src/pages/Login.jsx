@@ -9,6 +9,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -55,7 +56,7 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      const data = await login(email, password);
+      const data = await login(email, password, { remember: rememberMe });
       const authUser = data?.user;
       const role = authUser?.user_metadata?.role;
       
@@ -147,6 +148,23 @@ export default function Login() {
           </div>
           {error && <p className="text-red-500 text-[10px] font-black uppercase tracking-widest mt-2">{error}</p>}
         </div>
+
+        <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-2/30 px-4 py-3 cursor-pointer hover:border-brand/40 transition-colors">
+          <span>
+            <span className="block text-[10px] font-black text-text-primary uppercase tracking-widest">
+              Remember me
+            </span>
+            <span className="block mt-1 text-[9px] font-bold text-text-muted uppercase tracking-widest opacity-60">
+              Stay signed in on this device
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(event) => setRememberMe(event.target.checked)}
+            className="h-5 w-5 rounded border-border bg-surface accent-brand"
+          />
+        </label>
 
         {/* Submit Button */}
         <button

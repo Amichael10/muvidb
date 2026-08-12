@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router';
 import { Icon } from '@iconify/react';
 import { fetchPlayBySlug, getPlayDateLabel } from '../lib/plays';
 import SEO from '../components/SEO';
+import ImageWithFallback from '../components/ui/ImageWithFallback';
 
 export default function PlayDetail() {
   const { slug } = useParams();
@@ -62,10 +63,15 @@ export default function PlayDetail() {
           <div className="flex flex-col md:flex-row gap-8 items-start">
             {/* Poster Card */}
             <div className="w-full md:w-64 flex-shrink-0">
-              <img
-                src={play.poster_url || play.banner_url || 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=600'}
+              <ImageWithFallback
+                src={play.poster_url || play.banner_url}
                 alt={play.title}
+                fallbackType="film"
+                name={play.title}
                 className="w-full h-80 object-cover rounded-2xl border border-border shadow-2xl"
+                width={512}
+                sizes="(max-width: 767px) 100vw, 256px"
+                loading="eager"
               />
             </div>
 
@@ -73,7 +79,8 @@ export default function PlayDetail() {
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 <span className="px-3 py-1 rounded-full bg-brand/15 border border-brand/30 text-brand text-xs font-bold uppercase tracking-wider">
-                  🎭 {play.genre || 'Stage Production'}
+                  <Icon icon="solar:masks-bold" className="inline-block mr-1 text-sm" />
+                  {play.genre || 'Stage Production'}
                 </span>
                 {playDateLabel && (
                   <span className="text-sm font-semibold text-text-muted">
@@ -156,10 +163,15 @@ export default function PlayDetail() {
                   to={`/people/${person.slug || person.id}`}
                   className="group bg-surface border border-border hover:border-brand/50 rounded-xl p-3.5 flex flex-col items-center text-center transition-all hover:-translate-y-1"
                 >
-                  <img
-                    src={person.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'}
+                  <ImageWithFallback
+                    src={person.photo_url}
                     alt={person.name || 'Performer'}
+                    fallbackType="avatar"
+                    name={person.name || 'Performer'}
                     className="w-20 h-20 rounded-full object-cover border-2 border-border group-hover:border-brand transition-colors mb-3 shadow-md"
+                    width={160}
+                    sizes="80px"
+                    loading="lazy"
                   />
                   <h3 className="text-xs font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
                     {person.name || 'Unknown Performer'}

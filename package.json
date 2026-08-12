@@ -30,6 +30,7 @@
     "sync:nollistream:dom": "tsx scripts/nollistream_dom_sync.ts",
     "sync:ugandan": "tsx scripts/ugandan_sync.ts",
     "sync:nollymeter": "tsx scripts/nollymeter_sync.ts",
+    "sync:bap-theatre": "tsx scripts/sync_bap_theatre.ts",
     "cleanup:cinemas": "tsx scripts/cleanup-cinemas.ts",
     "fix-db": "tsx scripts/fix_db.ts",
     "db": "tsx scripts/query.ts",

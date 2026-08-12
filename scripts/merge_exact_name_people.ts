@@ -119,6 +119,7 @@ async function main() {
 
   const plans: Plan[] = [];
   let skippedConflict = 0;
+  let skippedHasCredits = 0;
 
   for (const [nameKey, list] of groups) {
     const sorted = [...list].sort((a, b) => rank(a, b, credits));
@@ -130,6 +131,14 @@ async function main() {
       }
       if (hasIdConflict(survivor, p)) {
         skippedConflict++;
+        return false;
+      }
+      // ⛔ SAFETY GUARD: if the duplicate has a substantial credit history (>5),
+      // skip it for manual review. Exact-name duplicates are very likely the same
+      // person, but we don't want to silently destroy a record with many credits.
+      // Review these via the admin deduplicator UI.
+      if ((credits.get(p.id) || 0) > 5) {
+        skippedHasCredits++;
         return false;
       }
       return true;
@@ -176,6 +185,7 @@ async function main() {
   console.log(`Mergeable exact-name groups: ${plans.length}`);
   console.log(`People to absorb: ${absorb}`);
   console.log(`Skipped conflicts: ${skippedConflict}`);
+  if (skippedHasCredits) console.log(`\u26d4  skipped (duplicate has >5 credits \u2014 manual review required in admin UI): ${skippedHasCredits}`);
   console.log(`Plan: ${OUT}`);
   for (const p of plans.slice(0, 20)) {
     console.log(

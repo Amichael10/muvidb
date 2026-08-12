@@ -160,6 +160,9 @@ const PersonDetail = () => {
   const [youtubeVideoIds, setYoutubeVideoIds] = useState([])
   const [youtubeLoading, setYoutubeLoading] = useState(false)
   const [visibleCreditsCount, setVisibleCreditsCount] = useState(20)
+  const [filmographySearch, setFilmographySearch] = useState('')
+  const [filmographyView, setFilmographyView] = useState('grid')
+  const [awardsOpen, setAwardsOpen] = useState(false)
 
   const {
     isFollowing,
@@ -184,6 +187,10 @@ const PersonDetail = () => {
   useEffect(() => {
     setVisibleCreditsCount(20)
   }, [activeRole])
+
+  useEffect(() => {
+    setVisibleCreditsCount(20)
+  }, [filmographySearch, filmographyView])
 
   // `preloaded` is the row the route loader already fetched server-side. When
   // present the primary query is skipped, but everything after it still runs.
@@ -284,7 +291,7 @@ const PersonDetail = () => {
     if (ch?.id) {
       const { data: vidsData } = await supabase
         .from('channel_videos')
-        .select('id, video_id, title, thumbnail_url, published_at, duration_seconds, is_hidden, film_id, match_status')
+        .select('id, video_id, title, thumbnail_url, published_at, duration_seconds, view_count, is_hidden, film_id, match_status')
         .eq('channel_id', ch.id)
         .order('published_at', { ascending: false })
         .limit(50)
@@ -486,6 +493,56 @@ const PersonDetail = () => {
     (sum, c) => sum + (c.films?.view_count || 0), 0
   ) || 0
   const activeCredits = creditsByRole(activeRole)
+  const getCreditTitle = (credit) => credit.films?.title || credit.video?.title || 'Untitled'
+  const getCreditPoster = (credit) => credit.films?.poster_url || credit.video?.thumbnail_url
+  const getCreditYear = (credit) => {
+    if (credit.films?.year) return credit.films.year
+    if (!credit.video?.published_at) return null
+    const year = new Date(credit.video.published_at).getFullYear()
+    return Number.isNaN(year) ? null : year
+  }
+  const getCreditLink = (credit) => {
+    if (credit.video?.video_id) return `https://www.youtube.com/watch?v=${credit.video.video_id}`
+    const film = credit.films
+    return film ? `/films/${film.slug || film.id}` : '#'
+  }
+  const isExternalCredit = (credit) => Boolean(credit.video?.video_id)
+  const getCreditViews = (credit) => {
+    const raw = credit.video?.view_count ?? credit.films?.view_count ?? 0
+    return typeof raw === 'number' ? raw : parseInt(raw, 10) || 0
+  }
+  const isYoutubeCredit = (credit) => {
+    const film = credit.films || {}
+    return Boolean(
+      credit.video
+      || credit.is_virtual
+      || film.youtube_watch_url
+      || film.trailer_youtube_id
+      || film.release_type === 'youtube'
+      || film.source === 'youtube'
+    )
+  }
+  const filmographyQuery = filmographySearch.trim().toLowerCase()
+  const filteredActiveCredits = activeCredits.filter((credit) => {
+    if (!filmographyQuery) return true
+    return [
+      getCreditTitle(credit),
+      credit.character_name,
+      credit.role,
+      getCreditYear(credit),
+      credit.films?.release_type,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(filmographyQuery))
+  })
+  const visibleActiveCredits = filteredActiveCredits.slice(0, visibleCreditsCount)
+  const awardEntries = Array.isArray(person.awards) ? person.awards : []
+  const awardWins = awardEntries.filter((award) => award.won !== false).length
+  const awardNominations = awardEntries.filter((award) => award.won === false).length
+  const awardSummary = [
+    awardWins ? `${awardWins} ${awardWins === 1 ? 'award' : 'awards'}` : '',
+    awardNominations ? `${awardNominations} ${awardNominations === 1 ? 'nomination' : 'nominations'}` : '',
+  ].filter(Boolean).join(' & ')
   const knownFor = [...new Map(
     (person.credits || [])
       .filter((credit) => credit.films?.id)
@@ -632,18 +689,18 @@ const PersonDetail = () => {
 
               {/* Impact card — inline for mobile/tablet, hidden on lg+ (shown as right column) */}
               {showImpactCard && (
-                <div className="lg:hidden w-full">
-                  <div className="inline-flex divide-x divide-border border border-border rounded-2xl bg-surface shadow-lg overflow-hidden">
-                    <div className="flex flex-col items-center px-8 py-5 gap-1.5 min-w-[130px]">
+                <div className="lg:hidden w-full max-w-xl mx-auto md:mx-0">
+                  <div className="grid grid-cols-2 divide-x divide-border border border-border rounded-2xl bg-surface shadow-lg overflow-hidden">
+                    <div className="flex flex-col items-start px-4 sm:px-6 py-5 gap-1.5 min-w-0">
                       <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">Box Office</p>
                       {hasBoxOffice
-                        ? <p className="text-brand text-3xl font-black font-heading tracking-tighter leading-none">{fmtMoney(displayBoxOffice)}</p>
+                        ? <p className="text-brand text-[clamp(1.6rem,8vw,2.25rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtMoney(displayBoxOffice)}</p>
                         : <p className="text-text-muted text-3xl font-black font-heading leading-none">—</p>}
                     </div>
-                    <div className="flex flex-col items-center px-8 py-5 gap-1.5 min-w-[130px]">
+                    <div className="flex flex-col items-start px-4 sm:px-6 py-5 gap-1.5 min-w-0">
                       <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">YouTube Views</p>
                       {hasYtViews
-                        ? <p className="text-text-primary text-3xl font-black font-heading tracking-tighter leading-none">{fmtViews(displayYtViews)}</p>
+                        ? <p className="text-text-primary text-[clamp(1.6rem,8vw,2.25rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtViews(displayYtViews)}</p>
                         : <p className="text-text-muted text-3xl font-black font-heading leading-none">—</p>}
                     </div>
                   </div>
@@ -759,22 +816,22 @@ const PersonDetail = () => {
 
             {/* ── Right Impact Card ── */}
             {showImpactCard && (
-              <div className="hidden lg:flex flex-col flex-shrink-0 self-start mt-10 mr-4">
-                <div className="border border-border rounded-2xl bg-surface overflow-hidden w-[200px]" style={{boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 12px 40px rgba(0,0,0,0.5)'}}>
+              <div className="hidden lg:flex flex-col flex-shrink-0 self-start mt-10 mr-4 max-w-[min(30vw,440px)]">
+                <div className="border border-border rounded-2xl bg-surface overflow-hidden min-w-[240px] w-max max-w-full" style={{boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 12px 40px rgba(0,0,0,0.5)'}}>
 
                   {/* Box Office */}
-                  <div className="flex flex-col items-start px-7 pt-8 pb-6 gap-2 border-b border-border">
+                  <div className="flex flex-col items-start px-7 pt-8 pb-6 gap-2 border-b border-border min-w-0">
                     <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Box Office</p>
                     {hasBoxOffice
-                      ? <p className="text-brand text-[2.6rem] font-black font-heading tracking-tighter leading-none">{fmtMoney(displayBoxOffice)}</p>
+                      ? <p className="text-brand text-[clamp(2rem,3vw,3.5rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtMoney(displayBoxOffice)}</p>
                       : <p className="text-text-muted text-4xl font-black font-heading leading-none">—</p>}
                   </div>
 
                   {/* YouTube Views */}
-                  <div className="flex flex-col items-start px-7 pt-6 pb-8 gap-2">
+                  <div className="flex flex-col items-start px-7 pt-6 pb-8 gap-2 min-w-0">
                     <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">YouTube Views</p>
                     {hasYtViews
-                      ? <p className="text-text-primary text-[2.6rem] font-black font-heading tracking-tighter leading-none">{fmtViews(displayYtViews)}</p>
+                      ? <p className="text-text-primary text-[clamp(2rem,3vw,3.5rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtViews(displayYtViews)}</p>
                       : <p className="text-text-muted text-4xl font-black font-heading leading-none">—</p>}
                   </div>
 
@@ -827,12 +884,54 @@ const PersonDetail = () => {
           </section>
         )}
         <div className="p-4 md:p-8 lg:p-12">
-          <h2 className="text-text-primary text-3xl font-bold font-heading mb-8 tracking-tighter">
-            Filmography
-          </h2>
+          <div className="mb-8 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+            <div>
+              <p className="text-brand text-[10px] font-black uppercase tracking-[0.22em] mb-2">
+                {filteredActiveCredits.length} {filteredActiveCredits.length === 1 ? 'credit' : 'credits'}
+              </p>
+              <h2 className="text-text-primary text-3xl font-bold font-heading tracking-tighter">
+                Filmography
+              </h2>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <label className="relative flex-1 lg:w-80 group">
+                <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand transition-colors" />
+                <input
+                  type="search"
+                  value={filmographySearch}
+                  onChange={(event) => setFilmographySearch(event.target.value)}
+                  placeholder="Search film title or role"
+                  className="w-full h-12 bg-surface border border-border rounded-lg pl-11 pr-4 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-brand transition-colors"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 h-12 border border-border rounded-lg overflow-hidden bg-surface shrink-0">
+                {[
+                  { id: 'grid', label: 'Grid', icon: 'solar:widget-5-bold' },
+                  { id: 'list', label: 'List', icon: 'solar:list-bold' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setFilmographyView(item.id)}
+                    title={`${item.label} view`}
+                    aria-label={`${item.label} view`}
+                    className={`w-12 flex items-center justify-center border-r last:border-r-0 border-border transition-colors ${
+                      filmographyView === item.id
+                        ? 'bg-brand text-white'
+                        : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+                    }`}
+                  >
+                    <Icon icon={item.icon} width="18" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
           {availableRoles.length > 1 && (
-            <div className="flex bg-surface p-1 rounded-lg border border-border w-fit mb-10 overflow-x-auto no-scrollbar">
+            <div className="flex bg-surface p-1 rounded-lg border border-border w-fit mb-8 overflow-x-auto no-scrollbar">
               {availableRoles.map(role => (
                 <button
                   key={role}
@@ -849,18 +948,20 @@ const PersonDetail = () => {
             </div>
           )}
 
-          {activeCredits.length > 0 ? (
+          {activeCredits.length > 0 && filteredActiveCredits.length > 0 ? (
             <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-              {activeCredits.slice(0, visibleCreditsCount).map(credit => {
-                const film = credit.films
-                const video = credit.video
-                const title = film?.title || video?.title
-                const poster = film?.poster_url || video?.thumbnail_url
-                const link = video 
-                  ? `https://www.youtube.com/watch?v=${video.video_id}` 
-                  : `/films/${film?.slug || film?.id}`
-                const isExternal = !!video
+            <div className={filmographyView === 'grid'
+              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6'
+              : 'space-y-3'
+            }>
+              {visibleActiveCredits.map(credit => {
+                const film = credit.films || {}
+                const title = getCreditTitle(credit)
+                const poster = getCreditPoster(credit)
+                const link = getCreditLink(credit)
+                const isExternal = isExternalCredit(credit)
+                const views = getCreditViews(credit)
+                const year = getCreditYear(credit)
 
                 return (
                   <Link
@@ -869,12 +970,19 @@ const PersonDetail = () => {
                     onClick={(e) => {
                       if (isExternal) {
                         e.preventDefault()
-                        window.open(link, '_blank')
+                        window.open(link, '_blank', 'noopener,noreferrer')
                       }
                     }}
-                    className="group block"
+                    className={filmographyView === 'grid'
+                      ? 'group block'
+                      : 'group flex items-center gap-4 rounded-xl border border-border bg-surface p-3 hover:border-brand transition-colors'
+                    }
                   >
-                    <div className="relative overflow-hidden rounded-lg aspect-[2/3] bg-surface-2 border border-border group-hover:border-brand transition-all shadow-sm">
+                    <div className={`relative overflow-hidden bg-surface-2 border border-border group-hover:border-brand transition-all shadow-sm ${
+                      filmographyView === 'grid'
+                        ? 'rounded-lg aspect-[2/3]'
+                        : 'w-16 h-24 rounded-lg flex-shrink-0'
+                    }`}>
                       <ImageWithFallback
                         src={poster}
                         alt={title}
@@ -893,20 +1001,29 @@ const PersonDetail = () => {
                         if (num <= 0) return null;
                         const fmt = num >= 1_000_000_000 ? `₦${(num / 1_000_000_000).toFixed(2)}B` : `₦${(num / 1_000_000).toFixed(0)}M`;
                         return (
-                          <div className="absolute top-2 right-2 bg-amber-500/90 text-bg text-[8px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-0.5 z-10 backdrop-blur-sm">
+                          <div className="absolute top-2 right-2 bg-amber-500/90 text-bg text-[8px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-1 z-10 backdrop-blur-sm">
                             <span>🎟️</span>
                             <span>{fmt}</span>
                           </div>
                         );
                       })()}
+                      {isYoutubeCredit(credit) && views > 0 && (
+                        <div className="absolute top-2 left-2 bg-bg/85 text-text-primary border border-border text-[8px] font-black px-1.5 py-0.5 rounded shadow flex items-center gap-1 z-10 backdrop-blur-sm">
+                          <Icon icon="solar:eye-bold" width="11" className="text-brand" />
+                          <span>{formatViewCount(views)}</span>
+                        </div>
+                      )}
+                      {filmographyView === 'grid' && (
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <p className="text-text-primary text-[11px] font-bold tracking-tight line-clamp-2 leading-tight group-hover:text-brand transition-colors">
                           {formatFilmTitle(title)}
                         </p>
                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          <p className="text-text-muted text-[9px] font-black tracking-widest uppercase">
-                            {film?.year || (video?.published_at && new Date(video.published_at).getFullYear())}
-                          </p>
+                          {year && (
+                            <p className="text-text-muted text-[9px] font-black tracking-widest uppercase">
+                              {year}
+                            </p>
+                          )}
                           {credit.character_name && (
                             <p className="text-brand text-[9px] font-bold truncate">
                               as {toTitleCase(credit.character_name)}
@@ -914,12 +1031,42 @@ const PersonDetail = () => {
                           )}
                         </div>
                       </div>
+                      )}
                     </div>
+                    {filmographyView === 'list' && (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          {year && (
+                            <span className="text-[9px] font-black uppercase tracking-[0.18em] text-text-muted">
+                              {year}
+                            </span>
+                          )}
+                          <PlatformBadge releaseType={film.release_type || (credit.video ? 'youtube' : '')} />
+                        </div>
+                        <h3 className="text-sm sm:text-base font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                          {formatFilmTitle(title)}
+                        </h3>
+                        <p className="mt-1 text-xs text-text-muted line-clamp-1">
+                          {[formatRole(credit.role), credit.character_name ? `as ${toTitleCase(credit.character_name)}` : null]
+                            .filter(Boolean)
+                            .join(' / ')}
+                        </p>
+                      </div>
+                    )}
+                    {filmographyView === 'list' && isYoutubeCredit(credit) && views > 0 && (
+                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border bg-bg px-2.5 py-1 text-[10px] font-black text-text-primary">
+                        <Icon icon="solar:eye-bold" width="13" className="text-brand" />
+                        {formatViewCount(views)}
+                      </span>
+                    )}
+                    {filmographyView === 'list' && (
+                      <Icon icon={isExternal ? 'solar:arrow-up-right-linear' : 'solar:alt-arrow-right-linear'} className="text-text-muted group-hover:text-brand shrink-0" width="18" />
+                    )}
                   </Link>
                 )
               })}
             </div>
-            {activeCredits.length > visibleCreditsCount && (
+            {filteredActiveCredits.length > visibleCreditsCount && (
               <div className="flex justify-center mt-10">
                 <button
                   type="button"
@@ -935,7 +1082,7 @@ const PersonDetail = () => {
           ) : (
             <div className="text-center py-20 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
               <p className="text-text-muted font-bold text-xs">
-                No credits available yet
+                {filmographySearch ? `No credits match "${filmographySearch}"` : 'No credits available yet'}
               </p>
             </div>
           )}
@@ -954,26 +1101,41 @@ const PersonDetail = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {stageCredits.map((play) => (
                 <Link
                   key={play.id}
                   to={`/plays/${play.slug}`}
-                  className="group bg-surface border border-border hover:border-brand rounded-xl p-4 flex gap-4 items-center transition-all hover:-translate-y-0.5"
+                  className="group bg-surface border border-border hover:border-brand rounded-xl p-4 flex gap-4 items-stretch transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand/5"
                 >
-                  <img
-                    src={play.poster_url || 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=200'}
+                  <ImageWithFallback
+                    src={play.poster_url}
                     alt={play.title}
-                    className="w-14 h-20 rounded-lg object-cover border border-border flex-shrink-0"
+                    fallbackType="film"
+                    name={play.title}
+                    className="w-20 h-28 rounded-lg object-cover border border-border flex-shrink-0 group-hover:border-brand/60 transition-colors"
+                    width={180}
+                    sizes="80px"
+                    loading="lazy"
                   />
-                  <div>
-                    <h3 className="text-sm font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <h3 className="text-base font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-2 leading-tight">
                       {play.title}
                     </h3>
-                    <span className="text-[11px] font-semibold text-brand block mt-0.5">
+                    <span className="text-[11px] font-bold text-brand block mt-1">
                       {play.role || 'Actor'} {play.character_name ? `as ${play.character_name}` : ''}
                     </span>
-                    <span className="text-[10px] text-text-muted block mt-1">
+                    <div className="mt-3 space-y-1.5 text-[10px] text-text-muted">
+                      <span className="flex items-start gap-1.5">
+                        <Icon icon="solar:calendar-minimalistic-bold" className="text-brand text-xs shrink-0 mt-0.5" />
+                        <span className="font-semibold leading-relaxed">{getPlayDateLabel(play, 'Date TBA')}</span>
+                      </span>
+                      <span className="flex items-start gap-1.5">
+                        <Icon icon="solar:map-point-bold" className="text-brand text-xs shrink-0 mt-0.5" />
+                        <span className="line-clamp-1">{play.venue || play.city || 'Theatre'}</span>
+                      </span>
+                    </div>
+                    <span className="hidden">
                       📍 {play.venue || play.city || 'Theatre'} ({getPlayDateLabel(play, 'N/A')})
                     </span>
                   </div>
@@ -984,32 +1146,34 @@ const PersonDetail = () => {
         )}
 
         {/* Awards (people.awards jsonb) */}
-        {Array.isArray(person.awards) && person.awards.length > 0 && (
+        {awardEntries.length > 0 && (
         <div className="p-4 md:p-8 lg:p-12 border-t border-border">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-8">
-            <h2 className="text-text-primary text-3xl font-bold font-heading tracking-tighter">
-              Awards
-            </h2>
-            {Array.isArray(person.awards) && person.awards.length > 0 && (() => {
-              // IMDb-style tally: wins counted separately from nominations.
-              const wins = person.awards.filter((a) => a.won !== false).length
-              const noms = person.awards.filter((a) => a.won === false).length
-              const parts = []
-              if (wins) parts.push(`${wins} ${wins === 1 ? 'win' : 'wins'}`)
-              if (noms) parts.push(`${noms} ${noms === 1 ? 'nomination' : 'nominations'}`)
-              return (
-                <span className="text-[10px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-xl px-3 py-1">
-                  {parts.join(' & ')} total
-                </span>
-              )
-            })()}
-          </div>
+          <button
+            type="button"
+            onClick={() => setAwardsOpen((open) => !open)}
+            className="w-full flex items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-4 mb-8 text-left hover:border-brand transition-colors"
+            aria-expanded={awardsOpen}
+          >
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-text-primary text-3xl font-bold font-heading tracking-tighter">
+                Awards
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest bg-brand/10 text-brand border border-brand/20 rounded-xl px-3 py-1">
+                {awardSummary || `${awardEntries.length} listed`}
+              </span>
+            </span>
+            <Icon
+              icon="solar:alt-arrow-down-linear"
+              className={`text-text-muted transition-transform ${awardsOpen ? 'rotate-180 text-brand' : ''}`}
+              width="22"
+            />
+          </button>
 
-          {Array.isArray(person.awards) && person.awards.length > 0 ? (
+          {awardsOpen && (
             <div className="space-y-8 max-w-3xl">
               {Object.entries(
                 // Group by awarding body (IMDb lists a block per organisation).
-                person.awards.reduce((acc, a) => {
+                awardEntries.reduce((acc, a) => {
                   const org = a.organization || 'Awards'
                   ;(acc[org] = acc[org] || []).push(a)
                   return acc
@@ -1091,14 +1255,6 @@ const PersonDetail = () => {
                   </div>
                 </div>
               ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border-2 border-dashed border-border bg-surface-2/20 py-16 flex flex-col items-center justify-center text-center gap-3">
-              <Icon icon="solar:cup-star-bold" className="text-5xl text-text-muted/40" />
-              <p className="text-text-secondary text-sm font-bold">No awards listed yet</p>
-              <p className="text-text-muted text-xs max-w-md px-4">
-                We&apos;re still compiling {formatPersonName(person.name)}&apos;s awards and honours.
-              </p>
             </div>
           )}
         </div>

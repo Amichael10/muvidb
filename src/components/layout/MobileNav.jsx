@@ -32,6 +32,8 @@ const MobileNav = () => {
     { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
     { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },
     { name: 'People', path: '/people', icon: 'solar:users-group-two-rounded-linear' },
+    { name: 'Critics', path: '/critics', icon: 'solar:pen-new-square-linear' },
+    { name: 'Theatre', path: '/plays', icon: 'solar:masks-linear' },
     { name: 'Awards', path: '/awards', icon: 'solar:cup-star-linear' },
     { name: 'Companies', path: '/companies', icon: 'solar:case-linear' },
   ];
@@ -51,9 +53,9 @@ const MobileNav = () => {
         />
       )}
 
-      {/* Slide-up Bottom Drawer Sheet — always dark glass; force light text so light theme tokens don't wash out labels */}
+      {/* Slide-up bottom drawer sheet; force light text so light theme tokens do not wash out labels. */}
       {isDrawerOpen && (
-        <div className="fixed bottom-0 left-0 right-0 z-[99] lg:hidden bg-black/85 backdrop-blur-2xl border-t border-white/10 rounded-t-3xl px-6 pt-4 pb-28 animate-in slide-in-from-bottom-8 duration-300 ease-out">
+        <div className="fixed bottom-0 left-0 right-0 z-[99] lg:hidden bg-black/85 backdrop-blur-2xl border-t border-white/10 rounded-t-3xl px-6 pt-4 pb-28 max-h-[calc(100dvh-4rem)] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300 ease-out">
           {/* Native Grab Handle */}
           <div className="w-12 h-1.5 bg-white/25 rounded-full mx-auto mb-6" />
           

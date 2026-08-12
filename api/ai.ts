@@ -37,6 +37,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'people_enrichment_gemini_batch': return await peopleEnrichmentGeminiBatch(data, res);
       case 'enrich_film_gemini': return await enrichFilmGeminiTask(data, res);
       case 'enrich_people_strict': return await enrichPeopleStrictTask(data, res);
+      case 'generate_missing_synopses': return await generateMissingSynopses(data, res);
+      case 'generate_missing_bios': return await generateMissingBios(data, res);
+      case 'detect_duplicate_films': return await detectDuplicateFilms(data, res);
+      case 'generate_social_teaser': return await generateSocialTeaser(data, res);
       default: return res.status(400).json({ error: 'Invalid task' });
     }
   } catch (err: any) {
@@ -1032,4 +1036,168 @@ async function enrichPeopleStrictTask(data: any, res: VercelResponse) {
   }
 
   return res.json({ success: true, count: results.length, results });
+}
+
+async function generateMissingSynopses(data: any, res: VercelResponse) {
+  const limit = Math.min(Number(data?.limit || 20), 50);
+
+  const { data: films, error } = await supabase
+    .from('films')
+    .select('id, title, year, synopsis')
+    .or('synopsis.is.null,synopsis.eq.')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!films || films.length === 0) {
+    return res.json({ success: true, message: 'No films missing synopses found', results: [] });
+  }
+
+  const prompt = `
+    You are a Nollywood database editor. Write a concise, 2-sentence factual movie logline for each film below.
+    Base the summary ONLY on the title and context (e.g. genre implied by title). Do NOT make up specific character names unless evident. Keep tone cinematic.
+
+    Return ONLY JSON: [{"id": "...", "title": "...", "synopsis": "..."}]
+
+    Films: ${JSON.stringify(films.map(f => ({ id: f.id, title: f.title, year: f.year })))}
+  `;
+
+  const { text, telemetry } = await generateAIContent(prompt);
+  const parsed = parseJSON(text);
+
+  let updatedCount = 0;
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      if (item.id && item.synopsis && item.synopsis.length > 20) {
+        const { error: uErr } = await supabase
+          .from('films')
+          .update({ synopsis: item.synopsis.trim() })
+          .eq('id', item.id);
+        if (!uErr) updatedCount++;
+      }
+    }
+  }
+
+  return res.json({ success: true, analyzedCount: films.length, updatedCount, results: parsed, telemetry });
+}
+
+async function generateMissingBios(data: any, res: VercelResponse) {
+  const limit = Math.min(Number(data?.limit || 15), 30);
+
+  const { data: people, error } = await supabase
+    .from('people')
+    .select('id, name, bio')
+    .or('bio.is.null,bio.eq.')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!people || people.length === 0) {
+    return res.json({ success: true, message: 'No people missing bios found', results: [] });
+  }
+
+  // Fetch top credit film titles for each person to give rich context
+  const personContexts = [];
+  for (const p of people) {
+    const { data: credits } = await supabase
+      .from('credits')
+      .select('films(title)')
+      .eq('person_id', p.id)
+      .limit(5);
+
+    const movieTitles = (credits || []).map((c: any) => c.films?.title).filter(Boolean);
+    personContexts.push({
+      id: p.id,
+      name: p.name,
+      knownForMovies: movieTitles,
+    });
+  }
+
+  const prompt = `
+    You are a Nollywood database biographer. Write a 2-3 sentence professional biography for each person below.
+    Highlight their contributions to African cinema and mention their notable movie appearances if listed.
+
+    Return ONLY JSON: [{"id": "...", "name": "...", "biography": "..."}]
+
+    People: ${JSON.stringify(personContexts)}
+  `;
+
+  const { text, telemetry } = await generateAIContent(prompt);
+  const parsed = parseJSON(text);
+
+  let updatedCount = 0;
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      if (item.id && item.biography && item.biography.length > 20) {
+        const { error: uErr } = await supabase
+          .from('people')
+          .update({ bio: item.biography.trim() })
+          .eq('id', item.id);
+        if (!uErr) updatedCount++;
+      }
+    }
+  }
+
+  return res.json({ success: true, analyzedCount: people.length, updatedCount, results: parsed, telemetry });
+}
+
+async function detectDuplicateFilms(data: any, res: VercelResponse) {
+  const limit = Math.min(Number(data?.limit || 100), 200);
+
+  const { data: films, error } = await supabase
+    .from('films')
+    .select('id, title, year')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) return res.status(500).json({ error: error.message });
+  if (!films || films.length < 2) {
+    return res.json({ success: true, duplicates: [] });
+  }
+
+  const prompt = `
+    You are a database deduplication auditor for a Nollywood film database.
+    Analyze these film titles and identify pairs that are VERY LIKELY the exact same film re-uploaded or typed differently.
+    (e.g., "Alakada (Part 1)" vs "Alakada Pt 1", "Osuofia in London" vs "Osuofia in London 1").
+
+    Return ONLY JSON: [{"original_id": "...", "original_title": "...", "duplicate_id": "...", "duplicate_title": "...", "confidence": 0.95, "reason": "..."}]
+
+    Films: ${JSON.stringify(films)}
+  `;
+
+  const { text, telemetry } = await generateAIContent(prompt);
+  const duplicates = parseJSON(text);
+
+  return res.json({ success: true, scannedCount: films.length, duplicates, telemetry });
+}
+
+async function generateSocialTeaser(data: any, res: VercelResponse) {
+  const { filmId } = data;
+  if (!filmId) return res.status(400).json({ error: 'filmId is required' });
+
+  const { data: film, error } = await supabase
+    .from('films')
+    .select('id, title, year, synopsis')
+    .eq('id', filmId)
+    .single();
+
+  if (error || !film) return res.status(404).json({ error: 'Film not found' });
+
+  const prompt = `
+    You are a social media marketing expert for Nollywood cinema.
+    Generate promotional captions for the film "${film.title}" (${film.year || 'Nollywood'}).
+    Synopsis: ${film.synopsis || 'An exciting Nollywood release.'}
+
+    Output captions for 3 platforms:
+    1. instagram: Engaging caption with line breaks, emojis, and hashtags.
+    2. twitter: Punchy tweet under 280 characters with 3 hashtags.
+    3. whatsapp: Casual broadcast message to send to movie groups.
+
+    Return ONLY JSON: {"instagram": "...", "twitter": "...", "whatsapp": "..."}
+  `;
+
+  const { text, telemetry } = await generateAIContent(prompt);
+  const teaser = parseJSON(text);
+
+  return res.json({ success: true, film: { id: film.id, title: film.title }, teaser, telemetry });
 }

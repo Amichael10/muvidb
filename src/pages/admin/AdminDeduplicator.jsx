@@ -168,6 +168,11 @@ export default function AdminDeduplicator() {
   const [isMerging, setIsMerging] = useState(false);
   const [isDismissing, setIsDismissing] = useState(false);
   const [databaseReady, setDatabaseReady] = useState(null);
+  const [isBulkMerging, setIsBulkMerging] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkTotal, setBulkTotal] = useState(0);
+  const [bulkMerged, setBulkMerged] = useState(0);
+  const [bulkSkipped, setBulkSkipped] = useState(0);
 
   const report = reports[entity];
 
@@ -364,6 +369,80 @@ export default function AdminDeduplicator() {
     }
   };
 
+  const bulkMergeHighConfidence = async () => {
+    if (databaseReady !== true) {
+      toast.error(DATABASE_SETUP_MESSAGE);
+      return;
+    }
+    const highGroups = (report?.groups || []).filter(
+      (group) => group.confidence === 'high' && group.conflicts.length === 0,
+    );
+    if (!highGroups.length) {
+      toast('No high-confidence groups without conflicts to merge.');
+      return;
+    }
+    setIsBulkMerging(true);
+    setBulkTotal(highGroups.length);
+    setBulkProgress(0);
+    setBulkMerged(0);
+    setBulkSkipped(0);
+    let mergedCount = 0;
+    let skippedCount = 0;
+    const mergedGroupIds = new Set();
+    for (let index = 0; index < highGroups.length; index += 1) {
+      const group = highGroups[index];
+      setBulkProgress(index + 1);
+      const selectedPrimaryId = group.recommendedPrimaryId || group.records[0]?.id;
+      const duplicateIds = group.records
+        .filter((record) => record.id !== selectedPrimaryId)
+        .map((record) => record.id);
+      if (!selectedPrimaryId || !duplicateIds.length) {
+        skippedCount += 1;
+        setBulkSkipped(skippedCount);
+        continue;
+      }
+      try {
+        const payload = await apiRequest({
+          action: 'merge', entity, primaryId: selectedPrimaryId, duplicateIds, metadata: {},
+        });
+        if (!payload) {
+          const rpcName = entity === 'people' ? 'merge_people_group' : 'merge_films_group';
+          const { error } = await supabase.rpc(rpcName, {
+            p_master_id: selectedPrimaryId,
+            p_duplicate_ids: duplicateIds,
+            p_metadata: {},
+          });
+          if (error) throw error;
+        }
+        mergedGroupIds.add(group.id);
+        mergedCount += 1;
+        setBulkMerged(mergedCount);
+      } catch (error) {
+        skippedCount += 1;
+        setBulkSkipped(skippedCount);
+      }
+    }
+    // Remove all successfully merged groups from the report at once.
+    setReports((current) => ({
+      ...current,
+      [entity]: {
+        ...current[entity],
+        groups: current[entity].groups.filter((group) => !mergedGroupIds.has(group.id)),
+        summary: {
+          ...current[entity].summary,
+          groups: Math.max(0, current[entity].summary.groups - mergedCount),
+          high: Math.max(0, (current[entity].summary.high || 0) - mergedCount),
+        },
+      },
+    }));
+    setIsBulkMerging(false);
+    if (mergedCount > 0) {
+      toast.success(`Bulk merge complete: ${mergedCount} groups merged${skippedCount ? `, ${skippedCount} skipped` : ''}.`);
+    } else {
+      toast.error('Bulk merge finished but no groups were merged. Check for errors.');
+    }
+  };
+
   const switchEntity = (nextEntity) => {
     setEntity(nextEntity);
     setQuery('');
@@ -382,15 +461,35 @@ export default function AdminDeduplicator() {
               Scan the full catalogue, compare identity evidence, and merge selected records into one survivor.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={scan}
-            disabled={isScanning}
-            className="inline-flex h-11 items-center justify-center gap-2 bg-brand px-5 text-sm font-bold text-white transition-colors hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
-          >
-            <Icon icon={isScanning ? 'solar:refresh-circle-linear' : 'solar:radar-2-linear'} className={isScanning ? 'animate-spin' : ''} width="19" />
-            {isScanning ? scanStatus || 'Scanning catalogue...' : `Scan all ${entity}`}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {(() => {
+              const highCount = (report?.groups || []).filter(
+                (group) => group.confidence === 'high' && group.conflicts.length === 0,
+              ).length;
+              return highCount > 0 && !isScanning ? (
+                <button
+                  type="button"
+                  onClick={bulkMergeHighConfidence}
+                  disabled={isBulkMerging || databaseReady !== true}
+                  className="inline-flex h-11 items-center justify-center gap-2 border border-emerald-500/40 bg-emerald-500/10 px-5 text-sm font-bold text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Icon icon={isBulkMerging ? 'solar:refresh-circle-linear' : 'solar:merge-linear'} className={isBulkMerging ? 'animate-spin' : ''} width="19" />
+                  {isBulkMerging
+                    ? `Merging ${bulkProgress} of ${bulkTotal}…`
+                    : `Merge all high-confidence (${highCount})`}
+                </button>
+              ) : null;
+            })()}
+            <button
+              type="button"
+              onClick={scan}
+              disabled={isScanning || isBulkMerging}
+              className="inline-flex h-11 items-center justify-center gap-2 bg-brand px-5 text-sm font-bold text-white transition-colors hover:bg-brand/90 disabled:cursor-wait disabled:opacity-60"
+            >
+              <Icon icon={isScanning ? 'solar:refresh-circle-linear' : 'solar:radar-2-linear'} className={isScanning ? 'animate-spin' : ''} width="19" />
+              {isScanning ? scanStatus || 'Scanning catalogue...' : `Scan all ${entity}`}
+            </button>
+          </div>
         </div>
 
         {databaseReady === false && (
@@ -412,6 +511,27 @@ export default function AdminDeduplicator() {
               <Icon icon="solar:refresh-linear" width="16" />
               Check again
             </button>
+          </div>
+        )}
+
+        {isBulkMerging && (
+          <div className="border-b border-emerald-500/20 bg-emerald-500/10 px-6 py-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <Icon icon="solar:merge-linear" width="16" />
+                <span className="text-xs font-bold">Bulk merging high-confidence groups…</span>
+              </div>
+              <span className="font-mono text-xs text-emerald-300">
+                {bulkProgress} / {bulkTotal}
+                {bulkSkipped > 0 && <span className="ml-2 text-amber-400">({bulkSkipped} skipped)</span>}
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-emerald-900/40">
+              <div
+                className="h-full rounded-full bg-emerald-400 transition-all duration-300"
+                style={{ width: bulkTotal > 0 ? `${(bulkProgress / bulkTotal) * 100}%` : '0%' }}
+              />
+            </div>
           </div>
         )}
 

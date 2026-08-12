@@ -15,6 +15,7 @@ import ImageWithFallback from '../components/ui/ImageWithFallback';
 import PopcornField from '../components/ui/PopcornField';
 import HomeIntroSection from '../components/film/HomeIntroSection';
 import { collapseSeriesFilms } from '../utils/series';
+import { fetchPlays, getPlayDateLabel } from '../lib/plays';
 
 // Below-fold sections — keep them out of the critical homepage JS chunk.
 const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
@@ -60,6 +61,8 @@ export default function Home() {
   const [streamTab, setStreamTab] = useState('netflix');
   const [youtubeFeed, setYoutubeFeed] = useState([]);
   const [youtubeFilter, setYoutubeFilter] = useState('All');
+  const [upcomingPlays, setUpcomingPlays] = useState([]);
+  const [isTheatreLoading, setIsTheatreLoading] = useState(false);
   const [spotlightPerson, setSpotlightPerson] = useState(null);
   const [otherPeople, setOtherPeople] = useState([]);
   const [creators, setCreators] = useState([]);
@@ -145,6 +148,7 @@ export default function Home() {
       await Promise.all([
         fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
         fetchNewToStream().catch(e => console.error('Error fetching new to stream:', e)),
+        fetchUpcomingPlays().catch(e => console.error('Error fetching theatre plays:', e)),
       ]);
     } catch (error) {
       console.error('Error in priority fetches:', error);
@@ -290,6 +294,33 @@ export default function Home() {
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
       }));
       setFeaturedSeries(collapseSeriesFilms(mapped).slice(0, HOME_ROW_CAP));
+    }
+  };
+
+  const fetchUpcomingPlays = async () => {
+    setIsTheatreLoading(true);
+    try {
+      const rows = await fetchPlays();
+      const today = new Date().toISOString().slice(0, 10);
+      const upcoming = (rows || [])
+        .filter((play) => {
+          const status = String(play.status || '').toLowerCase();
+          return (
+            status === 'upcoming'
+            || status === 'currently_running'
+            || (play.run_end_date && play.run_end_date >= today)
+            || (play.run_start_date && play.run_start_date >= today)
+          );
+        })
+        .sort((a, b) => {
+          const aDate = a.run_start_date || a.run_end_date || '9999-12-31';
+          const bDate = b.run_start_date || b.run_end_date || '9999-12-31';
+          return aDate.localeCompare(bDate);
+        })
+        .slice(0, 8);
+      setUpcomingPlays(upcoming);
+    } finally {
+      setIsTheatreLoading(false);
     }
   };
 
@@ -791,6 +822,101 @@ export default function Home() {
               cardVariant="cinema"
               maxItems={HOME_ROW_CAP}
             />
+          </div>
+        )}
+
+        {(isTheatreLoading || upcomingPlays.length > 0) && (
+          <div className="landing-band alt grided py-8 md:py-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
+              <div className="flex items-end justify-between gap-4 mb-6">
+                <div className="space-y-1.5">
+                  <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.25em]">Live stage dates</p>
+                  <h2 className="font-heading text-3xl md:text-[2.5rem] font-bold text-text-primary tracking-tight leading-none">
+                    Upcoming Theatre
+                  </h2>
+                </div>
+                <Link
+                  to="/plays"
+                  className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap pb-1"
+                >
+                  See all
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
+                </Link>
+              </div>
+
+              {isTheatreLoading && upcomingPlays.length === 0 ? (
+                <div className="flex gap-4 overflow-hidden">
+                  {[...Array(4)].map((_, index) => (
+                    <div key={index} className="w-[280px] sm:w-[340px] shrink-0 rounded-2xl border border-border bg-surface overflow-hidden animate-shimmer">
+                      <div className="grid grid-cols-[104px_1fr] min-h-[178px]">
+                        <div className="bg-surface-2 border-r border-border" />
+                        <div className="p-5 space-y-3">
+                          <div className="h-3 w-24 bg-surface-2 rounded" />
+                          <div className="h-5 w-2/3 bg-surface-2 rounded" />
+                          <div className="h-3 w-full bg-surface-2 rounded opacity-70" />
+                          <div className="h-3 w-3/4 bg-surface-2 rounded opacity-60" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+                  {upcomingPlays.map((play) => (
+                    <Link
+                      key={play.id}
+                      to={`/plays/${play.slug || play.id}`}
+                      className="group w-[280px] sm:w-[360px] shrink-0 snap-start rounded-2xl border border-border bg-surface overflow-hidden hover:border-brand/60 transition-all hover:shadow-xl hover:shadow-brand/5"
+                    >
+                      <div className="grid grid-cols-[104px_1fr] sm:grid-cols-[126px_1fr] min-h-[178px]">
+                        <div className="relative bg-surface-2 overflow-hidden">
+                          <ImageWithFallback
+                            src={play.poster_url || play.banner_url}
+                            alt={play.title}
+                            fallbackType="film"
+                            name={play.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            width={280}
+                            sizes="126px"
+                            loading="lazy"
+                          />
+                          <span className={`absolute left-2 top-2 rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-widest border backdrop-blur ${
+                            play.status === 'currently_running'
+                              ? 'bg-green-500/20 text-green-300 border-green-500/40'
+                              : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                          }`}>
+                            {play.status === 'currently_running' ? 'Running' : 'Upcoming'}
+                          </span>
+                        </div>
+                        <div className="p-4 sm:p-5 min-w-0 flex flex-col justify-between">
+                          <div>
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-brand mb-2">
+                              {play.genre || 'Stage Play'}
+                            </p>
+                            <h3 className="font-heading text-xl font-black tracking-tight text-text-primary group-hover:text-brand transition-colors line-clamp-2 leading-tight">
+                              {play.title}
+                            </h3>
+                            <p className="mt-2 text-xs text-text-muted line-clamp-2 leading-relaxed">
+                              {play.synopsis || 'Live theatre production with stage dates, venue, and cast credits.'}
+                            </p>
+                          </div>
+                          <div className="pt-4 space-y-2 text-[10px] text-text-muted">
+                            <div className="flex items-start gap-2">
+                              <Icon icon="solar:calendar-minimalistic-bold" className="text-brand text-sm shrink-0 mt-0.5" />
+                              <span className="font-bold leading-relaxed">{getPlayDateLabel(play, 'Date TBA')}</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <Icon icon="solar:map-point-bold" className="text-brand text-sm shrink-0 mt-0.5" />
+                              <span className="line-clamp-1">{play.venue || play.city || 'Venue TBA'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

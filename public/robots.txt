@@ -1,11 +1,16 @@
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
 User-agent: *
 Allow: /
-Crawl-delay: 10
 
-# Block AI scrapers, dataset crawlers, and SEO harvesters (the ones that
-# respect robots.txt). Malicious scrapers ignore this — rate limiting at the
-# edge (Cloudflare) + Supabase is the real defense; this documents intent and
-# stops the well-behaved bulk crawlers.
+# Block AI scrapers & commercial SEO dataset harvesters
 User-agent: GPTBot
 Disallow: /
 
@@ -82,3 +87,15 @@ User-agent: SemrushBot
 Disallow: /
 
 Sitemap: https://muvidb.com/sitemap.xml
+Sitemap: https://muvidb.com/sitemap-static.xml
+Sitemap: https://muvidb.com/sitemap-films.xml
+Sitemap: https://muvidb.com/sitemap-people.xml
+Sitemap: https://muvidb.com/sitemap-watch.xml
+Sitemap: https://muvidb.com/sitemap-companies.xml
+Sitemap: https://muvidb.com/sitemap-cinemas.xml
+Sitemap: https://muvidb.com/sitemap-channels.xml
+Sitemap: https://muvidb.com/sitemap-critics.xml
+Sitemap: https://muvidb.com/sitemap-plays.xml
+Sitemap: https://muvidb.com/sitemap-careers.xml
+Sitemap: https://muvidb.com/sitemap-awards.xml
+Sitemap: https://muvidb.com/sitemap-tvshows.xml

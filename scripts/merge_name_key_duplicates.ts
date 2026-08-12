@@ -14,6 +14,11 @@
  * Survivor = most films (film_count is now trigger-maintained and accurate),
  * then most complete, then oldest.
  *
+ * ⛔ SAFETY GUARD: any duplicate that already has real credits is SKIPPED
+ * automatically and flagged for manual review. Two distinct people can share
+ * the same sorted token multiset (same first+last name, different order),
+ * so we must not destroy a real person's credit history automatically.
+ *
  *   npx tsx scripts/merge_name_key_duplicates.ts
  *   npx tsx scripts/merge_name_key_duplicates.ts --apply
  */
@@ -40,14 +45,33 @@ async function main() {
   }
   console.log(`people with a name_key: ${all.length}`);
 
+  // Build name_key groups first
   const byKey = new Map<string, any[]>();
   for (const p of all) {
     const k = p.name_key as string;
     (byKey.get(k) || byKey.set(k, []).get(k)!).push(p);
   }
 
+  // Collect all person IDs that appear in a duplicate group, then fetch
+  // their actual credit counts. This is the safety gate — we will not
+  // auto-merge any duplicate that has real credits attached to it.
+  const allGroupIds: string[] = [];
+  for (const [, members] of byKey) {
+    if (members.length >= 2) allGroupIds.push(...members.map((m) => m.id));
+  }
+  const creditMap = new Map<string, number>();
+  for (let i = 0; i < allGroupIds.length; i += 200) {
+    const slice = allGroupIds.slice(i, i + 200);
+    const { data } = await supabase.from('credits').select('person_id').in('person_id', slice);
+    for (const row of data || []) {
+      creditMap.set(row.person_id, (creditMap.get(row.person_id) || 0) + 1);
+    }
+  }
+  console.log(`credit map built for ${creditMap.size} people who have at least 1 credit`);
+
   const plans: any[] = [];
   let skippedClaims = 0;
+  let skippedHasCredits = 0;
   for (const [, members] of byKey) {
     if (members.length < 2) continue;
     // Different owners must not be merged automatically.
@@ -58,12 +82,27 @@ async function main() {
       || completeness(b) - completeness(a)
       || Number(Boolean(b.is_verified)) - Number(Boolean(a.is_verified))
       || String(a.created_at || '').localeCompare(String(b.created_at || '')));
-    plans.push({ survivor: sorted[0], dups: sorted.slice(1) });
+    const survivor = sorted[0];
+    const safeDups = sorted.slice(1).filter((d) => {
+      // ⛔ SAFETY GUARD: never auto-merge a duplicate that has real credits.
+      // Two genuinely different people can share the same name_key if their
+      // given names happen to have the same tokens in a different order.
+      // If the duplicate has credits, it needs a human to review it via the
+      // admin deduplicator UI before merging.
+      if ((creditMap.get(d.id) || 0) > 0) {
+        skippedHasCredits++;
+        return false;
+      }
+      return true;
+    });
+    if (!safeDups.length) continue;
+    plans.push({ survivor, dups: safeDups });
   }
 
   const absorbed = plans.reduce((n, p) => n + p.dups.length, 0);
   console.log(`\nduplicate name_key groups: ${plans.length}   people absorbed: ${absorbed}`);
   if (skippedClaims) console.log(`skipped (claimed by different users): ${skippedClaims}`);
+  if (skippedHasCredits) console.log(`⚠️  skipped (duplicate has real credits — manual review required in admin UI): ${skippedHasCredits}`);
   console.log('\nsamples:');
   for (const p of plans.slice(0, 20)) {
     console.log(`  KEEP ${JSON.stringify(p.survivor.name)} (${p.survivor.film_count || 0} films)`);

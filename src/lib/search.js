@@ -1,4 +1,4 @@
-// Ranked, forgiving search across films, people and companies.
+// Ranked, forgiving search across films, people, companies, and theatre plays.
 //
 // Why not a single `ilike('%query%')`? That needs the whole phrase to appear
 // as one contiguous substring, so "odunlade adekola" finds nothing unless a
@@ -20,6 +20,11 @@ const FILM_FIELDS = `
   view_count, average_rating, liked_percent, audience_rating, tmdb_rating, nfvcb_rating,
   content_type, youtube_watch_url, release_type, streaming_links, source,
   countries, film_genres!left(genres(name))
+`;
+
+const PLAY_FIELDS = `
+  id, slug, title, poster_url, banner_url, year, run_start_date, run_end_date,
+  performance_time, venue, city, country, genre, status, synopsis, playwright, director
 `;
 
 // Clean, lowercase, keep words of length >= 2. Strip characters that would
@@ -93,28 +98,38 @@ async function fuzzy(rpcName, q) {
 export async function searchAll(query) {
   const fullQ = (query || '').trim().toLowerCase();
   const terms = tokenize(query);
-  if (!terms.length) return { films: [], people: [], companies: [] };
+  if (!terms.length) return { films: [], people: [], companies: [], plays: [] };
 
   // People: order-insensitive + AND-of-tokens (fast). Companies still OR terms.
   // Fuzzy RPCs only when the first pass is empty — keeps common searches snappy.
   const orIlike = (field, ts) => ts.map((t) => `${field}.ilike.*${t}*`).join(',');
+  const orIlikeAny = (fields, ts) => fields.flatMap((field) => ts.map((t) => `${field}.ilike.*${t}*`)).join(',');
 
-  const [peopleRows, companyRes] = await Promise.all([
+  const [peopleRows, companyRes, playRes] = await Promise.all([
     searchPeopleByName(query, {
       limit: 40,
       select: '*',
     }).catch(() => []),
     supabase.from('companies').select('*').or(orIlike('name', terms)).limit(40),
+    supabase
+      .from('plays')
+      .select(PLAY_FIELDS)
+      .or(orIlikeAny(['title', 'venue', 'city', 'genre', 'playwright', 'director'], terms))
+      .limit(40),
   ]);
 
-  // A strong person-name match means the useful film results are that person's
-  // credits. Skip the full film-title lookup in that case; it is both less
-  // relevant and unnecessarily expensive on a large catalogue.
+  // A strong person-name match (score ≥ 180) means the person's credits are the
+  // primary film results. However we ALWAYS run the title search too — a query
+  // like "koleoso" can be both a person name AND a film series title, and
+  // skipping the title lookup hides the films entirely.
+  // confidentPersonMatch now only controls the fuzzy fallback (filmsFz below).
   const confidentPersonMatch = peopleRows
     .some((person) => scoreText(person.name, fullQ, terms) >= 180);
-  const titleFilmRes = confidentPersonMatch
-    ? { data: [], error: null }
-    : await supabase.from('films').select(FILM_FIELDS).ilike('title', `%${fullQ}%`).limit(80);
+  const titleFilmRes = await supabase
+    .from('films')
+    .select(FILM_FIELDS)
+    .ilike('title', `%${fullQ}%`)
+    .limit(80);
 
   const peopleFz = peopleRows.length === 0
     ? await fuzzy('search_people_fuzzy', fullQ)
@@ -215,5 +230,16 @@ export async function searchAll(query) {
     .sort((a, b) => b._score - a._score)
     .slice(0, 20);
 
-  return { films, people, companies };
+  const plays = (playRes.data || [])
+    .map((play) => ({
+      ...play,
+      _score: Math.max(
+        scoreText(play.title, fullQ, terms),
+        scoreText([play.venue, play.city, play.genre, play.playwright, play.director].filter(Boolean).join(' '), fullQ, terms) * 0.75,
+      ),
+    }))
+    .sort((a, b) => b._score - a._score)
+    .slice(0, 20);
+
+  return { films, people, companies, plays };
 }

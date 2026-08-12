@@ -31,22 +31,24 @@ export default function CriticsList() {
         description="Discover leading African film critics, culture journalists, and movie reviewers. Explore reviews, ratings, and critical essays on Nollywood cinema."
       />
 
-      {/* Hero Header */}
-      <section className="relative overflow-hidden border-b border-border bg-surface/40 py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/30 text-brand text-xs font-semibold uppercase tracking-wider mb-4">
+      <section className="relative overflow-hidden border-b border-border bg-bg px-4 sm:px-6 lg:px-8">
+        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
+        <div className="max-w-7xl mx-auto py-14 md:py-20 relative z-10">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/30 text-brand text-[10px] font-black uppercase tracking-[0.24em] mb-5">
             <Icon icon="solar:pen-new-square-bold" className="w-4 h-4" />
             Film Critics & Journalists Directory
+            </div>
+            <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-black tracking-tighter text-text-primary leading-none">
+              Voices of African Cinema
+            </h1>
+            <p className="mt-5 text-sm sm:text-base text-text-muted max-w-2xl leading-relaxed">
+              Discover verified film critics, essayists, and reviewers providing incisive commentary, ratings, and reviews across Nollywood and international festivals.
+            </p>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-text-primary mb-4">
-            Voices of African Cinema
-          </h1>
-          <p className="text-lg text-text-muted max-w-2xl mx-auto">
-            Discover verified film critics, essayists, and reviewers providing incisive commentary, ratings, and reviews across Nollywood and international festivals.
-          </p>
 
           {/* Search Bar */}
-          <div className="mt-8 max-w-md mx-auto relative">
+          <div className="mt-8 max-w-xl relative">
             <Icon icon="solar:magnifer-linear" className="absolute left-4 top-3.5 text-text-muted w-5 h-5" />
             <input
               type="text"
