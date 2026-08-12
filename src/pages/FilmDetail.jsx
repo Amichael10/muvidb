@@ -22,6 +22,8 @@ import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle, toSentenceCase, formatPersonName, toTitleCase } from '../utils/format';
 import { formatRole } from '../lib/creditRoles';
 
+const RELATED_FILMS_LIMIT = 5;
+
 const genreKey = (genre) => {
   const aliases = {
     comedies: 'comedy',
@@ -407,7 +409,7 @@ export default function FilmDetail() {
         .select('rank, reason, films:related_id (id, title, year, poster_url, backdrop_url, slug, view_count, content_type, film_genres(genres(name)))')
         .eq('film_id', film.id)
         .order('rank', { ascending: true })
-        .limit(12);
+        .limit(RELATED_FILMS_LIMIT);
 
       if (pre?.length) {
         const mapped = pre
@@ -479,7 +481,7 @@ export default function FilmDetail() {
         return { ...candidate, genres, _relatedScore: (sharedGenres * 100) - Math.min(yearDistance, 30) };
       })
       .sort((a, b) => b._relatedScore - a._relatedScore || (b.view_count || 0) - (a.view_count || 0))
-      .slice(0, 4);
+      .slice(0, RELATED_FILMS_LIMIT);
 
     setRelatedFilms(ranked);
   };
@@ -1385,7 +1387,7 @@ export default function FilmDetail() {
             <div className="p-8">
               <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight">More Like This</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-1 gap-3 lg:gap-0 lg:border lg:border-border lg:rounded-lg lg:overflow-hidden lg:shadow-sm">
-                {relatedFilms.map(relatedFilm => (
+                {relatedFilms.slice(0, RELATED_FILMS_LIMIT).map(relatedFilm => (
                   <Link
                     key={relatedFilm.id}
                     to={`/films/${relatedFilm.slug || relatedFilm.id}`}

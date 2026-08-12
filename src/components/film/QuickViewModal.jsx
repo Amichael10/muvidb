@@ -10,6 +10,8 @@ import { formatFilmTitle } from '../../utils/format';
 import { formatRole } from '../../lib/creditRoles';
 import { getFilmBackdrop } from '../../lib/filmImages';
 
+const SIMILAR_FILMS_LIMIT = 5;
+
 const formatRuntimeHours = (minutes) => {
   if (!minutes) return null;
   const mins = Number(minutes);
@@ -56,7 +58,7 @@ export default function QuickViewModal() {
           .from('films')
           .select('*, film_genres(genres(name))')
           .neq('id', selectedFilm.id)
-          .limit(6);
+          .limit(SIMILAR_FILMS_LIMIT);
           
         setSimilarFilms(related || []);
 
@@ -235,7 +237,7 @@ export default function QuickViewModal() {
             <div className="px-10 pb-10">
               <h3 className="text-2xl font-bold text-white mb-6">More Like This</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {similarFilms.map(film => (
+                {similarFilms.slice(0, SIMILAR_FILMS_LIMIT).map(film => (
                   <div key={film.id} className="bg-[#2F2F2F] rounded-lg overflow-hidden group cursor-pointer">
                     <div className="relative aspect-video">
                       <ImageWithFallback 

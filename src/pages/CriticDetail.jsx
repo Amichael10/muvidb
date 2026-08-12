@@ -1,13 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { Icon } from '@iconify/react';
 import { fetchCriticBySlug } from '../lib/critics';
 import SEO from '../components/SEO';
 
+function ReviewPoster({ film }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const hasPoster = Boolean(film?.poster_url && !imageFailed);
+  const shellClass = "relative w-24 h-36 sm:w-28 sm:h-40 rounded-lg border border-border bg-surface-2 overflow-hidden shadow-lg flex items-center justify-center";
+  const content = (
+    <>
+      <Icon icon="solar:gallery-minimalistic-bold" className="w-8 h-8 text-text-muted opacity-40" />
+      {hasPoster && (
+        <img
+          src={film.poster_url}
+          alt=""
+          onError={() => setImageFailed(true)}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+    </>
+  );
+
+  if (film?.slug) {
+    return (
+      <Link to={`/film/${film.slug}`} className={`${shellClass} group/poster hover:border-brand transition-colors`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={shellClass}>{content}</div>;
+}
+
 export default function CriticDetail() {
   const { slug } = useParams();
   const [critic, setCritic] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reviewSearch, setReviewSearch] = useState('');
+  const [yearFilter, setYearFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState('newest');
 
   useEffect(() => {
     async function load() {
@@ -19,6 +52,69 @@ export default function CriticDetail() {
     }
     load();
   }, [slug]);
+
+  const reviews = critic?.reviews || [];
+  const ratedReviews = reviews.filter(r => r.rating !== null && r.rating !== undefined);
+  const avgRating = ratedReviews.length > 0
+    ? (ratedReviews.reduce((sum, r) => sum + Number(r.rating), 0) / ratedReviews.length).toFixed(1)
+    : 'N/A';
+  const sourceCount = reviews.filter(r => r.review_url).length;
+
+  const yearOptions = useMemo(() => {
+    const years = reviews
+      .map(r => r.film?.year)
+      .filter(Boolean);
+    return [...new Set(years)].sort((a, b) => b - a);
+  }, [reviews]);
+
+  const filteredReviews = useMemo(() => {
+    const query = reviewSearch.trim().toLowerCase();
+
+    return reviews
+      .filter((review) => {
+        const film = review.film || {};
+        const searchable = [
+          film.title,
+          film.year,
+          review.quote,
+          review.review_url,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        const matchesSearch = !query || searchable.includes(query);
+        const matchesYear = yearFilter === 'all' || String(film.year) === yearFilter;
+        const hasRating = review.rating !== null && review.rating !== undefined;
+        const hasSource = Boolean(review.review_url);
+        const matchesStatus =
+          statusFilter === 'all' ||
+          (statusFilter === 'rated' && hasRating) ||
+          (statusFilter === 'unrated' && !hasRating) ||
+          (statusFilter === 'source' && hasSource) ||
+          (statusFilter === 'high' && Number(review.rating) >= 4);
+
+        return matchesSearch && matchesYear && matchesStatus;
+      })
+      .sort((left, right) => {
+        const leftFilm = left.film || {};
+        const rightFilm = right.film || {};
+        if (sortOrder === 'title') {
+          return (leftFilm.title || '').localeCompare(rightFilm.title || '');
+        }
+        if (sortOrder === 'year-desc') {
+          return (rightFilm.year || 0) - (leftFilm.year || 0);
+        }
+        if (sortOrder === 'rating-desc') {
+          return Number(right.rating || 0) - Number(left.rating || 0);
+        }
+        return new Date(right.created_at || 0) - new Date(left.created_at || 0);
+      });
+  }, [reviews, reviewSearch, yearFilter, statusFilter, sortOrder]);
+
+  const clearReviewFilters = () => {
+    setReviewSearch('');
+    setYearFilter('all');
+    setStatusFilter('all');
+    setSortOrder('newest');
+  };
 
   if (loading) {
     return (
@@ -40,12 +136,6 @@ export default function CriticDetail() {
       </div>
     );
   }
-
-  const reviews = critic.reviews || [];
-  const ratedReviews = reviews.filter(r => r.rating !== null && r.rating !== undefined);
-  const avgRating = ratedReviews.length > 0
-    ? (ratedReviews.reduce((sum, r) => sum + Number(r.rating), 0) / ratedReviews.length).toFixed(1)
-    : 'N/A';
 
   return (
     <div className="min-h-screen bg-bg text-text-primary pb-20">
@@ -146,10 +236,85 @@ export default function CriticDetail() {
 
       {/* Reviews Filmography Section */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
-        <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-2">
-          <Icon icon="solar:videocamera-record-bold" className="text-brand w-6 h-6" />
-          Film Reviews by {critic.name} ({reviews.length})
-        </h2>
+        <div className="flex flex-col gap-5 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+                <Icon icon="solar:videocamera-record-bold" className="text-brand w-6 h-6" />
+                Film Reviews by {critic.name}
+              </h2>
+              <p className="text-xs text-text-muted mt-1">
+                Showing {filteredReviews.length} of {reviews.length} linked films
+                {sourceCount > 0 ? ` · ${sourceCount} original source ${sourceCount === 1 ? 'link' : 'links'}` : ''}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-text-muted font-semibold">
+                <Icon icon="solar:film-bold" className="w-4 h-4 text-brand" />
+                {reviews.length} films
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-text-muted font-semibold">
+                <Icon icon="solar:link-circle-bold" className="w-4 h-4 text-brand" />
+                {sourceCount} sources
+              </span>
+            </div>
+          </div>
+
+          {reviews.length > 0 && (
+            <div className="bg-surface border border-border rounded-xl p-3 sm:p-4">
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_auto_auto_auto] gap-3">
+                <div className="relative">
+                  <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                  <input
+                    type="search"
+                    value={reviewSearch}
+                    onChange={(e) => setReviewSearch(e.target.value)}
+                    placeholder="Search by film title or quote..."
+                    className="w-full bg-bg border border-border rounded-lg pl-10 pr-3 py-2.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
+                  />
+                </div>
+
+                <select
+                  value={yearFilter}
+                  onChange={(e) => setYearFilter(e.target.value)}
+                  className="bg-bg border border-border rounded-lg px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
+                  aria-label="Filter reviews by release year"
+                >
+                  <option value="all">All years</option>
+                  {yearOptions.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-bg border border-border rounded-lg px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
+                  aria-label="Filter reviews by review status"
+                >
+                  <option value="all">All reviews</option>
+                  <option value="source">With source link</option>
+                  <option value="rated">Rated</option>
+                  <option value="unrated">Unrated</option>
+                  <option value="high">4+ rating</option>
+                </select>
+
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="bg-bg border border-border rounded-lg px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
+                  aria-label="Sort reviews"
+                >
+                  <option value="newest">Newest added</option>
+                  <option value="title">Film title A-Z</option>
+                  <option value="year-desc">Release year</option>
+                  <option value="rating-desc">Rating high-low</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
 
         {reviews.length === 0 ? (
           <div className="bg-surface border border-border rounded-2xl p-12 text-center">
@@ -157,58 +322,92 @@ export default function CriticDetail() {
             <p className="text-lg font-bold text-text-primary mb-1">No reviews linked yet</p>
             <p className="text-xs text-text-muted">Reviews from this critic will appear here as they are added.</p>
           </div>
+        ) : filteredReviews.length === 0 ? (
+          <div className="bg-surface border border-border rounded-2xl p-12 text-center">
+            <Icon icon="solar:filter-bold-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-40" />
+            <p className="text-lg font-bold text-text-primary mb-1">No film reviews match those filters</p>
+            <p className="text-xs text-text-muted mb-5">Try another film title, year, or review status.</p>
+            <button
+              type="button"
+              onClick={clearReviewFilters}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-on-brand text-xs font-bold hover:bg-brand-hover transition-colors"
+            >
+              <Icon icon="solar:restart-bold" className="w-4 h-4" />
+              Reset filters
+            </button>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {reviews.map((rev) => {
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            {filteredReviews.map((rev) => {
               const film = rev.film || {};
+
               return (
-                <div key={rev.id} className="bg-surface border border-border rounded-2xl p-6 flex flex-col justify-between hover:border-brand/40 transition-colors">
-                  <div>
-                    {/* Film Title Header */}
-                    <div className="flex items-start gap-4 mb-4">
-                      {film.poster_url && (
-                        <img
-                          src={film.poster_url}
-                          alt={film.title}
-                          className="w-14 h-20 rounded-lg object-cover border border-border flex-shrink-0"
-                        />
-                      )}
-                      <div>
-                        <h3 className="text-lg font-bold text-text-primary hover:text-brand transition-colors">
-                          {film.slug ? (
-                            <Link to={`/film/${film.slug}`}>{film.title || 'Untitled Film'}</Link>
-                          ) : (
-                            film.title || 'Untitled Film'
-                          )}
-                        </h3>
-                        {film.year && <span className="text-xs text-text-muted font-semibold">{film.year}</span>}
-
-                        {rev.rating !== null && rev.rating !== undefined && (
-                          <div className="flex items-center gap-1 text-brand mt-1 text-xs font-bold">
-                            <Icon icon="solar:star-bold" className="w-4 h-4" />
-                            <span>{rev.rating} / 5</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Quote */}
-                    <blockquote className="text-sm text-text-primary italic bg-surface-2 border-l-4 border-brand p-3.5 rounded-r-xl leading-relaxed mb-4">
-                      "{rev.quote}"
-                    </blockquote>
+                <div key={rev.id} className="bg-surface border border-border rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row gap-4 hover:border-brand/50 transition-colors">
+                  <div className="w-28 sm:w-32 flex-shrink-0">
+                    <ReviewPoster film={film} />
                   </div>
 
-                  {rev.review_url && (
-                    <a
-                      href={rev.review_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline self-end"
-                    >
-                      Read Full Original Review
-                      <Icon icon="solar:export-bold" className="w-3.5 h-3.5" />
-                    </a>
-                  )}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between gap-4">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {film.year && (
+                          <span className="px-2 py-1 rounded-md bg-surface-2 border border-border text-[11px] text-text-muted font-bold">
+                            {film.year}
+                          </span>
+                        )}
+                        {rev.rating !== null && rev.rating !== undefined && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-brand/10 border border-brand/30 text-[11px] text-brand font-bold">
+                            <Icon icon="solar:star-bold" className="w-3.5 h-3.5" />
+                            {rev.rating} / 5
+                          </span>
+                        )}
+                        {rev.review_url && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-500/10 border border-green-500/30 text-[11px] text-green-500 font-bold">
+                            <Icon icon="solar:link-circle-bold" className="w-3.5 h-3.5" />
+                            Source
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl font-extrabold text-text-primary leading-tight hover:text-brand transition-colors">
+                        {film.slug ? (
+                          <Link to={`/film/${film.slug}`}>{film.title || 'Untitled Film'}</Link>
+                        ) : (
+                          film.title || 'Untitled Film'
+                        )}
+                      </h3>
+
+                      <blockquote className="mt-4 text-sm text-text-primary italic bg-surface-2 border-l-4 border-brand px-4 py-3 rounded-r-lg leading-relaxed">
+                        "{rev.quote}"
+                      </blockquote>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      {film.slug ? (
+                        <Link
+                          to={`/film/${film.slug}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-brand transition-colors"
+                        >
+                          <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
+                          Film page
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-text-muted font-semibold">No film page slug</span>
+                      )}
+
+                      {rev.review_url && (
+                        <a
+                          href={rev.review_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+                        >
+                          Original review
+                          <Icon icon="solar:export-bold" className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
