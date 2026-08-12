@@ -500,12 +500,52 @@ const PersonDetail = () => {
     })
     .slice(0, 6)
 
+  // ── Career Impact Stats ────────────────────────────────────────────────
+  const isImpactProfile = true // show for all profiles that have data
+  const getBoxOffice = (c) => {
+    const dom = c.films?.streaming_links?.box_office?.domestic || c.films?.box_office_domestic || 0
+    return typeof dom === 'number' ? dom : parseFloat(dom) || 0
+  }
+  const allCredits = person.credits || []
+  const leadCredits = allCredits.filter(c => {
+    const role = (c.role || '').toLowerCase()
+    const order = c.billing_order ?? 99
+    return (role === 'actor' && order <= 3) || ['producer', 'director'].includes(role)
+  })
+  const totalBoxOffice = allCredits.reduce((acc, c) => acc + getBoxOffice(c), 0)
+  const leadBoxOffice = leadCredits.reduce((acc, c) => acc + getBoxOffice(c), 0)
+  const displayBoxOffice = leadBoxOffice > 0 ? leadBoxOffice : totalBoxOffice
+  const totalYoutubeViews = allCredits.reduce((acc, c) => {
+    const v = c.films?.view_count || 0
+    return acc + (typeof v === 'number' ? v : parseInt(v, 10) || 0)
+  }, 0) + (channelVideos || []).reduce((acc, v) => acc + (v.view_count || 0), 0)
+  const leadYoutubeViews = leadCredits.reduce((acc, c) => {
+    const v = c.films?.view_count || 0
+    return acc + (typeof v === 'number' ? v : parseInt(v, 10) || 0)
+  }, 0) + (channelVideos || []).reduce((acc, v) => acc + (v.view_count || 0), 0)
+  const displayYtViews = leadYoutubeViews > 0 ? leadYoutubeViews : totalYoutubeViews
+  const hasBoxOffice = displayBoxOffice > 0
+  const hasYtViews = displayYtViews > 0
+  const showImpactCard = isImpactProfile && (hasBoxOffice || hasYtViews)
+
+  const fmtMoney = (num) => {
+    if (num >= 1_000_000_000) return `₦${(num / 1_000_000_000).toFixed(2)}B`
+    if (num >= 1_000_000) return `₦${(num / 1_000_000).toFixed(1)}M`
+    return `₦${num.toLocaleString()}`
+  }
+  const fmtViews = (num) => {
+    if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
+    if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
+    return String(num)
+  }
+
   return (
     <div className="min-h-screen bg-bg">
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
-          <div className="flex flex-col md:flex-row gap-10 items-center md:items-start text-center md:text-left">
+          <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-start text-center md:text-left">
             <div className="flex-shrink-0 relative group overflow-hidden rounded-lg">
               <ImageWithFallback
                 src={person.photo_url || person.photo}
@@ -578,92 +618,40 @@ const PersonDetail = () => {
                 )}
               </div>
 
-              {(() => {
-                const boxOfficeFilms = (person.credits || []).filter(c => {
-                  const dom = c.films?.streaming_links?.box_office?.domestic || c.films?.box_office_domestic || 0;
-                  return (typeof dom === 'number' ? dom : parseFloat(dom) || 0) > 0;
-                });
-                const boxOfficeFilmCount = boxOfficeFilms.length;
-                const totalBoxOffice = boxOfficeFilms.reduce((acc, c) => {
-                  const dom = c.films?.streaming_links?.box_office?.domestic || c.films?.box_office_domestic || 0;
-                  return acc + (typeof dom === 'number' ? dom : parseFloat(dom) || 0);
-                }, 0);
+              {/* Credits & Followers pills */}
+              <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden bg-surface shadow-sm max-w-xs">
+                <div className="flex-1 px-5 py-3 text-center border-r border-border">
+                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{totalFilms}</p>
+                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Credits</p>
+                </div>
+                <div className="flex-1 px-5 py-3 text-center">
+                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{followerCount.toLocaleString()}</p>
+                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Followers</p>
+                </div>
+              </div>
 
-                // Local test restriction for the 2 requested profiles
-                const isTestProfile = ['funke-akindele', 'ruth-kadiri', 'odunlade-adekola'].includes(person.slug);
-
-                const totalYoutubeViews = (person.credits || []).reduce((acc, c) => {
-                  const v = c.films?.view_count || 0;
-                  return acc + (typeof v === 'number' ? v : parseInt(v, 10) || 0);
-                }, 0) + (channelVideos || []).reduce((acc, v) => acc + (v.view_count || 0), 0);
-
-                const hasBoxOffice = totalBoxOffice > 0;
-                const showYtReach = isTestProfile && totalYoutubeViews > 0;
-
-                const gridColsClass = (hasBoxOffice && showYtReach) 
-                  ? 'grid-cols-2 sm:grid-cols-5 max-w-xl' 
-                  : (hasBoxOffice || showYtReach) 
-                  ? 'grid-cols-2 sm:grid-cols-4 max-w-md' 
-                  : 'grid-cols-3 max-w-sm';
-
-                const fmtYtViews = (num) => {
-                  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
-                  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-                  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-                  return String(num);
-                };
-
-                return (
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className={`grid ${gridColsClass} gap-0 border border-border rounded-lg overflow-hidden bg-surface w-full md:mx-0 shadow-sm`}>
-                      <div className="p-4 border-r border-b sm:border-b-0 border-border text-center">
-                        <p className="text-brand text-xl font-bold font-heading">
-                          {formatViewCount(person.profile_views || person.popularity_score || totalViews)}
-                        </p>
-                        <p className="text-text-muted text-[9px] font-bold">Profile Views</p>
-                      </div>
-                      <div className="p-4 border-r border-b sm:border-b-0 border-border text-center">
-                        <p className="text-text-primary text-xl font-bold font-heading">
-                          {totalFilms}
-                        </p>
-                        <p className="text-text-muted text-[9px] font-bold">Credits</p>
-                      </div>
-                      <div className={`p-4 ${(hasBoxOffice || showYtReach) ? 'border-r' : ''} border-border text-center`}>
-                        <p className="text-text-primary text-xl font-bold font-heading">
-                          {followerCount.toLocaleString()}
-                        </p>
-                        <p className="text-text-muted text-[9px] font-bold">Followers</p>
-                      </div>
-                      {hasBoxOffice && (
-                        <div 
-                          className={`p-4 bg-gradient-to-br from-amber-500/15 via-surface to-surface text-center relative group cursor-help ${showYtReach ? 'border-r border-border' : ''}`}
-                          title={`Grossed across ${boxOfficeFilmCount} theatrical ${boxOfficeFilmCount === 1 ? 'movie' : 'movies'}`}
-                        >
-                          <p className="text-amber-400 text-xl font-bold font-heading">
-                            {totalBoxOffice >= 1_000_000_000
-                              ? `₦${(totalBoxOffice / 1_000_000_000).toFixed(2)}B`
-                              : `₦${(totalBoxOffice / 1_000_000).toFixed(1)}M`}
-                          </p>
-                          <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">Box Office</p>
-                          
-                          {/* Tooltip on hover */}
-                          <div className="absolute left-1/2 -translate-x-1/2 -top-9 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-bg border border-amber-500/30 text-amber-300 text-[10px] font-bold px-2.5 py-1 rounded shadow-xl whitespace-nowrap pointer-events-none z-30">
-                            Across {boxOfficeFilmCount} cinema {boxOfficeFilmCount === 1 ? 'movie' : 'movies'}
-                          </div>
-                        </div>
-                      )}
-                      {showYtReach && (
-                        <div className="p-4 bg-gradient-to-br from-red-500/15 via-surface to-surface text-center">
-                          <p className="text-red-400 text-xl font-bold font-heading">
-                            {fmtYtViews(totalYoutubeViews)}
-                          </p>
-                          <p className="text-red-400 text-[9px] font-bold uppercase tracking-wider">YouTube Reach</p>
-                        </div>
-                      )}
+              {/* Impact card — inline for mobile/tablet, hidden on lg+ (shown as right column) */}
+              {showImpactCard && (
+                <div className="lg:hidden w-full">
+                  <div className="inline-flex divide-x divide-border border border-border rounded-2xl bg-surface shadow-lg overflow-hidden">
+                    <div className="flex flex-col items-center px-8 py-5 gap-1.5 min-w-[130px]">
+                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">Box Office</p>
+                      {hasBoxOffice
+                        ? <p className="text-brand text-3xl font-black font-heading tracking-tighter leading-none">{fmtMoney(displayBoxOffice)}</p>
+                        : <p className="text-text-muted text-3xl font-black font-heading leading-none">—</p>}
+                    </div>
+                    <div className="flex flex-col items-center px-8 py-5 gap-1.5 min-w-[130px]">
+                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">YouTube Views</p>
+                      {hasYtViews
+                        ? <p className="text-text-primary text-3xl font-black font-heading tracking-tighter leading-none">{fmtViews(displayYtViews)}</p>
+                        : <p className="text-text-muted text-3xl font-black font-heading leading-none">—</p>}
                     </div>
                   </div>
-                );
-              })()}
+                  <p className="text-text-muted/60 text-[9px] font-semibold mt-1.5 tracking-wider uppercase">
+                    {leadBoxOffice > 0 ? 'Starring roles' : 'Career total'}
+                  </p>
+                </div>
+              )}
 
               {(person.biography || person.bio) && (
                 <Biography text={toSentenceCase(person.biography || person.bio)} />
@@ -768,6 +756,35 @@ const PersonDetail = () => {
                 )}
               </div>
             </div>
+
+            {/* ── Right Impact Card ── */}
+            {showImpactCard && (
+              <div className="hidden lg:flex flex-col flex-shrink-0 self-start mt-10 mr-4">
+                <div className="border border-border rounded-2xl bg-surface overflow-hidden w-[200px]" style={{boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 12px 40px rgba(0,0,0,0.5)'}}>
+
+                  {/* Box Office */}
+                  <div className="flex flex-col items-start px-7 pt-8 pb-6 gap-2 border-b border-border">
+                    <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Box Office</p>
+                    {hasBoxOffice
+                      ? <p className="text-brand text-[2.6rem] font-black font-heading tracking-tighter leading-none">{fmtMoney(displayBoxOffice)}</p>
+                      : <p className="text-text-muted text-4xl font-black font-heading leading-none">—</p>}
+                  </div>
+
+                  {/* YouTube Views */}
+                  <div className="flex flex-col items-start px-7 pt-6 pb-8 gap-2">
+                    <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">YouTube Views</p>
+                    {hasYtViews
+                      ? <p className="text-text-primary text-[2.6rem] font-black font-heading tracking-tighter leading-none">{fmtViews(displayYtViews)}</p>
+                      : <p className="text-text-muted text-4xl font-black font-heading leading-none">—</p>}
+                  </div>
+
+                </div>
+                <p className="text-text-muted/50 text-[9px] font-semibold mt-2 ml-1 tracking-wider uppercase">
+                  {leadBoxOffice > 0 ? 'Starring roles' : 'Career total'}
+                </p>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
