@@ -18,7 +18,7 @@ import ImageWithFallback from '../components/ui/ImageWithFallback'
 import { slugOrId } from '../utils/slug'
 import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatDateOfBirth } from '../utils/format'
 import { nationalityToCountryName } from '../utils/africanCountries'
-import { fetchPersonStageCredits } from '../lib/plays'
+import { fetchPersonStageCredits, getPlayDateLabel } from '../lib/plays'
 import InstagramHighlights from '../components/person/InstagramHighlights'
 
 const PLATFORM_STYLES = {
@@ -974,7 +974,7 @@ const PersonDetail = () => {
                       {play.role || 'Actor'} {play.character_name ? `as ${play.character_name}` : ''}
                     </span>
                     <span className="text-[10px] text-text-muted block mt-1">
-                      📍 {play.venue || play.city || 'Theatre'} ({play.year || 'N/A'})
+                      📍 {play.venue || play.city || 'Theatre'} ({getPlayDateLabel(play, 'N/A')})
                     </span>
                   </div>
                 </Link>

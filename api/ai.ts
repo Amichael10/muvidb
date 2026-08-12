@@ -32,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'discover_actors': return await discoverActors(data, res);
       case 'deduplicate': return await mergeDuplicates(data, res);
       case 'extract_credits_from_image': return await extractCreditsFromImage(data, res);
+      case 'extract_play_from_instagram': return await extractPlayFromInstagram(data, res);
       case 'people_enrichment_gemini': return await peopleEnrichmentGemini(data, res);
       case 'people_enrichment_gemini_batch': return await peopleEnrichmentGeminiBatch(data, res);
       case 'enrich_film_gemini': return await enrichFilmGeminiTask(data, res);
@@ -42,6 +43,200 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('AI Service Error:', err);
     return res.status(500).json({ error: err.message });
   }
+}
+
+function normalizeInstagramUrl(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  const url = new URL(withProtocol);
+  const host = url.hostname.toLowerCase().replace(/^www\./, '').replace(/^m\./, '');
+  if (host !== 'instagram.com') {
+    throw new Error('Please paste a valid Instagram link.');
+  }
+  url.hash = '';
+  return url.toString();
+}
+
+function getInstagramAccessToken() {
+  if (process.env.INSTAGRAM_OEMBED_ACCESS_TOKEN) return process.env.INSTAGRAM_OEMBED_ACCESS_TOKEN;
+  if (process.env.FACEBOOK_APP_ACCESS_TOKEN) return process.env.FACEBOOK_APP_ACCESS_TOKEN;
+  if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_CLIENT_TOKEN) {
+    return `${process.env.FACEBOOK_APP_ID}|${process.env.FACEBOOK_CLIENT_TOKEN}`;
+  }
+  return '';
+}
+
+async function fetchInstagramOembed(instagramUrl: string) {
+  const accessToken = getInstagramAccessToken();
+  if (!accessToken) {
+    return {
+      oembed: null,
+      warning: 'Instagram oEmbed token is not configured; using the URL, caption, and uploaded flyer only.',
+    };
+  }
+
+  const graphVersion = process.env.FACEBOOK_GRAPH_VERSION || 'v20.0';
+  const endpoint = new URL(`https://graph.facebook.com/${graphVersion}/instagram_oembed`);
+  endpoint.searchParams.set('url', instagramUrl);
+  endpoint.searchParams.set('access_token', accessToken);
+  endpoint.searchParams.set('fields', 'thumbnail_url,author_name,provider_name,provider_url,html');
+
+  const response = await fetch(endpoint.toString());
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = json?.error?.message || `Instagram oEmbed failed with status ${response.status}`;
+    return { oembed: null, warning: message };
+  }
+  return { oembed: json, warning: null };
+}
+
+function parseDataUrlImage(value: unknown) {
+  const image = String(value || '').trim();
+  if (!image) return null;
+
+  const match = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], base64Data: match[2] };
+}
+
+function parseAIObject(text: string) {
+  const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      return JSON.parse(cleaned.substring(start, end + 1));
+    }
+  }
+  throw new Error('AI response did not contain a valid JSON object.');
+}
+
+function cleanString(value: unknown, maxLength = 2000) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function cleanDate(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const date = new Date(`${raw}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : raw;
+}
+
+function derivePlayStatus(startDate: string | null, endDate: string | null, aiStatus: unknown) {
+  const status = cleanString(aiStatus, 40);
+  if (['upcoming', 'currently_running', 'archived'].includes(status)) return status;
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (startDate && startDate > today) return 'upcoming';
+  if (startDate && startDate <= today && (!endDate || endDate >= today)) return 'currently_running';
+  return 'archived';
+}
+
+function normalizePlayExtraction(raw: any, instagramUrl: string, oembed: any) {
+  const runStartDate = cleanDate(raw?.run_start_date);
+  const runEndDate = cleanDate(raw?.run_end_date);
+  const safeEndDate = runStartDate && runEndDate && runEndDate < runStartDate ? null : runEndDate;
+
+  return {
+    title: cleanString(raw?.title, 220),
+    slug: '',
+    playwright: cleanString(raw?.playwright, 220),
+    director: cleanString(raw?.director, 220),
+    producer: cleanString(raw?.producer, 220),
+    venue: cleanString(raw?.venue, 220),
+    city: cleanString(raw?.city, 120),
+    country: cleanString(raw?.country, 120) || 'Nigeria',
+    synopsis: cleanString(raw?.synopsis || raw?.description, 5000),
+    genre: cleanString(raw?.genre, 220),
+    run_start_date: runStartDate || '',
+    run_end_date: safeEndDate || '',
+    performance_time: cleanString(raw?.performance_time || raw?.time, 120),
+    poster_url: cleanString(raw?.poster_url || oembed?.thumbnail_url, 2000),
+    banner_url: '',
+    source_url: cleanString(raw?.source_url, 2000) || instagramUrl,
+    year: runStartDate ? Number(runStartDate.slice(0, 4)) : new Date().getFullYear(),
+    status: derivePlayStatus(runStartDate, safeEndDate, raw?.status),
+  };
+}
+
+async function extractPlayFromInstagram(data: any, res: VercelResponse) {
+  const instagramUrl = normalizeInstagramUrl(data?.url);
+  const caption = cleanString(data?.caption, 6000);
+  const parsedImage = parseDataUrlImage(data?.image);
+  const warnings: string[] = [];
+  const { oembed, warning } = await fetchInstagramOembed(instagramUrl);
+  if (warning) warnings.push(warning);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const sourceContext = {
+    instagramUrl,
+    caption,
+    oembed,
+    today,
+    locale: 'Nigeria/Africa theatre listings',
+  };
+
+  const prompt = `
+You extract theatre play/event details for a Nollywood/African cinema database admin form.
+Today is ${today}. Treat dates as Nigerian local dates.
+
+Source context:
+${JSON.stringify(sourceContext, null, 2)}
+
+Return ONLY one valid JSON object with this shape:
+{
+  "title": "",
+  "playwright": "",
+  "director": "",
+  "producer": "",
+  "venue": "",
+  "city": "",
+  "country": "Nigeria",
+  "synopsis": "",
+  "genre": "",
+  "run_start_date": "YYYY-MM-DD or null",
+  "run_end_date": "YYYY-MM-DD or null",
+  "performance_time": "",
+  "poster_url": "",
+  "source_url": "${instagramUrl}",
+  "status": "upcoming|currently_running|archived",
+  "confidence": 0,
+  "notes": []
+}
+
+Rules:
+- Extract only facts visible in the source context or uploaded flyer image.
+- Do not invent missing names, venues, dates, or times.
+- If the flyer gives a day and month but no year, infer the next plausible Nigerian local date relative to ${today}; otherwise use null.
+- Use ISO dates only. Put the event time in performance_time, not in the date fields.
+- Use a concise public-facing synopsis from the caption/flyer text when available.
+`;
+
+  let text = '';
+  let telemetry = null;
+  if (parsedImage) {
+    const result = await generateAIVisionContent(prompt, parsedImage.base64Data, parsedImage.mimeType);
+    text = result.text;
+    telemetry = result.telemetry;
+  } else {
+    const result = await generateAIContent(prompt);
+    text = result.text;
+    telemetry = result.telemetry;
+  }
+
+  const extracted = parseAIObject(text);
+  const play = normalizePlayExtraction(extracted, instagramUrl, oembed);
+
+  return res.json({
+    play,
+    raw: extracted,
+    oembed,
+    warnings,
+    telemetry,
+  });
 }
 
 async function cleanupFilms(res: VercelResponse) {

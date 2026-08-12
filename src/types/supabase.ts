@@ -2743,12 +2743,14 @@ export type Database = {
           director: string | null
           genre: string | null
           id: string
+          performance_time: string | null
           playwright: string | null
           poster_url: string | null
           producer: string | null
           run_end_date: string | null
           run_start_date: string | null
           slug: string
+          source_url: string | null
           status: string
           synopsis: string | null
           title: string
@@ -2764,12 +2766,14 @@ export type Database = {
           director?: string | null
           genre?: string | null
           id?: string
+          performance_time?: string | null
           playwright?: string | null
           poster_url?: string | null
           producer?: string | null
           run_end_date?: string | null
           run_start_date?: string | null
           slug: string
+          source_url?: string | null
           status?: string
           synopsis?: string | null
           title: string
@@ -2785,12 +2789,14 @@ export type Database = {
           director?: string | null
           genre?: string | null
           id?: string
+          performance_time?: string | null
           playwright?: string | null
           poster_url?: string | null
           producer?: string | null
           run_end_date?: string | null
           run_start_date?: string | null
           slug?: string
+          source_url?: string | null
           status?: string
           synopsis?: string | null
           title?: string

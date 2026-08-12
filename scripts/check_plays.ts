@@ -14,7 +14,8 @@ async function check() {
   if (data) {
     console.log('PLAYS LIST:');
     data.forEach((p, i) => {
-      console.log(`${i + 1}. [${p.id}] ${p.title} (${p.slug}) - Year: ${p.year || p.first_performed_year}`);
+      const runDates = [p.run_start_date, p.run_end_date].filter(Boolean).join(' to ');
+      console.log(`${i + 1}. [${p.id}] ${p.title} (${p.slug}) - Date: ${runDates || p.year || 'N/A'}`);
     });
   }
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { Icon } from '@iconify/react';
-import { fetchPlayBySlug } from '../lib/plays';
+import { fetchPlayBySlug, getPlayDateLabel } from '../lib/plays';
 import SEO from '../components/SEO';
 
 export default function PlayDetail() {
@@ -42,11 +42,12 @@ export default function PlayDetail() {
   }
 
   const credits = play.credits || [];
+  const playDateLabel = getPlayDateLabel(play, '');
 
   return (
     <div className="min-h-screen bg-bg text-text-primary pb-20">
       <SEO 
-        title={`${play.title} (${play.year || ''}) - Stage Play | MuviDB`}
+        title={`${play.title} (${playDateLabel}) - Stage Play | MuviDB`}
         description={play.synopsis || `Explore stage play production details, playwright ${play.playwright}, director ${play.director}, and ensemble cast on MuviDB.`}
       />
 
@@ -74,9 +75,9 @@ export default function PlayDetail() {
                 <span className="px-3 py-1 rounded-full bg-brand/15 border border-brand/30 text-brand text-xs font-bold uppercase tracking-wider">
                   🎭 {play.genre || 'Stage Production'}
                 </span>
-                {play.year && (
+                {playDateLabel && (
                   <span className="text-sm font-semibold text-text-muted">
-                    {play.year}
+                    {playDateLabel}
                   </span>
                 )}
                 <span className="px-3 py-1 rounded-full bg-surface border border-border text-xs text-text-muted font-bold capitalize">
@@ -89,7 +90,7 @@ export default function PlayDetail() {
               </h1>
 
               {/* Key Crew Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 text-xs bg-surface border border-border p-4 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-xs bg-surface border border-border p-4 rounded-xl">
                 <div>
                   <span className="text-text-muted uppercase font-semibold block">Playwright</span>
                   <span className="text-text-primary font-bold text-sm">{play.playwright || 'N/A'}</span>
@@ -97,6 +98,10 @@ export default function PlayDetail() {
                 <div>
                   <span className="text-text-muted uppercase font-semibold block">Director</span>
                   <span className="text-text-primary font-bold text-sm">{play.director || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-text-muted uppercase font-semibold block">Run Dates</span>
+                  <span className="text-text-primary font-bold text-sm">{playDateLabel || 'Date TBA'}</span>
                 </div>
                 <div>
                   <span className="text-text-muted uppercase font-semibold block">Venue & City</span>
@@ -111,6 +116,18 @@ export default function PlayDetail() {
                   {play.synopsis || 'An acclaimed theatrical stage play celebrating storytelling and live dramatic craft.'}
                 </p>
               </div>
+
+              {play.source_url && (
+                <a
+                  href={play.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-xs font-bold text-brand hover:text-brand-hover transition-colors"
+                >
+                  <Icon icon="solar:link-round-bold" className="w-4 h-4" />
+                  Original Source
+                </a>
+              )}
             </div>
           </div>
         </div>

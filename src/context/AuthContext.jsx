@@ -4,6 +4,38 @@ import { requestWelcomeEmail } from '../lib/welcomeEmail';
 
 const AuthContext = createContext();
 
+function getAuthErrorStatus(error) {
+  return Number(error?.status || error?.statusCode || error?.code || 0);
+}
+
+function getAuthErrorMessage(error) {
+  return String(error?.message || error?.error_description || error || '').toLowerCase();
+}
+
+function isTransientAuthError(error) {
+  const status = getAuthErrorStatus(error);
+  const message = getAuthErrorMessage(error);
+  return (
+    [408, 409, 425, 429, 500, 502, 503, 504].includes(status) ||
+    /failed to fetch|fetch failed|network|timeout|timed out|aborted|offline|rate limit|too many requests|temporar|gateway|service unavailable/.test(message)
+  );
+}
+
+function isInvalidAuthError(error) {
+  if (!error || isTransientAuthError(error)) return false;
+
+  const status = getAuthErrorStatus(error);
+  const message = getAuthErrorMessage(error);
+  return (
+    [400, 401, 403, 404].includes(status) ||
+    /invalid.*jwt|jwt.*expired|invalid.*token|refresh.*token|session.*missing|session.*not found|user.*not found|user from sub claim|not authenticated/.test(message)
+  );
+}
+
+function roleFromUser(authUser) {
+  return authUser?.user_metadata?.role || null;
+}
+
 export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState({
     user: null,
@@ -27,9 +59,36 @@ export function AuthProvider({ children }) {
    * hits the Auth API and fails when the account no longer exists.
    */
   const validateAuthUser = async () => {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) return null;
-    return user;
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (user) return { user, invalid: false, transient: false, error: null };
+      if (error) {
+        return {
+          user: null,
+          invalid: isInvalidAuthError(error),
+          transient: isTransientAuthError(error),
+          error,
+        };
+      }
+      return { user: null, invalid: true, transient: false, error: null };
+    } catch (error) {
+      return {
+        user: null,
+        invalid: isInvalidAuthError(error),
+        transient: !isInvalidAuthError(error),
+        error,
+      };
+    }
+  };
+
+  const applyCachedAuthUser = (authUser) => {
+    if (!authUser) return;
+    setAuthState(prev => ({
+      ...prev,
+      user: authUser,
+      role: prev.role || roleFromUser(authUser),
+      loading: false,
+    }));
   };
 
   const fetchUserProfile = async (authUser) => {
@@ -101,16 +160,27 @@ export function AuthProvider({ children }) {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        // Re-validate with Auth server so deleted users are logged out on refresh.
-        const user = await validateAuthUser();
-        if (!user) {
+        // Trust the cached session immediately, then verify it in the background.
+        // Temporary network/rate-limit failures must not become real logouts.
+        settled = true;
+        applyCachedAuthUser(session.user);
+
+        const validation = await validateAuthUser();
+        if (validation.invalid) {
           await clearLocalAuth();
           return;
         }
-        await fetchUserProfile(user);
+        if (validation.transient) {
+          console.warn('Auth validation temporarily failed; preserving cached session:', validation.error);
+        }
+        await fetchUserProfile(validation.user || session.user);
       } catch (err) {
         console.error('Session check failed:', err);
-        await clearLocalAuth();
+        if (isInvalidAuthError(err)) {
+          await clearLocalAuth();
+        } else {
+          setAuthState(prev => ({ ...prev, loading: false }));
+        }
       } finally {
         stopLoading();
       }
@@ -132,25 +202,33 @@ export function AuthProvider({ children }) {
 
       // TOKEN_REFRESHED / USER_UPDATED: re-check the account still exists.
       if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        applyCachedAuthUser(session.user);
         void (async () => {
-          const user = await validateAuthUser();
-          if (!user) {
+          const validation = await validateAuthUser();
+          if (validation.invalid) {
             await clearLocalAuth();
             return;
           }
-          await fetchUserProfile(user);
+          if (validation.transient) {
+            console.warn(`Auth ${event} validation temporarily failed; preserving cached session:`, validation.error);
+          }
+          await fetchUserProfile(validation.user || session.user);
         })();
         return;
       }
 
       if (session) {
+        applyCachedAuthUser(session.user);
         void (async () => {
-          const user = await validateAuthUser();
-          if (!user) {
+          const validation = await validateAuthUser();
+          if (validation.invalid) {
             await clearLocalAuth();
             return;
           }
-          await fetchUserProfile(user);
+          if (validation.transient) {
+            console.warn(`Auth ${event} validation temporarily failed; preserving cached session:`, validation.error);
+          }
+          await fetchUserProfile(validation.user || session.user);
         })();
 
         // Email-confirm / OAuth return often lands as SIGNED_IN — force a welcome

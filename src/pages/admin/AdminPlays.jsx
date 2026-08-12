@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
-import { fetchPlays, upsertPlay, upsertStageCredit, deleteStageCredit } from '../../lib/plays';
+import { fetchPlays, getPlayDateLabel, upsertPlay, upsertStageCredit, deleteStageCredit } from '../../lib/plays';
 import { supabase } from '../../lib/supabase';
+import { authHeaders } from '../../lib/apiAuth';
 import ImageField from '../../components/admin/ImageField';
 import Drawer from '../../components/admin/Drawer';
 import SEO from '../../components/SEO';
+
+const BLANK_INSTAGRAM_IMPORT = {
+  url: '',
+  caption: '',
+  image: '',
+};
 
 const BLANK_FORM = {
   title: '',
@@ -20,6 +27,10 @@ const BLANK_FORM = {
   synopsis: '',
   genre: '',
   year: new Date().getFullYear(),
+  run_start_date: '',
+  run_end_date: '',
+  performance_time: '',
+  source_url: '',
   status: 'archived',
 };
 
@@ -40,6 +51,10 @@ export default function AdminPlays() {
   const [formData, setFormData] = useState(BLANK_FORM);
   const [formMsg, setFormMsg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [instagramImport, setInstagramImport] = useState(BLANK_INSTAGRAM_IMPORT);
+  const [instagramImageName, setInstagramImageName] = useState('');
+  const [instagramImportMsg, setInstagramImportMsg] = useState(null);
+  const [importingInstagram, setImportingInstagram] = useState(false);
 
   // -- Stage credits inside drawer ------------------------------------------
   const [credits, setCredits] = useState([]); // pending staged credits
@@ -86,6 +101,9 @@ export default function AdminPlays() {
     setPeopleSearch('');
     setPeopleResults([]);
     setShowPeopleDropdown(false);
+    setInstagramImport(play?.source_url ? { ...BLANK_INSTAGRAM_IMPORT, url: play.source_url } : BLANK_INSTAGRAM_IMPORT);
+    setInstagramImageName('');
+    setInstagramImportMsg(null);
 
     if (play) {
       setEditingPlay(play);
@@ -103,6 +121,10 @@ export default function AdminPlays() {
         synopsis: play.synopsis || '',
         genre: play.genre || '',
         year: play.year || new Date().getFullYear(),
+        run_start_date: play.run_start_date || '',
+        run_end_date: play.run_end_date || '',
+        performance_time: play.performance_time || '',
+        source_url: play.source_url || '',
         status: play.status || 'archived',
       });
       loadSavedCredits(play.id);
@@ -122,6 +144,9 @@ export default function AdminPlays() {
     setSavedCredits([]);
     setFormMsg(null);
     setCreditMsg(null);
+    setInstagramImport(BLANK_INSTAGRAM_IMPORT);
+    setInstagramImageName('');
+    setInstagramImportMsg(null);
   };
 
   // Load credits from DB
@@ -134,6 +159,125 @@ export default function AdminPlays() {
       .order('billing_order', { ascending: true });
     setSavedCredits(data || []);
     setLoadingCredits(false);
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function fileToCompressedDataUrl(file) {
+    const dataUrl = await readFileAsDataUrl(file);
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = dataUrl;
+    });
+
+    const maxSide = 1400;
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const width = Math.max(1, Math.round(img.width * scale));
+    const height = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas is not available.');
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', 0.84);
+  }
+
+  async function handleInstagramFlyerChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setInstagramImageName('');
+      setInstagramImport(prev => ({ ...prev, image: '' }));
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setInstagramImportMsg({ type: 'error', text: 'Please choose an image file.' });
+      return;
+    }
+
+    try {
+      setInstagramImageName(file.name);
+      const image = await fileToCompressedDataUrl(file);
+      setInstagramImport(prev => ({ ...prev, image }));
+      setInstagramImportMsg(null);
+    } catch {
+      setInstagramImageName('');
+      setInstagramImport(prev => ({ ...prev, image: '' }));
+      setInstagramImportMsg({ type: 'error', text: 'Could not read the flyer image.' });
+    }
+  }
+
+  async function handleInstagramImport() {
+    if (!instagramImport.url.trim()) {
+      setInstagramImportMsg({ type: 'error', text: 'Instagram URL is required.' });
+      return;
+    }
+
+    setImportingInstagram(true);
+    setInstagramImportMsg(null);
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          task: 'extract_play_from_instagram',
+          data: instagramImport,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Instagram import failed.');
+
+      const imported = payload.play || {};
+      const fields = [
+        'title',
+        'playwright',
+        'director',
+        'producer',
+        'venue',
+        'city',
+        'country',
+        'poster_url',
+        'banner_url',
+        'synopsis',
+        'genre',
+        'run_start_date',
+        'run_end_date',
+        'performance_time',
+        'source_url',
+        'status',
+      ];
+
+      setFormData(prev => {
+        const next = { ...prev };
+        fields.forEach(field => {
+          const value = imported[field];
+          if (value !== undefined && value !== null && String(value).trim() !== '') {
+            next[field] = value;
+          }
+        });
+        if (imported.year) next.year = Number(imported.year);
+        return next;
+      });
+
+      const warnings = Array.isArray(payload.warnings) ? payload.warnings.filter(Boolean) : [];
+      setInstagramImportMsg({
+        type: 'success',
+        text: warnings.length ? `Imported available details. ${warnings[0]}` : 'Imported available details.',
+      });
+    } catch (err) {
+      setInstagramImportMsg({ type: 'error', text: err.message || 'Instagram import failed.' });
+    } finally {
+      setImportingInstagram(false);
+    }
   }
 
   // ---- People search inside drawer -----------------------------------------
@@ -240,6 +384,10 @@ export default function AdminPlays() {
     e.preventDefault();
     if (!formData.title.trim()) {
       setFormMsg({ type: 'error', text: 'Play title is required.' });
+      return;
+    }
+    if (formData.run_start_date && formData.run_end_date && formData.run_end_date < formData.run_start_date) {
+      setFormMsg({ type: 'error', text: 'End date cannot be before the start date.' });
       return;
     }
     setSaving(true);
@@ -392,7 +540,7 @@ export default function AdminPlays() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-[10px] font-bold text-brand uppercase tracking-wider truncate">
-                      {play.genre || 'Stage Play'} • {play.year}
+                      {play.genre || 'Stage Play'} • {getPlayDateLabel(play, 'N/A')}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-tight flex-shrink-0 ${
                       play.status === 'currently_running'
@@ -464,6 +612,66 @@ export default function AdminPlays() {
         width="820px"
       >
         <form onSubmit={handleSubmit} className="space-y-10">
+          <section className="rounded-lg border border-border bg-surface-2/50 p-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                <Icon icon="mdi:instagram" className="w-4 h-4 text-pink-400" />
+                Instagram Import
+              </h4>
+              <button
+                type="button"
+                onClick={handleInstagramImport}
+                disabled={importingInstagram || !instagramImport.url.trim()}
+                className="inline-flex items-center gap-2 bg-brand text-on-brand px-3 py-2 rounded-md text-xs font-bold hover:bg-brand-hover transition-colors disabled:opacity-60"
+              >
+                <Icon icon={importingInstagram ? 'solar:refresh-bold' : 'solar:magic-stick-3-bold'} className={`w-4 h-4 ${importingInstagram ? 'animate-spin' : ''}`} />
+                {importingInstagram ? 'Fetching...' : 'Fetch Details'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Instagram URL</label>
+                <input
+                  type="url"
+                  value={instagramImport.url}
+                  onChange={e => setInstagramImport(prev => ({ ...prev, url: e.target.value }))}
+                  className="w-full bg-surface border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                  placeholder="https://www.instagram.com/p/..."
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Flyer</label>
+                <label className="h-[34px] inline-flex items-center gap-2 bg-surface border border-border rounded-md px-3 text-xs text-text-primary cursor-pointer hover:border-brand/60 transition-colors">
+                  <Icon icon="solar:upload-minimalistic-bold" className="w-4 h-4 text-text-muted" />
+                  <span className="max-w-[150px] truncate">{instagramImageName || 'Image'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleInstagramFlyerChange}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Caption</label>
+              <textarea
+                rows={3}
+                value={instagramImport.caption}
+                onChange={e => setInstagramImport(prev => ({ ...prev, caption: e.target.value }))}
+                className="w-full bg-surface border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none resize-none leading-relaxed"
+                placeholder="Paste caption text when available"
+              />
+            </div>
+
+            {instagramImportMsg && (
+              <div className={`p-2.5 rounded-lg text-xs font-bold ${instagramImportMsg.type === 'success' ? 'bg-green-500/10 text-green-500 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
+                {instagramImportMsg.text}
+              </div>
+            )}
+          </section>
 
           {/* Two Column Layout: Core Information vs Media & Presentation */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -506,7 +714,7 @@ export default function AdminPlays() {
                 </div>
 
                 {/* Playwright & Director */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-text-primary mb-1.5">Playwright</label>
                     <input
@@ -530,7 +738,7 @@ export default function AdminPlays() {
                 </div>
 
                 {/* Producer & Venue */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-text-primary mb-1.5">Producer</label>
                     <input
@@ -553,8 +761,61 @@ export default function AdminPlays() {
                   </div>
                 </div>
 
-                {/* Year, Status */}
-                <div className="grid grid-cols-3 gap-3">
+                {/* Run Dates */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Start Date</label>
+                    <input
+                      type="date"
+                      value={formData.run_start_date}
+                      onChange={e => {
+                        const run_start_date = e.target.value;
+                        setFormData({
+                          ...formData,
+                          run_start_date,
+                          year: run_start_date ? Number(run_start_date.slice(0, 4)) : formData.year,
+                        });
+                      }}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">End Date</label>
+                    <input
+                      type="date"
+                      value={formData.run_end_date}
+                      onChange={e => setFormData({ ...formData, run_end_date: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Time & Source */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Performance Time</label>
+                    <input
+                      type="text"
+                      value={formData.performance_time}
+                      onChange={e => setFormData({ ...formData, performance_time: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="e.g. 6:00 PM"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text-primary mb-1.5">Source URL</label>
+                    <input
+                      type="url"
+                      value={formData.source_url}
+                      onChange={e => setFormData({ ...formData, source_url: e.target.value })}
+                      className="w-full bg-surface-2 border border-border rounded-md px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+
+                {/* Year, City, Status */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-text-primary mb-1.5">Year</label>
                     <input
@@ -587,7 +848,6 @@ export default function AdminPlays() {
                     </select>
                   </div>
                 </div>
-
                 {/* Synopsis */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -612,7 +872,7 @@ export default function AdminPlays() {
                     <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span>
                     <h5 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">PRODUCTION INTELLIGENCE</h5>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Country</label>
                       <input

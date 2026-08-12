@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Icon } from '@iconify/react';
-import { fetchPlays } from '../lib/plays';
+import { fetchPlays, getPlayDateLabel } from '../lib/plays';
 import SEO from '../components/SEO';
 
 export default function PlaysList() {
@@ -113,7 +113,7 @@ export default function PlaysList() {
                 <div className="p-6 flex-1 flex flex-col justify-between">
                   <div>
                     <span className="text-xs font-semibold text-brand uppercase tracking-wider">
-                      {play.genre || 'Stage Play'} • {play.year || 'N/A'}
+                      {play.genre || 'Stage Play'} • {getPlayDateLabel(play, 'N/A')}
                     </span>
 
                     <h2 className="text-xl font-bold text-text-primary group-hover:text-brand transition-colors mt-1 mb-2">

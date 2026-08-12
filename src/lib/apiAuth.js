@@ -9,7 +9,18 @@ import { supabase } from './supabase';
  * @returns {Promise<Record<string, string>>}
  */
 export async function authHeaders(extra = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
+  let { data: { session } } = await supabase.auth.getSession();
+  const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
+
+  if (expiresAtMs && expiresAtMs < Date.now() + 60_000) {
+    try {
+      const { data } = await supabase.auth.refreshSession();
+      session = data.session || session;
+    } catch (err) {
+      console.warn('Could not refresh session before API request:', err);
+    }
+  }
+
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${session?.access_token || ''}`,

@@ -21,6 +21,11 @@ function collectKeys(base: string): string[] {
 
 // Gemini: rotate on 429/RESOURCE_EXHAUSTED before falling back to OpenAI/Groq.
 const GEMINI_KEYS = collectKeys('GEMINI_API_KEY');
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-flash-latest';
+const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite')
+  .split(',')
+  .map((model) => model.trim())
+  .filter(Boolean);
 let geminiKeyIdx = 0;
 
 function geminiModelFor(model: string) {
@@ -231,7 +236,7 @@ export async function generateAIContent(prompt: string) {
     providers.push({
       name: 'gemini',
       execute: async () => {
-        const result = await withGeminiRotation('gemini-flash-latest', (m) => m.generateContent(prompt));
+        const result = await withGeminiRotation(GEMINI_TEXT_MODEL, (m) => m.generateContent(prompt));
         return { text: result.response.text(), engine: 'gemini', headers: null };
       }
     });
@@ -325,14 +330,10 @@ export async function generateAIContent(prompt: string) {
 }
 
 /**
- * Vision Content Generator (Gemini Flash Vision)
+ * Vision Content Generator (Gemini + OpenAI fallback)
  */
 export async function generateAIVisionContent(prompt: string, base64Data: string, mimeType: string) {
-  if (!GEMINI_KEYS.length) {
-    throw new Error('GEMINI_API_KEY is not set. Vision AI requires Gemini.');
-  }
-  
-  console.log(`[AI Service] Sending Vision request to Gemini (mimeType: ${mimeType})...`);
+  console.log(`[AI Service] Sending Vision request (mimeType: ${mimeType})...`);
   const imagePart = {
     inlineData: {
       data: base64Data,
@@ -340,55 +341,51 @@ export async function generateAIVisionContent(prompt: string, base64Data: string
     }
   };
 
-  // Attempt 1: Gemini 2.5 Flash (primary), rotating keys on quota
-  try {
-    const result = await withGeminiRotation('gemini-flash-latest', (m) => m.generateContent([prompt, imagePart]));
-    return {
-      text: result.response.text(),
-      telemetry: { engine: 'gemini-vision-2.5', status: 'ok' }
-    };
-  } catch (err: any) {
-    console.warn('[AI Service] Gemini 2.5 Flash Vision failed:', err.message);
-
-    // Attempt 2: Gemini 2.0 Flash Lite (free tier fallback)
-    try {
-      console.log('[AI Service] Trying Gemini 2.0 Flash Lite fallback...');
-      const result = await withGeminiRotation('gemini-2.0-flash-lite', (m) => m.generateContent([prompt, imagePart]));
-      return {
-        text: result.response.text(),
-        telemetry: { engine: 'gemini-vision-2.0-lite', status: 'ok' }
-      };
-    } catch (fallbackErr: any) {
-      console.warn('[AI Service] Gemini 2.0 Flash Lite fallback failed:', fallbackErr.message);
-
-      // Attempt 3: OpenAI gpt-4o-mini vision (if configured)
-      if (openai) {
-        try {
-          console.log('[AI Service] Trying OpenAI Vision fallback...');
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
-              ]
-            }],
-            temperature: 0.2,
-          });
-          return {
-            text: response.choices[0]?.message?.content || '',
-            telemetry: { engine: 'openai-vision-4o-mini', status: 'ok' }
-          };
-        } catch (openaiErr: any) {
-          console.error('[AI Service] OpenAI Vision fallback failed:', openaiErr.message);
-          throw new Error(`All vision providers failed. Gemini 2.5: ${err.message} | Gemini 2.0 Lite: ${fallbackErr.message} | OpenAI: ${openaiErr.message}`);
-        }
+  const geminiErrors: string[] = [];
+  if (GEMINI_KEYS.length) {
+    for (const model of GEMINI_VISION_MODELS) {
+      try {
+        console.log(`[AI Service] Trying Gemini Vision model: ${model}`);
+        const result = await withGeminiRotation(model, (m) => m.generateContent([prompt, imagePart]));
+        return {
+          text: result.response.text(),
+          telemetry: { engine: `gemini-vision-${model}`, status: 'ok' }
+        };
+      } catch (err: any) {
+        const message = err?.message || String(err);
+        console.warn(`[AI Service] Gemini Vision model ${model} failed:`, message);
+        geminiErrors.push(`${model}: ${message}`);
       }
+    }
+  } else {
+    geminiErrors.push('No GEMINI_API_KEY configured');
+  }
 
-      throw new Error(`Vision API failed: ${err.message} (Gemini 2.0 Lite fallback: ${fallbackErr.message}). No OpenAI key configured for further fallback.`);
+  if (openai) {
+    try {
+      console.log('[AI Service] Trying OpenAI Vision fallback...');
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
+          ]
+        }],
+        temperature: 0.2,
+      });
+      return {
+        text: response.choices[0]?.message?.content || '',
+        telemetry: { engine: 'openai-vision-4o-mini', status: 'ok' }
+      };
+    } catch (openaiErr: any) {
+      console.error('[AI Service] OpenAI Vision fallback failed:', openaiErr.message);
+      throw new Error(`All vision providers failed. Gemini: ${geminiErrors.join(' | ')} | OpenAI: ${openaiErr.message}`);
     }
   }
+
+  throw new Error(`Vision API failed. Gemini attempts: ${geminiErrors.join(' | ')}. No OpenAI key configured for further fallback.`);
 }
 
 /** Whether Cohere keys are available in this process. */

@@ -1,5 +1,44 @@
 import { supabase } from './supabase';
 
+function parseDateOnly(value) {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day, 12, 0, 0);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatPlayDate(value) {
+  const date = parseDateOnly(value);
+  if (!date) return null;
+
+  return date.toLocaleDateString('en-NG', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+export function getPlayDateLabel(play, fallback = 'Date TBA') {
+  const start = formatPlayDate(play?.run_start_date);
+  const end = formatPlayDate(play?.run_end_date);
+  const time = String(play?.performance_time || '').trim();
+  let label = start || end || (play?.year ? String(play.year) : fallback);
+
+  if (start && end && play.run_start_date !== play.run_end_date) {
+    label = `${start} - ${end}`;
+  }
+
+  return time && label !== fallback ? `${label}, ${time}` : label;
+}
+
 /**
  * Fetch stage plays with optional status filtering
  */
@@ -7,7 +46,8 @@ export async function fetchPlays(status = null) {
   let query = supabase
     .from('plays')
     .select('*')
-    .order('year', { ascending: false });
+    .order('run_start_date', { ascending: false, nullsFirst: false })
+    .order('year', { ascending: false, nullsFirst: false });
 
   if (status) {
     query = query.eq('status', status);
@@ -80,6 +120,9 @@ export async function fetchPersonStageCredits(personId) {
         director,
         venue,
         city,
+        run_start_date,
+        run_end_date,
+        performance_time,
         year,
         poster_url,
         status
@@ -97,15 +140,28 @@ export async function fetchPersonStageCredits(personId) {
     ...item.play,
     role: item.role,
     character_name: item.character_name
-  }));
+  })).sort((a, b) => {
+    const dateA = a.run_start_date || (a.year ? `${a.year}-01-01` : '');
+    const dateB = b.run_start_date || (b.year ? `${b.year}-01-01` : '');
+    return dateB.localeCompare(dateA);
+  });
 }
 
 /**
  * Upsert stage play (Admin)
  */
 export async function upsertPlay(playData) {
+  const runStartDate = playData.run_start_date || null;
+  const runEndDate = playData.run_end_date || null;
+  const derivedYear = runStartDate ? Number(runStartDate.slice(0, 4)) : null;
+
   const payload = {
     ...playData,
+    run_start_date: runStartDate,
+    run_end_date: runEndDate,
+    performance_time: playData.performance_time?.trim() || null,
+    source_url: playData.source_url?.trim() || null,
+    year: derivedYear || (playData.year ? Number(playData.year) : null),
     slug: playData.slug || playData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
   };
 

@@ -23,6 +23,8 @@ async function insertAllPlays() {
       synopsis: 'A high-octane musical extravaganza detailing the journeys of four ambitious young men who migrate to Lagos in search of fame, fortune, and artistic freedom.',
       genre: 'Musical Drama',
       year: 2013,
+      run_start_date: '2013-10-25',
+      run_end_date: '2017-08-27',
       status: 'archived'
     },
     {
@@ -38,6 +40,8 @@ async function insertAllPlays() {
       synopsis: 'A satire about political trial, youth ambition, social struggle, and love among fresh university graduates in Nigeria.',
       genre: 'Satirical Musical',
       year: 2016,
+      run_start_date: '2016-07-21',
+      run_end_date: '2016-07-25',
       status: 'archived'
     },
     {
@@ -53,6 +57,8 @@ async function insertAllPlays() {
       synopsis: 'An exhilarating musical chronicle of Afrobeat legend Fela Kuti and the fierce, loyal women who supported his music, political activism, and Kalakuta Republic.',
       genre: 'Biographical Musical',
       year: 2017,
+      run_start_date: '2017-12-17',
+      run_end_date: '2019-04-14',
       status: 'archived'
     },
     {
@@ -68,6 +74,8 @@ async function insertAllPlays() {
       synopsis: 'A grand Yoruba historical stage production recounting Queen Moremi Ajasoro of Ile-Ife and her brave sacrifice to liberate her people.',
       genre: 'Historical Epic Musical',
       year: 2018,
+      run_start_date: '2018-12-21',
+      run_end_date: '2019-01-02',
       status: 'archived'
     },
     {
