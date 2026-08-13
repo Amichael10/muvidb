@@ -13,7 +13,28 @@ const youtubeFetch = async (endpoint, params = {}) => {
     }
   })
   const res = await fetch(`/api/youtube?${searchParams}`)
-  return res.json()
+
+  // Read as text first — the proxy may return plain-text error bodies
+  // (e.g. "A server error has occurred") which would crash res.json().
+  const text = await res.text()
+
+  if (!res.ok) {
+    // Try to extract a useful message from whatever the server sent back
+    let errorMsg = `YouTube API returned ${res.status}`
+    try {
+      const parsed = JSON.parse(text)
+      errorMsg = parsed?.error?.message || parsed?.error || parsed?.message || errorMsg
+    } catch {
+      if (text) errorMsg += `: ${text.substring(0, 200)}`
+    }
+    return { error: { message: errorMsg, code: res.status } }
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { error: { message: `Invalid JSON from YouTube API: ${text.substring(0, 200)}`, code: 0 } }
+  }
 }
 
 // ─────────────────────────────────────────
