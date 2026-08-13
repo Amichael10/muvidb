@@ -253,6 +253,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
       }
     },
     resolve: {
+      dedupe: ['react', 'react-dom'],
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
