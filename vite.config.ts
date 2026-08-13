@@ -234,6 +234,43 @@ export default defineConfig(({ mode, isSsrBuild }) => {
             return false;
           },
         },
+        '/api/editorial': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              const task = url.searchParams.get('task') || '';
+              
+              let body = {};
+              if (req.method === 'POST') {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+              }
+
+              // Dynamically import handler
+              const { default: handler } = await import('./api/editorial.js');
+              await handler({ query: Object.fromEntries(url.searchParams), body, method: req.method }, {
+                status: (code) => ({
+                  json: (data) => {
+                    res.statusCode = code;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(data));
+                  },
+                  end: () => {
+                    res.statusCode = code;
+                    res.end();
+                  }
+                }),
+                setHeader: (k, v) => res.setHeader(k, v),
+              });
+            } catch (err) {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          }
+        },
         '/api': {
           target: 'http://localhost:3001',
           bypass: (req, res) => {

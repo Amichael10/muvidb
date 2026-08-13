@@ -83,6 +83,7 @@ export default [
       route('cinema-films', 'pages/admin/AdminCinemaFilms.jsx'),
       route('cinema-scraping', 'pages/admin/AdminCinemaScraping.jsx'),
       route('ai', 'pages/admin/AdminAI.jsx'),
+      route('editorial', 'pages/admin/AdminEditorial.jsx'),
       route('deduplicator', 'pages/admin/AdminDeduplicator.jsx'),
       route('import', 'pages/admin/AdminImport.jsx'),
       route('spotlight', 'pages/admin/AdminSpotlight.jsx'),

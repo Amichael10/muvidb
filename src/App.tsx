@@ -81,6 +81,7 @@ const AdminChannels = lazyWithRetry(() => import('./pages/admin/AdminChannels'))
 const AdminCinemaFilms = lazyWithRetry(() => import('./pages/admin/AdminCinemaFilms'));
 const AdminCinemaScraping = lazyWithRetry(() => import('./pages/admin/AdminCinemaScraping'));
 const AdminCreditsExtractor = lazyWithRetry(() => import('./pages/admin/AdminCreditsExtractor'));
+const AdminEditorial = lazyWithRetry(() => import('./pages/admin/AdminEditorial'));
 const AdminChannelDetail = lazyWithRetry(() => import('./pages/admin/AdminChannelDetail'));
 const AdminImport = lazyWithRetry(() => import('./pages/admin/AdminImport'));
 const AdminAI = lazyWithRetry(() => import('./pages/admin/AdminAI'));
@@ -372,6 +373,7 @@ export default function App() {
                   <Route path="cinema-films" element={<AdminCinemaFilms />} />
                   <Route path="cinema-scraping" element={<AdminCinemaScraping />} />
                   <Route path="ai" element={<AdminAI />} />
+                  <Route path="editorial" element={<AdminEditorial />} />
                   <Route path="deduplicator" element={<AdminDeduplicator />} />
                   <Route path="import" element={<AdminImport />} />
                   <Route path="spotlight" element={<AdminSpotlight />} />
