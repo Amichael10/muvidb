@@ -12,6 +12,7 @@ import {
 } from '../../lib/personNameMatch';
 import { canonicalizeRole } from '../../lib/creditRoles';
 import { matchPeopleByNameKey, searchPeopleByName } from '../../lib/peopleSearch';
+import { extractCreditsWithLocalOCR } from '../../utils/localCreditOcr';
 
 const PEOPLE_SELECT = 'id, name, photo_url, film_count';
 
@@ -172,6 +173,7 @@ export default function AdminCreditsExtractor() {
   const [activeTab, setActiveTab] = useState('cast'); // 'cast' or 'crew'
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [ocrLogs, setOcrLogs] = useState([]);
+  const [ocrEngine, setOcrEngine] = useState('ai'); // 'ai' (AI Vision LLM) or 'local' (Free Tesseract)
 
   // Upload/Image State
   // Multiple screenshots: a credit roll rarely fits in one frame. Each entry is
@@ -421,25 +423,32 @@ export default function AdminCreditsExtractor() {
       for (let i = 0; i < screenshots.length; i++) {
         const shot = screenshots[i];
         const label = `Image ${i + 1}/${screenshots.length}`;
-        setOcrLogs((prev) => [...prev, `🔍 ${label} (${shot.name}): running Vision OCR...`]);
-
+        
         try {
-          const response = await fetch('/api/ai', {
-            method: 'POST',
-            headers: await authHeaders(),
-            body: JSON.stringify({
-              task: 'extract_credits_from_image',
-              data: { image: shot.base64, creditType: activeTab },
-            }),
-          });
+          let extracted = [];
 
-          if (!response.ok) {
-            const errJson = await response.json().catch(() => ({}));
-            throw new Error(errJson.error || 'Server returned an error');
+          if (ocrEngine === 'local') {
+            setOcrLogs((prev) => [...prev, `⚙️ ${label} (${shot.name}): running Free Local Tesseract OCR...`]);
+            extracted = await extractCreditsWithLocalOCR(shot.base64, activeTab);
+          } else {
+            setOcrLogs((prev) => [...prev, `🔍 ${label} (${shot.name}): running AI Vision OCR...`]);
+            const response = await fetch('/api/ai', {
+              method: 'POST',
+              headers: await authHeaders(),
+              body: JSON.stringify({
+                task: 'extract_credits_from_image',
+                data: { image: shot.base64, creditType: activeTab },
+              }),
+            });
+
+            if (!response.ok) {
+              const errJson = await response.json().catch(() => ({}));
+              throw new Error(errJson.error || 'Server returned an error');
+            }
+
+            const resData = await response.json();
+            extracted = resData.results || [];
           }
-
-          const resData = await response.json();
-          const extracted = resData.results || [];
 
           if (!extracted.length) {
             setOcrLogs((prev) => [...prev, `⚠️ ${label}: no credits found.`]);
@@ -828,9 +837,61 @@ export default function AdminCreditsExtractor() {
             </div>
           </div>
 
+          {/* OCR Engine Selection Card */}
+          <div className="card-cal p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-widest text-brand">2. Select Extraction Engine</h3>
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                ocrEngine === 'local' 
+                  ? 'bg-green-500/10 text-green-400 border-green-500/20' 
+                  : 'bg-brand/10 text-brand border-brand/20'
+              }`}>
+                {ocrEngine === 'local' ? 'Free Local OCR' : 'AI Vision LLM'}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setOcrEngine('ai')}
+                className={`p-3.5 rounded-xl border text-left transition-all ${
+                  ocrEngine === 'ai'
+                    ? 'border-brand bg-brand/10 ring-2 ring-brand/20'
+                    : 'border-border bg-surface-2/40 hover:border-brand/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">⚡</span>
+                  <span className="text-xs font-black text-text-primary">AI Vision Engine</span>
+                </div>
+                <p className="text-[11px] text-text-muted font-medium leading-snug">
+                  High-precision LLM Vision. Parses complex & stylized text.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOcrEngine('local')}
+                className={`p-3.5 rounded-xl border text-left transition-all ${
+                  ocrEngine === 'local'
+                    ? 'border-green-500/50 bg-green-500/10 ring-2 ring-green-500/20'
+                    : 'border-border bg-surface-2/40 hover:border-green-500/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">🆓</span>
+                  <span className="text-xs font-black text-text-primary">Local Free OCR</span>
+                </div>
+                <p className="text-[11px] text-text-muted font-medium leading-snug">
+                  Free Tesseract engine (Credit Harvest method). Zero API cost.
+                </p>
+              </button>
+            </div>
+          </div>
+
           {/* Screenshot Upload Card */}
           <div className="card-cal p-6 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">2. Upload Credit Screens</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-brand mb-2">3. Upload Credit Screens</h3>
             
             {/* Upload Area */}
             <div className="border-2 border-dashed border-border/80 hover:border-brand/40 rounded-xl p-6 transition-all flex flex-col items-center justify-center text-center cursor-pointer relative bg-surface-2/20 group">
