@@ -4,6 +4,7 @@ import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
 import { mirrorIfExternal } from './image_mirror.js';
 import { enrichFilmsFromAI, attachCreditsBatch, type EnrichedFilm } from './film_enrichment.js';
+import { enrichMissingSynopsesConcurrent } from './cohere_enrichment.js';
 import { pickTmdbMatch } from './tmdb_match.js';
 import {
   curateYouTubeTitle,
@@ -569,6 +570,10 @@ export async function runVideosSync() {
                   existingFilmsMap.set(f.source_video_id, f.id);
                   newFilms++;
                 });
+                const newlyAddedIds = newInsertedFilms.map((f: any) => f.id);
+                enrichMissingSynopsesConcurrent(newlyAddedIds).catch((e: any) =>
+                  console.warn(`[runVideosSync] Cohere synopsis enrichment error:`, e.message)
+                );
               }
             }
 

@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
+import { enrichMissingSynopsesConcurrent } from '../api/_lib/cohere_enrichment.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
@@ -227,6 +228,10 @@ async function main() {
                         existingFilmsMap.set(f.source_video_id, f.id);
                         newFilmsCreated++;
                       });
+                      const newlyAddedIds = newInsertedFilms.map((f: any) => f.id);
+                      enrichMissingSynopsesConcurrent(newlyAddedIds).catch((e: any) =>
+                        console.warn(`[continuous_youtube_sync] Cohere synopsis enrichment error:`, e.message)
+                      );
                     }
                   }
 

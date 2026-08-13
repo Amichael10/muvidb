@@ -156,9 +156,28 @@ async function startChannelFetcherLoop() {
   }
 }
 
-// Start Both
+async function startDailyActorBioBackfillLoop() {
+  console.log("Starting Daily Actor Bio Backfill Daemon Loop...");
+  while (true) {
+    try {
+      console.log("Running Cohere Daily Actor Bio Backfill...");
+      const { backfillActorBiosDaily } = await import('../api/_lib/cohere_enrichment.js');
+      await backfillActorBiosDaily(50);
+      await updateStatus('actor_bio_backfill', 'idle', 'Completed daily actor bio backfill.');
+    } catch (e: any) {
+      console.error("Error in daily actor bio backfill:", e.message);
+      await updateStatus('actor_bio_backfill', 'error', `Error: ${e.message}`);
+    }
+    // Sleep for 24 hours (24 * 60 * 60 * 1000)
+    console.log("Daily Actor Bio Backfill sleeping for 24 hours...");
+    await sleep(24 * 60 * 60 * 1000);
+  }
+}
+
+// Start All
 console.log("==========================================");
 console.log("   MUVIDB AUTOMATION DAEMON INITIALIZED");
 console.log("==========================================");
 startActorEnricherLoop();
 startChannelFetcherLoop();
+startDailyActorBioBackfillLoop();

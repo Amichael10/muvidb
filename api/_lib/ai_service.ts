@@ -217,21 +217,218 @@ export function parseJSON(text: string) {
         if (objStart !== -1 && objEnd > objStart) {
           const extracted = '[' + text.substring(objStart, objEnd + 1) + ']';
           return JSON.parse(extracted);
+const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite')
+  .split(',')
+  .map((model) => model.trim())
+  .filter(Boolean);
+let geminiKeyIdx = 0;
+
+function geminiModelFor(model: string) {
+  return new GoogleGenerativeAI(GEMINI_KEYS[geminiKeyIdx] || '').getGenerativeModel({ model });
+}
+
+function isGeminiQuotaError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 429 || /quota|resource_exhausted|rate limit|too many requests|\b429\b/.test(msg);
+}
+
+/** A revoked/typo'd Gemini key (401). Drop it for the life of this process. */
+function isDeadGeminiKeyError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 401 || /api key not valid|invalid.?api.?key|unauthorized|\b401\b|permission.?denied/.test(msg);
+}
+const deadGeminiKeys = new Set<string>();
+
+/** Run a Gemini call, rotating to the next key on quota or dead-key errors. */
+async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): Promise<any> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < Math.max(1, GEMINI_KEYS.length); attempt++) {
+    if (deadGeminiKeys.has(GEMINI_KEYS[geminiKeyIdx]) && deadGeminiKeys.size < GEMINI_KEYS.length) {
+      geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
+      continue;
+    }
+    try {
+      return await fn(geminiModelFor(model));
+    } catch (err: any) {
+      lastErr = err;
+      if (isDeadGeminiKeyError(err) && GEMINI_KEYS.length > 1) {
+        console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} is INVALID — dropping it`);
+        deadGeminiKeys.add(GEMINI_KEYS[geminiKeyIdx]);
+        geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
+        continue;
+      }
+      if (isGeminiQuotaError(err) && GEMINI_KEYS.length > 1) {
+        console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} quota hit, rotating…`);
+        geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+// Groq: same multi-key rotation as Gemini.
+const GROQ_KEYS = collectKeys('GROQ_API_KEY');
+let groqKeyIdx = 0;
+const groqClientFor = () => new Groq({ apiKey: GROQ_KEYS[groqKeyIdx] || '' });
+
+function isGroqQuotaError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 429 || /quota|rate limit|rate_limit|too many requests|\b429\b/.test(msg);
+}
+
+/** A revoked/typo'd key (401). Unlike a quota error this NEVER recovers, so the
+ *  key is dropped from the pool instead of being retried forever. */
+function isDeadKeyError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return err?.status === 401 || /invalid api key|invalid_api_key|unauthorized|\b401\b/.test(msg);
+}
+const deadGroqKeys = new Set<string>();
+
+/** Run a Groq call, rotating on quota AND skipping keys that are simply dead. */
+async function withGroqRotation(fn: (client: Groq) => Promise<any>): Promise<any> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < Math.max(1, GROQ_KEYS.length); attempt++) {
+    // Skip keys already proven dead this process.
+    if (deadGroqKeys.has(GROQ_KEYS[groqKeyIdx]) && deadGroqKeys.size < GROQ_KEYS.length) {
+      groqKeyIdx = (groqKeyIdx + 1) % GROQ_KEYS.length;
+      continue;
+    }
+    try {
+      return await fn(groqClientFor());
+    } catch (err: any) {
+      lastErr = err;
+      if (isDeadKeyError(err) && GROQ_KEYS.length > 1) {
+        console.warn(`[groq] key #${groqKeyIdx + 1}/${GROQ_KEYS.length} is INVALID (401) — dropping it`);
+        deadGroqKeys.add(GROQ_KEYS[groqKeyIdx]);
+        groqKeyIdx = (groqKeyIdx + 1) % GROQ_KEYS.length;
+        continue;
+      }
+      if (isGroqQuotaError(err) && GROQ_KEYS.length > 1) {
+        console.warn(`[groq] key #${groqKeyIdx + 1}/${GROQ_KEYS.length} quota hit, rotating…`);
+        groqKeyIdx = (groqKeyIdx + 1) % GROQ_KEYS.length;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+// Initialize OpenAI (if key exists)
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+
+// Cohere: same multi-key rotation as Groq (chat + embed + rerank).
+const COHERE_KEYS = collectKeys('COHERE_API_KEY');
+let cohereKeyIdx = 0;
+const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL || 'command-a-03-2025';
+const COHERE_EMBED_MODEL = process.env.COHERE_EMBED_MODEL || 'embed-v4.0';
+const COHERE_RERANK_MODEL = process.env.COHERE_RERANK_MODEL || 'rerank-v4.0-pro';
+
+const cohereClientFor = () => new CohereClientV2({ token: COHERE_KEYS[cohereKeyIdx] || '' });
+
+/** Cohere SDK uses statusCode; some paths surface status. */
+function cohereErrStatus(err: any): number | undefined {
+  return err?.statusCode ?? err?.status;
+}
+
+function isCohereQuotaError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return cohereErrStatus(err) === 429 || /quota|rate limit|rate_limit|too many requests|\b429\b/.test(msg);
+}
+
+/** Revoked/typo'd key (401/403). Drop it for the life of this process. */
+function isCohereDeadKeyError(err: any): boolean {
+  const status = cohereErrStatus(err);
+  const msg = (err?.message || '').toLowerCase();
+  return status === 401 || status === 403 || /invalid.?api.?key|unauthorized|forbidden|\b401\b|\b403\b/.test(msg);
+}
+const deadCohereKeys = new Set<string>();
+
+/** Run a Cohere call, rotating on quota AND skipping keys that are simply dead. */
+async function withCohereRotation(fn: (client: CohereClientV2) => Promise<any>): Promise<any> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < Math.max(1, COHERE_KEYS.length); attempt++) {
+    // Skip keys already proven dead this process.
+    if (deadCohereKeys.has(COHERE_KEYS[cohereKeyIdx]) && deadCohereKeys.size < COHERE_KEYS.length) {
+      cohereKeyIdx = (cohereKeyIdx + 1) % COHERE_KEYS.length;
+      continue;
+    }
+    try {
+      return await fn(cohereClientFor());
+    } catch (err: any) {
+      lastErr = err;
+      if (isCohereDeadKeyError(err) && COHERE_KEYS.length > 1) {
+        console.warn(`[cohere] key #${cohereKeyIdx + 1}/${COHERE_KEYS.length} is INVALID — dropping it`);
+        deadCohereKeys.add(COHERE_KEYS[cohereKeyIdx]);
+        cohereKeyIdx = (cohereKeyIdx + 1) % COHERE_KEYS.length;
+        continue;
+      }
+      if (isCohereQuotaError(err) && COHERE_KEYS.length > 1) {
+        console.warn(`[cohere] key #${cohereKeyIdx + 1}/${COHERE_KEYS.length} quota hit, rotating…`);
+        cohereKeyIdx = (cohereKeyIdx + 1) % COHERE_KEYS.length;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
+function extractCohereText(response: any): string {
+  const content = response?.message?.content;
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  const parts: string[] = [];
+  for (const part of content) {
+    if (typeof part === 'string') parts.push(part);
+    else if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text);
+  }
+  return parts.join('');
+}
+
+/**
+ * Clean and parse JSON from AI response
+ */
+export function parseJSON(text: string) {
+  try {
+    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (err) {
+    // Try to extract JSON array from within surrounding text
+    try {
+      const bracketStart = text.indexOf('[');
+      const bracketEnd = text.lastIndexOf(']');
+      if (bracketStart !== -1 && bracketEnd > bracketStart) {
+        const extracted = text.substring(bracketStart, bracketEnd + 1);
+        return JSON.parse(extracted);
+      }
+    } catch (err2) {
+      // Also try extracting a JSON object
+      try {
+        const objStart = text.indexOf('{');
+        const objEnd = text.lastIndexOf('}');
+        if (objStart !== -1 && objEnd > objStart) {
+          const extracted = '[' + text.substring(objStart, objEnd + 1) + ']';
+          return JSON.parse(extracted);
         }
       } catch (err3) {}
     }
     console.error('Failed to parse AI JSON. Raw text was:', text.substring(0, 500) + '...');
     return [];
-  }
 }
 
 /**
  * Unified request handler with rotation + fallback + telemetry
  * Supports Gemini, Groq, OpenAI, and Cohere
  */
-export async function generateAIContent(prompt: string) {
+export async function generateAIContent(
+  prompt: string,
+  options?: { preferredProvider?: string }
+) {
   const providers = [];
-  
+
   if (GEMINI_KEYS.length) {
     providers.push({
       name: 'gemini',
@@ -303,15 +500,28 @@ export async function generateAIContent(prompt: string) {
     throw new Error('No AI providers configured. Please check GEMINI_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, or COHERE_API_KEY.');
   }
 
-  // Shuffle providers to distribute load if both are available
-  const shuffled = [...providers].sort(() => Math.random() - 0.5);
+  // Order providers: if preferredProvider is specified, put it first, then shuffle the rest
+  let orderedProviders = [];
+  if (options?.preferredProvider) {
+    const prefIndex = providers.findIndex(p => p.name === options.preferredProvider);
+    if (prefIndex !== -1) {
+      const preferred = providers.splice(prefIndex, 1)[0];
+      const rest = providers.sort(() => Math.random() - 0.5);
+      orderedProviders = [preferred, ...rest];
+    } else {
+      orderedProviders = providers.sort(() => Math.random() - 0.5);
+    }
+  } else {
+    orderedProviders = providers.sort(() => Math.random() - 0.5);
+  }
+
   let lastError = null;
 
-  for (const provider of shuffled) {
+  for (const provider of orderedProviders) {
     try {
       console.log(`Trying AI Provider: ${provider.name}...`);
       const { text, engine, headers } = await provider.execute();
-      
+
       let telemetry: any = { engine, status: 'ok', remaining: 100, reset: 0 };
       if (engine === 'groq' && headers) {
         telemetry.remaining = parseInt(headers.get('x-ratelimit-remaining-tokens') || '0');
