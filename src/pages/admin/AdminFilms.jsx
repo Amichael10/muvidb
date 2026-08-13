@@ -22,6 +22,7 @@ import { parseLanguages, AFRICAN_LANGUAGES } from '../../utils/languages';
 import { resolveFilmImageFields } from '../../lib/filmImages';
 import { NFVCB_RATING_OPTIONS } from '../../lib/contributions';
 import { getShowName } from '../../utils/series';
+import { deleteFilmsPermanently } from '../../utils/filmDelete';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -1192,10 +1193,9 @@ export default function AdminFilms() {
   const handleConfirmDelete = async () => {
     if (!deletingFilm) return;
     try {
-      const { error } = await supabase.from('films').delete().eq('id', deletingFilm.id);
-      if (error) throw error;
+      await deleteFilmsPermanently([deletingFilm.id]);
       await logAdminAction(user, 'delete', 'film', deletingFilm.id, deletingFilm.title);
-      toast.success('Film deleted');
+      toast.success('Film deleted permanently');
       setSelectedFilmIds((prev) => prev.filter((id) => id !== deletingFilm.id));
       fetchFilms();
       setDeletingFilm(null);
@@ -1255,23 +1255,10 @@ export default function AdminFilms() {
     if (!filmBatchDeleteIds?.length) return;
     setIsBatchDeleting(true);
 
-    // Chunk into batches of 50 to avoid Supabase/PostgREST URL-length and
-    // statement-timeout limits when deleting large sets (e.g. 500+ films).
-    const CHUNK_SIZE = 50;
-    const chunks = [];
-    for (let i = 0; i < filmBatchDeleteIds.length; i += CHUNK_SIZE) {
-      chunks.push(filmBatchDeleteIds.slice(i, i + CHUNK_SIZE));
-    }
-
     const toastId = toast.loading(`Deleting ${filmBatchDeleteIds.length} films…`);
     try {
-      for (const chunk of chunks) {
-        const { error } = await supabase.from('films').delete().in('id', chunk);
-        if (error) throw error;
-      }
+      await deleteFilmsPermanently(filmBatchDeleteIds);
 
-      // Log a single summary entry instead of one row per film to avoid
-      // 500+ sequential inserts that also cause timeouts.
       await logAdminAction(
         user,
         'delete',
@@ -1281,7 +1268,7 @@ export default function AdminFilms() {
         { deletedIds: filmBatchDeleteIds }
       );
 
-      toast.success(`Deleted ${filmBatchDeleteIds.length} film${filmBatchDeleteIds.length === 1 ? '' : 's'}`, { id: toastId });
+      toast.success(`Deleted ${filmBatchDeleteIds.length} film${filmBatchDeleteIds.length === 1 ? '' : 's'} permanently`, { id: toastId });
       setSelectedFilmIds((prev) => prev.filter((id) => !filmBatchDeleteIds.includes(id)));
       setFilmBatchDeleteIds(null);
       fetchFilms();

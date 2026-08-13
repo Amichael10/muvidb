@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
+import { deleteFilmsPermanently } from '../../utils/filmDelete';
 
 export default function AdminAI() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -206,9 +207,14 @@ export default function AdminAI() {
         dbError = lastError;
         count = successCount;
       } else if (action === 'DELETE') {
-        const { error } = await supabase.from('films').delete().eq('id', item.id);
-        dbError = error;
-        count = error ? 0 : 1;
+        try {
+          await deleteFilmsPermanently([item.id]);
+          dbError = null;
+          count = 1;
+        } catch (delErr) {
+          dbError = delErr;
+          count = 0;
+        }
       } else if (action === 'UPDATE_TITLE') {
         const { data, error } = await supabase.from('films').update({
           title: item.new_title
