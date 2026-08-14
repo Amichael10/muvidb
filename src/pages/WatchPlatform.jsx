@@ -101,33 +101,135 @@ export default function WatchPlatform() {
     });
   }, [films, selectedGenre, yearMin, newThisMonth]);
 
+  const headerPosters = useMemo(() => {
+    const list = films
+      .map((f) => f.poster_url || f.backdrop_url)
+      .filter(Boolean);
+    const unique = Array.from(new Set(list));
+    return unique.slice(0, 10);
+  }, [films]);
+
   if (!platform) return <Navigate to="/browse" replace />;
 
   return (
     <div className="min-h-screen bg-bg">
 
-      {/* Header */}
-      <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
-        <div className="max-w-7xl mx-auto px-4 py-16 pt-32 border-x border-border relative z-10">
-          <Link to="/" className="text-text-muted text-[10px] font-bold uppercase tracking-widest hover:text-brand transition-colors flex items-center gap-1.5 mb-6 w-fit">
-            <Icon icon="solar:alt-arrow-left-linear" className="w-3.5 h-3.5" /> Where to Watch
-          </Link>
-          <div className="flex items-center gap-5">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center border border-white/10 shrink-0"
-              style={{ background: `${platform.color}22`, color: platform.color }}
-            >
-              <Icon icon={platform.icon} className="text-3xl" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-3xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">
-                Watch on {platform.name}
-              </h1>
-              <p className="text-text-muted text-sm">
-                {loading ? 'Loading titles…' : `${totalCount} Nollywood ${totalCount === 1 ? 'title' : 'titles'} available`}
+      {/* Cinematic Header with 3D Poster Collage Fan */}
+      <div className="relative bg-[#08080c] border-b border-border/60 overflow-hidden pt-28 pb-16 md:py-24">
+        {/* Ambient Warm Golden Glow background */}
+        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[600px] h-[500px] bg-gradient-to-l from-amber-500/15 via-amber-600/5 to-transparent blur-3xl rounded-full pointer-events-none" />
+        <div className="absolute inset-0 grid-bg opacity-15 pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 items-center gap-12 lg:gap-8">
+            
+            {/* Left Info Column */}
+            <div className="lg:col-span-6 xl:col-span-5 space-y-6">
+              <Link
+                to="/browse"
+                className="inline-flex items-center gap-2 text-text-muted text-[11px] font-bold uppercase tracking-widest hover:text-amber-400 transition-colors"
+              >
+                <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4 text-amber-400" />
+                <span>WHERE TO WATCH</span>
+              </Link>
+
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border border-amber-500/30 shrink-0 shadow-lg shadow-amber-500/10"
+                  style={{ background: `${platform.color}22`, color: platform.color }}
+                >
+                  {platform.logo ? (
+                    <img src={platform.logo} alt={platform.name} className="w-9 h-9 object-contain" />
+                  ) : (
+                    <Icon icon={platform.icon} className="text-3xl md:text-4xl" />
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold text-white tracking-tight leading-tight">
+                    Watch on {platform.name}
+                  </h1>
+                  <p className="text-text-muted text-sm md:text-base font-medium mt-1">
+                    {loading ? 'Loading titles…' : `${totalCount} Nollywood ${totalCount === 1 ? 'title' : 'titles'} available`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Gold Accent Bar */}
+              <div className="w-12 h-1 bg-amber-500 rounded-full shadow-sm shadow-amber-500/50" />
+
+              <p className="text-text-muted text-sm md:text-base leading-relaxed max-w-lg">
+                From timeless classics to the latest blockbusters, stream premium Nollywood movies anytime, anywhere.
               </p>
             </div>
+
+            {/* Right 3D Poster Fan & Film Reel Collage */}
+            <div className="lg:col-span-6 xl:col-span-7 relative flex justify-center lg:justify-end overflow-hidden lg:overflow-visible py-6">
+              
+              {/* Golden Film Reel Graphic (Behind Collage) */}
+              <div className="absolute -right-12 bottom-0 w-[280px] md:w-[360px] opacity-30 pointer-events-none z-0">
+                <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full text-amber-500/40">
+                  <circle cx="300" cy="200" r="160" stroke="currentColor" strokeWidth="12" />
+                  <circle cx="300" cy="200" r="130" stroke="currentColor" strokeWidth="4" strokeDasharray="12 12" />
+                  <circle cx="300" cy="200" r="40" stroke="currentColor" strokeWidth="8" />
+                  <circle cx="230" cy="200" r="24" fill="currentColor" />
+                  <circle cx="370" cy="200" r="24" fill="currentColor" />
+                  <circle cx="300" cy="130" r="24" fill="currentColor" />
+                  <circle cx="300" cy="270" r="24" fill="currentColor" />
+                </svg>
+              </div>
+
+              {/* 3D Poster Stack Container */}
+              <div className="relative w-full max-w-[560px] h-[320px] sm:h-[380px] md:h-[420px] flex items-center justify-center">
+                
+                {/* 2-Tier Collage Fan Grid */}
+                {headerPosters.length > 0 ? (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {headerPosters.slice(0, 9).map((posterUrl, idx) => {
+                      const configs = [
+                        { rotate: '-rotate-12', translateY: '-translate-y-12', translateX: '-translate-x-36 sm:-translate-x-44', z: 'z-30', scale: 'scale-100' },
+                        { rotate: '-rotate-6', translateY: '-translate-y-8', translateX: '-translate-x-20 sm:-translate-x-24', z: 'z-30', scale: 'scale-105' },
+                        { rotate: 'rotate-0', translateY: '-translate-y-4', translateX: 'translate-x-0', z: 'z-40', scale: 'scale-110' },
+                        { rotate: 'rotate-6', translateY: '-translate-y-8', translateX: 'translate-x-20 sm:translate-x-24', z: 'z-30', scale: 'scale-105' },
+                        { rotate: 'rotate-12', translateY: '-translate-y-12', translateX: 'translate-x-36 sm:translate-x-44', z: 'z-30', scale: 'scale-100' },
+                        { rotate: '-rotate-6', translateY: 'translate-y-16', translateX: '-translate-x-28 sm:-translate-x-32', z: 'z-10', scale: 'scale-95' },
+                        { rotate: 'rotate-0', translateY: 'translate-y-20', translateX: '-translate-x-8 sm:-translate-x-10', z: 'z-20', scale: 'scale-95' },
+                        { rotate: 'rotate-6', translateY: 'translate-y-20', translateX: 'translate-x-8 sm:translate-x-10', z: 'z-20', scale: 'scale-95' },
+                        { rotate: 'rotate-12', translateY: 'translate-y-16', translateX: 'translate-x-28 sm:translate-x-32', z: 'z-10', scale: 'scale-95' },
+                      ];
+
+                      const cfg = configs[idx % configs.length];
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`absolute top-1/2 left-1/2 -mt-24 sm:-mt-28 -ml-14 sm:-ml-16 w-28 sm:w-32 md:w-36 h-40 sm:h-48 md:h-52 rounded-xl sm:rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/80 transition-all duration-500 ease-out hover:rotate-0 hover:scale-125 hover:z-50 hover:shadow-amber-500/20 hover:border-amber-400/50 ${cfg.rotate} ${cfg.translateY} ${cfg.translateX} ${cfg.z} ${cfg.scale}`}
+                        >
+                          <img
+                            src={posterUrl}
+                            alt="Movie Poster"
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-white/10 pointer-events-none" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {[-10, -5, 0, 5, 10].map((deg, idx) => (
+                      <div
+                        key={idx}
+                        style={{ transform: `rotate(${deg}deg) translateX(${(idx - 2) * 45}px)` }}
+                        className="absolute w-28 sm:w-32 h-40 sm:h-48 rounded-2xl bg-surface-2/40 border border-white/10 animate-pulse shadow-xl"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
           </div>
         </div>
       </div>
