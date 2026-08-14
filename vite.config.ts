@@ -249,7 +249,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
               }
 
               // Dynamically import handler
-              const { default: handler } = await import('./api/editorial.js');
+              const { default: handler } = await import('./api/social.js');
               await handler({ query: Object.fromEntries(url.searchParams), body, method: req.method }, {
                 status: (code) => ({
                   json: (data) => {

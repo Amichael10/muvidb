@@ -43,7 +43,7 @@ export default function AdminEditorial() {
   // Load Overview Data
   const fetchOverview = async () => {
     try {
-      const res = await fetch('/api/editorial?task=overview');
+      const res = await fetch('/api/social?task=overview');
       if (!res.ok) throw new Error('Failed to fetch overview');
       const data = await res.json();
       setOverviewData(data);
@@ -55,7 +55,7 @@ export default function AdminEditorial() {
   // Load Calendar Slots
   const fetchCalendar = async () => {
     try {
-      const res = await fetch('/api/editorial?task=calendar');
+      const res = await fetch('/api/social?task=calendar');
       if (!res.ok) throw new Error('Failed to fetch calendar');
       const data = await res.json();
       setCalendarSlots(data.slots || []);
@@ -67,7 +67,7 @@ export default function AdminEditorial() {
   // Load Series Registry
   const fetchSeries = async () => {
     try {
-      const res = await fetch('/api/editorial?task=series');
+      const res = await fetch('/api/social?task=series');
       if (!res.ok) throw new Error('Failed to fetch series');
       const data = await res.json();
       setSeriesList(data.series || []);
@@ -90,7 +90,7 @@ export default function AdminEditorial() {
     const slug = slot.social_content_series?.slug || 'filmography';
 
     try {
-      const res = await fetch(`/api/editorial?task=candidates&seriesSlug=${slug}`);
+      const res = await fetch(`/api/social?task=candidates&seriesSlug=${slug}`);
       if (!res.ok) throw new Error('Failed to fetch candidates');
       const data = await res.json();
       setCandidates(data.candidates || []);
@@ -112,7 +112,7 @@ export default function AdminEditorial() {
     const toastId = toast.loading(`Building fact pack & generating copy for ${selectedCandidate.candidate.name}…`);
 
     try {
-      const res = await fetch('/api/editorial', {
+      const res = await fetch('/api/social', {
         method: 'POST',
         headers: await authHeaders(),
         body: JSON.stringify({
@@ -146,7 +146,7 @@ export default function AdminEditorial() {
   // Mark Published
   const handleMarkPublished = async (draftId, calendarId, entityType, entityId, platform = 'instagram') => {
     try {
-      const res = await fetch('/api/editorial', {
+      const res = await fetch('/api/social', {
         method: 'POST',
         headers: await authHeaders(),
         body: JSON.stringify({
@@ -176,7 +176,7 @@ export default function AdminEditorial() {
     }
 
     try {
-      const { error } = await supabase.from('social_content_events').insert({
+      const { error } = await supabase.from('social_news_events').insert({
         title: newEvent.title.trim(),
         description: newEvent.description.trim() || null,
         event_type: newEvent.event_type,

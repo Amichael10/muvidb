@@ -146,7 +146,7 @@ create index if not exists social_entity_history_published_idx on public.social_
 create index if not exists social_entity_history_entity_idx on public.social_entity_history(entity_type, entity_id, published_at DESC);
 
 -- 6. REACTIVE NEWS & CONTENT OPPORTUNITIES QUEUE
-create table if not exists public.social_content_events (
+create table if not exists public.social_news_events (
   id uuid primary key default gen_random_uuid(),
   event_type text not null, -- 'movie_announcement', 'trailer', 'casting', 'streaming_release', 'cinema_release', 'festival', 'award', 'theatre', 'critic_review', 'manual'
   entity_type text,
@@ -166,7 +166,7 @@ create table if not exists public.social_content_events (
   updated_at timestamptz not null default now()
 );
 
-create index if not exists social_content_events_status_idx on public.social_content_events(status, urgency, detected_at DESC);
+create index if not exists social_news_events_status_idx on public.social_news_events(status, urgency, detected_at DESC);
 
 -- 7. PROMPT TEMPLATES (Versioned Cohere System Instructions)
 create table if not exists public.social_prompt_templates (
@@ -203,7 +203,7 @@ alter table public.social_content_series enable row level security;
 alter table public.social_calendar enable row level security;
 alter table public.social_drafts enable row level security;
 alter table public.social_entity_history enable row level security;
-alter table public.social_content_events enable row level security;
+alter table public.social_news_events enable row level security;
 alter table public.social_prompt_templates enable row level security;
 alter table public.social_generation_logs enable row level security;
 
@@ -212,14 +212,14 @@ grant select on public.social_content_series to anon, authenticated, service_rol
 grant select on public.social_calendar to anon, authenticated, service_role;
 grant select on public.social_drafts to anon, authenticated, service_role;
 grant select on public.social_entity_history to anon, authenticated, service_role;
-grant select on public.social_content_events to anon, authenticated, service_role;
+grant select on public.social_news_events to anon, authenticated, service_role;
 grant select on public.social_prompt_templates to anon, authenticated, service_role;
 
 grant all on public.social_content_series to authenticated, service_role;
 grant all on public.social_calendar to authenticated, service_role;
 grant all on public.social_drafts to authenticated, service_role;
 grant all on public.social_entity_history to authenticated, service_role;
-grant all on public.social_content_events to authenticated, service_role;
+grant all on public.social_news_events to authenticated, service_role;
 grant all on public.social_prompt_templates to authenticated, service_role;
 grant all on public.social_generation_logs to authenticated, service_role;
 
@@ -236,8 +236,8 @@ create policy "public_read_drafts" on public.social_drafts for select using (tru
 drop policy if exists "public_read_history" on public.social_entity_history;
 create policy "public_read_history" on public.social_entity_history for select using (true);
 
-drop policy if exists "public_read_events" on public.social_content_events;
-create policy "public_read_events" on public.social_content_events for select using (true);
+drop policy if exists "public_read_news_events" on public.social_news_events;
+create policy "public_read_news_events" on public.social_news_events for select using (true);
 
 -- Admin all policies
 drop policy if exists "admin_all_series" on public.social_content_series;
@@ -252,8 +252,8 @@ create policy "admin_all_drafts" on public.social_drafts for all using (public.i
 drop policy if exists "admin_all_history" on public.social_entity_history;
 create policy "admin_all_history" on public.social_entity_history for all using (public.is_admin()) with check (public.is_admin());
 
-drop policy if exists "admin_all_events" on public.social_content_events;
-create policy "admin_all_events" on public.social_content_events for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "admin_all_news_events" on public.social_news_events;
+create policy "admin_all_news_events" on public.social_news_events for all using (public.is_admin()) with check (public.is_admin());
 
 -- 10. SEED INITIAL CONTENT SERIES
 insert into public.social_content_series (slug, name, description, category, cooldown_days, preferred_format, figma_template_key, config)

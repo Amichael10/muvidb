@@ -1,34 +1,24 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { fetchSeriesCandidates } from './_lib/editorial/candidate_service.js';
-import { scoreCandidate } from './_lib/editorial/scoring_service.js';
-import { buildFactPack } from './_lib/editorial/fact_pack_service.js';
-import { generateEditorialAngles, generateEditorialCopy } from './_lib/editorial/copy_service.js';
-import { seedRollingCalendar } from './_lib/editorial/calendar_service.js';
+import { fetchSeriesCandidates } from './editorial/candidate_service.js';
+import { scoreCandidate } from './editorial/scoring_service.js';
+import { buildFactPack } from './editorial/fact_pack_service.js';
+import { generateEditorialAngles, generateEditorialCopy } from './editorial/copy_service.js';
+import { seedRollingCalendar } from './editorial/calendar_service.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
+export async function handleEditorialTask(req: VercelRequest, res: VercelResponse) {
   try {
     const task = (req.query.task || req.body?.task || '').toString();
 
-    // 1. GET /api/editorial?task=candidates&seriesSlug=filmography
+    // 1. GET candidates
     if (task === 'candidates') {
       const seriesSlug = (req.query.seriesSlug || 'filmography').toString();
       const rawCandidates = await fetchSeriesCandidates(seriesSlug, 30);
-      
-      // Score candidates
       const scored = rawCandidates.map((c) => scoreCandidate(c));
       scored.sort((a, b) => b.score - a.score);
 
@@ -39,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 2. GET /api/editorial?task=calendar
+    // 2. GET calendar
     if (task === 'calendar') {
       await seedRollingCalendar(30);
 
@@ -53,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ slots: slots || [] });
     }
 
-    // 3. GET /api/editorial?task=series
+    // 3. GET series
     if (task === 'series') {
       const { data: series, error } = await supabase
         .from('social_content_series')
@@ -64,18 +54,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ series: series || [] });
     }
 
-    // 4. POST /api/editorial (task: generate_brief)
+    // 4. POST generate_brief
     if (req.method === 'POST' && task === 'generate_brief') {
-      const { entityType, entityId, figmaTemplateKey, calendarId, seriesId } = req.body;
+      const { entityType, entityId, figmaTemplateKey, calendarId, seriesId } = req.body || {};
 
       if (!entityType || !entityId) {
         return res.status(400).json({ error: 'entityType and entityId are required' });
       }
 
-      // Step A: Build Fact Pack
       const factPack = await buildFactPack(entityType, entityId);
-
-      // Step B: Generate Angles
       const angles = await generateEditorialAngles(factPack);
       const chosenAngle = angles[0] || {
         id: 'overview',
@@ -84,10 +71,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         confidence: 0.9,
       };
 
-      // Step C: Generate Copy
       const copy = await generateEditorialCopy(factPack, chosenAngle, figmaTemplateKey || 'people-filmography');
 
-      // Step D: Upsert Draft
       const { data: draft, error: draftErr } = await supabase
         .from('social_drafts')
         .insert({
@@ -107,7 +92,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (draftErr) console.warn('[Editorial API] Draft insert warning:', draftErr.message);
 
-      // Update Calendar Slot status if calendarId provided
       if (calendarId) {
         await supabase
           .from('social_calendar')
@@ -129,11 +113,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 5. POST /api/editorial (task: mark_published)
+    // 5. POST mark_published
     if (req.method === 'POST' && task === 'mark_published') {
-      const { draftId, calendarId, entityType, entityId, platform, postUrl } = req.body;
+      const { draftId, calendarId, entityType, entityId, platform, postUrl } = req.body || {};
 
-      // Log in entity history
       await supabase.from('social_entity_history').insert({
         entity_type: entityType || 'movie',
         entity_id: entityId,
@@ -161,7 +144,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true });
     }
 
-    // 6. GET /api/editorial?task=overview
+    // 6. GET overview
     if (task === 'overview') {
       const { data: upcomingSlots } = await supabase
         .from('social_calendar')
@@ -178,7 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .limit(10);
 
       const { data: events } = await supabase
-        .from('social_content_events')
+        .from('social_news_events')
         .select('*')
         .eq('status', 'new')
         .order('detected_at', { ascending: false })
@@ -198,9 +181,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    return res.status(400).json({ error: `Unknown task: ${task}` });
+    return res.status(400).json({ error: `Unknown editorial task: ${task}` });
   } catch (err: any) {
-    console.error('[api/editorial] Error:', err);
+    console.error('[Editorial Handler] Error:', err);
     return res.status(500).json({ error: err.message || 'Internal Editorial Server Error' });
   }
 }

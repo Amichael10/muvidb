@@ -12,11 +12,33 @@ import {
   socialHttpErrorPayload,
 } from './_lib/social_studio.js';
 import { parseGenerateDraftRequest } from '../src/features/social-studio/domain/validation.js';
+import { handleEditorialTask } from './_lib/editorial_handler.js';
 
 export const maxDuration = 60;
 
+const EDITORIAL_TASKS = new Set([
+  'candidates',
+  'calendar',
+  'series',
+  'generate_brief',
+  'mark_published',
+  'overview',
+]);
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
   if (req.method === 'OPTIONS') return res.status(204).end();
+
+  const task = (req.query.task || req.body?.task || '').toString();
+  const scope = (req.query.scope || req.body?.scope || '').toString();
+
+  // Route to Editorial Handler if scope=editorial or task matches editorial task
+  if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
+    return handleEditorialTask(req, res);
+  }
 
   try {
     if (req.method === 'GET') {
@@ -25,20 +47,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const task = typeof req.query.task === 'string' ? req.query.task : req.body?.task;
-
       if (task === 'generate_draft') {
         const actor = await requireSocialStudioAdmin(req);
-
-        // parseGenerateDraftRequest throws a bare Error, which would otherwise
-        // fall through to the 500 branch. Bad input is the caller's fault.
         let parsed;
         try {
           parsed = parseGenerateDraftRequest(req.body);
         } catch (parseErr) {
           return res.status(400).json({ error: (parseErr as Error).message });
         }
-
         return res.status(201).json(await generateSocialDraft(parsed, actor));
       }
 
