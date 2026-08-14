@@ -1,16 +1,33 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Permanently delete film(s) from the database and ensure their source YouTube video(s)
- * are marked as hidden/rejected in `channel_videos` so YouTube sync will NEVER re-import them.
+ * Log a deletion event to `deletion_logs` in Supabase.
  */
-export async function deleteFilmsPermanently(filmIds) {
+export async function logDeletion({ entity_type, entity_id, entity_name, deleted_by = 'Admin UI', reason = '' }) {
+  try {
+    await supabase.from('deletion_logs').insert({
+      entity_type,
+      entity_id,
+      entity_name,
+      deleted_by,
+      reason,
+    });
+  } catch (err) {
+    console.warn('[logDeletion] Non-blocking warning logging deletion:', err);
+  }
+}
+
+/**
+ * Permanently delete film(s) from the database, log the deletion event,
+ * and ensure their source YouTube video(s) are marked as hidden/rejected in `channel_videos`.
+ */
+export async function deleteFilmsPermanently(filmIds, deletedBy = 'Admin UI', reason = 'Manual deletion from Admin') {
   if (!filmIds || !filmIds.length) return { count: 0 };
 
-  // 1. Fetch source_video_id and trailer_youtube_id for these films
+  // 1. Fetch title & source_video_id for these films to record logs & hide videos
   const { data: films } = await supabase
     .from('films')
-    .select('id, source_video_id, trailer_youtube_id, youtube_watch_url')
+    .select('id, title, source_video_id, trailer_youtube_id, youtube_watch_url')
     .in('id', filmIds);
 
   const videoIdsToHide = new Set();
@@ -22,6 +39,15 @@ export async function deleteFilmsPermanently(filmIds) {
         const match = f.youtube_watch_url.match(/(?:v=|youtu\.be\/)([\w-]{11})/);
         if (match?.[1]) videoIdsToHide.add(match[1]);
       }
+
+      // Log each film deletion
+      await logDeletion({
+        entity_type: 'film',
+        entity_id: f.id,
+        entity_name: f.title || 'Untitled Film',
+        deleted_by: deletedBy,
+        reason: reason,
+      });
     }
   }
 

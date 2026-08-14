@@ -21,6 +21,15 @@ async function cleanupBadStubs() {
     const { data: people } = await supabase.from('people').select('id, name').ilike('name', pattern);
     if (people && people.length > 0) {
       for (const p of people) {
+        // Log before delete
+        await supabase.from('deletion_logs').insert({
+          entity_type: 'actor',
+          entity_id: p.id,
+          entity_name: p.name,
+          deleted_by: 'cleanup_bad_stubs.ts',
+          reason: `Matched invalid pattern: ${pattern}`
+        });
+
         await supabase.from('credits').delete().eq('person_id', p.id);
         await supabase.from('people').delete().eq('id', p.id);
         console.log(`Deleted bad person stub: "${p.name}" (${p.id})`);
