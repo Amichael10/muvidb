@@ -25,7 +25,7 @@ export type YouTubeTitleDecision =
 
 const STRONG_CLICKBAIT = /(not knowing|you won'?t believe|will shock|shocked everyone|made everyone cry|real tears|i (?:ask|urge|beg) (?:every|everyone)|leaving everyone in tears|turned out to be a (?:billionaire|prince|princess|ceo)|for true love|jaw.?dropping|see what happened next|changed (?:his|her) life forever|fell in love with (?:a|the|d) (?:poor|humble|maid|garbage|local|village|orphan)|kicked out to suffer|poor (?:village|orphan|helpless)|billionaire (?:lady|ceo|daughter)|in disguise|mocked (?:and|&) (?:rejected|humiliated)|how (?:a|an|the) (?:king|prince|princess|billionaire|ceo|man|lady|woman|girl|maid|orphan|husband|wife)|(?:marry|marries|married|marrying) (?:a|the) (?:poor|local|village|humble|maid|orphan|helpless|destitute)|(?:became|got) pregnant for|impregnated (?:a|the) (?:poor|local|village|maid)|disowned (?:his|her) (?:son|daughter|wife)|chased out (?:a|the) (?:poor|village|wife|maid|orphan))/i;
 
-const EMOTIONAL_PROMO = /(watch (?:this|dis)|don'?t (?:skip|watch)|dn'?t (?:skip|watch)|do not (?:skip|watch)|must watch|will (?:make you|shock you|blow your mind)|cry (?:like a baby|real|hot|many|tears)|cried .*tears|control (?:ur|your|my) tears|not to skip|smile at end|touching (?:&|and) interesting|true life story|interesting family|family drama|mind.?blow|life.?changing|learn a (?:life )?lesson|keep .* aside|drop whatever|you will (?:laugh|cry)|you'?ll (?:cry|laugh|regret)|no one will .*watch|no matter .*watch|what happened next)/i;
+const EMOTIONAL_PROMO = /(watch (?:this|dis|it|for|to)|watch it for|it'?s amazing|don'?t (?:skip|watch)|dn'?t (?:skip|watch)|do not (?:skip|watch)|must watch|will (?:make you|shock you|blow your mind)|cry (?:like a baby|real|hot|many|tears)|cried .*tears|control (?:ur|your|my) tears|not to skip|smile at end|touching (?:&|and) interesting|true life story|interesting family|family drama|mind.?blow|life.?changing|learn a (?:life )?lesson|keep .* aside|drop whatever|you will (?:laugh|cry)|you'?ll (?:cry|laugh|regret)|no one will .*watch|no matter .*watch|what happened next)/i;
 
 const SUBJECT = /\b(he|she|they|her|his|him|my|i|you|everyone|everylady|girl|lady|man|woman|wife|husband|mother|father|maid|orphan|billionaire|ceo|prince|princess|king|queen)\b/i;
 
@@ -35,9 +35,9 @@ const SENSATIONAL_VOCAB = /\b(poor|wicked|evil|shock(?:ing|ed)?|mind.?blow|emoti
 
 const STORY_VERB = /\b(is|was|were|has|had|came|went|got|gave|made|met|found|saw|told|admits|reveals|cries|refused|left|loved|hated|wanted|wants)\b/i;
 
-const NOISE = /(latest|new[- ]?(?:nigerian|nollywood|yoruba|african)?\s*(?:movie|movies|film)|full\s+(?:movie|film|video)|complete\s+(?:movie|film|season)|nigerian\s+(?:movie|movies)|nollywood|yoruba\s+(?:movie|movies)|african\s+(?:movie|movies)|\b20\d{2}\b|starring|featuring|\bfeat\.?\b|\bft\.?\b)/i;
+const NOISE = /(latest|new[- ]?(?:nigerian|nollywood|yoruba|african)?\s*(?:movie|movies|film)|full\s+(?:movie|film|video)|complete\s+(?:movie|film|season)|nigerian\s+(?:movie|movies)|nollywood|yoruba\s+(?:movie|movies)|african\s+(?:movie|movies)|\b20\d{2}\b|starring|featuring|\bfeat\.?\b|\bft\.?\b|\bbest of\b)/i;
 
-const BAD_PREFIX = /^(please|watch|you will|you must|you'?ll|don'?t|dn'?t|do not|every(?:one|body|lady|woman|man)|i (?:ask|urge|beg)|if (?:you|u)|just released|new released|new movie alert|latest movie|this (?:movie|story)|keep |drop |no matter|be the first|how |why |what happened|the day |the moment |the story of |a story of |when a |where a )\b/i;
+const BAD_PREFIX = /^(please|watch|you will|you must|you'?ll|you (?:cannot|can'?t|should|shall|would|could)|our |my |your |don'?t|dn'?t|do not|every(?:one|body|lady|woman|man)|i (?:ask|urge|beg)|if (?:you|u)|just released|new released|new movie alert|latest movie|this (?:movie|story)|keep |drop |no matter|be the first|how |why |what happened|the day |the moment |the story of |a story of |when a |where a )\b/i;
 
 function normalize(raw: string): string {
   return (raw || '')
@@ -69,6 +69,11 @@ export function isSensationalizedYouTubeTitle(raw: string): boolean {
     return true;
   }
 
+  // Catch sentence plot patterns like "Isioma the Beauty from Waters and Her Earth Husband"
+  if (/\b[a-z0-9_-]+\s+the\s+[a-z0-9_-]+\s+(?:from|in|of)\s+.*\s+(?:and|&)\s+(?:his|her|my|your|their)\b/i.test(title)) {
+    return true;
+  }
+
   const words = wordCount(title);
   // Any sentence-like title with a subject + plot verb or sensational word regardless of total length
   if (words >= 4 && SUBJECT.test(title) && PLOT_VERB.test(title)) return true;
@@ -97,8 +102,8 @@ function isPlausibleFilmTitle(raw: string): boolean {
 }
 
 function suffixLooksLikeUploadNoise(suffix: string): boolean {
-  return suffix.length >= 8
-    && (isSensationalizedYouTubeTitle(suffix) || NOISE.test(suffix) || (SUBJECT.test(suffix) && PLOT_VERB.test(suffix)));
+  return suffix.length >= 4
+    && (isSensationalizedYouTubeTitle(suffix) || NOISE.test(suffix) || (SUBJECT.test(suffix) && PLOT_VERB.test(suffix)) || /^[\{\[]/.test(suffix) || /^-\s*(?:NG|Nollywood|African)/i.test(suffix));
 }
 
 type EmbeddedTitle = { prefix: string; suffix: string };
@@ -133,6 +138,12 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
 
   const slash = title.search(/\s\/\s/);
   if (slash >= 0) add(slash, 3);
+
+  const bracketIndex = title.search(/\s*[\{\[]/);
+  if (bracketIndex > 0) add(bracketIndex, 0);
+
+  const countryTag = title.search(/\s*[-–—:]\s*(?:NG|Nollywood|African Movies?)\s*$/i);
+  if (countryTag > 0) add(countryTag, 0);
 
   const noisyParen = title.search(/\s*\((?:full|new|latest|complete|starring|featuring|20\d{2})\b/i);
   if (noisyParen >= 0) add(noisyParen, 0);

@@ -108,6 +108,10 @@ export function cleanTitle(raw: string): string {
   title = title.replace(/^(LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA)\s+(LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA|NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(MOVIE|FILM|MOVIES|FILMS|NOLLYWOOD|NIGERIAN|AFRICAN)?\s*(\d{4})?\s*[-–—:]\s*/i, '');
 
   // 2. Specific Nollywood/YouTube noise patterns
+  title = title.replace(/\s*\[[^\]]+\]/g, '');
+  title = title.replace(/\s*\{[^}]+\}/g, '');
+  title = title.replace(/\s*[-–—:]\s*(?:NG|Nollywood|African Movies|African Movie|Movie|Films?)\s*$/i, '');
+  title = title.replace(/\.\s*(?:Watch\s+.*|You\s+Will\s+.*|Don'?t\s+.*)$/i, '');
   title = title.replace(/\s*\/\s*[A-Z]{2,5}\.?\s*\/?\s*$/i, '');
   title = title.replace(/\s+[-–—]\s*Watch\s+.*/i, '');
   title = title.replace(/\s+[-–—]\s*LATEST\s*.*/i, '');
