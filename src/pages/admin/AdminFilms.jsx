@@ -136,6 +136,14 @@ export default function AdminFilms() {
   const [isSearchingCompanies, setIsSearchingCompanies] = useState(false);
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
 
+  // Distributor Search States
+  const [distributorSearch, setDistributorSearch] = useState('');
+  const [distributorResults, setDistributorResults] = useState([]);
+  const [selectedDistributorCompany, setSelectedDistributorCompany] = useState(null);
+  const [isSearchingDistributors, setIsSearchingDistributors] = useState(false);
+  const [isCreatingDistributorCompany, setIsCreatingDistributorCompany] = useState(false);
+  const distributorSearchTimeout = useRef(null);
+
   const initialFormState = {
     title: '',
     year: new Date().getFullYear(),
@@ -686,8 +694,28 @@ export default function AdminFilms() {
         setShowtimes(draft.showtimes || []);
         setSelectedCompany(draft.selectedCompany || null);
         setCompanySearch(draft.selectedCompany?.name || '');
+        const draftDist = draft.formData?.distributor || '';
+        setDistributorSearch(draftDist);
+        if (draftDist) {
+          supabase.from('companies').select('*').ilike('name', draftDist.trim()).maybeSingle().then(({ data }) => {
+            if (data) setSelectedDistributorCompany(data);
+            else setSelectedDistributorCompany(null);
+          });
+        } else {
+          setSelectedDistributorCompany(null);
+        }
       } else {
         await fetchFilmDetails(film.id);
+        const filmDist = film.distributor || film.streaming_links?.distributor || '';
+        setDistributorSearch(filmDist);
+        if (filmDist) {
+          supabase.from('companies').select('*').ilike('name', filmDist.trim()).maybeSingle().then(({ data }) => {
+            if (data) setSelectedDistributorCompany(data);
+            else setSelectedDistributorCompany(null);
+          });
+        } else {
+          setSelectedDistributorCompany(null);
+        }
       }
     } else {
       setEditingFilm(null);
@@ -696,7 +724,18 @@ export default function AdminFilms() {
       setShowtimes(draft?.showtimes || []);
       setSelectedCompany(draft?.selectedCompany || null);
       setCompanySearch(draft?.selectedCompany?.name || '');
+      const draftDist = draft?.formData?.distributor || '';
+      setDistributorSearch(draftDist);
+      if (draftDist) {
+        supabase.from('companies').select('*').ilike('name', draftDist.trim()).maybeSingle().then(({ data }) => {
+          if (data) setSelectedDistributorCompany(data);
+          else setSelectedDistributorCompany(null);
+        });
+      } else {
+        setSelectedDistributorCompany(null);
+      }
     }
+    setDistributorResults([]);
     setIsDrawerOpen(true);
   };
 
@@ -801,6 +840,9 @@ export default function AdminFilms() {
     setSelectedCompany(null);
     setCompanySearch('');
     setCompanyResults([]);
+    setSelectedDistributorCompany(null);
+    setDistributorSearch('');
+    setDistributorResults([]);
     setPeopleSearch('');
     setPeopleResults([]);
     setCustomRoles([]);
@@ -921,6 +963,68 @@ export default function AdminFilms() {
       toast.error('Failed to create company');
     } finally {
       setIsCreatingCompany(false);
+    }
+  };
+
+  const handleDistributorSearch = async (query) => {
+    setDistributorSearch(query);
+    setFormData(prev => ({ ...prev, distributor: query }));
+
+    if (!query || !query.trim()) {
+      setDistributorResults([]);
+      setSelectedDistributorCompany(null);
+      return;
+    }
+
+    if (distributorSearchTimeout.current) clearTimeout(distributorSearchTimeout.current);
+
+    distributorSearchTimeout.current = setTimeout(async () => {
+      setIsSearchingDistributors(true);
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .ilike('name', `%${query.trim()}%`)
+        .limit(5);
+
+      setDistributorResults(data || []);
+
+      const exactMatch = (data || []).find(c => c.name.toLowerCase() === query.trim().toLowerCase());
+      if (exactMatch) {
+        setSelectedDistributorCompany(exactMatch);
+      } else {
+        setSelectedDistributorCompany(null);
+      }
+      setIsSearchingDistributors(false);
+    }, 300);
+  };
+
+  const createDistributorCompany = async (name) => {
+    if (!name || !name.trim()) return;
+    setIsCreatingDistributorCompany(true);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .insert([{ 
+          name: name.trim(), 
+          description: '.', 
+          website: '.', 
+          logo_url: null 
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setSelectedDistributorCompany(data);
+      setDistributorSearch(data.name);
+      setFormData(prev => ({ ...prev, distributor: data.name }));
+      setDistributorResults([]);
+      toast.success(`Distributor company "${data.name}" created and linked`);
+    } catch (error) {
+      console.error('Error creating distributor company:', error);
+      toast.error('Failed to create distributor company');
+    } finally {
+      setIsCreatingDistributorCompany(false);
     }
   };
 
@@ -2171,16 +2275,69 @@ export default function AdminFilms() {
                       className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all"
                     />
                   </div>
-                  <div className="col-span-1 md:col-span-2">
+                  {/* Distributor Field with Company Search & Create */}
+                  <div className="col-span-1 md:col-span-2 relative">
                     <label className="block text-xs font-bold text-text-primary mb-2">Distributor / Distribution Partner</label>
-                    <input
-                      type="text"
-                      name="distributor"
-                      value={formData.distributor || ''}
-                      onChange={handleChange}
-                      placeholder="e.g. FilmOne Entertainment, Cinemax, Nile Entertainment, Silverbird..."
-                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all"
-                    />
+                    <div className="relative group">
+                      <input
+                        type="text"
+                        name="distributor"
+                        value={distributorSearch}
+                        onChange={(e) => handleDistributorSearch(e.target.value)}
+                        placeholder="Search or add distributor (e.g. FilmOne, Corporate Pictures, Cinemax, Nile)..."
+                        className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all pr-12"
+                      />
+                      <div className="absolute right-4 top-2.5 flex items-center gap-2">
+                        {isSearchingDistributors ? (
+                          <div className="w-4 h-4 border-2 border-brand/20 border-t-brand rounded-full animate-spin" />
+                        ) : distributorSearch && !selectedDistributorCompany && (
+                          <button
+                            type="button"
+                            onClick={() => createDistributorCompany(distributorSearch)}
+                            className="p-1 hover:bg-brand/10 rounded-full text-brand transition-all"
+                            title="Create and link this distributor company"
+                          >
+                            <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
+                          </button>
+                        )}
+                        {!distributorSearch && (
+                          <Icon icon="solar:buildings-linear" className="w-4 h-4 text-text-muted" />
+                        )}
+                        {selectedDistributorCompany && distributorSearch === selectedDistributorCompany.name && (
+                          <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500" />
+                        )}
+                      </div>
+
+                      {distributorResults.length > 0 && (
+                        <div className="absolute left-0 top-full mt-2 w-full bg-surface border border-border rounded-md shadow-2xl z-50 overflow-hidden ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2">
+                          {distributorResults.map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedDistributorCompany(c);
+                                setDistributorSearch(c.name);
+                                setFormData(prev => ({ ...prev, distributor: c.name }));
+                                setDistributorResults([]);
+                              }}
+                              className="w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-surface-2 overflow-hidden border border-border flex items-center justify-center">
+                                {c.logo_url ? (
+                                  <img src={c.logo_url} alt="" className="w-full h-full object-contain p-1" />
+                                ) : (
+                                  <span className="text-[10px] font-bold text-brand">{c.name.charAt(0)}</span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-text-primary">{c.name}</p>
+                                <p className="text-[10px] text-text-muted">{c.website?.replace(/^https?:\/\//, '') || 'No website'}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
