@@ -93,8 +93,9 @@ export async function backfillActorBiosDaily(batchLimit: number = 25): Promise<n
   try {
     const { data } = await supabase
       .from('people')
-      .select('id, name, bio')
+      .select('id, name, bio, film_count')
       .or('bio.is.null,bio.eq.')
+      .order('film_count', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(batchLimit);
     people = data || [];
