@@ -12,9 +12,7 @@ const BAD_NAME_PATTERNS = [
   'Nothing Could Satisfy%',
   'Wole Ojo Ebere%',
   '%Nigerian%',
-  '%Movie%',
-  '%Film%',
-  '%\)%'
+  '%Full Movie%'
 ];
 
 async function cleanupBadStubs() {
