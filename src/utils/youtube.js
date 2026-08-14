@@ -6,13 +6,13 @@
 // Sends all YouTube requests through /api/youtube
 // ─────────────────────────────────────────
 const youtubeFetch = async (endpoint, params = {}) => {
-  const searchParams = new URLSearchParams({ endpoint })
+  const searchParams = new URLSearchParams({ provider: 'youtube', endpoint })
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
       searchParams.set(key, String(value))
     }
   })
-  const res = await fetch(`/api/youtube?${searchParams}`)
+  const res = await fetch(`/api/external?${searchParams}`)
 
   // Read as text first — the proxy may return plain-text error bodies
   // (e.g. "A server error has occurred") which would crash res.json().

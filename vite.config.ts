@@ -88,15 +88,29 @@ export default defineConfig(({ mode, isSsrBuild }) => {
           target: 'https://pkenrmorywmuvnzfoylp.supabase.co',
           changeOrigin: true,
         },
-        '/api/youtube': {
-          target: 'https://www.googleapis.com/youtube/v3',
-          changeOrigin: true,
-          rewrite: (path) => {
-            const url = new URL(path, 'http://localhost:3001');
-            const endpoint = url.searchParams.get('endpoint');
-            url.searchParams.delete('endpoint');
-            url.searchParams.set('key', env.YOUTUBE_API_KEY || env.VITE_YOUTUBE_API_KEY || '');
-            return `/${endpoint}?${url.searchParams.toString()}`;
+        '/api/external': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              const { default: handler } = await import('./api/external.js');
+              await handler(
+                { query: Object.fromEntries(url.searchParams), method: req.method },
+                {
+                  status: (code) => ({
+                    json: (data) => {
+                      res.statusCode = code;
+                      res.setHeader('Content-Type', 'application/json');
+                      res.end(JSON.stringify(data));
+                    },
+                  }),
+                }
+              );
+            } catch (err) {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
           },
         },
         '/api/tmdb': {

@@ -55,9 +55,9 @@ export const fetchChannelData = async (identifier) => {
   try {
     let url;
     if (identifier.type === 'id') {
-      url = `/api/youtube?endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(identifier.value)}`;
+      url = `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(identifier.value)}`;
     } else {
-      url = `/api/youtube?endpoint=channels&part=snippet,statistics,brandingSettings&forHandle=${encodeURIComponent(identifier.value)}`;
+      url = `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&forHandle=${encodeURIComponent(identifier.value)}`;
     }
 
     const detailRes = await fetch(url);
