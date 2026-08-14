@@ -22,6 +22,18 @@ function escapeXml(text: string): string {
     .replace(/'/g, '&apos;');
 }
 
+function isValidImageUrl(url: unknown): boolean {
+  if (!url) return false;
+  const str = String(url).trim();
+  if (!str || str === 'null' || str === 'undefined' || str === 'none') return false;
+  try {
+    const parsed = new URL(str);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { type, slug } = req.query;
   const host = req.headers.host || 'muvidb.com';
@@ -133,8 +145,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         const filmUrls = (data || []).map((f: any) => {
           const loc = `${baseUrl}/films/${f.slug || f.id}`;
           const lastmod = f.updated_at || f.created_at ? new Date(f.updated_at || f.created_at).toISOString() : new Date().toISOString();
-          const imageTag = f.poster_url
-            ? `\n    <image:image>\n      <image:loc>${escapeXml(f.poster_url)}</image:loc>\n      <image:title>${escapeXml(f.title)} Poster</image:title>\n    </image:image>`
+          const imageTag = isValidImageUrl(f.poster_url)
+            ? `\n    <image:image>\n      <image:loc>${escapeXml(String(f.poster_url).trim())}</image:loc>\n      <image:title>${escapeXml(f.title)} Poster</image:title>\n    </image:image>`
             : '';
           return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>${imageTag}\n  </url>`;
         });
@@ -153,8 +165,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         const personUrls = (data || []).map((p: any) => {
           const loc = `${baseUrl}/people/${p.slug || p.id}`;
           const lastmod = p.updated_at || p.created_at ? new Date(p.updated_at || p.created_at).toISOString() : new Date().toISOString();
-          const imageTag = p.photo_url
-            ? `\n    <image:image>\n      <image:loc>${escapeXml(p.photo_url)}</image:loc>\n      <image:title>${escapeXml(p.name)} Photo</image:title>\n    </image:image>`
+          const imageTag = isValidImageUrl(p.photo_url)
+            ? `\n    <image:image>\n      <image:loc>${escapeXml(String(p.photo_url).trim())}</image:loc>\n      <image:title>${escapeXml(p.name)} Photo</image:title>\n    </image:image>`
             : '';
           return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>${imageTag}\n  </url>`;
         });
