@@ -85,6 +85,18 @@ async function enrichFromTMDB(title: string, year?: number | null): Promise<{
   }
 }
 
+const YORUBA_KW_REGEX = /(yoruba|iyawo|olori|akoni|alani|oba|orisha|osun|ogboni|apoti|oniduro|asise|eyin oku|ija idile|olugbongaga|iya oko|awimayehun|orun|kadara|mosebolatan|iya gbonkan|baba suwe|baba sala|ijebu|itele|kemity|londoner|ogboluke|kiekie|morili|apankufor|ori|ebo|ifa|egungun|alakada|opomulero|agbada|omoniyi|adebayo|afolayan|ogunde|lolan|ayanfe|gbajumo|gbarada|faaji|oluokun)/i;
+
+function detectVideoLanguage(title: string, channelName: string, primaryLang?: string): string {
+  if (primaryLang) return primaryLang;
+  const combined = `${title} ${channelName}`;
+  if (YORUBA_KW_REGEX.test(combined)) {
+    return 'Yoruba';
+  }
+  return 'English';
+}
+
+
 /**
  * Syncs cinema showtimes from various adapters
  */
@@ -469,7 +481,7 @@ export async function runVideosSync() {
                         tmdb_rating: tmdb?.tmdb_rating || null,
                         needs_review: true,
                         status: 'released',
-                        language: ch.primary_language || 'English'
+                        language: detectVideoLanguage(cleanedBase, ch.name, ch.primary_language)
                       }).select('id').single();
 
                       parentId = newParent?.id || null;
@@ -499,7 +511,7 @@ export async function runVideosSync() {
                     needs_review: true,
                     status: 'released',
                     runtime_minutes: Math.round(v.duration_seconds / 60),
-                    language: ch.primary_language || 'English',
+                    language: detectVideoLanguage(cleanedTitle, ch.name, ch.primary_language),
                     content_type: 'series',
                     series_id: parentId || null,
                     episode_number: episodeNum,
@@ -546,7 +558,7 @@ export async function runVideosSync() {
                       needs_review: !(ai?.synopsis || tmdb?.synopsis),
                       status: 'released',
                       runtime_minutes: Math.round(v.duration_seconds / 60),
-                      language: ch.primary_language || 'English',
+                      language: detectVideoLanguage(cleanedTitle, ch.name, ch.primary_language),
                       content_type: 'movie',
                     });
                   }
