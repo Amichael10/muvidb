@@ -252,6 +252,15 @@ async function main() {
                           .eq('video_id', v.video_id)
                       );
                     await Promise.all(updatePromises);
+
+                    try {
+                      const synCount = await enrichMissingSynopsesConcurrent(allFilmIds);
+                      if (synCount > 0) {
+                        console.log(`  ✍️ Cohere generated synopses for ${synCount} film(s) in ${ch.name}`);
+                      }
+                    } catch (synErr: any) {
+                      console.warn(`  ⚠️ Cohere synopsis enrichment error:`, synErr.message);
+                    }
                   }
                 }
               }

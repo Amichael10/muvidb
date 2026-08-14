@@ -3,6 +3,7 @@ import { supabase } from '../_lib/supabase.js';
 import { isValidAuth } from '../_lib/auth.js';
 import { runCastExtraction, runTitleCleanup } from '../_lib/ai_maintenance.js';
 import { runShowtimesSync, runVideosSync, runTMDBSync, purgeStaleUnmappedChannelVideos } from '../_lib/sync_service.js';
+import { enrichMissingSynopsesConcurrent } from '../_lib/cohere_enrichment.js';
 import { sweepStaleCinemas } from '../_lib/cinema-adapters/index.js';
 import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
 import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
@@ -116,6 +117,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       case 'tmdb':           result = await runTMDBSync(); break;
       case 'ai_maintenance': result = await runAIMaintenance(); break;
+      case 'cohere_synopses':
+        const synCount = await enrichMissingSynopsesConcurrent();
+        result = { task: 'cohere_synopses', updated: synCount };
+        break;
       case 'refresh_videos': return await refreshVideosHandler(req, res);
       case 'mirror_images':  return await mirrorImagesHandler(req, res);
       case 'social_publish': result = await runSocialPublisher({ lockedBy: 'cron-sync' }); break;
@@ -165,11 +170,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 // ── TASK: AI MAINTENANCE ─────────────────────────────────────────────────────
-// Orchestrates extract_cast → cleanup_titles in sequence.
+// Orchestrates extract_cast → cleanup_titles → cohere_synopses in sequence.
 // Isolated here to keep the switch statement clean and manage sequential dependencies.
 async function runAIMaintenance() {
   console.log('[AI Maintenance] Starting automated AI pipeline...');
-  const results: any = { extract_cast: null, cleanup_titles: null };
+  const results: any = { extract_cast: null, cleanup_titles: null, cohere_synopses: null };
 
   // 1. Extract Cast (must run first to capture actor names from messy titles)
   try {
@@ -185,10 +190,18 @@ async function runAIMaintenance() {
     results.cleanup_titles = { error: err.message };
   }
 
+  // 3. Cohere Synopses (generates factual 2-sentence loglines for films missing synopses)
+  try {
+    const updatedCount = await enrichMissingSynopsesConcurrent();
+    results.cohere_synopses = { updated: updatedCount };
+  } catch (err: any) {
+    results.cohere_synopses = { error: err.message };
+  }
+
   return {
     task: 'ai_maintenance',
-    processed: (results.extract_cast?.analyzed || 0) + (results.cleanup_titles?.analyzed || 0),
-    upserted: (results.extract_cast?.applied || 0) + (results.cleanup_titles?.applied || 0),
+    processed: (results.extract_cast?.analyzed || 0) + (results.cleanup_titles?.analyzed || 0) + (results.cohere_synopses?.updated || 0),
+    upserted: (results.extract_cast?.applied || 0) + (results.cleanup_titles?.applied || 0) + (results.cohere_synopses?.updated || 0),
     ...results
   };
 }

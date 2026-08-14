@@ -583,9 +583,14 @@ export async function runVideosSync() {
                   newFilms++;
                 });
                 const newlyAddedIds = newInsertedFilms.map((f: any) => f.id);
-                enrichMissingSynopsesConcurrent(newlyAddedIds).catch((e: any) =>
-                  console.warn(`[runVideosSync] Cohere synopsis enrichment error:`, e.message)
-                );
+                if (newlyAddedIds.length > 0) {
+                  try {
+                    const synCount = await enrichMissingSynopsesConcurrent(newlyAddedIds);
+                    console.log(`[runVideosSync] Cohere generated synopses for ${synCount}/${newlyAddedIds.length} newly imported films`);
+                  } catch (e: any) {
+                    console.warn(`[runVideosSync] Cohere synopsis enrichment error:`, e.message);
+                  }
+                }
               }
             }
 
