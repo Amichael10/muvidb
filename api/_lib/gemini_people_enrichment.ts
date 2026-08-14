@@ -664,8 +664,8 @@ export async function researchPersonWithGemini({
     });
 
     const noMatch = identity.status === 'no_match';
-    const candidateData = noMatch ? {} : mapCandidateForQueue(reconciled.candidateFields);
-    const fieldSources = noMatch ? {} : buildFieldSourcesFromEvidence(reconciled.evidence, 'Gemini');
+    const candidateData: Record<string, any> = noMatch ? {} : mapCandidateForQueue(reconciled.candidateFields);
+    const fieldSources: Record<string, any> = noMatch ? {} : buildFieldSourcesFromEvidence(reconciled.evidence, 'Gemini');
 
     // Photo requires visual admin confirmation — mark source metadata.
     if (candidateData.photo_url && fieldSources.photo_url) {
