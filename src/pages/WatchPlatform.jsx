@@ -163,46 +163,58 @@ export default function WatchPlatform() {
             </div>
 
             {/* Right 3D Poster Fan & Film Reel Collage */}
-            <div className="lg:col-span-6 xl:col-span-7 relative flex justify-center lg:justify-end overflow-hidden lg:overflow-visible py-6">
+            <div className="lg:col-span-7 xl:col-span-7 relative flex justify-center lg:justify-end overflow-hidden lg:overflow-visible py-4">
               
-              {/* Golden Film Reel Graphic (Behind Collage) */}
-              <div className="absolute -right-12 bottom-0 w-[280px] md:w-[360px] opacity-30 pointer-events-none z-0">
-                <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full text-amber-500/40">
-                  <circle cx="300" cy="200" r="160" stroke="currentColor" strokeWidth="12" />
-                  <circle cx="300" cy="200" r="130" stroke="currentColor" strokeWidth="4" strokeDasharray="12 12" />
-                  <circle cx="300" cy="200" r="40" stroke="currentColor" strokeWidth="8" />
-                  <circle cx="230" cy="200" r="24" fill="currentColor" />
-                  <circle cx="370" cy="200" r="24" fill="currentColor" />
-                  <circle cx="300" cy="130" r="24" fill="currentColor" />
-                  <circle cx="300" cy="270" r="24" fill="currentColor" />
+              {/* Golden Film Reel Graphic (Far Right Accent) */}
+              <div className="absolute -right-16 top-1/2 -translate-y-1/2 w-[320px] sm:w-[400px] md:w-[480px] opacity-40 pointer-events-none z-0">
+                <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full text-amber-500/50">
+                  <circle cx="300" cy="200" r="160" stroke="currentColor" strokeWidth="14" />
+                  <circle cx="300" cy="200" r="130" stroke="currentColor" strokeWidth="5" strokeDasharray="16 16" />
+                  <circle cx="300" cy="200" r="45" stroke="currentColor" strokeWidth="10" />
+                  <circle cx="220" cy="200" r="28" fill="currentColor" />
+                  <circle cx="380" cy="200" r="28" fill="currentColor" />
+                  <circle cx="300" cy="120" r="28" fill="currentColor" />
+                  <circle cx="300" cy="280" r="28" fill="currentColor" />
                 </svg>
               </div>
 
-              {/* 3D Poster Stack Container */}
-              <div className="relative w-full max-w-[560px] h-[320px] sm:h-[380px] md:h-[420px] flex items-center justify-center">
+              {/* 3D Large-Scale Poster Collage Container */}
+              <div className="relative w-full max-w-[650px] lg:max-w-[720px] h-[400px] sm:h-[480px] md:h-[540px] lg:h-[580px] flex items-center justify-center">
                 
-                {/* 2-Tier Collage Fan Grid */}
+                {/* Golden Film Strip Ribbon along the bottom */}
+                <div className="absolute -bottom-4 left-0 right-0 h-16 bg-gradient-to-r from-amber-600/20 via-amber-500/30 to-amber-600/20 border-y-2 border-amber-500/40 transform -rotate-3 z-30 pointer-events-none flex items-center overflow-hidden">
+                  <div className="flex gap-2 w-full px-2 opacity-60">
+                    {[...Array(24)].map((_, i) => (
+                      <div key={i} className="w-6 h-8 bg-black/80 rounded-sm border border-amber-500/30 shrink-0" />
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2-Tier Large Poster Grid */}
                 {headerPosters.length > 0 ? (
-                  <div className="relative w-full h-full flex items-center justify-center">
+                  <div className="relative w-full h-full">
                     {headerPosters.slice(0, 9).map((posterUrl, idx) => {
-                      const configs = [
-                        { rotate: '-rotate-12', translateY: '-translate-y-12', translateX: '-translate-x-36 sm:-translate-x-44', z: 'z-30', scale: 'scale-100' },
-                        { rotate: '-rotate-6', translateY: '-translate-y-8', translateX: '-translate-x-20 sm:-translate-x-24', z: 'z-30', scale: 'scale-105' },
-                        { rotate: 'rotate-0', translateY: '-translate-y-4', translateX: 'translate-x-0', z: 'z-40', scale: 'scale-110' },
-                        { rotate: 'rotate-6', translateY: '-translate-y-8', translateX: 'translate-x-20 sm:translate-x-24', z: 'z-30', scale: 'scale-105' },
-                        { rotate: 'rotate-12', translateY: '-translate-y-12', translateX: 'translate-x-36 sm:translate-x-44', z: 'z-30', scale: 'scale-100' },
-                        { rotate: '-rotate-6', translateY: 'translate-y-16', translateX: '-translate-x-28 sm:-translate-x-32', z: 'z-10', scale: 'scale-95' },
-                        { rotate: 'rotate-0', translateY: 'translate-y-20', translateX: '-translate-x-8 sm:-translate-x-10', z: 'z-20', scale: 'scale-95' },
-                        { rotate: 'rotate-6', translateY: 'translate-y-20', translateX: 'translate-x-8 sm:translate-x-10', z: 'z-20', scale: 'scale-95' },
-                        { rotate: 'rotate-12', translateY: 'translate-y-16', translateX: 'translate-x-28 sm:translate-x-32', z: 'z-10', scale: 'scale-95' },
+                      // Custom positions & scale for each poster card (Row 1 Top, Row 2 Bottom)
+                      const cardStyles = [
+                        // Row 1 (Top Level)
+                        { pos: 'left-[2%] sm:left-[4%] top-[2%] sm:top-[4%]', rotate: '-rotate-12', z: 'z-10' },
+                        { pos: 'left-[20%] sm:left-[22%] top-[0%]', rotate: '-rotate-6', z: 'z-20' },
+                        { pos: 'left-[38%] sm:left-[40%] top-[-2%]', rotate: 'rotate-0', z: 'z-30' },
+                        { pos: 'left-[56%] sm:left-[58%] top-[0%]', rotate: 'rotate-6', z: 'z-20' },
+                        { pos: 'left-[74%] sm:left-[76%] top-[2%] sm:top-[4%]', rotate: 'rotate-12', z: 'z-10' },
+                        // Row 2 (Bottom Level - Overlapping)
+                        { pos: 'left-[12%] sm:left-[14%] top-[42%] sm:top-[44%]', rotate: '-rotate-6', z: 'z-25' },
+                        { pos: 'left-[30%] sm:left-[32%] top-[44%] sm:top-[46%]', rotate: 'rotate-0', z: 'z-35' },
+                        { pos: 'left-[48%] sm:left-[50%] top-[44%] sm:top-[46%]', rotate: 'rotate-6', z: 'z-35' },
+                        { pos: 'left-[66%] sm:left-[68%] top-[42%] sm:top-[44%]', rotate: 'rotate-12', z: 'z-25' },
                       ];
 
-                      const cfg = configs[idx % configs.length];
+                      const style = cardStyles[idx % cardStyles.length];
 
                       return (
                         <div
                           key={idx}
-                          className={`absolute top-1/2 left-1/2 -mt-24 sm:-mt-28 -ml-14 sm:-ml-16 w-28 sm:w-32 md:w-36 h-40 sm:h-48 md:h-52 rounded-xl sm:rounded-2xl overflow-hidden border border-white/20 shadow-2xl shadow-black/80 transition-all duration-500 ease-out hover:rotate-0 hover:scale-125 hover:z-50 hover:shadow-amber-500/20 hover:border-amber-400/50 ${cfg.rotate} ${cfg.translateY} ${cfg.translateX} ${cfg.z} ${cfg.scale}`}
+                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-32 sm:w-40 md:w-48 lg:w-52 h-48 sm:h-60 md:h-72 lg:h-78 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.9)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-115 hover:z-50 hover:shadow-amber-500/30 hover:border-amber-400`}
                         >
                           <img
                             src={posterUrl}
@@ -210,7 +222,8 @@ export default function WatchPlatform() {
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-white/10 pointer-events-none" />
+                          {/* Inner gradient reflection */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-white/10 pointer-events-none" />
                         </div>
                       );
                     })}
@@ -220,8 +233,8 @@ export default function WatchPlatform() {
                     {[-10, -5, 0, 5, 10].map((deg, idx) => (
                       <div
                         key={idx}
-                        style={{ transform: `rotate(${deg}deg) translateX(${(idx - 2) * 45}px)` }}
-                        className="absolute w-28 sm:w-32 h-40 sm:h-48 rounded-2xl bg-surface-2/40 border border-white/10 animate-pulse shadow-xl"
+                        style={{ transform: `rotate(${deg}deg) translateX(${(idx - 2) * 60}px)` }}
+                        className="absolute w-36 sm:w-44 h-52 sm:h-64 rounded-2xl bg-surface-2/40 border border-white/10 animate-pulse shadow-xl"
                       />
                     ))}
                   </div>
