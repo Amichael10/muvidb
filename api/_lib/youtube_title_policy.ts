@@ -23,11 +23,11 @@ export type YouTubeTitleDecision =
       reason: 'sensational-title-without-film-title';
     };
 
-const STRONG_CLICKBAIT = /(not knowing|you won'?t believe|will shock|shocked everyone|made everyone cry|real tears|i urge every|i beg every|leaving everyone in tears|turned out to be a (?:billionaire|prince|princess|ceo)|for true love|jaw.?dropping|see what happened next|changed (?:his|her) life forever|fell in love with (?:a|the|d) (?:poor|humble|maid|garbage|local|village|orphan)|kicked out to suffer|poor (?:village|orphan|helpless)|billionaire (?:lady|ceo|daughter)|in disguise|mocked (?:and|&) (?:rejected|humiliated)|how (?:a|an|the) (?:king|prince|princess|billionaire|ceo|man|lady|woman|girl|maid|orphan|husband|wife)|(?:marry|marries|married|marrying) (?:a|the) (?:poor|local|village|humble|maid|orphan|helpless|destitute)|(?:became|got) pregnant for|impregnated (?:a|the) (?:poor|local|village|maid)|disowned (?:his|her) (?:son|daughter|wife)|chased out (?:a|the) (?:poor|village|wife|maid|orphan))/i;
+const STRONG_CLICKBAIT = /(not knowing|you won'?t believe|will shock|shocked everyone|made everyone cry|real tears|i (?:ask|urge|beg) (?:every|everyone)|leaving everyone in tears|turned out to be a (?:billionaire|prince|princess|ceo)|for true love|jaw.?dropping|see what happened next|changed (?:his|her) life forever|fell in love with (?:a|the|d) (?:poor|humble|maid|garbage|local|village|orphan)|kicked out to suffer|poor (?:village|orphan|helpless)|billionaire (?:lady|ceo|daughter)|in disguise|mocked (?:and|&) (?:rejected|humiliated)|how (?:a|an|the) (?:king|prince|princess|billionaire|ceo|man|lady|woman|girl|maid|orphan|husband|wife)|(?:marry|marries|married|marrying) (?:a|the) (?:poor|local|village|humble|maid|orphan|helpless|destitute)|(?:became|got) pregnant for|impregnated (?:a|the) (?:poor|local|village|maid)|disowned (?:his|her) (?:son|daughter|wife)|chased out (?:a|the) (?:poor|village|wife|maid|orphan))/i;
 
-const EMOTIONAL_PROMO = /(watch this|don'?t skip|do not skip|must watch|will (?:make you|shock you|blow your mind)|cry (?:real|hot|many) tears|cried .*tears|mind.?blow|life.?changing|learn a (?:life )?lesson|keep .* aside|drop whatever|you will (?:laugh|cry)|you'?ll (?:cry|laugh|regret)|no one will .*watch|no matter .*watch|what happened next)/i;
+const EMOTIONAL_PROMO = /(watch (?:this|dis)|don'?t (?:skip|watch)|dn'?t (?:skip|watch)|do not (?:skip|watch)|must watch|will (?:make you|shock you|blow your mind)|cry (?:like a baby|real|hot|many|tears)|cried .*tears|control (?:ur|your|my) tears|not to skip|smile at end|touching (?:&|and) interesting|true life story|interesting family|family drama|mind.?blow|life.?changing|learn a (?:life )?lesson|keep .* aside|drop whatever|you will (?:laugh|cry)|you'?ll (?:cry|laugh|regret)|no one will .*watch|no matter .*watch|what happened next)/i;
 
-const SUBJECT = /\b(he|she|they|her|his|him|my|i|you|everyone|girl|lady|man|woman|wife|husband|mother|father|maid|orphan|billionaire|ceo|prince|princess|king|queen)\b/i;
+const SUBJECT = /\b(he|she|they|her|his|him|my|i|you|everyone|everylady|girl|lady|man|woman|wife|husband|mother|father|maid|orphan|billionaire|ceo|prince|princess|king|queen)\b/i;
 
 const PLOT_VERB = /(?:fell|falls|falling|fall) (?:deeply )?(?:in|for) love|not knowing|never knew|never expected|pretend|disguis|maltreat|humiliat|reject|abandon|threw|throw|chased out|treated .*trash|married|marry|marries|marrying|saved|rescued|killed|destroyed|betrayed|cheat|chose|picked|hired|helped|used|sacrific|changed .*life|came back|returned|found out|thought .*poor|thinking .*poor|searching for (?:true )?love|looking for (?:true )?love/i;
 
@@ -37,12 +37,20 @@ const STORY_VERB = /\b(is|was|were|has|had|came|went|got|gave|made|met|found|saw
 
 const NOISE = /(latest|new[- ]?(?:nigerian|nollywood|yoruba|african)?\s*(?:movie|movies|film)|full\s+(?:movie|film|video)|complete\s+(?:movie|film|season)|nigerian\s+(?:movie|movies)|nollywood|yoruba\s+(?:movie|movies)|african\s+(?:movie|movies)|\b20\d{2}\b|starring|featuring|\bfeat\.?\b|\bft\.?\b)/i;
 
-const BAD_PREFIX = /^(please|watch|you will|you must|you'?ll|don'?t|do not|every(?:one|body|lady|woman|man)|i urge|i beg|if you|just released|new released|new movie alert|latest movie|this (?:movie|story)|keep |drop |no matter|be the first|how |why |what happened|the day |the moment |the story of |a story of |when a |where a )\b/i;
+const BAD_PREFIX = /^(please|watch|you will|you must|you'?ll|don'?t|dn'?t|do not|every(?:one|body|lady|woman|man)|i (?:ask|urge|beg)|if (?:you|u)|just released|new released|new movie alert|latest movie|this (?:movie|story)|keep |drop |no matter|be the first|how |why |what happened|the day |the moment |the story of |a story of |when a |where a )\b/i;
 
 function normalize(raw: string): string {
   return (raw || '')
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\bdis\b/gi, 'this')
+    .replace(/\bdat\b/gi, 'that')
+    .replace(/\bdn'?t\b/gi, "don't")
+    .replace(/\bu\b/gi, 'you')
+    .replace(/\bur\b/gi, 'your')
+    .replace(/\beverylady\b/gi, 'every lady')
+    .replace(/\beveryman\b/gi, 'every man')
+    .replace(/\beverywoman\b/gi, 'every woman')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -54,7 +62,7 @@ function wordCount(value: string): number {
 export function isSensationalizedYouTubeTitle(raw: string): boolean {
   const title = normalize(raw);
   if (!title) return false;
-  if (STRONG_CLICKBAIT.test(title) || EMOTIONAL_PROMO.test(title)) return true;
+  if (STRONG_CLICKBAIT.test(title) || EMOTIONAL_PROMO.test(title) || BAD_PREFIX.test(title)) return true;
 
   // Catch sentence plot headlines starting with How/Why/What/When/The Day/The Moment/A Story Of
   if (/^(?:how|why|what|when|the day|the moment|the story of|a story of)\s+(?:a|an|the|i|she|he|we|my|our|everyone|any|this|rich|poor)\b/i.test(title)) {
@@ -64,7 +72,7 @@ export function isSensationalizedYouTubeTitle(raw: string): boolean {
   const words = wordCount(title);
   // Any sentence-like title with a subject + plot verb or sensational word regardless of total length
   if (words >= 4 && SUBJECT.test(title) && PLOT_VERB.test(title)) return true;
-  if (words >= 4 && SUBJECT.test(title) && SENSATIONAL_VOCAB.test(title)) return true;
+  if (words >= 5 && SUBJECT.test(title) && SENSATIONAL_VOCAB.test(title)) return true;
 
   if (title.length >= 35 && words >= 7 && SUBJECT.test(title) && PLOT_VERB.test(title)) return true;
   return title.length >= 45
@@ -82,7 +90,7 @@ function isPlausibleFilmTitle(raw: string): boolean {
   if (/^(?:pt|part|episode|season)\s*\d+$/i.test(title)) return false;
   if (/\b(latest|movie|movies|film|films|telenovela|nollywood|20\d{2})\b/i.test(title)) return false;
   if (words >= 4 && SUBJECT.test(title) && PLOT_VERB.test(title)) return false;
-  if (words >= 4 && SENSATIONAL_VOCAB.test(title)) return false;
+  if (words >= 6 && SENSATIONAL_VOCAB.test(title) && SUBJECT.test(title)) return false;
   if (words >= 5 && /^the most\b/i.test(title)) return false;
   if (!/[\p{L}\p{N}]/u.test(title)) return false;
   return true;
@@ -132,8 +140,6 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
   const metadata = title.search(/\b(?:full\s+(?:movie|film|video)|complete\s+(?:movie|film|season)|latest\s+(?:nigerian|nollywood|yoruba|african)?\s*(?:movie|movies|film)|20\d{2}\s+latest)\b/i);
   if (metadata > 0) add(metadata, 0);
 
-  // Some channels append category/year metadata without a separator, e.g.
-  // "Love in Lagos Action Nollywood 2026 Movies".
   const trailingMetadata = title.match(/\s+((?:(?:new|latest|action|epic|comedy|drama|romance|thriller|yoruba|igbo|african|nigerian|nollywood|ghanaian|full|complete|20\d{2})[\s-]+)+(?:movie|movies|film|films)(?:[\s-]+20\d{2})?)$/i);
   if (trailingMetadata?.index != null) add(trailingMetadata.index, 0);
 
@@ -152,7 +158,7 @@ export function curateYouTubeTitle(raw: string): YouTubeTitleDecision {
   const sensational = isSensationalizedYouTubeTitle(original);
   const embedded = extractEmbeddedFilmTitle(original);
 
-  if (embedded) {
+  if (embedded && !isSensationalizedYouTubeTitle(embedded.prefix)) {
     return {
       action: 'clean',
       title: cleanTitle(embedded.prefix),

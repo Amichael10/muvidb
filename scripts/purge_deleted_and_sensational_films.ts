@@ -36,6 +36,7 @@ async function purgeSensationalAndOrphanedFilms() {
       const { data, error } = await supabase
         .from('films')
         .select('id, title, source_video_id, trailer_youtube_id, youtube_watch_url, release_type')
+        .order('id', { ascending: true })
         .range(currentFrom, currentFrom + PAGE_SIZE - 1);
       if (error) throw error;
       return data || [];
@@ -43,6 +44,7 @@ async function purgeSensationalAndOrphanedFilms() {
 
     if (!pageData || pageData.length === 0) break;
     allFilms.push(...pageData);
+    console.log(`Fetched ${allFilms.length} films so far...`);
     if (pageData.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
