@@ -367,8 +367,8 @@ export default function WatchPlatform() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                {[...Array(8)].map((_, i) => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6 sm:gap-8">
+                {[...Array(10)].map((_, i) => (
                   <div key={i} className="flex justify-center"><SkeletonCard size="md" /></div>
                 ))}
               </div>
@@ -382,7 +382,7 @@ export default function WatchPlatform() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6 sm:gap-8">
                 {filtered.map((film) => (
                   <div key={film.id} className="flex justify-center"><FilmCard film={film} /></div>
                 ))}
