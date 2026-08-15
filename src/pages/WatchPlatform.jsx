@@ -318,8 +318,13 @@ export default function WatchPlatform() {
           <button
             onClick={() => setNewThisMonth((v) => !v)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all ${
-              newThisMonth ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-text-muted hover:border-brand/50'
+              newThisMonth ? 'text-white shadow-md' : 'bg-surface border-border text-text-muted hover:border-white/20'
             }`}
+            style={
+              newThisMonth
+                ? { backgroundColor: accentColor, borderColor: accentColor, boxShadow: `0 4px 14px ${accentColor}40` }
+                : {}
+            }
           >
             <Icon icon="solar:fire-bold" className="text-sm" /> New this month
           </button>
@@ -327,7 +332,10 @@ export default function WatchPlatform() {
           <select
             value={selectedGenre}
             onChange={(e) => setSelectedGenre(e.target.value)}
-            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none transition-all"
+            style={{
+              borderColor: selectedGenre ? accentColor : undefined,
+            }}
           >
             <option value="">All genres</option>
             {genres.map((g) => (
@@ -338,7 +346,10 @@ export default function WatchPlatform() {
           <select
             value={yearMin}
             onChange={(e) => setYearMin(parseInt(e.target.value, 10))}
-            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+            className="bg-surface border border-border text-text-primary rounded-xl px-4 py-2 text-[11px] font-bold tracking-wider outline-none transition-all"
+            style={{
+              borderColor: yearMin ? accentColor : undefined,
+            }}
           >
             <option value={0}>Any year</option>
             <option value={2024}>2024 +</option>
@@ -350,7 +361,8 @@ export default function WatchPlatform() {
           {(selectedGenre || yearMin || newThisMonth) && (
             <button
               onClick={() => { setSelectedGenre(''); setYearMin(0); setNewThisMonth(false); }}
-              className="text-[10px] font-bold text-brand hover:underline uppercase tracking-widest ml-1"
+              className="text-[10px] font-bold hover:underline uppercase tracking-widest ml-1"
+              style={{ color: accentColor }}
             >
               Clear
             </button>
