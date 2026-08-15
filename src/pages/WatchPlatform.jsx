@@ -109,15 +109,22 @@ export default function WatchPlatform() {
     return unique.slice(0, 10);
   }, [films]);
 
+  const accentColor = platform?.color || '#D0A008';
+
   if (!platform) return <Navigate to="/browse" replace />;
 
   return (
     <div className="min-h-screen bg-bg">
 
-      {/* Cinematic Header with 3D Poster Collage Fan */}
-      <div className="relative bg-[#08080c] border-b border-border/60 overflow-hidden pt-28 pb-16 md:py-24">
-        {/* Ambient Warm Golden Glow background */}
-        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[600px] h-[500px] bg-gradient-to-l from-amber-500/15 via-amber-600/5 to-transparent blur-3xl rounded-full pointer-events-none" />
+      {/* Hero Header with Dynamic Platform Colors & User Provided Film Reel Artwork */}
+      <div className="relative bg-[#07070a] border-b border-border/60 overflow-hidden pt-28 pb-16 md:py-24">
+        {/* Dynamic Platform Ambient Color Glow */}
+        <div
+          className="absolute top-1/2 right-0 -translate-y-1/2 w-[700px] h-[550px] blur-3xl pointer-events-none rounded-full"
+          style={{
+            background: `radial-gradient(circle at 75% 50%, ${accentColor}33 0%, ${accentColor}10 45%, transparent 75%)`,
+          }}
+        />
         <div className="absolute inset-0 grid-bg opacity-15 pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
@@ -127,16 +134,21 @@ export default function WatchPlatform() {
             <div className="lg:col-span-6 xl:col-span-5 space-y-6">
               <Link
                 to="/browse"
-                className="inline-flex items-center gap-2 text-text-muted text-[11px] font-bold uppercase tracking-widest hover:text-amber-400 transition-colors"
+                className="inline-flex items-center gap-2 text-text-muted text-[11px] font-bold uppercase tracking-widest transition-colors group"
               >
-                <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4 text-amber-400" />
-                <span>WHERE TO WATCH</span>
+                <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4 transition-transform group-hover:-translate-x-1" style={{ color: accentColor }} />
+                <span className="group-hover:text-text-primary transition-colors">WHERE TO WATCH</span>
               </Link>
 
               <div className="flex items-center gap-4">
                 <div
-                  className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border border-amber-500/30 shrink-0 shadow-lg shadow-amber-500/10"
-                  style={{ background: `${platform.color}22`, color: platform.color }}
+                  className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border shrink-0 transition-all"
+                  style={{
+                    background: `${accentColor}20`,
+                    borderColor: `${accentColor}40`,
+                    color: accentColor,
+                    boxShadow: `0 8px 24px ${accentColor}25`,
+                  }}
                 >
                   {platform.logo ? (
                     <img src={platform.logo} alt={platform.name} className="w-9 h-9 object-contain" />
@@ -154,43 +166,43 @@ export default function WatchPlatform() {
                 </div>
               </div>
 
-              {/* Gold Accent Bar */}
-              <div className="w-12 h-1 bg-amber-500 rounded-full shadow-sm shadow-amber-500/50" />
+              {/* Dynamic Theme Color Accent Line */}
+              <div
+                className="w-12 h-1 rounded-full"
+                style={{
+                  backgroundColor: accentColor,
+                  boxShadow: `0 0 14px ${accentColor}88`,
+                }}
+              />
 
               <p className="text-text-muted text-sm md:text-base leading-relaxed max-w-lg">
                 From timeless classics to the latest blockbusters, stream premium Nollywood movies anytime, anywhere.
               </p>
             </div>
 
-            {/* Right 3D Poster Fan & Film Reel Collage */}
+            {/* Right 3D Poster Fan & Film Reel Artwork */}
             <div className="lg:col-span-7 xl:col-span-7 relative flex justify-center lg:justify-end overflow-hidden lg:overflow-visible py-4">
               
-              {/* Photorealistic 3D Golden Film Reel Asset (Far Right Accent) */}
-              <div className="absolute -right-10 sm:-right-16 md:-right-20 top-1/2 -translate-y-1/2 w-[300px] sm:w-[400px] md:w-[480px] lg:w-[540px] pointer-events-none z-20">
+              {/* User-provided High-Res Golden Film Reel Artwork (Far Right) */}
+              <div className="absolute -right-8 sm:-right-14 md:-right-18 top-1/2 -translate-y-1/2 w-[320px] sm:w-[420px] md:w-[520px] lg:w-[580px] pointer-events-none z-10">
                 <img
-                  src="/images/golden_film_reel.jpg"
-                  alt="Golden Film Reel"
-                  className="w-full h-auto object-contain mix-blend-screen drop-shadow-[0_0_60px_rgba(245,158,11,0.4)]"
+                  src="/images/film_reel_vector.svg"
+                  alt="Cinema Film Reel"
+                  className="w-full h-auto object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.9)]"
+                  onError={(e) => {
+                    // Fallback to original PNG if SVG renderer encounters issues
+                    e.currentTarget.src = '/images/film_reel_original.png';
+                  }}
                 />
               </div>
 
-              {/* 3D Large-Scale Poster Collage Container */}
+              {/* 3D Poster Collage Container */}
               <div className="relative w-full max-w-[680px] lg:max-w-[760px] h-[420px] sm:h-[500px] md:h-[560px] lg:h-[600px] flex items-center justify-center">
                 
-                {/* Photorealistic 3D Golden Film Strip Ribbon along the bottom */}
-                <div className="absolute -bottom-8 left-0 right-0 h-[120px] sm:h-[150px] md:h-[180px] z-40 pointer-events-none overflow-hidden">
-                  <img
-                    src="/images/golden_film_strip.jpg"
-                    alt="Golden Film Strip"
-                    className="w-full h-full object-cover mix-blend-screen opacity-90 drop-shadow-[0_0_40px_rgba(245,158,11,0.5)]"
-                  />
-                </div>
-
-                {/* 2-Tier Large Poster Grid matching reference layout */}
+                {/* 2-Tier Large Poster Grid matching reference mockup */}
                 {headerPosters.length > 0 ? (
-                  <div className="relative w-full h-full">
+                  <div className="relative w-full h-full z-20">
                     {headerPosters.slice(0, 9).map((posterUrl, idx) => {
-                      // Positions & tilts carefully arranged to match the reference image collage
                       const cardStyles = [
                         // Row 1 (Top / Upper Level)
                         { pos: 'left-[2%] sm:left-[3%] top-[4%] sm:top-[5%]', rotate: 'rotate-3', z: 'z-10' },
@@ -210,7 +222,10 @@ export default function WatchPlatform() {
                       return (
                         <div
                           key={idx}
-                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-32 sm:w-40 md:w-48 lg:w-54 h-48 sm:h-60 md:h-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-amber-500/30 shadow-[0_25px_60px_rgba(0,0,0,0.95)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-120 hover:z-50 hover:shadow-amber-500/40 hover:border-amber-400`}
+                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-32 sm:w-40 md:w-48 lg:w-54 h-48 sm:h-60 md:h-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-[0_25px_60px_rgba(0,0,0,0.95)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-120 hover:z-50`}
+                          style={{
+                            borderColor: `${accentColor}40`,
+                          }}
                         >
                           <img
                             src={posterUrl}
@@ -218,14 +233,14 @@ export default function WatchPlatform() {
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
-                          {/* Inner gold shimmer overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-amber-500/10 pointer-events-none" />
+                          {/* Inner shimmer overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-white/10 pointer-events-none" />
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="relative w-full h-full flex items-center justify-center">
+                  <div className="relative w-full h-full flex items-center justify-center z-20">
                     {[-10, -5, 0, 5, 10].map((deg, idx) => (
                       <div
                         key={idx}
