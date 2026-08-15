@@ -183,23 +183,19 @@ export default function WatchPlatform() {
             {/* Right 3D Poster Fan & Film Reel Artwork */}
             <div className="lg:col-span-7 xl:col-span-7 relative flex justify-center lg:justify-end overflow-hidden lg:overflow-visible py-4">
               
-              {/* User-provided High-Res Golden Film Reel Artwork (Far Right) */}
-              <div className="absolute -right-8 sm:-right-14 md:-right-18 top-1/2 -translate-y-1/2 w-[320px] sm:w-[420px] md:w-[520px] lg:w-[580px] pointer-events-none z-10">
+              {/* User-provided High-Res Golden Film Reel & Strip Artwork (Enlarged & Brought Up) */}
+              <div className="absolute -right-12 sm:-right-20 md:-right-24 -top-8 md:-top-16 w-[420px] sm:w-[560px] md:w-[680px] lg:w-[780px] pointer-events-none z-10">
                 <img
-                  src="/images/film_reel_vector.svg"
+                  src="/images/film_reel_original.png"
                   alt="Cinema Film Reel"
-                  className="w-full h-auto object-contain drop-shadow-[0_0_50px_rgba(0,0,0,0.9)]"
-                  onError={(e) => {
-                    // Fallback to original PNG if SVG renderer encounters issues
-                    e.currentTarget.src = '/images/film_reel_original.png';
-                  }}
+                  className="w-full h-auto object-contain drop-shadow-[0_0_60px_rgba(0,0,0,0.95)]"
                 />
               </div>
 
               {/* 3D Poster Collage Container */}
-              <div className="relative w-full max-w-[680px] lg:max-w-[760px] h-[420px] sm:h-[500px] md:h-[560px] lg:h-[600px] flex items-center justify-center">
+              <div className="relative w-full max-w-[650px] lg:max-w-[720px] h-[380px] sm:h-[460px] md:h-[520px] lg:h-[560px] flex items-center justify-center">
                 
-                {/* 2-Tier Large Poster Grid matching reference mockup */}
+                {/* 2-Tier Poster Grid matching reference mockup */}
                 {headerPosters.length > 0 ? (
                   <div className="relative w-full h-full z-20">
                     {headerPosters.slice(0, 9).map((posterUrl, idx) => {
@@ -222,7 +218,7 @@ export default function WatchPlatform() {
                       return (
                         <div
                           key={idx}
-                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-32 sm:w-40 md:w-48 lg:w-54 h-48 sm:h-60 md:h-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-[0_25px_60px_rgba(0,0,0,0.95)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-120 hover:z-50`}
+                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-28 sm:w-36 md:w-42 lg:w-46 h-42 sm:h-54 md:h-64 lg:h-68 rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-[0_25px_60px_rgba(0,0,0,0.95)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-120 hover:z-50`}
                           style={{
                             borderColor: `${accentColor}40`,
                           }}
