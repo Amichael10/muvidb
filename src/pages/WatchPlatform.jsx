@@ -109,6 +109,10 @@ export default function WatchPlatform() {
     return unique.slice(0, 10);
   }, [films]);
 
+  const featuredFilms = useMemo(() => {
+    return films.slice(0, 5);
+  }, [films]);
+
   const accentColor = platform?.color || '#D0A008';
 
   if (!platform) return <Navigate to="/browse" replace />;
@@ -116,38 +120,59 @@ export default function WatchPlatform() {
   return (
     <div className="min-h-screen bg-bg">
 
-      {/* Hero Header with Dynamic Platform Colors & User Provided Film Reel Artwork */}
-      <div className="relative bg-[#07070a] border-b border-border/60 overflow-hidden pt-28 pb-16 md:py-24">
-        {/* Dynamic Platform Ambient Color Glow */}
+      {/* Clean Product-Driven Hero Header matching Mockup */}
+      <div className="relative bg-[#07070a] border-b border-border/60 overflow-hidden pt-28 pb-12 md:py-20">
+        {/* Subtle Grid Background & Dynamic Ambient Color Glow */}
+        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
         <div
-          className="absolute top-1/2 right-0 -translate-y-1/2 w-[700px] h-[550px] blur-3xl pointer-events-none rounded-full"
+          className="absolute top-0 right-0 w-[700px] h-[500px] blur-3xl pointer-events-none rounded-full"
           style={{
-            background: `radial-gradient(circle at 75% 50%, ${accentColor}33 0%, ${accentColor}10 45%, transparent 75%)`,
+            background: `radial-gradient(circle at 80% 20%, ${accentColor}25 0%, ${accentColor}08 50%, transparent 80%)`,
           }}
         />
-        <div className="absolute inset-0 grid-bg opacity-15 pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 items-center gap-12 lg:gap-8">
-            
-            {/* Left Info Column */}
-            <div className="lg:col-span-6 xl:col-span-5 space-y-6">
-              <Link
-                to="/browse"
-                className="inline-flex items-center gap-2 text-text-muted text-[11px] font-bold uppercase tracking-widest transition-colors group"
-              >
-                <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4 transition-transform group-hover:-translate-x-1" style={{ color: accentColor }} />
-                <span className="group-hover:text-text-primary transition-colors">WHERE TO WATCH</span>
-              </Link>
+          
+          {/* Top Row: Back Link (Left) & Platform Brand Emblem (Right) */}
+          <div className="flex items-center justify-between mb-8">
+            <Link
+              to="/browse"
+              className="inline-flex items-center gap-2 text-text-muted text-[11px] font-bold uppercase tracking-widest transition-colors group"
+            >
+              <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4 transition-transform group-hover:-translate-x-1" style={{ color: accentColor }} />
+              <span className="group-hover:text-text-primary transition-colors">WHERE TO WATCH</span>
+            </Link>
 
-              <div className="flex items-center gap-4">
+            {/* Platform Brand Emblem (Top Right) */}
+            <div className="flex items-center gap-3 bg-surface-2/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-2xl">
+              {platform.logo ? (
+                <img src={platform.logo} alt={platform.name} className="h-7 w-auto object-contain" />
+              ) : (
                 <div
-                  className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border shrink-0 transition-all"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center"
+                  style={{ background: `${accentColor}22`, color: accentColor }}
+                >
+                  <Icon icon={platform.icon} className="text-xl" />
+                </div>
+              )}
+              <span className="text-lg md:text-xl font-heading font-extrabold text-white tracking-tight">
+                {platform.name}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-start">
+            
+            {/* Left Info & Feature Badges Column */}
+            <div className="lg:col-span-5 xl:col-span-5 space-y-6">
+              <div className="flex items-start gap-4">
+                <div
+                  className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border shrink-0 transition-all shadow-lg"
                   style={{
-                    background: `${accentColor}20`,
+                    background: `${accentColor}18`,
                     borderColor: `${accentColor}40`,
                     color: accentColor,
-                    boxShadow: `0 8px 24px ${accentColor}25`,
+                    boxShadow: `0 8px 24px ${accentColor}20`,
                   }}
                 >
                   {platform.logo ? (
@@ -156,96 +181,129 @@ export default function WatchPlatform() {
                     <Icon icon={platform.icon} className="text-3xl md:text-4xl" />
                   )}
                 </div>
-                <div>
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold text-white tracking-tight leading-tight">
-                    Watch on {platform.name}
+                <div className="space-y-1">
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold text-white tracking-tight leading-none">
+                    Watch on
                   </h1>
-                  <p className="text-text-muted text-sm md:text-base font-medium mt-1">
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold tracking-tight leading-none" style={{ color: accentColor }}>
+                    {platform.name}
+                  </h2>
+                  <p className="text-text-muted text-xs md:text-sm font-medium pt-2">
                     {loading ? 'Loading titles…' : `${totalCount} Nollywood ${totalCount === 1 ? 'title' : 'titles'} available`}
                   </p>
                 </div>
               </div>
 
-              {/* Dynamic Theme Color Accent Line */}
+              {/* Dynamic Theme Accent Line */}
               <div
                 className="w-12 h-1 rounded-full"
                 style={{
                   backgroundColor: accentColor,
-                  boxShadow: `0 0 14px ${accentColor}88`,
+                  boxShadow: `0 0 12px ${accentColor}88`,
                 }}
               />
 
-              <p className="text-text-muted text-sm md:text-base leading-relaxed max-w-lg">
+              <p className="text-text-muted text-xs sm:text-sm leading-relaxed max-w-md">
                 From timeless classics to the latest blockbusters, stream premium Nollywood movies anytime, anywhere.
               </p>
+
+              {/* Bottom Feature Badges Grid (4 Items) */}
+              <div className="grid grid-cols-4 gap-2 pt-4">
+                {[
+                  { label: 'Stream Anytime', icon: 'solar:clapperboard-play-bold' },
+                  { label: 'Premium Nollywood', icon: 'solar:play-circle-bold' },
+                  { label: 'Watch on Any Device', icon: 'solar:laptop-bold' },
+                  { label: 'Safe & Reliable', icon: 'solar:shield-check-bold' },
+                ].map((feat, idx) => (
+                  <div key={idx} className="flex flex-col items-center text-center space-y-1.5 p-2 rounded-xl bg-surface-2/15 border border-white/5">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center border"
+                      style={{
+                        background: `${accentColor}15`,
+                        borderColor: `${accentColor}30`,
+                        color: accentColor,
+                      }}
+                    >
+                      <Icon icon={feat.icon} className="text-base" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-text-muted leading-tight">
+                      {feat.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Right 3D Poster Fan & Film Reel Artwork */}
-            <div className="lg:col-span-7 xl:col-span-7 relative flex justify-center lg:justify-end overflow-hidden lg:overflow-visible py-4">
+            {/* Right Featured Movie Cards Row (5 Cards) */}
+            <div className="lg:col-span-7 xl:col-span-7 space-y-6">
               
-              {/* User-provided High-Res Golden Film Reel & Strip Artwork (Enlarged & Brought Up) */}
-              <div className="absolute -right-12 sm:-right-20 md:-right-24 -top-8 md:-top-16 w-[420px] sm:w-[560px] md:w-[680px] lg:w-[780px] pointer-events-none z-10">
-                <img
-                  src="/images/film_reel_original.png"
-                  alt="Cinema Film Reel"
-                  className="w-full h-auto object-contain drop-shadow-[0_0_60px_rgba(0,0,0,0.95)]"
-                />
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+                {featuredFilms.length > 0
+                  ? featuredFilms.map((film) => (
+                      <Link
+                        key={film.id}
+                        to={`/films/${film.slug || film.id}`}
+                        className="group flex flex-col bg-[#0b0b10] border rounded-2xl p-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                        style={{ borderColor: `${accentColor}30` }}
+                      >
+                        <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden shadow-md mb-2 bg-surface-2/40">
+                          {film.poster_url || film.backdrop_url ? (
+                            <img
+                              src={film.poster_url || film.backdrop_url}
+                              alt={film.title}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-text-muted">
+                              <Icon icon="solar:film-strip-bold" className="text-2xl" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <h3 className="text-xs font-bold text-white truncate px-1 group-hover:text-amber-400 transition-colors">
+                          {film.title}
+                        </h3>
+                        <p className="text-[10px] text-text-muted truncate px-1 mt-0.5">
+                          {Array.isArray(film.genres) && film.genres.length > 0 ? film.genres.join(', ') : 'Nollywood'}
+                        </p>
+                        <span className="text-[10px] font-semibold px-1 mt-0.5" style={{ color: accentColor }}>
+                          {film.year || 'Released'}
+                        </span>
+                      </Link>
+                    ))
+                  : [...Array(5)].map((_, i) => (
+                      <div key={i} className="bg-surface-2/20 border border-white/5 rounded-2xl p-2 space-y-2 animate-pulse">
+                        <div className="aspect-[2/3] w-full rounded-xl bg-surface-2/40" />
+                        <div className="h-3 bg-surface-2/60 rounded w-3/4" />
+                        <div className="h-2 bg-surface-2/40 rounded w-1/2" />
+                      </div>
+                    ))}
               </div>
 
-              {/* 3D Poster Collage Container */}
-              <div className="relative w-full max-w-[650px] lg:max-w-[720px] h-[380px] sm:h-[460px] md:h-[520px] lg:h-[560px] flex items-center justify-center">
-                
-                {/* 2-Tier Poster Grid matching reference mockup */}
-                {headerPosters.length > 0 ? (
-                  <div className="relative w-full h-full z-20">
-                    {headerPosters.slice(0, 9).map((posterUrl, idx) => {
-                      const cardStyles = [
-                        // Row 1 (Top / Upper Level)
-                        { pos: 'left-[2%] sm:left-[3%] top-[4%] sm:top-[5%]', rotate: 'rotate-3', z: 'z-10' },
-                        { pos: 'left-[18%] sm:left-[20%] top-[2%] sm:top-[3%]', rotate: 'rotate-6', z: 'z-15' },
-                        { pos: 'left-[35%] sm:left-[37%] top-[0%]', rotate: 'rotate-6', z: 'z-20' },
-                        { pos: 'left-[52%] sm:left-[54%] top-[2%] sm:top-[3%]', rotate: 'rotate-8', z: 'z-15' },
-                        { pos: 'left-[68%] sm:left-[70%] top-[5%] sm:top-[6%]', rotate: 'rotate-10', z: 'z-10' },
-                        // Row 2 (Bottom / Front Level - Overlapping Upward)
-                        { pos: 'left-[10%] sm:left-[12%] top-[46%] sm:top-[48%]', rotate: 'rotate-4', z: 'z-30' },
-                        { pos: 'left-[27%] sm:left-[29%] top-[48%] sm:top-[50%]', rotate: 'rotate-6', z: 'z-35' },
-                        { pos: 'left-[44%] sm:left-[46%] top-[48%] sm:top-[50%]', rotate: 'rotate-8', z: 'z-35' },
-                        { pos: 'left-[61%] sm:left-[63%] top-[46%] sm:top-[48%]', rotate: 'rotate-10', z: 'z-30' },
-                      ];
-
-                      const style = cardStyles[idx % cardStyles.length];
-
-                      return (
-                        <div
-                          key={idx}
-                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-28 sm:w-36 md:w-42 lg:w-46 h-42 sm:h-54 md:h-64 lg:h-68 rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-[0_25px_60px_rgba(0,0,0,0.95)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-120 hover:z-50`}
-                          style={{
-                            borderColor: `${accentColor}40`,
-                          }}
-                        >
-                          <img
-                            src={posterUrl}
-                            alt="Movie Poster"
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                          {/* Inner shimmer overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-white/10 pointer-events-none" />
-                        </div>
-                      );
-                    })}
+              {/* Bottom MuviDB Banner Pill */}
+              <div className="bg-[#0b0b10] border border-white/10 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+                <div className="flex items-center gap-3.5">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border"
+                    style={{ background: `${accentColor}20`, borderColor: `${accentColor}40`, color: accentColor }}
+                  >
+                    <Icon icon="solar:videocamera-record-bold" className="text-xl" />
                   </div>
-                ) : (
-                  <div className="relative w-full h-full flex items-center justify-center z-20">
-                    {[-10, -5, 0, 5, 10].map((deg, idx) => (
-                      <div
-                        key={idx}
-                        style={{ transform: `rotate(${deg}deg) translateX(${(idx - 2) * 60}px)` }}
-                        className="absolute w-36 sm:w-44 h-52 sm:h-64 rounded-2xl bg-surface-2/40 border border-white/10 animate-pulse shadow-xl"
-                      />
-                    ))}
-                  </div>
-                )}
+                  <p className="text-xs sm:text-sm font-medium text-text-muted leading-tight">
+                    Find out where your favorite African movies are streaming.{' '}
+                    <span className="font-bold block sm:inline" style={{ color: accentColor }}>
+                      MuviDB shows you. You decide what to watch.
+                    </span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 sm:border-l border-white/10 sm:pl-4">
+                  <img src="/filmhouse.png" alt="MuviDB" className="h-6 w-auto object-contain opacity-80" />
+                  <span className="text-base font-heading font-extrabold text-white tracking-tight">
+                    MuviDB
+                  </span>
+                </div>
               </div>
 
             </div>
