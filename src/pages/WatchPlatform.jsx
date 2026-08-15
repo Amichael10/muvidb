@@ -121,7 +121,7 @@ export default function WatchPlatform() {
     <div className="min-h-screen bg-bg">
 
       {/* Clean Product-Driven Hero Header matching Mockup */}
-      <div className="relative bg-[#07070a] border-b border-border/60 overflow-hidden pt-28 pb-12 md:py-20">
+      <div className="relative bg-bg border-b border-border overflow-hidden pt-28 pb-12 md:py-20">
         {/* Subtle Grid Background & Dynamic Ambient Color Glow */}
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
         <div
@@ -144,7 +144,7 @@ export default function WatchPlatform() {
             </Link>
 
             {/* Platform Brand Emblem (Top Right) */}
-            <div className="flex items-center gap-3 bg-surface-2/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-2xl">
+            <div className="flex items-center gap-3 bg-surface border border-border px-4 py-2 rounded-2xl shadow-sm">
               {platform.logo ? (
                 <img src={platform.logo} alt={platform.name} className="h-7 w-auto object-contain" />
               ) : (
@@ -155,7 +155,7 @@ export default function WatchPlatform() {
                   <Icon icon={platform.icon} className="text-xl" />
                 </div>
               )}
-              <span className="text-lg md:text-xl font-heading font-extrabold text-white tracking-tight">
+              <span className="text-lg md:text-xl font-heading font-extrabold text-text-primary tracking-tight">
                 {platform.name}
               </span>
             </div>
@@ -167,7 +167,7 @@ export default function WatchPlatform() {
             <div className="lg:col-span-5 xl:col-span-5 space-y-6">
               <div className="flex items-start gap-4">
                 <div
-                  className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border shrink-0 transition-all shadow-lg"
+                  className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center border shrink-0 transition-all shadow-md"
                   style={{
                     background: `${accentColor}18`,
                     borderColor: `${accentColor}40`,
@@ -182,7 +182,7 @@ export default function WatchPlatform() {
                   )}
                 </div>
                 <div className="space-y-1">
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold text-white tracking-tight leading-none">
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold text-text-primary tracking-tight leading-none">
                     Watch on
                   </h1>
                   <h2 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold tracking-tight leading-none" style={{ color: accentColor }}>
@@ -215,7 +215,7 @@ export default function WatchPlatform() {
                   { label: 'Watch on Any Device', icon: 'solar:laptop-bold' },
                   { label: 'Safe & Reliable', icon: 'solar:shield-check-bold' },
                 ].map((feat, idx) => (
-                  <div key={idx} className="flex flex-col items-center text-center space-y-1.5 p-2 rounded-xl bg-surface-2/15 border border-white/5">
+                  <div key={idx} className="flex flex-col items-center text-center space-y-1.5 p-2 rounded-xl bg-surface border border-border/60 shadow-xs">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center border"
                       style={{
@@ -243,10 +243,10 @@ export default function WatchPlatform() {
                       <Link
                         key={film.id}
                         to={`/films/${film.slug || film.id}`}
-                        className="group flex flex-col bg-[#0b0b10] border rounded-2xl p-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                        className="group flex flex-col bg-surface border border-border rounded-2xl p-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                         style={{ borderColor: `${accentColor}30` }}
                       >
-                        <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden shadow-md mb-2 bg-surface-2/40">
+                        <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden shadow-sm mb-2 bg-surface-2/60">
                           {film.poster_url || film.backdrop_url ? (
                             <img
                               src={film.poster_url || film.backdrop_url}
@@ -261,7 +261,7 @@ export default function WatchPlatform() {
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                        <h3 className="text-xs font-bold text-white truncate px-1 group-hover:text-amber-400 transition-colors">
+                        <h3 className="text-xs font-bold text-text-primary truncate px-1 group-hover:text-amber-500 transition-colors">
                           {film.title}
                         </h3>
                         <p className="text-[10px] text-text-muted truncate px-1 mt-0.5">
@@ -273,16 +273,16 @@ export default function WatchPlatform() {
                       </Link>
                     ))
                   : [...Array(5)].map((_, i) => (
-                      <div key={i} className="bg-surface-2/20 border border-white/5 rounded-2xl p-2 space-y-2 animate-pulse">
-                        <div className="aspect-[2/3] w-full rounded-xl bg-surface-2/40" />
-                        <div className="h-3 bg-surface-2/60 rounded w-3/4" />
-                        <div className="h-2 bg-surface-2/40 rounded w-1/2" />
+                      <div key={i} className="bg-surface border border-border/40 rounded-2xl p-2 space-y-2 animate-pulse">
+                        <div className="aspect-[2/3] w-full rounded-xl bg-surface-2/60" />
+                        <div className="h-3 bg-surface-2/80 rounded w-3/4" />
+                        <div className="h-2 bg-surface-2/60 rounded w-1/2" />
                       </div>
                     ))}
               </div>
 
               {/* Bottom MuviDB Banner Pill */}
-              <div className="bg-[#0b0b10] border border-white/10 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+              <div className="bg-surface border border-border p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
                 <div className="flex items-center gap-3.5">
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border"
@@ -298,9 +298,9 @@ export default function WatchPlatform() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 sm:border-l border-white/10 sm:pl-4">
-                  <img src="/filmhouse.png" alt="MuviDB" className="h-6 w-auto object-contain opacity-80" />
-                  <span className="text-base font-heading font-extrabold text-white tracking-tight">
+                <div className="flex items-center gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 sm:border-l border-border sm:pl-4">
+                  <img src="/filmhouse.png" alt="MuviDB" className="h-6 w-auto object-contain opacity-80 dark:opacity-100" />
+                  <span className="text-base font-heading font-extrabold text-text-primary tracking-tight">
                     MuviDB
                   </span>
                 </div>
