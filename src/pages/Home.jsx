@@ -861,53 +861,74 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+                <div className="flex gap-5 overflow-x-auto pb-4 pt-1 scrollbar-hide snap-x snap-mandatory">
                   {upcomingPlays.map((play) => (
                     <Link
                       key={play.id}
                       to={`/plays/${play.slug || play.id}`}
-                      className="group w-[280px] sm:w-[360px] shrink-0 snap-start rounded-2xl border border-border bg-surface overflow-hidden hover:border-brand/60 transition-all hover:shadow-xl hover:shadow-brand/5"
+                      className="group flex w-[320px] sm:w-[390px] shrink-0 snap-start rounded-2xl border border-border bg-surface overflow-hidden hover:border-brand/60 transition-all duration-300 hover:shadow-2xl hover:shadow-brand/10 hover:-translate-y-1"
                     >
-                      <div className="grid grid-cols-[104px_1fr] sm:grid-cols-[126px_1fr] min-h-[178px]">
-                        <div className="relative bg-surface-2 overflow-hidden">
-                          <ImageWithFallback
-                            src={play.poster_url || play.banner_url}
-                            alt={play.title}
-                            fallbackType="film"
-                            name={play.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            width={280}
-                            sizes="126px"
-                            loading="lazy"
-                          />
-                          <span className={`absolute left-2 top-2 rounded-full px-2.5 py-1 text-[8px] font-black uppercase tracking-widest border backdrop-blur ${
-                            play.status === 'currently_running'
-                              ? 'bg-green-500/20 text-green-300 border-green-500/40'
-                              : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                          }`}>
-                            {play.status === 'currently_running' ? 'Running' : 'Upcoming'}
-                          </span>
-                        </div>
-                        <div className="p-4 sm:p-5 min-w-0 flex flex-col justify-between">
-                          <div>
-                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-brand mb-2">
+                      {/* Left Poster (Uncropped 2:3 Vertical Poster Aspect) */}
+                      <div className="relative w-[125px] sm:w-[145px] shrink-0 bg-surface-2 overflow-hidden border-r border-border/50">
+                        <ImageWithFallback
+                          src={play.poster_url || play.banner_url}
+                          alt={play.title}
+                          fallbackType="film"
+                          name={play.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          width={280}
+                          sizes="145px"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/20 pointer-events-none" />
+                      </div>
+
+                      {/* Right Content Column */}
+                      <div className="p-4 sm:p-5 min-w-0 flex-1 flex flex-col justify-between space-y-3">
+                        <div className="space-y-2">
+                          {/* Category & Status Badge Row */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-brand truncate">
                               {play.genre || 'Stage Play'}
-                            </p>
-                            <h3 className="font-heading text-xl font-black tracking-tight text-text-primary group-hover:text-brand transition-colors line-clamp-2 leading-tight">
-                              {play.title}
-                            </h3>
-                            <p className="mt-2 text-xs text-text-muted line-clamp-2 leading-relaxed">
-                              {play.synopsis || 'Live theatre production with stage dates, venue, and cast credits.'}
-                            </p>
+                            </span>
+                            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[8px] font-black uppercase tracking-wider border backdrop-blur ${
+                              play.status === 'currently_running'
+                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                            }`}>
+                              {play.status === 'currently_running' ? 'Running' : 'Upcoming'}
+                            </span>
                           </div>
-                          <div className="pt-4 space-y-2 text-[10px] text-text-muted">
-                            <div className="flex items-start gap-2">
-                              <Icon icon="solar:calendar-minimalistic-bold" className="text-brand text-sm shrink-0 mt-0.5" />
-                              <span className="font-bold leading-relaxed">{getPlayDateLabel(play, 'Date TBA')}</span>
+
+                          {/* Play Title */}
+                          <h3 className="font-heading text-base sm:text-lg font-black tracking-tight text-text-primary group-hover:text-brand transition-colors line-clamp-2 leading-snug">
+                            {play.title}
+                          </h3>
+
+                          {/* Synopsis */}
+                          <p className="text-[11px] text-text-muted line-clamp-2 leading-relaxed">
+                            {play.synopsis || 'Live theatre production with stage dates, venue, and cast credits.'}
+                          </p>
+                        </div>
+
+                        {/* Footer Meta Details & Action Pill */}
+                        <div className="pt-2 border-t border-border/60 space-y-2.5">
+                          <div className="space-y-1.5 text-[11px] text-text-secondary">
+                            <div className="flex items-center gap-2">
+                              <Icon icon="solar:calendar-bold" className="text-brand text-xs shrink-0" />
+                              <span className="font-semibold truncate">{getPlayDateLabel(play, 'Date TBA')}</span>
                             </div>
-                            <div className="flex items-start gap-2">
-                              <Icon icon="solar:map-point-bold" className="text-brand text-sm shrink-0 mt-0.5" />
-                              <span className="line-clamp-1">{play.venue || play.city || 'Venue TBA'}</span>
+                            <div className="flex items-center gap-2">
+                              <Icon icon="solar:map-point-bold" className="text-brand text-xs shrink-0" />
+                              <span className="truncate text-text-muted">{play.venue || play.city || 'Venue TBA'}</span>
+                            </div>
+                          </div>
+
+                          {/* Action Pill */}
+                          <div className="pt-1 flex items-center justify-between text-[10px] font-bold text-brand group-hover:translate-x-0.5 transition-transform">
+                            <span className="uppercase tracking-widest">Get Stage Info</span>
+                            <div className="w-6 h-6 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center group-hover:bg-brand group-hover:text-white transition-all shadow-xs">
+                              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5" />
                             </div>
                           </div>
                         </div>
