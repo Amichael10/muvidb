@@ -165,48 +165,44 @@ export default function WatchPlatform() {
             {/* Right 3D Poster Fan & Film Reel Collage */}
             <div className="lg:col-span-7 xl:col-span-7 relative flex justify-center lg:justify-end overflow-hidden lg:overflow-visible py-4">
               
-              {/* Golden Film Reel Graphic (Far Right Accent) */}
-              <div className="absolute -right-16 top-1/2 -translate-y-1/2 w-[320px] sm:w-[400px] md:w-[480px] opacity-40 pointer-events-none z-0">
-                <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full text-amber-500/50">
-                  <circle cx="300" cy="200" r="160" stroke="currentColor" strokeWidth="14" />
-                  <circle cx="300" cy="200" r="130" stroke="currentColor" strokeWidth="5" strokeDasharray="16 16" />
-                  <circle cx="300" cy="200" r="45" stroke="currentColor" strokeWidth="10" />
-                  <circle cx="220" cy="200" r="28" fill="currentColor" />
-                  <circle cx="380" cy="200" r="28" fill="currentColor" />
-                  <circle cx="300" cy="120" r="28" fill="currentColor" />
-                  <circle cx="300" cy="280" r="28" fill="currentColor" />
-                </svg>
+              {/* Photorealistic 3D Golden Film Reel Asset (Far Right Accent) */}
+              <div className="absolute -right-10 sm:-right-16 md:-right-20 top-1/2 -translate-y-1/2 w-[300px] sm:w-[400px] md:w-[480px] lg:w-[540px] pointer-events-none z-20">
+                <img
+                  src="/images/golden_film_reel.jpg"
+                  alt="Golden Film Reel"
+                  className="w-full h-auto object-contain mix-blend-screen drop-shadow-[0_0_60px_rgba(245,158,11,0.4)]"
+                />
               </div>
 
               {/* 3D Large-Scale Poster Collage Container */}
-              <div className="relative w-full max-w-[650px] lg:max-w-[720px] h-[400px] sm:h-[480px] md:h-[540px] lg:h-[580px] flex items-center justify-center">
+              <div className="relative w-full max-w-[680px] lg:max-w-[760px] h-[420px] sm:h-[500px] md:h-[560px] lg:h-[600px] flex items-center justify-center">
                 
-                {/* Golden Film Strip Ribbon along the bottom */}
-                <div className="absolute -bottom-4 left-0 right-0 h-16 bg-gradient-to-r from-amber-600/20 via-amber-500/30 to-amber-600/20 border-y-2 border-amber-500/40 transform -rotate-3 z-30 pointer-events-none flex items-center overflow-hidden">
-                  <div className="flex gap-2 w-full px-2 opacity-60">
-                    {[...Array(24)].map((_, i) => (
-                      <div key={i} className="w-6 h-8 bg-black/80 rounded-sm border border-amber-500/30 shrink-0" />
-                    ))}
-                  </div>
+                {/* Photorealistic 3D Golden Film Strip Ribbon along the bottom */}
+                <div className="absolute -bottom-8 left-0 right-0 h-[120px] sm:h-[150px] md:h-[180px] z-40 pointer-events-none overflow-hidden">
+                  <img
+                    src="/images/golden_film_strip.jpg"
+                    alt="Golden Film Strip"
+                    className="w-full h-full object-cover mix-blend-screen opacity-90 drop-shadow-[0_0_40px_rgba(245,158,11,0.5)]"
+                  />
                 </div>
 
-                {/* 2-Tier Large Poster Grid */}
+                {/* 2-Tier Large Poster Grid matching reference layout */}
                 {headerPosters.length > 0 ? (
                   <div className="relative w-full h-full">
                     {headerPosters.slice(0, 9).map((posterUrl, idx) => {
-                      // Custom positions & scale for each poster card (Row 1 Top, Row 2 Bottom)
+                      // Positions & tilts carefully arranged to match the reference image collage
                       const cardStyles = [
-                        // Row 1 (Top Level)
-                        { pos: 'left-[2%] sm:left-[4%] top-[2%] sm:top-[4%]', rotate: '-rotate-12', z: 'z-10' },
-                        { pos: 'left-[20%] sm:left-[22%] top-[0%]', rotate: '-rotate-6', z: 'z-20' },
-                        { pos: 'left-[38%] sm:left-[40%] top-[-2%]', rotate: 'rotate-0', z: 'z-30' },
-                        { pos: 'left-[56%] sm:left-[58%] top-[0%]', rotate: 'rotate-6', z: 'z-20' },
-                        { pos: 'left-[74%] sm:left-[76%] top-[2%] sm:top-[4%]', rotate: 'rotate-12', z: 'z-10' },
-                        // Row 2 (Bottom Level - Overlapping)
-                        { pos: 'left-[12%] sm:left-[14%] top-[42%] sm:top-[44%]', rotate: '-rotate-6', z: 'z-25' },
-                        { pos: 'left-[30%] sm:left-[32%] top-[44%] sm:top-[46%]', rotate: 'rotate-0', z: 'z-35' },
-                        { pos: 'left-[48%] sm:left-[50%] top-[44%] sm:top-[46%]', rotate: 'rotate-6', z: 'z-35' },
-                        { pos: 'left-[66%] sm:left-[68%] top-[42%] sm:top-[44%]', rotate: 'rotate-12', z: 'z-25' },
+                        // Row 1 (Top / Upper Level)
+                        { pos: 'left-[2%] sm:left-[3%] top-[4%] sm:top-[5%]', rotate: 'rotate-3', z: 'z-10' },
+                        { pos: 'left-[18%] sm:left-[20%] top-[2%] sm:top-[3%]', rotate: 'rotate-6', z: 'z-15' },
+                        { pos: 'left-[35%] sm:left-[37%] top-[0%]', rotate: 'rotate-6', z: 'z-20' },
+                        { pos: 'left-[52%] sm:left-[54%] top-[2%] sm:top-[3%]', rotate: 'rotate-8', z: 'z-15' },
+                        { pos: 'left-[68%] sm:left-[70%] top-[5%] sm:top-[6%]', rotate: 'rotate-10', z: 'z-10' },
+                        // Row 2 (Bottom / Front Level - Overlapping Upward)
+                        { pos: 'left-[10%] sm:left-[12%] top-[46%] sm:top-[48%]', rotate: 'rotate-4', z: 'z-30' },
+                        { pos: 'left-[27%] sm:left-[29%] top-[48%] sm:top-[50%]', rotate: 'rotate-6', z: 'z-35' },
+                        { pos: 'left-[44%] sm:left-[46%] top-[48%] sm:top-[50%]', rotate: 'rotate-8', z: 'z-35' },
+                        { pos: 'left-[61%] sm:left-[63%] top-[46%] sm:top-[48%]', rotate: 'rotate-10', z: 'z-30' },
                       ];
 
                       const style = cardStyles[idx % cardStyles.length];
@@ -214,7 +210,7 @@ export default function WatchPlatform() {
                       return (
                         <div
                           key={idx}
-                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-32 sm:w-40 md:w-48 lg:w-52 h-48 sm:h-60 md:h-72 lg:h-78 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.9)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-115 hover:z-50 hover:shadow-amber-500/30 hover:border-amber-400`}
+                          className={`absolute ${style.pos} ${style.rotate} ${style.z} w-32 sm:w-40 md:w-48 lg:w-54 h-48 sm:h-60 md:h-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden border-2 border-amber-500/30 shadow-[0_25px_60px_rgba(0,0,0,0.95)] transition-all duration-500 ease-out hover:rotate-0 hover:scale-120 hover:z-50 hover:shadow-amber-500/40 hover:border-amber-400`}
                         >
                           <img
                             src={posterUrl}
@@ -222,8 +218,8 @@ export default function WatchPlatform() {
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
-                          {/* Inner gradient reflection */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-white/10 pointer-events-none" />
+                          {/* Inner gold shimmer overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-amber-500/10 pointer-events-none" />
                         </div>
                       );
                     })}
