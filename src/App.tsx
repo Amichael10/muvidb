@@ -14,16 +14,25 @@ import Home from './pages/Home';
 // stale chunk reference after a deploy (or a dropped mobile request) is the
 // classic cause of a blank page that a manual reload "fixes" — this does that
 // reload automatically, guarded so it can never loop.
+let chunkReloadInProgress = false;
+
 function lazyWithRetry(factory: () => Promise<{ default: ComponentType<any> }>) {
   return lazy(() =>
     factory().catch((err) => {
       const key = 'chunk-reload-ts';
       const last = Number(sessionStorage.getItem(key) || 0);
       if (Date.now() - last > 10000) {
+        // Several route chunks can fail together after a deployment (the admin
+        // layout and its index page, for example). Once one failure schedules a
+        // reload, keep every concurrent import suspended instead of allowing a
+        // second failure to reach the global error boundary first.
+        if (chunkReloadInProgress) return new Promise<never>(() => {});
+        chunkReloadInProgress = true;
         sessionStorage.setItem(key, String(Date.now()));
         window.location.reload();
         return new Promise<never>(() => {}); // stay suspended through the reload
       }
+      if (chunkReloadInProgress) return new Promise<never>(() => {});
       throw err; // reloaded recently already — let the error boundary show
     })
   );
