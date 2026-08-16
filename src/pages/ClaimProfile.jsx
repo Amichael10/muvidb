@@ -29,6 +29,8 @@ export default function ClaimProfile() {
   const [searchMode, setSearchMode] = useState('name');
   const [filmResults, setFilmResults] = useState([]);
   const [selectedFilm, setSelectedFilm] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [filmCreditsLoading, setFilmCreditsLoading] = useState(false);
   const [person, setPerson] = useState(null);
   const [platform, setPlatform] = useState('');
   const [socialUrl, setSocialUrl] = useState('');
@@ -58,34 +60,65 @@ export default function ClaimProfile() {
 
   useEffect(() => {
     if (query.trim().length < 2 || person || selectedFilm) {
+      setSearching(false);
       if (!selectedFilm) { setResults([]); setFilmResults([]); }
       return;
     }
+    let cancelled = false;
+    setSearching(true);
     const timer = setTimeout(async () => {
-      if (searchMode === 'name') {
-        const rows = await searchPeopleByName(query.trim(), { limit: 8, select: '*' });
-        setResults(rows || []);
-        setFilmResults([]);
-      } else {
-        const { data } = await supabase.from('films').select('id,title,year,poster_url').ilike('title', `%${query.trim()}%`).order('year', { ascending: false }).limit(8);
-        setFilmResults(data || []);
-        setResults([]);
+      try {
+        if (searchMode === 'name') {
+          const rows = await searchPeopleByName(query.trim(), { limit: 8, select: '*' });
+          if (!cancelled) {
+            setResults(rows || []);
+            setFilmResults([]);
+          }
+        } else {
+          const { data, error } = await supabase.from('films').select('id,title,year,poster_url').ilike('title', `%${query.trim()}%`).order('year', { ascending: false }).limit(8);
+          if (error) throw error;
+          if (!cancelled) {
+            setFilmResults(data || []);
+            setResults([]);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setResults([]);
+          setFilmResults([]);
+          toast.error('Search could not be completed. Please try again.');
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
       }
     }, 250);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [query, person, searchMode, selectedFilm]);
 
   const chooseFilm = async (film) => {
     setSelectedFilm(film);
     setFilmResults([]);
-    const response = await fetch(`/api/content?resource=film-credits&filmId=${encodeURIComponent(film.id)}`);
-    const body = response.ok ? await response.json() : { credits: [] };
-    const seen = new Set();
-    setResults((body.credits || []).map((credit) => credit.people).filter((row) => {
-      if (!row?.id || seen.has(row.id)) return false;
-      seen.add(row.id);
-      return true;
-    }));
+    setResults([]);
+    setFilmCreditsLoading(true);
+    try {
+      const response = await fetch(`/api/content?resource=film-credits&filmId=${encodeURIComponent(film.id)}`);
+      if (!response.ok) throw new Error('Unable to load film credits');
+      const body = await response.json();
+      const seen = new Set();
+      setResults((body.credits || []).map((credit) => credit.people).filter((row) => {
+        if (!row?.id || seen.has(row.id)) return false;
+        seen.add(row.id);
+        return true;
+      }));
+    } catch (error) {
+      setResults([]);
+      toast.error('The cast and crew could not be loaded. Please try again.');
+    } finally {
+      setFilmCreditsLoading(false);
+    }
   };
 
   const knownSocials = useMemo(() => {
@@ -179,18 +212,21 @@ export default function ClaimProfile() {
               <button type="button" onClick={() => { setSearchMode('film'); setSelectedFilm(null); setQuery(''); setResults([]); }} className={`rounded-lg py-3 text-xs font-black ${searchMode === 'film' ? 'bg-brand text-white' : 'text-text-muted'}`}>Find me through a film</button>
             </div>
             <label htmlFor="claim-person-search" className="mt-6 block text-xs font-bold text-text-primary">{searchMode === 'name' ? 'Search your professional name' : selectedFilm ? `Choose yourself from ${selectedFilm.title}` : 'Search for a film you worked on'}</label>
-            {!selectedFilm && <input id="claim-person-search" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder={searchMode === 'name' ? 'Start typing your name…' : 'Start typing a film title…'} className="mt-3 w-full rounded-xl border border-border bg-surface-2 px-5 py-4 text-sm text-text-primary outline-none focus:border-brand" />}
-            {selectedFilm && <div className="mt-3 flex items-center gap-3 rounded-xl border border-brand bg-brand/5 p-4"><img src={selectedFilm.poster_url || '/images/film-placeholder.webp'} alt="" className="h-14 w-10 rounded object-cover" /><div><strong className="text-sm text-text-primary">{selectedFilm.title}</strong><p className="text-xs text-text-muted">{selectedFilm.year || 'Year unknown'}</p></div><button type="button" onClick={() => { setSelectedFilm(null); setResults([]); setQuery(''); }} className="ml-auto text-xs font-bold text-brand">Change film</button></div>}
-            {filmResults.length > 0 && <div className="mt-5 grid gap-3 sm:grid-cols-2">{filmResults.map((film) => <button type="button" key={film.id} onClick={() => chooseFilm(film)} className="flex items-center gap-4 rounded-xl border border-border p-4 text-left hover:border-brand"><img src={film.poster_url || '/images/film-placeholder.webp'} alt="" className="h-14 w-10 rounded object-cover" /><span><strong className="block text-sm text-text-primary">{film.title}</strong><small className="text-text-muted">{film.year || 'Year unknown'}</small></span></button>)}</div>}
+            {!selectedFilm && <div className="relative mt-3"><input id="claim-person-search" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder={searchMode === 'name' ? 'Start typing your name…' : 'Start typing a film title…'} aria-describedby="claim-search-status" className="w-full rounded-xl border border-border bg-surface-2 px-5 py-4 pr-14 text-sm text-text-primary outline-none focus:border-brand" />{searching && <Icon icon="solar:spinner-linear" width="22" className="absolute right-5 top-1/2 -translate-y-1/2 animate-spin text-brand" />}</div>}
+            <div id="claim-search-status" role="status" aria-live="polite" className="sr-only">{searching ? (searchMode === 'name' ? 'Searching professional profiles' : 'Searching films') : ''}</div>
+            {selectedFilm && <div className="mt-3 flex items-center gap-3 rounded-xl border border-brand bg-brand/5 p-4"><img src={selectedFilm.poster_url || '/images/film-placeholder.webp'} alt="" className="h-14 w-10 rounded object-cover" /><div><strong className="text-sm text-text-primary">{selectedFilm.title}</strong><p className="text-xs text-text-muted">{filmCreditsLoading ? 'Loading cast and crew…' : (selectedFilm.year || 'Year unknown')}</p></div><button type="button" disabled={filmCreditsLoading} onClick={() => { setSelectedFilm(null); setResults([]); setQuery(''); }} className="ml-auto text-xs font-bold text-brand disabled:opacity-50">Change film</button></div>}
+            {searching && <div className="mt-5 grid gap-3 sm:grid-cols-2" aria-hidden="true">{[0, 1, 2, 3].map((item) => <div key={item} className="flex animate-pulse items-center gap-4 rounded-xl border border-border p-4"><div className="h-14 w-12 rounded-xl bg-surface-2" /><div className="flex-1"><div className="h-3 w-2/3 rounded bg-surface-2" /><div className="mt-2 h-2.5 w-1/3 rounded bg-surface-2" /></div></div>)}</div>}
+            {!searching && filmResults.length > 0 && <div className="mt-5 grid gap-3 sm:grid-cols-2">{filmResults.map((film) => <button type="button" key={film.id} onClick={() => chooseFilm(film)} className="flex items-center gap-4 rounded-xl border border-border p-4 text-left hover:border-brand"><img src={film.poster_url || '/images/film-placeholder.webp'} alt="" className="h-14 w-10 rounded object-cover" /><span><strong className="block text-sm text-text-primary">{film.title}</strong><small className="text-text-muted">{film.year || 'Year unknown'}</small></span></button>)}</div>}
+            {filmCreditsLoading && <div className="mt-5 flex items-center justify-center gap-3 rounded-xl border border-border bg-surface-2 p-8 text-sm font-bold text-text-muted" role="status"><Icon icon="solar:spinner-linear" width="22" className="animate-spin text-brand" />Loading cast and crew…</div>}
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {results.map((row) => (
+              {!searching && !filmCreditsLoading && results.map((row) => (
                 <button key={row.id} onClick={() => setPerson(row)} className="flex items-center gap-4 rounded-xl border border-border p-4 text-left hover:border-brand">
                   <img src={row.photo_url || '/images/person-placeholder.png'} alt="" className="h-14 w-14 rounded-xl object-cover" />
                   <span><strong className="block text-sm text-text-primary">{row.name}</strong><small className="text-text-muted">{row.known_for_department || 'Film professional'}</small></span>
                 </button>
               ))}
             </div>
-            {selectedFilm && results.length === 0 && <p className="mt-5 rounded-xl bg-surface-2 p-5 text-sm text-text-muted">No cast or crew records were found for this film. Try searching your name instead.</p>}
+            {selectedFilm && !filmCreditsLoading && results.length === 0 && <p className="mt-5 rounded-xl bg-surface-2 p-5 text-sm text-text-muted">No cast or crew records were found for this film. Try searching your name instead.</p>}
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-6 rounded-2xl border border-border bg-surface p-7 md:p-9">

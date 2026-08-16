@@ -55,7 +55,7 @@ export default function AdminLayout() {
     { path: '/admin/critics', label: 'Film Critics', icon: 'solar:chat-round-bold-linear' },
     { path: '/admin/plays', label: 'Theatre Plays', icon: 'solar:mask-hamsa-linear' },
     { path: '/admin/countries', label: 'Countries', icon: 'solar:global-linear' },
-    { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear', badge: isSuperAdmin ? pendingCount : 0 },
+    { path: '/admin/cinema-films', label: 'Cinema Films', icon: 'solar:ticket-linear', badge: isSuperAdmin ? cinemaCount : 0 },
     { path: '/admin/cinema-scraping', label: 'Scraping', icon: 'solar:refresh-linear' },
     { path: '/admin/logs', label: 'Activity Logs', icon: 'solar:history-linear' },
     { path: '/admin/deduplicator', label: 'Deduplicator', icon: 'solar:radar-2-linear' },
