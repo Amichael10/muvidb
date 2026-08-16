@@ -3,6 +3,7 @@ import { getCorsHeaders } from './cors.js';
 import { supabase } from './supabase.js';
 import { sendActorClaimApprovedEmail } from './actor_claim_email.js';
 import { notifyActorClaimSubmission } from './actor_claim_notify.js';
+import { generateProfessionalCvPdf } from './professional_cv_pdf.js';
 
 function cors(req: VercelRequest, res: VercelResponse) {
   const headers = getCorsHeaders(req);
@@ -44,6 +45,37 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
 
   try {
     const user = await authenticatedUser(req);
+    if (action === 'export-professional-cv') {
+      if (!user) return res.status(403).json({ error: 'Authentication required' });
+      const format = req.body?.format === 'detailed' ? 'detailed' : 'resume';
+      const { data: access, error: accessError } = await supabase.from('actor_profile_access')
+        .select('person_id,people(name,biography,nationality,known_for_department,profile_views,slug)')
+        .eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle();
+      if (accessError) throw accessError;
+      if (!access?.person_id) return res.status(403).json({ error: 'A verified professional profile is required' });
+      const [{ data: profile }, { data: credits, error: creditsError }] = await Promise.all([
+        supabase.from('users').select('email,professional_roles').eq('id', user.id).single(),
+        supabase.from('credits')
+          .select('role,character_name,films(title,year,view_count,average_rating)')
+          .eq('person_id', access.person_id),
+      ]);
+      if (creditsError) throw creditsError;
+      const person = Array.isArray(access.people) ? access.people[0] : access.people;
+      if (!person?.name) return res.status(400).json({ error: 'Professional profile is incomplete' });
+      const pdf = generateProfessionalCvPdf({
+        format,
+        person,
+        email: profile?.email || user.email,
+        professionalRoles: profile?.professional_roles || [],
+        credits: credits || [],
+      });
+      const filename = `${String(person.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'professional'}-${format}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      return res.status(200).send(pdf);
+    }
+
     if (action === 'submit-claim') {
       if (!user) return res.status(403).json({ error: 'Authentication required' });
       const personId = String(req.body?.personId || '').trim();

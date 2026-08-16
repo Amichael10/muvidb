@@ -5,6 +5,9 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { CAST_ROLE, CREW_ROLES, formatRole } from '../lib/creditRoles';
+import { authHeaders } from '../lib/apiAuth';
+import { formatViewCount } from '../utils/youtube';
+import { professionalRoleLabel } from '../lib/professionalRoles';
 
 const input = 'w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none focus:border-brand';
 
@@ -132,6 +135,7 @@ export default function ProDashboard() {
   const [credits, setCredits] = useState([]);
   const [requests, setRequests] = useState([]);
   const [adding, setAdding] = useState(false);
+  const [exporting, setExporting] = useState(null);
 
   const load = async () => {
     if (!user?.id) return;
@@ -173,13 +177,44 @@ export default function ProDashboard() {
     load();
   };
 
+  const exportCv = async (format) => {
+    setExporting(format);
+    try {
+      const response = await fetch('/api/actor-claims', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({ action: 'export-professional-cv', format }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Could not generate PDF');
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `${person.name}-${format}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`${format === 'resume' ? 'Resume' : 'Detailed CV'} downloaded.`);
+    } catch (error) {
+      toast.error(error.message || 'Could not generate PDF');
+    } finally {
+      setExporting(null);
+    }
+  };
+
   if (loading) return <main className="min-h-screen bg-bg px-6 pt-32"><div className="mx-auto h-48 max-w-5xl animate-pulse rounded-2xl bg-surface" /></main>;
 
   if (!access) {
     return (
       <main className="min-h-screen bg-bg px-4 pt-32 pb-20">
         <section className="mx-auto max-w-2xl rounded-2xl border border-border bg-surface p-8 text-center md:p-12">
-          {claim?.status === 'pending' ? <><Icon icon="solar:hourglass-line-bold" width="42" className="mx-auto text-brand" /><h1 className="mt-5 text-3xl font-black text-text-primary">Claim under review</h1><p className="mt-4 text-sm leading-7 text-text-muted">MuviDB will contact <strong className="text-text-primary">{claim.social_handle}</strong> on {claim.social_platform}. Current verification status: <strong className="text-text-primary">{String(claim.verification_status).replace('_', ' ')}</strong>.</p><div className="mx-auto mt-6 max-w-xs rounded-xl bg-surface-2 p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Verification code</p><p className="mt-1 font-mono text-2xl font-black text-brand">{claim.verification_code}</p></div></> : <><Icon icon="solar:user-check-linear" width="42" className="mx-auto text-brand" /><h1 className="mt-5 text-3xl font-black text-text-primary">Connect your actor profile</h1><p className="mt-4 text-sm leading-7 text-text-muted">Claim and verify your public actor record before requesting filmography changes.</p><Link to="/claim" className="mt-7 inline-flex rounded-xl bg-brand px-7 py-3 text-xs font-black text-white">Claim actor profile</Link></>}
+          {claim?.status === 'pending' ? <><Icon icon="solar:hourglass-line-bold" width="42" className="mx-auto text-brand" /><h1 className="mt-5 text-3xl font-black text-text-primary">Claim under review</h1><p className="mt-4 text-sm leading-7 text-text-muted">MuviDB will contact <strong className="text-text-primary">{claim.social_handle}</strong> on {claim.social_platform}. Current verification status: <strong className="text-text-primary">{String(claim.verification_status).replace('_', ' ')}</strong>.</p><div className="mx-auto mt-6 max-w-xs rounded-xl bg-surface-2 p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Verification code</p><p className="mt-1 font-mono text-2xl font-black text-brand">{claim.verification_code}</p></div><div className="mx-auto mt-6 max-w-md text-left text-xs text-text-muted"><p className="font-black text-text-primary">Progress</p><p className="mt-2">Submitted → Social contact → Confirmation → Admin approval</p></div></> : <><Icon icon="solar:user-check-linear" width="42" className="mx-auto text-brand" /><h1 className="mt-5 text-3xl font-black text-text-primary">Find your professional profile</h1><p className="mt-4 text-sm leading-7 text-text-muted">Search your name or find yourself through a film you worked on, then claim the matching public profile.</p><Link to="/claim" className="mt-7 inline-flex rounded-xl bg-brand px-7 py-3 text-xs font-black text-white">Find and claim my profile</Link></>}
         </section>
       </main>
     );
@@ -191,16 +226,18 @@ export default function ProDashboard() {
       <section className="mx-auto max-w-6xl">
         <header className="flex flex-col gap-6 rounded-2xl border border-border bg-surface p-7 md:flex-row md:items-center">
           <img src={person.photo_url || '/images/person-placeholder.png'} alt="" className="h-24 w-24 rounded-2xl object-cover" />
-          <div><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand">Verified actor workspace</p><h1 className="mt-2 text-3xl font-black text-text-primary">{person.name}</h1><p className="mt-2 text-sm text-text-muted">Submit filmography additions and removal requests. An admin reviews every change before it goes live.</p></div>
-          <div className="md:ml-auto"><button onClick={() => setAdding(true)} className="rounded-xl bg-brand px-6 py-3 text-xs font-black text-white"><Icon icon="solar:add-circle-bold" className="mr-2 inline" />Add credit</button></div>
+          <div><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand">Verified professional workspace</p><h1 className="mt-2 text-3xl font-black text-text-primary">{person.name}</h1><p className="mt-1 text-xs font-bold text-brand">{(user.professional_roles || ['actor']).map(professionalRoleLabel).join(' · ')}</p><p className="mt-2 text-sm text-text-muted">Submit filmography requests and export a verified professional resume. An admin reviews every catalogue change.</p></div>
+          <div className="flex flex-wrap gap-2 md:ml-auto"><button disabled={exporting} onClick={() => exportCv('resume')} className="rounded-xl border border-brand px-4 py-3 text-xs font-black text-brand disabled:opacity-50"><Icon icon="solar:file-download-linear" className="mr-2 inline" />{exporting === 'resume' ? 'Building…' : 'Resume PDF'}</button><button disabled={exporting} onClick={() => exportCv('detailed')} className="rounded-xl border border-border px-4 py-3 text-xs font-black text-text-primary disabled:opacity-50"><Icon icon="solar:documents-linear" className="mr-2 inline" />{exporting === 'detailed' ? 'Building…' : 'Detailed CV'}</button><button onClick={() => setAdding(true)} className="rounded-xl bg-brand px-5 py-3 text-xs font-black text-white"><Icon icon="solar:add-circle-bold" className="mr-2 inline" />Add credit</button></div>
         </header>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border border-border bg-surface p-5"><p className="text-[9px] font-black uppercase tracking-widest text-text-muted">Verified credits</p><p className="mt-2 text-2xl font-black text-text-primary">{credits.length}</p></div><div className="rounded-xl border border-border bg-surface p-5"><p className="text-[9px] font-black uppercase tracking-widest text-text-muted">Profile views</p><p className="mt-2 text-2xl font-black text-text-primary">{formatViewCount(person.profile_views || 0)}</p></div><div className="rounded-xl border border-border bg-surface p-5"><p className="text-[9px] font-black uppercase tracking-widest text-text-muted">Film catalogue views</p><p className="mt-2 text-2xl font-black text-text-primary">{formatViewCount(credits.reduce((sum, credit) => sum + (Number(credit.films?.view_count) || 0), 0))}</p></div></div>
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1.4fr_.8fr]">
           <section className="rounded-2xl border border-border bg-surface p-6">
             <div className="flex items-center justify-between"><h2 className="text-xl font-black text-text-primary">Published filmography</h2><span className="text-xs font-bold text-text-muted">{credits.length} credits</span></div>
             <div className="mt-5 space-y-3">
               {credits.length === 0 && <p className="rounded-xl bg-surface-2 p-6 text-sm text-text-muted">No published credits yet.</p>}
-              {credits.sort((a,b) => (b.films?.year || 0) - (a.films?.year || 0)).map((credit) => <div key={credit.id} className="flex items-center gap-4 rounded-xl border border-border p-4"><img src={credit.films?.poster_url || '/images/film-placeholder.webp'} alt="" className="h-16 w-12 rounded object-cover" /><div className="min-w-0"><Link to={`/films/${credit.films?.slug || credit.film_id}`} className="block truncate text-sm font-black text-text-primary hover:text-brand">{credit.films?.title || 'Unknown film'}</Link><p className="mt-1 text-xs text-text-muted">{formatRole(credit.role)}{credit.character_name ? ` · ${credit.character_name}` : ''} · {credit.films?.year || 'Year unknown'}</p></div><button disabled={pendingRemoval.has(credit.id)} onClick={() => requestRemoval(credit)} className="ml-auto rounded-lg border border-border px-3 py-2 text-[10px] font-black text-text-muted hover:border-red-500 hover:text-red-500 disabled:opacity-50">{pendingRemoval.has(credit.id) ? 'Removal pending' : 'Request removal'}</button></div>)}
+              {credits.sort((a,b) => (b.films?.year || 0) - (a.films?.year || 0)).map((credit) => <div key={credit.id} className="flex items-center gap-4 rounded-xl border border-border p-4"><img src={credit.films?.poster_url || '/images/film-placeholder.webp'} alt="" className="h-16 w-12 rounded object-cover" /><div className="min-w-0"><Link to={`/films/${credit.films?.slug || credit.film_id}`} className="block truncate text-sm font-black text-text-primary hover:text-brand">{credit.films?.title || 'Unknown film'}</Link><p className="mt-1 text-xs text-text-muted">{formatRole(credit.role)}{credit.character_name ? ` · ${credit.character_name}` : ''} · {credit.films?.year || 'Year unknown'}</p><p className="mt-1 text-[10px] font-bold text-brand">{formatViewCount(credit.films?.view_count || 0)} film views</p></div><button disabled={pendingRemoval.has(credit.id)} onClick={() => requestRemoval(credit)} className="ml-auto rounded-lg border border-border px-3 py-2 text-[10px] font-black text-text-muted hover:border-red-500 hover:text-red-500 disabled:opacity-50">{pendingRemoval.has(credit.id) ? 'Removal pending' : 'Request removal'}</button></div>)}
             </div>
           </section>
 

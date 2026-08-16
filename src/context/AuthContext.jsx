@@ -52,6 +52,7 @@ export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState({
     user: null,
     role: null,
+    profile: null,
     loading: true,
   });
 
@@ -125,7 +126,7 @@ export function AuthProvider({ children }) {
       // Check public.users table directly for the role
       const { data: profile, error } = await supabase
         .from('users')
-        .select('role')
+        .select('role,account_intent,professional_roles,professional_onboarding_status')
         .eq('id', authUser.id)
         .single();
       
@@ -148,6 +149,7 @@ export function AuthProvider({ children }) {
         ...prev,
         user: authUser,
         role: finalRole,
+        profile: profile || prev.profile || null,
         loading: false,
       }));
 
@@ -363,7 +365,7 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const signup = async (name, email, password, userRole, onboarded = false) => {
+  const signup = async (name, email, password, userRole, onboarded = false, extraMetadata = {}) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -371,7 +373,8 @@ export function AuthProvider({ children }) {
         data: {
           name,
           role: userRole,
-          onboarded: onboarded
+          onboarded: onboarded,
+          ...extraMetadata,
         }
       }
     });
@@ -412,7 +415,10 @@ export function AuthProvider({ children }) {
     email: user.email,
     avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
     role: role,
-    onboarded: user.user_metadata?.onboarded || (role && role !== 'new_user' && role !== 'admin') || role === 'admin'
+    account_intent: role === 'professional' ? 'professional' : (authState.profile?.account_intent || user.user_metadata?.account_intent || 'fan'),
+    professional_roles: authState.profile?.professional_roles?.length ? authState.profile.professional_roles : (user.user_metadata?.professional_roles || []),
+    professional_onboarding_status: authState.profile?.professional_onboarding_status || 'not_started',
+    onboarded: user.user_metadata?.onboarded || (role && role !== 'new_user' && role !== 'admin' && role !== 'professional') || role === 'admin'
   } : null;
 
   const value = {

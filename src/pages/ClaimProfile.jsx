@@ -21,11 +21,14 @@ function handleFromUrl(value = '') {
 }
 
 export default function ClaimProfile() {
-  const { user } = useAuth();
+  const { user, updateUserProfile } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [searchMode, setSearchMode] = useState('name');
+  const [filmResults, setFilmResults] = useState([]);
+  const [selectedFilm, setSelectedFilm] = useState(null);
   const [person, setPerson] = useState(null);
   const [platform, setPlatform] = useState('');
   const [socialUrl, setSocialUrl] = useState('');
@@ -54,13 +57,36 @@ export default function ClaimProfile() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (query.trim().length < 3 || person) return setResults([]);
+    if (query.trim().length < 2 || person || selectedFilm) {
+      if (!selectedFilm) { setResults([]); setFilmResults([]); }
+      return;
+    }
     const timer = setTimeout(async () => {
-      const rows = await searchPeopleByName(query.trim(), { limit: 8, select: '*' });
-      setResults(rows || []);
+      if (searchMode === 'name') {
+        const rows = await searchPeopleByName(query.trim(), { limit: 8, select: '*' });
+        setResults(rows || []);
+        setFilmResults([]);
+      } else {
+        const { data } = await supabase.from('films').select('id,title,year,poster_url').ilike('title', `%${query.trim()}%`).order('year', { ascending: false }).limit(8);
+        setFilmResults(data || []);
+        setResults([]);
+      }
     }, 250);
     return () => clearTimeout(timer);
-  }, [query, person]);
+  }, [query, person, searchMode, selectedFilm]);
+
+  const chooseFilm = async (film) => {
+    setSelectedFilm(film);
+    setFilmResults([]);
+    const response = await fetch(`/api/content?resource=film-credits&filmId=${encodeURIComponent(film.id)}`);
+    const body = response.ok ? await response.json() : { credits: [] };
+    const seen = new Set();
+    setResults((body.credits || []).map((credit) => credit.people).filter((row) => {
+      if (!row?.id || seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    }));
+  };
 
   const knownSocials = useMemo(() => {
     if (!person) return [];
@@ -102,6 +128,14 @@ export default function ClaimProfile() {
     setSubmitting(false);
     if (error) return toast.error(error.message.includes('policy') ? 'This profile cannot be claimed with the supplied details.' : error.message);
     setSubmitted(data);
+    if (user.role !== 'professional') {
+      await updateUserProfile({
+        role: 'professional',
+        account_intent: 'professional',
+        professional_roles: [...new Set([...(user.professional_roles || []), 'actor'])],
+        onboarded: true,
+      }).catch((profileError) => console.warn('Claim submitted; professional session refresh is pending:', profileError));
+    }
   };
 
   if (submitted) {
@@ -140,8 +174,14 @@ export default function ClaimProfile() {
 
         {!person ? (
           <div className="rounded-2xl border border-border bg-surface p-7">
-            <label htmlFor="claim-person-search" className="text-xs font-bold text-text-primary">Search your professional name</label>
-            <input id="claim-person-search" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder="Start typing your name…" className="mt-3 w-full rounded-xl border border-border bg-surface-2 px-5 py-4 text-sm text-text-primary outline-none focus:border-brand" />
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface-2 p-1.5">
+              <button type="button" onClick={() => { setSearchMode('name'); setSelectedFilm(null); setQuery(''); setResults([]); }} className={`rounded-lg py-3 text-xs font-black ${searchMode === 'name' ? 'bg-brand text-white' : 'text-text-muted'}`}>Search my name</button>
+              <button type="button" onClick={() => { setSearchMode('film'); setSelectedFilm(null); setQuery(''); setResults([]); }} className={`rounded-lg py-3 text-xs font-black ${searchMode === 'film' ? 'bg-brand text-white' : 'text-text-muted'}`}>Find me through a film</button>
+            </div>
+            <label htmlFor="claim-person-search" className="mt-6 block text-xs font-bold text-text-primary">{searchMode === 'name' ? 'Search your professional name' : selectedFilm ? `Choose yourself from ${selectedFilm.title}` : 'Search for a film you worked on'}</label>
+            {!selectedFilm && <input id="claim-person-search" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus placeholder={searchMode === 'name' ? 'Start typing your name…' : 'Start typing a film title…'} className="mt-3 w-full rounded-xl border border-border bg-surface-2 px-5 py-4 text-sm text-text-primary outline-none focus:border-brand" />}
+            {selectedFilm && <div className="mt-3 flex items-center gap-3 rounded-xl border border-brand bg-brand/5 p-4"><img src={selectedFilm.poster_url || '/images/film-placeholder.webp'} alt="" className="h-14 w-10 rounded object-cover" /><div><strong className="text-sm text-text-primary">{selectedFilm.title}</strong><p className="text-xs text-text-muted">{selectedFilm.year || 'Year unknown'}</p></div><button type="button" onClick={() => { setSelectedFilm(null); setResults([]); setQuery(''); }} className="ml-auto text-xs font-bold text-brand">Change film</button></div>}
+            {filmResults.length > 0 && <div className="mt-5 grid gap-3 sm:grid-cols-2">{filmResults.map((film) => <button type="button" key={film.id} onClick={() => chooseFilm(film)} className="flex items-center gap-4 rounded-xl border border-border p-4 text-left hover:border-brand"><img src={film.poster_url || '/images/film-placeholder.webp'} alt="" className="h-14 w-10 rounded object-cover" /><span><strong className="block text-sm text-text-primary">{film.title}</strong><small className="text-text-muted">{film.year || 'Year unknown'}</small></span></button>)}</div>}
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {results.map((row) => (
                 <button key={row.id} onClick={() => setPerson(row)} className="flex items-center gap-4 rounded-xl border border-border p-4 text-left hover:border-brand">
@@ -150,6 +190,7 @@ export default function ClaimProfile() {
                 </button>
               ))}
             </div>
+            {selectedFilm && results.length === 0 && <p className="mt-5 rounded-xl bg-surface-2 p-5 text-sm text-text-muted">No cast or crew records were found for this film. Try searching your name instead.</p>}
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-6 rounded-2xl border border-border bg-surface p-7 md:p-9">

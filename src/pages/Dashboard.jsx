@@ -98,6 +98,7 @@ export default function Dashboard() {
   const [following, setFollowing] = useState([]);
   const [followFilms, setFollowFilms] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [professionalClaim, setProfessionalClaim] = useState(null);
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [editBody, setEditBody] = useState('');
   const [editRating, setEditRating] = useState(0);
@@ -156,7 +157,7 @@ export default function Dashboard() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [wlRes, followRes, revRes] = await Promise.all([
+      const [wlRes, followRes, revRes, claimRes] = await Promise.all([
         supabase
           .from('watchlist')
           .select('film_id, watched, watched_at, added_at, films(*)')
@@ -171,7 +172,11 @@ export default function Dashboard() {
           .select('*, films(*)')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false }),
+        supabase.from('profile_claims')
+          .select('id,status,verification_status,verification_code,created_at,people!profile_claims_person_id_fkey(name,slug)')
+          .eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ]);
+      setProfessionalClaim(claimRes.data || null);
 
       if (wlRes.data) {
         const rows = wlRes.data
@@ -477,6 +482,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="animate-in fade-in duration-500">
+              {professionalClaim ? <Link to="/pro-dashboard" className="mb-8 flex flex-col gap-4 rounded-2xl border border-brand/30 bg-brand/5 p-5 transition-colors hover:border-brand sm:flex-row sm:items-center"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-white"><Icon icon="solar:verified-check-linear" width="22" /></div><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-brand">Professional profile claim</p><h2 className="mt-1 truncate text-lg font-bold text-text-primary">{professionalClaim.people?.name || 'Professional profile'}</h2><p className="mt-1 text-xs text-text-muted">Status: {String(professionalClaim.verification_status).replaceAll('_', ' ')} · Reference {String(professionalClaim.id).slice(0, 8).toUpperCase()}</p></div><span className="sm:ml-auto text-xs font-black text-brand">Track progress →</span></Link> : <Link to="/claim" className="mb-8 flex items-center gap-4 rounded-2xl border border-border bg-surface p-5 hover:border-brand"><Icon icon="solar:clapperboard-text-linear" className="text-brand" width="26" /><div><p className="text-sm font-bold text-text-primary">Do you work in film?</p><p className="mt-1 text-xs text-text-muted">Find and claim your professional profile without creating another account.</p></div><span className="ml-auto text-xs font-black text-brand">Get started</span></Link>}
               {/* WATCHLIST */}
               {activeTab === 'watchlist' && (
                 <div className="space-y-8">

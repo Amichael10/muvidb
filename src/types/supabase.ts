@@ -4411,6 +4411,7 @@ export type Database = {
       }
       users: {
         Row: {
+          account_intent: string
           avatar_url: string | null
           created_at: string
           email: string
@@ -4419,10 +4420,13 @@ export type Database = {
           last_sign_in_at: string | null
           linked_profile_id: string | null
           name: string
+          professional_onboarding_status: string
+          professional_roles: string[]
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
         Insert: {
+          account_intent?: string
           avatar_url?: string | null
           created_at?: string
           email: string
@@ -4431,10 +4435,13 @@ export type Database = {
           last_sign_in_at?: string | null
           linked_profile_id?: string | null
           name: string
+          professional_onboarding_status?: string
+          professional_roles?: string[]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
         Update: {
+          account_intent?: string
           avatar_url?: string | null
           created_at?: string
           email?: string
@@ -4443,6 +4450,8 @@ export type Database = {
           last_sign_in_at?: string | null
           linked_profile_id?: string | null
           name?: string
+          professional_onboarding_status?: string
+          professional_roles?: string[]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
@@ -5169,6 +5178,30 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "credit_harvest_control"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_professional_preferences: {
+        Args: { p_roles: string[] }
+        Returns: {
+          account_intent: string
+          avatar_url: string | null
+          created_at: string
+          email: string
+          id: string
+          is_banned: boolean | null
+          last_sign_in_at: string | null
+          linked_profile_id: string | null
+          name: string
+          professional_onboarding_status: string
+          professional_roles: string[]
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "users"
           isOneToOne: true
           isSetofReturn: false
         }

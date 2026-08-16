@@ -7,6 +7,8 @@ const testState = vi.hoisted(() => ({
   updates: [] as Array<{ table: string; patch: Record<string, unknown> }>,
   inserts: [] as Array<{ table: string; row: Record<string, unknown> }>,
   pendingClaimIds: [] as string[],
+  cvAccess: null as any,
+  cvCredits: [] as any[],
 }));
 
 const rpcMock = vi.hoisted(() => vi.fn());
@@ -32,7 +34,7 @@ vi.mock('./supabase.js', () => {
         return chain;
       }),
       single: vi.fn(async () => {
-        if (table === 'users') return { data: { role: testState.role }, error: null };
+        if (table === 'users') return { data: { role: testState.role, email: 'actor@example.test', professional_roles: ['actor'] }, error: null };
         if (table === 'profile_claims') {
           if (testState.inserts.some((item) => item.table === 'profile_claims')) {
             return { data: { id: 'new-claim-id', status: 'pending', verification_status: 'awaiting_contact', verification_code: 'ABC123' }, error: null };
@@ -41,8 +43,9 @@ vi.mock('./supabase.js', () => {
         }
         return { data: null, error: null };
       }),
+      maybeSingle: vi.fn(async () => ({ data: table === 'actor_profile_access' ? testState.cvAccess : null, error: null })),
       then: (resolve: (value: unknown) => void) => resolve({
-        data: table === 'profile_claims' ? testState.pendingClaimIds.map((id) => ({ id })) : null,
+        data: table === 'profile_claims' ? testState.pendingClaimIds.map((id) => ({ id })) : table === 'credits' ? testState.cvCredits : null,
         error: null,
       }),
     };
@@ -80,6 +83,7 @@ function response() {
   result.setHeader = vi.fn((name: string, value: string) => { result.headers[name] = value; });
   result.status = vi.fn((code: number) => { result.statusCode = code; return result; });
   result.json = vi.fn((body: unknown) => { result.body = body; return result; });
+  result.send = vi.fn((body: unknown) => { result.body = body; return result; });
   result.end = vi.fn(() => result);
   return result;
 }
@@ -93,6 +97,8 @@ describe('actor claims admin handler', () => {
     testState.updates.length = 0;
     testState.inserts.length = 0;
     testState.pendingClaimIds.length = 0;
+    testState.cvAccess = null;
+    testState.cvCredits.length = 0;
     getUserMock.mockImplementation(async () => testState.authenticated
       ? { data: { user: { id: 'admin-id' } }, error: null }
       : { data: { user: null }, error: new Error('invalid token') });
@@ -171,6 +177,29 @@ describe('actor claims admin handler', () => {
     expect(res.statusCode).toBe(200);
     expect(notifyClaimMock).toHaveBeenCalledWith('claim-one');
     expect(notifyClaimMock).toHaveBeenCalledWith('claim-two');
+  });
+
+  it('requires verified profile access before exporting a professional CV', async () => {
+    const res = response();
+    await handleActorClaims(request({ action: 'export-professional-cv', format: 'resume' }), res);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.error).toMatch(/verified professional profile/i);
+  });
+
+  it('exports a private PDF for the verified profile owner', async () => {
+    testState.cvAccess = {
+      person_id: 'person-id',
+      people: { name: 'Ada Actor', biography: 'Professional biography.', nationality: 'Nigerian', known_for_department: 'Acting', profile_views: 500, slug: 'ada-actor' },
+    };
+    testState.cvCredits.push({ role: 'actor', character_name: 'Ada', films: { title: 'Example Film', year: 2026, view_count: 2500, average_rating: 7.2 } });
+    const res = response();
+    await handleActorClaims(request({ action: 'export-professional-cv', format: 'resume' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Content-Type']).toBe('application/pdf');
+    expect(res.headers['Cache-Control']).toBe('private, no-store');
+    expect(Buffer.isBuffer(res.body)).toBe(true);
+    expect(res.body.toString('ascii')).toContain('%PDF-1.4');
   });
 
   it('approves a verified claim, sends email, and records delivery', async () => {
