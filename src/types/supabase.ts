@@ -3058,6 +3058,8 @@ export type Database = {
           social_platform: string | null
           social_url: string | null
           status: Database["public"]["Enums"]["claim_status"]
+          telegram_notification_error: string | null
+          telegram_notified_at: string | null
           user_id: string
           verification_code: string
           verification_status: string
@@ -3078,6 +3080,8 @@ export type Database = {
           social_platform?: string | null
           social_url?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
+          telegram_notification_error?: string | null
+          telegram_notified_at?: string | null
           user_id: string
           verification_code?: string
           verification_status?: string
@@ -3098,6 +3102,8 @@ export type Database = {
           social_platform?: string | null
           social_url?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
+          telegram_notification_error?: string | null
+          telegram_notified_at?: string | null
           user_id?: string
           verification_code?: string
           verification_status?: string

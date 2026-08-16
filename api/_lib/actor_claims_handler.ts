@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCorsHeaders } from './cors.js';
 import { supabase } from './supabase.js';
 import { sendActorClaimApprovedEmail } from './actor_claim_email.js';
+import { notifyActorClaimSubmission } from './actor_claim_notify.js';
 
 function cors(req: VercelRequest, res: VercelResponse) {
   const headers = getCorsHeaders(req);
@@ -11,14 +12,19 @@ function cors(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Vary', 'Origin');
 }
 
-async function fullAdmin(req: VercelRequest) {
+async function authenticatedUser(req: VercelRequest) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return null;
   const token = header.slice(7).trim();
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) return null;
-  const { data: profile } = await supabase.from('users').select('role').eq('id', data.user.id).single();
-  return profile?.role === 'admin' ? data.user : null;
+  return data.user;
+}
+
+async function fullAdmin(user: { id: string } | null) {
+  if (!user) return null;
+  const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+  return profile?.role === 'admin' ? user : null;
 }
 
 function dashboardUrl() {
@@ -32,15 +38,28 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const admin = await fullAdmin(req);
-  if (!admin) return res.status(403).json({ error: 'Full admin access required' });
-
   const action = String(req.body?.action || '');
   const id = String(req.body?.id || '');
   const note = typeof req.body?.note === 'string' ? req.body.note.trim() : null;
   if (!id) return res.status(400).json({ error: 'Request id is required' });
 
   try {
+    const user = await authenticatedUser(req);
+    if (action === 'notify-new-claim') {
+      if (!user) return res.status(403).json({ error: 'Authentication required' });
+      const notification = await notifyActorClaimSubmission(id, { expectedUserId: user.id });
+      return res.status(200).json({ success: true, notification });
+    }
+
+    const admin = await fullAdmin(user);
+    if (!admin) return res.status(403).json({ error: 'Full admin access required' });
+
+    if (action === 'retry-claim-telegram') {
+      const notification = await notifyActorClaimSubmission(id, { force: true });
+      if (!notification.ok) return res.status(502).json({ error: notification.error });
+      return res.status(200).json({ success: true, notification });
+    }
+
     if (action === 'mark-contacted' || action === 'mark-confirmed') {
       const patch = action === 'mark-contacted'
         ? { verification_status: 'contacted', contacted_at: new Date().toISOString(), reviewer_note: note }
@@ -99,14 +118,14 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
 
     if (action === 'retry-approval-email') {
       const { data: claim, error: claimError } = await supabase.from('profile_claims')
-        .select('id,status,verification_status,approval_email_sent_at,users(name,email),people(name)')
+        .select('id,status,verification_status,approval_email_sent_at,claimant:users!profile_claims_user_id_fkey(name,email),people!profile_claims_person_id_fkey(name)')
         .eq('id', id).single();
       if (claimError) throw claimError;
       if (claim.status !== 'approved' || claim.verification_status !== 'verified') {
         return res.status(400).json({ error: 'Only verified claims can receive an approval email' });
       }
       if (claim.approval_email_sent_at) return res.status(200).json({ success: true, email: { sent: true, skipped: true } });
-      const user = Array.isArray(claim.users) ? claim.users[0] : claim.users;
+      const user = Array.isArray(claim.claimant) ? claim.claimant[0] : claim.claimant;
       const person = Array.isArray(claim.people) ? claim.people[0] : claim.people;
       if (!user?.email || !person?.name) return res.status(400).json({ error: 'Claim email details are incomplete' });
       const result = await sendActorClaimApprovedEmail({ email: user.email, userName: user.name, personName: person.name, dashboardUrl: dashboardUrl() });

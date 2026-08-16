@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { searchPeopleByName } from '../lib/peopleSearch';
+import { authHeaders } from '../lib/apiAuth';
 
 const SOCIALS = [
   ['instagram', 'Instagram', 'instagram_url'],
@@ -90,6 +91,14 @@ export default function ClaimProfile() {
     setSubmitting(false);
     if (error) return toast.error(error.message.includes('policy') ? 'This profile cannot be claimed with the supplied details.' : error.message);
     setSubmitted(data);
+    void authHeaders()
+      .then((headers) => fetch('/api/actor-claims', {
+        method: 'POST',
+        headers,
+        keepalive: true,
+        body: JSON.stringify({ action: 'notify-new-claim', id: data.id }),
+      }))
+      .catch((notificationError) => console.warn('Claim submitted; admin alert could not be sent:', notificationError));
   };
 
   if (submitted) {

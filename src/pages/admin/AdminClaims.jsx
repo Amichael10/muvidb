@@ -13,7 +13,7 @@ export default function AdminClaims() {
   const load = async () => {
     setLoading(true);
     const { data, error } = await supabase.from('profile_claims')
-      .select('*,users(name,email,avatar_url),people(name,slug,photo_url,is_verified,claimed_by)')
+      .select('*,claimant:users!profile_claims_user_id_fkey(name,email,avatar_url),people!profile_claims_person_id_fkey(name,slug,photo_url,is_verified,claimed_by)')
       .or('status.eq.pending,and(status.eq.approved,verification_status.eq.verified,approval_email_sent_at.is.null)')
       .order('created_at', { ascending: true });
     if (error) toast.error(error.message);
@@ -33,7 +33,8 @@ export default function AdminClaims() {
     if (!response.ok) return toast.error(body.error || 'Action failed');
     if (action === 'approve-claim') {
       toast.success(body.email?.sent ? 'Claim approved and verification email sent.' : 'Claim approved. Email delivery needs attention.');
-    } else toast.success('Claim updated.');
+    } else if (action === 'retry-claim-telegram') toast.success('Telegram alert sent.');
+    else toast.success('Claim updated.');
     load();
   };
 
@@ -54,13 +55,16 @@ export default function AdminClaims() {
           <div className="grid gap-7 lg:grid-cols-[180px_1fr_260px]">
             <div className="text-center"><img src={claim.people?.photo_url || '/images/person-placeholder.png'} alt="" className="mx-auto h-24 w-24 rounded-2xl object-cover" /><h2 className="mt-3 font-black text-text-primary">{claim.people?.name || 'Unknown actor'}</h2><Link to={`/people/${claim.people?.slug || claim.person_id}`} target="_blank" className="mt-2 inline-block text-xs font-bold text-brand">View profile</Link></div>
             <div className="space-y-4 border-y border-border py-6 lg:border-x lg:border-y-0 lg:px-7 lg:py-0">
-              <div><p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Claimant</p><p className="mt-1 text-sm font-black text-text-primary">{claim.users?.name}</p><p className="text-xs text-text-muted">{claim.users?.email}</p></div>
+              <div><p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Claimant</p><p className="mt-1 text-sm font-black text-text-primary">{claim.claimant?.name}</p><p className="text-xs text-text-muted">{claim.claimant?.email}</p></div>
               <div className="rounded-xl bg-surface-2 p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Contact on {claim.social_platform}</p><a href={claim.social_url} target="_blank" rel="noreferrer" className="mt-1 block text-sm font-black text-brand">{claim.social_handle}</a></div><Icon icon="solar:chat-round-line-bold" width="26" className="text-brand" /></div></div>
               <div className="grid grid-cols-2 gap-3"><div className="rounded-xl border border-border p-3"><p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Claim reference</p><p className="mt-1 font-mono font-black text-text-primary">{reference}</p></div><div className="rounded-xl border border-border p-3"><p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Code</p><p className="mt-1 font-mono text-lg font-black text-brand">{claim.verification_code}</p></div></div>
               {claim.note && <blockquote className="border-l-2 border-brand pl-4 text-xs leading-6 text-text-muted">{claim.note}</blockquote>}
             </div>
             <div className="flex flex-col justify-center gap-3">
               <div className="mb-2 rounded-xl border border-border bg-surface-2 p-3"><p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Verification state</p><p className="mt-1 text-sm font-black capitalize text-text-primary">{claim.verification_status.replace('_', ' ')}</p></div>
+              {claim.telegram_notified_at && <p className="text-center text-[10px] font-bold text-green-500">Telegram alert sent</p>}
+              {claim.status === 'pending' && !claim.telegram_notified_at && <button disabled={busy === claim.id} onClick={() => act(claim, 'retry-claim-telegram')} className="rounded-xl border border-sky-500 py-3 text-xs font-black text-sky-400">Send Telegram alert</button>}
+              {claim.status === 'pending' && claim.telegram_notification_error && !claim.telegram_notified_at && <p className="rounded-lg bg-red-500/10 p-2 text-[10px] text-red-400">Last Telegram attempt: {claim.telegram_notification_error}</p>}
               {claim.status === 'approved' && !claim.approval_email_sent_at && <button disabled={busy === claim.id} onClick={() => act(claim, 'retry-approval-email')} className="rounded-xl bg-brand py-3 text-xs font-black text-white">Retry approval email</button>}
               {claim.status === 'pending' && claim.verification_status === 'awaiting_contact' && <button disabled={busy === claim.id} onClick={() => act(claim, 'mark-contacted', `Contacted ${claim.social_handle} on ${claim.social_platform}.`)} className="rounded-xl border border-brand py-3 text-xs font-black text-brand">Mark contacted</button>}
               {claim.verification_status === 'contacted' && <button disabled={busy === claim.id} onClick={() => act(claim, 'mark-confirmed', `Confirmation received from ${claim.social_handle}.`)} className="rounded-xl border border-green-500 py-3 text-xs font-black text-green-500">Mark reply confirmed</button>}

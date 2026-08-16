@@ -10,6 +10,7 @@ const testState = vi.hoisted(() => ({
 const rpcMock = vi.hoisted(() => vi.fn());
 const getUserMock = vi.hoisted(() => vi.fn());
 const sendEmailMock = vi.hoisted(() => vi.fn());
+const notifyClaimMock = vi.hoisted(() => vi.fn());
 
 vi.mock('./supabase.js', () => {
   const from = vi.fn((table: string) => {
@@ -45,6 +46,10 @@ vi.mock('./actor_claim_email.js', () => ({
   sendActorClaimApprovedEmail: sendEmailMock,
 }));
 
+vi.mock('./actor_claim_notify.js', () => ({
+  notifyActorClaimSubmission: notifyClaimMock,
+}));
+
 import { handleActorClaims } from './actor_claims_handler.js';
 
 function request(body: Record<string, unknown>, authorization = 'Bearer valid-token') {
@@ -76,6 +81,7 @@ describe('actor claims admin handler', () => {
       : { data: { user: null }, error: new Error('invalid token') });
     rpcMock.mockResolvedValue({ data: null, error: null });
     sendEmailMock.mockResolvedValue({ ok: true, emailId: 'email-id' });
+    notifyClaimMock.mockResolvedValue({ ok: true, skipped: false, messageId: 123 });
   });
 
   it('rejects requests without a valid bearer session', async () => {
@@ -92,6 +98,24 @@ describe('actor claims admin handler', () => {
     await handleActorClaims(request({ action: 'approve-claim', id: 'claim-id' }), res);
     expect(res.statusCode).toBe(403);
     expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it('allows an authenticated actor to notify only for their own submitted claim', async () => {
+    testState.role = 'fan';
+    getUserMock.mockResolvedValue({ data: { user: { id: 'actor-id' } }, error: null });
+    const res = response();
+    await handleActorClaims(request({ action: 'notify-new-claim', id: 'claim-id' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(notifyClaimMock).toHaveBeenCalledWith('claim-id', { expectedUserId: 'actor-id' });
+  });
+
+  it('allows a full admin to retry a failed Telegram claim alert', async () => {
+    const res = response();
+    await handleActorClaims(request({ action: 'retry-claim-telegram', id: 'claim-id' }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(notifyClaimMock).toHaveBeenCalledWith('claim-id', { force: true });
   });
 
   it('approves a verified claim, sends email, and records delivery', async () => {
