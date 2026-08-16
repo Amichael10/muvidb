@@ -46,6 +46,7 @@ export default function AdminLayout() {
     { path: '/admin/credits/harvest', label: 'Credit Harvest', icon: 'solar:magnifer-zoom-in-linear' },
     { path: '/admin/companies', label: 'Companies', icon: 'solar:buildings-linear' },
     { path: '/admin/claims', label: 'Pending Claims', icon: 'solar:clipboard-list-linear' },
+    { path: '/admin/actor-credits', label: 'Actor Credit Requests', icon: 'solar:clapperboard-edit-linear' },
     { path: '/admin/outreach', label: 'Artist Outreach', icon: 'solar:chat-round-line-linear' },
     { path: '/admin/contributions', label: 'Contributions', icon: 'solar:users-group-rounded-linear' },
     { path: '/admin/users', label: 'Users', icon: 'solar:users-group-two-rounded-linear' },

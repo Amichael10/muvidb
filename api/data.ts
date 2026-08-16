@@ -42,6 +42,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleAuthEmailSend } = await import('./_lib/auth_email_data.js');
       return handleAuthEmailSend(req, res);
     }
+    if (key === 'actor-claims') {
+      const { handleActorClaims } = await import('./_lib/actor_claims_handler.js');
+      return handleActorClaims(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {

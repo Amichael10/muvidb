@@ -754,6 +754,15 @@ const PersonDetail = () => {
                   {isFollowing ? 'Following' : 'Follow'}
                 </button>
 
+                {!person.claimed_by && (
+                  <Link
+                    to={`/claim?person=${encodeURIComponent(person.slug || person.id)}`}
+                    className="inline-flex min-h-[44px] flex-shrink-0 items-center rounded-lg border border-border bg-surface px-6 py-3 text-xs font-bold text-text-primary transition-all hover:border-brand hover:text-brand"
+                  >
+                    Claim this profile
+                  </Link>
+                )}
+
                 {getPersonYoutubeChannelUrl(person) && (
                   <a
                     href={getPersonYoutubeChannelUrl(person)}

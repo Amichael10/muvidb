@@ -58,8 +58,7 @@ export default [
   layout('routes/require-auth.tsx', [
     route('onboarding', 'pages/Onboarding.jsx'),
     route('dashboard', 'pages/Dashboard.jsx'),
-  ]),
-  layout('routes/require-pro.tsx', [
+    route('claim', 'pages/ClaimProfile.jsx'),
     route('pro-dashboard', 'pages/ProDashboard.jsx'),
   ]),
 
@@ -74,6 +73,7 @@ export default [
       route('credits/harvest', 'pages/admin/AdminCreditHarvest.jsx'),
       route('companies', 'pages/admin/AdminCompanies.jsx'),
       route('claims', 'pages/admin/AdminClaims.jsx'),
+      route('actor-credits', 'pages/admin/AdminActorCredits.jsx'),
       route('contributions', 'pages/admin/AdminContributions.jsx'),
       route('new-releases', 'pages/admin/AdminNewReleases.jsx'),
       route('users', 'pages/admin/AdminUsers.jsx'),

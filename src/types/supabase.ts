@@ -39,6 +39,206 @@ export type Database = {
   }
   public: {
     Tables: {
+      actor_credit_requests: {
+        Row: {
+          applied_credit_id: string | null
+          applied_film_id: string | null
+          character_name: string | null
+          created_at: string
+          credit_id: string | null
+          evidence_url: string | null
+          film_id: string | null
+          id: string
+          note: string | null
+          person_id: string
+          proposed_film: Json | null
+          rejection_reason: string | null
+          request_type: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_note: string | null
+          role: string | null
+          status: string
+          submitted_by: string
+          updated_at: string
+        }
+        Insert: {
+          applied_credit_id?: string | null
+          applied_film_id?: string | null
+          character_name?: string | null
+          created_at?: string
+          credit_id?: string | null
+          evidence_url?: string | null
+          film_id?: string | null
+          id?: string
+          note?: string | null
+          person_id: string
+          proposed_film?: Json | null
+          rejection_reason?: string | null
+          request_type: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          role?: string | null
+          status?: string
+          submitted_by: string
+          updated_at?: string
+        }
+        Update: {
+          applied_credit_id?: string | null
+          applied_film_id?: string | null
+          character_name?: string | null
+          created_at?: string
+          credit_id?: string | null
+          evidence_url?: string | null
+          film_id?: string | null
+          id?: string
+          note?: string | null
+          person_id?: string
+          proposed_film?: Json | null
+          rejection_reason?: string | null
+          request_type?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          role?: string | null
+          status?: string
+          submitted_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actor_credit_requests_applied_credit_id_fkey"
+            columns: ["applied_credit_id"]
+            isOneToOne: false
+            referencedRelation: "credits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_credit_requests_applied_film_id_fkey"
+            columns: ["applied_film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_credit_requests_credit_id_fkey"
+            columns: ["credit_id"]
+            isOneToOne: false
+            referencedRelation: "credits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_credit_requests_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_credit_requests_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_credit_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_credit_requests_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      actor_profile_access: {
+        Row: {
+          access_role: string
+          claim_id: string | null
+          created_at: string
+          granted_at: string
+          granted_by: string | null
+          id: string
+          person_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_role?: string
+          claim_id?: string | null
+          created_at?: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          person_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_role?: string
+          claim_id?: string | null
+          created_at?: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          person_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "actor_profile_access_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "profile_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_profile_access_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_profile_access_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_profile_access_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "actor_profile_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_actions: {
         Row: {
           action_type: string
@@ -1358,6 +1558,39 @@ export type Database = {
         }
         Relationships: []
       }
+      deletion_logs: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          entity_id: string | null
+          entity_name: string
+          entity_type: string
+          id: string
+          metadata: Json | null
+          reason: string | null
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          entity_id?: string | null
+          entity_name: string
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          entity_id?: string | null
+          entity_name?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       film_companies: {
         Row: {
           company_id: string
@@ -1612,6 +1845,7 @@ export type Database = {
           content_type: string | null
           countries: string[] | null
           created_at: string
+          distributor: string | null
           duration: number | null
           episode_count: number | null
           episode_number: number | null
@@ -1684,6 +1918,7 @@ export type Database = {
           content_type?: string | null
           countries?: string[] | null
           created_at?: string
+          distributor?: string | null
           duration?: number | null
           episode_count?: number | null
           episode_number?: number | null
@@ -1756,6 +1991,7 @@ export type Database = {
           content_type?: string | null
           countries?: string[] | null
           created_at?: string
+          distributor?: string | null
           duration?: number | null
           episode_count?: number | null
           episode_number?: number | null
@@ -2808,34 +3044,64 @@ export type Database = {
       }
       profile_claims: {
         Row: {
+          approval_email_sent_at: string | null
+          contacted_at: string | null
           created_at: string
           id: string
           note: string | null
           person_id: string
+          rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          reviewer_note: string | null
+          social_handle: string | null
+          social_platform: string | null
+          social_url: string | null
           status: Database["public"]["Enums"]["claim_status"]
           user_id: string
+          verification_code: string
+          verification_status: string
+          verified_at: string | null
         }
         Insert: {
+          approval_email_sent_at?: string | null
+          contacted_at?: string | null
           created_at?: string
           id?: string
           note?: string | null
           person_id: string
+          rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_note?: string | null
+          social_handle?: string | null
+          social_platform?: string | null
+          social_url?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
           user_id: string
+          verification_code?: string
+          verification_status?: string
+          verified_at?: string | null
         }
         Update: {
+          approval_email_sent_at?: string | null
+          contacted_at?: string | null
           created_at?: string
           id?: string
           note?: string | null
           person_id?: string
+          rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_note?: string | null
+          social_handle?: string | null
+          social_platform?: string | null
+          social_url?: string | null
           status?: Database["public"]["Enums"]["claim_status"]
           user_id?: string
+          verification_code?: string
+          verification_status?: string
+          verified_at?: string | null
         }
         Relationships: [
           {
@@ -3094,6 +3360,68 @@ export type Database = {
           },
         ]
       }
+      social_calendar: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          draft_id: string | null
+          id: string
+          notes: string | null
+          priority: string
+          scheduled_date: string
+          scheduled_time: string | null
+          selection_locked: boolean
+          series_id: string | null
+          source: string
+          status: Database["public"]["Enums"]["editorial_calendar_status"]
+          subject_entity_id: string | null
+          subject_entity_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          draft_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          scheduled_date: string
+          scheduled_time?: string | null
+          selection_locked?: boolean
+          series_id?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["editorial_calendar_status"]
+          subject_entity_id?: string | null
+          subject_entity_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          draft_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          scheduled_date?: string
+          scheduled_time?: string | null
+          selection_locked?: boolean
+          series_id?: string | null
+          source?: string
+          status?: Database["public"]["Enums"]["editorial_calendar_status"]
+          subject_entity_id?: string | null
+          subject_entity_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_calendar_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_connections: {
         Row: {
           connection_metadata: Json
@@ -3273,6 +3601,357 @@ export type Database = {
           },
         ]
       }
+      social_content_series: {
+        Row: {
+          active: boolean
+          category: string
+          config: Json
+          cooldown_days: number
+          created_at: string
+          default_frequency: string
+          description: string | null
+          figma_template_key: string | null
+          id: string
+          min_candidate_score: number
+          min_reviews: number
+          name: string
+          preferred_format: string
+          preferred_platforms: string[]
+          requires_photo: boolean
+          requires_poster: boolean
+          requires_reviews: boolean
+          requires_streaming: boolean
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category: string
+          config?: Json
+          cooldown_days?: number
+          created_at?: string
+          default_frequency?: string
+          description?: string | null
+          figma_template_key?: string | null
+          id?: string
+          min_candidate_score?: number
+          min_reviews?: number
+          name: string
+          preferred_format?: string
+          preferred_platforms?: string[]
+          requires_photo?: boolean
+          requires_poster?: boolean
+          requires_reviews?: boolean
+          requires_streaming?: boolean
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          config?: Json
+          cooldown_days?: number
+          created_at?: string
+          default_frequency?: string
+          description?: string | null
+          figma_template_key?: string | null
+          id?: string
+          min_candidate_score?: number
+          min_reviews?: number
+          name?: string
+          preferred_format?: string
+          preferred_platforms?: string[]
+          requires_photo?: boolean
+          requires_poster?: boolean
+          requires_reviews?: boolean
+          requires_streaming?: boolean
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      social_drafts: {
+        Row: {
+          ai_model: string | null
+          angle_id: string | null
+          angle_json: Json
+          approved_at: string | null
+          approved_by: string | null
+          calendar_id: string | null
+          candidate_score: number | null
+          caption_style: string | null
+          content_json: Json
+          created_at: string
+          created_by: string | null
+          edited_content_json: Json | null
+          editor_notes: string | null
+          entity_id: string
+          entity_type: string
+          fact_pack_json: Json
+          figma_template_key: string | null
+          id: string
+          prompt_version: string | null
+          published_at: string | null
+          selection_reason: Json
+          series_id: string | null
+          status: Database["public"]["Enums"]["editorial_draft_status"]
+          updated_at: string
+          validation_results: Json
+        }
+        Insert: {
+          ai_model?: string | null
+          angle_id?: string | null
+          angle_json?: Json
+          approved_at?: string | null
+          approved_by?: string | null
+          calendar_id?: string | null
+          candidate_score?: number | null
+          caption_style?: string | null
+          content_json?: Json
+          created_at?: string
+          created_by?: string | null
+          edited_content_json?: Json | null
+          editor_notes?: string | null
+          entity_id: string
+          entity_type: string
+          fact_pack_json?: Json
+          figma_template_key?: string | null
+          id?: string
+          prompt_version?: string | null
+          published_at?: string | null
+          selection_reason?: Json
+          series_id?: string | null
+          status?: Database["public"]["Enums"]["editorial_draft_status"]
+          updated_at?: string
+          validation_results?: Json
+        }
+        Update: {
+          ai_model?: string | null
+          angle_id?: string | null
+          angle_json?: Json
+          approved_at?: string | null
+          approved_by?: string | null
+          calendar_id?: string | null
+          candidate_score?: number | null
+          caption_style?: string | null
+          content_json?: Json
+          created_at?: string
+          created_by?: string | null
+          edited_content_json?: Json | null
+          editor_notes?: string | null
+          entity_id?: string
+          entity_type?: string
+          fact_pack_json?: Json
+          figma_template_key?: string | null
+          id?: string
+          prompt_version?: string | null
+          published_at?: string | null
+          selection_reason?: Json
+          series_id?: string | null
+          status?: Database["public"]["Enums"]["editorial_draft_status"]
+          updated_at?: string
+          validation_results?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_drafts_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "social_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_drafts_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_entity_history: {
+        Row: {
+          angle: string | null
+          calendar_id: string | null
+          caption_style: string | null
+          country: string | null
+          created_at: string
+          draft_id: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          metadata: Json
+          platforms: string[]
+          profession: string | null
+          published_at: string
+          series_id: string | null
+        }
+        Insert: {
+          angle?: string | null
+          calendar_id?: string | null
+          caption_style?: string | null
+          country?: string | null
+          created_at?: string
+          draft_id?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          metadata?: Json
+          platforms?: string[]
+          profession?: string | null
+          published_at?: string
+          series_id?: string | null
+        }
+        Update: {
+          angle?: string | null
+          calendar_id?: string | null
+          caption_style?: string | null
+          country?: string | null
+          created_at?: string
+          draft_id?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          platforms?: string[]
+          profession?: string | null
+          published_at?: string
+          series_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_entity_history_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "social_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_entity_history_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "social_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_entity_history_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "social_content_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_generation_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          input_tokens: number | null
+          latency_ms: number | null
+          model: string
+          output_tokens: number | null
+          prompt_version: number | null
+          provider: string
+          success: boolean
+          task_type: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model: string
+          output_tokens?: number | null
+          prompt_version?: number | null
+          provider?: string
+          success?: boolean
+          task_type: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model?: string
+          output_tokens?: number | null
+          prompt_version?: number | null
+          provider?: string
+          success?: boolean
+          task_type?: string
+        }
+        Relationships: []
+      }
+      social_news_events: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          description: string | null
+          detected_at: string
+          draft_id: string | null
+          entity_id: string | null
+          entity_type: string | null
+          event_date: string | null
+          event_type: string
+          id: string
+          metadata: Json
+          source_type: string
+          source_url: string | null
+          status: Database["public"]["Enums"]["editorial_event_status"]
+          title: string
+          updated_at: string
+          urgency: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          description?: string | null
+          detected_at?: string
+          draft_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          event_date?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json
+          source_type?: string
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["editorial_event_status"]
+          title: string
+          updated_at?: string
+          urgency?: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          description?: string | null
+          detected_at?: string
+          draft_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          event_date?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json
+          source_type?: string
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["editorial_event_status"]
+          title?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_news_events_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "social_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_platform_variants: {
         Row: {
           caption: string
@@ -3360,6 +4039,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      social_prompt_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          prompt: string
+          task_type: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          prompt: string
+          task_type: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          prompt?: string
+          task_type?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
       }
       social_publish_jobs: {
         Row: {
@@ -3933,6 +4645,10 @@ export type Database = {
         Args: { p_fields: string[]; p_queue_id: string; p_reviewer_id?: string }
         Returns: Json
       }
+      approve_actor_profile_claim: {
+        Args: { p_admin_id: string; p_claim_id: string }
+        Returns: Json
+      }
       approve_credit_candidate: {
         Args: {
           p_candidate_id: string
@@ -4053,6 +4769,7 @@ export type Database = {
           content_type: string | null
           countries: string[] | null
           created_at: string
+          distributor: string | null
           duration: number | null
           episode_count: number | null
           episode_number: number | null
@@ -4260,6 +4977,7 @@ export type Database = {
         }
         Returns: string
       }
+      purge_old_deletion_logs: { Args: never; Returns: number }
       reaction_liked_blend: {
         Args: { base_liked: number; dislikes: number; likes: number }
         Returns: number
@@ -4281,6 +4999,15 @@ export type Database = {
       reject_credit_metadata_candidate: {
         Args: { p_candidate_id: string }
         Returns: undefined
+      }
+      review_actor_credit_request: {
+        Args: {
+          p_admin_id: string
+          p_decision: string
+          p_note?: string
+          p_request_id: string
+        }
+        Returns: Json
       }
       review_people_enrichment_candidate: {
         Args: {
@@ -4316,6 +5043,7 @@ export type Database = {
           content_type: string | null
           countries: string[] | null
           created_at: string
+          distributor: string | null
           duration: number | null
           episode_count: number | null
           episode_number: number | null
@@ -4468,6 +5196,31 @@ export type Database = {
         | "editor"
         | "composer"
         | "costume_designer"
+      editorial_calendar_status:
+        | "planned"
+        | "selecting"
+        | "subject_selected"
+        | "draft_ready"
+        | "needs_review"
+        | "approved"
+        | "designed"
+        | "published"
+        | "skipped"
+        | "cancelled"
+      editorial_draft_status:
+        | "generating"
+        | "draft"
+        | "needs_review"
+        | "approved"
+        | "designed"
+        | "published"
+        | "rejected"
+      editorial_event_status:
+        | "new"
+        | "reviewed"
+        | "converted_to_draft"
+        | "ignored"
+        | "expired"
       film_status:
         | "released"
         | "upcoming"
@@ -4662,6 +5415,34 @@ export const Constants = {
         "editor",
         "composer",
         "costume_designer",
+      ],
+      editorial_calendar_status: [
+        "planned",
+        "selecting",
+        "subject_selected",
+        "draft_ready",
+        "needs_review",
+        "approved",
+        "designed",
+        "published",
+        "skipped",
+        "cancelled",
+      ],
+      editorial_draft_status: [
+        "generating",
+        "draft",
+        "needs_review",
+        "approved",
+        "designed",
+        "published",
+        "rejected",
+      ],
+      editorial_event_status: [
+        "new",
+        "reviewed",
+        "converted_to_draft",
+        "ignored",
+        "expired",
       ],
       film_status: [
         "released",

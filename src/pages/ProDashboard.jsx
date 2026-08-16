@@ -1,498 +1,219 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '@iconify/react';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { toast } from 'react-hot-toast';
-import { Skeleton } from '../components/ui/Skeleton';
+import { CAST_ROLE, CREW_ROLES, formatRole } from '../lib/creditRoles';
 
-export default function ProDashboard() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+const input = 'w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none focus:border-brand';
 
-  const [activeTab, setActiveTab] = useState('profile');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
-  const [claimState, setClaimState] = useState('unclaimed');
-  const [selectedPerson, setSelectedPerson] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const [stats, setStats] = useState({
-    filmStats: []
-  });
-
-  const [isEditingBio, setIsEditingBio] = useState(false);
-  const [editedBio, setEditedBio] = useState('');
-  const [isEditingPhoto, setIsEditingPhoto] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState('');
-
-  // New Profile Form
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newProfileData, setNewProfileData] = useState({
-    name: user?.name || '',
-    role: 'Actor',
-    bio: ''
+function StatusPill({ status }) {
+  const tone = status === 'approved' ? 'text-green-500 bg-green-500/10 border-green-500/20' : status === 'rejected' ? 'text-red-500 bg-red-500/10 border-red-500/20' : 'text-amber-500 bg-amber-500/10 border-amber-500/20';
+  return <span className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>{String(status).replace('_', ' ')}</span>;
+}
+function CreditRequestModal({ person, onClose, onSaved }) {
+  const { user } = useAuth();
+  const [mode, setMode] = useState('existing');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [film, setFilm] = useState(null);
+  const [kind, setKind] = useState('cast');
+  const [crewRole, setCrewRole] = useState(CREW_ROLES[0].value);
+  const [customRole, setCustomRole] = useState('');
+  const [characterName, setCharacterName] = useState('');
+  const [note, setNote] = useState('');
+  const [evidenceUrl, setEvidenceUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [newFilm, setNewFilm] = useState({
+    title: '', content_type: 'movie', year: new Date().getFullYear(), release_type: '',
+    synopsis: '', genres: '', runtime_minutes: '', language: 'English', countries: 'Nigeria',
+    release_date: '', nfvcb_rating: '', youtube_watch_url: '', trailer_youtube_id: '', poster_url: '',
   });
 
   useEffect(() => {
-    document.title = "MuviDB Pro | Dashboard";
-    if (user?.role === 'admin' || user?.role === 'admin_limited') {
-      navigate('/admin');
-      return;
-    }
+    if (mode !== 'existing' || query.trim().length < 2 || film) return setResults([]);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase.from('films').select('id,title,year,poster_url,content_type').ilike('title', `%${query.trim()}%`).order('year', { ascending: false }).limit(10);
+      setResults(data || []);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, film, mode]);
 
-    if (user?.id) {
-      checkClaimStatus();
-    }
-    
-    const hasSeenModal = localStorage.getItem('MuviDB_pro_welcome_seen');
-    if (!hasSeenModal && user?.role === 'professional' && !user.linked_profile_id) {
-      setShowWelcomeModal(true);
-    }
-  }, [user]);
+  const role = kind === 'cast' ? CAST_ROLE : (customRole.trim().toLowerCase() || crewRole);
+  const setField = (key, value) => setNewFilm((current) => ({ ...current, [key]: value }));
 
-  const checkClaimStatus = async () => {
-    setLoading(true);
-    try {
-      if (user.linked_profile_id) {
-        const { data: person } = await supabase
-          .from('people')
-          .select('*')
-          .eq('id', user.linked_profile_id)
-          .single();
-        
-        if (person) {
-          setSelectedPerson(person);
-          setClaimState('approved');
-          fetchProStats(person.id);
-        }
-      } else {
-        // Check if they created a profile that is pending verification
-        const { data: createdPerson } = await supabase
-          .from('people')
-          .select('*')
-          .eq('claimed_by', user.id)
-          .single();
-
-        if (createdPerson) {
-          setSelectedPerson(createdPerson);
-          setClaimState('pending');
-        }
-      }
-    } catch (err) {
-      console.error('Check claim error:', err);
-    } finally {
-      setLoading(false);
+  const submit = async (event) => {
+    event.preventDefault();
+    if (mode === 'existing' && !film) return toast.error('Select a film first.');
+    if (mode === 'new' && (!newFilm.title.trim() || !newFilm.release_type || !newFilm.countries.trim() || !evidenceUrl.trim())) {
+      return toast.error('Title, release type, country and a supporting source are required.');
     }
+    setSaving(true);
+    const proposed = mode === 'new' ? {
+      ...newFilm,
+      year: Number(newFilm.year),
+      runtime_minutes: newFilm.runtime_minutes ? Number(newFilm.runtime_minutes) : null,
+      genres: newFilm.genres.split(',').map((value) => value.trim()).filter(Boolean),
+      countries: newFilm.countries.split(',').map((value) => value.trim()).filter(Boolean),
+    } : null;
+    const { error } = await supabase.from('actor_credit_requests').insert({
+      submitted_by: user.id,
+      person_id: person.id,
+      request_type: mode === 'new' ? 'add_new_film' : 'add_existing',
+      film_id: mode === 'existing' ? film.id : null,
+      role,
+      character_name: kind === 'cast' ? characterName.trim() || null : null,
+      proposed_film: proposed,
+      note: note.trim() || null,
+      evidence_url: evidenceUrl.trim() || null,
+      status: 'submitted',
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success('Credit request submitted for review.');
+    onSaved();
+    onClose();
   };
-
-  const fetchProStats = async (personId) => {
-    try {
-      // Via our own endpoint rather than a direct `credits` read — see
-      // api/content.ts (keeps the cast graph from being bulk-scraped).
-      const res = await fetch(`/api/content?resource=person-credits&personId=${encodeURIComponent(personId)}`);
-      const credits = res.ok ? (await res.json()).credits : null;
-
-
-      if (credits) {
-        const filmsList = credits.map(c => c.films).filter(Boolean);
-        setStats({
-          filmStats: filmsList
-        });
-      }
-    } catch (err) {
-      console.error('Fetch stats error:', err);
-    }
-  };
-
-  const handleSaveBio = async () => {
-    if (!selectedPerson) return;
-    setIsSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from('people')
-        .update({ bio: editedBio })
-        .eq('id', selectedPerson.id);
-      
-      if (error) throw error;
-      
-      setSelectedPerson({ ...selectedPerson, bio: editedBio });
-      setIsEditingBio(false);
-      toast.success('Bio updated.');
-    } catch (err) {
-      toast.error('Failed to update bio.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCreateProfile = async () => {
-    if (!newProfileData.name || !newProfileData.bio) {
-        toast.error('Name and Bio are required.');
-        return;
-    }
-    setIsSubmitting(true);
-    try {
-      const { data: profileId, error } = await supabase.rpc('create_pro_profile', {
-        user_id: user.id,
-        pro_name: newProfileData.name,
-        pro_role: newProfileData.role,
-        pro_bio: newProfileData.bio
-      });
-
-      if (error) throw error;
-
-      toast.success('Profile created. Pending verification.');
-      setShowCreateModal(false);
-      checkClaimStatus();
-    } catch (err) {
-      console.error('Create profile error:', err);
-      toast.error('Failed to create profile.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const tabs = [
-    { id: 'profile', label: 'Profile', icon: 'solar:user-linear' },
-    { id: 'network', label: 'Network', icon: 'solar:users-group-rounded-linear' },
-    { id: 'projects', label: 'Projects', icon: 'solar:clapperboard-edit-linear' },
-    { id: 'stats', label: 'Insights', icon: 'solar:chart-linear' },
-    { id: 'settings', label: 'Settings', icon: 'solar:settings-linear' }
-  ];
 
   return (
-    <div className="min-h-screen bg-bg">
-      <div className="max-w-7xl mx-auto border-x border-border flex pt-20 min-h-screen">
-        <aside className="hidden md:flex w-72 border-r border-border flex-col justify-between py-12 shrink-0 bg-surface-2/5">
-          <nav className="space-y-2 px-6">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-xl text-xs font-bold transition-all duration-300 ${
-                  activeTab === tab.id ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-text-muted hover:text-brand hover:bg-surface border border-transparent hover:border-border'
-                }`}
-              >
-                <Icon icon={tab.icon} className="text-lg opacity-60" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-          <div className="px-8 py-6 border-t border-border mt-auto">
-             <p className="text-[10px] font-bold text-text-muted mb-4 uppercase tracking-wider">System status</p>
-             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                <span className="text-[10px] font-bold text-text-primary">Online</span>
-             </div>
-          </div>
-        </aside>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form onSubmit={submit} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 md:p-8">
+        <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-widest text-brand">Filmography request</p><h2 className="mt-2 text-2xl font-black text-text-primary">Add a credit for {person.name}</h2></div><button type="button" onClick={onClose} className="text-text-muted"><Icon icon="solar:close-circle-linear" width="26" /></button></div>
 
-        <main className="flex-1 p-8 md:p-16 relative">
-          {loading ? (
-             <div className="space-y-12">
-                {/* Profile Header Skeleton */}
-                <div className="flex items-end justify-between border-b border-border pb-6 animate-shimmer">
-                    <div className="h-10 w-64 bg-surface-2 rounded-lg"></div>
-                    <div className="h-4 w-24 bg-surface-2 rounded-md"></div>
-                </div>
-
-                {/* Profile Card Skeleton */}
-                <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col md:flex-row gap-10 animate-shimmer">
-                    <div className="w-40 h-40 rounded-2xl bg-surface-2 shrink-0"></div>
-                    <div className="space-y-6 flex-1">
-                        <div className="space-y-2">
-                            <div className="h-10 w-1/2 bg-surface-2 rounded-lg"></div>
-                            <div className="h-4 w-24 bg-surface-2 rounded-md"></div>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="h-4 w-full bg-surface-2 rounded-md"></div>
-                            <div className="h-4 w-full bg-surface-2 rounded-md"></div>
-                            <div className="h-4 w-2/3 bg-surface-2 rounded-md"></div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stats Grid Skeleton */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-shimmer">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="bg-surface border border-border p-8 rounded-2xl space-y-4">
-                            <div className="h-3 w-20 bg-surface-2 rounded-md"></div>
-                            <div className="h-10 w-16 bg-surface-2 rounded-lg"></div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-          ) : (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-              {activeTab === 'profile' && (
-                <div className="space-y-12">
-                   {claimState === 'unclaimed' && (
-                      <div className="max-w-2xl mx-auto space-y-12 py-12 text-center">
-                        <div className="w-20 h-20 bg-surface border border-border rounded-2xl flex items-center justify-center mx-auto shadow-xl">
-                          <Icon icon="solar:lock-password-linear" className="text-4xl text-text-muted opacity-40" />
-                        </div>
-                        <div className="space-y-4">
-                          <h2 className="text-4xl font-bold text-text-primary tracking-tight">Connect profile</h2>
-                          <p className="text-sm font-medium text-text-muted max-w-sm mx-auto leading-relaxed">To manage your filmography and career statistics, you must connect your account to a professional profile.</p>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                          <Link to="/claim" className="inline-block bg-brand text-white py-4 px-10 rounded-xl text-xs font-bold hover:scale-[1.02] transition-all shadow-lg shadow-brand/20">Connect profile</Link>
-                          <button 
-                            onClick={() => setShowCreateModal(true)} 
-                            className="inline-block bg-surface-2 text-text-primary py-4 px-10 rounded-xl text-xs font-bold hover:border-brand border border-border transition-all"
-                          >
-                            Create profile
-                          </button>
-                        </div>
-                      </div>
-                   )}
-                   {claimState === 'pending' && selectedPerson && (
-                      <div className="space-y-12">
-                         <div className="bg-brand/5 border border-brand/20 rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-8">
-                            <div className="flex items-center gap-6">
-                               <div className="w-14 h-14 bg-brand/10 text-brand rounded-xl flex items-center justify-center text-2xl">
-                                 <Icon icon="solar:history-linear" />
-                               </div>
-                               <div className="space-y-1">
-                                  <h2 className="text-2xl font-bold text-text-primary tracking-tight">Under review</h2>
-                                  <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Your profile is being reviewed by the administration.</p>
-                                </div>
-                            </div>
-                            <div className="px-5 py-2 bg-brand/10 border border-brand/20 rounded-lg text-[10px] font-bold text-brand uppercase tracking-wider">Estimated time: 24 hours</div>
-                         </div>
-                         <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col md:flex-row gap-10 opacity-60">
-                            <div className="w-40 h-40 rounded-2xl overflow-hidden border-4 border-surface-2 shadow-xl shrink-0">
-                               <img src={selectedPerson.photo_url || selectedPerson.photo || 'https://via.placeholder.com/300'} alt={selectedPerson.name} className="w-full h-full object-cover grayscale" />
-                            </div>
-                            <div className="space-y-6">
-                               <div className="space-y-2">
-                                 <h1 className="text-4xl font-bold text-text-primary tracking-tight">{selectedPerson.name}</h1>
-                                 <p className="text-brand text-xs font-bold uppercase tracking-wider">{selectedPerson.role || 'FILMMAKER'}</p>
-                               </div>
-                               <p className="text-text-muted text-sm leading-relaxed border-l-2 border-brand/20 pl-6 italic">"{selectedPerson.bio}"</p>
-                            </div>
-                         </div>
-                      </div>
-                   )}
-                   {claimState === 'approved' && selectedPerson && (
-                      <div className="space-y-12">
-                         <div className="flex items-end justify-between border-b border-border pb-6">
-                            <h2 className="text-3xl font-bold text-text-primary tracking-tight">Professional profile</h2>
-                            <button onClick={() => { setEditedBio(selectedPerson.bio); setIsEditingBio(true); }} className="text-[10px] font-bold text-brand uppercase tracking-wider hover:underline">Edit bio</button>
-                         </div>
-                         <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col md:flex-row gap-10">
-                            <div className="relative group shrink-0">
-                               <div className="w-40 h-40 rounded-2xl overflow-hidden border-4 border-surface-2 shadow-xl">
-                                  <img src={selectedPerson.photo_url || selectedPerson.photo} alt={selectedPerson.name} className="w-full h-full object-cover" />
-                               </div>
-                               <button onClick={() => { setPhotoUrl(selectedPerson.photo_url || selectedPerson.photo); setIsEditingPhoto(true); }} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
-                                 <span className="text-[10px] font-bold text-white uppercase tracking-wider">Update photo</span>
-                               </button>
-                            </div>
-                            <div className="space-y-6">
-                               <div className="space-y-2">
-                                 <h1 className="text-4xl font-bold text-text-primary tracking-tight">{selectedPerson.name}</h1>
-                                 <p className="text-brand text-xs font-bold uppercase tracking-wider">{selectedPerson.role || 'FILMMAKER'}</p>
-                               </div>
-                               <p className="text-text-muted text-sm leading-relaxed border-l-2 border-brand/20 pl-6 italic">"{selectedPerson.bio}"</p>
-                            </div>
-                         </div>
-                      </div>
-                   )}
-                </div>
-              )}
-
-              {activeTab === 'network' && (
-                <div className="space-y-12">
-                   <h2 className="text-3xl font-bold text-text-primary tracking-tight border-b border-border pb-6">Network</h2>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-surface border border-border rounded-2xl p-8 space-y-4 group hover:border-brand transition-all cursor-pointer">
-                         <div className="flex items-center justify-between">
-                           <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Producers</h3>
-                           <span className="text-[9px] font-bold text-brand uppercase tracking-wider">Coming soon</span>
-                         </div>
-                         <p className="text-xs text-text-muted leading-relaxed opacity-60">Connect with production houses and independent executive producers for collaboration.</p>
-                      </div>
-                      <div className="bg-surface border border-border rounded-2xl p-8 space-y-4 group hover:border-brand transition-all cursor-pointer">
-                         <div className="flex items-center justify-between">
-                           <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Guild directory</h3>
-                           <span className="text-[9px] font-bold text-brand uppercase tracking-wider">Coming soon</span>
-                         </div>
-                         <p className="text-xs text-text-muted leading-relaxed opacity-60">Official contact channels for AGN, DGN, and other technical Nollywood guilds.</p>
-                      </div>
-                   </div>
-                   <div className="bg-surface-2/10 border border-border rounded-2xl p-12 text-center space-y-6">
-                      <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider opacity-40">Contact information is exclusive to verified accounts.</p>
-                      <button className="bg-surface border border-border py-3 px-8 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:border-brand transition-all">View updates</button>
-                   </div>
-                </div>
-              )}
-
-              {activeTab === 'projects' && (
-                <div className="space-y-12">
-                   <div className="flex items-end justify-between border-b border-border pb-6">
-                     <h2 className="text-3xl font-bold text-text-primary tracking-tight">Project board</h2>
-                     <button className="bg-brand text-white py-3 px-6 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:scale-[1.02] transition-all">Post project</button>
-                   </div>
-                   <div className="grid grid-cols-1 gap-6">
-                      <div className="bg-surface border border-border rounded-xl p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                         <div className="space-y-2">
-                           <span className="text-[8px] font-bold bg-brand/10 text-brand px-2 py-0.5 rounded uppercase tracking-wider">Development</span>
-                           <h3 className="text-lg font-bold text-text-primary">Untitled project</h3>
-                           <p className="text-xs font-medium text-text-muted">Looking for: Cinematographer, Lead actress</p>
-                         </div>
-                         <button className="text-[10px] font-bold text-brand uppercase tracking-wider border border-brand/20 px-6 py-2 rounded-lg hover:bg-brand hover:text-white transition-all">Apply</button>
-                      </div>
-                   </div>
-                </div>
-              )}
-
-              {activeTab === 'stats' && (
-                <div className="space-y-12">
-                  <h2 className="text-3xl font-bold text-text-primary tracking-tight border-b border-border pb-6">Insights</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-surface border border-border p-8 rounded-2xl">
-                      <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-4 opacity-60">Total reach</p>
-                      <p className="text-4xl font-bold text-brand">N/A</p>
-                    </div>
-                    <div className="bg-surface border border-border p-8 rounded-2xl">
-                      <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-4 opacity-60">Active credits</p>
-                      <p className="text-4xl font-bold text-text-primary">{stats.filmStats.length}</p>
-                    </div>
-                    <div className="bg-surface border border-border p-8 rounded-2xl">
-                      <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-4 opacity-60">Impact score</p>
-                      <p className="text-4xl font-bold text-text-primary">N/A</p>
-                    </div>
-                  </div>
-                  <div className="bg-surface border border-border rounded-2xl p-10 space-y-8">
-                    <h3 className="text-2xl font-bold text-text-primary tracking-tight">Market trends</h3>
-                    <div className="h-64 bg-bg rounded-xl border border-border flex items-center justify-center relative overflow-hidden">
-                      <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider opacity-40">Performance tracking coming soon...</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'settings' && (
-                <div className="space-y-12">
-                   <h2 className="text-3xl font-bold text-text-primary tracking-tight border-b border-border pb-6">Settings</h2>
-                   <div className="bg-surface border border-border rounded-2xl p-8 max-w-2xl space-y-8">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider opacity-60">Full name</label>
-                        <input type="text" defaultValue={user?.name} className="w-full bg-bg border border-border text-text-primary rounded-xl px-6 py-4 text-sm font-medium focus:border-brand transition-all outline-none" />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider opacity-60">Email address</label>
-                        <input type="email" defaultValue={user?.email} disabled className="w-full bg-surface-2 border border-border text-text-muted rounded-xl px-6 py-4 text-sm font-medium opacity-50 outline-none" />
-                      </div>
-                      <button className="bg-brand text-white py-4 px-10 rounded-xl text-xs font-bold hover:scale-[1.02] transition-all shadow-lg shadow-brand/20">Save changes</button>
-                   </div>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
-
-      {isEditingBio && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-bg/90 backdrop-blur-xl" onClick={() => setIsEditingBio(false)}></div>
-          <div className="bg-surface border border-border rounded-3xl p-10 max-w-2xl w-full relative z-10 space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold text-text-primary tracking-tight">Edit bio</h2>
-              <p className="text-xs font-medium text-text-muted opacity-60">Update your professional description.</p>
-            </div>
-            <textarea value={editedBio} onChange={(e) => setEditedBio(e.target.value)} className="w-full h-64 bg-surface-2/50 border border-border text-text-primary rounded-xl p-6 text-sm leading-relaxed focus:border-brand focus:outline-none transition-all resize-none" placeholder="Write your professional bio..." />
-            <div className="flex gap-4">
-              <button onClick={() => setIsEditingBio(false)} className="flex-1 bg-surface-2 text-text-primary py-4 rounded-xl text-xs font-bold hover:bg-border transition-all">Cancel</button>
-              <button onClick={handleSaveBio} disabled={isSubmitting} className="flex-1 bg-brand text-white py-4 rounded-xl text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20 disabled:opacity-50">
-                {isSubmitting ? 'Saving...' : 'Save changes'}
-              </button>
-            </div>
-          </div>
+        <div className="mt-7 grid grid-cols-2 gap-2 rounded-xl bg-surface-2 p-1.5">
+          <button type="button" onClick={() => setMode('existing')} className={`rounded-lg py-3 text-xs font-black ${mode === 'existing' ? 'bg-brand text-white' : 'text-text-muted'}`}>Existing film</button>
+          <button type="button" onClick={() => setMode('new')} className={`rounded-lg py-3 text-xs font-black ${mode === 'new' ? 'bg-brand text-white' : 'text-text-muted'}`}>Film is missing</button>
         </div>
-      )}
 
-      {isEditingPhoto && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-bg/90 backdrop-blur-xl" onClick={() => setIsEditingPhoto(false)}></div>
-          <div className="bg-surface border border-border rounded-3xl p-12 max-w-lg w-full relative z-10 space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
-            <div className="space-y-2"><h2 className="font-heading font-bold text-4xl text-text-primary tracking-tighter">Profile Photo</h2><p className="text-[10px] font-bold text-text-muted opacity-60">Provide a high-quality URL for your headshot.</p></div>
-            <div className="space-y-4">
-              <div className="w-32 h-32 mx-auto rounded-2xl overflow-hidden border-2 border-border"><img src={photoUrl || 'https://via.placeholder.com/150'} alt="Preview" className="w-full h-full object-cover" /></div>
-              <input type="text" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-xs font-bold focus:border-brand focus:outline-none transition-all" placeholder="https://example.com/photo.jpg" />
-            </div>
-            <div className="flex gap-4"><button onClick={() => setIsEditingPhoto(false)} className="flex-1 bg-surface-2 text-text-primary py-4 rounded-xl text-xs font-bold hover:bg-border transition-all">Cancel</button><button onClick={handleSavePhoto} disabled={isSubmitting} className="flex-1 bg-brand text-white py-4 rounded-xl text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20 disabled:opacity-50">{isSubmitting ? 'Updating...' : 'Update Photo'}</button></div>
+        {mode === 'existing' ? (
+          <div className="mt-6">
+            <label htmlFor="actor-film-search" className="text-xs font-bold text-text-primary">Search film</label>
+            {film ? <div className="mt-2 flex items-center gap-3 rounded-xl border border-brand bg-brand/5 p-4"><img src={film.poster_url || '/images/film-placeholder.webp'} alt="" className="h-14 w-10 rounded object-cover" /><div><strong className="text-sm text-text-primary">{film.title}</strong><p className="text-xs text-text-muted">{film.year || 'Year unknown'}</p></div><button type="button" onClick={() => setFilm(null)} className="ml-auto text-xs font-bold text-brand">Change</button></div> : <><input id="actor-film-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search the catalogue…" className={`mt-2 ${input}`} /><div className="mt-2 grid gap-2">{results.map((row) => <button type="button" key={row.id} onClick={() => setFilm(row)} className="flex items-center gap-3 rounded-xl border border-border p-3 text-left hover:border-brand"><img src={row.poster_url || '/images/film-placeholder.webp'} alt="" className="h-12 w-9 rounded object-cover" /><span><strong className="block text-sm text-text-primary">{row.title}</strong><small className="text-text-muted">{row.year || 'Year unknown'}</small></span></button>)}</div></>}
           </div>
-        </div>
-      )}
-
-      {showWelcomeModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-bg/90 backdrop-blur-xl"></div>
-          <div className="bg-surface border border-border rounded-3xl p-12 max-w-lg w-full relative z-10 text-center space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
-             <div className="w-20 h-20 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-4 border border-brand/20"><span className="text-3xl">🎭</span></div>
-             <h2 className="font-heading font-bold text-4xl text-text-primary tracking-tighter">Welcome to Pro</h2>
-             <p className="text-text-muted text-xs font-bold leading-relaxed opacity-60">MuviDB Pro is the management portal for industry professionals. Connect your profile to manage your filmography and access insights.</p>
-             <button onClick={() => { setShowWelcomeModal(false); localStorage.setItem('MuviDB_pro_welcome_seen', 'true'); }} className="w-full bg-brand text-white py-5 rounded-xl text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20">Continue</button>
+        ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2"><label htmlFor="actor-film-title" className="text-xs font-bold text-text-primary">Film title *</label><input id="actor-film-title" value={newFilm.title} onChange={(e) => setField('title', e.target.value)} className={`mt-2 ${input}`} required /></div>
+            <div><label htmlFor="actor-film-content-type" className="text-xs font-bold text-text-primary">Content type *</label><select id="actor-film-content-type" value={newFilm.content_type} onChange={(e) => setField('content_type', e.target.value)} className={`mt-2 ${input}`}><option value="movie">Movie</option><option value="series">Series</option><option value="mini_series">Mini-series</option><option value="documentary">Documentary</option></select></div>
+            <div><label htmlFor="actor-film-year" className="text-xs font-bold text-text-primary">Release year *</label><input id="actor-film-year" type="number" min="1900" max="2100" value={newFilm.year} onChange={(e) => setField('year', e.target.value)} className={`mt-2 ${input}`} required /></div>
+            <div><label htmlFor="actor-film-release-type" className="text-xs font-bold text-text-primary">Release type *</label><select id="actor-film-release-type" value={newFilm.release_type} onChange={(e) => setField('release_type', e.target.value)} className={`mt-2 ${input}`} required><option value="">Select</option><option value="cinema">Cinema</option><option value="youtube">YouTube (free)</option><option value="youtube_premium">YouTube (paid)</option><option value="netflix">Netflix</option><option value="prime_video">Prime Video</option><option value="showmax">Showmax</option><option value="kava">Kava</option><option value="unreleased">Not released yet</option></select></div>
+            <div><label htmlFor="actor-film-countries" className="text-xs font-bold text-text-primary">Countries *</label><input id="actor-film-countries" value={newFilm.countries} onChange={(e) => setField('countries', e.target.value)} placeholder="Nigeria, Ghana" className={`mt-2 ${input}`} required /></div>
+            <div className="sm:col-span-2"><label htmlFor="actor-film-synopsis" className="text-xs font-bold text-text-primary">Synopsis</label><textarea id="actor-film-synopsis" value={newFilm.synopsis} onChange={(e) => setField('synopsis', e.target.value)} rows="4" className={`mt-2 ${input}`} /></div>
+            <div><label htmlFor="actor-film-genres" className="text-xs font-bold text-text-primary">Genres</label><input id="actor-film-genres" value={newFilm.genres} onChange={(e) => setField('genres', e.target.value)} placeholder="Drama, Thriller" className={`mt-2 ${input}`} /></div>
+            <div><label htmlFor="actor-film-runtime" className="text-xs font-bold text-text-primary">Runtime (minutes)</label><input id="actor-film-runtime" type="number" min="1" value={newFilm.runtime_minutes} onChange={(e) => setField('runtime_minutes', e.target.value)} className={`mt-2 ${input}`} /></div>
+            <div><label htmlFor="actor-film-languages" className="text-xs font-bold text-text-primary">Languages</label><input id="actor-film-languages" value={newFilm.language} onChange={(e) => setField('language', e.target.value)} className={`mt-2 ${input}`} /></div>
+            <div><label htmlFor="actor-film-release-date" className="text-xs font-bold text-text-primary">Release date</label><input id="actor-film-release-date" type="date" value={newFilm.release_date} onChange={(e) => setField('release_date', e.target.value)} className={`mt-2 ${input}`} /></div>
+            <div><label htmlFor="actor-film-rating" className="text-xs font-bold text-text-primary">NFVCB rating</label><select id="actor-film-rating" value={newFilm.nfvcb_rating} onChange={(e) => setField('nfvcb_rating', e.target.value)} className={`mt-2 ${input}`}><option value="">Unknown</option>{['G','PG','12','12A','PG-13','15','18','RE'].map((value) => <option key={value}>{value}</option>)}</select></div>
+            <div><label htmlFor="actor-film-poster" className="text-xs font-bold text-text-primary">Poster URL</label><input id="actor-film-poster" type="url" value={newFilm.poster_url} onChange={(e) => setField('poster_url', e.target.value)} className={`mt-2 ${input}`} /></div>
+            <div><label htmlFor="actor-film-watch-url" className="text-xs font-bold text-text-primary">Official watch URL</label><input id="actor-film-watch-url" type="url" value={newFilm.youtube_watch_url} onChange={(e) => setField('youtube_watch_url', e.target.value)} className={`mt-2 ${input}`} /></div>
+            <div><label htmlFor="actor-film-trailer" className="text-xs font-bold text-text-primary">Trailer YouTube ID</label><input id="actor-film-trailer" value={newFilm.trailer_youtube_id} onChange={(e) => setField('trailer_youtube_id', e.target.value)} className={`mt-2 ${input}`} /></div>
           </div>
-        </div>
-      )}
+        )}
 
-      {showCreateModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-bg/90 backdrop-blur-xl" onClick={() => setShowCreateModal(false)}></div>
-          <div className="bg-surface border border-border rounded-3xl p-10 max-w-xl w-full relative z-10 space-y-8 animate-in zoom-in-95 duration-500 shadow-2xl">
-            <div className="space-y-2">
-                <h2 className="font-heading font-bold text-4xl text-text-primary tracking-tighter">Create Profile</h2>
-                <p className="text-xs font-bold text-text-muted opacity-60">Establish your presence in the database.</p>
-            </div>
-            
-            <div className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-text-muted opacity-60">Stage Name</label>
-                    <input 
-                      type="text" 
-                      value={newProfileData.name} 
-                      onChange={(e) => setNewProfileData({...newProfileData, name: e.target.value})}
-                      className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-xs font-bold focus:border-brand outline-none transition-all" 
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-text-muted opacity-60">Primary Role</label>
-                    <select 
-                      value={newProfileData.role} 
-                      onChange={(e) => setNewProfileData({...newProfileData, role: e.target.value})}
-                      className="w-full bg-surface-2/50 border border-border text-text-primary rounded-xl px-6 py-4 text-xs font-bold focus:border-brand outline-none transition-all appearance-none"
-                    >
-                        <option value="Actor">Actor</option>
-                        <option value="Director">Director</option>
-                        <option value="Producer">Producer</option>
-                        <option value="Cinematographer">Cinematographer</option>
-                        <option value="Writer">Writer</option>
-                    </select>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-text-muted opacity-60">Professional Bio</label>
-                    <textarea 
-                      value={newProfileData.bio} 
-                      onChange={(e) => setNewProfileData({...newProfileData, bio: e.target.value})}
-                      className="w-full h-32 bg-surface-2/50 border border-border text-text-primary rounded-xl p-6 text-sm leading-relaxed focus:border-brand outline-none transition-all resize-none" 
-                    />
-                </div>
-            </div>
-
-            <div className="flex gap-4">
-                <button onClick={() => setShowCreateModal(false)} className="flex-1 bg-surface-2 text-text-primary py-4 rounded-xl text-xs font-bold hover:bg-border transition-all">Cancel</button>
-                <button onClick={handleCreateProfile} disabled={isSubmitting} className="flex-1 bg-brand text-white py-4 rounded-xl text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20 disabled:opacity-50">
-                    {isSubmitting ? 'Creating...' : 'Create Profile'}
-                </button>
-            </div>
-          </div>
+        <div className="mt-7 grid gap-4 sm:grid-cols-2">
+          <div><label htmlFor="actor-credit-type" className="text-xs font-bold text-text-primary">Credit type</label><select id="actor-credit-type" value={kind} onChange={(e) => setKind(e.target.value)} className={`mt-2 ${input}`}><option value="cast">Cast / Actor</option><option value="crew">Crew</option></select></div>
+          {kind === 'cast' ? <div><label htmlFor="actor-character-name" className="text-xs font-bold text-text-primary">Character name</label><input id="actor-character-name" value={characterName} onChange={(e) => setCharacterName(e.target.value)} className={`mt-2 ${input}`} /></div> : <div><label htmlFor="actor-crew-role" className="text-xs font-bold text-text-primary">Crew role</label><select id="actor-crew-role" value={crewRole} onChange={(e) => setCrewRole(e.target.value)} className={`mt-2 ${input}`}>{CREW_ROLES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>}
+          {kind === 'crew' && <div className="sm:col-span-2"><label htmlFor="actor-custom-role" className="text-xs font-bold text-text-primary">Custom role <span className="font-normal text-text-muted">(optional)</span></label><input id="actor-custom-role" value={customRole} onChange={(e) => setCustomRole(e.target.value)} placeholder="Overrides the selected crew role" className={`mt-2 ${input}`} /></div>}
+          <div className="sm:col-span-2"><label htmlFor="actor-credit-source" className="text-xs font-bold text-text-primary">Supporting source {mode === 'new' && '*'}</label><input id="actor-credit-source" type="url" value={evidenceUrl} onChange={(e) => setEvidenceUrl(e.target.value)} required={mode === 'new'} placeholder="Official trailer, announcement or production page" className={`mt-2 ${input}`} /></div>
+          <div className="sm:col-span-2"><label htmlFor="actor-credit-note" className="text-xs font-bold text-text-primary">Note to the editor</label><textarea id="actor-credit-note" value={note} onChange={(e) => setNote(e.target.value)} rows="3" className={`mt-2 ${input}`} /></div>
         </div>
-      )}
+        <button disabled={saving} className="mt-7 w-full rounded-xl bg-brand py-4 text-xs font-black text-white disabled:opacity-50">{saving ? 'Submitting…' : 'Submit for admin review'}</button>
+      </form>
     </div>
+  );
+}
+
+export default function ProDashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [access, setAccess] = useState(null);
+  const [claim, setClaim] = useState(null);
+  const [credits, setCredits] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [adding, setAdding] = useState(false);
+
+  const load = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    const { data: accessRow } = await supabase.from('actor_profile_access').select('*,people(*)').eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle();
+    setAccess(accessRow || null);
+    if (!accessRow) {
+      const { data: claimRow } = await supabase.from('profile_claims').select('*,people(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      setClaim(claimRow || null);
+      setLoading(false);
+      return;
+    }
+    const [creditRes, requestRes] = await Promise.all([
+      fetch(`/api/content?resource=person-credits&personId=${encodeURIComponent(accessRow.person_id)}`).then((res) => res.ok ? res.json() : { credits: [] }),
+      supabase.from('actor_credit_requests').select('*').eq('submitted_by', user.id).order('created_at', { ascending: false }),
+    ]);
+    setCredits(creditRes.credits || []);
+    setRequests(requestRes.data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    document.title = 'Actor dashboard | MuviDB';
+    if (user?.role === 'admin' || user?.role === 'admin_limited') return navigate('/admin');
+    load();
+  }, [user?.id]);
+
+  const pendingRemoval = useMemo(() => new Set(requests.filter((r) => r.request_type === 'remove' && ['submitted','in_review','needs_information'].includes(r.status)).map((r) => r.credit_id)), [requests]);
+
+  const requestRemoval = async (credit) => {
+    const reason = window.prompt(`Why should “${credit.films?.title || 'this credit'}” be removed from your filmography?`);
+    if (!reason?.trim()) return;
+    const { error } = await supabase.from('actor_credit_requests').insert({
+      submitted_by: user.id, person_id: access.person_id, request_type: 'remove',
+      credit_id: credit.id, note: reason.trim(), status: 'submitted',
+    });
+    if (error) return toast.error(error.message);
+    toast.success('Removal request submitted. The credit stays public until an admin approves.');
+    load();
+  };
+
+  if (loading) return <main className="min-h-screen bg-bg px-6 pt-32"><div className="mx-auto h-48 max-w-5xl animate-pulse rounded-2xl bg-surface" /></main>;
+
+  if (!access) {
+    return (
+      <main className="min-h-screen bg-bg px-4 pt-32 pb-20">
+        <section className="mx-auto max-w-2xl rounded-2xl border border-border bg-surface p-8 text-center md:p-12">
+          {claim?.status === 'pending' ? <><Icon icon="solar:hourglass-line-bold" width="42" className="mx-auto text-brand" /><h1 className="mt-5 text-3xl font-black text-text-primary">Claim under review</h1><p className="mt-4 text-sm leading-7 text-text-muted">MuviDB will contact <strong className="text-text-primary">{claim.social_handle}</strong> on {claim.social_platform}. Current verification status: <strong className="text-text-primary">{String(claim.verification_status).replace('_', ' ')}</strong>.</p><div className="mx-auto mt-6 max-w-xs rounded-xl bg-surface-2 p-4"><p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Verification code</p><p className="mt-1 font-mono text-2xl font-black text-brand">{claim.verification_code}</p></div></> : <><Icon icon="solar:user-check-linear" width="42" className="mx-auto text-brand" /><h1 className="mt-5 text-3xl font-black text-text-primary">Connect your actor profile</h1><p className="mt-4 text-sm leading-7 text-text-muted">Claim and verify your public actor record before requesting filmography changes.</p><Link to="/claim" className="mt-7 inline-flex rounded-xl bg-brand px-7 py-3 text-xs font-black text-white">Claim actor profile</Link></>}
+        </section>
+      </main>
+    );
+  }
+
+  const person = access.people;
+  return (
+    <main className="min-h-screen bg-bg px-4 pt-24 pb-20">
+      <section className="mx-auto max-w-6xl">
+        <header className="flex flex-col gap-6 rounded-2xl border border-border bg-surface p-7 md:flex-row md:items-center">
+          <img src={person.photo_url || '/images/person-placeholder.png'} alt="" className="h-24 w-24 rounded-2xl object-cover" />
+          <div><p className="text-[10px] font-black uppercase tracking-[.2em] text-brand">Verified actor workspace</p><h1 className="mt-2 text-3xl font-black text-text-primary">{person.name}</h1><p className="mt-2 text-sm text-text-muted">Submit filmography additions and removal requests. An admin reviews every change before it goes live.</p></div>
+          <div className="md:ml-auto"><button onClick={() => setAdding(true)} className="rounded-xl bg-brand px-6 py-3 text-xs font-black text-white"><Icon icon="solar:add-circle-bold" className="mr-2 inline" />Add credit</button></div>
+        </header>
+
+        <div className="mt-8 grid gap-8 lg:grid-cols-[1.4fr_.8fr]">
+          <section className="rounded-2xl border border-border bg-surface p-6">
+            <div className="flex items-center justify-between"><h2 className="text-xl font-black text-text-primary">Published filmography</h2><span className="text-xs font-bold text-text-muted">{credits.length} credits</span></div>
+            <div className="mt-5 space-y-3">
+              {credits.length === 0 && <p className="rounded-xl bg-surface-2 p-6 text-sm text-text-muted">No published credits yet.</p>}
+              {credits.sort((a,b) => (b.films?.year || 0) - (a.films?.year || 0)).map((credit) => <div key={credit.id} className="flex items-center gap-4 rounded-xl border border-border p-4"><img src={credit.films?.poster_url || '/images/film-placeholder.webp'} alt="" className="h-16 w-12 rounded object-cover" /><div className="min-w-0"><Link to={`/films/${credit.films?.slug || credit.film_id}`} className="block truncate text-sm font-black text-text-primary hover:text-brand">{credit.films?.title || 'Unknown film'}</Link><p className="mt-1 text-xs text-text-muted">{formatRole(credit.role)}{credit.character_name ? ` · ${credit.character_name}` : ''} · {credit.films?.year || 'Year unknown'}</p></div><button disabled={pendingRemoval.has(credit.id)} onClick={() => requestRemoval(credit)} className="ml-auto rounded-lg border border-border px-3 py-2 text-[10px] font-black text-text-muted hover:border-red-500 hover:text-red-500 disabled:opacity-50">{pendingRemoval.has(credit.id) ? 'Removal pending' : 'Request removal'}</button></div>)}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-surface p-6">
+            <h2 className="text-xl font-black text-text-primary">Your requests</h2>
+            <div className="mt-5 space-y-3">
+              {requests.length === 0 && <p className="rounded-xl bg-surface-2 p-6 text-sm text-text-muted">You have not submitted any filmography requests.</p>}
+              {requests.map((request) => <article key={request.id} className="rounded-xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wider text-brand">{request.request_type.replaceAll('_', ' ')}</p><h3 className="mt-1 text-sm font-black text-text-primary">{request.proposed_film?.title || credits.find((c) => c.film_id === request.film_id || c.id === request.credit_id)?.films?.title || 'Film request'}</h3></div><StatusPill status={request.status} /></div>{request.rejection_reason && <p className="mt-3 rounded-lg bg-red-500/10 p-3 text-xs text-red-400">{request.rejection_reason}</p>}<p className="mt-3 text-[10px] text-text-muted">Submitted {new Date(request.created_at).toLocaleDateString()}</p></article>)}
+            </div>
+          </section>
+        </div>
+      </section>
+      {adding && <CreditRequestModal person={person} onClose={() => setAdding(false)} onSaved={load} />}
+    </main>
   );
 }

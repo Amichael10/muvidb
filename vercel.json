@@ -108,6 +108,10 @@
       "destination": "/api/data?_r=welcome-email"
     },
     {
+      "source": "/api/actor-claims",
+      "destination": "/api/data?_r=actor-claims"
+    },
+    {
       "source": "/api/youtube",
       "destination": "/api/external?provider=youtube"
     },
