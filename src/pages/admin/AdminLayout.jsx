@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Icon } from '@iconify/react';
-import { useCinemaTriageNotifications } from '../../hooks/useCinemaTriageNotifications';
+import { useAdminNotifications } from '../../hooks/useAdminNotifications';
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const isSuperAdmin = user?.role === 'admin';
-  const { pendingCount, latestPending, loading: notificationsLoading } = useCinemaTriageNotifications(isSuperAdmin);
+  const { totalCount, cinemaCount, claimCount, notifications, loading: notificationsLoading } = useAdminNotifications(isSuperAdmin);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('MuviDB_admin_collapsed') === 'true';
   });
@@ -241,14 +241,14 @@ export default function AdminLayout() {
                 <button
                   onClick={() => setNotificationsOpen(value => !value)}
                   className={`relative w-10 h-10 rounded-lg bg-surface-2 border transition-all flex items-center justify-center shadow-sm ${notificationsOpen ? 'border-brand text-brand' : 'border-border text-text-muted hover:text-brand'}`}
-                  title={`${pendingCount} cinema films awaiting review`}
-                  aria-label="Cinema review notifications"
+                  title={`${totalCount} items awaiting review`}
+                  aria-label="Admin notifications"
                   aria-expanded={notificationsOpen}
                 >
                   <Icon icon="solar:bell-linear" width="20" />
-                  {pendingCount > 0 && (
+                  {totalCount > 0 && (
                     <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-md border-2 border-surface bg-brand px-1 text-[9px] font-bold text-white">
-                      {pendingCount > 99 ? '99+' : pendingCount}
+                      {totalCount > 99 ? '99+' : totalCount}
                     </span>
                   )}
                 </button>
@@ -257,8 +257,8 @@ export default function AdminLayout() {
                   <div className="absolute right-0 top-12 z-50 w-[min(340px,calc(100vw-80px))] overflow-hidden rounded-md border border-border bg-surface shadow-2xl">
                     <div className="flex items-center justify-between border-b border-border px-4 py-3">
                       <div>
-                        <p className="text-sm font-bold text-text-primary">Cinema review</p>
-                        <p className="text-[10px] text-text-muted">{pendingCount} awaiting a decision</p>
+                        <p className="text-sm font-bold text-text-primary">Admin notifications</p>
+                        <p className="text-[10px] text-text-muted">{claimCount} claims · {cinemaCount} cinema items</p>
                       </div>
                       <Icon icon="solar:ticket-linear" className="text-brand" width="20" />
                     </div>
@@ -266,26 +266,29 @@ export default function AdminLayout() {
                     <div className="max-h-80 overflow-y-auto">
                       {notificationsLoading ? (
                         <p className="p-6 text-center text-xs text-text-muted">Loading...</p>
-                      ) : latestPending.length === 0 ? (
+                      ) : notifications.length === 0 ? (
                         <div className="p-6 text-center">
                           <Icon icon="solar:check-circle-linear" className="mx-auto mb-2 text-emerald-500" width="24" />
                           <p className="text-xs font-bold text-text-primary">Queue is clear</p>
                         </div>
-                      ) : latestPending.map(item => (
-                        <Link key={item.id} to="/admin/cinema-films" className="block border-b border-border px-4 py-3 last:border-0 hover:bg-surface-2">
+                      ) : notifications.map(item => (
+                        <Link key={item.id} to={item.href} className="block border-b border-border px-4 py-3 last:border-0 hover:bg-surface-2">
                           <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
+                            <div className="flex min-w-0 gap-3">
+                              <Icon icon={item.type === 'actor_claim' ? 'solar:user-check-rounded-linear' : 'solar:ticket-linear'} className="mt-0.5 flex-shrink-0 text-brand" width="18" />
+                              <div className="min-w-0">
                               <p className="truncate text-xs font-bold text-text-primary">{item.title}</p>
-                              <p className="mt-1 truncate text-[10px] text-text-muted">{item.source?.replace(/[_-]+/g, ' ') || 'Cinema scraper'}</p>
+                              <p className="mt-1 truncate text-[10px] text-text-muted">{item.detail}</p>
+                              </div>
                             </div>
-                            <span className="flex-shrink-0 rounded-md bg-brand/10 px-2 py-1 text-[9px] font-bold text-brand">{item.showtime_count || 0}</span>
+                            {item.type === 'actor_claim' ? <span className="flex-shrink-0 rounded-md bg-brand/10 px-2 py-1 text-[9px] font-bold text-brand">CLAIM</span> : <span className="flex-shrink-0 rounded-md bg-brand/10 px-2 py-1 text-[9px] font-bold text-brand">{item.badge}</span>}
                           </div>
                         </Link>
                       ))}
                     </div>
 
-                    <Link to="/admin/cinema-films" className="flex h-11 items-center justify-center gap-2 border-t border-border text-xs font-bold text-brand hover:bg-brand/5">
-                      Review all pending films
+                    <Link to={claimCount > 0 ? '/admin/claims' : '/admin/cinema-films'} className="flex h-11 items-center justify-center gap-2 border-t border-border text-xs font-bold text-brand hover:bg-brand/5">
+                      Review pending items
                       <Icon icon="solar:arrow-right-linear" width="15" />
                     </Link>
                   </div>

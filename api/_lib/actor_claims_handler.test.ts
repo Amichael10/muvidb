@@ -5,6 +5,8 @@ const testState = vi.hoisted(() => ({
   role: 'admin',
   claimEmailSentAt: null as string | null,
   updates: [] as Array<{ table: string; patch: Record<string, unknown> }>,
+  inserts: [] as Array<{ table: string; row: Record<string, unknown> }>,
+  pendingClaimIds: [] as string[],
 }));
 
 const rpcMock = vi.hoisted(() => vi.fn());
@@ -18,6 +20,13 @@ vi.mock('./supabase.js', () => {
       error: null,
       select: vi.fn(() => chain),
       eq: vi.fn(() => chain),
+      is: vi.fn(() => chain),
+      order: vi.fn(() => chain),
+      limit: vi.fn(() => chain),
+      insert: vi.fn((row: Record<string, unknown>) => {
+        testState.inserts.push({ table, row });
+        return chain;
+      }),
       update: vi.fn((patch: Record<string, unknown>) => {
         testState.updates.push({ table, patch });
         return chain;
@@ -25,11 +34,17 @@ vi.mock('./supabase.js', () => {
       single: vi.fn(async () => {
         if (table === 'users') return { data: { role: testState.role }, error: null };
         if (table === 'profile_claims') {
+          if (testState.inserts.some((item) => item.table === 'profile_claims')) {
+            return { data: { id: 'new-claim-id', status: 'pending', verification_status: 'awaiting_contact', verification_code: 'ABC123' }, error: null };
+          }
           return { data: { approval_email_sent_at: testState.claimEmailSentAt }, error: null };
         }
         return { data: null, error: null };
       }),
-      then: (resolve: (value: unknown) => void) => resolve({ data: null, error: null }),
+      then: (resolve: (value: unknown) => void) => resolve({
+        data: table === 'profile_claims' ? testState.pendingClaimIds.map((id) => ({ id })) : null,
+        error: null,
+      }),
     };
     return chain;
   });
@@ -76,6 +91,8 @@ describe('actor claims admin handler', () => {
     testState.role = 'admin';
     testState.claimEmailSentAt = null;
     testState.updates.length = 0;
+    testState.inserts.length = 0;
+    testState.pendingClaimIds.length = 0;
     getUserMock.mockImplementation(async () => testState.authenticated
       ? { data: { user: { id: 'admin-id' } }, error: null }
       : { data: { user: null }, error: new Error('invalid token') });
@@ -110,12 +127,50 @@ describe('actor claims admin handler', () => {
     expect(notifyClaimMock).toHaveBeenCalledWith('claim-id', { expectedUserId: 'actor-id' });
   });
 
-  it('allows a full admin to retry a failed Telegram claim alert', async () => {
+  it('creates a claim server-side and automatically sends the Telegram alert', async () => {
+    testState.role = 'fan';
+    getUserMock.mockResolvedValue({ data: { user: { id: 'actor-id' } }, error: null });
     const res = response();
-    await handleActorClaims(request({ action: 'retry-claim-telegram', id: 'claim-id' }), res);
+    await handleActorClaims(request({
+      action: 'submit-claim',
+      personId: 'person-id',
+      socialPlatform: 'instagram',
+      socialHandle: '@ada',
+      socialUrl: 'https://instagram.com/ada',
+    }), res);
+
+    expect(res.statusCode).toBe(201);
+    expect(testState.inserts).toContainEqual(expect.objectContaining({
+      table: 'profile_claims',
+      row: expect.objectContaining({ user_id: 'actor-id', person_id: 'person-id', social_platform: 'instagram' }),
+    }));
+    expect(notifyClaimMock).toHaveBeenCalledWith('new-claim-id', { expectedUserId: 'actor-id' });
+  });
+
+  it('rejects a social URL that does not belong to the selected platform', async () => {
+    getUserMock.mockResolvedValue({ data: { user: { id: 'actor-id' } }, error: null });
+    const res = response();
+    await handleActorClaims(request({
+      action: 'submit-claim',
+      personId: 'person-id',
+      socialPlatform: 'instagram',
+      socialHandle: '@ada',
+      socialUrl: 'https://example.test/ada',
+    }), res);
+
+    expect(res.statusCode).toBe(400);
+    expect(testState.inserts).toHaveLength(0);
+    expect(notifyClaimMock).not.toHaveBeenCalled();
+  });
+
+  it('lets a full admin automatically retry unnotified pending claims', async () => {
+    testState.pendingClaimIds.push('claim-one', 'claim-two');
+    const res = response();
+    await handleActorClaims(request({ action: 'notify-pending-claims' }), res);
 
     expect(res.statusCode).toBe(200);
-    expect(notifyClaimMock).toHaveBeenCalledWith('claim-id', { force: true });
+    expect(notifyClaimMock).toHaveBeenCalledWith('claim-one');
+    expect(notifyClaimMock).toHaveBeenCalledWith('claim-two');
   });
 
   it('approves a verified claim, sends email, and records delivery', async () => {

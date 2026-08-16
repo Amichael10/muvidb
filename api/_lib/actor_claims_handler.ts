@@ -41,10 +41,58 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
   const action = String(req.body?.action || '');
   const id = String(req.body?.id || '');
   const note = typeof req.body?.note === 'string' ? req.body.note.trim() : null;
-  if (!id) return res.status(400).json({ error: 'Request id is required' });
 
   try {
     const user = await authenticatedUser(req);
+    if (action === 'submit-claim') {
+      if (!user) return res.status(403).json({ error: 'Authentication required' });
+      const personId = String(req.body?.personId || '').trim();
+      const socialPlatform = String(req.body?.socialPlatform || '').trim().toLowerCase();
+      const socialHandle = String(req.body?.socialHandle || '').trim();
+      const socialUrl = String(req.body?.socialUrl || '').trim();
+      const claimantNote = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+      const allowedPlatforms = new Set(['instagram', 'x', 'tiktok', 'facebook', 'youtube']);
+      if (!personId || !allowedPlatforms.has(socialPlatform) || !socialHandle || !socialUrl) {
+        return res.status(400).json({ error: 'Actor and valid social account details are required' });
+      }
+      let parsedSocialUrl: URL;
+      try {
+        parsedSocialUrl = new URL(socialUrl);
+      } catch {
+        return res.status(400).json({ error: 'A valid social profile URL is required' });
+      }
+      const platformDomains: Record<string, string[]> = {
+        instagram: ['instagram.com'],
+        x: ['x.com', 'twitter.com'],
+        tiktok: ['tiktok.com'],
+        facebook: ['facebook.com', 'fb.com'],
+        youtube: ['youtube.com', 'youtu.be'],
+      };
+      const hostname = parsedSocialUrl.hostname.toLowerCase().replace(/^www\./, '');
+      const matchesPlatform = platformDomains[socialPlatform].some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+      if (parsedSocialUrl.protocol !== 'https:' || !matchesPlatform) {
+        return res.status(400).json({ error: 'A valid social profile URL is required' });
+      }
+
+      const { data: claim, error: insertError } = await supabase.from('profile_claims').insert({
+        user_id: user.id,
+        person_id: personId,
+        status: 'pending',
+        verification_status: 'awaiting_contact',
+        social_platform: socialPlatform,
+        social_handle: socialHandle.slice(0, 200),
+        social_url: parsedSocialUrl.toString().slice(0, 1000),
+        note: claimantNote.slice(0, 2000) || null,
+      }).select('id,status,verification_status,verification_code,people!profile_claims_person_id_fkey(name,slug)').single();
+      if (insertError) throw insertError;
+
+      const notification = await notifyActorClaimSubmission(claim.id, { expectedUserId: user.id });
+      return res.status(201).json({ success: true, claim, notification });
+    }
+
+    if (!id && action !== 'notify-pending-claims') {
+      return res.status(400).json({ error: 'Request id is required' });
+    }
     if (action === 'notify-new-claim') {
       if (!user) return res.status(403).json({ error: 'Authentication required' });
       const notification = await notifyActorClaimSubmission(id, { expectedUserId: user.id });
@@ -54,10 +102,16 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
     const admin = await fullAdmin(user);
     if (!admin) return res.status(403).json({ error: 'Full admin access required' });
 
-    if (action === 'retry-claim-telegram') {
-      const notification = await notifyActorClaimSubmission(id, { force: true });
-      if (!notification.ok) return res.status(502).json({ error: notification.error });
-      return res.status(200).json({ success: true, notification });
+    if (action === 'notify-pending-claims') {
+      const { data: pending, error: pendingError } = await supabase.from('profile_claims')
+        .select('id')
+        .eq('status', 'pending')
+        .is('telegram_notified_at', null)
+        .order('created_at', { ascending: true })
+        .limit(10);
+      if (pendingError) throw pendingError;
+      const results = await Promise.all((pending || []).map((claim) => notifyActorClaimSubmission(claim.id)));
+      return res.status(200).json({ success: true, attempted: results.length, results });
     }
 
     if (action === 'mark-contacted' || action === 'mark-confirmed') {

@@ -5,6 +5,21 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
 
+function verificationMessage(claim) {
+  const reference = String(claim.id).slice(0, 8).toUpperCase();
+  return `Hello ${claim.social_handle},
+
+MuviDB received a request to claim the actor profile for ${claim.people?.name || 'this actor'}.
+
+To confirm that you control this account, please reply to this message with:
+Claim reference: ${reference}
+Verification code: ${claim.verification_code}
+
+If you did not submit this request, please let us know and do not share this code.
+
+MuviDB will never ask for your password, login code, payment, or government ID.`;
+}
+
 export default function AdminClaims() {
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,9 +48,21 @@ export default function AdminClaims() {
     if (!response.ok) return toast.error(body.error || 'Action failed');
     if (action === 'approve-claim') {
       toast.success(body.email?.sent ? 'Claim approved and verification email sent.' : 'Claim approved. Email delivery needs attention.');
-    } else if (action === 'retry-claim-telegram') toast.success('Telegram alert sent.');
+    } else if (action === 'mark-contacted') toast.success('Claim marked as contacted.');
     else toast.success('Claim updated.');
     load();
+  };
+
+  const contactActor = async (claim) => {
+    const message = verificationMessage(claim);
+    window.open(claim.social_url, '_blank', 'noopener,noreferrer');
+    try {
+      await navigator.clipboard.writeText(message);
+      toast.success('Verification message copied. Paste and send it in the opened social account.');
+    } catch {
+      window.prompt('Copy this verification message, then send it from the official MuviDB account:', message);
+    }
+    await act(claim, 'mark-contacted', `Opened ${claim.social_handle} on ${claim.social_platform} and prepared the verification message for manual delivery.`);
   };
 
   const reject = (claim) => {
@@ -58,15 +85,13 @@ export default function AdminClaims() {
               <div><p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Claimant</p><p className="mt-1 text-sm font-black text-text-primary">{claim.claimant?.name}</p><p className="text-xs text-text-muted">{claim.claimant?.email}</p></div>
               <div className="rounded-xl bg-surface-2 p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Contact on {claim.social_platform}</p><a href={claim.social_url} target="_blank" rel="noreferrer" className="mt-1 block text-sm font-black text-brand">{claim.social_handle}</a></div><Icon icon="solar:chat-round-line-bold" width="26" className="text-brand" /></div></div>
               <div className="grid grid-cols-2 gap-3"><div className="rounded-xl border border-border p-3"><p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Claim reference</p><p className="mt-1 font-mono font-black text-text-primary">{reference}</p></div><div className="rounded-xl border border-border p-3"><p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Code</p><p className="mt-1 font-mono text-lg font-black text-brand">{claim.verification_code}</p></div></div>
+              {claim.status === 'pending' && claim.verification_status === 'awaiting_contact' && <div className="rounded-xl border border-border bg-surface-2 p-4"><p className="text-[9px] font-black uppercase tracking-widest text-text-muted">Verification message</p><p className="mt-2 whitespace-pre-line text-[11px] leading-5 text-text-muted">{verificationMessage(claim)}</p></div>}
               {claim.note && <blockquote className="border-l-2 border-brand pl-4 text-xs leading-6 text-text-muted">{claim.note}</blockquote>}
             </div>
             <div className="flex flex-col justify-center gap-3">
               <div className="mb-2 rounded-xl border border-border bg-surface-2 p-3"><p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Verification state</p><p className="mt-1 text-sm font-black capitalize text-text-primary">{claim.verification_status.replace('_', ' ')}</p></div>
-              {claim.telegram_notified_at && <p className="text-center text-[10px] font-bold text-green-500">Telegram alert sent</p>}
-              {claim.status === 'pending' && !claim.telegram_notified_at && <button disabled={busy === claim.id} onClick={() => act(claim, 'retry-claim-telegram')} className="rounded-xl border border-sky-500 py-3 text-xs font-black text-sky-400">Send Telegram alert</button>}
-              {claim.status === 'pending' && claim.telegram_notification_error && !claim.telegram_notified_at && <p className="rounded-lg bg-red-500/10 p-2 text-[10px] text-red-400">Last Telegram attempt: {claim.telegram_notification_error}</p>}
               {claim.status === 'approved' && !claim.approval_email_sent_at && <button disabled={busy === claim.id} onClick={() => act(claim, 'retry-approval-email')} className="rounded-xl bg-brand py-3 text-xs font-black text-white">Retry approval email</button>}
-              {claim.status === 'pending' && claim.verification_status === 'awaiting_contact' && <button disabled={busy === claim.id} onClick={() => act(claim, 'mark-contacted', `Contacted ${claim.social_handle} on ${claim.social_platform}.`)} className="rounded-xl border border-brand py-3 text-xs font-black text-brand">Mark contacted</button>}
+              {claim.status === 'pending' && claim.verification_status === 'awaiting_contact' && <button disabled={busy === claim.id} onClick={() => contactActor(claim)} className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-orange-500 py-3 text-xs font-black text-white"><Icon icon={claim.social_platform === 'instagram' ? 'mdi:instagram' : 'solar:chat-round-dots-bold'} width="17" />Contact on {claim.social_platform === 'instagram' ? 'Instagram' : claim.social_platform}</button>}
               {claim.verification_status === 'contacted' && <button disabled={busy === claim.id} onClick={() => act(claim, 'mark-confirmed', `Confirmation received from ${claim.social_handle}.`)} className="rounded-xl border border-green-500 py-3 text-xs font-black text-green-500">Mark reply confirmed</button>}
               {['confirmed','verified'].includes(claim.verification_status) && <button disabled={busy === claim.id} onClick={() => act(claim, 'approve-claim')} className="rounded-xl bg-brand py-3 text-xs font-black text-white">Approve claim + send email</button>}
               {claim.status === 'pending' && <button disabled={busy === claim.id} onClick={() => reject(claim)} className="rounded-xl border border-border py-3 text-xs font-black text-red-500">Reject claim</button>}

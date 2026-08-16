@@ -78,27 +78,30 @@ export default function ClaimProfile() {
     event.preventDefault();
     if (!user?.id || !person?.id || !platform || !socialHandle.trim() || !socialUrl.trim() || !confirmed) return;
     setSubmitting(true);
-    const { data, error } = await supabase.from('profile_claims').insert({
-      user_id: user.id,
-      person_id: person.id,
-      status: 'pending',
-      verification_status: 'awaiting_contact',
-      social_platform: platform,
-      social_handle: socialHandle.trim(),
-      social_url: socialUrl.trim(),
-      note: note.trim() || null,
-    }).select('id,status,verification_status,verification_code,people(name,slug)').single();
+    let data = null;
+    let error = null;
+    try {
+      const response = await fetch('/api/actor-claims', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          action: 'submit-claim',
+          personId: person.id,
+          socialPlatform: platform,
+          socialHandle: socialHandle.trim(),
+          socialUrl: socialUrl.trim(),
+          note: note.trim() || null,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) error = new Error(body.error || 'Unable to submit profile claim');
+      else data = body.claim;
+    } catch (requestError) {
+      error = requestError;
+    }
     setSubmitting(false);
     if (error) return toast.error(error.message.includes('policy') ? 'This profile cannot be claimed with the supplied details.' : error.message);
     setSubmitted(data);
-    void authHeaders()
-      .then((headers) => fetch('/api/actor-claims', {
-        method: 'POST',
-        headers,
-        keepalive: true,
-        body: JSON.stringify({ action: 'notify-new-claim', id: data.id }),
-      }))
-      .catch((notificationError) => console.warn('Claim submitted; admin alert could not be sent:', notificationError));
   };
 
   if (submitted) {
