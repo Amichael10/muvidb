@@ -49,7 +49,7 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
       if (!user) return res.status(403).json({ error: 'Authentication required' });
       const format = req.body?.format === 'detailed' ? 'detailed' : 'resume';
       const { data: access, error: accessError } = await supabase.from('actor_profile_access')
-        .select('person_id,people(name,biography,nationality,known_for_department,profile_views,slug)')
+        .select('person_id,people(name,bio,nationality,known_for_department,profile_views,slug)')
         .eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle();
       if (accessError) throw accessError;
       if (!access?.person_id) return res.status(403).json({ error: 'A verified professional profile is required' });
@@ -236,7 +236,11 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (error: any) {
-    console.error('[actor-claims]', action, error);
-    return res.status(400).json({ error: error?.message || 'Request failed' });
+    const reference = crypto.randomUUID().slice(0, 8).toUpperCase();
+    console.error('[actor-claims]', { action, reference, error });
+    return res.status(400).json({
+      error: 'We could not complete this request. Please try again.',
+      reference,
+    });
   }
 }

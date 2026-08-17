@@ -9,7 +9,7 @@ function sample(format: 'resume' | 'detailed', creditCount = 4) {
     professionalRoles: ['actor', 'producer'],
     person: {
       name: 'Ada Example',
-      biography: 'Ada Example is an award-winning actor and producer working across African film and television.',
+      bio: 'Ada Example is an award-winning actor and producer working across African film and television.',
       nationality: 'Nigerian',
       known_for_department: 'Acting',
       profile_views: 12500,
@@ -34,6 +34,7 @@ describe('professional CV PDF', () => {
     const content = pdf.toString('ascii');
     expect(content.startsWith('%PDF-1.4')).toBe(true);
     expect(content).toContain('/Type /Pages /Count 1');
+    expect(content).toContain('(Ada Example is an award-winning actor and producer working across African film and television.)');
     expect(content).toContain('(FILM CATALOGUE VIEWS)');
     expect(content).toContain('(Analytics note: profile and film views are MuviDB-recorded catalogue metrics, not box-office or streaming revenue.)');
   });

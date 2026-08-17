@@ -13,6 +13,7 @@ export type ProfessionalCvData = {
   format: 'resume' | 'detailed';
   person: {
     name: string;
+    bio?: string | null;
     biography?: string | null;
     nationality?: string | null;
     known_for_department?: string | null;
@@ -114,7 +115,7 @@ function buildPageContent(data: ProfessionalCvData) {
 
   page.push(text(MARGIN, y, 10, 'PROFESSIONAL SUMMARY', true, '0.96 0.29 0.08'));
   y -= 18;
-  const biography = data.person.biography || `${data.person.name} is a film professional with ${credits.length} verified credit${credits.length === 1 ? '' : 's'} recorded by MuviDB.`;
+  const biography = data.person.bio || data.person.biography || `${data.person.name} is a film professional with ${credits.length} verified credit${credits.length === 1 ? '' : 's'} recorded by MuviDB.`;
   const bioLines = wrap(biography, data.format === 'resume' ? 105 : 92).slice(0, data.format === 'resume' ? 3 : 4);
   for (const bioLine of bioLines) {
     page.push(text(MARGIN, y, 9.2, bioLine, false, '0.22 0.24 0.27'));
