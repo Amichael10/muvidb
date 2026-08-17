@@ -49,14 +49,14 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
       if (!user) return res.status(403).json({ error: 'Authentication required' });
       const format = req.body?.format === 'detailed' ? 'detailed' : 'resume';
       const { data: access, error: accessError } = await supabase.from('actor_profile_access')
-        .select('person_id,people(name,bio,nationality,known_for_department,profile_views,slug)')
+        .select('person_id,people(name,bio,nationality,known_for_department,slug,youtube_stats)')
         .eq('user_id', user.id).eq('status', 'active').limit(1).maybeSingle();
       if (accessError) throw accessError;
       if (!access?.person_id) return res.status(403).json({ error: 'A verified professional profile is required' });
       const [{ data: profile }, { data: credits, error: creditsError }] = await Promise.all([
         supabase.from('users').select('email,professional_roles').eq('id', user.id).single(),
         supabase.from('credits')
-          .select('role,character_name,films(title,year,view_count,average_rating)')
+          .select('role,character_name,films(title,year,view_count,average_rating,liked_percent,release_type,source,youtube_watch_url,box_office_domestic,box_office_worldwide,box_office_currency,box_office_source)')
           .eq('person_id', access.person_id),
       ]);
       if (creditsError) throw creditsError;

@@ -20,6 +20,7 @@ import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatD
 import { nationalityToCountryName } from '../utils/africanCountries'
 import { fetchPersonStageCredits, getPlayDateLabel } from '../lib/plays'
 import InstagramHighlights from '../components/person/InstagramHighlights'
+import CareerPassportModal from '../components/professional/CareerPassportModal'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -163,6 +164,7 @@ const PersonDetail = () => {
   const [filmographySearch, setFilmographySearch] = useState('')
   const [filmographyView, setFilmographyView] = useState('grid')
   const [awardsOpen, setAwardsOpen] = useState(false)
+  const [passportOpen, setPassportOpen] = useState(false)
 
   const {
     isFollowing,
@@ -560,6 +562,8 @@ const PersonDetail = () => {
   // ── Career Impact Stats ────────────────────────────────────────────────
   const isImpactProfile = true // show for all profiles that have data
   const getBoxOffice = (c) => {
+    const source = c.films?.streaming_links?.box_office?.source || c.films?.box_office_source
+    if (!source) return 0
     const dom = c.films?.streaming_links?.box_office?.domestic || c.films?.box_office_domestic || 0
     return typeof dom === 'number' ? dom : parseFloat(dom) || 0
   }
@@ -692,7 +696,7 @@ const PersonDetail = () => {
                 <div className="lg:hidden w-full max-w-xl mx-auto md:mx-0">
                   <div className="grid grid-cols-2 divide-x divide-border border border-border rounded-2xl bg-surface shadow-lg overflow-hidden">
                     <div className="flex flex-col items-start px-4 sm:px-6 py-5 gap-1.5 min-w-0">
-                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">Box Office</p>
+                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">Reported Film Box Office</p>
                       {hasBoxOffice
                         ? <p className="text-brand text-[clamp(1.6rem,8vw,2.25rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtMoney(displayBoxOffice)}</p>
                         : <p className="text-text-muted text-3xl font-black font-heading leading-none">—</p>}
@@ -705,7 +709,7 @@ const PersonDetail = () => {
                     </div>
                   </div>
                   <p className="text-text-muted/60 text-[9px] font-semibold mt-1.5 tracking-wider uppercase">
-                    {leadBoxOffice > 0 ? 'Starring roles' : 'Career total'}
+                    Source-backed credited productions · not personal earnings
                   </p>
                 </div>
               )}
@@ -774,12 +778,18 @@ const PersonDetail = () => {
                   </a>
                 )}
                 
-                <ShareAction 
-                  title={person.name}
-                  text={`Check out ${person.name}'s profile on MuviDB`}
-                  className="!w-auto"
-                  containerClassName="w-auto flex-shrink-0"
-                />
+                {person.claimed_by ? (
+                  <button onClick={() => setPassportOpen(true)} className="inline-flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded-lg border border-brand/40 bg-brand/5 px-5 py-3 text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white">
+                    <Icon icon="solar:passport-linear" width="17" /> Share Career Passport
+                  </button>
+                ) : (
+                  <ShareAction
+                    title={person.name}
+                    text={`Check out ${person.name}'s profile on MuviDB`}
+                    className="!w-auto"
+                    containerClassName="w-auto flex-shrink-0"
+                  />
+                )}
 
                 {(person.instagram_url || person.facebook_url || person.twitter_url) && (
                   <div className="h-6 w-[1px] bg-border mx-2 self-center flex-shrink-0" />
@@ -830,7 +840,7 @@ const PersonDetail = () => {
 
                   {/* Box Office */}
                   <div className="flex flex-col items-start px-7 pt-8 pb-6 gap-2 border-b border-border min-w-0">
-                    <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Box Office</p>
+                    <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Reported Film Box Office</p>
                     {hasBoxOffice
                       ? <p className="text-brand text-[clamp(2rem,3vw,3.5rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtMoney(displayBoxOffice)}</p>
                       : <p className="text-text-muted text-4xl font-black font-heading leading-none">—</p>}
@@ -846,7 +856,7 @@ const PersonDetail = () => {
 
                 </div>
                 <p className="text-text-muted/50 text-[9px] font-semibold mt-2 ml-1 tracking-wider uppercase">
-                  {leadBoxOffice > 0 ? 'Starring roles' : 'Career total'}
+                  Source-backed credited productions · not personal earnings
                 </p>
               </div>
             )}
@@ -1004,6 +1014,8 @@ const PersonDetail = () => {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-80" />
                       {(() => {
+                        const source = film?.streaming_links?.box_office?.source || film?.box_office_source;
+                        if (!source) return null;
                         const dom = film?.streaming_links?.box_office?.domestic || film?.box_office_domestic || 0;
                         if (!dom) return null;
                         const num = typeof dom === 'number' ? dom : parseFloat(dom) || 0;
@@ -1307,6 +1319,11 @@ const PersonDetail = () => {
                     {formatViewCount(channel.subscriber_count)} Subscribers • {toTitleCase(channel.category || 'Official')}
                   </p>
                 )}
+                {Number(person.youtube_stats?.views) > 0 && (
+                  <p className="-mt-2 mb-4 text-[10px] font-black tracking-widest text-red-400">
+                    {formatViewCount(person.youtube_stats.views)} Channel views · synced from YouTube
+                  </p>
+                )}
                 {channel.description && (
                   <p className="text-text-muted text-xs line-clamp-2 leading-relaxed italic opacity-80">
                     {toSentenceCase(channel.description)}
@@ -1322,6 +1339,7 @@ const PersonDetail = () => {
             </Link>
           </div>
         )}
+        {passportOpen && <CareerPassportModal person={person} credits={person.credits || []} onClose={() => setPassportOpen(false)} />}
       </div>
     </div>
   )

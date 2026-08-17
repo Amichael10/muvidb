@@ -96,6 +96,7 @@ export const fetchChannelData = async (identifier) => {
       thumbnail: channel.snippet.thumbnails?.high?.url || channel.snippet.thumbnails?.default?.url,
       banner: channel.brandingSettings?.image?.bannerExternalUrl,
       subscribers: channel.statistics?.subscriberCount || '0',
+      views: channel.statistics?.viewCount || '0',
       videos: channel.statistics?.videoCount || '0',
       lastUpdated: new Date().toISOString()
     };

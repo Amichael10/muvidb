@@ -4,6 +4,8 @@ import { toast } from 'react-hot-toast';
 import { suggestPersonEdit } from '../../lib/contributions';
 import { uploadContributionImage } from '../../lib/imageUpload';
 import { getChangedProfileFields } from '../../lib/professionalProfile';
+import { extractChannelIdentifier, fetchChannelData } from '../../lib/youtube';
+import { formatViewCount } from '../../utils/youtube';
 
 const fieldClass = 'mt-2 w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10';
 
@@ -17,7 +19,6 @@ const fields = [
   ['twitter_url', 'X / Twitter', 'url', 'https://x.com/yourname'],
   ['tiktok_url', 'TikTok', 'url', 'https://tiktok.com/@yourname'],
   ['facebook_url', 'Facebook', 'url', 'https://facebook.com/yourname'],
-  ['youtube_handle', 'YouTube handle', 'text', '@yourchannel'],
 ];
 
 export default function ProfileEditorModal({ person, onClose, onSaved }) {
@@ -26,6 +27,26 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
   const [bio, setBio] = useState(person?.bio || '');
   const [photo, setPhoto] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [youtubeInput, setYoutubeInput] = useState(person.youtube_channel_id ? `https://youtube.com/channel/${person.youtube_channel_id}` : (person.youtube_handle || ''));
+  const [youtubePreview, setYoutubePreview] = useState(person.youtube_stats || null);
+  const [checkingYoutube, setCheckingYoutube] = useState(false);
+
+  const checkYoutube = async () => {
+    const identifier = extractChannelIdentifier(youtubeInput.trim());
+    if (!identifier) return toast.error('Enter a YouTube channel URL, handle or channel ID.');
+    setCheckingYoutube(true);
+    try {
+      const channel = await fetchChannelData(identifier);
+      setYoutubePreview(channel);
+      setValues((current) => ({ ...current, youtube_channel_id: channel.channelId, youtube_handle: channel.handle || '' }));
+      toast.success('YouTube channel found. It will be connected after editorial review.');
+    } catch (error) {
+      console.error('YouTube channel lookup failed', error);
+      toast.error('We couldn’t find that channel. Check the link or handle and try again.');
+    } finally {
+      setCheckingYoutube(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -81,7 +102,7 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
               <Icon icon="solar:camera-add-linear" width="18" /> Choose headshot
               <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} />
             </label>
-            <p className="mt-2 text-center text-[10px] leading-4 text-text-muted">PNG, JPEG or WebP · up to 5 MB</p>
+            <p className="mt-2 text-center text-[10px] leading-4 text-text-muted">PNG, JPEG or WebP · large photos are compressed automatically</p>
           </aside>
 
           <div>
@@ -96,6 +117,11 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
                 <span className="flex items-center justify-between text-xs font-bold text-text-primary"><span>Professional bio</span><span className="font-medium text-text-muted">{bio.length}/1200</span></span>
                 <textarea value={bio} maxLength={1200} rows={7} onChange={(event) => setBio(event.target.value)} placeholder="Introduce your work, experience and career highlights in a few clear paragraphs." className={fieldClass} />
               </label>
+              <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-5">
+                <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-500/10 text-red-400"><Icon icon="logos:youtube-icon" width="22" /></span><div><p className="text-sm font-black text-text-primary">Connect your YouTube channel</p><p className="mt-1 text-xs leading-5 text-text-muted">Enter a channel link, @handle or channel ID. MuviDB previews it now and starts syncing analytics after approval.</p></div></div>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row"><input value={youtubeInput} onChange={(event) => setYoutubeInput(event.target.value)} placeholder="https://youtube.com/@yourchannel" className={`${fieldClass} mt-0 flex-1`} /><button type="button" disabled={checkingYoutube} onClick={checkYoutube} className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-xs font-black text-red-400 disabled:opacity-50">{checkingYoutube ? 'Checking…' : 'Preview channel'}</button></div>
+                {youtubePreview && <div className="mt-4 flex items-center gap-4 rounded-xl border border-white/10 bg-white/[.03] p-4"><img src={youtubePreview.thumbnail || '/images/person-placeholder.png'} alt="" className="h-12 w-12 rounded-full object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-text-primary">{youtubePreview.title || youtubePreview.handle || 'Connected channel'}</p><p className="mt-1 text-[10px] text-text-muted">{formatViewCount(youtubePreview.subscribers || 0)} subscribers · {formatViewCount(youtubePreview.views || 0)} channel views · {formatViewCount(youtubePreview.videos || 0)} videos</p></div><Icon icon="solar:verified-check-bold" width="22" className="text-emerald-400" /></div>}
+              </div>
             </div>
 
             <div className="mt-7 flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">

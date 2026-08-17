@@ -6,6 +6,14 @@ type FilmCredit = {
     year?: number | null;
     view_count?: number | null;
     average_rating?: number | null;
+    liked_percent?: number | null;
+    release_type?: string | null;
+    source?: string | null;
+    youtube_watch_url?: string | null;
+    box_office_domestic?: number | null;
+    box_office_worldwide?: number | null;
+    box_office_currency?: string | null;
+    box_office_source?: string | null;
   } | null;
 };
 
@@ -17,8 +25,8 @@ export type ProfessionalCvData = {
     biography?: string | null;
     nationality?: string | null;
     known_for_department?: string | null;
-    profile_views?: number | null;
     slug?: string | null;
+    youtube_stats?: Record<string, unknown> | null;
   };
   email?: string | null;
   professionalRoles?: string[];
@@ -52,6 +60,18 @@ function roleLabel(value: unknown) {
 
 function number(value: unknown) {
   return Math.max(0, Number(value) || 0).toLocaleString('en-US');
+}
+
+function money(value: unknown, currency = 'NGN') {
+  const amount = Math.max(0, Number(value) || 0);
+  const prefix = currency === 'NGN' ? 'NGN ' : `${ascii(currency)} `;
+  if (amount >= 1_000_000_000) return `${prefix}${(amount / 1_000_000_000).toFixed(2)}B`;
+  if (amount >= 1_000_000) return `${prefix}${(amount / 1_000_000).toFixed(1)}M`;
+  return `${prefix}${number(amount)}`;
+}
+
+function isYoutubeFilm(film: FilmCredit['films']) {
+  return Boolean(film?.youtube_watch_url || film?.release_type === 'youtube' || film?.source === 'youtube');
 }
 
 function wrap(value: unknown, maxChars: number) {
@@ -100,9 +120,12 @@ function buildPageContent(data: ProfessionalCvData) {
   const credits = [...(data.credits || [])].sort((a, b) => (Number(b.films?.year) || 0) - (Number(a.films?.year) || 0));
   const shownCredits = data.format === 'resume' ? credits.slice(0, 12) : credits;
   const roles = (data.professionalRoles?.length ? data.professionalRoles : [data.person.known_for_department || 'Film professional']).map(roleLabel);
-  const totalFilmViews = credits.reduce((sum, credit) => sum + (Number(credit.films?.view_count) || 0), 0);
-  const years = credits.map((credit) => Number(credit.films?.year) || 0).filter(Boolean);
-  const span = years.length ? `${Math.min(...years)} - ${Math.max(...years)}` : 'Not available';
+  const youtubeViews = Number(data.person.youtube_stats?.views) || 0;
+  const youtubeSubscribers = Number(data.person.youtube_stats?.subscribers) || 0;
+  const reportedBoxOffice = credits.reduce((sum, credit) => {
+    const film = credit.films;
+    return sum + (film?.box_office_source ? Number(film.box_office_domestic || film.box_office_worldwide) || 0 : 0);
+  }, 0);
   const subtitle = `${roles.join(' | ')}${data.person.nationality ? ` | ${ascii(data.person.nationality)}` : ''}`;
   const pages: string[][] = [[]];
   let page = pages[0];
@@ -124,11 +147,17 @@ function buildPageContent(data: ProfessionalCvData) {
   y -= 12;
 
   const metricTop = y;
+  const metrics = [{ label: 'VERIFIED CREDITS', value: number(credits.length) }];
+  if (youtubeViews) metrics.push({ label: 'YOUTUBE CHANNEL VIEWS', value: number(youtubeViews) });
+  if (youtubeSubscribers) metrics.push({ label: 'YOUTUBE SUBSCRIBERS', value: number(youtubeSubscribers) });
+  if (reportedBoxOffice) metrics.push({ label: 'REPORTED FILM BOX OFFICE', value: money(reportedBoxOffice) });
   page.push(`0.97 0.97 0.975 rg 44 ${metricTop - 68} 507 68 re f`);
-  page.push(text(58, metricTop - 20, 8, 'VERIFIED CREDITS', true, '0.45 0.47 0.5'), text(58, metricTop - 46, 17, number(credits.length), true));
-  page.push(text(190, metricTop - 20, 8, 'PROFILE VIEWS', true, '0.45 0.47 0.5'), text(190, metricTop - 46, 17, number(data.person.profile_views), true));
-  page.push(text(322, metricTop - 20, 8, 'FILM CATALOGUE VIEWS', true, '0.45 0.47 0.5'), text(322, metricTop - 46, 17, number(totalFilmViews), true));
-  page.push(text(470, metricTop - 20, 8, 'CAREER SPAN', true, '0.45 0.47 0.5'), text(470, metricTop - 46, 11, span, true));
+  const metricWidth = 507 / metrics.length;
+  metrics.forEach((metric, index) => {
+    const x = 58 + metricWidth * index;
+    page.push(text(x, metricTop - 20, metrics.length > 3 ? 6.7 : 8, metric.label, true, '0.45 0.47 0.5'));
+    page.push(text(x, metricTop - 46, metrics.length > 3 ? 13 : 17, metric.value, true));
+  });
   y = metricTop - 92;
 
   const startFilmographyPage = () => {
@@ -140,7 +169,7 @@ function buildPageContent(data: ProfessionalCvData) {
     y -= 22;
     page.push(text(MARGIN, y, 8, 'YEAR', true, '0.45 0.47 0.5'));
     page.push(text(88, y, 8, 'TITLE / CREDIT', true, '0.45 0.47 0.5'));
-    page.push(text(455, y, 8, 'FILM VIEWS', true, '0.45 0.47 0.5'));
+    page.push(text(405, y, 8, 'VERIFIED ANALYTICS', true, '0.45 0.47 0.5'));
     y -= 10;
     page.push(line(MARGIN, y, PAGE_WIDTH - MARGIN, y));
     y -= 18;
@@ -156,10 +185,15 @@ function buildPageContent(data: ProfessionalCvData) {
     const film = credit.films || {};
     const creditLine = `${roleLabel(credit.role || 'Credit')}${credit.character_name ? ` as ${ascii(credit.character_name)}` : ''}`;
     page.push(text(MARGIN, y, 9, film.year || '-', true));
-    page.push(text(88, y, 9.4, ascii(film.title || 'Untitled production').slice(0, 62), true));
-    page.push(text(455, y, 9, number(film.view_count), true));
+    page.push(text(88, y, 9.4, ascii(film.title || 'Untitled production').slice(0, 50), true));
+    const analytics = [];
+    if (isYoutubeFilm(film) && Number(film.view_count) > 0) analytics.push(`${number(film.view_count)} YouTube views`);
+    const boxOffice = Number(film.box_office_domestic || film.box_office_worldwide) || 0;
+    if (boxOffice > 0 && film.box_office_source) analytics.push(`${money(boxOffice, film.box_office_currency || 'NGN')} reported box office`);
+    if (film.average_rating) analytics.push(`Rating ${Number(film.average_rating).toFixed(1)}/10`);
+    page.push(text(405, y, 8.2, analytics[0] || '-', true));
     page.push(text(88, y - 13, 8.2, creditLine.slice(0, 75), false, '0.4 0.42 0.45'));
-    if (film.average_rating) page.push(text(455, y - 13, 8, `Rating ${Number(film.average_rating).toFixed(1)}/10`, false, '0.4 0.42 0.45'));
+    if (analytics[1]) page.push(text(405, y - 13, 7.3, analytics[1], false, '0.4 0.42 0.45'));
     y -= 34;
     page.push(line(88, y + 8, PAGE_WIDTH - MARGIN, y + 8, '0.92 0.92 0.93'));
   }
@@ -168,7 +202,7 @@ function buildPageContent(data: ProfessionalCvData) {
     page.push(text(MARGIN, Math.max(y - 4, 58), 8, `${credits.length - shownCredits.length} additional verified credits available on MuviDB.`, false, '0.45 0.47 0.5'));
   }
 
-  page.push(text(MARGIN, 52, 7.2, 'Analytics note: profile and film views are MuviDB-recorded catalogue metrics, not box-office or streaming revenue.', false, '0.45 0.47 0.5'));
+  page.push(text(MARGIN, 52, 7.2, 'Analytics note: YouTube metrics are synced from the linked channel. Box-office figures are source-backed production totals, not personal earnings.', false, '0.45 0.47 0.5'));
   const totalPages = pages.length;
   pages.forEach((commands, index) => commands.push(...pageFooter(index + 1, totalPages, generatedDate)));
   return pages.map((commands) => commands.join('\n'));

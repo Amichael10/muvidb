@@ -189,7 +189,7 @@ describe('actor claims admin handler', () => {
   it('exports a private PDF for the verified profile owner', async () => {
     testState.cvAccess = {
       person_id: 'person-id',
-      people: { name: 'Ada Actor', bio: 'Professional biography.', nationality: 'Nigerian', known_for_department: 'Acting', profile_views: 500, slug: 'ada-actor' },
+      people: { name: 'Ada Actor', bio: 'Professional biography.', nationality: 'Nigerian', known_for_department: 'Acting', youtube_stats: { views: '25000' }, slug: 'ada-actor' },
     };
     testState.cvCredits.push({ role: 'actor', character_name: 'Ada', films: { title: 'Example Film', year: 2026, view_count: 2500, average_rating: 7.2 } });
     const res = response();

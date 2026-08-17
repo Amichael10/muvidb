@@ -12,8 +12,8 @@ function sample(format: 'resume' | 'detailed', creditCount = 4) {
       bio: 'Ada Example is an award-winning actor and producer working across African film and television.',
       nationality: 'Nigerian',
       known_for_department: 'Acting',
-      profile_views: 12500,
       slug: 'ada-example',
+      youtube_stats: { views: '3200000', subscribers: '84500', videos: '74' },
     },
     credits: Array.from({ length: creditCount }, (_, index) => ({
       role: index % 2 ? 'producer' : 'actor',
@@ -23,6 +23,12 @@ function sample(format: 'resume' | 'detailed', creditCount = 4) {
         year: 2026 - index,
         view_count: 100000 + index * 2500,
         average_rating: 7.5,
+        release_type: 'youtube',
+        source: 'youtube',
+        youtube_watch_url: 'https://youtube.com/watch?v=abcdefghijk',
+        box_office_domestic: index === 0 ? 125000000 : null,
+        box_office_currency: 'NGN',
+        box_office_source: index === 0 ? 'CEAN Official' : null,
       },
     })),
   });
@@ -35,8 +41,11 @@ describe('professional CV PDF', () => {
     expect(content.startsWith('%PDF-1.4')).toBe(true);
     expect(content).toContain('/Type /Pages /Count 1');
     expect(content).toContain('(Ada Example is an award-winning actor and producer working across African film and television.)');
-    expect(content).toContain('(FILM CATALOGUE VIEWS)');
-    expect(content).toContain('(Analytics note: profile and film views are MuviDB-recorded catalogue metrics, not box-office or streaming revenue.)');
+    expect(content).toContain('(YOUTUBE CHANNEL VIEWS)');
+    expect(content).toContain('(REPORTED FILM BOX OFFICE)');
+    expect(content).not.toContain('(PROFILE VIEWS)');
+    expect(content).not.toContain('(CAREER SPAN)');
+    expect(content).toContain('(Analytics note: YouTube metrics are synced from the linked channel. Box-office figures are source-backed production totals, not personal earnings.)');
   });
 
   it('paginates a detailed filmography and includes page numbering', () => {

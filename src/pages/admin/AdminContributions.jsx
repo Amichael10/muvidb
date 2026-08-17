@@ -15,6 +15,7 @@ import {
   CONTENT_TYPE_OPTIONS,
 } from '../../lib/contributions';
 import { signedContributionUrl, publishContributionImage, deleteContributionImage } from '../../lib/imageUpload';
+import { fetchChannelData } from '../../lib/youtube';
 
 // Map a single submitted social URL to the right people.* column.
 function socialField(url = '') {
@@ -524,6 +525,7 @@ export default function AdminContributions() {
       let appliedSummary = '';
       let editedKeys = [];
       const notes = [];
+      let approvedYoutube = null;
 
       if (item.type === 'new_person') {
         const { picked, edited } = pickValues(item, sel, editRow);
@@ -666,6 +668,23 @@ export default function AdminContributions() {
           if (coerced.skipped.length) notes.push(`not applied (bad value): ${coerced.skipped.join(', ')}`);
         } else {
           update = { ...picked };
+          if (update.youtube_channel_id) {
+            const channel = await fetchChannelData({ type: 'id', value: update.youtube_channel_id });
+            const { data: currentPerson } = await supabase.from('people').select('youtube_stats').eq('id', item.target_id).single();
+            update.youtube_channel_id = channel.channelId;
+            update.youtube_handle = channel.handle || update.youtube_handle || null;
+            update.youtube_stats = {
+              ...(currentPerson?.youtube_stats || {}),
+              title: channel.title,
+              subscribers: channel.subscribers,
+              views: channel.views,
+              videos: channel.videos,
+              thumbnail: channel.thumbnail,
+              banner: channel.banner,
+              last_updated: channel.lastUpdated,
+            };
+            approvedYoutube = channel;
+          }
         }
 
         if (wantImage) {
@@ -681,6 +700,29 @@ export default function AdminContributions() {
         const table = item.type === 'edit_film' ? 'films' : 'people';
         const { error: upErr } = await supabase.from(table).update(update).eq('id', item.target_id);
         if (upErr) throw upErr;
+
+        if (item.type === 'edit_person' && approvedYoutube) {
+          const channelUpdate = {
+            name: approvedYoutube.title,
+            channel_id: approvedYoutube.channelId,
+            channel_handle: approvedYoutube.handle || null,
+            channel_url: `https://www.youtube.com/channel/${approvedYoutube.channelId}`,
+            subscriber_count: Number(approvedYoutube.subscribers) || 0,
+            thumbnail_url: approvedYoutube.thumbnail || null,
+            banner_url: approvedYoutube.banner || null,
+            owner_person_id: item.target_id,
+            owner_name: update.name || approvedYoutube.title,
+            category: 'Celebrity',
+            sync_enabled: true,
+          };
+          const { data: existingChannel } = await supabase.from('channels').select('id').eq('channel_id', approvedYoutube.channelId).limit(1).maybeSingle();
+          const channelWrite = existingChannel?.id
+            ? supabase.from('channels').update(channelUpdate).eq('id', existingChannel.id)
+            : supabase.from('channels').insert(channelUpdate);
+          const { error: channelError } = await channelWrite;
+          if (channelError) throw channelError;
+          notes.push('YouTube channel connected and queued for ongoing sync');
+        }
 
         appliedSummary = `Applied: ${Object.keys(update).join(', ')}`;
       } else {

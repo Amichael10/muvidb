@@ -219,6 +219,26 @@ export async function runVideosSync() {
         if (updateData.thumbnail_url !== ch.thumbnail_url || updateData.banner_url !== ch.banner_url || updateData.subscriber_count !== ch.subscriber_count || updateData.channel_id !== ch.channel_id) {
           await supabase.from('channels').update(updateData).eq('id', ch.id);
         }
+
+        // Claimed professionals keep a compact snapshot on people so their
+        // dashboard and CV can load channel analytics without another API call.
+        if (ch.owner_person_id) {
+          const { data: owner } = await supabase.from('people').select('youtube_stats').eq('id', ch.owner_person_id).single();
+          await supabase.from('people').update({
+            youtube_channel_id: discoveredChannelId,
+            youtube_handle: item.snippet?.customUrl || null,
+            youtube_stats: {
+              ...(owner?.youtube_stats || {}),
+              title: item.snippet?.title || ch.name,
+              subscribers: item.statistics?.subscriberCount || '0',
+              views: item.statistics?.viewCount || '0',
+              videos: item.statistics?.videoCount || '0',
+              thumbnail: updateData.thumbnail_url,
+              banner: updateData.banner_url,
+              last_updated: new Date().toISOString(),
+            },
+          }).eq('id', ch.owner_person_id);
+        }
       }
 
       if (!uploadsId) continue;

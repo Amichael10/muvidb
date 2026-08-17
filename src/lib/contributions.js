@@ -38,6 +38,7 @@ export const PERSON_EDIT_FIELDS = [
   { key: 'twitter_url', label: 'X / Twitter', kind: 'url', placeholder: 'https://x.com/…' },
   { key: 'tiktok_url', label: 'TikTok', kind: 'url', placeholder: 'https://tiktok.com/@…' },
   { key: 'facebook_url', label: 'Facebook', kind: 'url', placeholder: 'https://facebook.com/…' },
+  { key: 'youtube_channel_id', label: 'YouTube channel ID', kind: 'text', placeholder: 'UC…' },
   { key: 'youtube_handle', label: 'YouTube handle', kind: 'text', placeholder: '@channel' },
 ];
 

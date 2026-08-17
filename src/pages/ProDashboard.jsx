@@ -11,6 +11,8 @@ import { getProfileProgress } from '../lib/professionalProfile';
 import { formatViewCount } from '../utils/youtube';
 import CreditRequestModal from '../components/professional/CreditRequestModal';
 import ProfileEditorModal from '../components/professional/ProfileEditorModal';
+import CareerPassportModal from '../components/professional/CareerPassportModal';
+import CareerPassportWelcome from '../components/professional/CareerPassportWelcome';
 
 const OPEN_STATUSES = ['submitted', 'pending', 'in_review', 'needs_information'];
 
@@ -38,6 +40,18 @@ function EmptyState({ icon, title, body, action }) {
   return <div className="rounded-2xl border border-dashed border-white/10 bg-white/[.02] px-6 py-9 text-center"><Icon icon={icon} width="30" className="mx-auto text-brand" /><h3 className="mt-3 text-sm font-black text-text-primary">{title}</h3><p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-text-muted">{body}</p>{action}</div>;
 }
 
+function formatMoney(value, currency = 'NGN') {
+  const amount = Number(value) || 0;
+  const prefix = currency === 'NGN' ? '₦' : `${currency} `;
+  if (amount >= 1_000_000_000) return `${prefix}${(amount / 1_000_000_000).toFixed(2)}B`;
+  if (amount >= 1_000_000) return `${prefix}${(amount / 1_000_000).toFixed(1)}M`;
+  return `${prefix}${amount.toLocaleString()}`;
+}
+
+function isYoutubeFilm(film = {}) {
+  return Boolean(film.youtube_watch_url || film.release_type === 'youtube' || film.source === 'youtube');
+}
+
 export default function ProDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -50,6 +64,8 @@ export default function ProDashboard() {
   const [profileRequests, setProfileRequests] = useState([]);
   const [addingCredit, setAddingCredit] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [passportOpen, setPassportOpen] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [exporting, setExporting] = useState(null);
 
   const load = useCallback(async () => {
@@ -93,6 +109,16 @@ export default function ProDashboard() {
     else load();
   }, [load, navigate, user?.role]);
 
+  useEffect(() => {
+    const personId = access?.person_id || access?.people?.id;
+    if (!user?.id || !personId || typeof window === 'undefined') return;
+    const key = `muvidb:career-passport-welcome:${user.id}:${personId}:v1`;
+    if (!window.localStorage.getItem(key)) {
+      window.localStorage.setItem(key, new Date().toISOString());
+      setWelcomeOpen(true);
+    }
+  }, [access?.people?.id, access?.person_id, user?.id]);
+
   const person = access?.people;
   const progress = useMemo(() => getProfileProgress(person, credits), [person, credits]);
   const pendingRemoval = useMemo(() => new Set(creditRequests.filter((request) => request.request_type === 'remove' && OPEN_STATUSES.includes(request.status)).map((request) => request.credit_id)), [creditRequests]);
@@ -100,6 +126,14 @@ export default function ProDashboard() {
   const hasPendingProfileUpdate = profileRequests.some((request) => OPEN_STATUSES.includes(request.status));
   const sortedCredits = [...credits].sort((a, b) => (b.films?.year || 0) - (a.films?.year || 0));
   const roles = (user?.professional_roles?.length ? user.professional_roles : [person?.known_for_department || 'actor']).map(professionalRoleLabel);
+  const youtubeStats = person?.youtube_stats || {};
+  const youtubeViews = Number(youtubeStats.views) || 0;
+  const youtubeSubscribers = Number(youtubeStats.subscribers) || 0;
+  const reportedBoxOffice = credits.reduce((sum, credit) => {
+    const film = credit.films || {};
+    if (!film.box_office_source) return sum;
+    return sum + (Number(film.box_office_domestic || film.box_office_worldwide) || 0);
+  }, 0);
 
   const requestRemoval = async (credit) => {
     const reason = window.prompt(`Why should “${credit.films?.title || 'this credit'}” be removed from your filmography?`);
@@ -158,7 +192,7 @@ export default function ProDashboard() {
       <section className="relative mx-auto max-w-7xl">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-4 px-1">
           <div><p className="text-[10px] font-black uppercase tracking-[.28em] text-brand">Professional dashboard</p><h1 className="mt-2 text-2xl font-black text-text-primary md:text-3xl">Welcome back, {person.name.split(' ')[0]}</h1></div>
-          <Link to={`/people/${person.slug || person.id}`} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.03] px-4 py-2.5 text-xs font-black text-text-primary hover:border-brand/50 hover:text-brand"><Icon icon="solar:eye-linear" width="17" /> View public profile</Link>
+          <div className="flex flex-wrap gap-2"><button onClick={() => setPassportOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-brand/15"><Icon icon="solar:share-bold" width="17" /> Share Career Passport</button><Link to={`/people/${person.slug || person.id}`} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.03] px-4 py-2.5 text-xs font-black text-text-primary hover:border-brand/50 hover:text-brand"><Icon icon="solar:eye-linear" width="17" /> View public profile</Link></div>
         </div>
 
         <header className="relative overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br from-[#1d1d1d] to-[#121212] p-6 shadow-2xl md:p-8">
@@ -180,9 +214,10 @@ export default function ProDashboard() {
           </div>
         </header>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          <MetricCard icon="solar:eye-linear" label="Profile views" value={formatViewCount(person.profile_views || 0)} detail="People discovering your work" />
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard icon="solar:clapperboard-play-linear" label="Published credits" value={credits.length} detail="Credits verified by MuviDB" />
+          <MetricCard icon="logos:youtube-icon" label="YouTube channel views" value={youtubeViews ? formatViewCount(youtubeViews) : '—'} detail={youtubeViews ? 'Synced from your linked channel' : 'Connect a channel to begin syncing'} />
+          <MetricCard icon="solar:ticket-sale-linear" label="Reported film box office" value={reportedBoxOffice ? formatMoney(reportedBoxOffice) : '—'} detail={reportedBoxOffice ? 'Source-backed credited productions' : 'Appears when sourced figures exist'} />
           <MetricCard icon="solar:inbox-linear" label="Open requests" value={openRequests.length} detail="Currently with the editorial team" />
         </div>
 
@@ -192,7 +227,7 @@ export default function ProDashboard() {
               <div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-brand">Career</p><h2 className="mt-1 text-xl font-black text-text-primary">Published filmography</h2></div><button onClick={() => setAddingCredit(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-3 text-xs font-black text-white"><Icon icon="solar:add-circle-bold" width="17" /> Add a credit</button></div>
               <div className="mt-5 space-y-3">
                 {sortedCredits.length === 0 && <EmptyState icon="solar:clapperboard-text-linear" title="Build your filmography" body="Search the MuviDB catalogue or submit a missing production. An editor will verify each credit." action={<button onClick={() => setAddingCredit(true)} className="mt-4 text-xs font-black text-brand">Add your first credit →</button>} />}
-                {sortedCredits.map((credit) => <article key={credit.id} className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[.015] p-3.5 transition hover:border-brand/25"><img src={credit.films?.poster_url || '/images/film-placeholder.webp'} alt="" className="h-20 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><Link to={`/films/${credit.films?.slug || credit.film_id}`} className="block truncate text-sm font-black text-text-primary group-hover:text-brand">{credit.films?.title || 'Unknown film'}</Link><p className="mt-1 text-xs text-text-muted">{formatRole(credit.role)}{credit.character_name ? ` as ${credit.character_name}` : ''} · {credit.films?.year || 'Year unknown'}</p><p className="mt-2 text-[10px] font-bold text-brand"><Icon icon="solar:eye-linear" className="mr-1 inline" />{formatViewCount(credit.films?.view_count || 0)} film views</p></div><button disabled={pendingRemoval.has(credit.id)} onClick={() => requestRemoval(credit)} className="rounded-lg border border-white/10 px-3 py-2 text-[9px] font-black text-text-muted hover:border-red-500/40 hover:text-red-400 disabled:opacity-50">{pendingRemoval.has(credit.id) ? 'Removal pending' : 'Request removal'}</button></article>)}
+                {sortedCredits.map((credit) => { const film = credit.films || {}; const boxOffice = Number(film.box_office_domestic || film.box_office_worldwide) || 0; return <article key={credit.id} className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[.015] p-3.5 transition hover:border-brand/25"><img src={film.poster_url || '/images/film-placeholder.webp'} alt="" className="h-20 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><Link to={`/films/${film.slug || credit.film_id}`} className="block truncate text-sm font-black text-text-primary group-hover:text-brand">{film.title || 'Unknown film'}</Link><p className="mt-1 text-xs text-text-muted">{formatRole(credit.role)}{credit.character_name ? ` as ${credit.character_name}` : ''} · {film.year || 'Year unknown'}</p><div className="mt-2 flex flex-wrap gap-2">{isYoutubeFilm(film) && Number(film.view_count) > 0 && <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-[9px] font-black text-red-300"><Icon icon="logos:youtube-icon" className="mr-1 inline" />{formatViewCount(film.view_count)} views</span>}{film.average_rating > 0 && <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[9px] font-black text-amber-300"><Icon icon="solar:star-bold" className="mr-1 inline" />{Number(film.average_rating).toFixed(1)}/10</span>}{boxOffice > 0 && film.box_office_source && <span title={`Source: ${film.box_office_source}`} className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black text-emerald-300"><Icon icon="solar:ticket-sale-linear" className="mr-1 inline" />{formatMoney(boxOffice, film.box_office_currency || 'NGN')} reported</span>}</div></div><button disabled={pendingRemoval.has(credit.id)} onClick={() => requestRemoval(credit)} className="rounded-lg border border-white/10 px-3 py-2 text-[9px] font-black text-text-muted hover:border-red-500/40 hover:text-red-400 disabled:opacity-50">{pendingRemoval.has(credit.id) ? 'Removal pending' : 'Request removal'}</button></article>; })}
               </div>
             </section>
 
@@ -207,6 +242,7 @@ export default function ProDashboard() {
           </div>
 
           <aside className="space-y-6">
+            {(person.youtube_channel_id || youtubeViews || youtubeSubscribers) && <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#171717]"><div className="h-20 bg-gradient-to-r from-red-500/20 via-brand/10 to-transparent" /><div className="p-6 pt-0"><div className="-mt-8 flex items-end gap-3"><img src={youtubeStats.thumbnail || person.photo_url || '/images/person-placeholder.png'} alt="" className="h-16 w-16 rounded-2xl border-4 border-[#171717] object-cover" /><div className="pb-1"><p className="text-[9px] font-black uppercase tracking-[.2em] text-red-400">Connected YouTube channel</p><h2 className="mt-1 text-base font-black text-text-primary">{youtubeStats.title || person.youtube_handle || person.name}</h2></div></div><div className="mt-5 grid grid-cols-3 gap-2"><div className="rounded-xl bg-white/[.03] p-3"><p className="text-[8px] font-black uppercase text-text-muted">Views</p><p className="mt-1 text-sm font-black text-text-primary">{formatViewCount(youtubeViews)}</p></div><div className="rounded-xl bg-white/[.03] p-3"><p className="text-[8px] font-black uppercase text-text-muted">Subscribers</p><p className="mt-1 text-sm font-black text-text-primary">{formatViewCount(youtubeSubscribers)}</p></div><div className="rounded-xl bg-white/[.03] p-3"><p className="text-[8px] font-black uppercase text-text-muted">Videos</p><p className="mt-1 text-sm font-black text-text-primary">{formatViewCount(youtubeStats.videos || 0)}</p></div></div><p className="mt-4 text-[10px] text-text-muted">Last synced {youtubeStats.last_updated ? new Date(youtubeStats.last_updated).toLocaleDateString() : 'after editorial approval'}</p></div></section>}
             <section className="rounded-3xl border border-white/10 bg-[#171717] p-6">
               <div className="flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-brand">Profile checklist</p><h2 className="mt-1 text-lg font-black text-text-primary">Stand out professionally</h2></div><span className="text-xs font-black text-brand">{progress.percent}%</span></div>
               <div className="mt-5 space-y-3">{progress.checks.map((check) => <div key={check.key} className="flex items-center gap-3"><span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${check.complete ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[.05] text-text-muted'}`}><Icon icon={check.complete ? 'solar:check-circle-bold' : 'solar:circle-linear'} width="15" /></span><p className={`text-xs ${check.complete ? 'text-text-muted line-through decoration-white/20' : 'font-bold text-text-primary'}`}>{check.label}</p></div>)}</div>
@@ -225,6 +261,8 @@ export default function ProDashboard() {
       </section>
       {addingCredit && <CreditRequestModal person={person} onClose={() => setAddingCredit(false)} onSaved={load} />}
       {editingProfile && <ProfileEditorModal person={person} onClose={() => setEditingProfile(false)} onSaved={load} />}
+      {welcomeOpen && <CareerPassportWelcome firstName={person.name?.split(' ')[0]} onDismiss={() => setWelcomeOpen(false)} onCreate={() => { setWelcomeOpen(false); setPassportOpen(true); }} />}
+      {passportOpen && <CareerPassportModal person={{ ...person, claimed: true }} credits={credits} personalized onClose={() => setPassportOpen(false)} />}
     </main>
   );
 }

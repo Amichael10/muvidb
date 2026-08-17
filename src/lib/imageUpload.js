@@ -10,8 +10,9 @@
 import { supabase } from './supabase';
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-const MAX_DIM = 1600;              // px, longest edge
+const MAX_ORIGINAL_BYTES = 40 * 1024 * 1024; // Browser-safety cap; never uploaded as-is.
+const TARGET_BYTES = 4.5 * 1024 * 1024;       // Leave headroom under Storage's 5 MB limit.
+const MAX_DIM = 2000;                          // px, longest edge after processing.
 
 // Verify the real file type from its leading bytes.
 async function hasImageMagicBytes(file) {
@@ -27,27 +28,54 @@ async function hasImageMagicBytes(file) {
 export async function validateImage(file) {
   if (!file) return 'No file selected.';
   if (!ALLOWED_TYPES.includes(file.type)) return 'Only PNG, JPEG or WebP images are allowed.';
-  if (file.size > MAX_BYTES) return 'Image must be under 5 MB.';
+  if (file.size > MAX_ORIGINAL_BYTES) return 'That photo is unusually large. Please choose one under 40 MB.';
   if (!(await hasImageMagicBytes(file))) return "That file doesn't look like a real image.";
   return null;
 }
 
 // Decode and re-encode to a clean WebP blob (strips metadata + any payload,
 // caps dimensions). Runs in the browser; rejects if the image can't decode.
-export function reencodeToWebp(fileOrBlob) {
+function canvasBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Encode failed'))), 'image/webp', quality);
+  });
+}
+
+export function reencodeToWebp(fileOrBlob, targetBytes = TARGET_BYTES) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(fileOrBlob);
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       URL.revokeObjectURL(url);
-      const scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
+      let scale = Math.min(1, MAX_DIM / Math.max(img.width, img.height));
+      let w = Math.max(1, Math.round(img.width * scale));
+      let h = Math.max(1, Math.round(img.height * scale));
       const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Encode failed'))), 'image/webp', 0.85);
+      try {
+        // Most portraits land under the target on the first pass. If a very
+        // detailed image does not, lower quality first and dimensions second.
+        for (let sizePass = 0; sizePass < 4; sizePass += 1) {
+          canvas.width = w;
+          canvas.height = h;
+          const context = canvas.getContext('2d', { alpha: false });
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
+          context.drawImage(img, 0, 0, w, h);
+          for (const quality of [0.88, 0.8, 0.72, 0.64, 0.56]) {
+            const blob = await canvasBlob(canvas, quality);
+            if (blob.size <= targetBytes) {
+              resolve(blob);
+              return;
+            }
+          }
+          // Keep the original aspect ratio while reducing both edges together.
+          w = Math.max(1, Math.round(w * 0.82));
+          h = Math.max(1, Math.round(h * 0.82));
+        }
+        reject(new Error('Could not compress image below upload limit'));
+      } catch (error) {
+        reject(error);
+      }
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);

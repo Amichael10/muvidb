@@ -9,7 +9,7 @@ export const PROFILE_CHECKS = [
   {
     key: 'social',
     label: 'Connect at least one professional social',
-    test: (person) => ['instagram_url', 'twitter_url', 'tiktok_url', 'facebook_url', 'youtube_handle'].some((key) => hasText(person?.[key])),
+    test: (person) => ['instagram_url', 'twitter_url', 'tiktok_url', 'facebook_url', 'youtube_channel_id', 'youtube_handle'].some((key) => hasText(person?.[key])),
   },
   { key: 'credit', label: 'Publish your first verified credit', test: (_person, credits) => (credits?.length || 0) > 0 },
 ];
