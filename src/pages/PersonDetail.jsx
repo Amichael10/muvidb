@@ -1339,7 +1339,7 @@ const PersonDetail = () => {
             </Link>
           </div>
         )}
-        {passportOpen && <CareerPassportModal person={person} credits={person.credits || []} onClose={() => setPassportOpen(false)} />}
+        {passportOpen && <CareerPassportModal person={person} credits={person.credits || []} stageCredits={stageCredits} onClose={() => setPassportOpen(false)} />}
       </div>
     </div>
   )

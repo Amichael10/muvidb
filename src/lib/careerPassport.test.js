@@ -10,11 +10,12 @@ const credits = [
 
 describe('career passport model', () => {
   it('deduplicates productions while preserving verified credit count', () => {
-    const model = buildCareerPassportModel({ person, credits, collaboratorCount: 9, baseUrl: 'https://muvidb.com/' });
+    const model = buildCareerPassportModel({ person, credits, stageCredits: [{ id: 'stage-1' }], collaboratorCount: 9, baseUrl: 'https://muvidb.com/' });
     expect(model.productions).toBe(2);
     expect(model.credits).toBe(3);
     expect(model.collaborators).toBe(9);
-    expect(model.formats).toEqual(expect.arrayContaining(['Cinema', 'YouTube']));
+    expect(model.formats).toEqual(expect.arrayContaining(['Cinema', 'YouTube', 'Theatre']));
+    expect(model.formats).not.toContain('Short Film');
     expect(model.profileUrl).toBe('https://muvidb.com/people/ada-example');
     expect(model.claimed).toBe(true);
   });

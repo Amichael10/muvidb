@@ -9,6 +9,7 @@ import { authHeaders } from '../lib/apiAuth';
 import { professionalRoleLabel } from '../lib/professionalRoles';
 import { getProfileProgress } from '../lib/professionalProfile';
 import { formatViewCount } from '../utils/youtube';
+import { fetchPersonStageCredits } from '../lib/plays';
 import CreditRequestModal from '../components/professional/CreditRequestModal';
 import ProfileEditorModal from '../components/professional/ProfileEditorModal';
 import CareerPassportModal from '../components/professional/CareerPassportModal';
@@ -60,6 +61,7 @@ export default function ProDashboard() {
   const [access, setAccess] = useState(null);
   const [claim, setClaim] = useState(null);
   const [credits, setCredits] = useState([]);
+  const [stageCredits, setStageCredits] = useState([]);
   const [creditRequests, setCreditRequests] = useState([]);
   const [profileRequests, setProfileRequests] = useState([]);
   const [addingCredit, setAddingCredit] = useState(false);
@@ -81,18 +83,21 @@ export default function ProDashboard() {
         if (claimError) throw claimError;
         setClaim(claimRow || null);
         setCredits([]);
+        setStageCredits([]);
         setCreditRequests([]);
         setProfileRequests([]);
         return;
       }
-      const [creditResponse, requestResponse, profileResponse] = await Promise.all([
+      const [creditResponse, stageCreditResponse, requestResponse, profileResponse] = await Promise.all([
         fetch(`/api/content?resource=person-credits&personId=${encodeURIComponent(accessRow.person_id)}`).then((response) => response.ok ? response.json() : Promise.reject(new Error('credits unavailable'))),
+        fetchPersonStageCredits(accessRow.person_id),
         supabase.from('actor_credit_requests').select('*').eq('submitted_by', user.id).eq('person_id', accessRow.person_id).order('created_at', { ascending: false }),
         supabase.from('contributions').select('id,status,payload,note,created_at,reviewed_at').eq('submitted_by', user.id).eq('type', 'edit_person').eq('target_id', accessRow.person_id).order('created_at', { ascending: false }),
       ]);
       if (requestResponse.error) throw requestResponse.error;
       if (profileResponse.error) throw profileResponse.error;
       setCredits(creditResponse.credits || []);
+      setStageCredits(stageCreditResponse || []);
       setCreditRequests(requestResponse.data || []);
       setProfileRequests(profileResponse.data || []);
     } catch (error) {
@@ -113,11 +118,15 @@ export default function ProDashboard() {
     const personId = access?.person_id || access?.people?.id;
     if (!user?.id || !personId || typeof window === 'undefined') return;
     const key = `muvidb:career-passport-welcome:${user.id}:${personId}:v1`;
-    if (!window.localStorage.getItem(key)) {
-      window.localStorage.setItem(key, new Date().toISOString());
-      setWelcomeOpen(true);
-    }
-  }, [access?.people?.id, access?.person_id, user?.id]);
+    if (user.career_passport_welcome_seen_at || window.localStorage.getItem(key)) return;
+
+    const seenAt = new Date().toISOString();
+    window.localStorage.setItem(key, seenAt);
+    setWelcomeOpen(true);
+    void supabase.auth.updateUser({ data: { career_passport_welcome_seen_at: seenAt } }).then(({ error }) => {
+      if (error) console.warn('Could not sync Career Passport welcome state', error);
+    });
+  }, [access?.people?.id, access?.person_id, user?.career_passport_welcome_seen_at, user?.id]);
 
   const person = access?.people;
   const progress = useMemo(() => getProfileProgress(person, credits), [person, credits]);
@@ -262,7 +271,7 @@ export default function ProDashboard() {
       {addingCredit && <CreditRequestModal person={person} onClose={() => setAddingCredit(false)} onSaved={load} />}
       {editingProfile && <ProfileEditorModal person={person} onClose={() => setEditingProfile(false)} onSaved={load} />}
       {welcomeOpen && <CareerPassportWelcome firstName={person.name?.split(' ')[0]} onDismiss={() => setWelcomeOpen(false)} onCreate={() => { setWelcomeOpen(false); setPassportOpen(true); }} />}
-      {passportOpen && <CareerPassportModal person={{ ...person, claimed: true }} credits={credits} personalized onClose={() => setPassportOpen(false)} />}
+      {passportOpen && <CareerPassportModal person={{ ...person, claimed: true }} credits={credits} stageCredits={stageCredits} personalized onClose={() => setPassportOpen(false)} />}
     </main>
   );
 }

@@ -41,17 +41,17 @@ export function getCareerPassportId(person = {}) {
   return `MVP-${countryCode(person.nationality)}-${String(stableNumber(person.id || person.slug || person.name)).padStart(6, '0')}`;
 }
 
-function detectFormats(credits = []) {
+function detectFormats(credits = [], stageCredits = []) {
   const formats = new Set();
   for (const credit of credits) {
     const film = credit?.films || {};
     const release = String(film.release_type || film.source || '').toLowerCase();
     if (release.includes('youtube') || film.youtube_watch_url || film.trailer_youtube_id) formats.add('YouTube');
     if (release.includes('cinema') || release.includes('theatr')) formats.add('Cinema');
-    if (release.includes('short') || Number(film.runtime) > 0 && Number(film.runtime) <= 40) formats.add('Short Film');
     if (release.includes('tv') || release.includes('television') || film.content_type === 'series') formats.add('TV');
     if (release.includes('stream') || Array.isArray(film.streaming_links) && film.streaming_links.length) formats.add('Streaming');
   }
+  if (stageCredits.length) formats.add('Theatre');
   return [...formats];
 }
 
@@ -61,7 +61,7 @@ function clipText(value, max) {
   return `${clean.slice(0, max - 1).replace(/\s+\S*$/, '')}…`;
 }
 
-export function buildCareerPassportModel({ person = {}, credits = [], collaboratorCount = 0, baseUrl = 'https://muvidb.com' }) {
+export function buildCareerPassportModel({ person = {}, credits = [], stageCredits = [], collaboratorCount = 0, baseUrl = 'https://muvidb.com' }) {
   const films = uniqueFilms(credits);
   const selectedCredits = [...films]
     .sort((a, b) => (Number(b.films?.year) || 0) - (Number(a.films?.year) || 0))
@@ -80,7 +80,7 @@ export function buildCareerPassportModel({ person = {}, credits = [], collaborat
     productions: films.length,
     credits: credits.length,
     collaborators: Math.max(0, Number(collaboratorCount) || 0),
-    formats: detectFormats(credits),
+    formats: detectFormats(credits, stageCredits),
     selectedCredits: selectedCredits.map((credit) => ({
       title: credit.films?.title || 'Untitled production',
       posterUrl: credit.films?.poster_url || '/images/film-placeholder.webp',
@@ -116,6 +116,7 @@ function loadImage(src) {
 
 async function safeImage(src, fallback) {
   try { return await loadImage(src); } catch {
+    if (!fallback) return null;
     try { return await loadImage(fallback); } catch { return null; }
   }
 }
@@ -196,6 +197,7 @@ export async function generateCareerPassportJpeg(input) {
   const model = input.profileUrl ? input : buildCareerPassportModel(input);
   await Promise.allSettled([
     document.fonts?.load('400 72px "Bebas Neue"'),
+    document.fonts?.load('500 60px Barlow'),
     document.fonts?.load('700 36px Inter'),
   ]);
   const canvas = document.createElement('canvas');
@@ -211,10 +213,19 @@ export async function generateCareerPassportJpeg(input) {
   ctx.fillStyle = ORANGE;
   for (let row = 0; row < 3; row += 1) for (let col = 0; col < 3; col += 1) ctx.beginPath(), ctx.arc(1000 + col * 14, 44 + row * 14, 3, 0, Math.PI * 2), ctx.fill();
 
-  const [logo, portrait, qr, ...posters] = await Promise.all([
+  const [logo, portrait, qr, cinemaIcon, streamingIcon, youtubeIcon, theatreIcon, tvIcon, clapperIcon, starIcon, usersIcon, actorIcon, ...posters] = await Promise.all([
     safeImage('/images/MuviDB%20Brand/MuviDB%20Icon.png', '/images/logo.png'),
     safeImage(model.photoUrl, '/images/person-placeholder.png'),
     loadImage(await QRCode.toDataURL(model.profileUrl, { width: 150, margin: 1, errorCorrectionLevel: 'M', color: { dark: BLACK, light: '#ffffff' } })),
+    safeImage('/images/career-passport/solar-reel-outline.svg'),
+    safeImage('/images/career-passport/solar-screencast-outline.svg'),
+    safeImage('/images/career-passport/youtube.svg'),
+    safeImage('/images/career-passport/solar-masks-outline.svg'),
+    safeImage('/images/career-passport/solar-tv-outline.svg'),
+    safeImage('/images/career-passport/solar-clapperboard-outline.svg'),
+    safeImage('/images/career-passport/solar-star-outline.svg'),
+    safeImage('/images/career-passport/solar-users-group-rounded-outline.svg'),
+    safeImage('/images/career-passport/solar-mask-happly-outline.svg'),
     ...model.selectedCredits.map((credit) => safeImage(credit.posterUrl, '/images/film-placeholder.webp')),
   ]);
 
@@ -226,21 +237,27 @@ export async function generateCareerPassportJpeg(input) {
 
   // Portrait panel.
   drawCover(ctx, portrait, 46, 154, 352, 478, 26);
-  ctx.strokeStyle = ORANGE; ctx.lineWidth = 2; roundRect(ctx, 46, 154, 352, 478, 26, null, ORANGE, 2);
+  ctx.save();
+  roundRect(ctx, 46, 154, 352, 478, 26, null);
+  ctx.clip();
   ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.moveTo(352, 632); ctx.lineTo(398, 575); ctx.lineTo(398, 632); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  roundRect(ctx, 46, 154, 352, 478, 26, null, ORANGE, 2);
 
   // Main identity.
   ctx.fillStyle = BLACK; ctx.font = '400 94px "Bebas Neue", Impact, sans-serif'; ctx.fillText('CAREER', 438, 206);
   ctx.fillStyle = ORANGE; ctx.font = '400 98px "Bebas Neue", Impact, sans-serif'; ctx.fillText('PASSPORT', 438, 296);
   roundRect(ctx, 438, 316, 386, 38, 7, BLACK);
   ctx.fillStyle = '#fff'; ctx.font = '700 21px Inter, sans-serif'; ctx.fillText('AFRICAN FILM PROFESSIONAL', 456, 343);
-  const nameSize = fitText(ctx, model.name.toUpperCase(), 425, 65, '"Bebas Neue", Impact, sans-serif', 400, 38);
-  ctx.fillStyle = BLACK; ctx.font = `400 ${nameSize}px "Bebas Neue", Impact, sans-serif`; ctx.fillText(model.name.toUpperCase(), 438, 430);
+  const nameWidth = model.claimed ? 365 : 570;
+  const nameSize = fitText(ctx, model.name.toUpperCase(), nameWidth, 58, 'Barlow, Inter, sans-serif', 500, 32);
+  ctx.fillStyle = BLACK; ctx.font = `500 ${nameSize}px Barlow, Inter, sans-serif`; ctx.fillText(model.name.toUpperCase(), 438, 430);
   if (model.claimed) {
     roundRect(ctx, 820, 378, 210, 42, 18, ORANGE);
     ctx.fillStyle = '#fff'; ctx.font = '700 15px Inter, sans-serif'; ctx.fillText('✓ CLAIMED PROFILE', 840, 405);
   }
   ctx.fillStyle = ORANGE; ctx.fillRect(438, 446, 46, 3);
+  if (actorIcon) ctx.drawImage(actorIcon, 438, 464, 30, 30);
   ctx.font = '700 22px Inter, sans-serif'; ctx.fillStyle = BLACK; ctx.fillText(model.role, 482, 492);
   drawMiniIcon(ctx, 'globe', 438, 510, ORANGE);
   ctx.font = '600 22px Inter, sans-serif'; ctx.fillText(model.nationality, 482, 540);
@@ -248,11 +265,11 @@ export async function generateCareerPassportJpeg(input) {
 
   // Stats strip.
   roundRect(ctx, 46, 664, 988, 96, 18, '#fff', LINE, 1.5);
-  const stats = [[model.productions, 'Productions', 'credits'], [model.credits, 'Verified credits', 'star'], [model.collaborators || '—', 'Collaborators', 'people']];
+  const stats = [[model.productions, 'Productions', clapperIcon], [model.credits, 'Verified credits', starIcon], [model.collaborators || '—', 'Collaborators', usersIcon]];
   stats.forEach(([value, label, icon], index) => {
     const x = 120 + index * 326;
     if (index) { ctx.strokeStyle = LINE; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 60, 680); ctx.lineTo(x - 60, 744); ctx.stroke(); }
-    drawMiniIcon(ctx, icon, x - 38, 690, ORANGE);
+    if (icon) ctx.drawImage(icon, x - 40, 688, 40, 40);
     ctx.fillStyle = BLACK; ctx.font = '700 40px Inter, sans-serif'; ctx.fillText(String(value), x + 18, 715);
     ctx.font = '500 17px Inter, sans-serif'; ctx.fillText(label, x + 18, 739);
   });
@@ -260,12 +277,18 @@ export async function generateCareerPassportJpeg(input) {
   // Work formats.
   roundRect(ctx, 46, 776, 988, 78, 16, '#fff', LINE, 1.5);
   ctx.fillStyle = BLACK; ctx.font = '800 18px Inter, sans-serif'; ctx.fillText('WORK', 78, 807); ctx.fillText('ACROSS', 78, 829);
-  const formatList = ['Cinema', 'Streaming', 'YouTube', 'Short Film', 'TV'];
-  formatList.forEach((format, index) => {
+  const formatList = [
+    ['Cinema', cinemaIcon],
+    ['Streaming', streamingIcon],
+    ['YouTube', youtubeIcon],
+    ['Theatre', theatreIcon],
+    ['TV', tvIcon],
+  ];
+  formatList.forEach(([format, icon], index) => {
     const x = 205 + index * 160;
     const active = model.formats.includes(format);
     ctx.globalAlpha = active ? 1 : 0.35;
-    drawMiniIcon(ctx, format === 'YouTube' || format === 'Streaming' ? 'play' : format === 'Cinema' ? 'globe' : 'screen', x, 795, ORANGE);
+    if (icon) ctx.drawImage(icon, x, 791, 38, 38);
     ctx.fillStyle = BLACK; ctx.font = '600 15px Inter, sans-serif'; ctx.fillText(format, x + 46, 818);
     ctx.globalAlpha = 1;
   });

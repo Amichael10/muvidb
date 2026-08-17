@@ -418,6 +418,7 @@ export function AuthProvider({ children }) {
     account_intent: role === 'professional' ? 'professional' : (authState.profile?.account_intent || user.user_metadata?.account_intent || 'fan'),
     professional_roles: authState.profile?.professional_roles?.length ? authState.profile.professional_roles : (user.user_metadata?.professional_roles || []),
     professional_onboarding_status: authState.profile?.professional_onboarding_status || 'not_started',
+    career_passport_welcome_seen_at: user.user_metadata?.career_passport_welcome_seen_at || null,
     onboarded: user.user_metadata?.onboarded || (role && role !== 'new_user' && role !== 'admin' && role !== 'professional') || role === 'admin'
   } : null;
 

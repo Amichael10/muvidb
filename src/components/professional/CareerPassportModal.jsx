@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import '@fontsource/bebas-neue/400.css';
+import '@fontsource/barlow/500.css';
 import { supabase } from '../../lib/supabase';
 import {
   buildCareerPassportModel,
@@ -29,7 +30,7 @@ async function getCollaboratorCount(person, credits) {
   return new Set((data || []).map((credit) => credit.person_id).filter(Boolean)).size;
 }
 
-export default function CareerPassportModal({ person, credits = [], personalized = false, onClose }) {
+export default function CareerPassportModal({ person, credits = [], stageCredits = [], personalized = false, onClose }) {
   const [blob, setBlob] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [error, setError] = useState(false);
@@ -42,7 +43,7 @@ export default function CareerPassportModal({ person, credits = [], personalized
     (async () => {
       try {
         const collaboratorCount = await getCollaboratorCount(person, credits);
-        const model = buildCareerPassportModel({ person, credits, collaboratorCount, baseUrl });
+        const model = buildCareerPassportModel({ person, credits, stageCredits, collaboratorCount, baseUrl });
         const generated = await generateCareerPassportJpeg(model);
         if (!active) return;
         objectUrl = URL.createObjectURL(generated);
@@ -57,7 +58,7 @@ export default function CareerPassportModal({ person, credits = [], personalized
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [baseUrl, credits, person]);
+  }, [baseUrl, credits, person, stageCredits]);
 
   const handleShare = async () => {
     if (!blob) return;
