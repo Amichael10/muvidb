@@ -35,20 +35,19 @@ const EDITORIAL_TASKS = new Set([
 ]);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  try {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method === 'OPTIONS') return res.status(204).end();
 
-    const task = (req.query?.task || req.body?.task || '').toString();
-    const scope = (req.query?.scope || req.body?.scope || '').toString();
+  const task = (req.query?.task || req.body?.task || '').toString();
+  const scope = (req.query?.scope || req.body?.scope || '').toString();
 
-    // Route to Editorial Handler if scope=editorial or task matches editorial task
-    if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
-      return handleEditorialTask(req, res);
-    }
+  // Route to Editorial Handler if scope=editorial or task matches editorial task
+  if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
+    return handleEditorialTask(req, res);
+  }
 
   if (req.method === 'GET' && task === 'threads_callback') {
     try {
