@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
 import { uploadAdminImage } from '../../lib/imageUpload';
-import SocialDraftComposer from '../../components/admin/SocialDraftComposer';
+import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
 
 const STATUS_TONES = {
   draft: 'blue',
@@ -30,6 +30,7 @@ const SERIES_ICONS = {
   stage_to_screen: 'solar:star-fall-linear',
   film_conversation: 'solar:dialog-linear',
   new_and_upcoming: 'solar:bell-bing-linear',
+  birthday_spotlight: 'solar:cake-linear',
 };
 
 const emptySummary = {
@@ -58,14 +59,14 @@ function Metric({ label, value, icon, tone = 'brand' }) {
   };
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-5">
-      <div className="flex items-center justify-between gap-4">
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">{label}</p>
-          <p className="mt-2 text-3xl font-black tracking-tight text-text-primary">{value}</p>
+          <p className="mt-1 text-2xl font-black tracking-tight text-text-primary">{value}</p>
         </div>
-        <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${tones[tone] || tones.brand}`}>
-          <Icon icon={icon} width="22" />
+        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tones[tone] || tones.brand}`}>
+          <Icon icon={icon} width="18" />
         </div>
       </div>
     </div>
@@ -82,7 +83,7 @@ function Pill({ children, tone = 'brand' }) {
   };
 
   return (
-    <span className={`inline-flex items-center rounded-md border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${tones[tone] || tones.brand}`}>
+    <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest ${tones[tone] || tones.brand}`}>
       {children}
     </span>
   );
@@ -90,7 +91,7 @@ function Pill({ children, tone = 'brand' }) {
 
 export default function AdminSocialStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('composer'); // 'composer' | 'drafts' | 'calendar'
+  const [activeTab, setActiveTab] = useState('composer'); // 'composer' | 'calendar' | 'drafts'
   const [summary, setSummary] = useState(emptySummary);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -104,7 +105,11 @@ export default function AdminSocialStudio() {
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [seedingCalendar, setSeedingCalendar] = useState(false);
 
-  // Custom asset upload ref
+  // Selected slot state for creating draft directly from a calendar day
+  const [selectedThemeId, setSelectedThemeId] = useState('actor_spotlight');
+  const [slotContext, setSlotContext] = useState(null);
+
+  // Custom asset upload
   const fileInputRefs = useRef({});
   const [uploadingAssetId, setUploadingAssetId] = useState(null);
 
@@ -169,7 +174,7 @@ export default function AdminSocialStudio() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success(`Generated/Refreshed ${data.seeded || 30} days of rolling content plan!`);
+      toast.success(`Refreshed ${data.seeded || 30} days of rolling content plan!`);
       await fetchCalendar();
     } catch (err) {
       toast.error(err.message || 'Failed to seed 30-day calendar');
@@ -203,7 +208,7 @@ export default function AdminSocialStudio() {
     const result = searchParams.get('threads');
     if (!result) return;
     if (result === 'connected') {
-      toast.success('Threads is connected and ready for a test post.');
+      toast.success('Threads is connected and ready for publishing.');
       fetchThreadsStatus();
     } else {
       toast.error(searchParams.get('message') || 'Threads could not be connected. Please try again.');
@@ -378,7 +383,7 @@ export default function AdminSocialStudio() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      toast.success('Custom design attached to this post!');
+      toast.success('Custom artwork attached to this draft!');
       refreshAll();
     } catch (err) {
       toast.error(err.message || 'Failed to attach custom design');
@@ -407,122 +412,107 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const handleCreateDraftFromCalendarSlot = slot => {
+    const series = slot.social_content_series || {};
+    const dateObj = new Date(slot.scheduled_date);
+    const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'long' });
+
+    // Map series slug to editor theme ID
+    const matchedTheme =
+      EDITORIAL_THEMES.find(t => t.seriesSlug === series.slug) ||
+      EDITORIAL_THEMES.find(t => t.id === series.slug) ||
+      EDITORIAL_THEMES[0];
+
+    setSelectedThemeId(matchedTheme.id);
+    setSlotContext({
+      slotId: slot.id,
+      scheduledDate: slot.scheduled_date,
+      dayName,
+      seriesName: series.name || 'Editorial Slot',
+      seriesSlug: series.slug,
+    });
+    setActiveTab('composer');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast.success(`Activated ${matchedTheme.name} for ${slot.scheduled_date} (${dayName})!`);
+  };
+
   const counts = summary.counts || emptySummary.counts;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Top Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-black tracking-tight text-text-primary">Social Studio</h1>
             <Pill tone={summary.enabled ? 'green' : 'amber'}>
-              {summary.enabled ? 'Enabled' : 'Flag off'}
+              {summary.enabled ? 'Active' : 'Flag off'}
             </Pill>
-            <Pill tone={summary.publishMode === 'live' ? 'green' : 'blue'}>
-              {summary.publishMode === 'live' ? 'Live Publishing' : 'Mock Mode'}
+            <Pill tone={threads.connection ? 'green' : 'amber'}>
+              {threads.connection ? `@${threads.connection.username}` : 'Threads Offline'}
             </Pill>
           </div>
-          <p className="mt-1 text-sm text-text-muted">
-            30-day content pipeline, AI captions with actor tags, custom artwork replacement, and Meta publishing.
+          <p className="mt-1 text-xs text-text-muted">
+            Editorial content machine: 30-day strategy, viral AI captions with actor tags, custom artwork replacement, and Meta publishing.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={refreshAll}
-            disabled={loading}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-xs font-bold text-text-primary transition-colors hover:bg-surface-2 disabled:opacity-60"
-          >
-            <Icon icon="solar:refresh-linear" width="16" />
-            Refresh
-          </button>
-          <button
-            onClick={runMockPublisher}
-            disabled={publishing || !summary.enabled}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Icon icon={publishing ? 'solar:spinner-linear' : 'solar:play-linear'} className={publishing ? 'animate-spin' : ''} width="16" />
-            Run {summary.publishMode === 'live' ? 'Live' : 'Mock'} Publisher
-          </button>
-        </div>
-      </div>
-
-      {/* Metrics Bar */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
-        <Metric label="Content Items" value={counts.contentItems} icon="solar:posts-carousel-vertical-linear" />
-        <Metric label="Drafts" value={counts.draftItems} icon="solar:document-add-linear" tone="blue" />
-        <Metric label="Scheduled" value={counts.scheduledItems} icon="solar:calendar-mark-linear" tone="amber" />
-        <Metric label="Queued Jobs" value={counts.queuedJobs} icon="solar:server-square-linear" tone="green" />
-        <Metric label="Failed Jobs" value={counts.failedJobs} icon="solar:danger-triangle-linear" tone={counts.failedJobs ? 'red' : 'green'} />
-        <Metric label="Connections" value={counts.connections} icon="solar:link-circle-linear" tone="brand" />
-      </div>
-
-      {/* Threads Connection Box */}
-      <div className="rounded-lg border border-border bg-surface p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-text-primary text-background">
-              <Icon icon="simple-icons:threads" width="21" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">Threads Publisher</h2>
-                {threads.connection ? <Pill tone="green">Connected</Pill> : <Pill tone="amber">Not connected</Pill>}
-              </div>
-              {threads.loading ? (
-                <p className="mt-1 text-sm text-text-muted">Checking connection status...</p>
-              ) : threads.connection ? (
-                <p className="mt-1 text-sm text-text-muted">
-                  Connected as <span className="font-bold text-text-primary">@{threads.connection.username}</span>
-                  {threads.connection.tokenExpiresAt ? ` • token valid until ${new Date(threads.connection.tokenExpiresAt).toLocaleDateString()}` : ''}
-                </p>
-              ) : threads.configuration?.readyForConnection ? (
-                <p className="mt-1 text-sm text-text-muted">The Meta app is ready. Connect your MuviDB Threads account to authorize publishing.</p>
-              ) : (
-                <p className="mt-1 text-sm text-text-muted">Meta App credentials configured.</p>
-              )}
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
           {threads.connection ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={connectThreads}
-                disabled={threads.connecting}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 text-xs font-bold text-text-primary disabled:opacity-50"
-              >
-                <Icon icon="solar:refresh-linear" width="16" /> Reconnect
-              </button>
-              <button
-                type="button"
-                onClick={disconnectThreadsAccount}
-                disabled={threads.connecting}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 text-xs font-bold text-red-500 disabled:opacity-50"
-              >
-                Disconnect
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={disconnectThreadsAccount}
+              disabled={threads.connecting}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-bold text-text-muted hover:text-red-500"
+            >
+              <Icon icon="simple-icons:threads" width="14" /> Disconnect
+            </button>
           ) : (
             <button
               type="button"
               onClick={connectThreads}
-              disabled={threads.loading || threads.connecting || !threads.configuration?.readyForConnection}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={threads.connecting || threads.loading}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-text-primary px-3 text-xs font-bold text-background hover:opacity-90"
             >
-              <Icon icon={threads.connecting ? 'solar:spinner-linear' : 'solar:link-circle-linear'} className={threads.connecting ? 'animate-spin' : ''} width="16" />
-              Connect Threads
+              <Icon icon="simple-icons:threads" width="14" /> Connect Threads
             </button>
           )}
+
+          <button
+            onClick={refreshAll}
+            disabled={loading}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-bold text-text-primary hover:bg-surface-2"
+          >
+            <Icon icon="solar:refresh-linear" width="14" /> Refresh
+          </button>
+
+          <button
+            onClick={runMockPublisher}
+            disabled={publishing || !summary.enabled}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-xs font-bold text-white hover:bg-brand-hover"
+          >
+            <Icon icon={publishing ? 'solar:spinner-linear' : 'solar:play-linear'} className={publishing ? 'animate-spin' : ''} width="14" />
+            Publish Due Posts
+          </button>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Overview Metrics */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <Metric label="Content Items" value={counts.contentItems} icon="solar:posts-carousel-vertical-linear" />
+        <Metric label="Active Drafts" value={counts.draftItems} icon="solar:document-add-linear" tone="blue" />
+        <Metric label="Scheduled" value={counts.scheduledItems} icon="solar:calendar-mark-linear" tone="amber" />
+        <Metric label="Queued Jobs" value={counts.queuedJobs} icon="solar:server-square-linear" tone="green" />
+        <Metric label="Failed Jobs" value={counts.failedJobs} icon="solar:danger-triangle-linear" tone={counts.failedJobs ? 'red' : 'green'} />
+        <Metric label="30-Day Plan Slots" value={calendarSlots.length} icon="solar:calendar-date-linear" tone="brand" />
+      </div>
+
+      {/* Main Tab Navigation */}
       <div className="flex border-b border-border">
         <button
           type="button"
           onClick={() => setActiveTab('composer')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
             activeTab === 'composer'
               ? 'border-brand text-brand'
               : 'border-transparent text-text-muted hover:text-text-primary'
@@ -534,37 +524,143 @@ export default function AdminSocialStudio() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('drafts')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
-            activeTab === 'drafts'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-text-muted hover:text-text-primary'
-          }`}
-        >
-          <Icon icon="solar:posts-carousel-vertical-linear" width="16" />
-          Recent Drafts ({drafts.length})
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveTab('calendar')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
             activeTab === 'calendar'
               ? 'border-brand text-brand'
               : 'border-transparent text-text-muted hover:text-text-primary'
           }`}
         >
           <Icon icon="solar:calendar-mark-linear" width="16" />
-          30-Day Content Plan ({calendarSlots.length} Slots)
+          30-Day Editorial Calendar ({calendarSlots.length} Days)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('drafts')}
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+            activeTab === 'drafts'
+              ? 'border-brand text-brand'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Icon icon="solar:posts-carousel-vertical-linear" width="16" />
+          Queue & Recent Drafts ({drafts.length})
         </button>
       </div>
 
-      {/* TAB 1: Composer */}
+      {/* TAB 1: Composer & Generator */}
       {activeTab === 'composer' && (
-        <SocialDraftComposer disabled={!summary.enabled} onGenerated={refreshAll} />
+        <SocialDraftComposer
+          disabled={!summary.enabled}
+          selectedThemeId={selectedThemeId}
+          slotContext={slotContext}
+          onClearSlot={() => setSlotContext(null)}
+          onGenerated={refreshAll}
+        />
       )}
 
-      {/* TAB 2: Recent Drafts & Publishing Queue */}
+      {/* TAB 2: 30-Day Editorial Plan */}
+      {activeTab === 'calendar' && (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
+                30-Day Rolling Editorial Content Calendar
+              </h2>
+              <p className="mt-1 text-xs text-text-muted">
+                Structured into 7 high-engagement weekday series. Click "Generate Draft" on any day to create, customize, and schedule it.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={seedCalendar}
+              disabled={seedingCalendar}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
+            >
+              <Icon icon={seedingCalendar ? 'solar:spinner-linear' : 'solar:magic-stick-3-linear'} className={seedingCalendar ? 'animate-spin' : ''} width="16" />
+              {seedingCalendar ? 'Refreshing…' : 'Refresh 30-Day Plan'}
+            </button>
+          </div>
+
+          {loadingCalendar ? (
+            <div className="rounded-lg border border-border bg-surface p-12 text-center">
+              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="28" />
+              <p className="mt-2 text-sm text-text-muted">Loading editorial calendar…</p>
+            </div>
+          ) : calendarSlots.length === 0 ? (
+            <div className="rounded-lg border border-border bg-surface p-8 text-center">
+              <Icon icon="solar:calendar-mark-linear" className="mx-auto text-text-muted" width="32" />
+              <p className="mt-2 text-sm font-bold text-text-primary">No calendar slots found</p>
+              <p className="mt-1 text-xs text-text-muted">Click the button below to generate a 30-day schedule automatically.</p>
+              <button
+                type="button"
+                onClick={seedCalendar}
+                disabled={seedingCalendar}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white"
+              >
+                Generate 30 Days Now
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {calendarSlots.map(slot => {
+                const dateObj = new Date(slot.scheduled_date);
+                const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
+                const monthDay = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                const series = slot.social_content_series || {};
+                const icon = SERIES_ICONS[series.slug] || 'solar:posts-carousel-vertical-linear';
+
+                return (
+                  <div
+                    key={slot.id}
+                    className="flex flex-col justify-between rounded-lg border border-border bg-surface p-4 transition-all hover:border-brand/50 hover:shadow-sm"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold text-text-primary">
+                          {dayName}, {monthDay}
+                        </span>
+                        <Pill tone={slot.status === 'published' ? 'green' : slot.status === 'scheduled' ? 'amber' : 'blue'}>
+                          {slot.status || 'planned'}
+                        </Pill>
+                      </div>
+
+                      <div className="mt-3 flex items-start gap-2.5">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                          <Icon icon={icon} width="18" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-black text-text-primary truncate">{series.name || 'Editorial Slot'}</h4>
+                          <p className="mt-0.5 text-[10px] text-text-muted line-clamp-2">
+                            {series.description || 'Curated Nollywood editorial post.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-text-muted">
+                        {series.category || 'Editorial'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateDraftFromCalendarSlot(slot)}
+                        className="inline-flex items-center gap-1.5 rounded bg-brand px-2.5 py-1 text-xs font-bold text-white hover:bg-brand-hover transition-colors shadow-sm"
+                      >
+                        <Icon icon="solar:magic-stick-3-linear" width="13" />
+                        Create Draft
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: Queue & Drafts List */}
       {activeTab === 'drafts' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -643,7 +739,7 @@ export default function AdminSocialStudio() {
                               className={uploadingAssetId === item.id ? 'animate-spin' : ''}
                               width="13"
                             />
-                            {uploadingAssetId === item.id ? 'Uploading...' : 'Replace Design (Canva/Poster)'}
+                            {uploadingAssetId === item.id ? 'Uploading...' : 'Replace Artwork (Canva/Poster)'}
                           </button>
                         </div>
                       </div>
@@ -746,7 +842,7 @@ export default function AdminSocialStudio() {
                     </div>
                   )}
 
-                  {/* Caption preview preview snippet */}
+                  {/* Caption preview snippet */}
                   {item.social_platform_variants?.[0]?.caption && (
                     <div className="mt-3 rounded-md bg-surface-2 p-3 text-xs text-text-muted whitespace-pre-wrap max-h-28 overflow-y-auto font-mono">
                       {item.social_platform_variants[0].caption}
@@ -758,127 +854,6 @@ export default function AdminSocialStudio() {
           )}
         </div>
       )}
-
-      {/* TAB 3: 30-Day Content Plan (Rolling Calendar) */}
-      {activeTab === 'calendar' && (
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
-                30-Day Rolling Editorial Content Plan
-              </h2>
-              <p className="mt-1 text-xs text-text-muted">
-                Each day is mapped to a high-converting weekly theme (Filmography, Critics, Where to Watch, Behind the Scenes, Weekend Watchlist, Stage, Debate).
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={seedCalendar}
-              disabled={seedingCalendar}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
-            >
-              <Icon icon={seedingCalendar ? 'solar:spinner-linear' : 'solar:magic-stick-3-linear'} className={seedingCalendar ? 'animate-spin' : ''} width="16" />
-              {seedingCalendar ? 'Generating Slots...' : 'Refresh 30-Day Plan'}
-            </button>
-          </div>
-
-          {loadingCalendar ? (
-            <div className="rounded-lg border border-border bg-surface p-12 text-center">
-              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="28" />
-              <p className="mt-2 text-sm text-text-muted">Loading 30-day content calendar...</p>
-            </div>
-          ) : calendarSlots.length === 0 ? (
-            <div className="rounded-lg border border-border bg-surface p-8 text-center">
-              <Icon icon="solar:calendar-mark-linear" className="mx-auto text-text-muted" width="32" />
-              <p className="mt-2 text-sm font-bold text-text-primary">No calendar slots found</p>
-              <p className="mt-1 text-xs text-text-muted">Click the "Refresh 30-Day Plan" button above to populate the next 30 days automatically.</p>
-              <button
-                type="button"
-                onClick={seedCalendar}
-                disabled={seedingCalendar}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white"
-              >
-                Generate 30 Days Now
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {calendarSlots.map(slot => {
-                const dateObj = new Date(slot.scheduled_date);
-                const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
-                const monthDay = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                const series = slot.social_content_series || {};
-                const icon = SERIES_ICONS[series.slug] || 'solar:posts-carousel-vertical-linear';
-
-                return (
-                  <div
-                    key={slot.id}
-                    className="flex flex-col justify-between rounded-lg border border-border bg-surface p-4 transition-all hover:border-brand/50"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold text-text-primary">
-                          {dayName}, {monthDay}
-                        </span>
-                        <Pill tone={slot.status === 'published' ? 'green' : slot.status === 'scheduled' ? 'amber' : 'blue'}>
-                          {slot.status || 'planned'}
-                        </Pill>
-                      </div>
-
-                      <div className="mt-3 flex items-start gap-2.5">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
-                          <Icon icon={icon} width="18" />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-black text-text-primary truncate">{series.name || 'Editorial Slot'}</h4>
-                          <p className="mt-0.5 text-[10px] text-text-muted line-clamp-2">
-                            {series.description || 'Curated Nollywood editorial post.'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-text-muted">
-                        Category: {series.category || 'General'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTab('composer');
-                          toast('Draft composer opened. Search source entity to generate.', { icon: '✨' });
-                        }}
-                        className="inline-flex items-center gap-1 rounded bg-brand/10 px-2 py-1 text-[11px] font-bold text-brand hover:bg-brand/20 transition-colors"
-                      >
-                        <Icon icon="solar:pen-new-square-linear" width="12" />
-                        Create Draft
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Footer Info */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border border-border bg-surface p-5">
-          <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Asset Bucket</p>
-          <p className="mt-2 break-all font-mono text-sm text-text-primary">{summary.assetBucket}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-5">
-          <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Timezone</p>
-          <p className="mt-2 font-mono text-sm text-text-primary">{summary.defaultTimezone}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-5">
-          <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Live Providers</p>
-          <p className="mt-2 text-sm font-bold text-text-primary">
-            {threads.connection ? 'Threads Connected' : 'Threads Not Connected'} • Instagram & Facebook adapter ready
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
