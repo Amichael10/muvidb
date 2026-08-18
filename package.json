@@ -31,6 +31,8 @@
     "sync:ugandan": "tsx scripts/ugandan_sync.ts",
     "sync:nollymeter": "tsx scripts/nollymeter_sync.ts",
     "sync:bap-theatre": "tsx scripts/sync_bap_theatre.ts",
+    "sync:ebony": "tsx scripts/ebonylife_sync.ts",
+    "sync:all-requested": "tsx scripts/prime_sync.ts && tsx scripts/scrape_nollistream_public.ts && tsx scripts/sync_feed_kappa.ts && tsx scripts/sync_feed_zeta.ts && tsx scripts/ebonylife_sync.ts",
     "cleanup:cinemas": "tsx scripts/cleanup-cinemas.ts",
     "fix-db": "tsx scripts/fix_db.ts",
     "db": "tsx scripts/query.ts",

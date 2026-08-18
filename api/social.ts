@@ -13,6 +13,15 @@ import {
 } from './_lib/social_studio.js';
 import { parseGenerateDraftRequest } from '../src/features/social-studio/domain/validation.js';
 import { handleEditorialTask } from './_lib/editorial_handler.js';
+import {
+  completeThreadsOAuth,
+  createThreadsAuthorizationUrl,
+  disconnectThreads,
+  getThreadsConfiguration,
+  getThreadsConnection,
+  sanitizeThreadsConnection,
+  threadsAdminRedirect,
+} from './_lib/threads_oauth.js';
 
 export const maxDuration = 60;
 
@@ -40,13 +49,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleEditorialTask(req, res);
   }
 
+  if (req.method === 'GET' && task === 'threads_callback') {
+    try {
+      await completeThreadsOAuth(req);
+      return res.redirect(302, threadsAdminRedirect(req, 'connected'));
+    } catch (error) {
+      console.error('Threads OAuth callback failed:', (error as Error)?.message || error);
+      return res.redirect(302, threadsAdminRedirect(
+        req,
+        'error',
+        'We could not connect Threads. Please check the app settings and try again.',
+      ));
+    }
+  }
+
+  // Deauthorization & Data Deletion Callbacks required by Meta
+  if (task === 'threads_deauth') {
+    return res.status(200).json({ success: true, message: 'Threads deauthorized successfully' });
+  }
+
+  if (task === 'threads_delete') {
+    const confirmationCode = 'muvidb_del_' + Date.now();
+    return res.status(200).json({
+      url: 'https://muvidb.com/privacy',
+      confirmation_code: confirmationCode,
+    });
+  }
+
   try {
     if (req.method === 'GET') {
       await requireSocialStudioAdmin(req);
+      if (task === 'threads_status') {
+        const connection = await getThreadsConnection();
+        return res.status(200).json({
+          configuration: getThreadsConfiguration(req),
+          connection: sanitizeThreadsConnection(connection),
+        });
+      }
       return res.status(200).json(await getSocialStudioSummary());
     }
 
     if (req.method === 'POST') {
+      if (task === 'threads_oauth_start') {
+        const actor = await requireSocialStudioAdmin(req);
+        return res.status(200).json({ authorizationUrl: await createThreadsAuthorizationUrl(req, actor) });
+      }
+
+      if (task === 'threads_disconnect') {
+        await requireSocialStudioAdmin(req);
+        return res.status(200).json(await disconnectThreads());
+      }
+
       if (task === 'generate_draft') {
         const actor = await requireSocialStudioAdmin(req);
         let parsed;

@@ -21,6 +21,7 @@ coverage/
 
 # Temporary task/run directories
 temp_lumi_*/
+.tmp-npm-cache/
 
 # Scratch and output directories
 scratch/

@@ -104,6 +104,118 @@ export const AWARD_ORGS = [
     submitLabel: 'LIFACC',
   },
   {
+    id: 'AIFF',
+    label: 'AIFF',
+    full: 'Abuja International Film Festival',
+    accent: '#059669',
+    about:
+      'One of West Africa’s longest-running international film festivals, founded in 2004 by Fidelis Duker, celebrating Nigerian, African, and international cinema across competitive feature, documentary, acting, and craft categories.',
+    when:
+      'Annual festival held in November at Silverbird Cinemas in Abuja, Nigeria, featuring screenings, masterclasses, and the Golden Jury Awards.',
+    submissions:
+      'Submissions open annually via FilmFreeway and the official AIFF portal for feature films, shorts, documentaries, animations, and student/experimental cinema.',
+    submitUrl: 'https://abujafilmfestival.org/',
+    submitLabel: 'AIFF Portal',
+  },
+  {
+    id: 'ZUFF',
+    label: 'ZUMA',
+    full: 'Zuma Film Festival',
+    accent: '#EA580C',
+    about:
+      'Nigeria’s official national film festival, organized annually by the Nigerian Film Corporation (NFC), celebrating artistic excellence, cultural heritage, and indigenous storytelling across Africa and the diaspora.',
+    when:
+      'Annual national festival held in December in Abuja, hosted by the Nigerian Film Corporation.',
+    submissions:
+      'Open to Nigerian, African, and international entries across feature films, documentaries, student cinema, indigenous language films, animations, and shorts via FilmFreeway and the official NFC portal.',
+    submitUrl: 'https://zumafilmfest.com/',
+    submitLabel: 'Zuma Festival Portal',
+  },
+  {
+    id: 'KILAF',
+    label: 'KILAF',
+    full: 'Kano Indigenous Languages of Africa Film Festival',
+    accent: '#7C3AED',
+    about:
+      'An annual pan-African film market and festival in Kano, Nigeria, founded by Alhaji Abdul-Kareem Mohammed, dedicated to celebrating, marketing, and elevating cinematic storytelling produced in native African indigenous languages.',
+    when:
+      'Annual festival and market held in November in Kano, Nigeria, featuring continental film screenings, academic symposia, and grand awards.',
+    submissions:
+      'Open to African indigenous language features, shorts, documentaries, student films, and animations through FilmFreeway and the official KILAF portal.',
+    submitUrl: 'https://kilaf.org/',
+    submitLabel: 'KILAF Portal',
+  },
+  {
+    id: 'KADIFF',
+    label: 'KADIFF',
+    full: 'Kaduna International Film Festival',
+    accent: '#0284C7',
+    about:
+      'An annual international film festival founded by Israel Kashim Audu in Kaduna, Nigeria, dedicated to using cinema as a tool for social change, celebrating African narratives, and fostering emerging and veteran filmmakers across the globe.',
+    when:
+      'Annual festival held in August in Kaduna, Nigeria, featuring masterclasses, screenings, and gala excellence awards.',
+    submissions:
+      'Open to international and African feature films, documentaries, short films, student cinema, animations, and indigenous language productions via FilmFreeway and the official festival website.',
+    submitUrl: 'https://www.kadunafilmfestival.com/',
+    submitLabel: 'KADIFF Portal',
+  },
+  {
+    id: 'CCFF',
+    label: 'CCFF',
+    full: 'Coal City Film Festival',
+    accent: '#D97706',
+    about:
+      'An annual international film festival founded by filmmaker Uche Agbo in Enugu, Nigeria—the historic coal city and cradle of Nollywood—celebrating African and global cinema, cultural tourism, and industry legends.',
+    when:
+      'Annual festival held in March / April in Enugu, Nigeria, featuring city tours, screenings, masterclasses, and the Hall of Fame gala.',
+    submissions:
+      'Open to African and international feature films, documentaries, shorts, animations, and student cinema via FilmFreeway and the official CCFF portal.',
+    submitUrl: 'https://coalcityfilmfestival.org/',
+    submitLabel: 'CCFF Portal',
+  },
+  {
+    id: 'WRIFF',
+    label: 'WRIFF',
+    full: 'Warien Rose International Film Festival',
+    accent: '#E11D48',
+    about:
+      'An annual international film festival in Lagos, Nigeria, founded under the Warien Rose Academy and Foundation by Prof. Doc. Efe Anaughe, championing "Great Stories, Global Impact" and celebrating films that spotlight social justice, cultural preservation, and transformative African narratives.',
+    when:
+      'Annual international film festival hosted in Lagos, Nigeria, featuring screenings, masterclasses, and social impact awards.',
+    submissions:
+      'Open to feature films, documentaries, shorts, and advocacy cinema via the Warien Rose Academy portal and FilmFreeway.',
+    submitUrl: 'https://www.warienroseacademy.com',
+    submitLabel: 'Warien Rose Academy',
+  },
+  {
+    id: 'AFFIF',
+    label: 'AFFIF',
+    full: 'Africa Films For Impact Festival',
+    accent: '#0D9488',
+    about:
+      'An annual social impact film festival and fellowship organized by the Films For Impact Foundation in Abuja, Nigeria, dedicated to using cinema, human rights narratives, and advocacy as catalysts for positive social transformation.',
+    when:
+      'Annual festival held in October / November at Silverbird Cinemas in Abuja, Nigeria, featuring masterclasses, impact fellowships, and the Impact Awards.',
+    submissions:
+      'Open to narrative features, documentaries, shorts, animations, and student impact films via FilmFreeway and the official AFFIF website.',
+    submitUrl: 'https://affif.org/',
+    submitLabel: 'AFFIF Portal',
+  },
+  {
+    id: 'OAFP',
+    label: 'OAFP',
+    full: 'Odunlade Adekola Films Production Awards',
+    accent: '#6B21A8',
+    about:
+      'An annual film awards gala and academy convocation founded by Nollywood icon Odunlade Adekola in Abeokuta, Ogun State, established to celebrate, reward, and elevate actors, emerging talents, production crew, and veteran legends across Nigerian cinema.',
+    when:
+      'Annual awards gala and academy convocation held in December at the Olusegun Obasanjo Presidential Library (OOPL) and Cultural Centre in Abeokuta, Nigeria.',
+    submissions:
+      'Recognitions and merit awards are conferred across academy graduating cohorts, mainstream Nollywood performers, technical crew, and industry honorees by the OAFP jury.',
+    submitUrl: 'https://www.instagram.com/odunomoadekola/',
+    submitLabel: 'OAFP Portal',
+  },
+  {
     id: 'EKO_STAR',
     label: 'Eko Star',
     full: 'Eko Star Film & TV Awards',
@@ -127,6 +239,15 @@ function normOrg(raw) {
   if (upper.includes('AMVCA') || upper.includes('AFRICA MAGIC')) return 'AMVCA';
   if (upper.includes('AMAA') || upper.includes('AFRICA MOVIE ACADEMY')) return 'AMAA';
   if (upper.includes('TINFF') || upper.includes('INDUSTRY NOLLYWOOD')) return 'TINFF';
+  if (upper.includes('NTFF') || upper.includes('NOLLYWOOD TRAVEL') || upper.includes('TRAVEL FILM FESTIVAL')) return 'NTFF';
+  if (upper.includes('AIFF') || upper.includes('ABUJA INTERNATIONAL') || upper.includes('ABUJA FILM')) return 'AIFF';
+  if (upper.includes('ZUMA') || upper.includes('ZUFF')) return 'ZUFF';
+  if (upper.includes('KILAF') || upper.includes('KANO INDIGENOUS')) return 'KILAF';
+  if (upper.includes('KADIFF') || upper.includes('KADUNA INTERNATIONAL') || upper.includes('KADUNA FILM')) return 'KADIFF';
+  if (upper.includes('CCFF') || upper.includes('COAL CITY')) return 'CCFF';
+  if (upper.includes('WRIFF') || upper.includes('WARIEN ROSE') || upper.includes('WARIEN')) return 'WRIFF';
+  if (upper.includes('AFFIF') || upper.includes('FILMS FOR IMPACT') || upper.includes('AFRICA FILMS FOR IMPACT')) return 'AFFIF';
+  if (upper.includes('OAFP') || upper.includes('ODUNLADE ADEKOLA') || upper.includes('ODUNLADE')) return 'OAFP';
   if (upper.includes('GOLDEN STAR') || upper.includes('GOLDENSTARS')) return 'GOLDEN_STARS';
   if (upper.includes('BON') || upper.includes('BEST OF NOLLYWOOD')) return 'BON';
   if (upper.includes('LIFACC') || upper.includes('LAGOS INTERNATIONAL FILM AND CINEMA')) return 'LIFACC';

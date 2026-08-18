@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
 import SocialDraftComposer from '../../components/admin/SocialDraftComposer';
@@ -71,12 +72,27 @@ function Pill({ children, tone = 'brand' }) {
 }
 
 export default function AdminSocialStudio() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState(emptySummary);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [drafts, setDrafts] = useState([]);
   const [reviewingId, setReviewingId] = useState(null);
   const [scheduleAt, setScheduleAt] = useState({});
+  const [threads, setThreads] = useState({ loading: true, connecting: false, configuration: null, connection: null });
+
+  const fetchThreadsStatus = async () => {
+    setThreads(current => ({ ...current, loading: true }));
+    try {
+      const res = await fetch('/api/social?task=threads_status', { headers: await authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setThreads(current => ({ ...current, loading: false, configuration: data.configuration, connection: data.connection }));
+    } catch (error) {
+      setThreads(current => ({ ...current, loading: false }));
+      console.warn('Failed to load Threads connection status:', error.message);
+    }
+  };
 
   const fetchDrafts = async () => {
     try {
@@ -112,11 +128,65 @@ export default function AdminSocialStudio() {
   useEffect(() => {
     fetchSummary();
     fetchDrafts();
+    fetchThreadsStatus();
   }, []);
+
+  useEffect(() => {
+    const result = searchParams.get('threads');
+    if (!result) return;
+    if (result === 'connected') {
+      toast.success('Threads is connected and ready for a test post.');
+      fetchThreadsStatus();
+    } else {
+      toast.error(searchParams.get('message') || 'Threads could not be connected. Please try again.');
+    }
+    setSearchParams(current => {
+      const next = new URLSearchParams(current);
+      next.delete('threads');
+      next.delete('message');
+      return next;
+    }, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const refreshAll = () => {
     fetchSummary();
     fetchDrafts();
+    fetchThreadsStatus();
+  };
+
+  const connectThreads = async () => {
+    setThreads(current => ({ ...current, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=threads_oauth_start', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authorizationUrl) throw new Error(data.error || 'Threads connection could not start');
+      window.location.assign(data.authorizationUrl);
+    } catch (error) {
+      toast.error(error.message || 'Threads connection could not start');
+      setThreads(current => ({ ...current, connecting: false }));
+    }
+  };
+
+  const disconnectThreadsAccount = async () => {
+    if (!window.confirm('Disconnect the MuviDB Threads account? Scheduled Threads posts will not publish until it is reconnected.')) return;
+    setThreads(current => ({ ...current, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=threads_disconnect', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Threads could not be disconnected');
+      toast.success('Threads account disconnected.');
+      await fetchThreadsStatus();
+    } catch (error) {
+      toast.error(error.message || 'Threads could not be disconnected');
+    } finally {
+      setThreads(current => ({ ...current, connecting: false }));
+    }
   };
 
   // Which review actions each status offers. Mirrors the server-side machine in
@@ -221,7 +291,7 @@ export default function AdminSocialStudio() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.skipped) toast(`Publisher skipped: ${data.reason}`);
-      else toast.success(`Mock publisher processed ${data.processed || 0} job(s)`);
+      else toast.success(`${summary.publishMode === 'live' ? 'Live' : 'Mock'} publisher processed ${data.processed || 0} job(s)`);
       refreshAll();
     } catch (err) {
       toast.error(err.message || 'Mock publisher failed');
@@ -263,7 +333,7 @@ export default function AdminSocialStudio() {
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Icon icon={publishing ? 'solar:spinner-linear' : 'solar:play-linear'} className={publishing ? 'animate-spin' : ''} width="16" />
-            Run Mock Publisher
+            Run {summary.publishMode === 'live' ? 'Live' : 'Mock'} Publisher
           </button>
         </div>
       </div>
@@ -288,6 +358,69 @@ export default function AdminSocialStudio() {
         <Metric label="Failed Jobs" value={counts.failedJobs} icon="solar:danger-triangle-linear" tone={counts.failedJobs ? 'red' : 'green'} />
         <Metric label="Connections" value={counts.connections} icon="solar:link-circle-linear" />
         <Metric label="Templates" value={counts.templates} icon="solar:palette-round-linear" tone="blue" />
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-text-primary text-background">
+              <Icon icon="simple-icons:threads" width="21" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">Threads Publisher</h2>
+                {threads.connection ? <Pill tone="green">Connected</Pill> : <Pill tone="amber">Not connected</Pill>}
+              </div>
+              {threads.loading ? (
+                <p className="mt-1 text-sm text-text-muted">Checking the account connection...</p>
+              ) : threads.connection ? (
+                <p className="mt-1 text-sm text-text-muted">
+                  Connected as <span className="font-bold text-text-primary">@{threads.connection.username}</span>
+                  {threads.connection.tokenExpiresAt ? ` - token expires ${new Date(threads.connection.tokenExpiresAt).toLocaleDateString()}` : ''}
+                </p>
+              ) : threads.configuration?.readyForConnection ? (
+                <p className="mt-1 text-sm text-text-muted">The Meta app is configured. Connect the MuviDB Threads account to authorize publishing.</p>
+              ) : threads.configuration?.appConfigured ? (
+                <p className="mt-1 text-sm text-text-muted">Add the two server-side security keys shown in the setup guide before connecting the account.</p>
+              ) : (
+                <p className="mt-1 text-sm text-text-muted">Add the server-side Threads App ID and secret before connecting an account.</p>
+              )}
+              {threads.configuration?.redirectUri && !threads.connection && (
+                <p className="mt-2 break-all font-mono text-[10px] text-text-muted">Callback: {threads.configuration.redirectUri}</p>
+              )}
+            </div>
+          </div>
+          {threads.connection ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={connectThreads}
+                disabled={threads.connecting}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 text-xs font-bold text-text-primary disabled:opacity-50"
+              >
+                <Icon icon="solar:refresh-linear" width="16" /> Reconnect
+              </button>
+              <button
+                type="button"
+                onClick={disconnectThreadsAccount}
+                disabled={threads.connecting}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 text-xs font-bold text-red-500 disabled:opacity-50"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={connectThreads}
+              disabled={threads.loading || threads.connecting || !threads.configuration?.readyForConnection}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon icon={threads.connecting ? 'solar:spinner-linear' : 'solar:link-circle-linear'} className={threads.connecting ? 'animate-spin' : ''} width="16" />
+              Connect Threads
+            </button>
+          )}
+        </div>
       </div>
 
       <SocialDraftComposer disabled={!summary.enabled} onGenerated={refreshAll} />
@@ -398,7 +531,9 @@ export default function AdminSocialStudio() {
         </div>
         <div className="rounded-lg border border-border bg-surface p-5">
           <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">Live Providers</p>
-          <p className="mt-2 text-sm font-bold text-text-primary">Not configured in Phase 1</p>
+          <p className="mt-2 text-sm font-bold text-text-primary">
+            {threads.connection ? 'Threads connected' : 'Threads not connected'} · Instagram and Facebook pending
+          </p>
         </div>
       </div>
     </div>

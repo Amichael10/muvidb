@@ -3,7 +3,10 @@ import type { VercelRequest } from '@vercel/node';
 import { supabase } from './supabase.js';
 import { isValidAuth } from './auth.js';
 import { MockSocialPlatformAdapter } from '../../src/features/social-studio/platforms/mock-adapter.js';
+import { ThreadsPlatformAdapter } from '../../src/features/social-studio/platforms/threads-adapter.js';
 import { SocialPlatformError } from '../../src/features/social-studio/platforms/platform-errors.js';
+import type { SocialPlatformAdapter } from '../../src/features/social-studio/platforms/social-platform-adapter.js';
+import { getThreadsPublishingCredentials, isThreadsLivePublishingEnabled } from './threads_oauth.js';
 import { assertContentTransition, nextRetryAvailableAt } from '../../src/features/social-studio/domain/transitions.js';
 import type { SocialContentStatus } from '../../src/features/social-studio/domain/statuses.js';
 import { createPublishJobIdempotencyKey } from '../../src/features/social-studio/domain/validation.js';
@@ -41,9 +44,10 @@ export function isSocialStudioEnabled(): boolean {
   return ['true', '1', 'yes'].includes(String(process.env.SOCIAL_STUDIO_ENABLED || '').toLowerCase());
 }
 
-export function getSocialPublishMode(): 'mock' | 'disabled' {
+export function getSocialPublishMode(): 'mock' | 'live' | 'disabled' {
   const mode = String(process.env.SOCIAL_PUBLISH_MODE || 'mock').toLowerCase();
-  return mode === 'mock' ? 'mock' : 'disabled';
+  if (mode === 'mock' || mode === 'live') return mode;
+  return 'disabled';
 }
 
 function bearerToken(req: VercelRequest): string | null {
@@ -129,7 +133,7 @@ export async function getSocialStudioSummary() {
     countRows('social_content_items', query => query.eq('status', 'scheduled')),
     countRows('social_publish_jobs', query => query.in('status', ['queued', 'retrying'])),
     countRows('social_publish_jobs', query => query.in('status', ['failed', 'dead_letter'])),
-    countRows('social_connections'),
+    countRows('social_connections', query => query.eq('status', 'connected')),
     countRows('social_templates', query => query.eq('is_active', true)),
   ]);
 
@@ -243,12 +247,29 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     contentItemId: contentItem.id,
     platformVariantId: variant.id,
     eventType: 'publishing_started',
-    eventData: { job_id: job.id, platform: variant.platform, mode: 'mock' },
+    eventData: { job_id: job.id, platform: variant.platform, mode: getSocialPublishMode() },
   });
 
-  const adapter = new MockSocialPlatformAdapter();
-
   try {
+    let adapter: SocialPlatformAdapter;
+    const publishMode = getSocialPublishMode();
+    if (publishMode === 'mock') {
+      adapter = new MockSocialPlatformAdapter();
+    } else if (publishMode === 'live' && variant.platform === 'threads' && isThreadsLivePublishingEnabled()) {
+      const { connection, accessToken } = await getThreadsPublishingCredentials();
+      adapter = new ThreadsPlatformAdapter({
+        accessToken,
+        userId: connection.external_account_id,
+        apiVersion: process.env.THREADS_GRAPH_API_VERSION,
+      });
+    } else {
+      throw new SocialPlatformError({
+        platform: variant.platform,
+        code: 'social_provider_not_configured',
+        message: `${variant.platform} live publishing is not configured yet.`,
+      });
+    }
+
     const result = await adapter.publish({
       jobId: job.id,
       variantId: variant.id,
@@ -306,8 +327,8 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       ? err
       : new SocialPlatformError({
           platform: variant.platform,
-          code: 'mock_unknown_failure',
-          message: err?.message || 'Mock publish failed',
+          code: 'social_unknown_failure',
+          message: err?.message || 'Social publishing failed',
         });
 
     const canRetry = platformError.retryable && attemptCount < Number(job.max_attempts || 5);
@@ -365,8 +386,8 @@ export async function runSocialPublisher(input: {
     return { skipped: true, reason: 'social_studio_disabled', processed: 0, results: [] };
   }
 
-  if (getSocialPublishMode() !== 'mock') {
-    return { skipped: true, reason: 'social_publish_mode_not_mock', processed: 0, results: [] };
+  if (getSocialPublishMode() === 'disabled') {
+    return { skipped: true, reason: 'social_publish_mode_disabled', processed: 0, results: [] };
   }
 
   const now = input.now || new Date();

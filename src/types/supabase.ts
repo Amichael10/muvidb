@@ -3444,6 +3444,9 @@ export type Database = {
           refresh_token_expires_at: string | null
           status: Database["public"]["Enums"]["social_connection_status"]
           token_expires_at: string | null
+          token_auth_tag: string | null
+          token_ciphertext: string | null
+          token_iv: string | null
           token_secret_id: string | null
           updated_at: string
           username: string | null
@@ -3463,6 +3466,9 @@ export type Database = {
           refresh_token_expires_at?: string | null
           status?: Database["public"]["Enums"]["social_connection_status"]
           token_expires_at?: string | null
+          token_auth_tag?: string | null
+          token_ciphertext?: string | null
+          token_iv?: string | null
           token_secret_id?: string | null
           updated_at?: string
           username?: string | null
@@ -3482,9 +3488,42 @@ export type Database = {
           refresh_token_expires_at?: string | null
           status?: Database["public"]["Enums"]["social_connection_status"]
           token_expires_at?: string | null
+          token_auth_tag?: string | null
+          token_ciphertext?: string | null
+          token_iv?: string | null
           token_secret_id?: string | null
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      social_oauth_states: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          expires_at: string
+          provider: Database["public"]["Enums"]["social_platform"]
+          redirect_uri: string
+          state_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          expires_at: string
+          provider: Database["public"]["Enums"]["social_platform"]
+          redirect_uri: string
+          state_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          expires_at?: string
+          provider?: Database["public"]["Enums"]["social_platform"]
+          redirect_uri?: string
+          state_hash?: string
+          used_at?: string | null
         }
         Relationships: []
       }

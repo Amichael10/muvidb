@@ -53,7 +53,6 @@ export default [
   route('careers/:slug', 'pages/CareerDetail.jsx'),
   route('waitlist', 'pages/Waitlist.tsx'),
   route('run-scanners', 'routes/api.run-scanners.tsx'),
-
   // ---- Authenticated ----
   layout('routes/require-auth.tsx', [
     route('onboarding', 'pages/Onboarding.jsx'),
