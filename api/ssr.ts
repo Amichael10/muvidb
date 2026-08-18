@@ -132,6 +132,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (key.toLowerCase() === 'transfer-encoding') return;
       res.setHeader(key, value);
     });
+
+    const existingCc = response.headers.get('cache-control');
+    if (response.status === 200) {
+      const cc = existingCc || 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400';
+      res.setHeader('Cache-Control', cc);
+      if (!res.getHeader('CDN-Cache-Control')) {
+        res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      }
+      if (!res.getHeader('Vercel-CDN-Cache-Control')) {
+        res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      }
+    } else if (response.status === 404) {
+      const cc = existingCc || 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600';
+      res.setHeader('Cache-Control', cc);
+      if (!res.getHeader('CDN-Cache-Control')) {
+        res.setHeader('CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+      }
+      if (!res.getHeader('Vercel-CDN-Cache-Control')) {
+        res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+      }
+    }
+
     res.setHeader('X-MuviDB-SSR', 'ok');
     res.setHeader('X-MuviDB-SSR-Build', buildPath);
     res.end(Buffer.from(await response.arrayBuffer()));

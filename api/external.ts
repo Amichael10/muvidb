@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkRateLimit } from './_lib/rateLimit';
-
+import { checkRateLimit } from './_lib/rateLimit.js';
 import { handleCors } from './_lib/cors.js';
 
 const YOUTUBE_BASE = 'https://www.googleapis.com/youtube/v3';
@@ -47,6 +46,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('[YouTube API Error]', ytRes.status, data);
         return res.status(ytRes.status).json(data);
       }
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
       return res.status(200).json(data);
     } catch (e) { 
       console.error('[API] YouTube Fetch Exception:', e);
@@ -73,6 +75,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('[TMDB API Error]', tmdbRes.status, data);
         return res.status(tmdbRes.status).json(data);
       }
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
       return res.status(200).json(data);
     } catch (e) { 
       console.error('[API] TMDB Fetch Exception:', e);

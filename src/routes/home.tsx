@@ -48,3 +48,8 @@ export function meta() {
     { name: 'twitter:card', content: 'summary_large_image' },
   ];
 }
+
+export function headers({ loaderHeaders }: { loaderHeaders: Headers }) {
+  return { 'Cache-Control': loaderHeaders.get('Cache-Control') ?? CACHE_OK };
+}
+

@@ -45,6 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       trackSeoHit(req, 'sitemap', String(slug || 'index'));
       res.setHeader('Content-Type', 'text/xml; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=43200, s-maxage=43200, stale-while-revalidate=86400');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=43200, stale-while-revalidate=86400');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=43200, stale-while-revalidate=86400');
 
       const urlset = (entries: string, withImages = false) => {
         const imageNs = withImages ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : '';

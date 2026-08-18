@@ -60,6 +60,8 @@ export async function handleFilms(req: VercelRequest, res: VercelResponse) {
 
     const raw = data as any;
     res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     return res.status(200).json({ 
       film: {
         ...raw,
@@ -119,5 +121,7 @@ export async function handleFilms(req: VercelRequest, res: VercelResponse) {
   }));
 
   res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=300, stale-while-revalidate=3600');
+  res.setHeader('CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+  res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
   return res.status(200).json({ films, limit: limitValue, offset: offsetValue });
 }

@@ -48,5 +48,7 @@ export async function handlePeople(req: VercelRequest, res: VercelResponse) {
   }
 
   res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=300, stale-while-revalidate=3600');
+  res.setHeader('CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+  res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
   return res.status(200).json({ people: data ?? [], limit, offset });
 }

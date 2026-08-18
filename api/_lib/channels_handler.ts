@@ -110,6 +110,9 @@ export async function handleChannels(req: VercelRequest, res: VercelResponse) {
       .eq('channel_id', id)
       .eq('status', 'pending');
 
+    res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     return res.status(200).json({
       channel,
       videos: videos ?? [],
@@ -146,5 +149,9 @@ export async function handleChannels(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to fetch channels' });
   }
 
+  res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=300, stale-while-revalidate=3600');
+  res.setHeader('CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+  res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
   return res.status(200).json({ channels: data ?? [], limit, offset });
 }
+

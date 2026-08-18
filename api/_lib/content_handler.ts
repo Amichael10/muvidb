@@ -42,7 +42,9 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
         .order('billing_order', { ascending: true });
       if (error) throw error;
 
-      res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
       return res.status(200).json({ credits: data ?? [] });
     }
 
@@ -58,7 +60,9 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
         .eq('person_id', personId);
       if (error) throw error;
 
-      res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
       return res.status(200).json({ credits: data ?? [] });
     }
 
@@ -101,7 +105,9 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
       if (error) throw error;
 
       const filmIds = [...new Set((data ?? []).map((c: any) => c.film_id).filter(Boolean))];
-      res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
       return res.status(200).json({ filmIds });
     }
 

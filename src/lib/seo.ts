@@ -24,9 +24,11 @@ const DEFAULT_TITLE = 'MuviDB | The Ultimate African Film & Entertainment Databa
  * under load), so every server-rendered route must be edge-cached — see
  * docs/SSR_MIGRATION.md.
  */
-export const CACHE_OK = 'public, max-age=60, s-maxage=3600, stale-while-revalidate';
+export const CACHE_OK = 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400';
 /** Thin/missing pages: short cache so later enrichment can become indexable fast. */
-export const CACHE_404 = 'public, max-age=60, s-maxage=300, stale-while-revalidate';
+export const CACHE_404 = 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600';
+export const CDN_CACHE_OK = 'public, s-maxage=3600, stale-while-revalidate=86400';
+export const CDN_CACHE_404 = 'public, s-maxage=300, stale-while-revalidate=3600';
 
 /** Converts a Seo payload into React Router meta descriptors. */
 export function toMeta(seo?: Seo) {
