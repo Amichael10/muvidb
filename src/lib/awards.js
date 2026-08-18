@@ -438,6 +438,60 @@ export const AWARD_ORGS = [
     tags: ['Global Tour', 'Travel Festival', 'Diaspora', 'Berlin', 'Toronto', 'London'],
   },
   {
+    id: 'EKOIFF',
+    label: 'EKOIFF',
+    full: 'Eko International Film Festival',
+    tagline: 'Lagos Premier International Showcase for Global & Nollywood Cinema',
+    category: 'festival',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (April / May)',
+    founded: 2009,
+    accent: '#8B5CF6',
+    about:
+      'Founded in 2009 by Hope Obioma Opara, Eko International Film Festival (EKOIFF) is one of Nigeria’s longest-standing international film festivals in Lagos. Its mission is to promote the appreciation of arts and culture through motion picture arts and sciences, boost tourism, and foster cross-cultural collaborations between African filmmakers and the global cinema industry.',
+    when:
+      'Annual international festival held in April / May at Silverbird Cinemas, Victoria Island, Lagos, Nigeria. Features competitive feature film showcases, documentary screenings, Canon cinematography workshops, and gala jury awards.',
+    submissions:
+      'Open to Nigerian, African, and international filmmakers across feature films, shorts, documentaries, indigenous language cinema, student projects, and animations via FilmFreeway and the official festival website.',
+    entryPlan: {
+      fees: 'Standard Entry ($15 – $40 via FilmFreeway)',
+      eligibility: 'Features, shorts, documentaries completed within 2 years. English subtitles required for foreign dialogue.',
+      formats: 'Full HD / 4K screener; DCP / ProRes for theatrical projections.',
+      categoriesCount: '15 Feature, Acting & Craft Categories',
+      platform: 'FilmFreeway & EKOIFF Portal',
+    },
+    submitUrl: 'https://filmfreeway.com/EkoInternationalFilmFestival',
+    submitLabel: 'Submit on FilmFreeway',
+    tags: ['Lagos', 'Film Festival', 'International', 'Silverbird Cinemas', 'FilmFreeway', 'Nollywood'],
+  },
+  {
+    id: 'ASIFF',
+    label: 'ASIFF',
+    full: 'African Smartphone International Film Festival',
+    tagline: 'Africa’s Premier Mobile & Smartphone Cinema Showcase',
+    category: 'festival',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (December)',
+    founded: 2017,
+    accent: '#06B6D4',
+    about:
+      'Founded in 2017 by Nigerian filmmaker Michael Osheku, ASIFF is Africa’s first and largest international smartphone film festival. The festival democratizes cinematic storytelling by showcasing groundbreaking narrative features, shorts, and documentaries created entirely using smartphones, mobile devices, and mobile AI.',
+    when:
+      'Annual 4-day international showcase held December 18–21 in Lagos, Nigeria. Features global film screenings, panel sessions, mobile tech expos, and awards gala.',
+    submissions:
+      'Open to African, diaspora, and global filmmakers. Entries must be filmed using mobile phones, tablets, or mobile action equipment across fiction, documentary, animation, and student categories.',
+    entryPlan: {
+      fees: 'Standard Entry ($15 – $35 via FilmFreeway)',
+      eligibility: 'Films shot on mobile phones/tablets completed within the last 2 years. English subtitles required.',
+      formats: 'HD / 4K MP4/MOV screener; ProRes/DCP for theatrical showcase.',
+      categoriesCount: '16 Smartphone & Mobile Craft Categories',
+      platform: 'FilmFreeway & ASIFF Portal',
+    },
+    submitUrl: 'https://filmfreeway.com/AfricanSmartphoneInternationalFilmFestival',
+    submitLabel: 'Submit on FilmFreeway',
+    tags: ['Lagos', 'Smartphone Film', 'Mobile Cinema', 'Innovation', 'FilmFreeway', 'AI & Mobile'],
+  },
+  {
     id: 'EKO_STAR',
     label: 'Eko Star',
     full: 'Eko Star Film & TV Awards',
@@ -521,6 +575,8 @@ export function normOrg(raw) {
   if (upper.includes('GOLDEN STAR') || upper.includes('GOLDENSTARS')) return 'GOLDEN_STARS';
   if (upper.includes('BON') || upper.includes('BEST OF NOLLYWOOD')) return 'BON';
   if (upper.includes('LIFACC') || upper.includes('LAGOS INTERNATIONAL FILM AND CINEMA')) return 'LIFACC';
+  if (upper.includes('ASIFF') || upper.includes('SMARTPHONE') || upper.includes('SMARTFILM')) return 'ASIFF';
+  if (upper.includes('EKOIFF') || upper.includes('EKO INTERNATIONAL FILM')) return 'EKOIFF';
   if (upper.includes('EKO STAR')) return 'EKO_STAR';
   return s;
 }
