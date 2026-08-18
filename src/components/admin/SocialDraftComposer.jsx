@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
+import { uploadAdminImage } from '../../lib/imageUpload';
 
 const CONTENT_TYPES = [
   {
@@ -37,9 +38,12 @@ export default function SocialDraftComposer({ disabled, onGenerated }) {
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
+  const [uploadingCustom, setUploadingCustom] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const [customScheduleDate, setCustomScheduleDate] = useState('');
+  const fileInputRef = useRef(null);
 
   const config = useMemo(() => CONTENT_TYPES.find(entry => entry.value === contentType), [contentType]);
-  // Guards against an earlier, slower search overwriting a newer one.
   const searchToken = useRef(0);
 
   useEffect(() => {
@@ -113,6 +117,83 @@ export default function SocialDraftComposer({ disabled, onGenerated }) {
       toast.error(err.message || 'Draft generation failed');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleCustomImageUpload = async event => {
+    const file = event.target.files?.[0];
+    if (!file || !result?.contentItem?.id) return;
+    setUploadingCustom(true);
+    try {
+      const uploadRes = await uploadAdminImage(file, 'film-images');
+      if (uploadRes.error) throw new Error(uploadRes.error);
+      const url = uploadRes.url;
+
+      const res = await fetch('/api/social?task=attach_custom_asset', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentItemId: result.contentItem.id,
+          publicUrl: url,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      toast.success('Custom design uploaded and attached to this post!');
+      setResult(curr => ({
+        ...curr,
+        assets: [
+          { id: data.id, publicUrl: url, format: 'custom_design', width: data.width || 1080, height: data.height || 1080 },
+          ...(curr?.assets || []),
+        ],
+      }));
+      onGenerated?.(result);
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload custom design');
+    } finally {
+      setUploadingCustom(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSchedule = async (preset, customValue) => {
+    if (!result?.contentItem?.id) return;
+    let targetDate = new Date();
+    if (preset === 'today_6pm') {
+      targetDate.setHours(18, 0, 0, 0);
+      if (targetDate.getTime() < Date.now()) {
+        targetDate.setDate(targetDate.getDate() + 1);
+      }
+    } else if (preset === 'tomorrow_10am') {
+      targetDate.setDate(targetDate.getDate() + 1);
+      targetDate.setHours(10, 0, 0, 0);
+    } else if (preset === 'tomorrow_6pm') {
+      targetDate.setDate(targetDate.getDate() + 1);
+      targetDate.setHours(18, 0, 0, 0);
+    } else if (preset === 'custom') {
+      if (!customValue) return toast.error('Pick a date and time first');
+      targetDate = new Date(customValue);
+    }
+
+    setScheduling(true);
+    try {
+      const res = await fetch('/api/social?task=schedule', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentItemId: result.contentItem.id,
+          scheduledFor: targetDate.toISOString(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`Post scheduled for ${targetDate.toLocaleString()}!`);
+      onGenerated?.(result);
+    } catch (err) {
+      toast.error(err.message || 'Scheduling failed');
+    } finally {
+      setScheduling(false);
     }
   };
 
@@ -250,35 +331,68 @@ export default function SocialDraftComposer({ disabled, onGenerated }) {
       </button>
 
       {result && (
-        <div className="mt-5 space-y-3 border-t border-border pt-5">
-          {result.assets?.length > 0 && (
-            <div>
+        <div className="mt-5 space-y-4 border-t border-border pt-5">
+          {/* Custom Artwork & Rendered Assets */}
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">
-                Rendered Assets
+                Post Image & Design
               </p>
-              <div className="mt-2 flex flex-wrap gap-3">
-                {result.assets.map(asset => (
-                  <a
-                    key={asset.id}
-                    href={asset.publicUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="group w-32 shrink-0"
-                    title={`${asset.format} — ${asset.width}×${asset.height}`}
-                  >
+              <div>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  ref={fileInputRef}
+                  onChange={handleCustomImageUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingCustom}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-bold text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
+                >
+                  <Icon
+                    icon={uploadingCustom ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'}
+                    className={uploadingCustom ? 'animate-spin' : ''}
+                    width="14"
+                  />
+                  {uploadingCustom ? 'Uploading...' : 'Replace with My Design (Canva/Poster)'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-3">
+              {result.assets?.map(asset => (
+                <div
+                  key={asset.id}
+                  className="group relative w-36 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2"
+                >
+                  <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="block">
                     <img
                       src={asset.publicUrl}
                       alt={asset.format}
-                      className="w-full rounded-md border border-border bg-surface-2 object-contain transition-opacity group-hover:opacity-80"
+                      className="h-36 w-full object-cover transition-opacity group-hover:opacity-90"
                     />
-                    <p className="mt-1 truncate text-[10px] font-bold text-text-muted">
-                      {asset.format} · {asset.width}×{asset.height}
-                    </p>
                   </a>
-                ))}
-              </div>
+                  <div className="p-2">
+                    <span
+                      className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                        asset.format === 'custom_design'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-surface text-text-muted'
+                      }`}
+                    >
+                      {asset.format === 'custom_design' ? 'Custom Design' : asset.format}
+                    </span>
+                    <p className="mt-0.5 truncate text-[10px] text-text-muted">
+                      {asset.width}×{asset.height}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
 
           {result.warnings?.length > 0 && (
             <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2">
@@ -291,21 +405,83 @@ export default function SocialDraftComposer({ disabled, onGenerated }) {
             </div>
           )}
 
-          {result.variants?.map(variant => (
-            <div key={variant.id} className="rounded-lg border border-border bg-surface-2 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-brand">{variant.platform}</span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">{variant.status}</span>
+          {/* Platform Variants */}
+          <div className="space-y-3">
+            {result.variants?.map(variant => (
+              <div key={variant.id} className="rounded-lg border border-border bg-surface-2 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-brand">{variant.platform}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">{variant.status}</span>
+                </div>
+                {variant.title && <p className="mt-2 text-sm font-bold text-text-primary">{variant.title}</p>}
+                <p className="mt-1 whitespace-pre-wrap text-xs text-text-muted">{variant.caption}</p>
+                {variant.hashtags?.length > 0 && (
+                  <p className="mt-2 text-xs font-bold text-brand">{variant.hashtags.map(tag => `#${tag}`).join(' ')}</p>
+                )}
               </div>
-              {variant.title && <p className="mt-2 text-sm font-bold text-text-primary">{variant.title}</p>}
-              <p className="mt-1 whitespace-pre-wrap text-xs text-text-muted">{variant.caption}</p>
-              {variant.hashtags?.length > 0 && (
-                <p className="mt-2 text-xs font-bold text-brand">{variant.hashtags.map(tag => `#${tag}`).join(' ')}</p>
-              )}
+            ))}
+          </div>
+
+          {/* Quick Schedule Section */}
+          <div className="rounded-lg border border-border bg-surface-2 p-4">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:calendar-mark-linear" className="text-brand" width="16" />
+              <h3 className="text-xs font-black uppercase tracking-widest text-text-primary">
+                Schedule This Post
+              </h3>
             </div>
-          ))}
+            <p className="mt-1 text-xs text-text-muted">
+              Pick a quick time slot or enter a custom date to automatically queue for publishing.
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSchedule('today_6pm')}
+                disabled={scheduling}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold text-text-primary transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+              >
+                🕒 Today 6:00 PM
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSchedule('tomorrow_10am')}
+                disabled={scheduling}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold text-text-primary transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+              >
+                🕒 Tomorrow 10:00 AM
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSchedule('tomorrow_6pm')}
+                disabled={scheduling}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold text-text-primary transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+              >
+                🕒 Tomorrow 6:00 PM
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input
+                type="datetime-local"
+                value={customScheduleDate}
+                onChange={e => setCustomScheduleDate(e.target.value)}
+                className="h-8 rounded-md border border-border bg-surface px-2 text-xs text-text-primary outline-none focus:border-brand"
+              />
+              <button
+                type="button"
+                onClick={() => handleSchedule('custom', customScheduleDate)}
+                disabled={scheduling || !customScheduleDate}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
+              >
+                <Icon icon={scheduling ? 'solar:spinner-linear' : 'solar:calendar-add-linear'} className={scheduling ? 'animate-spin' : ''} width="14" />
+                Schedule Custom Date
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
+

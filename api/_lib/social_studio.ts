@@ -881,11 +881,12 @@ export async function scheduleContentItem(
   if (error) throw error;
   if (!item) throw httpError(404, 'Content item not found');
 
-  // Deliberately narrower than the transition table, which also allows
-  // scheduled -> scheduled. Rescheduling would need to move variants that are
-  // already `scheduled` and cancel their outstanding jobs; this function only
-  // promotes `approved` variants, so a reschedule would silently half-apply.
-  // Refuse it outright until reschedule is built properly.
+  // If currently in draft or review, automatically approve so scheduling is one-click.
+  if (item.status === 'draft' || item.status === 'ready_for_review') {
+    await reviewContentItem({ contentItemId: input.contentItemId, action: 'approve' }, actor);
+    item.status = 'approved';
+  }
+
   if (item.status !== 'approved') {
     throw httpError(409, `Only approved items can be scheduled (this one is ${item.status})`);
   }
@@ -1140,4 +1141,76 @@ export function socialHttpErrorPayload(err: unknown) {
     status: typed.status || 500,
     body: { error: typed.message || 'Social Studio request failed' },
   };
+}
+
+export async function attachCustomAsset(
+  input: {
+    contentItemId: string;
+    publicUrl: string;
+    format?: SocialAssetFormat;
+    width?: number;
+    height?: number;
+  },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const format: SocialAssetFormat = input.format || 'square';
+  const width = input.width || 1080;
+  const height = input.height || 1080;
+
+  const { data: assetRow, error: assetError } = await supabase
+    .from('social_assets')
+    .upsert(
+      {
+        content_item_id: input.contentItemId,
+        format,
+        storage_bucket: 'custom-upload',
+        storage_path: input.publicUrl,
+        public_url: input.publicUrl,
+        mime_type: 'image/png',
+        width,
+        height,
+        file_size_bytes: 0,
+        render_metadata: { source: 'custom_upload', uploaded_by: actor.id },
+      },
+      { onConflict: 'content_item_id,format' },
+    )
+    .select('id,public_url,format,width,height')
+    .single();
+
+  if (assetError) throw assetError;
+
+  await supabase
+    .from('social_platform_variants')
+    .update({ selected_asset_id: assetRow.id })
+    .eq('content_item_id', input.contentItemId);
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'custom_asset_uploaded',
+    eventData: { actor_id: actor.id, asset_id: assetRow.id, public_url: input.publicUrl },
+  });
+
+  return assetRow;
+}
+
+export async function getEditorialCalendar(days = 30) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase
+    .from('social_calendar')
+    .select('id,scheduled_date,scheduled_time,status,priority,source,notes,series_id,social_content_series(id,name,slug,category,figma_template_key,description)')
+    .gte('scheduled_date', today)
+    .order('scheduled_date', { ascending: true })
+    .limit(days);
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function seedEditorialCalendarSlots(days = 30) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const { seedRollingCalendar } = await import('./editorial/calendar_service.js');
+  const count = await seedRollingCalendar(days);
+  return { seeded: count };
 }

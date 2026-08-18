@@ -81,6 +81,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       requireSocialStudioAdmin,
       runSocialPublisher,
       parseGenerateDraftRequest,
+      attachCustomAsset,
+      getEditorialCalendar,
+      seedEditorialCalendarSlots,
     } = await import('./_lib/social_studio.js');
 
     const {
@@ -100,10 +103,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           connection: sanitizeThreadsConnection(connection),
         });
       }
+      if (task === 'calendar_plan') {
+        const days = Number(req.query?.days || 30);
+        return res.status(200).json(await getEditorialCalendar(days));
+      }
       return res.status(200).json(await getSocialStudioSummary());
     }
 
     if (req.method === 'POST') {
+      if (task === 'seed_calendar') {
+        await requireSocialStudioAdmin(req);
+        const days = Number(req.body?.days || 30);
+        return res.status(200).json(await seedEditorialCalendarSlots(days));
+      }
+
+      if (task === 'attach_custom_asset') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, publicUrl, format, width, height } = req.body || {};
+        if (!contentItemId || !publicUrl) {
+          return res.status(400).json({ error: 'contentItemId and publicUrl are required' });
+        }
+        return res.status(200).json(await attachCustomAsset({ contentItemId, publicUrl, format, width, height }, actor));
+      }
+
       if (task === 'threads_oauth_start') {
         const actor = await requireSocialStudioAdmin(req);
         return res.status(200).json({ authorizationUrl: await createThreadsAuthorizationUrl(req, actor) });
