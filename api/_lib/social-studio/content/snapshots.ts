@@ -21,6 +21,7 @@ export type SnapshotKnownForFilm = {
 export type SnapshotCastMember = {
   personId: string;
   name: string;
+  handle: string | null;
   character: string | null;
 };
 
@@ -29,13 +30,9 @@ export type ActorSpotlightSnapshot = {
   capturedAt: string;
   personId: string;
   name: string;
+  handle: string | null;
   slug: string | null;
   photoUrl: string | null;
-  /**
-   * Background-removed portrait, when the cut-out job has produced one. Cards
-   * prefer this so the subject can sit over brand shapes; `photoUrl` is the
-   * fallback and still renders a usable card.
-   */
   photoCutoutUrl: string | null;
   nationality: string | null;
   knownForDepartment: string | null;
@@ -53,6 +50,7 @@ export type UpcomingMovieSnapshot = {
   posterUrl: string | null;
   backdropUrl: string | null;
   releaseDate: string | null;
+  watchAvailability: string | null;
   year: number | null;
   synopsis: string | null;
   tagline: string | null;
@@ -142,6 +140,7 @@ export function buildActorSpotlightSnapshot(input: {
     capturedAt: input.capturedAt,
     personId: String(input.person.id),
     name: String(text(input.person.name) || 'Unknown'),
+    handle: extractSocialHandle(input.person),
     slug: text(input.person.slug),
     photoUrl: text(input.person.photo_url),
     photoCutoutUrl:
@@ -208,6 +207,82 @@ export function daysUntilBirthday(dateOfBirth: string, capturedAt: string): numb
   return Math.round((next - today) / 86_400_000);
 }
 
+export function extractSocialHandle(person: {
+  instagram_url?: string | null;
+  twitter_url?: string | null;
+  tiktok_url?: string | null;
+  youtube_handle?: string | null;
+}): string | null {
+  if (!person) return null;
+  if (person.instagram_url) {
+    const clean = String(person.instagram_url).trim().replace(/\/$/, '');
+    const match = clean.match(/(?:instagram\.com\/|@)?([a-zA-Z0-9._]+)$/i);
+    if (match && match[1] && !['p', 'reel', 'tv', 'stories', 'explore'].includes(match[1].toLowerCase())) {
+      return `@${match[1]}`;
+    }
+  }
+  if (person.twitter_url) {
+    const clean = String(person.twitter_url).trim().replace(/\/$/, '');
+    const match = clean.match(/(?:twitter\.com\/|x\.com\/|@)?([a-zA-Z0-9_]+)$/i);
+    if (match && match[1]) return `@${match[1]}`;
+  }
+  if (person.tiktok_url) {
+    const clean = String(person.tiktok_url).trim().replace(/\/$/, '');
+    const match = clean.match(/(?:tiktok\.com\/@?|@)?([a-zA-Z0-9._]+)$/i);
+    if (match && match[1]) return `@${match[1]}`;
+  }
+  if (person.youtube_handle) {
+    const h = String(person.youtube_handle).trim().replace(/^@/, '');
+    if (h) return `@${h}`;
+  }
+  return null;
+}
+
+function formatDateNice(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
+
+export function formatWatchAvailability(film: {
+  is_in_cinemas?: boolean | null;
+  coming_soon?: boolean | null;
+  release_date?: string | null;
+  streaming_links?: Record<string, string> | null;
+  youtube_watch_url?: string | null;
+}): string | null {
+  if (!film) return null;
+  const links = film.streaming_links || {};
+  const hasPrime = Boolean(links.prime_video || links.prime);
+  const hasNetflix = Boolean(links.netflix);
+  const hasYoutube = Boolean(film.youtube_watch_url || links.youtube);
+  const releaseStr = film.release_date ? formatDateNice(film.release_date) : '';
+
+  if (hasPrime) {
+    return releaseStr ? `Only on Prime Video • ${releaseStr} 🍿` : `Streaming on Prime Video 🍿`;
+  }
+  if (hasNetflix) {
+    return releaseStr ? `Only on Netflix • ${releaseStr} 🍿` : `Streaming on Netflix 🍿`;
+  }
+  if (film.is_in_cinemas) {
+    return releaseStr ? `In Cinemas • ${releaseStr} 🎟️` : `In Cinemas Now 🎟️`;
+  }
+  if (hasYoutube) {
+    return `Watch on YouTube 📺`;
+  }
+  if (film.coming_soon) {
+    return releaseStr ? `Coming Soon • ${releaseStr} ⏳` : `Coming Soon ⏳`;
+  }
+  if (releaseStr) {
+    return `Release Date: ${releaseStr} 🎬`;
+  }
+  return null;
+}
+
 export function buildBirthdaySpotlightSnapshot(input: {
   person: Record<string, any>;
   credits?: Record<string, any>[];
@@ -244,6 +319,7 @@ export function buildUpcomingMovieSnapshot(input: {
     .map(credit => ({
       personId: String(credit.people.id),
       name: String(text(credit.people.name)),
+      handle: extractSocialHandle(credit.people),
       character: text(credit.character_name),
     }))
     .slice(0, limit);
@@ -260,6 +336,7 @@ export function buildUpcomingMovieSnapshot(input: {
     posterUrl: text(input.film.poster_url),
     backdropUrl: text(input.film.backdrop_url) || text(input.film.backdrop),
     releaseDate: text(input.film.release_date),
+    watchAvailability: formatWatchAvailability(input.film),
     year: yearFrom(input.film),
     synopsis: text(input.film.synopsis),
     tagline: text(input.film.tagline),

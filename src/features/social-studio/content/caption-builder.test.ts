@@ -81,17 +81,19 @@ describe('truncateAtWord', () => {
 describe('buildVariantContent', () => {
   it('builds an actor spotlight caption from the snapshot', () => {
     const content = buildVariantContent({ snapshot: actorSnapshot, platform: 'instagram' });
-    expect(content.caption).toContain('Spotlight: Adésúwà Etomi — Nigerian Acting.');
-    expect(content.caption).toContain('Known for King of Boys and The Wedding Party.');
+    expect(content.caption).toContain('Star Spotlight: Adésúwà Etomi 🌟');
+    expect(content.caption).toContain('King of Boys and The Wedding Party');
+    expect(content.caption).toContain('What is your favorite Adésúwà Etomi movie of all time?');
     expect(content.hashtags).toContain('MuviDB');
     expect(content.hashtags).toContain('AdesuwaEtomi');
   });
 
   it('builds an upcoming movie caption with cast and tagline', () => {
     const content = buildVariantContent({ snapshot: movieSnapshot, platform: 'instagram' });
-    expect(content.caption).toContain('Coming soon: Jagun Jagun (2026)');
+    expect(content.caption).toContain('New Look at Jagun Jagun (2026) 🎬');
     expect(content.caption).toContain('A warrior never kneels.');
-    expect(content.caption).toContain('Starring Femi Adebayo.');
+    expect(content.caption).toContain('Starring:\nFemi Adebayo');
+    expect(content.caption).toContain('Are you seated for this one?');
     expect(content.hashtags).toContain('ComingSoon');
   });
 

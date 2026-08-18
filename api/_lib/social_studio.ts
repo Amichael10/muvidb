@@ -452,7 +452,7 @@ async function loadPersonSource(
 ) {
   const { data: person, error } = await supabase
     .from('people')
-    .select('id,name,slug,photo_url,photo_cutout_url,photo_cutout_status,nationality,known_for_department,bio,date_of_birth')
+    .select('id,name,slug,photo_url,photo_cutout_url,photo_cutout_status,nationality,known_for_department,bio,date_of_birth,instagram_url,twitter_url,tiktok_url,youtube_handle')
     .eq('id', personId)
     .maybeSingle();
 
@@ -480,7 +480,7 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   const { data: film, error } = await supabase
     .from('films')
     .select(
-      'id,title,slug,poster_url,backdrop_url,backdrop,release_date,year,synopsis,tagline,genres,countries,languages,liked_percent,coming_soon,is_published',
+      'id,title,slug,poster_url,backdrop_url,backdrop,release_date,year,synopsis,tagline,genres,countries,languages,liked_percent,coming_soon,is_published,is_in_cinemas,streaming_links,youtube_watch_url',
     )
     .eq('id', filmId)
     .maybeSingle();
@@ -490,7 +490,7 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
 
   const { data: credits, error: creditsError } = await supabase
     .from('credits')
-    .select('character_name,billing_order,people!inner(id,name)')
+    .select('character_name,billing_order,people!inner(id,name,instagram_url,twitter_url,tiktok_url,youtube_handle)')
     .eq('film_id', filmId)
     .eq('role', 'actor')
     .order('billing_order', { ascending: true, nullsFirst: false })

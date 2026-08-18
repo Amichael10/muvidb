@@ -73,61 +73,127 @@ function joinTitles(titles: string[]): string {
   return `${titles.slice(0, -1).join(', ')} and ${titles[titles.length - 1]}`;
 }
 
-function actorLead(snapshot: ActorSpotlightSnapshot): string {
-  const descriptor = [snapshot.nationality, snapshot.knownForDepartment]
-    .map(part => (part || '').trim())
-    .filter(Boolean)
-    .join(' ');
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-  return descriptor ? `${snapshot.name} — ${descriptor}.` : `${snapshot.name}.`;
+export function buildMovieHook(tagline: string | null, synopsis: string | null, title: string): string {
+  const parts: string[] = [];
+
+  const usableTagline = firstUsableCopy(tagline);
+  if (usableTagline) {
+    parts.push(usableTagline);
+  }
+
+  const usableSynopsis = firstUsableCopy(synopsis);
+  if (usableSynopsis) {
+    const clean = usableSynopsis
+      .replace(new RegExp(`^${escapeRegex(title)}\\s*(\\([^)]*\\))?\\s*(is a [^.]+film that\\s*)?(follows|revolves around|tells the story of|centers on|chronicles)\\s+`, 'i'), '')
+      .replace(/^(This movie|This film|The story)\s+(follows|revolves around|tells the story of|centers on|is about)\s+/i, '')
+      .trim();
+
+    const capitalized = clean.charAt(0).toUpperCase() + clean.slice(1);
+    const sentences = capitalized
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (sentences.length > 0) {
+      if (!usableTagline) {
+        parts.push(sentences.slice(0, 2).join(' '));
+      } else if (sentences[0] && !usableTagline.includes(sentences[0])) {
+        parts.push(sentences[0]);
+      }
+    }
+  }
+
+  return parts.filter(Boolean).join('\n\n');
+}
+
+function formatCastList(cast: SnapshotCastMember[]): string {
+  if (!cast.length) return '';
+  const handlesOrNames = cast.map(c => (c.handle ? c.handle : c.name));
+  return `Starring:\n${handlesOrNames.join('\n')}`;
 }
 
 function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
-  const lines: string[] = [`Spotlight: ${actorLead(snapshot)}`];
+  const lines: string[] = [];
+  const handleOrName = snapshot.handle ? `${snapshot.name} (${snapshot.handle})` : snapshot.name;
+  lines.push(`Star Spotlight: ${handleOrName} 🌟`);
 
   const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
-  if (titles.length) lines.push(`Known for ${joinTitles(titles)}.`);
+  if (titles.length) {
+    lines.push(`From standout performances in ${joinTitles(titles)}, ${snapshot.name} continues to deliver unforgettable Nollywood cinema.`);
+  }
 
   const bio = firstUsableCopy(snapshot.bio);
-  if (bio) lines.push(bio);
+  if (bio) {
+    lines.push(bio);
+  }
 
+  lines.push(`What is your favorite ${snapshot.name} movie of all time? Drop your top picks in the comments! 👇`);
   return lines;
 }
 
-/**
- * The age is only stated when it came from a real birth year. Guessing an age
- * for a living person in a published post is worse than omitting it.
- */
 function birthdayBody(snapshot: BirthdaySpotlightSnapshot): string[] {
-  const lines: string[] = [
+  const lines: string[] = [];
+  const handleOrName = snapshot.handle ? `${snapshot.name} (${snapshot.handle})` : snapshot.name;
+  lines.push(
     snapshot.age === null
-      ? `Happy birthday, ${snapshot.name}!`
-      : `Happy birthday, ${snapshot.name} — ${snapshot.age} today!`,
-  ];
-
-  if (snapshot.roles.length) lines.push(`${joinTitles(snapshot.roles)}.`);
+      ? `Happy Birthday to the incredible ${handleOrName}! 🎂🎉✨`
+      : `Happy Birthday to the incredible ${handleOrName} — celebrating ${snapshot.age} golden years today! 🎂🎉✨`
+  );
 
   const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
-  if (titles.length) lines.push(`Known for ${joinTitles(titles)}.`);
+  if (titles.length) {
+    lines.push(`Celebrating a true Nollywood icon known for unforgettable roles in ${joinTitles(titles)}.`);
+  }
 
+  lines.push(`Join us in celebrating this star today! Drop your warm birthday wishes and favorite roles below! 🥳👇`);
   return lines;
 }
 
 function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
-  const heading = snapshot.year ? `${snapshot.title} (${snapshot.year})` : snapshot.title;
-  const lines: string[] = [snapshot.comingSoon ? `Coming soon: ${heading}` : heading];
+  const lines: string[] = [];
+  const yearSuffix = snapshot.year ? ` (${snapshot.year})` : '';
 
-  const blurb = firstUsableCopy(snapshot.tagline, snapshot.synopsis);
-  if (blurb) lines.push(blurb);
+  // 1. Engaging Announcement Header
+  lines.push(
+    snapshot.comingSoon
+      ? `New Look at ${snapshot.title}${yearSuffix} 🎬`
+      : `${snapshot.title}${yearSuffix}`
+  );
 
-  const cast = snapshot.topCast.map(member => member.name).filter(Boolean);
-  if (cast.length) lines.push(`Starring ${joinTitles(cast)}.`);
+  // 2. Watch Platform / Release Date line
+  if (snapshot.watchAvailability) {
+    lines.push(snapshot.watchAvailability);
+  } else if (snapshot.releaseDate) {
+    lines.push(snapshot.comingSoon ? `Coming Soon • ${snapshot.releaseDate} 🍿` : `Released ${snapshot.releaseDate} 🍿`);
+  }
+
+  // 3. Punchy narrative teaser / hook (NOT dry textbook synopsis!)
+  const hook = buildMovieHook(snapshot.tagline, snapshot.synopsis, snapshot.title);
+  if (hook) {
+    lines.push(hook);
+  }
+
+  // 4. Starring line-by-line with direct @handles
+  const castBlock = formatCastList(snapshot.topCast);
+  if (castBlock) {
+    lines.push(castBlock);
+  }
+
+  // 5. High-engagement question CTA to spark comments
+  const cta = snapshot.comingSoon
+    ? 'Are you seated for this one? Drop a 🍿 if this is on your watchlist! 👇'
+    : 'Have you watched this yet? Drop your ratings and thoughts below! 👇';
+  lines.push(cta);
 
   return lines;
 }
 
 function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
-  const tags: (string | null)[] = ['MuviDB'];
+  const tags: (string | null)[] = ['Nollywood', 'NollywoodMovies', 'MuviDB'];
 
   if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     tags.push(toHashtag(snapshot.name));
