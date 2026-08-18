@@ -43,7 +43,7 @@
       "maxDuration": 60
     },
     "api/social.ts": {
-      "includeFiles": "api/_lib/{fonts,decor}/**",
+      "includeFiles": "{api/_lib/{fonts,decor}/**,src/features/social-studio/**}",
       "maxDuration": 60
     },
     "api/cron/sync.ts": {
