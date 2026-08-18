@@ -492,6 +492,33 @@ export const AWARD_ORGS = [
     tags: ['Lagos', 'Smartphone Film', 'Mobile Cinema', 'Innovation', 'FilmFreeway', 'AI & Mobile'],
   },
   {
+    id: 'EKOIFF',
+    label: 'EKOIFF',
+    full: 'Eko International Film Festival',
+    tagline: 'Lagos Premier International Showcase for Global & Nollywood Cinema',
+    category: 'festival',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (April / May)',
+    founded: 2009,
+    accent: '#8B5CF6',
+    about:
+      'Founded in 2009 by Hope Obioma Opara, Eko International Film Festival (EKOIFF) is one of Nigeria’s longest-standing international film festivals in Lagos. Its mission is to promote the appreciation of arts and culture through motion picture arts and sciences, boost tourism, and foster cross-cultural collaborations between African filmmakers and the global cinema industry.',
+    when:
+      'Annual international festival held in April / May at Silverbird Cinemas, Victoria Island, Lagos, Nigeria. Features competitive feature film showcases, documentary screenings, Canon cinematography workshops, and gala jury awards.',
+    submissions:
+      'Open to Nigerian, African, and international filmmakers across feature films, shorts, documentaries, indigenous language cinema, student projects, and animations via FilmFreeway and the official festival website.',
+    entryPlan: {
+      fees: 'Standard Entry ($15 – $40 via FilmFreeway)',
+      eligibility: 'Features, shorts, documentaries completed within 2 years. English subtitles required for foreign dialogue.',
+      formats: 'Full HD / 4K screener; DCP / ProRes for theatrical projections.',
+      categoriesCount: '15 Feature, Acting & Craft Categories',
+      platform: 'FilmFreeway & EKOIFF Portal',
+    },
+    submitUrl: 'https://filmfreeway.com/EkoInternationalFilmFestival',
+    submitLabel: 'Submit on FilmFreeway',
+    tags: ['Lagos', 'Film Festival', 'International', 'Silverbird Cinemas', 'FilmFreeway', 'Nollywood'],
+  },
+  {
     id: 'EKO_STAR',
     label: 'Eko Star',
     full: 'Eko Star Film & TV Awards',
@@ -576,6 +603,7 @@ export function normOrg(raw) {
   if (upper.includes('BON') || upper.includes('BEST OF NOLLYWOOD')) return 'BON';
   if (upper.includes('LIFACC') || upper.includes('LAGOS INTERNATIONAL FILM AND CINEMA')) return 'LIFACC';
   if (upper.includes('ASIFF') || upper.includes('SMARTPHONE') || upper.includes('SMARTFILM')) return 'ASIFF';
+  if (upper.includes('EKOIFF') || upper.includes('EKO INTERNATIONAL FILM')) return 'EKOIFF';
   if (upper.includes('EKO STAR')) return 'EKO_STAR';
   return s;
 }
