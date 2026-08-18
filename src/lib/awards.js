@@ -60,31 +60,85 @@ export const AWARD_ORGS = [
     tags: ['Pan-African', 'Academy', 'Cinema', 'Craft', 'Directing', 'Diaspora'],
   },
   {
-    id: 'AFRIFF',
-    label: 'AFRIFF',
-    full: 'Africa International Film Festival',
-    tagline: 'Bridging African Cinema to the Global Industry',
+    id: 'TINFF',
+    label: 'TINFF',
+    full: 'The Industry Nollywood Film Festival',
+    tagline: 'Connecting Diaspora Filmmakers to Nigerian Cinema',
     category: 'festival',
-    location: 'Lagos, Nigeria',
-    frequency: 'Annual (November)',
-    founded: 2010,
-    accent: '#3B82F6',
+    location: 'Toronto, Canada / Lagos, Nigeria',
+    frequency: 'Annual (September)',
+    founded: 2017,
+    accent: '#E11D48',
     about:
-      'Founded by Chioma Ude, AFRIFF is West Africa’s flagship international film festival and market, drawing international filmmakers, Hollywood executives, streaming buyers, masterclasses, and competitive Globe Awards.',
+      'A festival-and-awards platform that spotlights Nollywood and diaspora storytelling — less red‑carpet TV spectacle, more industry showcase with competitive categories for features, independent cinema, and emerging diaspora work.',
     when:
-      'Held annually every November in Lagos, Nigeria. Submissions open early spring and close late summer.',
+      'Festival editions and awards typically cluster mid‑year; exact dates shift by host city and edition.',
     submissions:
-      'Open to African, Diaspora, and international feature films, short films, feature documentaries, student cinema, animations, and virtual reality narratives.',
+      'Films enter through the festival’s submission process on FilmFreeway. Accepted titles can screen in the programme and compete in TINFF award categories.',
     entryPlan: {
-      fees: 'Tiered by Deadline (Early / Regular / Late)',
-      eligibility: 'Completed within 24 months preceding the festival. Nigerian, African, and international premieres prioritized.',
-      formats: 'DCP for screenings; password-protected online screener for jury evaluation.',
-      categoriesCount: 'Globe Awards across 14 Categories',
+      fees: 'Standard Entry ($20 – $50)',
+      eligibility: 'Nollywood, African, and international independent cinema.',
+      formats: 'DCP / Online Screener.',
+      categoriesCount: '20 Award Categories',
       platform: 'FilmFreeway',
     },
-    submitUrl: 'https://filmfreeway.com/AfricaInternationalFilmFestival',
+    submitUrl: 'https://filmfreeway.com/TINFF',
     submitLabel: 'Submit on FilmFreeway',
-    tags: ['Lagos', 'Film Festival', 'International', 'Market', 'Globe Awards', 'Masterclasses'],
+    tags: ['Diaspora', 'Toronto', 'International', 'Independent', 'Showcase'],
+  },
+  {
+    id: 'DIYMA',
+    label: 'DIYMA',
+    full: 'Distinct Indigenous Yoruba Movie Awards',
+    tagline: 'Recognizing Exceptional Craft & Performances in Yoruba Cinema',
+    category: 'indigenous',
+    location: 'Lagos / Oyo, Nigeria',
+    frequency: 'Annual',
+    founded: 2020,
+    accent: '#EA580C',
+    about:
+      'An annual awards platform dedicated to celebrating artistic excellence, cultural authenticity, acting performances, and technical craft (continuity, cinematography, set design, editing) across Yoruba-language cinema and productions.',
+    when:
+      'Annual awards cycle celebrating indigenous releases across cinema, broadcast television, and digital streaming platforms.',
+    submissions:
+      'Producers and practitioners submit indigenous Yoruba-language titles for jury evaluation across performance and technical craft categories.',
+    entryPlan: {
+      fees: 'Free / Indigenous Entry',
+      eligibility: 'Yoruba-language feature films and productions released during the award cycle.',
+      formats: 'Digital screener.',
+      categoriesCount: '20+ Craft & Performance Categories',
+      platform: 'DIYMA Secretariat',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Indigenous', 'Yoruba Cinema', 'Craft', 'Set Design', 'Continuity', 'Acting'],
+  },
+  {
+    id: 'BON',
+    label: 'BON',
+    full: 'Best of Nollywood Awards',
+    tagline: 'Celebrating The Very Best in English & Indigenous Nollywood',
+    category: 'academy',
+    location: 'Rotating Nigerian State Hosts',
+    frequency: 'Annual (November / December)',
+    founded: 2009,
+    accent: '#10B981',
+    about:
+      'Founded by Seun Oloketuyi, Best of Nollywood (BON) is one of Nigeria’s premier film award bodies honoring technical craft, lead acting, and supporting performances across Indigenous (Yoruba, Hausa, Igbo) and English-language Nollywood cinema.',
+    when:
+      'Annual ceremony held late in the year (November/December). Honors theatrical, streaming, and television films released in the eligibility window.',
+    submissions:
+      'Producers submit physical and digital film screeners to the BON jury screening panel during the open call window.',
+    entryPlan: {
+      fees: 'Free Producer Entry',
+      eligibility: 'Nigerian feature films released theatrically or on streaming in the award year.',
+      formats: 'HD Digital screener or physical preview copy.',
+      categoriesCount: '25+ Acting & Technical Prizes',
+      platform: 'BON Secretariat',
+    },
+    submitUrl: 'https://www.instagram.com/bonawards/',
+    submitLabel: 'BON Awards Channel',
+    tags: ['Nollywood', 'Indigenous', 'Yoruba', 'Hausa', 'Igbo', 'Craft'],
   },
   {
     id: 'AIFF',
@@ -141,58 +195,31 @@ export const AWARD_ORGS = [
     tags: ['Abuja', 'National Festival', 'NFC', 'Government', 'Cultural Heritage'],
   },
   {
-    id: 'YOMAFA',
-    label: 'YOMAFA',
-    full: 'Yomafa Global Awards',
-    tagline: 'Pan-African Audience Honours & Heritage Gala',
-    category: 'academy',
+    id: 'GOLDEN_STARS',
+    label: 'Golden Stars',
+    full: 'Golden Stars Awards',
+    tagline: 'Honouring Outstanding Performance in Nollywood & Media',
+    category: 'industry',
     location: 'Lagos, Nigeria',
-    frequency: 'Annual (Season Cycle)',
-    founded: 2008,
-    accent: '#FAB80F',
+    frequency: 'Annual (June / July)',
+    founded: 2019,
+    accent: '#F59E0B',
     about:
-      'Pan-African showbiz honours spanning film, music, media and culture — audience voting across dozens of categories each season, celebrating stars, veteran trailblazers, and fan-favorite cinema.',
+      'Annual African entertainment and industry honours recognizing excellence across acting, Nollywood performances, music, and media personalities in Lagos, Nigeria.',
     when:
-      'Voting is live on yomafaglobal.com during the season cycle. Past seasons are archived with gala award presentations.',
+      'Annual ceremony held mid-year in Lagos. Past winners include prominent Nollywood actors, producers, and entertainment leaders.',
     submissions:
-      'Nominees are registered through the Yomafa platform during the open nomination window each season.',
+      'Nominees are registered and accredited via the official Golden Stars Awards platform.',
     entryPlan: {
-      fees: 'Nomination Registration',
-      eligibility: 'Nollywood and Pan-African performers, movies, music, and media personalities active during the season.',
-      formats: 'Digital nomination form and reel submission.',
-      categoriesCount: '40+ Audience & Jury Categories',
-      platform: 'Yomafa Official Platform',
+      fees: 'Accreditation / Entry by nomination',
+      eligibility: 'Active Nigerian and African actors, creators, and cinema personalities.',
+      formats: 'Digital portfolio / video reel.',
+      categoriesCount: '20+ Acting & Media Prizes',
+      platform: 'Golden Stars Portal',
     },
-    submitUrl: 'https://yomafaglobal.com/',
-    submitLabel: 'Yomafa Global Portal',
-    tags: ['Lagos', 'Showbiz', 'Audience Voting', 'Music & Film', 'Cultural'],
-  },
-  {
-    id: 'BON',
-    label: 'BON',
-    full: 'Best of Nollywood Awards',
-    tagline: 'Celebrating The Very Best in English & Indigenous Nollywood',
-    category: 'academy',
-    location: 'Rotating Nigerian State Hosts',
-    frequency: 'Annual (November / December)',
-    founded: 2009,
-    accent: '#10B981',
-    about:
-      'Founded by Seun Oloketuyi, Best of Nollywood (BON) is one of Nigeria’s premier film award bodies honoring technical craft, lead acting, and supporting performances across Indigenous (Yoruba, Hausa, Igbo) and English-language Nollywood cinema.',
-    when:
-      'Annual ceremony held late in the year (November/December). Honors theatrical, streaming, and television films released in the eligibility window.',
-    submissions:
-      'Producers submit physical and digital film screeners to the BON jury screening panel during the open call window.',
-    entryPlan: {
-      fees: 'Free Producer Entry',
-      eligibility: 'Nigerian feature films released theatrically or on streaming in the award year.',
-      formats: 'HD Digital screener or physical preview copy.',
-      categoriesCount: '25+ Acting & Technical Prizes',
-      platform: 'BON Secretariat',
-    },
-    submitUrl: 'https://www.instagram.com/bonawards/',
-    submitLabel: 'BON Awards Channel',
-    tags: ['Nollywood', 'Indigenous', 'Yoruba', 'Hausa', 'Igbo', 'Craft'],
+    submitUrl: 'https://goldenstarsaward.com/',
+    submitLabel: 'Golden Stars Portal',
+    tags: ['Lagos', 'Entertainment', 'Acting', 'Celebrity', 'Media'],
   },
   {
     id: 'KILAF',
@@ -274,33 +301,6 @@ export const AWARD_ORGS = [
     submitUrl: 'https://coalcityfilmfestival.org/',
     submitLabel: 'CCFF Official Portal',
     tags: ['Enugu', 'Film Festival', 'Cradle of Nollywood', 'Eastern Nigeria', 'Tourism'],
-  },
-  {
-    id: 'GOLDEN_STARS',
-    label: 'Golden Stars',
-    full: 'Golden Stars Awards',
-    tagline: 'Honouring Outstanding Performance in Nollywood & Media',
-    category: 'industry',
-    location: 'Lagos, Nigeria',
-    frequency: 'Annual (June / July)',
-    founded: 2019,
-    accent: '#F59E0B',
-    about:
-      'Annual African entertainment and industry honours recognizing excellence across acting, Nollywood performances, music, and media personalities in Lagos, Nigeria.',
-    when:
-      'Annual ceremony held mid-year in Lagos. Past winners include prominent Nollywood actors, producers, and entertainment leaders.',
-    submissions:
-      'Nominees are registered and accredited via the official Golden Stars Awards platform.',
-    entryPlan: {
-      fees: 'Accreditation / Entry by nomination',
-      eligibility: 'Active Nigerian and African actors, creators, and cinema personalities.',
-      formats: 'Digital portfolio / video reel.',
-      categoriesCount: '20+ Acting & Media Prizes',
-      platform: 'Golden Stars Portal',
-    },
-    submitUrl: 'https://goldenstarsaward.com/',
-    submitLabel: 'Golden Stars Portal',
-    tags: ['Lagos', 'Entertainment', 'Acting', 'Celebrity', 'Media'],
   },
   {
     id: 'LIFACC',
@@ -411,33 +411,6 @@ export const AWARD_ORGS = [
     tags: ['Abeokuta', 'Yoruba Cinema', 'Acting Academy', 'Odunlade Adekola', 'Grassroots'],
   },
   {
-    id: 'TINFF',
-    label: 'TINFF',
-    full: 'The Industry Nollywood Film Festival',
-    tagline: 'Connecting Diaspora Filmmakers to Nigerian Cinema',
-    category: 'festival',
-    location: 'Toronto, Canada / Lagos, Nigeria',
-    frequency: 'Annual (September)',
-    founded: 2017,
-    accent: '#E11D48',
-    about:
-      'A festival-and-awards platform that spotlights Nollywood and diaspora storytelling — less red‑carpet TV spectacle, more industry showcase with competitive categories for features, independent cinema, and emerging diaspora work.',
-    when:
-      'Festival editions and awards typically cluster mid‑year; exact dates shift by host city and edition.',
-    submissions:
-      'Films enter through the festival’s submission process on FilmFreeway. Accepted titles can screen in the programme and compete in TINFF award categories.',
-    entryPlan: {
-      fees: 'Standard Entry ($20 – $50)',
-      eligibility: 'Nollywood, African, and international independent cinema.',
-      formats: 'DCP / Online Screener.',
-      categoriesCount: '20 Award Categories',
-      platform: 'FilmFreeway',
-    },
-    submitUrl: 'https://filmfreeway.com/TINFF',
-    submitLabel: 'Submit on FilmFreeway',
-    tags: ['Diaspora', 'Toronto', 'International', 'Independent', 'Showcase'],
-  },
-  {
     id: 'NTFF',
     label: 'NTFF',
     full: 'Nollywood Travel Film Festival',
@@ -463,60 +436,6 @@ export const AWARD_ORGS = [
     submitUrl: 'https://filmfreeway.com/NollywoodTravelFilmFestival',
     submitLabel: 'Submit on FilmFreeway',
     tags: ['Global Tour', 'Travel Festival', 'Diaspora', 'Berlin', 'Toronto', 'London'],
-  },
-  {
-    id: 'ASIFF',
-    label: 'ASIFF',
-    full: 'African Smartphone International Film Festival',
-    tagline: 'Africa’s Premier Mobile & Smartphone Cinema Showcase',
-    category: 'festival',
-    location: 'Lagos, Nigeria',
-    frequency: 'Annual (December)',
-    founded: 2017,
-    accent: '#06B6D4',
-    about:
-      'Founded in 2017 by Nigerian filmmaker Michael Osheku, ASIFF is Africa’s first and largest international smartphone film festival. The festival democratizes cinematic storytelling by showcasing groundbreaking narrative features, shorts, and documentaries created entirely using smartphones, mobile devices, and mobile AI.',
-    when:
-      'Annual 4-day international showcase held December 18–21 in Lagos, Nigeria. Features global film screenings, panel sessions, mobile tech expos, and awards gala.',
-    submissions:
-      'Open to African, diaspora, and global filmmakers. Entries must be filmed using mobile phones, tablets, or mobile action equipment across fiction, documentary, animation, and student categories.',
-    entryPlan: {
-      fees: 'Standard Entry ($15 – $35 via FilmFreeway)',
-      eligibility: 'Films shot on mobile phones/tablets completed within the last 2 years. English subtitles required.',
-      formats: 'HD / 4K MP4/MOV screener; ProRes/DCP for theatrical showcase.',
-      categoriesCount: '16 Smartphone & Mobile Craft Categories',
-      platform: 'FilmFreeway & ASIFF Portal',
-    },
-    submitUrl: 'https://filmfreeway.com/AfricanSmartphoneInternationalFilmFestival',
-    submitLabel: 'Submit on FilmFreeway',
-    tags: ['Lagos', 'Smartphone Film', 'Mobile Cinema', 'Innovation', 'FilmFreeway', 'AI & Mobile'],
-  },
-  {
-    id: 'EKOIFF',
-    label: 'EKOIFF',
-    full: 'Eko International Film Festival',
-    tagline: 'Lagos Premier International Showcase for Global & Nollywood Cinema',
-    category: 'festival',
-    location: 'Lagos, Nigeria',
-    frequency: 'Annual (April / May)',
-    founded: 2009,
-    accent: '#8B5CF6',
-    about:
-      'Founded in 2009 by Hope Obioma Opara, Eko International Film Festival (EKOIFF) is one of Nigeria’s longest-standing international film festivals in Lagos. Its mission is to promote the appreciation of arts and culture through motion picture arts and sciences, boost tourism, and foster cross-cultural collaborations between African filmmakers and the global cinema industry.',
-    when:
-      'Annual international festival held in April / May at Silverbird Cinemas, Victoria Island, Lagos, Nigeria. Features competitive feature film showcases, documentary screenings, Canon cinematography workshops, and gala jury awards.',
-    submissions:
-      'Open to Nigerian, African, and international filmmakers across feature films, shorts, documentaries, indigenous language cinema, student projects, and animations via FilmFreeway and the official festival website.',
-    entryPlan: {
-      fees: 'Standard Entry ($15 – $40 via FilmFreeway)',
-      eligibility: 'Features, shorts, documentaries completed within 2 years. English subtitles required for foreign dialogue.',
-      formats: 'Full HD / 4K screener; DCP / ProRes for theatrical projections.',
-      categoriesCount: '15 Feature, Acting & Craft Categories',
-      platform: 'FilmFreeway & EKOIFF Portal',
-    },
-    submitUrl: 'https://filmfreeway.com/EkoInternationalFilmFestival',
-    submitLabel: 'Submit on FilmFreeway',
-    tags: ['Lagos', 'Film Festival', 'International', 'Silverbird Cinemas', 'FilmFreeway', 'Nollywood'],
   },
   {
     id: 'EKO_STAR',
@@ -588,8 +507,8 @@ export function normOrg(raw) {
   if (upper.includes('YOMAFA') || upper.includes('YOMAFA GLOBAL')) return 'YOMAFA';
   if (upper.includes('AMVCA') || upper.includes('AFRICA MAGIC')) return 'AMVCA';
   if (upper.includes('AMAA') || upper.includes('AFRICA MOVIE ACADEMY')) return 'AMAA';
-  if (upper.includes('AFRIFF') || upper.includes('AFRICA INTERNATIONAL FILM')) return 'AFRIFF';
   if (upper.includes('TINFF') || upper.includes('INDUSTRY NOLLYWOOD')) return 'TINFF';
+  if (upper.includes('DIYMA') || upper.includes('DISTINCT INDIGENOUS')) return 'DIYMA';
   if (upper.includes('NTFF') || upper.includes('NOLLYWOOD TRAVEL') || upper.includes('TRAVEL FILM FESTIVAL')) return 'NTFF';
   if (upper.includes('AIFF') || upper.includes('ABUJA INTERNATIONAL') || upper.includes('ABUJA FILM')) return 'AIFF';
   if (upper.includes('ZUMA') || upper.includes('ZUFF')) return 'ZUFF';
@@ -602,8 +521,6 @@ export function normOrg(raw) {
   if (upper.includes('GOLDEN STAR') || upper.includes('GOLDENSTARS')) return 'GOLDEN_STARS';
   if (upper.includes('BON') || upper.includes('BEST OF NOLLYWOOD')) return 'BON';
   if (upper.includes('LIFACC') || upper.includes('LAGOS INTERNATIONAL FILM AND CINEMA')) return 'LIFACC';
-  if (upper.includes('ASIFF') || upper.includes('SMARTPHONE') || upper.includes('SMARTFILM')) return 'ASIFF';
-  if (upper.includes('EKOIFF') || upper.includes('EKO INTERNATIONAL FILM')) return 'EKOIFF';
   if (upper.includes('EKO STAR')) return 'EKO_STAR';
   return s;
 }
@@ -842,9 +759,7 @@ export async function loadAwardsCatalog() {
   }
 
   const recordedOrgs = [...new Set(rows.map((r) => r.org))];
-  const allOrgIds = [...new Set([...AWARD_ORGS.map((o) => o.id), ...recordedOrgs])];
-
-  const orgs = allOrgIds.sort((a, b) => {
+  const orgs = recordedOrgs.sort((a, b) => {
     const ai = AWARD_ORGS.findIndex((o) => o.id === a);
     const bi = AWARD_ORGS.findIndex((o) => o.id === b);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.localeCompare(b);

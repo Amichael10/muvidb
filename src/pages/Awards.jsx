@@ -69,15 +69,11 @@ export default function Awards() {
     return map;
   }, [catalog.rows]);
 
-  // Combine static AWARD_ORGS with any extra orgs in database
+  // Only include organizations that actually have recorded film / people awards in the database
   const allOrganizations = useMemo(() => {
-    const list = [...AWARD_ORGS];
-    for (const orgId of catalog.orgs) {
-      if (!list.some((o) => o.id === orgId)) {
-        list.push(getAwardOrg(orgId));
-      }
-    }
-    return list;
+    return (catalog.orgs || [])
+      .map((orgId) => getAwardOrg(orgId))
+      .filter(Boolean);
   }, [catalog.orgs]);
 
   // Filter organizations by search and category
