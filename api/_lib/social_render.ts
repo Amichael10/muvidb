@@ -14,7 +14,17 @@ export const ASSET_FORMAT_DIMENSIONS: Record<SocialAssetFormat, { width: number;
   vertical_9_16: { width: 1080, height: 1920 },
 };
 
-const FONT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fonts');
+function getLibDir(): string {
+  if (typeof __dirname !== 'undefined') return __dirname;
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta?.url) {
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch {}
+  return path.join(process.cwd(), 'api', '_lib');
+}
+
+const FONT_DIR = path.join(getLibDir(), 'fonts');
 
 type SatoriNode = { type: string; props: Record<string, unknown> };
 
@@ -193,14 +203,7 @@ const BRAND = {
   rule: 'rgba(17,17,17,0.12)',
 };
 
-const BRAND_DIR = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  'public',
-  'images',
-  'MuviDB Brand',
-);
+const BRAND_DIR = path.join(process.cwd(), 'public', 'images', 'MuviDB Brand');
 
 /**
  * The mockups use a horizontal lockup: hexagon icon then the wordmark.
@@ -222,7 +225,7 @@ async function loadBrandImage(file: string): Promise<Artwork> {
   }
 }
 
-const DECOR_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'decor');
+const DECOR_DIR = path.join(getLibDir(), 'decor');
 
 /**
  * Authored decorative vectors, vendored from docs/social-templates so they ship

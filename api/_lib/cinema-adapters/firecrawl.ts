@@ -23,8 +23,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { mirrorIfExternal } from '../image_mirror.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _safeFilename = typeof __filename !== 'undefined' ? __filename : (typeof import.meta !== 'undefined' && import.meta?.url ? fileURLToPath(import.meta.url) : '');
+const _safeDirname = typeof __dirname !== 'undefined' ? __dirname : (_safeFilename ? path.dirname(_safeFilename) : process.cwd());
 
 // Activate the stealth plugin locally
 const stealthPlugin = stealth();
