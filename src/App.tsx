@@ -64,6 +64,7 @@ const Privacy = lazyWithRetry(() => import('./pages/Privacy'));
 const Waitlist = lazyWithRetry(() => import('./pages/Waitlist'));
 const About = lazyWithRetry(() => import('./pages/About'));
 const Awards = lazyWithRetry(() => import('./pages/Awards'));
+const AwardDetail = lazyWithRetry(() => import('./pages/AwardDetail'));
 const Contact = lazyWithRetry(() => import('./pages/Contact'));
 const Careers = lazyWithRetry(() => import('./pages/Careers'));
 const CareerDetail = lazyWithRetry(() => import('./pages/CareerDetail'));
@@ -345,6 +346,7 @@ export default function App() {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/awards" element={<Awards />} />
+                <Route path="/awards/:id" element={<AwardDetail />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/careers" element={<Careers />} />
                 <Route path="/careers/:slug" element={<CareerDetail />} />

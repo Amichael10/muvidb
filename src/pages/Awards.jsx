@@ -1,36 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Icon } from '@iconify/react';
-import { AWARD_ORGS, groupAwards, loadAwardsCatalog } from '../lib/awards';
+import { AWARD_ORGS, getAwardOrg, loadAwardsCatalog } from '../lib/awards';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
-import { formatFilmTitle, formatPersonName, toTitleCase } from '../utils/format';
+import { formatFilmTitle, formatPersonName } from '../utils/format';
 
-function orgMeta(id) {
-  return (
-    AWARD_ORGS.find((o) => o.id === id) || {
-      id,
-      label: id,
-      full: id,
-      accent: 'var(--color-brand)',
-      about: 'A film and television awards body represented in the MuviDB catalogue.',
-      when: 'Dates vary by edition.',
-      submissions: 'Submission rules are set by the organising body each year.',
-      submitUrl: null,
-    }
-  );
-}
+const CATEGORY_TABS = [
+  { id: 'all', label: 'All Honours & Festivals', icon: 'solar:cup-star-linear' },
+  { id: 'academy', label: 'Academies & Major Honours', icon: 'solar:medal-star-linear' },
+  { id: 'festival', label: 'Film Festivals & Markets', icon: 'solar:clapperboard-linear' },
+  { id: 'indigenous', label: 'Indigenous & Regional', icon: 'solar:masks-linear' },
+  { id: 'impact', label: 'Industry & Social Impact', icon: 'solar:heart-angle-linear' },
+];
+
+const CATEGORY_LABELS = {
+  academy: 'Academy Honours',
+  festival: 'Film Festival',
+  indigenous: 'Indigenous & Regional',
+  industry: 'Industry & Business',
+  impact: 'Social Impact',
+};
 
 export default function Awards() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [catalog, setCatalog] = useState({ rows: [], orgs: [], years: [], stats: {} });
-  const [org, setOrg] = useState(null);
-  const [year, setYear] = useState(null);
-  const [infoOpen, setInfoOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   useEffect(() => {
-    document.title = 'Awards | MuviDB';
+    document.title = 'Awards & Film Festivals | MuviDB';
     window.scrollTo(0, 0);
   }, []);
 
@@ -38,24 +38,13 @@ export default function Awards() {
     let cancelled = false;
     (async () => {
       try {
+        setLoading(true);
         const data = await loadAwardsCatalog();
         if (cancelled) return;
         setCatalog(data);
-        const preferred =
-          data.orgs.find((o) => o === 'AMVCA') ||
-          data.orgs.find((o) => o === 'AMAA') ||
-          data.orgs[0] ||
-          null;
-        setOrg(preferred);
-        const yearsForOrg = [
-          ...new Set(
-            data.rows.filter((r) => r.org === preferred).map((r) => r.year).filter(Boolean)
-          ),
-        ].sort((a, b) => b - a);
-        setYear(yearsForOrg[0] || null);
       } catch (err) {
-        console.error(err);
-        if (!cancelled) setError(err.message || 'Failed to load awards');
+        console.error('Failed to load awards catalog:', err);
+        if (!cancelled) setError(err.message || 'Failed to load awards directory');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -65,42 +54,76 @@ export default function Awards() {
     };
   }, []);
 
-  const yearsForOrg = useMemo(() => {
-    if (!org) return catalog.years;
-    return [
-      ...new Set(catalog.rows.filter((r) => r.org === org).map((r) => r.year).filter(Boolean)),
-    ].sort((a, b) => b - a);
-  }, [catalog.rows, catalog.years, org]);
-
-  useEffect(() => {
-    if (!yearsForOrg.length) {
-      setYear(null);
-      return;
+  // Compute stats per organization
+  const orgStatsMap = useMemo(() => {
+    const map = new Map();
+    for (const r of catalog.rows) {
+      if (!map.has(r.org)) {
+        map.set(r.org, { entries: 0, winners: 0, years: new Set() });
+      }
+      const item = map.get(r.org);
+      item.entries += 1;
+      if (r.won) item.winners += 1;
+      if (r.year) item.years.add(r.year);
     }
-    if (!year || !yearsForOrg.includes(year)) setYear(yearsForOrg[0]);
-  }, [yearsForOrg, year]);
+    return map;
+  }, [catalog.rows]);
 
-  const categories = useMemo(
-    () => groupAwards(catalog.rows, { org, year }),
-    [catalog.rows, org, year]
-  );
+  // Combine static AWARD_ORGS with any extra orgs in database
+  const allOrganizations = useMemo(() => {
+    const list = [...AWARD_ORGS];
+    for (const orgId of catalog.orgs) {
+      if (!list.some((o) => o.id === orgId)) {
+        list.push(getAwardOrg(orgId));
+      }
+    }
+    return list;
+  }, [catalog.orgs]);
 
-  const winCount = useMemo(
-    () => catalog.rows.filter((r) => r.org === org && r.year === year && r.won).length,
-    [catalog.rows, org, year]
-  );
+  // Filter organizations by search and category
+  const filteredOrgs = useMemo(() => {
+    let list = allOrganizations;
 
-  const meta = orgMeta(org);
+    if (selectedCategory !== 'all') {
+      if (selectedCategory === 'impact') {
+        list = list.filter((o) => o.category === 'impact' || o.category === 'industry');
+      } else {
+        list = list.filter((o) => o.category === selectedCategory);
+      }
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((o) => {
+        const matchName =
+          o.label.toLowerCase().includes(q) ||
+          o.full.toLowerCase().includes(q) ||
+          (o.tagline && o.tagline.toLowerCase().includes(q));
+        const matchLocation = o.location && o.location.toLowerCase().includes(q);
+        const matchAbout = o.about && o.about.toLowerCase().includes(q);
+        const matchTags = Array.isArray(o.tags) && o.tags.some((t) => t.toLowerCase().includes(q));
+        return matchName || matchLocation || matchAbout || matchTags;
+      });
+    }
+
+    return list;
+  }, [allOrganizations, selectedCategory, searchQuery]);
+
+  // Recent Highlights Spotlight: last major winners recorded
+  const recentSpotlightWinners = useMemo(() => {
+    return catalog.rows
+      .filter((r) => r.won && (r.film?.poster_url || r.person?.photo_url) && r.year >= 2024)
+      .slice(0, 6);
+  }, [catalog.rows]);
 
   return (
     <div className="min-h-screen bg-bg text-text-primary">
-      {/* Site grid shell */}
       <div className="mx-auto max-w-7xl border-x border-border min-h-screen">
-        {/* Hero — creative, not a Classification clone */}
-        <header className="relative overflow-hidden border-b border-border">
+        {/* Hero Section */}
+        <header className="relative overflow-hidden border-b border-border bg-surface/30">
           <div
-            className="pointer-events-none absolute -right-24 top-0 h-[420px] w-[420px] rounded-full opacity-30 blur-3xl"
-            style={{ background: `radial-gradient(circle, ${meta.accent}55, transparent 70%)` }}
+            className="pointer-events-none absolute -right-24 top-0 h-[450px] w-[450px] rounded-full opacity-20 blur-3xl"
+            style={{ background: 'radial-gradient(circle, var(--color-brand) 55%, transparent 70%)' }}
             aria-hidden="true"
           />
           <div
@@ -113,487 +136,350 @@ export default function Awards() {
             aria-hidden="true"
           />
 
-          <div className="relative px-4 pb-12 pt-28 sm:px-6 lg:px-8 md:pb-16 md:pt-32">
-            <motion.p
+          <div className="relative px-4 pb-12 pt-24 sm:px-6 lg:px-8 md:pb-16 md:pt-28">
+            <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-[11px] font-black uppercase tracking-[0.4em] text-brand"
+              className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.25em] text-brand"
             >
-              Ceremonies · winners · nominations
-            </motion.p>
+              <Icon icon="solar:cup-star-bold" width="14" />
+              African Film Honours &amp; Festival Directory
+            </motion.div>
 
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-4 max-w-2xl font-heading text-5xl font-black leading-[0.92] tracking-tighter md:text-7xl"
+              transition={{ delay: 0.05, duration: 0.5 }}
+              className="mt-4 max-w-3xl font-heading text-4xl font-black leading-tight tracking-tight sm:text-6xl md:text-7xl"
             >
-              The nights that
-              <span className="block text-brand">shape the slate</span>
+              The ceremonies that
+              <span className="block text-brand">crown African cinema</span>
             </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 14 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12 }}
-              className="mt-6 max-w-lg text-base leading-relaxed text-text-muted md:text-lg"
+              transition={{ delay: 0.1 }}
+              className="mt-5 max-w-2xl text-sm leading-relaxed text-text-muted sm:text-base md:text-lg"
             >
-              Browse African award history on MuviDB — every win and nomination tied back to the
-              film and the people who made it.
+              Explore premier academies, international festivals, and industry honours across Nigeria and the continent. View entry guidelines, dates, and historical winners tied directly to the films and talent.
             </motion.p>
 
+            {/* Live Stats Bar */}
             {!loading && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="mt-8 flex flex-wrap gap-3"
+                transition={{ delay: 0.15 }}
+                className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 max-w-3xl"
               >
-                {[
-                  { n: catalog.stats.entries || 0, l: 'Entries' },
-                  { n: catalog.orgs.length, l: 'Ceremonies' },
-                  { n: catalog.years.length, l: 'Years' },
-                ].map((s) => (
-                  <div
-                    key={s.l}
-                    className="rounded-2xl border border-border bg-surface/80 px-4 py-3 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:border-brand/40"
-                  >
-                    <p className="font-heading text-2xl font-black tabular-nums tracking-tight">{s.n}</p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">
-                      {s.l}
-                    </p>
-                  </div>
-                ))}
+                <div className="rounded-xl border border-border bg-surface/80 p-3.5 backdrop-blur-sm">
+                  <p className="font-heading text-2xl font-black tabular-nums tracking-tight text-text-primary">
+                    {allOrganizations.length}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                    Honours &amp; Festivals
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-surface/80 p-3.5 backdrop-blur-sm">
+                  <p className="font-heading text-2xl font-black tabular-nums tracking-tight text-text-primary">
+                    {catalog.years.length}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                    Editions Archived
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-surface/80 p-3.5 backdrop-blur-sm">
+                  <p className="font-heading text-2xl font-black tabular-nums tracking-tight text-text-primary">
+                    {catalog.stats.entries || catalog.rows.length}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                    Recorded Entries
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-surface/80 p-3.5 backdrop-blur-sm">
+                  <p className="font-heading text-2xl font-black tabular-nums tracking-tight text-text-primary">
+                    {(catalog.stats.films || 0) + (catalog.stats.people || 0)}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                    Honoured Films &amp; Cast
+                  </p>
+                </div>
               </motion.div>
             )}
           </div>
         </header>
 
-        <div className="px-4 py-10 sm:px-6 lg:px-8 md:py-12">
-          {/* Ceremony picker — large interactive cards */}
-          <div className="grid gap-3 md:grid-cols-3">
-            {(catalog.orgs.length ? catalog.orgs : AWARD_ORGS.map((o) => o.id)).map((id) => {
-              const m = orgMeta(id);
-              const active = org === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    setOrg(id);
-                    setInfoOpen(true);
-                  }}
-                  className={`group relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 ${
-                    active
-                      ? 'border-transparent shadow-lg scale-[1.01]'
-                      : 'border-border bg-surface hover:-translate-y-1 hover:border-brand/35 hover:shadow-md'
-                  }`}
-                  style={
-                    active
-                      ? {
-                          background: `linear-gradient(145deg, ${m.accent} 0%, color-mix(in srgb, ${m.accent} 70%, #111) 100%)`,
-                          color: '#fff',
-                        }
-                      : undefined
-                  }
-                >
-                  <span
-                    className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-40 ${
-                      active ? 'opacity-50' : ''
-                    }`}
-                    style={{ background: m.accent }}
-                    aria-hidden="true"
-                  />
-                  <p
-                    className={`text-[10px] font-black uppercase tracking-[0.28em] ${
-                      active ? 'text-white/70' : 'text-text-muted'
-                    }`}
-                  >
-                    Ceremony
-                  </p>
-                  <p className="mt-2 font-heading text-2xl font-black tracking-tight">{m.label}</p>
-                  <p
-                    className={`mt-1 text-xs leading-snug line-clamp-2 ${
-                      active ? 'text-white/80' : 'text-text-muted'
-                    }`}
-                  >
-                    {m.full}
-                  </p>
-                  <span
-                    className={`mt-4 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider transition-transform group-hover:translate-x-1 ${
-                      active ? 'text-white' : 'text-brand'
-                    }`}
-                  >
-                    {active ? 'Selected' : 'Explore'}
-                    <Icon icon="solar:arrow-right-linear" width="14" />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Ceremony explainer */}
-          <AnimatePresence mode="wait">
-            {org && infoOpen && (
-              <motion.section
-                key={org}
-                initial={{ opacity: 0, y: 12, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: 'auto' }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface"
-              >
-                <div
-                  className="h-1 w-full"
-                  style={{ background: meta.accent }}
-                  aria-hidden="true"
+        <main className="px-4 py-10 sm:px-6 lg:px-8 space-y-12">
+          {/* Controls Bar: Live Search & Category Chips */}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              {/* Search Bar */}
+              <div className="relative flex-1 max-w-xl">
+                <Icon
+                  icon="solar:magnifer-linear"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted"
+                  width="18"
                 />
-                <div className="flex items-start justify-between gap-4 p-5 md:p-7">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">
-                      What is {meta.label}?
-                    </p>
-                    <h2 className="mt-1 font-heading text-2xl font-black tracking-tight md:text-3xl">
-                      {meta.full}
-                    </h2>
-                  </div>
+                <input
+                  type="text"
+                  placeholder="Search awards, festivals, cities (Lagos, Abuja, Kano, Enugu), categories…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-surface py-3 pl-11 pr-10 text-xs sm:text-sm font-medium text-text-primary placeholder:text-text-muted focus:border-brand focus:outline-none transition-all shadow-sm"
+                />
+                {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setInfoOpen(false)}
-                    className="shrink-0 rounded-full border border-border p-2 text-text-muted transition-colors hover:border-brand hover:text-brand"
-                    aria-label="Collapse ceremony info"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
                   >
-                    <Icon icon="solar:alt-arrow-up-linear" width="18" />
+                    <Icon icon="solar:close-circle-bold" width="16" />
                   </button>
-                </div>
+                )}
+              </div>
 
-                <div className="grid gap-px border-t border-border bg-border md:grid-cols-3">
-                  <InfoTile
-                    icon="solar:info-circle-linear"
-                    title="What it means"
-                    body={meta.about}
-                  />
-                  <InfoTile
-                    icon="solar:calendar-linear"
-                    title="When it usually happens"
-                    body={meta.when}
-                  />
-                  <InfoTile
-                    icon="solar:upload-linear"
-                    title="Film submissions"
-                    body={meta.submissions}
-                    action={
-                      meta.submitUrl
-                        ? { href: meta.submitUrl, label: meta.submitLabel || 'Official portal' }
-                        : null
-                    }
-                  />
-                </div>
-              </motion.section>
-            )}
-          </AnimatePresence>
+              <span className="text-xs font-bold text-text-muted">
+                Showing {filteredOrgs.length} of {allOrganizations.length} honours
+              </span>
+            </div>
 
-          {org && !infoOpen && (
-            <button
-              type="button"
-              onClick={() => setInfoOpen(true)}
-              className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-brand hover:underline"
-            >
-              <Icon icon="solar:info-circle-linear" width="16" />
-              About {meta.label} — timing &amp; submissions
-            </button>
+            {/* Category Filter Chips */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {CATEGORY_TABS.map((tab) => {
+                const active = selectedCategory === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(tab.id)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
+                      active
+                        ? 'border-brand bg-brand text-white shadow-md shadow-brand/20'
+                        : 'border-border bg-surface text-text-muted hover:border-brand/40 hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon={tab.icon} width="14" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Directory Cards Grid */}
+          {loading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-64 animate-pulse rounded-2xl border border-border bg-surface-2"
+                />
+              ))}
+            </div>
+          ) : error ? (
+            <p className="rounded-2xl border border-red-500/30 bg-red-500/5 px-6 py-8 text-center text-sm font-bold text-red-500">
+              {error}
+            </p>
+          ) : filteredOrgs.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface p-12 text-center">
+              <Icon icon="solar:cup-star-linear" className="mx-auto text-text-muted" width="40" />
+              <p className="mt-3 text-base font-bold text-text-primary">
+                No ceremonies found matching "{searchQuery}"
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                Try searching for a different keyword or resetting your filter.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                }}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white"
+              >
+                Reset Search
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredOrgs.map((org) => {
+                const stats = orgStatsMap.get(org.id) || { entries: 0, winners: 0, years: new Set() };
+                const yearCount = stats.years.size;
+
+                return (
+                  <Link
+                    key={org.id}
+                    to={`/awards/${org.id}`}
+                    className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-border bg-surface p-6 transition-all duration-300 hover:-translate-y-1.5 hover:border-brand/40 hover:shadow-xl"
+                  >
+                    {/* Glowing Top Accent Bar */}
+                    <div
+                      className="absolute left-0 top-0 h-1.5 w-full transition-all duration-300 group-hover:h-2"
+                      style={{ background: org.accent }}
+                      aria-hidden="true"
+                    />
+
+                    {/* Ambient Glow */}
+                    <div
+                      className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-30"
+                      style={{ background: org.accent }}
+                      aria-hidden="true"
+                    />
+
+                    <div>
+                      {/* Category & Location Badge */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white"
+                          style={{ background: org.accent }}
+                        >
+                          {CATEGORY_LABELS[org.category] || 'Honours'}
+                        </span>
+                        <span className="text-[11px] font-bold text-text-muted">
+                          {org.location?.split(',')[0] || 'Nigeria'}
+                        </span>
+                      </div>
+
+                      {/* Header Title */}
+                      <div className="mt-4">
+                        <h3 className="font-heading text-2xl font-black tracking-tight text-text-primary group-hover:text-brand transition-colors">
+                          {org.label}
+                        </h3>
+                        <p className="mt-0.5 text-xs font-semibold text-text-primary line-clamp-1">
+                          {org.full}
+                        </p>
+                      </div>
+
+                      {/* About Snippet */}
+                      <p className="mt-3 text-xs leading-relaxed text-text-muted line-clamp-3">
+                        {org.about}
+                      </p>
+
+                      {/* Key Metadata Tag Badges */}
+                      <div className="mt-4 flex flex-wrap gap-1.5">
+                        {org.frequency && (
+                          <span className="rounded bg-surface-2 px-2 py-0.5 text-[10px] font-bold text-text-muted">
+                            📅 {org.frequency}
+                          </span>
+                        )}
+                        {yearCount > 0 && (
+                          <span className="rounded bg-surface-2 px-2 py-0.5 text-[10px] font-bold text-text-muted">
+                            🏆 {yearCount} Editions
+                          </span>
+                        )}
+                        {stats.entries > 0 && (
+                          <span className="rounded bg-surface-2 px-2 py-0.5 text-[10px] font-bold text-text-muted">
+                            {stats.entries} Entries
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Footer */}
+                    <div className="mt-6 pt-4 border-t border-border flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                        {org.entryPlan?.fees || 'Official Submissions'}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs font-black text-brand transition-transform group-hover:translate-x-1">
+                        View Details &amp; Winners
+                        <Icon icon="solar:arrow-right-linear" width="14" />
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           )}
 
-          {/* Year scrubber */}
-          {yearsForOrg.length > 0 && (
-            <div className="mt-10">
-              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-text-muted">
-                Edition year
-              </p>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                {yearsForOrg.map((y) => {
-                  const active = year === y;
-                  const count = catalog.rows.filter(
-                    (r) => r.org === org && r.year === y
-                  ).length;
+          {/* Section: Recent African Award Winners Spotlight */}
+          {!loading && recentSpotlightWinners.length > 0 && (
+            <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border pb-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.28em] text-brand">
+                    Spotlight
+                  </span>
+                  <h2 className="font-heading text-2xl font-black tracking-tight text-text-primary sm:text-3xl">
+                    Recent Award-Winning Work &amp; Talent
+                  </h2>
+                </div>
+                <p className="text-xs text-text-muted">
+                  Top honours conferred across recent African ceremonies
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {recentSpotlightWinners.map((winner, idx) => {
+                  const person = winner.person;
+                  const film = winner.film;
+                  const orgMeta = getAwardOrg(winner.org);
+                  const filmTo = film?.slug || film?.id ? `/films/${film.slug || film.id}` : null;
+                  const personTo = person?.slug || person?.id ? `/people/${person.slug || person.id}` : null;
+
                   return (
-                    <button
-                      key={y}
-                      type="button"
-                      onClick={() => setYear(y)}
-                      className={`group shrink-0 rounded-2xl border px-4 py-3 text-left transition-all duration-300 ${
-                        active
-                          ? 'border-brand bg-brand text-white shadow-md shadow-brand/20'
-                          : 'border-border bg-surface hover:-translate-y-1 hover:border-brand/40 hover:shadow-sm'
-                      }`}
+                    <article
+                      key={idx}
+                      className="group flex gap-3.5 rounded-xl border border-border bg-surface-2/70 p-3.5 transition-all hover:border-brand/40 hover:shadow-md"
                     >
-                      <span className="block font-heading text-xl font-black tabular-nums leading-none">
-                        {y}
-                      </span>
-                      <span
-                        className={`mt-1 block text-[10px] font-bold uppercase tracking-wider ${
-                          active ? 'text-white/70' : 'text-text-muted group-hover:text-brand'
-                        }`}
-                      >
-                        {count} entries
-                      </span>
-                    </button>
+                      {filmTo ? (
+                        <Link
+                          to={filmTo}
+                          className="h-20 w-14 shrink-0 overflow-hidden rounded-lg border border-border bg-surface"
+                        >
+                          <ImageWithFallback
+                            src={film?.poster_url || person?.photo_url}
+                            alt={film?.title || person?.name || ''}
+                            name={film?.title || person?.name || ''}
+                            fallbackType={film?.poster_url ? 'film' : 'avatar'}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        </Link>
+                      ) : (
+                        <div className="flex h-20 w-14 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-text-muted">
+                          <Icon icon="solar:cup-star-bold" className="text-brand" width="20" />
+                        </div>
+                      )}
+
+                      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white"
+                            style={{ background: orgMeta.accent }}
+                          >
+                            {orgMeta.label} {winner.year}
+                          </span>
+                          <span className="text-[10px] font-bold text-text-muted truncate">
+                            {winner.category}
+                          </span>
+                        </div>
+
+                        {person?.name && (
+                          <Link
+                            to={personTo || '#'}
+                            className="text-xs font-black text-text-primary hover:text-brand truncate"
+                          >
+                            {formatPersonName(person.name)}
+                          </Link>
+                        )}
+
+                        {film?.title && (
+                          <Link
+                            to={filmTo || '#'}
+                            className="text-xs font-semibold text-text-muted hover:text-text-primary truncate"
+                          >
+                            {formatFilmTitle(film.title)}
+                          </Link>
+                        )}
+                      </div>
+                    </article>
                   );
                 })}
               </div>
-            </div>
+            </section>
           )}
-
-          {/* Results header */}
-          {org && !loading && (
-            <div className="mt-12 mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-4">
-              <div>
-                <h2 className="font-heading text-3xl font-black tracking-tighter md:text-4xl">
-                  {meta.label} {year}
-                </h2>
-                <p className="mt-1 text-sm text-text-muted">
-                  {winCount} winners across {categories.length} categories
-                </p>
-              </div>
-            </div>
-          )}
-
-          {loading && (
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-40 animate-pulse rounded-2xl border border-border bg-surface-2"
-                />
-              ))}
-            </div>
-          )}
-
-          {error && (
-            <p className="mt-10 rounded-2xl border border-red-500/30 bg-red-500/5 px-6 py-8 text-center text-sm font-bold text-red-500">
-              {error}
-            </p>
-          )}
-
-          {!loading && !error && categories.length === 0 && (
-            <p className="mt-10 py-16 text-center text-text-muted">
-              No awards for this selection yet.
-            </p>
-          )}
-
-          {!loading && categories.length > 0 && (
-            <div className="space-y-12">
-              {categories.map((cat, index) => (
-                <CategorySection key={cat.category} cat={cat} index={index} accent={meta.accent} />
-              ))}
-            </div>
-          )}
-        </div>
+        </main>
       </div>
     </div>
-  );
-}
-
-function InfoTile({ icon, title, body, action }) {
-  return (
-    <div className="bg-surface p-5 md:p-6 transition-colors hover:bg-surface-2/60">
-      <div className="mb-3 flex items-center gap-2 text-brand">
-        <Icon icon={icon} width="18" />
-        <h3 className="text-[11px] font-black uppercase tracking-[0.2em]">{title}</h3>
-      </div>
-      <p className="text-sm leading-relaxed text-text-muted">{body}</p>
-      {action?.href && (
-        <a
-          href={action.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-brand transition-all hover:gap-2.5"
-        >
-          {action.label}
-          <Icon icon="solar:arrow-right-up-linear" width="14" />
-        </a>
-      )}
-    </div>
-  );
-}
-
-function CategorySection({ cat, index, accent }) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-40px' }}
-      transition={{ duration: 0.4, delay: Math.min(index * 0.03, 0.2) }}
-    >
-      <div className="mb-4 flex items-baseline gap-3">
-        <span className="font-heading text-sm font-black tabular-nums text-text-muted/40">
-          {String(index + 1).padStart(2, '0')}
-        </span>
-        <h3 className="font-heading text-xl font-black tracking-tight md:text-2xl">
-          {cat.category}
-        </h3>
-        <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
-          {cat.winners.length}W · {cat.nominees.length}N
-        </span>
-      </div>
-
-      {cat.winners.length > 0 && (
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cat.winners.map((row, i) => (
-            <AwardCard
-              key={`w-${i}-${row.person?.id || row.person?.name}-${row.film?.id || row.work}`}
-              row={row}
-              winner
-              accent={accent}
-            />
-          ))}
-        </div>
-      )}
-
-      {cat.nominees.length > 0 && (
-        <>
-          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.22em] text-text-muted">
-            Nominees
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {cat.nominees.map((row, i) => (
-              <AwardCard
-                key={`n-${i}-${row.person?.id || row.person?.name}-${row.film?.id || row.work}`}
-                row={row}
-                accent={accent}
-              />
-            ))}
-          </div>
-        </>
-      )}
-    </motion.section>
-  );
-}
-
-function AwardCard({ row, winner = false, accent }) {
-  const person = row.person;
-  const film = row.film;
-  const company = row.company;
-  const cinema = row.cinema;
-  const personTo = person?.slug || person?.id ? `/people/${person.slug || person.id}` : null;
-  const filmTo = film?.slug || film?.id ? `/films/${film.slug || film.id}` : null;
-  const companyTo = company?.slug || company?.id ? `/companies/${company.slug || company.id}` : null;
-  const cinemaTo = cinema?.id ? `/cinemas/${cinema.id}` : null;
-  const entity = person
-    ? {
-        to: personTo,
-        image: person.photo_url,
-        imageType: 'avatar',
-        name: formatPersonName(person.name),
-        label: 'Person',
-        icon: 'solar:user-linear',
-      }
-    : company
-      ? {
-          to: companyTo,
-          image: company.logo_url,
-          imageType: 'company',
-          name: toTitleCase(company.name),
-          label: 'Company',
-          icon: 'solar:buildings-2-linear',
-        }
-      : cinema
-        ? {
-            to: cinemaTo,
-            image: cinema.logo_url,
-            imageType: 'company',
-            name: toTitleCase(cinema.name),
-            label: 'Cinema',
-            icon: 'solar:city-linear',
-          }
-        : film
-          ? {
-              to: filmTo,
-              image: film.poster_url,
-              imageType: 'film',
-              name: formatFilmTitle(film.title),
-              label: 'Film',
-              icon: 'solar:clapperboard-linear',
-            }
-          : null;
-  const detail = film && !entity?.to?.startsWith('/films/')
-    ? formatFilmTitle(film.title)
-    : cinema
-      ? [toTitleCase(cinema.city), toTitleCase(cinema.state)].filter(Boolean).join(', ')
-      : row.work && String(row.work).toLowerCase() !== String(entity?.name || '').toLowerCase()
-        ? row.work
-        : null;
-
-  return (
-    <article
-      className={`group relative flex gap-3 overflow-hidden rounded-2xl border bg-surface p-3 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl ${
-        winner ? 'border-transparent' : 'border-border hover:border-brand/35'
-      }`}
-      style={
-        winner
-          ? {
-              boxShadow: `inset 0 0 0 1px ${accent}66, 0 0 0 0 transparent`,
-            }
-          : undefined
-      }
-    >
-      {/* Hover wash */}
-      <span
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background: `linear-gradient(135deg, ${accent}14, transparent 55%)`,
-        }}
-        aria-hidden="true"
-      />
-
-      {entity?.to ? (
-        <Link
-          to={entity.to}
-          className="relative z-[1] h-[88px] w-[60px] shrink-0 overflow-hidden rounded-xl border border-border bg-surface-2"
-        >
-          <ImageWithFallback
-            src={entity.image}
-            alt={entity.name || ''}
-            name={entity.name || ''}
-            fallbackType={entity.imageType}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-          />
-        </Link>
-      ) : (
-        <div className="relative z-[1] flex h-[88px] w-[60px] shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2">
-          <Icon icon={entity?.icon || 'solar:cup-star-linear'} className="text-xl text-text-muted/40" />
-        </div>
-      )}
-
-      <div className="relative z-[1] flex min-w-0 flex-1 flex-col justify-center gap-1">
-        {winner && (
-          <span
-            className="inline-flex w-fit items-center gap-1 rounded-xl px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white"
-            style={{ background: accent }}
-          >
-            <Icon icon="solar:cup-star-bold" width="11" />
-            Winner
-          </span>
-        )}
-
-        {entity ? (
-          entity.to ? (
-            <Link to={entity.to} className="min-w-0 transition-colors hover:text-brand">
-              <span className="truncate text-sm font-bold">{entity.name}</span>
-            </Link>
-          ) : (
-            <p className="truncate text-sm font-bold">{entity.name}</p>
-          )
-        ) : (
-          <p className="text-[10px] font-black uppercase tracking-widest text-brand">Award</p>
-        )}
-
-        {detail ? (
-          <p className="line-clamp-2 text-xs leading-snug text-text-muted">{detail}</p>
-        ) : (
-          <p className="text-[10px] font-black uppercase tracking-widest text-brand">{entity?.label || 'Recognition'}</p>
-        )}
-      </div>
-    </article>
   );
 }

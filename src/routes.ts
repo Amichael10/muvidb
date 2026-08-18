@@ -38,6 +38,7 @@ export default [
   route('plays', 'pages/PlaysList.jsx'),
   route('plays/:slug', 'pages/PlayDetail.jsx'),
   route('awards', 'pages/Awards.jsx'),
+  route('awards/:id', 'pages/AwardDetail.jsx'),
   route('showtimes', 'routes/showtimes.tsx'),
   route('cinemas', 'routes/cinemas-list.tsx'),
   route('cinemas/:id', 'routes/cinema-detail.tsx'),
