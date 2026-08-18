@@ -248,6 +248,57 @@ export default defineConfig(({ mode, isSsrBuild }) => {
             return false;
           },
         },
+        '/api/social': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              let body = {};
+              if (req.method === 'POST') {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+              }
+
+              const { default: handler } = await import('./api/social.js');
+              await handler(
+                {
+                  headers: req.headers,
+                  query: Object.fromEntries(url.searchParams),
+                  body,
+                  method: req.method,
+                  url: req.url,
+                },
+                {
+                  statusCode: 200,
+                  status: function (code) {
+                    this.statusCode = code;
+                    return this;
+                  },
+                  json: (data) => {
+                    res.statusCode = res.statusCode || 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(data));
+                  },
+                  redirect: (statusOrUrl, url) => {
+                    const status = typeof statusOrUrl === 'number' ? statusOrUrl : 302;
+                    const dest = typeof statusOrUrl === 'number' ? url : statusOrUrl;
+                    res.statusCode = status;
+                    res.setHeader('Location', dest);
+                    res.end();
+                  },
+                  setHeader: (k, v) => res.setHeader(k, v),
+                  end: () => res.end(),
+                }
+              );
+            } catch (err) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          },
+        },
         '/api/editorial': {
           target: 'http://localhost:3001',
           bypass: async (req, res) => {
