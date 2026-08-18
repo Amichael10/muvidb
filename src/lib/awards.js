@@ -492,6 +492,33 @@ export const AWARD_ORGS = [
     tags: ['Lagos', 'Smartphone Film', 'Mobile Cinema', 'Innovation', 'FilmFreeway', 'AI & Mobile'],
   },
   {
+    id: 'BIFF',
+    label: 'BIFF',
+    full: 'Bayelsa International Film Festival',
+    tagline: 'Celebrating Niger Delta Heritage, Indigenous Stories & Global African Cinema',
+    category: 'festival',
+    location: 'Yenagoa, Bayelsa State, Nigeria',
+    frequency: 'Annual (October / November)',
+    founded: 2021,
+    accent: '#10B981',
+    about:
+      'Founded in 2021 by festival director Moses Etonzor, Bayelsa International Film Festival (BIFF) is the premier cinema, arts, and cultural gathering held in Yenagoa, Bayelsa State. The festival champions Niger Delta storytelling, indigenous culture, environmental advocacy, and international co-productions through competitive screenings, workshops, masterclasses, and awards galas.',
+    when:
+      'Annual multi-day festival held in October / November in Yenagoa, Bayelsa State, featuring film screenings, panel sessions, cultural exhibitions ("Owigiri Night"), fashion galas, and awards ceremony.',
+    submissions:
+      'Open to Nigerian, African, and international filmmakers across feature films, documentaries, shorts, animations, and student categories via FilmFreeway and the official festival portal.',
+    entryPlan: {
+      fees: 'Standard Entry ($10 – $30 on FilmFreeway) / Free Community Entry',
+      eligibility: 'Narrative features, shorts, documentaries, indigenous language cinema, and student projects completed within 2 years. English subtitles required.',
+      formats: 'Digital screener (MP4/MOV); DCP for theatrical cinema screenings.',
+      categoriesCount: '15+ Feature, Acting, Technical & Student Categories',
+      platform: 'FilmFreeway & BIFF Portal',
+    },
+    submitUrl: 'https://filmfreeway.com/BayelsaInternationalFilmFestival',
+    submitLabel: 'Submit on FilmFreeway',
+    tags: ['Yenagoa', 'Bayelsa', 'Niger Delta', 'Film Festival', 'FilmFreeway', 'Indigenous', 'Cultural Heritage'],
+  },
+  {
     id: 'EKO_STAR',
     label: 'Eko Star',
     full: 'Eko Star Film & TV Awards',
@@ -577,6 +604,7 @@ export function normOrg(raw) {
   if (upper.includes('LIFACC') || upper.includes('LAGOS INTERNATIONAL FILM AND CINEMA')) return 'LIFACC';
   if (upper.includes('ASIFF') || upper.includes('SMARTPHONE') || upper.includes('SMARTFILM')) return 'ASIFF';
   if (upper.includes('EKOIFF') || upper.includes('EKO INTERNATIONAL FILM')) return 'EKOIFF';
+  if (upper.includes('BIFF') || upper.includes('BAYELSA INTERNATIONAL') || upper.includes('BAYELSA FILM')) return 'BIFF';
   if (upper.includes('EKO STAR')) return 'EKO_STAR';
   return s;
 }
