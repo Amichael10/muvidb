@@ -48,17 +48,17 @@ function safeEqual(left: string, right: string): boolean {
 }
 
 function requestOrigin(req: VercelRequest): string {
-  const configured = String(process.env.PUBLIC_SITE_URL || '').trim().replace(/\/$/, '');
-  if (configured) return configured;
-  const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
-  if (!host) throw httpError(500, 'Unable to determine the OAuth callback host');
-  return `${proto}://${host}`;
+  const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim();
+  const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
+  if (host) return `${proto}://${host}`;
+  const configured = String(process.env.PUBLIC_SITE_URL || process.env.VITE_APP_URL || process.env.APP_URL || '').trim().replace(/\/$/, '');
+  return configured || 'https://muvidb.com';
 }
 
 export function threadsRedirectUri(req: VercelRequest): string {
   const configured = String(process.env.THREAD_REDIRECT_URI || '').trim();
-  return configured || `${requestOrigin(req)}/api/social?task=threads_callback`;
+  if (configured) return configured;
+  return `${requestOrigin(req)}/api/social?task=threads_callback`;
 }
 
 export function threadsAdminRedirect(req: VercelRequest, result: 'connected' | 'error', message?: string): string {
