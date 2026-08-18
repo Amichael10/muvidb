@@ -1,8 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import satori from 'satori';
-import { Resvg } from '@resvg/resvg-js';
 import type { SocialSourceSnapshot } from '../../src/features/social-studio/content/snapshots.js';
 import { SOCIAL_ICONS, type SocialIconName } from './social_icons.js';
 
@@ -1041,6 +1039,9 @@ export async function renderSnapshotAsset(input: {
           await getCardDecor(),
         )
       : buildCard(copy, input.format, artwork);
+
+  const { default: satori } = await import('satori');
+  const { Resvg } = await import('@resvg/resvg-js');
 
   const svg = await satori(element as never, {
     width,

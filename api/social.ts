@@ -10,8 +10,8 @@ import {
   requireSocialStudioAdmin,
   runSocialPublisher,
   socialHttpErrorPayload,
+  parseGenerateDraftRequest,
 } from './_lib/social_studio.js';
-import { parseGenerateDraftRequest } from '../src/features/social-studio/domain/validation.js';
 import { handleEditorialTask } from './_lib/editorial_handler.js';
 import {
   completeThreadsOAuth,
@@ -35,19 +35,20 @@ const EDITORIAL_TASKS = new Set([
 ]);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  try {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') return res.status(204).end();
+    if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const task = (req.query.task || req.body?.task || '').toString();
-  const scope = (req.query.scope || req.body?.scope || '').toString();
+    const task = (req.query?.task || req.body?.task || '').toString();
+    const scope = (req.query?.scope || req.body?.scope || '').toString();
 
-  // Route to Editorial Handler if scope=editorial or task matches editorial task
-  if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
-    return handleEditorialTask(req, res);
-  }
+    // Route to Editorial Handler if scope=editorial or task matches editorial task
+    if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
+      return handleEditorialTask(req, res);
+    }
 
   if (req.method === 'GET' && task === 'threads_callback') {
     try {

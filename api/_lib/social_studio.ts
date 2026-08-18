@@ -9,6 +9,8 @@ import type { SocialPlatformAdapter } from '../../src/features/social-studio/pla
 import { getThreadsPublishingCredentials, isThreadsLivePublishingEnabled } from './threads_oauth.js';
 import { assertContentTransition, nextRetryAvailableAt } from '../../src/features/social-studio/domain/transitions.js';
 import type { SocialContentStatus } from '../../src/features/social-studio/domain/statuses.js';
+import { parseGenerateDraftRequest, parseReviewRequest, parseScheduleRequest } from '../../src/features/social-studio/domain/validation.js';
+export { parseGenerateDraftRequest, parseReviewRequest, parseScheduleRequest };
 import { createPublishJobIdempotencyKey } from '../../src/features/social-studio/domain/validation.js';
 import type { SocialContentType } from '../../src/features/social-studio/domain/content-types.js';
 import { preferredAssetFormat, type SocialPlatform } from '../../src/features/social-studio/domain/platform-types.js';
