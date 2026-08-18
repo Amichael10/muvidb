@@ -546,6 +546,33 @@ export const AWARD_ORGS = [
     tags: ['Benin City', 'Edo State', 'Film Festival', 'FilmFreeway', 'Cultural Heritage', 'Bronze Kingdom', 'Nollywood'],
   },
   {
+    id: 'LIFANIMA',
+    label: 'LIFANIMA',
+    full: 'Lagos International Festival of Animation',
+    tagline: 'Africa’s Premier Dedicated Animation Film Festival & Industry Summit',
+    category: 'festival',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (October)',
+    founded: 2017,
+    accent: '#F59E0B',
+    about:
+      'Founded in 2017 by Muyiwa Kayode, the Lagos International Festival of Animation (LIFANIMA) is Africa’s largest and most prestigious dedicated animation festival. Hosted at the Alliance Française / Mike Adenuga Centre in Ikoyi, Lagos, LIFANIMA champions the rapidly growing African animation ecosystem by connecting animators, visual effects artists, studios, broadcasters, and game developers across competitive categories.',
+    when:
+      'Annual 3-day animation festival held in October at the Alliance Française / Mike Adenuga Centre, Ikoyi, Lagos, Nigeria. Features theatrical screenings, animation masterclasses, studio pitching sessions, and the LIFANIMA Awards Gala.',
+    submissions:
+      'Open to African, diaspora, and international animators and studios across 2D animation, 3D CGI, Stop Motion, Visual Effects, Animation Commercials, and Student Films via FilmFreeway and the official festival website.',
+    entryPlan: {
+      fees: 'Free / Low Administrative Entry via FilmFreeway',
+      eligibility: '2D, 3D, Stop-Motion, VFX, and animated films completed within 2 years. English subtitles required for foreign dialogue.',
+      formats: 'Full HD / 4K MP4/MOV digital screener.',
+      categoriesCount: '6 Animation & VFX Categories',
+      platform: 'FilmFreeway & LIFANIMA Portal',
+    },
+    submitUrl: 'https://filmfreeway.com/LIFANIMA',
+    submitLabel: 'Submit on FilmFreeway',
+    tags: ['Lagos', 'Animation Festival', '2D & 3D', 'CGI', 'Visual Effects', 'Stop Motion', 'FilmFreeway', 'Alliance Française'],
+  },
+  {
     id: 'EKO_STAR',
     label: 'Eko Star',
     full: 'Eko Star Film & TV Awards',
@@ -633,6 +660,7 @@ export function normOrg(raw) {
   if (upper.includes('EKOIFF') || upper.includes('EKO INTERNATIONAL FILM')) return 'EKOIFF';
   if (upper.includes('BIFF') || upper.includes('BAYELSA INTERNATIONAL') || upper.includes('BAYELSA FILM')) return 'BIFF';
   if (upper.includes('BCFF') || upper.includes('BENIN CITY FILM') || upper.includes('BENIN FILM')) return 'BCFF';
+  if (upper.includes('LIFANIMA') || upper.includes('ANIMATION FESTIVAL') || upper.includes('LAGOS INTERNATIONAL FESTIVAL OF ANIMATION')) return 'LIFANIMA';
   if (upper.includes('EKO STAR')) return 'EKO_STAR';
   return s;
 }
