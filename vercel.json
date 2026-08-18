@@ -112,6 +112,10 @@
       "destination": "/api/data?_r=actor-claims"
     },
     {
+      "source": "/api/social",
+      "destination": "/api/data?_r=social"
+    },
+    {
       "source": "/api/youtube",
       "destination": "/api/external?provider=youtube"
     },

@@ -46,6 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleActorClaims } = await import('./_lib/actor_claims_handler.js');
       return handleActorClaims(req, res);
     }
+    if (key === 'social') {
+      const { default: handleSocial } = await import('./social.js');
+      return handleSocial(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {
