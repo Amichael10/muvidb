@@ -52,14 +52,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET' && task === 'threads_callback') {
     try {
       await completeThreadsOAuth(req);
-      return res.redirect(302, threadsAdminRedirect(req, 'connected'));
+      const dest = threadsAdminRedirect(req, 'connected');
+      res.setHeader('Location', dest);
+      return res.status(302).end();
     } catch (error) {
-      console.error('Threads OAuth callback failed:', (error as Error)?.message || error);
-      return res.redirect(302, threadsAdminRedirect(
-        req,
-        'error',
-        'We could not connect Threads. Please check the app settings and try again.',
-      ));
+      const errMsg = (error as Error)?.message || 'We could not connect Threads. Please check the app settings and try again.';
+      console.error('Threads OAuth callback error:', errMsg);
+      try {
+        const dest = threadsAdminRedirect(req, 'error', errMsg);
+        res.setHeader('Location', dest);
+        return res.status(302).end();
+      } catch (redirectErr) {
+        return res.status(200).send(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>Threads Connection</title><meta http-equiv="refresh" content="3;url=/admin/social-studio"></head>
+            <body style="background:#111;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+              <h2>Threads connection issue</h2>
+              <p style="color:#f87171;">${errMsg}</p>
+              <p><a href="/admin/social-studio" style="color:#f97316;">Return to Social Studio</a></p>
+            </body>
+          </html>
+        `);
+      }
     }
   }
 

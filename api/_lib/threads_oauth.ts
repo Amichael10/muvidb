@@ -62,7 +62,7 @@ export function threadsRedirectUri(req: VercelRequest): string {
 }
 
 export function threadsAdminRedirect(req: VercelRequest, result: 'connected' | 'error', message?: string): string {
-  const target = new URL('/admin/social', requestOrigin(req));
+  const target = new URL('/admin/social-studio', requestOrigin(req));
   target.searchParams.set('threads', result);
   if (message) target.searchParams.set('message', message.slice(0, 180));
   return target.toString();
@@ -173,8 +173,8 @@ export async function createThreadsAuthorizationUrl(req: VercelRequest, actor: S
 }
 
 export async function completeThreadsOAuth(req: VercelRequest) {
-  const code = String(req.query.code || '');
-  const rawState = String(req.query.state || '');
+  const code = String(req.query.code || '').replace(/#_$/, '').replace(/#$/, '').trim();
+  const rawState = String(req.query.state || '').replace(/#_$/, '').replace(/#$/, '').trim();
   const state = verifyThreadsState(rawState);
   if (!code) throw httpError(400, 'Threads did not return an authorization code');
 
