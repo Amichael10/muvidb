@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SocialSourceSnapshot } from '../../src/features/social-studio/content/snapshots.js';
+import type { SocialSourceSnapshot } from './social-studio/content/snapshots.js';
 import { SOCIAL_ICONS, type SocialIconName } from './social_icons.js';
 
 export type SocialAssetFormat = 'portrait_4_5' | 'square_1_1' | 'vertical_9_16';

@@ -2,31 +2,31 @@ import type { User } from '@supabase/supabase-js';
 import type { VercelRequest } from '@vercel/node';
 import { supabase } from './supabase.js';
 import { isValidAuth } from './auth.js';
-import { MockSocialPlatformAdapter } from '../../src/features/social-studio/platforms/mock-adapter.js';
-import { ThreadsPlatformAdapter } from '../../src/features/social-studio/platforms/threads-adapter.js';
-import { SocialPlatformError } from '../../src/features/social-studio/platforms/platform-errors.js';
-import type { SocialPlatformAdapter } from '../../src/features/social-studio/platforms/social-platform-adapter.js';
+import { MockSocialPlatformAdapter } from './social-studio/platforms/mock-adapter.js';
+import { ThreadsPlatformAdapter } from './social-studio/platforms/threads-adapter.js';
+import { SocialPlatformError } from './social-studio/platforms/platform-errors.js';
+import type { SocialPlatformAdapter } from './social-studio/platforms/social-platform-adapter.js';
 import { getThreadsPublishingCredentials, isThreadsLivePublishingEnabled } from './threads_oauth.js';
-import { assertContentTransition, nextRetryAvailableAt } from '../../src/features/social-studio/domain/transitions.js';
-import type { SocialContentStatus } from '../../src/features/social-studio/domain/statuses.js';
-import { parseGenerateDraftRequest, parseReviewRequest, parseScheduleRequest } from '../../src/features/social-studio/domain/validation.js';
+import { assertContentTransition, nextRetryAvailableAt } from './social-studio/domain/transitions.js';
+import type { SocialContentStatus } from './social-studio/domain/statuses.js';
+import { parseGenerateDraftRequest, parseReviewRequest, parseScheduleRequest } from './social-studio/domain/validation.js';
 export { parseGenerateDraftRequest, parseReviewRequest, parseScheduleRequest };
-import { createPublishJobIdempotencyKey } from '../../src/features/social-studio/domain/validation.js';
-import type { SocialContentType } from '../../src/features/social-studio/domain/content-types.js';
-import { preferredAssetFormat, type SocialPlatform } from '../../src/features/social-studio/domain/platform-types.js';
+import { createPublishJobIdempotencyKey } from './social-studio/domain/validation.js';
+import type { SocialContentType } from './social-studio/domain/content-types.js';
+import { preferredAssetFormat, type SocialPlatform } from './social-studio/domain/platform-types.js';
 import {
   PLATFORM_CAPTION_LIMITS,
   buildVariantContent,
-} from '../../src/features/social-studio/content/caption-builder.js';
+} from './social-studio/content/caption-builder.js';
 import { ASSET_FORMAT_DIMENSIONS, renderSnapshotAssets, type SocialAssetFormat } from './social_render.js';
-import type { SocialSourceSnapshot } from '../../src/features/social-studio/content/snapshots.js';
+import type { SocialSourceSnapshot } from './social-studio/content/snapshots.js';
 import {
   SOURCE_ENTITY_TYPES,
   buildActorSpotlightSnapshot,
   buildBirthdaySpotlightSnapshot,
   buildUpcomingMovieSnapshot,
   collectSnapshotWarnings,
-} from '../../src/features/social-studio/content/snapshots.js';
+} from './social-studio/content/snapshots.js';
 
 type SocialActor = {
   id: string;
