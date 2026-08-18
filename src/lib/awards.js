@@ -519,6 +519,33 @@ export const AWARD_ORGS = [
     tags: ['Yenagoa', 'Bayelsa', 'Niger Delta', 'Film Festival', 'FilmFreeway', 'Indigenous', 'Cultural Heritage'],
   },
   {
+    id: 'BCFF',
+    label: 'BCFF',
+    full: 'Benin City Film Festival',
+    tagline: 'Celebrating Edo Cultural Heritage, Historic Storytelling & Collective Cinema',
+    category: 'festival',
+    location: 'Benin City, Edo State, Nigeria',
+    frequency: 'Annual (November / December)',
+    founded: 2018,
+    accent: '#D97706',
+    about:
+      'Founded in 2018 by Godfrey Omorodion Aibuedefe, the Benin City Film Festival (BCFF) is Edo State’s premier cinema celebration held in the ancient city of Benin. Centered around the theme "Stronger Together – The Power of Collective Filmmaking," BCFF bridges emerging talent with veteran cinema legends, spotlights Edo and African cultural heritage, hosts masterclasses, and honors outstanding feature films, documentaries, shorts, and performances.',
+    when:
+      'Annual festival held in November / December in Benin City, Edo State, Nigeria. Features competitive screenings, masterclasses, cultural galas, and the BCFF Excellence Awards.',
+    submissions:
+      'Open to Nigerian, African, and international filmmakers across feature films, documentaries, shorts, animations, indigenous language films, student projects, and mobile cinema via FilmFreeway and the official portal.',
+    entryPlan: {
+      fees: 'Standard Festival Fee ($10 – $35 via FilmFreeway)',
+      eligibility: 'Narrative features, shorts, documentaries, and animations produced within 2 years. English subtitles required for non-English dialogue.',
+      formats: 'Digital HD screener; DCP / ProRes for cinema projections.',
+      categoriesCount: '16 Feature, Craft, Acting & Regional Categories',
+      platform: 'FilmFreeway & BCFF Portal',
+    },
+    submitUrl: 'https://filmfreeway.com/BeninCityFilmFestival',
+    submitLabel: 'Submit on FilmFreeway',
+    tags: ['Benin City', 'Edo State', 'Film Festival', 'FilmFreeway', 'Cultural Heritage', 'Bronze Kingdom', 'Nollywood'],
+  },
+  {
     id: 'EKO_STAR',
     label: 'Eko Star',
     full: 'Eko Star Film & TV Awards',
@@ -605,6 +632,7 @@ export function normOrg(raw) {
   if (upper.includes('ASIFF') || upper.includes('SMARTPHONE') || upper.includes('SMARTFILM')) return 'ASIFF';
   if (upper.includes('EKOIFF') || upper.includes('EKO INTERNATIONAL FILM')) return 'EKOIFF';
   if (upper.includes('BIFF') || upper.includes('BAYELSA INTERNATIONAL') || upper.includes('BAYELSA FILM')) return 'BIFF';
+  if (upper.includes('BCFF') || upper.includes('BENIN CITY FILM') || upper.includes('BENIN FILM')) return 'BCFF';
   if (upper.includes('EKO STAR')) return 'EKO_STAR';
   return s;
 }
