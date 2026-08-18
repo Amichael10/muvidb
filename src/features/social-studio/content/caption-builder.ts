@@ -1,6 +1,6 @@
-import type { SocialPlatform } from '../domain/platform-types';
-import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots';
-import { firstUsableCopy } from './copy-quality';
+import type { SocialPlatform } from '../domain/platform-types.js';
+import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots.js';
+import { firstUsableCopy } from './copy-quality.js';
 
 export type PlatformCaptionLimits = {
   /** Hard character ceiling the platform enforces on the caption body. */

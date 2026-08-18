@@ -1,4 +1,4 @@
-import type { SocialPlatform } from '../domain/platform-types';
+import type { SocialPlatform } from '../domain/platform-types.js';
 
 export class SocialPlatformError extends Error {
   platform: SocialPlatform;

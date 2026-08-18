@@ -1,4 +1,4 @@
-import type { SocialContentStatus, SocialJobStatus, SocialVariantStatus } from './statuses';
+import type { SocialContentStatus, SocialJobStatus, SocialVariantStatus } from './statuses.js';
 
 const CONTENT_TRANSITIONS: Record<SocialContentStatus, readonly SocialContentStatus[]> = {
   generating: ['draft', 'failed'],

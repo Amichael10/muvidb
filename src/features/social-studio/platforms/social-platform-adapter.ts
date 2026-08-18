@@ -1,5 +1,5 @@
-import type { SocialPlatform } from '../domain/platform-types';
-import type { SocialVariantStatus } from '../domain/statuses';
+import type { SocialPlatform } from '../domain/platform-types.js';
+import type { SocialVariantStatus } from '../domain/statuses.js';
 
 export type SocialPublishRequest = {
   jobId: string;

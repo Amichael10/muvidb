@@ -1,5 +1,5 @@
-import type { SocialPlatformAdapter, SocialPublishRequest, SocialPublishResult } from './social-platform-adapter';
-import { SocialPlatformError } from './platform-errors';
+import type { SocialPlatformAdapter, SocialPublishRequest, SocialPublishResult } from './social-platform-adapter.js';
+import { SocialPlatformError } from './platform-errors.js';
 
 type ThreadsAdapterOptions = {
   accessToken: string;

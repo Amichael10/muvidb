@@ -1,5 +1,5 @@
-import type { SocialContentType } from '../domain/content-types';
-import { firstUsableCopy, isLikelyFilmTitle } from './copy-quality';
+import type { SocialContentType } from '../domain/content-types.js';
+import { firstUsableCopy, isLikelyFilmTitle } from './copy-quality.js';
 
 /**
  * A snapshot is the frozen copy of the source entity at generation time.
