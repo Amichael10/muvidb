@@ -194,8 +194,16 @@
       "destination": "/api/cron/sync?task=refresh_videos"
     },
     {
-      "source": "/api/cron/mirror-images",
-      "destination": "/api/cron/sync?task=mirror_images"
+      "source": "/api/social/tiktok/callback",
+      "destination": "/api/social?task=tiktok_callback"
+    },
+    {
+      "source": "/api/social/meta/callback",
+      "destination": "/api/social?task=meta_callback"
+    },
+    {
+      "source": "/api/social/threads/callback",
+      "destination": "/api/social?task=threads_callback"
     },
     {
       "source": "/sitemap.xml",

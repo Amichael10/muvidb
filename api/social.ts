@@ -18,7 +18,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const task = (req.query?.task || req.body?.task || '').toString();
+  const pathname = (req.url || '').split('?')[0];
+  let task = (req.query?.task || req.body?.task || '').toString();
+  if (!task && pathname.includes('/tiktok/callback')) task = 'tiktok_callback';
+  if (!task && pathname.includes('/meta/callback')) task = 'meta_callback';
+  if (!task && pathname.includes('/threads/callback')) task = 'threads_callback';
   const scope = (req.query?.scope || req.body?.scope || '').toString();
 
   try {
