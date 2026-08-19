@@ -10,6 +10,7 @@ export interface ScoredCandidate {
     assetAvailability: number;
     geographicBalance: number;
     roleBalance: number;
+    platformProminence: number;
     randomness: number;
   };
   reasons: string[];
@@ -51,20 +52,40 @@ export function scoreCandidate(
     reasons.push(`Geographic balance penalty (${country} featured ${recentCountryCount}x recently)`);
   }
 
-  // 5. Editorial Relevance (0-20)
-  let relevance = 15;
-  if (candidate.data.film_count && candidate.data.film_count >= 5) {
-    relevance = 20;
+  // 5. Editorial Relevance & Talent Growth Boost (0-20)
+  let relevance = 12;
+  if (candidate.data?.isRisingStar) {
+    relevance = 18;
+    reasons.push(`✨ Rising star spotlight (${candidate.data.film_count || 0} verified credits)`);
+  } else if (candidate.data?.isCrew) {
+    relevance = 18;
+    reasons.push(`🎬 Key craft department (${candidate.category || 'Crew'})`);
+  } else if (candidate.data?.film_count && candidate.data.film_count >= 5) {
+    relevance = 16;
     reasons.push(`Strong credit volume (${candidate.data.film_count} credits)`);
   }
 
-  // 6. Role Balance (0-5)
+  // 6. Platform Prominence & Hidden Gem Multiplier (0-15)
+  let platformProminence = 0;
+  if (candidate.data?.isEmergingPlatform) {
+    platformProminence = 15;
+    reasons.push(`🚀 Emerging platform boost (${candidate.data.platformDisplayName || 'Platform'})`);
+  } else if (candidate.data?.isYoutubeGem) {
+    platformProminence = 15;
+    reasons.push(`💎 YouTube hidden gem (${candidate.data.outperformanceRatio || 1}x reach multiplier)`);
+  } else if (candidate.data?.isMainstream) {
+    platformProminence = 8;
+    reasons.push(`Streamer / Cinema feature (${candidate.data.platformDisplayName || 'Streamer'})`);
+  }
+
+  // 7. Role Balance (0-5)
   const roleBalance = candidate.category && candidate.category !== 'Actor' ? 5 : 3;
 
-  // 7. Controlled Randomness (0-5)
+  // 8. Controlled Randomness (0-5)
   const randomness = Math.floor(Math.random() * 5);
 
-  const score = Math.min(100, completeness + freshness + relevance + assetAvailability + geographicBalance + roleBalance + randomness);
+  const rawScore = completeness + freshness + relevance + assetAvailability + geographicBalance + platformProminence + roleBalance + randomness;
+  const score = Math.min(100, Math.max(0, rawScore));
 
   return {
     candidate,
@@ -76,8 +97,10 @@ export function scoreCandidate(
       assetAvailability,
       geographicBalance,
       roleBalance,
+      platformProminence,
       randomness,
     },
     reasons,
   };
 }
+

@@ -1,5 +1,5 @@
 import type { SocialPlatform } from '../domain/platform-types.js';
-import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots.js';
+import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SnapshotCastMember, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots.js';
 import { firstUsableCopy } from './copy-quality.js';
 
 export type PlatformCaptionLimits = {

@@ -303,6 +303,29 @@ export async function disconnectThreads() {
   return { disconnected: true };
 }
 
+export async function getPlatformPublishingCredentials(platform: string) {
+  const { data: connection, error } = await supabase
+    .from('social_connections')
+    .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,token_ciphertext,token_iv,token_auth_tag')
+    .eq('platform', platform)
+    .eq('status', 'connected')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!connection) throw httpError(409, `Connect the MuviDB ${platform} account before publishing`);
+
+  const { accessToken } = decryptThreadsToken(connection);
+  const expiresAt = connection.token_expires_at ? new Date(connection.token_expires_at).getTime() : null;
+  if (expiresAt && expiresAt <= Date.now()) {
+    await supabase.from('social_connections').update({ status: 'expired' }).eq('id', connection.id);
+    throw httpError(409, `The ${platform} connection has expired. Reconnect it before publishing`);
+  }
+
+  return { connection, accessToken };
+}
+
 export function sanitizeThreadsConnection(connection: any) {
   if (!connection) return null;
   return {
@@ -317,3 +340,4 @@ export function sanitizeThreadsConnection(connection: any) {
     lastVerifiedAt: connection.last_verified_at,
   };
 }
+

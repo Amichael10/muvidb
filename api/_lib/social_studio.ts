@@ -4,9 +4,12 @@ import { supabase } from './supabase.js';
 import { isValidAuth } from './auth.js';
 import { MockSocialPlatformAdapter } from './social-studio/platforms/mock-adapter.js';
 import { ThreadsPlatformAdapter } from './social-studio/platforms/threads-adapter.js';
+import { InstagramPlatformAdapter } from './social-studio/platforms/instagram-adapter.js';
+import { FacebookPlatformAdapter } from './social-studio/platforms/facebook-adapter.js';
+import { TikTokPlatformAdapter } from './social-studio/platforms/tiktok-adapter.js';
 import { SocialPlatformError } from './social-studio/platforms/platform-errors.js';
 import type { SocialPlatformAdapter } from './social-studio/platforms/social-platform-adapter.js';
-import { getThreadsPublishingCredentials, isThreadsLivePublishingEnabled } from './threads_oauth.js';
+import { getThreadsPublishingCredentials, getPlatformPublishingCredentials, isThreadsLivePublishingEnabled } from './threads_oauth.js';
 import { assertContentTransition, nextRetryAvailableAt } from './social-studio/domain/transitions.js';
 import type { SocialContentStatus } from './social-studio/domain/statuses.js';
 import { parseGenerateDraftRequest, createPublishJobIdempotencyKey } from './social-studio/domain/validation.js';
@@ -273,6 +276,26 @@ async function processJob(job: any, lockedBy: string, now: Date) {
         accessToken,
         userId: connection.external_account_id,
         apiVersion: process.env.THREADS_GRAPH_API_VERSION,
+      });
+    } else if (publishMode === 'live' && variant.platform === 'instagram') {
+      const { connection, accessToken } = await getPlatformPublishingCredentials('instagram');
+      adapter = new InstagramPlatformAdapter({
+        accessToken,
+        instagramAccountId: connection.external_account_id,
+        apiVersion: process.env.META_GRAPH_API_VERSION,
+      });
+    } else if (publishMode === 'live' && variant.platform === 'facebook') {
+      const { connection, accessToken } = await getPlatformPublishingCredentials('facebook');
+      adapter = new FacebookPlatformAdapter({
+        accessToken,
+        pageId: connection.external_account_id,
+        apiVersion: process.env.META_GRAPH_API_VERSION,
+      });
+    } else if (publishMode === 'live' && variant.platform === 'tiktok') {
+      const { connection, accessToken } = await getPlatformPublishingCredentials('tiktok');
+      adapter = new TikTokPlatformAdapter({
+        accessToken,
+        openId: connection.external_account_id,
       });
     } else {
       throw new SocialPlatformError({
@@ -1154,7 +1177,7 @@ export async function attachCustomAsset(
   actor: SocialActor,
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
-  const format: SocialAssetFormat = input.format || 'square';
+  const format: SocialAssetFormat = input.format || 'square_1_1';
   const width = input.width || 1080;
   const height = input.height || 1080;
 
