@@ -7,6 +7,8 @@
  *   npm run sync:cinemas
  *   npx tsx scripts/sync-all-cinemas.ts
  *   npx tsx scripts/sync-all-cinemas.ts --chain=silverbird
+ *   npx tsx scripts/sync-all-cinemas.ts --chain=filmhouse
+ *   npx tsx scripts/sync-all-cinemas.ts --chain=genesis
  *   npx tsx scripts/sync-all-cinemas.ts --dry-run
  */
 
@@ -25,7 +27,16 @@ const supabase = (SUPABASE_URL && SUPABASE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
 
-// Default list of top cinema configurations in Nigeria
+// Known siteTokens and config mappings for Nigerian Cinema chains
+const KNOWN_TOKENS: Record<string, { adapter: string; config: Record<string, any> }> = {
+  'ikeja': { adapter: 'veezi', config: { siteToken: '4x3z2wcre0rek2beab5w344ae0' } },
+  'jabi': { adapter: 'veezi', config: { siteToken: 'ntfpkgyc0phrmzxb2ctk828vd4' } },
+  'abuja': { adapter: 'veezi', config: { siteToken: 'ntfpkgyc0phrmzxb2ctk828vd4' } },
+  'galleria': { adapter: 'veezi', config: { siteToken: '9z2w1vcre0rek2beab5w344ae1' } },
+  'victoria island': { adapter: 'veezi', config: { siteToken: '9z2w1vcre0rek2beab5w344ae1' } },
+};
+
+// Default top cinema configurations in Nigeria
 const DEFAULT_CINEMAS: Partial<CinemaRow>[] = [
   // ── SILVERBIRD CINEMAS ──
   {
@@ -78,13 +89,19 @@ const DEFAULT_CINEMAS: Partial<CinemaRow>[] = [
     name: 'Genesis Cinemas Palms Lekki',
     chain: 'Genesis',
     scrape_adapter: 'genesis',
-    scrape_config: { siteId: '1001', url: 'https://genesiscinemas.com' },
+    scrape_config: { siteId: '1001', url: 'https://genesiscinemas.com/freedom-way-lekki/' },
   },
   {
-    name: 'Genesis Cinemas Maryland Mall',
+    name: 'Genesis Cinemas Abuja',
     chain: 'Genesis',
     scrape_adapter: 'genesis',
-    scrape_config: { siteId: '1002', url: 'https://genesiscinemas.com' },
+    scrape_config: { siteId: '1002', url: 'https://genesiscinemas.com/ceddi-plaza-abuja/' },
+  },
+  {
+    name: 'Genesis Cinemas Port Harcourt',
+    chain: 'Genesis',
+    scrape_adapter: 'genesis',
+    scrape_config: { siteId: '1003', url: 'https://genesiscinemas.com/genesis-center-port-harcourt/' },
   },
 
   // ── BLUE PICTURES CINEMA ──
@@ -102,6 +119,7 @@ async function sync() {
   console.log(`======================================================\n`);
 
   const isDryRun = process.argv.includes('--dry-run');
+  const includeAll = process.argv.includes('--all');
 
   let dbCinemas: any[] | null = null;
   if (supabase && !isDryRun) {
@@ -116,16 +134,44 @@ async function sync() {
     }
   }
 
-  const targetCinemas: any[] = (dbCinemas && dbCinemas.length > 0)
-    ? dbCinemas.map(c => {
-        const fallback = DEFAULT_CINEMAS.find(d => d.name?.toLowerCase() === c.name.toLowerCase());
-        return {
-          ...c,
-          scrape_adapter: c.scrape_adapter || fallback?.scrape_adapter || 'veezi',
-          scrape_config: c.scrape_config && Object.keys(c.scrape_config).length ? c.scrape_config : fallback?.scrape_config,
-        };
-      })
-    : DEFAULT_CINEMAS.map((c, idx) => ({ id: `cinema-${idx}`, ...c }));
+  const rawList = (dbCinemas && dbCinemas.length > 0) ? dbCinemas : DEFAULT_CINEMAS;
+
+  const targetCinemas: any[] = rawList
+    .map(c => {
+      let adapter = c.scrape_adapter;
+      let config = c.scrape_config || {};
+
+      // Match known tokens if missing
+      const nameLower = (c.name || '').toLowerCase();
+      for (const [key, mapping] of Object.entries(KNOWN_TOKENS)) {
+        if (nameLower.includes(key) && (c.chain?.toLowerCase() === 'silverbird' || !c.chain)) {
+          if (!config.siteToken && mapping.config.siteToken) {
+            config = { ...config, ...mapping.config };
+            adapter = adapter || mapping.adapter;
+          }
+        }
+      }
+
+      // Check fallback list
+      const fallback = DEFAULT_CINEMAS.find(d => d.name?.toLowerCase() === nameLower);
+      if (fallback) {
+        adapter = adapter || fallback.scrape_adapter;
+        config = Object.keys(config).length ? config : fallback.scrape_config;
+      }
+
+      return {
+        ...c,
+        scrape_adapter: adapter,
+        scrape_config: config,
+      };
+    })
+    .filter(c => {
+      // Unless --all is specified, skip disabled or unconfigured rows
+      if (!includeAll && c.scrape_enabled === false) return false;
+      if (c.scrape_adapter === 'veezi' && !c.scrape_config?.siteToken) return false;
+      if (c.scrape_adapter === 'reach_cinema' && !c.scrape_config?.externalCinemaId) return false;
+      return true;
+    });
 
   // CLI Filters
   const chainArg = process.argv.find(a => a.startsWith('--chain='))?.slice('--chain='.length).toLowerCase();
@@ -137,7 +183,7 @@ async function sync() {
     return true;
   });
 
-  console.log(`Found ${filtered.length} cinema targets to process...\n`);
+  console.log(`Found ${filtered.length} active cinema targets to process...\n`);
 
   let totalShowtimes = 0;
   let totalMatched = 0;
@@ -148,14 +194,14 @@ async function sync() {
   for (const cinema of filtered) {
     const adapter = (ADAPTERS as any)[cinema.scrape_adapter];
     if (!adapter) {
-      console.log(`  ✗ [${cinema.chain}] ${cinema.name}: No adapter '${cinema.scrape_adapter}'`);
+      console.log(`  ✗ [${cinema.chain || 'Other'}] ${cinema.name}: No adapter '${cinema.scrape_adapter}'`);
       failCount++;
       continue;
     }
 
     const t0 = Date.now();
     try {
-      console.log(`Fetching [${cinema.chain}] ${cinema.name}...`);
+      console.log(`Fetching [${cinema.chain || 'Other'}] ${cinema.name}...`);
       const res = await adapter(cinema);
       if (res.error) throw new Error(res.error);
 

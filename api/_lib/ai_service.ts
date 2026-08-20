@@ -276,13 +276,22 @@ export async function generateAIContent(
         } catch (err: any) {
           if (isGroqQuotaError(err)) throw err; // let rotation handle quota
           // If 70b is otherwise limited, try the smaller 8b model as a sub-fallback
-          console.warn('Groq 70b limited, trying 8b instant...');
-          const response = await client.chat.completions.create({
-            messages: [{ role: 'user', content: prompt }],
-            model: 'llama-3.1-8b-instant',
-          }).asResponse();
-          const data = await response.json();
-          return { text: data.choices[0]?.message?.content || '', engine: 'groq-8b', headers: response.headers };
+          console.warn('Groq 70b limited, trying gemma2-9b-it / llama3-8b-8192...');
+          try {
+            const response = await client.chat.completions.create({
+              messages: [{ role: 'user', content: prompt }],
+              model: 'gemma2-9b-it',
+            }).asResponse();
+            const data = await response.json();
+            return { text: data.choices[0]?.message?.content || '', engine: 'groq-gemma', headers: response.headers };
+          } catch {
+            const response = await client.chat.completions.create({
+              messages: [{ role: 'user', content: prompt }],
+              model: 'llama3-8b-8192',
+            }).asResponse();
+            const data = await response.json();
+            return { text: data.choices[0]?.message?.content || '', engine: 'groq-8b', headers: response.headers };
+          }
         }
       })
     });

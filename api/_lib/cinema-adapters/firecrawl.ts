@@ -119,7 +119,7 @@ function normalizeDate(raw: string | null | undefined, fallback: string): string
 async function runScraplingBridge(url: string, options: { wait?: number; solveCloudflare?: boolean; selector?: string } = {}): Promise<{ status: number; text: string; html: string; error?: string }> {
   return new Promise((resolve) => {
     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-    const bridgePath = path.resolve(__dirname, '../../../scripts/scrapling_bridge.py');
+    const bridgePath = path.resolve(process.cwd(), 'scripts/scrapling_bridge.py');
     
     const args = ['-u', bridgePath, '--url', url, '--timeout', '90000'];
     if (options.wait !== undefined) {

@@ -47,32 +47,35 @@ async function resolveFromTmdb(
   const apiKey = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
   if (!apiKey) return null;
 
-  const search = await fetch(
-    `https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(title)}`,
-  );
-  if (!search.ok) return null;
+  try {
+    const search = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(title)}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!search.ok) return null;
 
-  const searchData = await search.json() as { results?: any[] };
-  const expected = normalizedTitle(title);
-  const candidate = (searchData.results || []).slice(0, 8).find((item) =>
-    normalizedTitle(item.title) === expected || normalizedTitle(item.original_title) === expected,
-  );
-  if (!candidate?.id) return null;
+    const searchData = await search.json() as { results?: any[] };
+    const expected = normalizedTitle(title);
+    const candidate = (searchData.results || []).slice(0, 8).find((item) =>
+      normalizedTitle(item.title) === expected || normalizedTitle(item.original_title) === expected,
+    );
+    if (!candidate?.id) return null;
 
-  const detailsResponse = await fetch(
-    `https://api.themoviedb.org/3/movie/${candidate.id}?api_key=${encodeURIComponent(apiKey)}&append_to_response=videos`,
-  );
-  if (!detailsResponse.ok) return null;
+    const detailsResponse = await fetch(
+      `https://api.themoviedb.org/3/movie/${candidate.id}?api_key=${encodeURIComponent(apiKey)}&append_to_response=videos`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!detailsResponse.ok) return null;
 
-  const details = await detailsResponse.json() as any;
-  const isNigerian = details.production_countries?.some((country: any) => country.iso_3166_1 === 'NG');
-  if (!isNigerian) return null;
+    const details = await detailsResponse.json() as any;
+    const isNigerian = details.production_countries?.some((country: any) => country.iso_3166_1 === 'NG');
+    if (!isNigerian) return null;
 
-  const releaseYear = details.release_date ? Number(details.release_date.slice(0, 4)) : null;
-  const payload = {
-    title: details.title || title,
-    original_title: details.original_title || null,
-    synopsis: details.overview || null,
+    const releaseYear = details.release_date ? Number(details.release_date.slice(0, 4)) : null;
+    const payload = {
+      title: details.title || title,
+      original_title: details.original_title || null,
+      synopsis: details.overview || null,
     year: Number.isFinite(releaseYear) ? releaseYear : null,
     release_date: details.release_date || null,
     poster_url: imageUrl(details.poster_path, 'w500'),
@@ -113,8 +116,12 @@ async function resolveFromTmdb(
     return (existing?.[0] as CinemaResolvedFilm | undefined) ?? null;
   }
 
-  console.error(`[cinema-resolver] Could not create "${title}":`, error?.message);
-  return null;
+    console.error(`[cinema-resolver] Could not create "${title}":`, error?.message);
+    return null;
+  } catch (err: any) {
+    console.warn(`[cinema-resolver] TMDB lookup failed for "${title}":`, err.message);
+    return null;
+  }
 }
 
 export function resolveMissingNollywoodFilm(
