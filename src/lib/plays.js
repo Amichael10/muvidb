@@ -40,25 +40,71 @@ export function getPlayDateLabel(play, fallback = 'Date TBA') {
 }
 
 /**
- * Fetch stage plays with optional status filtering
+ * Derive the accurate live status ('upcoming' | 'currently_running' | 'archived')
+ * based on the run dates relative to the current reference date.
+ */
+export function derivePlayStatus(play, refDate = new Date()) {
+  const todayStr = (refDate instanceof Date ? refDate : new Date(refDate)).toISOString().slice(0, 10);
+  const currentYear = (refDate instanceof Date ? refDate : new Date(refDate)).getFullYear();
+
+  const start = play?.run_start_date ? String(play.run_start_date).slice(0, 10) : null;
+  const end = play?.run_end_date ? String(play.run_end_date).slice(0, 10) : null;
+
+  // Case 1: Both start and end dates exist
+  if (start && end) {
+    if (end < todayStr) return 'archived';
+    if (start <= todayStr && end >= todayStr) return 'currently_running';
+    return 'upcoming';
+  }
+
+  // Case 2: Only start date exists
+  if (start && !end) {
+    if (start < todayStr) return 'archived';
+    if (start === todayStr) return 'currently_running';
+    return 'upcoming';
+  }
+
+  // Case 3: Only end date exists
+  if (!start && end) {
+    if (end < todayStr) return 'archived';
+    return 'currently_running';
+  }
+
+  // Case 4: No exact run dates — check year
+  if (play?.year && Number(play.year) < currentYear) {
+    return 'archived';
+  }
+
+  return play?.status || 'archived';
+}
+
+/**
+ * Fetch stage plays with date-aware status derivation
  */
 export async function fetchPlays(status = null) {
-  let query = supabase
+  const query = supabase
     .from('plays')
     .select('*')
     .order('run_start_date', { ascending: false, nullsFirst: false })
     .order('year', { ascending: false, nullsFirst: false });
-
-  if (status) {
-    query = query.eq('status', status);
-  }
 
   const { data, error } = await query;
   if (error) {
     console.error('Error fetching plays:', error);
     return [];
   }
-  return data || [];
+
+  // Derive live status on all plays
+  const normalized = (data || []).map((play) => ({
+    ...play,
+    status: derivePlayStatus(play),
+  }));
+
+  if (status && status !== 'all') {
+    return normalized.filter((play) => play.status === status);
+  }
+
+  return normalized;
 }
 
 /**
@@ -98,6 +144,7 @@ export async function fetchPlayBySlug(slug) {
 
   return {
     ...play,
+    status: derivePlayStatus(play),
     credits: credits || []
   };
 }
@@ -138,6 +185,7 @@ export async function fetchPersonStageCredits(personId) {
 
   return (data || []).map(item => ({
     ...item.play,
+    status: derivePlayStatus(item.play),
     role: item.role,
     character_name: item.character_name
   })).sort((a, b) => {
@@ -155,10 +203,17 @@ export async function upsertPlay(playData) {
   const runEndDate = playData.run_end_date || null;
   const derivedYear = runStartDate ? Number(runStartDate.slice(0, 4)) : null;
 
+  const derivedStatus = derivePlayStatus({
+    ...playData,
+    run_start_date: runStartDate,
+    run_end_date: runEndDate,
+  });
+
   const payload = {
     ...playData,
     run_start_date: runStartDate,
     run_end_date: runEndDate,
+    status: playData.status || derivedStatus,
     performance_time: playData.performance_time?.trim() || null,
     source_url: playData.source_url?.trim() || null,
     year: derivedYear || (playData.year ? Number(playData.year) : null),
@@ -172,7 +227,10 @@ export async function upsertPlay(playData) {
     .single();
 
   if (error) throw error;
-  return data;
+  return {
+    ...data,
+    status: derivePlayStatus(data),
+  };
 }
 
 /**

@@ -10,6 +10,7 @@ import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
 import { pruneSocialAssets, runSocialPublisher } from '../_lib/social_studio.js';
 import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
+import { sweepAndUpdatePlayStatuses } from '../_lib/theatre_service.js';
 
 
 /**
@@ -46,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { name: 'showtimes', fn: runShowtimesSync },
         { name: 'videos', fn: runVideosSync },
         { name: 'tmdb', fn: runTMDBSync },
+        { name: 'theatre_status_sweep', fn: sweepAndUpdatePlayStatuses },
         { name: 'ai_maintenance', fn: runAIMaintenance }
       ];
 
@@ -131,6 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Advisory only — records a verdict, never hides or deletes a film.
       case 'classify_film_kinds': result = await classifyFilmKinds({ limit: 100 }); break;
       case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
+      case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
       case 'kava':      
         return res.status(200).json({ 
           task: 'kava', 
