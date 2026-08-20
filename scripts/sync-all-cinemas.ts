@@ -111,6 +111,86 @@ const DEFAULT_CINEMAS: Partial<CinemaRow>[] = [
     scrape_adapter: 'bluepictures',
     scrape_config: { url: 'https://bluepicturesng.com/now-showing/' },
   },
+
+  // ── VIVA CINEMAS ──
+  {
+    name: 'Viva Cinemas Ikeja',
+    chain: 'Viva',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+  },
+  {
+    name: 'Viva Cinemas Abuja',
+    chain: 'Viva',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+  },
+  {
+    name: 'Viva Cinemas Ibadan',
+    chain: 'Viva',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+  },
+  {
+    name: 'Viva Cinemas Ilorin',
+    chain: 'Viva',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+  },
+  {
+    name: 'Viva Cinemas Ota',
+    chain: 'Viva',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+  },
+
+  // ── KADA CINEMAS ──
+  {
+    name: 'KADA Cinema Kaduna',
+    chain: 'Kada',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'kad-65087c1a', bookingBaseUrl: 'https://kadacinemas.com' },
+  },
+  {
+    name: 'Kada Cinemas Benin',
+    chain: 'Kada',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'kad-65087c1a', bookingBaseUrl: 'https://kadacinemas.com' },
+  },
+  {
+    name: 'Kada Calabar',
+    chain: 'Kada',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'kad-65087c1a', bookingBaseUrl: 'https://kadacinemas.com' },
+  },
+
+  // ── BOX OFFICE CINEMAS ──
+  {
+    name: 'Box Office Cinemas Garden City',
+    chain: 'Box Office',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'fil-98ff968e', bookingBaseUrl: 'https://boxofficecinemas.ng' },
+  },
+  {
+    name: 'Box Office Cinemas Pleasure Park',
+    chain: 'Box Office',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'box-62fe38ce', bookingBaseUrl: 'https://boxofficecinemas.ng' },
+  },
+
+  // ── NILE & NOVA CINEMAS ──
+  {
+    name: 'Nile Cinemas',
+    chain: 'Nile',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'thc-e7ff5df1', bookingBaseUrl: 'https://nilecinemas.com' },
+  },
+  {
+    name: 'Nova Cinema Abuja',
+    chain: 'Nova',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'nov-f76e616e', bookingBaseUrl: 'https://novacinemang.com' },
+  },
 ];
 
 async function sync() {
