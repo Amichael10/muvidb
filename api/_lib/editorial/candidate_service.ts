@@ -294,10 +294,12 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
         });
       });
 
-      // Sort with priority: Emerging Platforms & Hidden Gems first, followed by Mainstream
+      // Sort with priority: Emerging Platforms & Hidden Gems + High Star Ratings
       candidates.sort((a, b) => {
-        const aBoost = a.data?.isEmergingPlatform ? 3 : (a.data?.isYoutubeGem ? 2 : 1);
-        const bBoost = b.data?.isEmergingPlatform ? 3 : (b.data?.isYoutubeGem ? 2 : 1);
+        const aStar = Number(a.data?.imdb_rating || (a.data?.liked_percent ? a.data.liked_percent / 10 : 0));
+        const bStar = Number(b.data?.imdb_rating || (b.data?.liked_percent ? b.data.liked_percent / 10 : 0));
+        const aBoost = (a.data?.isEmergingPlatform ? 3 : (a.data?.isYoutubeGem ? 2.5 : 1)) + (aStar >= 7.0 ? 1.5 : (aStar >= 6.0 ? 0.5 : 0));
+        const bBoost = (b.data?.isEmergingPlatform ? 3 : (b.data?.isYoutubeGem ? 2.5 : 1)) + (bStar >= 7.0 ? 1.5 : (bStar >= 6.0 ? 0.5 : 0));
         return bBoost - aBoost;
       });
 

@@ -164,6 +164,7 @@ export default function FilmCard({
       netflix: { icon: 'simple-icons:netflix', color: 'text-[#E50914]', label: 'Watch on Netflix' },
       prime_video: { icon: 'simple-icons:primevideo', color: 'text-[#00A8E1]', label: 'Watch on Prime Video' },
       kava: { icon: 'solar:play-circle-bold', color: 'text-[#E84090]', label: 'Watch on Kava' },
+      nollistream: { icon: 'solar:play-circle-bold', color: 'text-[#D0A008]', label: 'Watch on NolliStream' },
       ironflix: { icon: 'solar:play-bold', color: 'text-[#D32F2F]', label: 'Watch on Ironflix' },
       docuth: { icon: 'solar:play-bold', color: 'text-[#0048A8]', label: 'Watch on Docuth' },
       ebonylife: { icon: 'solar:play-circle-bold', color: 'text-[#F8A008]', label: 'Watch on EbonyLife' },
@@ -231,8 +232,14 @@ export default function FilmCard({
               width={640}
               sizes="(max-width: 640px) 100vw, 320px"
             />
-            {likedPct != null && (
-              <LikedScore percent={likedPct} variant="badge" className="absolute top-2.5 left-2.5 z-20" />
+            {(likedPct != null || film.imdb_rating != null || film.tmdb_rating != null || film.audience_rating != null) && (
+              <LikedScore
+                percent={likedPct}
+                starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
+                votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count}
+                variant="badge"
+                className="absolute top-2.5 left-2.5 z-20"
+              />
             )}
             {(film.content_type === 'series' || film.is_series_group) && film.episodes_count > 1 && (
               <div className={`absolute top-2.5 ${likedPct != null ? 'left-[4.25rem]' : 'left-2.5'} flex items-center gap-1 bg-brand text-white px-1.5 py-0.5 rounded-md shadow-lg z-20 text-[9px] font-black uppercase tracking-wider`}>
@@ -315,8 +322,14 @@ export default function FilmCard({
 
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
-          {likedPct != null && (
-            <LikedScore percent={likedPct} variant="badge" className="absolute top-2.5 left-2.5 z-20" />
+          {(likedPct != null || film.imdb_rating != null || film.tmdb_rating != null || film.audience_rating != null) && (
+            <LikedScore
+              percent={likedPct}
+              starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
+              votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count}
+              variant="badge"
+              className="absolute top-2.5 left-2.5 z-20"
+            />
           )}
 
           {(film.content_type === 'series' || film.is_series_group) && (

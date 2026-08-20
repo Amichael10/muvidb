@@ -230,10 +230,31 @@ export default function FilmDetail() {
 
   const [cast, setCast] = useState([]);
   const [crew, setCrew] = useState([]);
+  const [criticSummary, setCriticSummary] = useState({ score: null, count: 0 });
   const [showFilmEdit, setShowFilmEdit] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
   const [awardsOpen, setAwardsOpen] = useState(false);
+
+  const fetchCriticSummary = async (uuid) => {
+    try {
+      const { data } = await supabase
+        .from('critic_reviews')
+        .select('rating')
+        .eq('film_id', uuid);
+      if (data && data.length > 0) {
+        const valid = data
+          .map((r) => (r.rating != null && r.rating !== '' ? Number(r.rating) : null))
+          .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10);
+        if (valid.length > 0) {
+          const avg = Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10;
+          setCriticSummary({ score: avg, count: valid.length });
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching critic summary:', e);
+    }
+  };
 
   // For the slug the loader seeded, hand the row straight to fetchFilm so it
   // skips the primary query but STILL runs the follow-on work (credits,
@@ -384,6 +405,7 @@ export default function FilmDetail() {
       setLoading(false);
 
       fetchCredits(data.id);
+      fetchCriticSummary(data.id);
       if (data.content_type === 'series') {
         fetchEpisodes(data.id, getShowName(data.title));
       } else if (data.series_id) {
@@ -643,8 +665,15 @@ export default function FilmDetail() {
               </div>
 
               <div className="flex flex-wrap items-end gap-6">
-                {film.liked_percent != null ? (
-                  <LikedScore percent={film.liked_percent} variant="hero" />
+                {(film.liked_percent != null || film.imdb_rating != null || film.tmdb_rating != null || film.audience_rating != null || criticSummary.score != null) ? (
+                  <LikedScore
+                    percent={film.liked_percent}
+                    starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
+                    criticScore={criticSummary.score}
+                    criticCount={criticSummary.count}
+                    votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count || (likesCount + dislikesCount)}
+                    variant="hero"
+                  />
                 ) : (
                   <button 
                     onClick={() => {

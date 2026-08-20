@@ -110,3 +110,145 @@ export function blendReactionLikedPercent(
     ((L + REACTION_PRIOR_WEIGHT * (anchor / 100)) / (n + REACTION_PRIOR_WEIGHT)) * 100;
   return Math.round(Math.max(5, Math.min(97, pct)));
 }
+
+/**
+ * Approximate 0-10 score from a 0-100 "% liked" value (inverse of `pctLiked`).
+ * Clamped to [1.0, 9.7] with 1 decimal place.
+ */
+export function score10FromLikedPercent(likedPct: number): number {
+  const p = Math.max(5.1, Math.min(96.9, likedPct));
+  // Invert p = 100 / (1 + exp(-1.15 * (x - 7.1)))
+  const x = 7.1 - (1 / 1.15) * Math.log((100 - p) / p);
+  return Math.round(Math.max(1.0, Math.min(9.7, x)) * 10) / 10;
+}
+
+export type FilmRatingSignals = {
+  imdb_rating?: number | null;
+  imdb_vote_count?: number | null;
+  tmdb_rating?: number | null;
+  tmdb_vote_count?: number | null;
+  audience_rating?: number | null;
+  audience_rating_count?: number | null;
+  liked_percent?: number | null;
+  streaming_links?: Record<string, any> | null;
+  youtube_stats?: {
+    view_count?: number;
+    like_count?: number;
+    comment_count?: number;
+  } | null;
+};
+
+export type CriticReviewSignal = {
+  rating?: number | string | null;
+  is_featured?: boolean;
+};
+
+export type CompositeRatingResult = {
+  starRating: number | null; // 0.0 - 10.0 scale (e.g. 7.8)
+  likedPercent: number | null; // 0 - 100% scale (e.g. 84)
+  criticScore: number | null; // 0.0 - 10.0 scale for verified critics
+  criticReviewsCount: number;
+  totalVotesCount: number;
+  primarySource: 'imdb' | 'tmdb' | 'critics' | 'youtube' | 'blended' | 'community';
+};
+
+/**
+ * Compute multi-pillar composite rating combining:
+ * 1. Expert Film Critic reviews (critic_reviews)
+ * 2. External authority ratings (IMDb, TMDB, Prime Video)
+ * 3. YouTube video engagement & mined comment sentiment
+ * 4. In-app user reactions (likes/dislikes)
+ */
+export function computeCompositeRating(params: {
+  film?: FilmRatingSignals | null;
+  criticReviews?: CriticReviewSignal[] | null;
+  userLikes?: number;
+  userDislikes?: number;
+}): CompositeRatingResult {
+  const { film, criticReviews = [], userLikes = 0, userDislikes = 0 } = params;
+
+  // 1. Critic Score
+  const validCriticRatings = (criticReviews || [])
+    .map((r) => (r.rating != null && r.rating !== '' ? Number(r.rating) : null))
+    .filter((n): n is number => n !== null && !isNaN(n) && n > 0 && n <= 10);
+
+  const criticReviewsCount = validCriticRatings.length;
+  const criticScore =
+    criticReviewsCount > 0
+      ? Math.round(
+          (validCriticRatings.reduce((a, b) => a + b, 0) / criticReviewsCount) * 10
+        ) / 10
+      : null;
+
+  // 2. Base External Score (0-10) and Vote Count
+  let baseScore10: number | null = null;
+  let totalVotes = 0;
+  let primarySource: CompositeRatingResult['primarySource'] = 'community';
+
+  if (film?.imdb_rating != null && Number(film.imdb_rating) > 0) {
+    baseScore10 = Number(film.imdb_rating);
+    totalVotes += film.imdb_vote_count || 100;
+    primarySource = 'imdb';
+  } else if (film?.tmdb_rating != null && Number(film.tmdb_rating) > 0) {
+    baseScore10 = Number(film.tmdb_rating);
+    totalVotes += film.tmdb_vote_count || 50;
+    primarySource = 'tmdb';
+  } else if (film?.audience_rating != null && Number(film.audience_rating) > 0) {
+    baseScore10 = Number(film.audience_rating);
+    totalVotes += film.audience_rating_count || 20;
+    primarySource = 'youtube';
+  } else if (film?.liked_percent != null && Number(film.liked_percent) > 0) {
+    baseScore10 = score10FromLikedPercent(Number(film.liked_percent));
+    primarySource = 'blended';
+  }
+
+  // YouTube Stats adjustment (if available)
+  if (film?.youtube_stats) {
+    const views = film.youtube_stats.view_count || 0;
+    const likes = film.youtube_stats.like_count || 0;
+    if (views >= 1000 && likes > 0) {
+      const likeRatio = likes / views; // e.g. 0.04 = 4% like rate
+      totalVotes += Math.min(500, Math.round(views / 1000));
+      if (baseScore10 == null) {
+        // Approximate 6.0 to 8.8 based on like ratio
+        baseScore10 = Math.min(8.8, Math.max(5.5, 6.0 + likeRatio * 50));
+        primarySource = 'youtube';
+      }
+    }
+  }
+
+  // 3. User Reactions
+  const reactionsTotal = userLikes + userDislikes;
+  totalVotes += reactionsTotal;
+
+  // 4. Blend Star Rating (0-10)
+  let starRating: number | null = null;
+  if (criticScore != null && baseScore10 != null) {
+    // 40% Critics, 60% Audience/External
+    starRating = Math.round((0.4 * criticScore + 0.6 * baseScore10) * 10) / 10;
+    primarySource = 'blended';
+  } else if (criticScore != null) {
+    starRating = criticScore;
+    primarySource = 'critics';
+  } else if (baseScore10 != null) {
+    starRating = Math.round(baseScore10 * 10) / 10;
+  }
+
+  // 5. Liked Percent (0-100)
+  let likedPercent = film?.liked_percent ?? null;
+  if (likedPercent == null && starRating != null) {
+    likedPercent = pctLiked(starRating);
+  }
+  if (reactionsTotal > 0) {
+    likedPercent = blendReactionLikedPercent(likedPercent, userLikes, userDislikes);
+  }
+
+  return {
+    starRating,
+    likedPercent,
+    criticScore,
+    criticReviewsCount,
+    totalVotesCount: totalVotes,
+    primarySource,
+  };
+}
