@@ -21,7 +21,7 @@ function collectKeys(base: string): string[] {
 
 // Gemini: rotate on 429/RESOURCE_EXHAUSTED before falling back to OpenAI/Groq.
 const GEMINI_KEYS = collectKeys('GEMINI_API_KEY');
-const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-flash-latest';
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite')
   .split(',')
   .map((model) => model.trim())
