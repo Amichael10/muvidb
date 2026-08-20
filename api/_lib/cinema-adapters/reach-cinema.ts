@@ -14,6 +14,7 @@
 
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { inferFormat, toLagosDateTime, todayLagos } from './types.js';
+import { cinemaFetch } from './cinema-fetch.js';
 
 // Public bearer JWT bundled in web.vivacinemas.com (exp: 2027-06-05).
 // If Reach Cinema ever rotates it, set REACH_CINEMA_JWT env var to override.
@@ -92,7 +93,7 @@ async function fetchViaBrowser<T>(url: string, jwt: string): Promise<T> {
 }
 
 async function fetchDirect(url: string, jwt: string): Promise<Response> {
-  return fetch(url, {
+  return cinemaFetch(url, {
     headers: {
       Authorization: `Bearer ${jwt}`,
       Accept: 'application/json',

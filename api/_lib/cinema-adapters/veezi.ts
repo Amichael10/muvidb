@@ -10,34 +10,11 @@
  *
  * cinemas.scrape_config must include:
  *   { "siteToken": "4x3z2wcre0rek2beab5w344ae0" }
- *
- * HTML structure (stable as of 2025):
- *   <div class="film" id="ST00001764">
- *     <h3 class="title">Film Title</h3>
- *     <span class="censor">PG</span>
- *     <img class="poster" src="/Media/Poster?siteToken=...&code=...">
- *     <div class="sessions">
- *       <div class="date-container">
- *         <h4 class="date">Sunday 19, April</h4>
- *         <ul class="session-times">
- *           <li>
- *             <a href="/purchase/286926?siteToken=...">
- *               <time>6:50 PM</time>
- *               <span class="screen-attribute attribute-...">GR</span>
- *             </a>
- *           </li>
- *         </ul>
- *       </div>
- *     </div>
- *   </div>
- *
- * Date format: "Sunday 19, April" — no year; we infer the year by checking whether
- * the date is in the past relative to today (Lagos), and rolling over to next year
- * if we're in late December looking at January dates.
  */
 
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { inferFormat } from './types.js';
+import { cinemaFetch } from './cinema-fetch.js';
 
 const VEEZI_BASE = 'https://ticketing.eu.veezi.com';
 const VEEZI_PURCHASE_BASE = 'https://ticketing.eu.veezi.com/purchase';
@@ -103,111 +80,116 @@ function parseVeeziTime(timeStr: string): string | null {
   let hr = parseInt(m[1], 10);
   const min = parseInt(m[2], 10);
   const ampm = m[3].toUpperCase();
-  if (ampm === 'AM') {
-    if (hr === 12) hr = 0;
-  } else {
-    if (hr !== 12) hr += 12;
-  }
+  if (ampm === 'PM' && hr < 12) hr += 12;
+  if (ampm === 'AM' && hr === 12) hr = 0;
   return `${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}:00`;
 }
 
 /**
- * Extract text content from a simple HTML tag — ignores nested tags.
- * e.g. `<h3 class="title">  My Film  </h3>` → "My Film"
+ * Strip HTML tags from a string.
  */
-function extractTag(html: string, tag: string, className?: string): string | null {
-  const classClause = className ? `[^>]*class="[^"]*${className}[^"]*"` : '';
-  const re = new RegExp(`<${tag}${classClause}[^>]*>([\\s\\S]*?)</${tag}>`, 'i');
-  const m = html.match(re);
-  if (!m) return null;
-  // Strip inner tags, decode basic entities, trim
-  return m[1]
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .trim() || null;
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Parse the Veezi widget HTML and return ScrapedShowtime[].
+ * Extract clean text content from inside a tag match.
+ */
+function extractTagContent(html: string, tagName: string): string | null {
+  const re = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i');
+  const m = html.match(re);
+  return m ? stripTags(m[1]) : null;
+}
+
+/**
+ * Parse the full Veezi widget HTML into ScrapedShowtime rows.
+ * Uses regex matching rather than cheerio so we have no external DOM dependency.
+ *
  * siteToken is passed in so we can build absolute poster + ticket URLs.
  */
 function parseVeeziHtml(html: string, siteToken: string): ScrapedShowtime[] {
   const showtimes: ScrapedShowtime[] = [];
 
-  // Split into per-film blocks — each starts with <div class="film" id="ST...">
-  // We use the id= to split; the closing </div> boundary is approximated by the
-  // next film id or end-of-string.
-  const filmBlocks = html.split(/<div[^>]+class="[^"]*\bfilm\b[^"]*"[^>]+id="(ST\d+)"/i);
+  // Split into per-film blocks: <div class="film" ...> ... </div> (until next film or end)
+  // Each film block contains: title, censor rating, poster img, and multiple date-containers
+  const filmBlocks = html.split(/<div\s+class=["']film["']/i).slice(1);
 
-  // filmBlocks[0] = preamble (skip)
-  // filmBlocks[1] = film id, filmBlocks[2] = content, filmBlocks[3] = film id, ...
-  for (let i = 1; i < filmBlocks.length - 1; i += 2) {
-    const filmId = filmBlocks[i];       // e.g. "ST00001764"
-    const block  = filmBlocks[i + 1];  // everything until the next split
+  for (const block of filmBlocks) {
+    // Film title: <h3 class="title">Film Title</h3>
+    const titleMatch = block.match(/<h3\s+class=["']title["'][^>]*>([\s\S]*?)<\/h3>/i);
+    if (!titleMatch) continue;
+    const rawTitle = stripTags(titleMatch[1]);
+    if (!rawTitle) continue;
 
-    const title = extractTag(block, 'h3', 'title');
-    if (!title) continue;
+    // Format from title if present, e.g. "Spider-Man (3D)"
+    const titleFormat = inferFormat(rawTitle);
 
-    const rating = extractTag(block, 'span', 'censor');
+    // Censor/rating: <span class="censor">PG</span>
+    const ratingMatch = block.match(/<span\s+class=["']censor["'][^>]*>([\s\S]*?)<\/span>/i);
+    const rating = ratingMatch ? stripTags(ratingMatch[1]) : undefined;
 
     // Poster: <img class="poster" src="/Media/Poster?siteToken=...&code=...">
-    const posterMatch = block.match(/<img[^>]+class="[^"]*poster[^"]*"[^>]+src="([^"]+)"/i)
-                     || block.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*poster[^"]*"/i);
-    let posterUrl: string | null = null;
+    let posterUrl: string | undefined;
+    const posterMatch = block.match(/<img[^>]+class=["']poster["'][^>]+src=["']([^"']+)["']/i)
+      || block.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']poster["']/i);
     if (posterMatch) {
       const src = posterMatch[1].replace(/&amp;/g, '&');
-      posterUrl = src.startsWith('http') ? src : `${VEEZI_BASE}${src}`;
+      posterUrl = src.startsWith('http') ? src : `${VEEZI_BASE}${src.startsWith('/') ? '' : '/'}${src}`;
     }
 
-    // Split into date-container blocks
-    const dateBlocks = block.split(/<div[^>]+class="[^"]*date-container[^"]*"[^>]*>/i);
-    // dateBlocks[0] = pre-dates section (skip)
-    for (let j = 1; j < dateBlocks.length; j++) {
-      const dateBlock = dateBlocks[j];
+    // Split film block into date-containers: <div class="date-container"> ...
+    const dateContainers = block.split(/<div\s+class=["']date-container["']/i).slice(1);
 
-      const dateText = extractTag(dateBlock, 'h4', 'date');
-      if (!dateText) continue;
-      const showDate = parseVeeziDate(dateText);
+    for (const dateBlock of dateContainers) {
+      // Date: <h4 class="date">Sunday 19, April</h4>
+      const dateMatch = dateBlock.match(/<h4\s+class=["']date["'][^>]*>([\s\S]*?)<\/h4>/i);
+      if (!dateMatch) continue;
+      const rawDate = stripTags(dateMatch[1]);
+      const showDate = parseVeeziDate(rawDate);
       if (!showDate) continue;
 
-      // Extract all session <a> tags within session-times
+      // Extract all session <li> items inside this date container
       // Pattern: <a href="/purchase/286926?siteToken=...">...<time>6:50 PM</time>...<span class="screen-attribute...">GR</span>
-      const sessionRe = /<a\s+href="\/purchase\/(\d+)[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
-      let sessionMatch: RegExpExecArray | null;
+      const liMatches = dateBlock.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi);
 
-      while ((sessionMatch = sessionRe.exec(dateBlock)) !== null) {
-        const sessionId = sessionMatch[1];
-        const sessionContent = sessionMatch[2];
+      for (const liMatch of liMatches) {
+        const li = liMatch[1];
 
-        const timeText = extractTag(sessionContent, 'time');
-        if (!timeText) continue;
-        const showTime = parseVeeziTime(timeText);
+        // Showtime: <time>6:50 PM</time>
+        const timeMatch = li.match(/<time[^>]*>([\s\S]*?)<\/time>/i);
+        if (!timeMatch) continue;
+        const showTime = parseVeeziTime(stripTags(timeMatch[1]));
         if (!showTime) continue;
 
-        // Screen attribute — text inside span.screen-attribute
-        const attrMatch = sessionContent.match(
-          /<span[^>]+class="[^"]*screen-attribute[^"]*"[^>]*>([^<]+)<\/span>/i
-        );
-        const attrLabel = attrMatch ? attrMatch[1].trim().toUpperCase() : 'GR';
-        const format = SCREEN_ATTR_FORMAT[attrLabel] ?? inferFormat(attrLabel);
+        // Screen attribute: <span class="screen-attribute attribute-...">GR</span>
+        const attrMatch = li.match(/<span\s+class=["'][^"']*screen-attribute[^"']*["'][^>]*>([\s\S]*?)<\/span>/i);
+        const attrCode = attrMatch ? stripTags(attrMatch[1]).toUpperCase() : '';
+        const format = SCREEN_ATTR_FORMAT[attrCode] || titleFormat || 'Standard';
 
-        const ticketUrl = `${VEEZI_PURCHASE_BASE}/${sessionId}?siteToken=${siteToken}`;
+        // Ticket URL / session ID: href="/purchase/286926?siteToken=..." or href="https://..."
+        let ticketUrl: string | undefined;
+        const hrefMatch = li.match(/href=["']([^"']+)["']/i);
+        if (hrefMatch) {
+          const href = hrefMatch[1].replace(/&amp;/g, '&');
+          if (href.startsWith('http')) {
+            ticketUrl = href;
+          } else {
+            // Relative path like "/purchase/286926?siteToken=..."
+            ticketUrl = `${VEEZI_BASE}${href.startsWith('/') ? '' : '/'}${href}`;
+          }
+        }
 
         showtimes.push({
-          externalFilmId: filmId,
-          filmTitle: title,
-          filmMeta: {
-            posterUrl,
-            rating: rating ?? null,
-          },
+          externalFilmId: `veezi-${siteToken}-${rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          filmTitle: rawTitle,
           showDate,
           showTime,
           format,
           ticketUrl,
+          filmMeta: {
+            rating: rating || undefined,
+            posterUrl,
+          },
         });
       }
     }
@@ -231,9 +213,8 @@ export const veeziAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<Ad
 
   let html: string;
   try {
-    const res = await fetch(url, {
+    const res = await cinemaFetch(url, {
       headers: {
-        // Must send a browser-like UA; Veezi returns 403 for curl/bot UAs
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -267,12 +248,14 @@ export const veeziAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<Ad
 
   const showtimes = parseVeeziHtml(html, siteToken);
 
+  const warnings: string[] = [];
+  if (showtimes.length === 0) {
+    warnings.push(`Veezi returned schedule HTML for siteToken=${siteToken} but 0 showtimes were parsed.`);
+  }
+
   return {
     cinemaId: cinema.id,
     showtimes,
-    warnings:
-      showtimes.length === 0
-        ? [`Parsed 0 showtimes from Veezi widget — may be no upcoming sessions or HTML structure changed.`]
-        : undefined,
+    warnings: warnings.length ? warnings : undefined,
   };
 };

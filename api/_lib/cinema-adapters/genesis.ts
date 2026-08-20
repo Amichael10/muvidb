@@ -22,6 +22,7 @@
 import * as cheerio from 'cheerio';
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { todayLagos } from './types.js';
+import { cinemaFetch } from './cinema-fetch.js';
 
 const FORMAT_SUFFIX = /\s*\((VIP|3D|2D|IMAX|4DX|STANDARD|PREMIUM|RECLINER)\)\s*$/i;
 
@@ -49,7 +50,7 @@ export const genesisAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<
 
   let html: string;
   try {
-    const res = await fetch(url, {
+    const res = await cinemaFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',

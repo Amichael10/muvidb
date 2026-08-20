@@ -16,6 +16,7 @@
 import * as cheerio from 'cheerio';
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { todayLagos } from './types.js';
+import { cinemaFetch } from './cinema-fetch.js';
 
 // "10:00AM" / "10:00 AM" / "22:05" / ISO → HH:MM:SS (+ date if ISO)
 function parseTime(raw: any): { time: string; date?: string } | null {
@@ -91,7 +92,7 @@ export const filmhouseAdapter: CinemaAdapter = async (cinema: CinemaRow): Promis
 
   let html: string;
   try {
-    const res = await fetch(url, {
+    const res = await cinemaFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',

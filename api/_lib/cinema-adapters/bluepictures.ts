@@ -24,6 +24,7 @@
 
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { todayLagos } from './types.js';
+import { cinemaFetch } from './cinema-fetch.js';
 
 const DEFAULT_NOW_SHOWING = 'https://bluepicturesng.com/now-showing/';
 const DEFAULT_TICKET_URL  = 'https://bluepicturesng.com/value/blockbuster-ticket/';
@@ -128,7 +129,7 @@ export const bluepicturesAdapter: CinemaAdapter = async (cinema: CinemaRow): Pro
 
   let html: string;
   try {
-    const res = await fetch(nowShowingUrl, {
+    const res = await cinemaFetch(nowShowingUrl, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
