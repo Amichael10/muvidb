@@ -99,6 +99,7 @@ export default [
       // Full admins only — `admin_limited` must not reach these.
       layout('routes/require-admin-strict.tsx', [
         route('social', 'pages/admin/AdminSocialStudio.jsx'),
+        route('social-studio', 'pages/admin/AdminSocialStudio.jsx', { id: 'admin-social-studio-alias' }),
         route('people-enrichment', 'pages/admin/AdminPeopleEnrichment.jsx'),
         route('outreach', 'pages/admin/AdminOutreach.jsx'),
         route('logs', 'pages/admin/AdminLogs.jsx'),

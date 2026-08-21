@@ -72,7 +72,7 @@ export function tiktokRedirectUri(req: VercelRequest): string {
 }
 
 export function threadsAdminRedirect(req: VercelRequest, result: 'connected' | 'error', message?: string): string {
-  const target = new URL('/admin/social-studio', requestOrigin(req));
+  const target = new URL('/admin/social', requestOrigin(req));
   target.searchParams.set('threads', result);
   if (message) target.searchParams.set('message', message.slice(0, 180));
   return target.toString();
@@ -536,7 +536,7 @@ export async function completeMetaOAuth(req: VercelRequest): Promise<string> {
     }
   }
 
-  const target = new URL('/admin/social-studio', requestOrigin(req));
+  const target = new URL('/admin/social', requestOrigin(req));
   target.searchParams.set('meta', 'connected');
   target.searchParams.set('message', `Meta connected: Facebook (${connectedFb ? 'Ready' : 'Pending'}), Instagram (${connectedIg ? 'Ready' : 'Pending'})`);
   return target.toString();
@@ -629,7 +629,7 @@ export async function completeTikTokOAuth(req: VercelRequest): Promise<string> {
     grantedScopes: ['user.info.basic', 'video.publish', 'video.upload'],
   });
 
-  const target = new URL('/admin/social-studio', requestOrigin(req));
+  const target = new URL('/admin/social', requestOrigin(req));
   target.searchParams.set('tiktok', 'connected');
   return target.toString();
 }

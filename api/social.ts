@@ -49,11 +49,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(200).send(`
             <!DOCTYPE html>
             <html>
-              <head><title>Threads Connection</title><meta http-equiv="refresh" content="3;url=/admin/social-studio"></head>
+              <head><title>Threads Connection</title><meta http-equiv="refresh" content="3;url=/admin/social"></head>
               <body style="background:#111;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
                 <h2>Threads connection issue</h2>
                 <p style="color:#f87171;">${errMsg}</p>
-                <p><a href="/admin/social-studio" style="color:#f97316;">Return to Social Studio</a></p>
+                <p><a href="/admin/social" style="color:#f97316;">Return to Social Studio</a></p>
               </body>
             </html>
           `);
@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (error) {
         const errMsg = (error as Error)?.message || 'We could not connect Meta. Please check your Meta app permissions.';
         console.error('Meta OAuth callback error:', errMsg);
-        res.setHeader('Location', `/admin/social-studio?meta=error&message=${encodeURIComponent(errMsg.slice(0, 150))}`);
+        res.setHeader('Location', `/admin/social?meta=error&message=${encodeURIComponent(errMsg.slice(0, 150))}`);
         return res.status(302).end();
       }
     }
@@ -84,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (error) {
         const errMsg = (error as Error)?.message || 'We could not connect TikTok. Please check your TikTok app permissions.';
         console.error('TikTok OAuth callback error:', errMsg);
-        res.setHeader('Location', `/admin/social-studio?tiktok=error&message=${encodeURIComponent(errMsg.slice(0, 150))}`);
+        res.setHeader('Location', `/admin/social?tiktok=error&message=${encodeURIComponent(errMsg.slice(0, 150))}`);
         return res.status(302).end();
       }
     }
