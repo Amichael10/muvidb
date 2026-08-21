@@ -58,13 +58,13 @@ export default function ComingSoonCard({ film }) {
   };
 
   return (
-    <article className="group w-[250px] min-w-[250px] shrink-0 overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-xl">
+    <article className="group relative w-[250px] min-w-[250px] shrink-0 overflow-hidden rounded-lg border border-border bg-surface shadow-sm cinema-card-glow card-sheen transition-transform duration-300 hover:z-20">
       <div className="relative aspect-[2/3] overflow-hidden bg-surface-2">
         <Link to={filmPath} className="block h-full" title={title}>
           <ImageWithFallback
             src={film.poster_url || film.backdrop_url}
             alt={title}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
             fallbackType="film"
             name={title}
             loading="lazy"
@@ -72,6 +72,13 @@ export default function ComingSoonCard({ film }) {
             sizes="250px"
           />
         </Link>
+
+        {/* Central Play/Explore Quick Action Indicator */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-20">
+          <div className="w-11 h-11 rounded-full bg-brand/90 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transform scale-75 group-hover:scale-100 transition-transform duration-300 border border-white/25">
+            <Icon icon={primaryPlatform?.id === 'cinema' ? 'solar:ticket-bold' : 'solar:clapperboard-play-bold'} className="text-xl ml-0.5" />
+          </div>
+        </div>
 
         <button
           type="button"
@@ -118,6 +125,9 @@ export default function ComingSoonCard({ film }) {
           </Link>
         </div>
       </div>
+
+      {/* Bottom glowing accent bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand via-orange-500 to-amber-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-400 origin-left z-30" />
     </article>
   );
 }

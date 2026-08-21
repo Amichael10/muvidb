@@ -815,4 +815,46 @@
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
   }
+
+  /* Cinematic Card Hover & Shimmer Glow */
+  .cinema-card-glow {
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.35s cubic-bezier(0.2, 0.8, 0.2, 1),
+                border-color 0.35s ease;
+  }
+  .cinema-card-glow:hover {
+    transform: translateY(-4px) scale(1.025);
+    border-color: rgba(255, 90, 31, 0.6) !important;
+    box-shadow: 0 16px 36px -8px rgba(255, 90, 31, 0.35),
+                0 6px 18px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(255, 90, 31, 0.3) !important;
+  }
+
+  /* Light Sheen Sweep across cards on hover */
+  .card-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+  .card-sheen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -120%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.15),
+      transparent
+    );
+    transform: skewX(-25deg);
+    transition: left 0.75s ease-in-out;
+    pointer-events: none;
+    z-index: 25;
+  }
+  .card-sheen:hover::before,
+  .group:hover .card-sheen::before {
+    left: 150%;
+  }
 }

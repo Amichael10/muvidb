@@ -121,9 +121,9 @@ export default function FilmCard({
 
   if (variant === 'top10') {
     return (
-      <div className="relative flex items-end pl-14 sm:pl-16 h-72 sm:h-80 group select-none">
+      <div className="relative flex items-end pl-14 sm:pl-16 h-72 sm:h-80 group select-none transition-transform duration-300 hover:z-20">
         {/* Giant Translucent Number */}
-        <span className="text-[140px] sm:text-[160px] font-black text-brand/15 dark:text-white/10 select-none absolute left-0 bottom-[-24px] z-0 font-heading leading-none -translate-x-3 tracking-tighter">
+        <span className="text-[140px] sm:text-[160px] font-black text-brand/15 dark:text-white/10 group-hover:text-brand/30 dark:group-hover:text-brand/25 select-none absolute left-0 bottom-[-24px] z-0 font-heading leading-none -translate-x-3 tracking-tighter transition-colors duration-300">
           {film.rank || 1}
         </span>
         <div className="relative z-10 shrink-0">
@@ -214,18 +214,18 @@ export default function FilmCard({
   const youtubeCardHeight = fullWidth ? 'h-[360px] sm:h-[430px] lg:h-[390px]' : 'h-[350px] sm:h-[370px]';
 
   return (
-    <div className={`relative group flex flex-col gap-3 ${isLandscapeVariant ? (fullWidth ? 'w-full' : 'w-72 sm:w-80 shrink-0') : ''}`}>
+    <div className={`relative group flex flex-col gap-3 transition-transform duration-300 hover:z-20 ${isLandscapeVariant ? (fullWidth ? 'w-full' : 'w-72 sm:w-80 shrink-0') : ''}`}>
       {isLandscapeVariant ? (
-        <div className={`relative flex w-full flex-col ${isYoutubeVariant ? `${youtubeCardHeight} overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-xl` : 'gap-2'}`}>
+        <div className={`relative flex w-full flex-col ${isYoutubeVariant ? `${youtubeCardHeight} cinema-card-glow card-sheen overflow-hidden rounded-lg border border-border bg-surface shadow-sm` : 'gap-2'}`}>
           <Link 
             to={`/films/${film.slug || film.id}`}
             title={formatFilmTitle(film.title)}
-            className={`relative z-0 block aspect-video w-full shrink-0 overflow-hidden bg-surface-2/60 transition-all duration-500 hover:z-10 ${isYoutubeVariant ? 'border-b border-border' : 'rounded-lg border border-border shadow-sm group-hover:border-brand/40 group-hover:shadow-xl group-hover:shadow-brand/5'}`}
+            className={`relative z-0 block aspect-video w-full shrink-0 overflow-hidden bg-surface-2/60 transition-all duration-500 ${isYoutubeVariant ? 'border-b border-border' : 'cinema-card-glow card-sheen rounded-lg border border-border shadow-sm'}`}
           >
             <ImageWithFallback
               src={getFilmBackdrop(film)}
               alt={formatFilmTitle(film.title)}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
               fallbackType="film"
               name={formatFilmTitle(film.title)}
               loading="lazy"
@@ -238,7 +238,7 @@ export default function FilmCard({
                 starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
                 votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count}
                 variant="badge"
-                className="absolute top-2.5 left-2.5 z-20"
+                className="absolute top-2.5 left-2.5 z-20 shadow-md"
               />
             )}
             {(film.content_type === 'series' || film.is_series_group) && film.episodes_count > 1 && (
@@ -247,11 +247,11 @@ export default function FilmCard({
                 <span>{film.episodes_count} videos</span>
               </div>
             )}
-            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors duration-300" />
+            <div className="absolute inset-0 bg-black/25 group-hover:bg-black/5 transition-colors duration-300" />
             {getYoutubeId(film.youtube_watch_url) && (
               <div className="absolute inset-0 flex items-center justify-center opacity-90 group-hover:opacity-100 transition-opacity">
-                <div className="w-10 h-10 rounded-full bg-brand/90 text-white flex items-center justify-center shadow-lg transition-transform group-hover:scale-110">
-                  <Icon icon="solar:play-bold" className="text-lg ml-0.5" />
+                <div className="w-11 h-11 rounded-full bg-brand text-white flex items-center justify-center shadow-xl shadow-brand/40 transition-transform duration-300 group-hover:scale-115 border border-white/20">
+                  <Icon icon="solar:play-bold" className="text-xl ml-0.5" />
                 </div>
               </div>
             )}
@@ -260,7 +260,7 @@ export default function FilmCard({
           <div className={isYoutubeVariant ? 'flex min-h-0 flex-1 flex-col p-3 text-left' : 'mt-1 flex flex-col px-1 text-left'}>
             <Link to={`/films/${film.slug || film.id}`}>
               <h3 
-                className={`font-bold text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors ${isYoutubeVariant ? 'min-h-10 text-base line-clamp-2' : 'text-sm line-clamp-1'}`}
+                className={`font-bold text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors duration-200 ${isYoutubeVariant ? 'min-h-10 text-base line-clamp-2' : 'text-sm line-clamp-1'}`}
                 title={formatFilmTitle(film.title)}
               >
                 {formatFilmTitle(film.title)}
@@ -307,12 +307,12 @@ export default function FilmCard({
         <Link 
           to={`/films/${film.slug || film.id}`}
           title={formatFilmTitle(film.title)}
-          className={`relative block rounded-lg overflow-hidden transition-all duration-500 hover:shadow-2xl z-0 bg-surface-2/60 hover:border-brand/40 border border-border ${sizeClasses[size]}`}
+          className={`relative block rounded-lg overflow-hidden cinema-card-glow card-sheen z-0 bg-surface-2/60 border border-border ${sizeClasses[size]}`}
         >
           <ImageWithFallback
             src={film.poster_url || film.poster}
             alt={formatFilmTitle(film.title)}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
             fallbackType="film"
             name={formatFilmTitle(film.title)}
             loading="lazy"
@@ -320,7 +320,14 @@ export default function FilmCard({
             sizes="(max-width: 640px) 44vw, 192px"
           />
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
+
+          {/* Central Play/Explore Quick Action Indicator */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-20">
+            <div className="w-11 h-11 rounded-full bg-brand/90 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transform scale-75 group-hover:scale-100 transition-transform duration-300 border border-white/25">
+              <Icon icon={film.release_type === 'youtube' || (film.youtube_watch_url && film.youtube_watch_url.length > 5) ? "solar:play-bold" : "solar:clapperboard-play-bold"} className="text-xl ml-0.5" />
+            </div>
+          </div>
 
           {(likedPct != null || film.imdb_rating != null || film.tmdb_rating != null || film.audience_rating != null) && (
             <LikedScore
@@ -328,7 +335,7 @@ export default function FilmCard({
               starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
               votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count}
               variant="badge"
-              className="absolute top-2.5 left-2.5 z-20"
+              className="absolute top-2.5 left-2.5 z-20 shadow-md"
             />
           )}
 
@@ -339,27 +346,27 @@ export default function FilmCard({
             </div>
           )}
 
-          <div className="absolute top-2.5 right-2.5 transition-all duration-500 z-20 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0">
+          <div className="absolute top-2.5 right-2.5 transition-all duration-300 z-20 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0">
             <button
-              className="bg-brand hover:bg-white text-white hover:text-brand w-7 h-7 rounded-lg transition-all duration-300 active:scale-90 shadow-xl flex items-center justify-center border border-white/10"
+              className="bg-black/60 hover:bg-brand text-white w-8 h-8 rounded-lg transition-all duration-300 active:scale-90 shadow-xl flex items-center justify-center border border-white/20 backdrop-blur-md hover:scale-105"
               onClick={(e) => {
                 e.preventDefault();
                 if (onAction) onAction(film);
               }}
               aria-label={actionType === 'add' ? `Add ${formatFilmTitle(film.title)} to watchlist` : `Remove ${formatFilmTitle(film.title)} from watchlist`}
             >
-              <Icon icon={actionType === 'add' ? "solar:add-circle-linear" : "solar:close-circle-linear"} width="14" />
+              <Icon icon={actionType === 'add' ? "solar:add-circle-linear" : "solar:close-circle-linear"} width="16" />
             </button>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 p-3.5 z-20 bg-gradient-to-t from-black/95 via-black/40 to-transparent pt-10">
-            <h3 className="text-white text-xs font-bold leading-tight mb-1 line-clamp-2 group-hover:text-brand transition-colors" title={formatFilmTitle(film.title)}>
+          <div className="absolute inset-x-0 bottom-0 p-3.5 z-20 bg-gradient-to-t from-black/95 via-black/60 to-transparent pt-12">
+            <h3 className="text-white text-xs font-bold leading-tight mb-1 line-clamp-2 group-hover:text-brand transition-colors duration-200" title={formatFilmTitle(film.title)}>
               {formatFilmTitle(film.title)}
             </h3>
             <div className="flex items-center justify-between gap-2 mt-1">
               <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/70">
                 {flag && <span title={primaryCountry} className="text-[11px] leading-none">{flag}</span>}
-                <span className="text-brand/90 font-bold">{film.year || film.release_date?.split('-')[0] || 'N/A'}</span>
+                <span className="text-brand font-bold">{film.year || film.release_date?.split('-')[0] || 'N/A'}</span>
                 {film.genres && film.genres.length > 0 && (
                   <>
                     <span className="w-1 h-1 rounded-full bg-white/20" />
@@ -373,7 +380,7 @@ export default function FilmCard({
                   {activePlatforms.slice(0, 3).map(platform => (
                     <span
                       key={platform.id}
-                      className={`${platform.logo ? 'bg-white' : `${platform.color} bg-black/40`} backdrop-blur-sm w-5 h-5 rounded-full flex items-center justify-center border border-white/5 overflow-hidden`}
+                      className={`${platform.logo ? 'bg-white' : `${platform.color} bg-black/50`} backdrop-blur-sm w-5 h-5 rounded-full flex items-center justify-center border border-white/10 overflow-hidden shadow-sm transition-transform duration-300 group-hover:scale-105`}
                       title={platform.label}
                     >
                       {platform.logo
@@ -382,7 +389,7 @@ export default function FilmCard({
                     </span>
                   ))}
                   {activePlatforms.length > 3 && (
-                    <span className="text-[8px] font-black text-white bg-black/60 px-1 rounded-xl border border-white/10 shrink-0">
+                    <span className="text-[8px] font-black text-white bg-black/70 px-1 rounded-xl border border-white/15 shrink-0">
                       +{activePlatforms.length - 3}
                     </span>
                   )}
@@ -391,7 +398,8 @@ export default function FilmCard({
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left z-30" />
+          {/* Bottom dynamic glowing accent bar */}
+          <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand via-orange-500 to-amber-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-400 origin-left z-30" />
         </Link>
       )}
 
