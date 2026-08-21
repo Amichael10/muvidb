@@ -429,7 +429,7 @@ export async function createMetaAuthorizationUrl(req: VercelRequest, actor: Soci
 
   const { error } = await supabase.from('social_oauth_states').insert({
     state_hash: stateHash(state),
-    provider: 'meta',
+    provider: 'facebook',
     actor_user_id: actor.id,
     redirect_uri: redirectUri,
     expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
@@ -450,6 +450,20 @@ export async function completeMetaOAuth(req: VercelRequest): Promise<string> {
   const rawState = String(req.query.state || '').replace(/#_$/, '').replace(/#$/, '').trim();
   const state = verifyThreadsState(rawState);
   if (!code) throw httpError(400, 'Meta did not return an authorization code');
+
+  const { data: consumed, error: consumeError } = await supabase
+    .from('social_oauth_states')
+    .update({ used_at: new Date().toISOString() })
+    .eq('state_hash', stateHash(rawState))
+    .eq('provider', 'facebook')
+    .eq('actor_user_id', state.actorId)
+    .eq('redirect_uri', state.redirectUri)
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .select('state_hash')
+    .maybeSingle();
+  if (consumeError) throw consumeError;
+  if (!consumed) throw httpError(400, 'The Meta connection request has already been used or expired');
 
   const appId = process.env.META_APP_ID || process.env.THREAD_APP_ID;
   const appSecret = process.env.META_APP_SECRET || process.env.THREAD_APP_SECRET;
@@ -553,6 +567,20 @@ export async function completeTikTokOAuth(req: VercelRequest): Promise<string> {
   const rawState = String(req.query.state || '').replace(/#_$/, '').replace(/#$/, '').trim();
   const state = verifyThreadsState(rawState);
   if (!code) throw httpError(400, 'TikTok did not return an authorization code');
+
+  const { data: consumed, error: consumeError } = await supabase
+    .from('social_oauth_states')
+    .update({ used_at: new Date().toISOString() })
+    .eq('state_hash', stateHash(rawState))
+    .eq('provider', 'tiktok')
+    .eq('actor_user_id', state.actorId)
+    .eq('redirect_uri', state.redirectUri)
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .select('state_hash')
+    .maybeSingle();
+  if (consumeError) throw consumeError;
+  if (!consumed) throw httpError(400, 'The TikTok connection request has already been used or expired');
 
   const clientKey = process.env.TIKTOK_CLIENT_KEY;
   const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
