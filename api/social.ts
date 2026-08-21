@@ -146,6 +146,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const days = Number(req.query?.days || 30);
         return res.status(200).json(await getEditorialCalendar(days));
       }
+      if (task === 'slot_candidates') {
+        const seriesSlug = String(req.query?.seriesSlug || 'filmography');
+        const { fetchSeriesCandidates } = await import('./_lib/editorial/candidate_service.js');
+        return res.status(200).json(await fetchSeriesCandidates(seriesSlug, 20));
+      }
       const summary = await getSocialStudioSummary();
       const allConnections = await getAllPlatformConnections();
       return res.status(200).json({
@@ -155,6 +160,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (task === 'approve_slot') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { approveEditorialSlot } = await import('./_lib/social_studio.js');
+        return res.status(200).json(await approveEditorialSlot(req.body, actor));
+      }
+
       if (task === 'seed_calendar') {
         await requireSocialStudioAdmin(req);
         const days = Number(req.body?.days || 30);

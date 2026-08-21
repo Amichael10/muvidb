@@ -1228,7 +1228,128 @@ export async function getEditorialCalendar(days = 30) {
     .limit(days);
 
   if (error) throw error;
-  return data || [];
+  const slots = data || [];
+
+  // Group candidate fetches by series slug to pre-populate smart candidates
+  try {
+    const { fetchSeriesCandidates } = await import('./editorial/candidate_service.js');
+    const seriesSlugs = [...new Set(slots.map((s: any) => s.social_content_series?.slug).filter(Boolean))];
+    const candidatePools: Record<string, any[]> = {};
+
+    await Promise.all(
+      seriesSlugs.map(async (slug) => {
+        try {
+          candidatePools[slug] = await fetchSeriesCandidates(slug, 20);
+        } catch {
+          candidatePools[slug] = [];
+        }
+      })
+    );
+
+    const usageCount: Record<string, number> = {};
+
+    return slots.map((slot: any) => {
+      const slug = slot.social_content_series?.slug || 'filmography';
+      const pool = candidatePools[slug] || [];
+      const idx = usageCount[slug] || 0;
+      usageCount[slug] = (idx + 1) % Math.max(pool.length, 1);
+      const candidate = pool[idx] || null;
+
+      return {
+        ...slot,
+        candidate: candidate
+          ? {
+              id: candidate.id,
+              type: candidate.type,
+              name: candidate.name,
+              subtext: candidate.subtext,
+              imageUrl: candidate.imageUrl,
+              category: candidate.category,
+              completenessScore: candidate.completenessScore,
+              contentType: candidate.type === 'person' ? 'actor_spotlight' : 'upcoming_movie',
+              templateSlug: candidate.type === 'person' ? 'actor-spotlight-v1' : 'upcoming-movie-v1',
+            }
+          : null,
+      };
+    });
+  } catch (err) {
+    console.warn('Failed to attach candidates to calendar slots:', (err as Error)?.message);
+    return slots;
+  }
+}
+
+export async function approveEditorialSlot(
+  input: {
+    slotId: string;
+    candidateId: string;
+    candidateType: 'person' | 'movie';
+    contentType?: SocialContentType;
+    templateSlug?: string;
+    scheduledDate: string;
+    scheduledTime?: string;
+    platforms?: SocialPlatform[];
+    customCaptions?: Record<string, string>;
+  },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+
+  const contentType = input.contentType || (input.candidateType === 'person' ? 'actor_spotlight' : 'upcoming_movie');
+  const templateSlug = input.templateSlug || (input.candidateType === 'person' ? 'actor-spotlight-v1' : 'upcoming-movie-v1');
+  const platforms = input.platforms && input.platforms.length ? input.platforms : (['instagram', 'threads', 'facebook', 'tiktok'] as SocialPlatform[]);
+
+  // 1. Generate the draft
+  const draft = await generateSocialDraft(
+    {
+      contentType,
+      sourceEntityId: input.candidateId,
+      templateSlug,
+      platforms,
+    },
+    actor,
+  );
+
+  // 2. Compute scheduled time ISO string
+  const time = input.scheduledTime || '11:00:00';
+  const scheduledFor = new Date(`${input.scheduledDate}T${time}`).toISOString();
+
+  // 3. Update platform variants with custom captions if provided
+  if (input.customCaptions) {
+    for (const [platform, caption] of Object.entries(input.customCaptions)) {
+      await supabase
+        .from('social_platform_variants')
+        .update({ caption })
+        .eq('content_item_id', draft.contentItem.id)
+        .eq('platform', platform);
+    }
+  }
+
+  // 4. Schedule the draft
+  const scheduledItem = await scheduleContentItem(
+    draft.contentItem.id,
+    {
+      scheduledFor,
+      platformSettings: platforms.map(p => ({ platform: p, scheduledFor })),
+    },
+    actor,
+  );
+
+  // 5. Link to calendar slot
+  if (input.slotId) {
+    await supabase
+      .from('social_calendar')
+      .update({
+        status: 'scheduled',
+        notes: `Scheduled ${draft.contentItem.title} for ${input.scheduledDate}`,
+      })
+      .eq('id', input.slotId);
+  }
+
+  return {
+    success: true,
+    contentItem: scheduledItem,
+    draft,
+  };
 }
 
 export async function seedEditorialCalendarSlots(days = 30) {

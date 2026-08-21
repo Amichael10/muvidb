@@ -6,6 +6,7 @@ import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
 import { uploadAdminImage } from '../../lib/imageUpload';
 import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
+import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
 
 const STATUS_TONES = {
   draft: 'blue',
@@ -91,7 +92,8 @@ function Pill({ children, tone = 'brand' }) {
 
 export default function AdminSocialStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('composer'); // 'composer' | 'calendar' | 'drafts'
+  const [activeTab, setActiveTab] = useState('calendar'); // 'calendar' | 'drafts' | 'composer'
+  const [selectedSlotForReview, setSelectedSlotForReview] = useState(null);
   const [summary, setSummary] = useState(emptySummary);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -262,7 +264,7 @@ export default function AdminSocialStudio() {
         next.delete('tiktok');
         next.delete('message');
         return next;
-      }, { replace: true });
+      });
     }
   }, [searchParams, setSearchParams]);
 
@@ -271,278 +273,6 @@ export default function AdminSocialStudio() {
     fetchDrafts();
     fetchConnectionsStatus();
     fetchCalendar();
-  };
-
-  const connectThreads = async () => {
-    setConnections(current => ({ ...current, connecting: true }));
-    try {
-      const res = await fetch('/api/social?task=threads_oauth_start', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.authorizationUrl) throw new Error(data.error || 'Threads connection could not start');
-      window.location.assign(data.authorizationUrl);
-    } catch (error) {
-      toast.error(error.message || 'Threads connection could not start');
-      setConnections(current => ({ ...current, connecting: false }));
-    }
-  };
-
-  const connectMeta = async () => {
-    setConnections(current => ({ ...current, connecting: true }));
-    try {
-      const res = await fetch('/api/social?task=meta_oauth_start', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.authorizationUrl) throw new Error(data.error || 'Meta connection could not start');
-      window.location.assign(data.authorizationUrl);
-    } catch (error) {
-      toast.error(error.message || 'Meta connection could not start');
-      setConnections(current => ({ ...current, connecting: false }));
-    }
-  };
-
-  const connectTikTok = async () => {
-    setConnections(current => ({ ...current, connecting: true }));
-    try {
-      const res = await fetch('/api/social?task=tiktok_oauth_start', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.authorizationUrl) throw new Error(data.error || 'TikTok connection could not start');
-      window.location.assign(data.authorizationUrl);
-    } catch (error) {
-      toast.error(error.message || 'TikTok connection could not start');
-      setConnections(current => ({ ...current, connecting: false }));
-    }
-  };
-
-  const disconnectAccount = async (platform) => {
-    if (!window.confirm(`Disconnect the MuviDB ${platform} account? Scheduled posts for ${platform} will not publish until it is reconnected.`)) return;
-    setConnections(current => ({ ...current, connecting: true }));
-    try {
-      const res = await fetch('/api/social?task=disconnect_platform', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `${platform} could not be disconnected`);
-      toast.success(`${platform} account disconnected.`);
-      await fetchConnectionsStatus();
-    } catch (error) {
-      toast.error(error.message || `Failed to disconnect ${platform}`);
-    } finally {
-      setConnections(current => ({ ...current, connecting: false }));
-    }
-  };
-
-  const saveManualConnection = async (e) => {
-    e.preventDefault();
-    if (!manualConnectPlatform || !manualFormData.username || !manualFormData.accessToken) {
-      return toast.error('Username and Access Token are required');
-    }
-    setConnections(current => ({ ...current, connecting: true }));
-    try {
-      const res = await fetch('/api/social?task=save_connection', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          platform: manualConnectPlatform,
-          username: manualFormData.username,
-          displayName: manualFormData.displayName || manualFormData.username,
-          externalAccountId: manualFormData.externalAccountId || manualFormData.username,
-          accessToken: manualFormData.accessToken,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Failed to save connection');
-      toast.success(`${manualConnectPlatform} connected successfully!`);
-      setManualConnectPlatform(null);
-      setManualFormData({ username: '', displayName: '', externalAccountId: '', accessToken: '' });
-      await fetchConnectionsStatus();
-    } catch (err) {
-      toast.error(err.message || 'Failed to connect');
-    } finally {
-      setConnections(current => ({ ...current, connecting: false }));
-    }
-  };
-
-  const reviewActions = status => {
-    if (status === 'draft') return [{ action: 'submit', label: 'Submit for review', tone: 'brand' }];
-    if (status === 'ready_for_review') {
-      return [
-        { action: 'approve', label: 'Approve', tone: 'green' },
-        { action: 'reject', label: 'Reject', tone: 'red' },
-        { action: 'reopen', label: 'Back to draft', tone: 'plain' },
-      ];
-    }
-    if (status === 'rejected') return [{ action: 'reopen', label: 'Reopen', tone: 'plain' }];
-    if (status === 'approved') return [{ action: 'reopen', label: 'Undo approval', tone: 'plain' }];
-    return [];
-  };
-
-  const runReview = async (contentItemId, action) => {
-    let reason = null;
-    if (action === 'reject') {
-      reason = window.prompt('Why is this being rejected?');
-      if (reason === null) return;
-      if (!reason.trim()) return toast.error('A rejection reason is required');
-    }
-
-    setReviewingId(contentItemId);
-    try {
-      const res = await fetch('/api/social?task=review', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentItemId, action, reason }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success(`${data.from} → ${data.status}`);
-      refreshAll();
-    } catch (err) {
-      toast.error(err.message || 'Review action failed');
-    } finally {
-      setReviewingId(null);
-    }
-  };
-
-  const runSchedule = async (contentItemId, explicitDate) => {
-    const value = explicitDate || scheduleAt[contentItemId];
-    if (!value) return toast.error('Pick a date and time first');
-
-    setReviewingId(contentItemId);
-    try {
-      const res = await fetch('/api/social?task=schedule', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentItemId, scheduledFor: new Date(value).toISOString() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success(`Scheduled ${data.jobs} job(s): ${data.platforms?.join(', ')}`);
-      setScheduleAt(current => ({ ...current, [contentItemId]: '' }));
-      refreshAll();
-    } catch (err) {
-      toast.error(err.message || 'Scheduling failed');
-    } finally {
-      setReviewingId(null);
-    }
-  };
-
-  const runQuickSchedulePreset = (contentItemId, preset) => {
-    let target = new Date();
-    if (preset === 'today_6pm') {
-      target.setHours(18, 0, 0, 0);
-      if (target.getTime() < Date.now()) target.setDate(target.getDate() + 1);
-    } else if (preset === 'tomorrow_10am') {
-      target.setDate(target.getDate() + 1);
-      target.setHours(10, 0, 0, 0);
-    } else if (preset === 'tomorrow_6pm') {
-      target.setDate(target.getDate() + 1);
-      target.setHours(18, 0, 0, 0);
-    }
-    runSchedule(contentItemId, target.toISOString());
-  };
-
-  const runCancelSchedule = async contentItemId => {
-    setReviewingId(contentItemId);
-    try {
-      const res = await fetch('/api/social?task=cancel_schedule', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentItemId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success(
-        data.inFlight
-          ? `Cancelled ${data.cancelledJobs} job(s); ${data.inFlight} already publishing`
-          : `Cancelled ${data.cancelledJobs} job(s) — back to approved`,
-      );
-      refreshAll();
-    } catch (err) {
-      toast.error(err.message || 'Cancel failed');
-    } finally {
-      setReviewingId(null);
-    }
-  };
-
-  const handleCustomUploadOnItem = async (contentItemId, event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setUploadingAssetId(contentItemId);
-    try {
-      const uploadRes = await uploadAdminImage(file, 'film-images');
-      if (uploadRes.error) throw new Error(uploadRes.error);
-
-      const res = await fetch('/api/social?task=attach_custom_asset', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentItemId,
-          publicUrl: uploadRes.url,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-
-      toast.success('Custom artwork attached to this draft!');
-      refreshAll();
-    } catch (err) {
-      toast.error(err.message || 'Failed to attach custom design');
-    } finally {
-      setUploadingAssetId(null);
-    }
-  };
-
-  const runMockPublisher = async () => {
-    setPublishing(true);
-    try {
-      const res = await fetch('/api/social?task=publish_due', {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify({ limit: 10 }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      if (data.skipped) toast(`Publisher skipped: ${data.reason}`);
-      else toast.success(`${summary.publishMode === 'live' ? 'Live' : 'Mock'} publisher processed ${data.processed || 0} job(s)`);
-      refreshAll();
-    } catch (err) {
-      toast.error(err.message || 'Publisher run failed');
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const handleCreateDraftFromCalendarSlot = slot => {
-    const series = slot.social_content_series || {};
-    const dateObj = new Date(slot.scheduled_date);
-    const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'long' });
-
-    // Map series slug to editor theme ID
-    const matchedTheme =
-      EDITORIAL_THEMES.find(t => t.seriesSlug === series.slug) ||
-      EDITORIAL_THEMES.find(t => t.id === series.slug) ||
-      EDITORIAL_THEMES[0];
-
-    setSelectedThemeId(matchedTheme.id);
-    setSlotContext({
-      slotId: slot.id,
-      scheduledDate: slot.scheduled_date,
-      dayName,
-      seriesName: series.name || 'Editorial Slot',
-      seriesSlug: series.slug,
-    });
-    setActiveTab('composer');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    toast.success(`Activated ${matchedTheme.name} for ${slot.scheduled_date} (${dayName})!`);
   };
 
   const counts = summary.counts || emptySummary.counts;
@@ -557,33 +287,12 @@ export default function AdminSocialStudio() {
             <Pill tone={summary.enabled ? 'green' : 'amber'}>
               {summary.enabled ? 'Active' : 'Flag off'}
             </Pill>
-            <Pill tone={connections.platforms.instagram ? 'green' : 'amber'}>
-              <span className="flex items-center gap-1">
-                <Icon icon="simple-icons:instagram" width="11" />
-                {connections.platforms.instagram ? `@${connections.platforms.instagram.username}` : 'Instagram Offline'}
-              </span>
-            </Pill>
-            <Pill tone={connections.platforms.facebook ? 'green' : 'amber'}>
-              <span className="flex items-center gap-1">
-                <Icon icon="simple-icons:facebook" width="11" />
-                {connections.platforms.facebook ? `${connections.platforms.facebook.displayName || connections.platforms.facebook.username}` : 'Facebook Offline'}
-              </span>
-            </Pill>
-            <Pill tone={connections.platforms.threads ? 'green' : 'amber'}>
-              <span className="flex items-center gap-1">
-                <Icon icon="simple-icons:threads" width="11" />
-                {connections.platforms.threads ? `@${connections.platforms.threads.username}` : 'Threads Offline'}
-              </span>
-            </Pill>
-            <Pill tone={connections.platforms.tiktok ? 'green' : 'amber'}>
-              <span className="flex items-center gap-1">
-                <Icon icon="simple-icons:tiktok" width="11" />
-                {connections.platforms.tiktok ? `@${connections.platforms.tiktok.username}` : 'TikTok Offline'}
-              </span>
+            <Pill tone={Object.values(connections.platforms).some(Boolean) ? 'green' : 'amber'}>
+              {Object.values(connections.platforms).filter(Boolean).length}/4 Channels Connected
             </Pill>
           </div>
           <p className="mt-1 text-xs text-text-muted">
-            Editorial content machine: 30-day strategy, viral AI captions with actor tags, custom artwork replacement, and multi-channel publishing (Instagram, Facebook, Threads, TikTok).
+            30-day editorial pipeline: Auto-assigned Nollywood stars & movies, Figma graphic generation, and 1-click multi-platform scheduling (Instagram, Facebook, Threads, TikTok).
           </p>
         </div>
 
@@ -594,7 +303,7 @@ export default function AdminSocialStudio() {
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-bold text-text-primary hover:border-brand hover:text-brand"
           >
             <Icon icon="solar:share-circle-linear" width="14" />
-            Channels ({Object.values(connections.platforms).filter(Boolean).length}/4 Connected)
+            Channels ({Object.values(connections.platforms).filter(Boolean).length}/4)
           </button>
 
           <button
@@ -606,7 +315,25 @@ export default function AdminSocialStudio() {
           </button>
 
           <button
-            onClick={runMockPublisher}
+            onClick={async () => {
+              setPublishing(true);
+              try {
+                const res = await fetch('/api/social?task=publish_due', {
+                  method: 'POST',
+                  headers: await authHeaders(),
+                  body: JSON.stringify({ limit: 10 }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                if (data.skipped) toast(`Publisher skipped: ${data.reason}`);
+                else toast.success(`${summary.publishMode === 'live' ? 'Live' : 'Mock'} publisher processed ${data.processed || 0} job(s)`);
+                refreshAll();
+              } catch (err) {
+                toast.error(err.message || 'Publisher run failed');
+              } finally {
+                setPublishing(false);
+              }
+            }}
             disabled={publishing || !summary.enabled}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-xs font-bold text-white hover:bg-brand-hover"
           >
@@ -618,29 +345,16 @@ export default function AdminSocialStudio() {
 
       {/* Overview Metrics */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <Metric label="Content Items" value={counts.contentItems} icon="solar:posts-carousel-vertical-linear" />
+        <Metric label="30-Day Plan Slots" value={calendarSlots.length} icon="solar:calendar-date-linear" tone="brand" />
         <Metric label="Active Drafts" value={counts.draftItems} icon="solar:document-add-linear" tone="blue" />
         <Metric label="Scheduled" value={counts.scheduledItems} icon="solar:calendar-mark-linear" tone="amber" />
         <Metric label="Queued Jobs" value={counts.queuedJobs} icon="solar:server-square-linear" tone="green" />
+        <Metric label="Total Content" value={counts.contentItems} icon="solar:posts-carousel-vertical-linear" tone="blue" />
         <Metric label="Failed Jobs" value={counts.failedJobs} icon="solar:danger-triangle-linear" tone={counts.failedJobs ? 'red' : 'green'} />
-        <Metric label="30-Day Plan Slots" value={calendarSlots.length} icon="solar:calendar-date-linear" tone="brand" />
       </div>
 
       {/* Main Tab Navigation */}
       <div className="flex border-b border-border">
-        <button
-          type="button"
-          onClick={() => setActiveTab('composer')}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
-            activeTab === 'composer'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-text-muted hover:text-text-primary'
-          }`}
-        >
-          <Icon icon="solar:magic-stick-3-linear" width="16" />
-          Draft Composer & Generator
-        </button>
-
         <button
           type="button"
           onClick={() => setActiveTab('calendar')}
@@ -651,7 +365,7 @@ export default function AdminSocialStudio() {
           }`}
         >
           <Icon icon="solar:calendar-mark-linear" width="16" />
-          30-Day Editorial Calendar ({calendarSlots.length} Days)
+          30-Day Auto-Pilot Plan ({calendarSlots.length} Days)
         </button>
 
         <button
@@ -664,31 +378,33 @@ export default function AdminSocialStudio() {
           }`}
         >
           <Icon icon="solar:posts-carousel-vertical-linear" width="16" />
-          Queue & Recent Drafts ({drafts.length})
+          Queue & Scheduled Posts ({drafts.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('composer')}
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+            activeTab === 'composer'
+              ? 'border-brand text-brand'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Icon icon="solar:magic-stick-3-linear" width="16" />
+          Ad-Hoc Custom Composer
         </button>
       </div>
 
-      {/* TAB 1: Composer & Generator */}
-      {activeTab === 'composer' && (
-        <SocialDraftComposer
-          disabled={!summary.enabled}
-          selectedThemeId={selectedThemeId}
-          slotContext={slotContext}
-          onClearSlot={() => setSlotContext(null)}
-          onGenerated={refreshAll}
-        />
-      )}
-
-      {/* TAB 2: 30-Day Editorial Plan */}
+      {/* TAB 1: 30-Day Auto-Pilot Editorial Plan */}
       {activeTab === 'calendar' && (
         <div className="space-y-4">
           <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
-                30-Day Rolling Editorial Content Calendar
+                30-Day Auto-Pilot Editorial Plan
               </h2>
               <p className="mt-1 text-xs text-text-muted">
-                Structured into 7 high-engagement weekday series. Click "Generate Draft" on any day to create, customize, and schedule it.
+                Each day is pre-matched with high-quality Nollywood candidates. Click <strong>"Review & Schedule"</strong> to approve in 1 click or shuffle candidates.
               </p>
             </div>
             <button
@@ -705,21 +421,12 @@ export default function AdminSocialStudio() {
           {loadingCalendar ? (
             <div className="rounded-lg border border-border bg-surface p-12 text-center">
               <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="28" />
-              <p className="mt-2 text-sm text-text-muted">Loading editorial calendar…</p>
+              <p className="mt-2 text-sm text-text-muted">Loading auto-pilot calendar & candidates…</p>
             </div>
           ) : calendarSlots.length === 0 ? (
             <div className="rounded-lg border border-border bg-surface p-8 text-center">
               <Icon icon="solar:calendar-mark-linear" className="mx-auto text-text-muted" width="32" />
               <p className="mt-2 text-sm font-bold text-text-primary">No calendar slots found</p>
-              <p className="mt-1 text-xs text-text-muted">Click the button below to generate a 30-day schedule automatically.</p>
-              <button
-                type="button"
-                onClick={seedCalendar}
-                disabled={seedingCalendar}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white"
-              >
-                Generate 30 Days Now
-              </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -729,47 +436,96 @@ export default function AdminSocialStudio() {
                 const monthDay = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                 const series = slot.social_content_series || {};
                 const icon = SERIES_ICONS[series.slug] || 'solar:posts-carousel-vertical-linear';
+                const candidate = slot.candidate;
+                const isScheduled = slot.status === 'scheduled';
+                const isPublished = slot.status === 'published';
 
                 return (
                   <div
                     key={slot.id}
-                    className="flex flex-col justify-between rounded-lg border border-border bg-surface p-4 transition-all hover:border-brand/50 hover:shadow-sm"
+                    className={`group flex flex-col justify-between rounded-xl border p-4 transition-all ${
+                      isPublished
+                        ? 'border-green-500/30 bg-surface shadow-sm'
+                        : isScheduled
+                          ? 'border-amber-500/30 bg-surface shadow-sm'
+                          : 'border-border bg-surface hover:border-brand/60 hover:shadow-md'
+                    }`}
                   >
                     <div>
+                      {/* Header: Date + Status */}
                       <div className="flex items-center justify-between">
-                        <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold text-text-primary">
-                          {dayName}, {monthDay}
-                        </span>
-                        <Pill tone={slot.status === 'published' ? 'green' : slot.status === 'scheduled' ? 'amber' : 'blue'}>
-                          {slot.status || 'planned'}
+                        <div className="flex items-center gap-1.5">
+                          <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold text-text-primary">
+                            {dayName}, {monthDay}
+                          </span>
+                          {slot.scheduled_time && (
+                            <span className="font-mono text-[10px] text-text-muted">
+                              {slot.scheduled_time.slice(0, 5)}
+                            </span>
+                          )}
+                        </div>
+                        <Pill tone={isPublished ? 'green' : isScheduled ? 'amber' : 'blue'}>
+                          {isPublished ? 'Published' : isScheduled ? 'Scheduled' : 'Ready'}
                         </Pill>
                       </div>
 
-                      <div className="mt-3 flex items-start gap-2.5">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
-                          <Icon icon={icon} width="18" />
+                      {/* Series Badge */}
+                      <div className="mt-2.5 flex items-center gap-1.5 text-brand">
+                        <Icon icon={icon} width="14" />
+                        <span className="text-[11px] font-black uppercase tracking-wider truncate">
+                          {series.name || 'Editorial Series'}
+                        </span>
+                      </div>
+
+                      {/* Auto-Assigned Candidate Preview Box */}
+                      <div className="mt-2.5 flex items-center gap-3 rounded-lg border border-border/80 bg-surface-2/60 p-2.5">
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-surface">
+                          {candidate?.imageUrl ? (
+                            <img src={candidate.imageUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-text-muted">
+                              <Icon icon="solar:user-star-linear" width="22" />
+                            </div>
+                          )}
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-black text-text-primary truncate">{series.name || 'Editorial Slot'}</h4>
-                          <p className="mt-0.5 text-[10px] text-text-muted line-clamp-2">
-                            {series.description || 'Curated Nollywood editorial post.'}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1">
+                            <span className="truncate text-xs font-black text-text-primary">
+                              {candidate?.name || 'Curated Nollywood Star'}
+                            </span>
+                          </div>
+                          <p className="truncate text-[10px] text-text-muted">
+                            {candidate?.subtext || series.description || 'Ready for review'}
                           </p>
                         </div>
                       </div>
                     </div>
 
+                    {/* Action Footer */}
                     <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
                       <span className="text-[9px] font-black uppercase tracking-wider text-text-muted">
                         {series.category || 'Editorial'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCreateDraftFromCalendarSlot(slot)}
-                        className="inline-flex items-center gap-1.5 rounded bg-brand px-2.5 py-1 text-xs font-bold text-white hover:bg-brand-hover transition-colors shadow-sm"
-                      >
-                        <Icon icon="solar:magic-stick-3-linear" width="13" />
-                        Create Draft
-                      </button>
+                      {isScheduled || isPublished ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSlotForReview(slot)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-green-400 hover:text-green-300"
+                        >
+                          <Icon icon="solar:check-circle-bold" width="13" />
+                          {isPublished ? 'View Post' : 'Scheduled'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSlotForReview(slot)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-brand-hover hover:shadow-brand/20 active:scale-95"
+                        >
+                          <Icon icon="solar:bolt-bold" width="13" />
+                          Review & Schedule
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -779,7 +535,7 @@ export default function AdminSocialStudio() {
         </div>
       )}
 
-      {/* TAB 3: Queue & Drafts List */}
+      {/* TAB 2: Queue & Drafts List */}
       {activeTab === 'drafts' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -797,7 +553,7 @@ export default function AdminSocialStudio() {
 
           {drafts.length === 0 ? (
             <div className="rounded-lg border border-border bg-surface p-8 text-center">
-              <p className="text-sm text-text-muted">No content items yet. Generate one in the Draft Composer tab.</p>
+              <p className="text-sm text-text-muted">No content items yet. Approve one in the 30-Day Plan tab or create one in Composer.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -807,7 +563,6 @@ export default function AdminSocialStudio() {
                   className="rounded-lg border border-border bg-surface p-5 transition-shadow hover:shadow-sm"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    {/* Visual Art / Poster Preview */}
                     <div className="flex shrink-0 items-start gap-4">
                       {item.social_assets && item.social_assets.length > 0 ? (
                         <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
@@ -821,44 +576,64 @@ export default function AdminSocialStudio() {
                           </span>
                         </div>
                       ) : (
-                        <div className="flex h-28 w-28 shrink-0 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-surface-2 text-center p-2">
-                          <Icon icon="solar:gallery-linear" className="text-text-muted" width="24" />
-                          <span className="mt-1 text-[9px] text-text-muted">No artwork</span>
+                        <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-surface-2 text-text-muted">
+                          <Icon icon="solar:gallery-linear" width="28" />
                         </div>
                       )}
 
-                      <div className="min-w-0">
+                      <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-black text-text-primary">{item.title}</h3>
-                          <Pill tone={STATUS_TONES[item.status] || 'brand'}>{item.status}</Pill>
+                          <h3 className="font-bold text-text-primary">{item.title}</h3>
+                          <Pill tone={STATUS_TONES[item.status] || 'blue'}>{item.status}</Pill>
+                          <span className="text-xs text-text-muted">
+                            Type: <strong className="text-text-primary">{item.content_type}</strong>
+                          </span>
                         </div>
                         <p className="mt-1 text-xs text-text-muted">
-                          {item.content_type} • Created {new Date(item.created_at).toLocaleString()}
+                          Created {new Date(item.created_at).toLocaleString()}
                         </p>
 
-                        {/* Replace Design with Custom Artwork */}
-                        <div className="mt-3">
+                        {/* Replace Graphic Asset Button */}
+                        <div className="mt-3 flex items-center gap-2">
                           <input
                             type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            ref={el => {
-                              fileInputRefs.current[item.id] = el;
+                            accept="image/*"
+                            ref={el => (fileInputRefs.current[item.id] = el)}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingAssetId(item.id);
+                              try {
+                                const { publicUrl } = await uploadAdminImage(file, 'social');
+                                const res = await fetch('/api/social?task=attach_custom_asset', {
+                                  method: 'POST',
+                                  headers: await authHeaders(),
+                                  body: JSON.stringify({
+                                    contentItemId: item.id,
+                                    publicUrl,
+                                    format: 'custom_design',
+                                  }),
+                                });
+                                const data = await res.json().catch(() => ({}));
+                                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                                toast.success('Custom artwork uploaded & attached!');
+                                fetchDrafts();
+                              } catch (err) {
+                                toast.error(err.message || 'Failed to upload custom asset');
+                              } finally {
+                                setUploadingAssetId(null);
+                              }
                             }}
-                            onChange={e => handleCustomUploadOnItem(item.id, e)}
                             className="hidden"
                           />
                           <button
                             type="button"
                             onClick={() => fileInputRefs.current[item.id]?.click()}
                             disabled={uploadingAssetId === item.id}
-                            className="inline-flex items-center gap-1.5 rounded border border-border bg-surface-2 px-2.5 py-1 text-xs font-bold text-text-primary transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 rounded border border-border bg-surface px-2.5 py-1 text-xs font-bold text-text-primary hover:border-brand hover:text-brand disabled:opacity-50"
                           >
-                            <Icon
-                              icon={uploadingAssetId === item.id ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'}
-                              className={uploadingAssetId === item.id ? 'animate-spin' : ''}
-                              width="13"
-                            />
-                            {uploadingAssetId === item.id ? 'Uploading...' : 'Replace Artwork (Canva/Poster)'}
+                            <Icon icon={uploadingAssetId === item.id ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'} className={uploadingAssetId === item.id ? 'animate-spin' : ''} width="13" />
+                            {uploadingAssetId === item.id ? 'Uploading…' : '🖼️ Replace Graphic'}
                           </button>
                         </div>
                       </div>
@@ -1360,6 +1135,19 @@ export default function AdminSocialStudio() {
           </div>
         </div>
       )}
+
+      {/* Auto-Pilot 1-Click Review & Approve Modal */}
+      <AutoPilotReviewModal
+        isOpen={!!selectedSlotForReview}
+        slot={selectedSlotForReview}
+        onClose={() => setSelectedSlotForReview(null)}
+        onApproved={refreshAll}
+        onOpenManualComposer={(ctx) => {
+          setSlotContext(ctx);
+          setSelectedThemeId(ctx.seriesSlug || 'actor_spotlight');
+          setActiveTab('composer');
+        }}
+      />
     </div>
   );
 }
