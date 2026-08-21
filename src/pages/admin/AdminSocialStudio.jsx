@@ -98,7 +98,20 @@ export default function AdminSocialStudio() {
   const [drafts, setDrafts] = useState([]);
   const [reviewingId, setReviewingId] = useState(null);
   const [scheduleAt, setScheduleAt] = useState({});
-  const [threads, setThreads] = useState({ loading: true, connecting: false, configuration: null, connection: null });
+  const [connections, setConnections] = useState({
+    loading: true,
+    connecting: false,
+    configuration: null,
+    platforms: {
+      threads: null,
+      instagram: null,
+      facebook: null,
+      tiktok: null,
+    },
+  });
+  const [channelsModalOpen, setChannelsModalOpen] = useState(false);
+  const [manualConnectPlatform, setManualConnectPlatform] = useState(null);
+  const [manualFormData, setManualFormData] = useState({ username: '', displayName: '', externalAccountId: '', accessToken: '' });
 
   // 30-Day Calendar State
   const [calendarSlots, setCalendarSlots] = useState([]);
@@ -113,16 +126,26 @@ export default function AdminSocialStudio() {
   const fileInputRefs = useRef({});
   const [uploadingAssetId, setUploadingAssetId] = useState(null);
 
-  const fetchThreadsStatus = async () => {
-    setThreads(current => ({ ...current, loading: true }));
+  const fetchConnectionsStatus = async () => {
+    setConnections(current => ({ ...current, loading: true }));
     try {
-      const res = await fetch('/api/social?task=threads_status', { headers: await authHeaders() });
+      const res = await fetch('/api/social?task=connections_status', { headers: await authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setThreads(current => ({ ...current, loading: false, configuration: data.configuration, connection: data.connection }));
+      setConnections(current => ({
+        ...current,
+        loading: false,
+        configuration: data.configuration,
+        platforms: {
+          threads: data.connections?.threads || data.connection || null,
+          instagram: data.connections?.instagram || null,
+          facebook: data.connections?.facebook || null,
+          tiktok: data.connections?.tiktok || null,
+        },
+      }));
     } catch (error) {
-      setThreads(current => ({ ...current, loading: false }));
-      console.warn('Failed to load Threads connection status:', error.message);
+      setConnections(current => ({ ...current, loading: false }));
+      console.warn('Failed to load social connections status:', error.message);
     }
   };
 
@@ -200,7 +223,7 @@ export default function AdminSocialStudio() {
   useEffect(() => {
     fetchSummary();
     fetchDrafts();
-    fetchThreadsStatus();
+    fetchConnectionsStatus();
     fetchCalendar();
   }, []);
 
@@ -209,7 +232,7 @@ export default function AdminSocialStudio() {
     if (!result) return;
     if (result === 'connected') {
       toast.success('Threads is connected and ready for publishing.');
-      fetchThreadsStatus();
+      fetchConnectionsStatus();
     } else {
       toast.error(searchParams.get('message') || 'Threads could not be connected. Please try again.');
     }
@@ -224,12 +247,12 @@ export default function AdminSocialStudio() {
   const refreshAll = () => {
     fetchSummary();
     fetchDrafts();
-    fetchThreadsStatus();
+    fetchConnectionsStatus();
     fetchCalendar();
   };
 
   const connectThreads = async () => {
-    setThreads(current => ({ ...current, connecting: true }));
+    setConnections(current => ({ ...current, connecting: true }));
     try {
       const res = await fetch('/api/social?task=threads_oauth_start', {
         method: 'POST',
@@ -240,26 +263,58 @@ export default function AdminSocialStudio() {
       window.location.assign(data.authorizationUrl);
     } catch (error) {
       toast.error(error.message || 'Threads connection could not start');
-      setThreads(current => ({ ...current, connecting: false }));
+      setConnections(current => ({ ...current, connecting: false }));
     }
   };
 
-  const disconnectThreadsAccount = async () => {
-    if (!window.confirm('Disconnect the MuviDB Threads account? Scheduled Threads posts will not publish until it is reconnected.')) return;
-    setThreads(current => ({ ...current, connecting: true }));
+  const disconnectAccount = async (platform) => {
+    if (!window.confirm(`Disconnect the MuviDB ${platform} account? Scheduled posts for ${platform} will not publish until it is reconnected.`)) return;
+    setConnections(current => ({ ...current, connecting: true }));
     try {
-      const res = await fetch('/api/social?task=threads_disconnect', {
+      const res = await fetch('/api/social?task=disconnect_platform', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Threads could not be disconnected');
-      toast.success('Threads account disconnected.');
-      await fetchThreadsStatus();
+      if (!res.ok) throw new Error(data.error || `${platform} could not be disconnected`);
+      toast.success(`${platform} account disconnected.`);
+      await fetchConnectionsStatus();
     } catch (error) {
-      toast.error(error.message || 'Threads could not be disconnected');
+      toast.error(error.message || `Failed to disconnect ${platform}`);
     } finally {
-      setThreads(current => ({ ...current, connecting: false }));
+      setConnections(current => ({ ...current, connecting: false }));
+    }
+  };
+
+  const saveManualConnection = async (e) => {
+    e.preventDefault();
+    if (!manualConnectPlatform || !manualFormData.username || !manualFormData.accessToken) {
+      return toast.error('Username and Access Token are required');
+    }
+    setConnections(current => ({ ...current, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=save_connection', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: manualConnectPlatform,
+          username: manualFormData.username,
+          displayName: manualFormData.displayName || manualFormData.username,
+          externalAccountId: manualFormData.externalAccountId || manualFormData.username,
+          accessToken: manualFormData.accessToken,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to save connection');
+      toast.success(`${manualConnectPlatform} connected successfully!`);
+      setManualConnectPlatform(null);
+      setManualFormData({ username: '', displayName: '', externalAccountId: '', accessToken: '' });
+      await fetchConnectionsStatus();
+    } catch (err) {
+      toast.error(err.message || 'Failed to connect');
+    } finally {
+      setConnections(current => ({ ...current, connecting: false }));
     }
   };
 
@@ -448,35 +503,45 @@ export default function AdminSocialStudio() {
             <Pill tone={summary.enabled ? 'green' : 'amber'}>
               {summary.enabled ? 'Active' : 'Flag off'}
             </Pill>
-            <Pill tone={threads.connection ? 'green' : 'amber'}>
-              {threads.connection ? `@${threads.connection.username}` : 'Threads Offline'}
+            <Pill tone={connections.platforms.instagram ? 'green' : 'amber'}>
+              <span className="flex items-center gap-1">
+                <Icon icon="simple-icons:instagram" width="11" />
+                {connections.platforms.instagram ? `@${connections.platforms.instagram.username}` : 'Instagram Offline'}
+              </span>
+            </Pill>
+            <Pill tone={connections.platforms.facebook ? 'green' : 'amber'}>
+              <span className="flex items-center gap-1">
+                <Icon icon="simple-icons:facebook" width="11" />
+                {connections.platforms.facebook ? `${connections.platforms.facebook.displayName || connections.platforms.facebook.username}` : 'Facebook Offline'}
+              </span>
+            </Pill>
+            <Pill tone={connections.platforms.threads ? 'green' : 'amber'}>
+              <span className="flex items-center gap-1">
+                <Icon icon="simple-icons:threads" width="11" />
+                {connections.platforms.threads ? `@${connections.platforms.threads.username}` : 'Threads Offline'}
+              </span>
+            </Pill>
+            <Pill tone={connections.platforms.tiktok ? 'green' : 'amber'}>
+              <span className="flex items-center gap-1">
+                <Icon icon="simple-icons:tiktok" width="11" />
+                {connections.platforms.tiktok ? `@${connections.platforms.tiktok.username}` : 'TikTok Offline'}
+              </span>
             </Pill>
           </div>
           <p className="mt-1 text-xs text-text-muted">
-            Editorial content machine: 30-day strategy, viral AI captions with actor tags, custom artwork replacement, and Meta publishing.
+            Editorial content machine: 30-day strategy, viral AI captions with actor tags, custom artwork replacement, and multi-channel publishing (Instagram, Facebook, Threads, TikTok).
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {threads.connection ? (
-            <button
-              type="button"
-              onClick={disconnectThreadsAccount}
-              disabled={threads.connecting}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-bold text-text-muted hover:text-red-500"
-            >
-              <Icon icon="simple-icons:threads" width="14" /> Disconnect
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={connectThreads}
-              disabled={threads.connecting || threads.loading}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-text-primary px-3 text-xs font-bold text-background hover:opacity-90"
-            >
-              <Icon icon="simple-icons:threads" width="14" /> Connect Threads
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setChannelsModalOpen(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-bold text-text-primary hover:border-brand hover:text-brand"
+          >
+            <Icon icon="solar:share-circle-linear" width="14" />
+            Channels ({Object.values(connections.platforms).filter(Boolean).length}/4 Connected)
+          </button>
 
           <button
             onClick={refreshAll}
@@ -852,6 +917,356 @@ export default function AdminSocialStudio() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Social Channels & Platform Connections Modal */}
+      {channelsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div>
+                <h3 className="text-lg font-black tracking-tight text-text-primary">Connected Social Channels</h3>
+                <p className="text-xs text-text-muted">Manage active publishing accounts across Instagram, Facebook, Threads, and TikTok.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setChannelsModalOpen(false);
+                  setManualConnectPlatform(null);
+                }}
+                className="rounded-lg p-1.5 text-text-muted hover:bg-surface-2 hover:text-text-primary"
+              >
+                <Icon icon="solar:close-circle-linear" width="20" />
+              </button>
+            </div>
+
+            {/* Platform Grid */}
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Instagram */}
+              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#E1306C]/10 text-[#E1306C]">
+                        <Icon icon="simple-icons:instagram" width="18" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-text-primary">Instagram</h4>
+                        <p className="text-[11px] text-text-muted">Feed, Carousels & Reels</p>
+                      </div>
+                    </div>
+                    <Pill tone={connections.platforms.instagram ? 'green' : 'amber'}>
+                      {connections.platforms.instagram ? 'Connected' : 'Offline'}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Handle:</span>
+                      <span className="font-mono font-bold text-text-primary">
+                        {connections.platforms.instagram ? `@${connections.platforms.instagram.username}` : 'Not connected'}
+                      </span>
+                    </div>
+                    {connections.platforms.instagram?.tokenExpiresAt && (
+                      <div className="flex justify-between text-text-muted text-[11px]">
+                        <span>Expires:</span>
+                        <span>{new Date(connections.platforms.instagram.tokenExpiresAt).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                  {connections.platforms.instagram ? (
+                    <button
+                      type="button"
+                      onClick={() => disconnectAccount('instagram')}
+                      disabled={connections.connecting}
+                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualConnectPlatform('instagram');
+                      setManualFormData({
+                        username: connections.platforms.instagram?.username || 'muvidb',
+                        displayName: connections.platforms.instagram?.displayName || 'MuviDB Instagram',
+                        externalAccountId: connections.platforms.instagram?.externalAccountId || 'muvidb_ig_id',
+                        accessToken: '',
+                      });
+                    }}
+                    className="ml-auto rounded bg-brand px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-hover"
+                  >
+                    {connections.platforms.instagram ? 'Update Token' : 'Connect Instagram'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Facebook */}
+              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1877F2]/10 text-[#1877F2]">
+                        <Icon icon="simple-icons:facebook" width="18" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-text-primary">Facebook</h4>
+                        <p className="text-[11px] text-text-muted">Pages & Community Feed</p>
+                      </div>
+                    </div>
+                    <Pill tone={connections.platforms.facebook ? 'green' : 'amber'}>
+                      {connections.platforms.facebook ? 'Connected' : 'Offline'}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Page:</span>
+                      <span className="font-mono font-bold text-text-primary">
+                        {connections.platforms.facebook ? (connections.platforms.facebook.displayName || connections.platforms.facebook.username) : 'Not connected'}
+                      </span>
+                    </div>
+                    {connections.platforms.facebook?.tokenExpiresAt && (
+                      <div className="flex justify-between text-text-muted text-[11px]">
+                        <span>Expires:</span>
+                        <span>{new Date(connections.platforms.facebook.tokenExpiresAt).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                  {connections.platforms.facebook ? (
+                    <button
+                      type="button"
+                      onClick={() => disconnectAccount('facebook')}
+                      disabled={connections.connecting}
+                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualConnectPlatform('facebook');
+                      setManualFormData({
+                        username: connections.platforms.facebook?.username || 'muvidb',
+                        displayName: connections.platforms.facebook?.displayName || 'MuviDB Page',
+                        externalAccountId: connections.platforms.facebook?.externalAccountId || 'muvidb_fb_page_id',
+                        accessToken: '',
+                      });
+                    }}
+                    className="ml-auto rounded bg-brand px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-hover"
+                  >
+                    {connections.platforms.facebook ? 'Update Token' : 'Connect Facebook'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Threads */}
+              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-text-primary/10 text-text-primary">
+                        <Icon icon="simple-icons:threads" width="18" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-text-primary">Threads</h4>
+                        <p className="text-[11px] text-text-muted">Meta Threads API</p>
+                      </div>
+                    </div>
+                    <Pill tone={connections.platforms.threads ? 'green' : 'amber'}>
+                      {connections.platforms.threads ? 'Connected' : 'Offline'}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Account:</span>
+                      <span className="font-mono font-bold text-text-primary">
+                        {connections.platforms.threads ? `@${connections.platforms.threads.username}` : 'Not connected'}
+                      </span>
+                    </div>
+                    {connections.platforms.threads?.tokenExpiresAt && (
+                      <div className="flex justify-between text-text-muted text-[11px]">
+                        <span>Expires:</span>
+                        <span>{new Date(connections.platforms.threads.tokenExpiresAt).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                  {connections.platforms.threads ? (
+                    <button
+                      type="button"
+                      onClick={() => disconnectAccount('threads')}
+                      disabled={connections.connecting}
+                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={connectThreads}
+                    disabled={connections.connecting}
+                    className="ml-auto rounded bg-text-primary px-3 py-1.5 text-xs font-bold text-background hover:opacity-90 disabled:opacity-50"
+                  >
+                    <span className="flex items-center gap-1">
+                      <Icon icon="simple-icons:threads" width="12" />
+                      {connections.platforms.threads ? 'Reconnect OAuth' : 'Connect via Meta OAuth'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* TikTok */}
+              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black text-[#25F4EE] border border-border">
+                        <Icon icon="simple-icons:tiktok" width="18" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-text-primary">TikTok</h4>
+                        <p className="text-[11px] text-text-muted">Vertical Shorts & Clips</p>
+                      </div>
+                    </div>
+                    <Pill tone={connections.platforms.tiktok ? 'green' : 'amber'}>
+                      {connections.platforms.tiktok ? 'Connected' : 'Offline'}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Account:</span>
+                      <span className="font-mono font-bold text-text-primary">
+                        {connections.platforms.tiktok ? `@${connections.platforms.tiktok.username}` : 'Not connected'}
+                      </span>
+                    </div>
+                    {connections.platforms.tiktok?.tokenExpiresAt && (
+                      <div className="flex justify-between text-text-muted text-[11px]">
+                        <span>Expires:</span>
+                        <span>{new Date(connections.platforms.tiktok.tokenExpiresAt).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                  {connections.platforms.tiktok ? (
+                    <button
+                      type="button"
+                      onClick={() => disconnectAccount('tiktok')}
+                      disabled={connections.connecting}
+                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualConnectPlatform('tiktok');
+                      setManualFormData({
+                        username: connections.platforms.tiktok?.username || 'muvidb',
+                        displayName: connections.platforms.tiktok?.displayName || 'MuviDB TikTok',
+                        externalAccountId: connections.platforms.tiktok?.externalAccountId || 'muvidb_tiktok_id',
+                        accessToken: '',
+                      });
+                    }}
+                    className="ml-auto rounded bg-brand px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-hover"
+                  >
+                    {connections.platforms.tiktok ? 'Update Token' : 'Connect TikTok'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Manual / Direct Token Connection Form */}
+            {manualConnectPlatform && (
+              <form onSubmit={saveManualConnection} className="mt-6 rounded-lg border border-brand/30 bg-surface-2 p-5">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                  <h4 className="text-sm font-bold text-brand uppercase tracking-wider">
+                    Connect {manualConnectPlatform.toUpperCase()}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setManualConnectPlatform(null)}
+                    className="text-xs text-text-muted hover:text-text-primary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-muted uppercase">Handle / Username</label>
+                    <input
+                      type="text"
+                      required
+                      value={manualFormData.username}
+                      onChange={e => setManualFormData(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="@muvidb"
+                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-text-muted uppercase">Display Name</label>
+                    <input
+                      type="text"
+                      value={manualFormData.displayName}
+                      onChange={e => setManualFormData(prev => ({ ...prev, displayName: e.target.value }))}
+                      placeholder="MuviDB Official"
+                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-text-muted uppercase">Access Token / API Key</label>
+                    <input
+                      type="password"
+                      required
+                      value={manualFormData.accessToken}
+                      onChange={e => setManualFormData(prev => ({ ...prev, accessToken: e.target.value }))}
+                      placeholder="Paste permanent or long-lived API Access Token"
+                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand font-mono"
+                    />
+                    <p className="mt-1 text-[10px] text-text-muted">
+                      Tokens are encrypted with AES-256-GCM before storage in database.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setManualConnectPlatform(null)}
+                    className="rounded border border-border px-3 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={connections.connecting}
+                    className="rounded bg-brand px-4 py-1.5 text-xs font-bold text-white hover:bg-brand-hover disabled:opacity-50"
+                  >
+                    {connections.connecting ? 'Saving…' : `Save ${manualConnectPlatform} Connection`}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       )}
     </div>

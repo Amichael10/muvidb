@@ -341,3 +341,69 @@ export function sanitizeThreadsConnection(connection: any) {
   };
 }
 
+export async function getAllPlatformConnections() {
+  const { data, error } = await supabase
+    .from('social_connections')
+    .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at')
+    .eq('status', 'connected')
+    .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+
+  const platforms = ['instagram', 'facebook', 'threads', 'tiktok'] as const;
+  const result: Record<string, any> = {};
+
+  for (const p of platforms) {
+    const conn = data?.find(row => row.platform === p);
+    result[p] = conn ? sanitizeThreadsConnection(conn) : null;
+  }
+
+  return result;
+}
+
+export async function disconnectPlatform(platform: string) {
+  const { error } = await supabase
+    .from('social_connections')
+    .update({ status: 'revoked', token_ciphertext: null, token_iv: null, token_auth_tag: null })
+    .eq('platform', platform)
+    .eq('status', 'connected');
+  if (error) throw error;
+  return { disconnected: true, platform };
+}
+
+export async function savePlatformConnection(input: {
+  platform: string;
+  displayName: string;
+  username: string;
+  externalAccountId: string;
+  accessToken: string;
+  profileImageUrl?: string;
+  tokenExpiresAt?: string;
+  grantedScopes?: string[];
+  actorId?: string;
+}) {
+  const encrypted = encryptThreadsToken({ accessToken: input.accessToken });
+  const record = {
+    platform: input.platform,
+    display_name: input.displayName,
+    username: input.username,
+    external_account_id: input.externalAccountId,
+    profile_image_url: input.profileImageUrl || null,
+    status: 'connected',
+    granted_scopes: input.grantedScopes || [],
+    token_expires_at: input.tokenExpiresAt || null,
+    last_verified_at: new Date().toISOString(),
+    created_by: input.actorId || null,
+    ...encrypted,
+  };
+
+  const { data, error } = await supabase
+    .from('social_connections')
+    .upsert(record, { onConflict: 'platform,external_account_id' })
+    .select('id,platform,display_name,username,status,token_expires_at,last_verified_at')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+

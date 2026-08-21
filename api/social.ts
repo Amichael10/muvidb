@@ -96,22 +96,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       getThreadsConfiguration,
       getThreadsConnection,
       sanitizeThreadsConnection,
+      getAllPlatformConnections,
+      disconnectPlatform,
+      savePlatformConnection,
     } = await import('./_lib/threads_oauth.js');
 
     if (req.method === 'GET') {
       await requireSocialStudioAdmin(req);
-      if (task === 'threads_status') {
+      if (task === 'threads_status' || task === 'connections_status') {
         const connection = await getThreadsConnection();
+        const allConnections = await getAllPlatformConnections();
         return res.status(200).json({
           configuration: getThreadsConfiguration(req),
           connection: sanitizeThreadsConnection(connection),
+          connections: allConnections,
         });
       }
       if (task === 'calendar_plan') {
         const days = Number(req.query?.days || 30);
         return res.status(200).json(await getEditorialCalendar(days));
       }
-      return res.status(200).json(await getSocialStudioSummary());
+      const summary = await getSocialStudioSummary();
+      const allConnections = await getAllPlatformConnections();
+      return res.status(200).json({
+        ...summary,
+        connections: allConnections,
+      });
     }
 
     if (req.method === 'POST') {
@@ -119,6 +129,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await requireSocialStudioAdmin(req);
         const days = Number(req.body?.days || 30);
         return res.status(200).json(await seedEditorialCalendarSlots(days));
+      }
+
+      if (task === 'disconnect_platform') {
+        await requireSocialStudioAdmin(req);
+        const platform = String(req.body?.platform || '').toLowerCase();
+        if (!platform) return res.status(400).json({ error: 'Platform is required' });
+        return res.status(200).json(await disconnectPlatform(platform));
+      }
+
+      if (task === 'save_connection') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { platform, displayName, username, externalAccountId, accessToken, profileImageUrl, tokenExpiresAt, grantedScopes } = req.body || {};
+        if (!platform || !username || !accessToken) {
+          return res.status(400).json({ error: 'platform, username, and accessToken are required' });
+        }
+        return res.status(200).json(await savePlatformConnection({
+          platform,
+          displayName: displayName || username,
+          username,
+          externalAccountId: externalAccountId || username,
+          accessToken,
+          profileImageUrl,
+          tokenExpiresAt,
+          grantedScopes,
+          actorId: actor.id,
+        }));
       }
 
       if (task === 'attach_custom_asset') {
