@@ -375,7 +375,7 @@ function personCardSpec(
     return {
       eyebrow: 'BIRTHDAY SPOTLIGHT',
       kicker: 'BIRTHDAY',
-      roleLine: (snapshot.roles.length ? snapshot.roles : ['Actor'])
+      roleLine: ((snapshot.roles && snapshot.roles.length ? snapshot.roles : [(snapshot.knownForDepartment || 'Actor')]))
         .map(role => role.toUpperCase())
         .join('  •  '),
       support: 'Celebrating the talent, versatility and impact you bring to African cinema.',
