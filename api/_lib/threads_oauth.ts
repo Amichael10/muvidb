@@ -407,3 +407,191 @@ export async function savePlatformConnection(input: {
   return data;
 }
 
+const META_SCOPES = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'pages_manage_posts',
+  'instagram_basic',
+  'instagram_content_publish',
+];
+
+export async function createMetaAuthorizationUrl(req: VercelRequest, actor: SocialActor): Promise<string> {
+  const appId = process.env.META_APP_ID || process.env.THREAD_APP_ID;
+  if (!appId) throw httpError(503, 'META_APP_ID is not configured');
+
+  const redirectUri = `${requestOrigin(req)}/api/social?task=meta_callback`;
+  const state = signThreadsState({
+    actorId: actor.id,
+    redirectUri,
+    createdAt: Date.now(),
+    nonce: randomBytes(18).toString('hex'),
+  });
+
+  const { error } = await supabase.from('social_oauth_states').insert({
+    state_hash: stateHash(state),
+    provider: 'meta',
+    actor_user_id: actor.id,
+    redirect_uri: redirectUri,
+    expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+  });
+  if (error) throw error;
+
+  const url = new URL('https://www.facebook.com/v19.0/dialog/oauth');
+  url.searchParams.set('client_id', appId);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('scope', META_SCOPES.join(','));
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('state', state);
+  return url.toString();
+}
+
+export async function completeMetaOAuth(req: VercelRequest): Promise<string> {
+  const code = String(req.query.code || '').replace(/#_$/, '').replace(/#$/, '').trim();
+  const rawState = String(req.query.state || '').replace(/#_$/, '').replace(/#$/, '').trim();
+  const state = verifyThreadsState(rawState);
+  if (!code) throw httpError(400, 'Meta did not return an authorization code');
+
+  const appId = process.env.META_APP_ID || process.env.THREAD_APP_ID;
+  const appSecret = process.env.META_APP_SECRET || process.env.THREAD_APP_SECRET;
+  if (!appId || !appSecret) throw httpError(503, 'Meta OAuth App Credentials not configured');
+
+  const tokenUrl = new URL('https://graph.facebook.com/v19.0/oauth/access_token');
+  tokenUrl.searchParams.set('client_id', appId);
+  tokenUrl.searchParams.set('client_secret', appSecret);
+  tokenUrl.searchParams.set('redirect_uri', state.redirectUri);
+  tokenUrl.searchParams.set('code', code);
+
+  const tokenRes = await threadsFetch(tokenUrl.toString());
+  const userToken = tokenRes.access_token;
+  if (!userToken) throw httpError(502, 'Meta did not return an access token');
+
+  const longUrl = new URL('https://graph.facebook.com/v19.0/oauth/access_token');
+  longUrl.searchParams.set('grant_type', 'fb_exchange_token');
+  longUrl.searchParams.set('client_id', appId);
+  longUrl.searchParams.set('client_secret', appSecret);
+  longUrl.searchParams.set('fb_exchange_token', userToken);
+  const longRes = await threadsFetch(longUrl.toString()).catch(() => ({ access_token: userToken }));
+  const longLivedToken = longRes.access_token || userToken;
+
+  const accountsUrl = new URL('https://graph.facebook.com/v19.0/me/accounts');
+  accountsUrl.searchParams.set('fields', 'id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}');
+  accountsUrl.searchParams.set('access_token', longLivedToken);
+  const accountsRes = await threadsFetch(accountsUrl.toString()).catch(() => ({ data: [] }));
+
+  const pages = accountsRes.data || [];
+  let connectedFb = false;
+  let connectedIg = false;
+
+  for (const page of pages) {
+    if (page.id && page.access_token) {
+      await savePlatformConnection({
+        platform: 'facebook',
+        displayName: page.name || 'MuviDB Facebook Page',
+        username: page.name || 'muvidb',
+        externalAccountId: String(page.id),
+        accessToken: page.access_token,
+        actorId: state.actorId,
+        grantedScopes: META_SCOPES,
+      });
+      connectedFb = true;
+    }
+
+    if (page.instagram_business_account?.id) {
+      const ig = page.instagram_business_account;
+      await savePlatformConnection({
+        platform: 'instagram',
+        displayName: ig.name || ig.username || 'MuviDB Instagram',
+        username: ig.username ? String(ig.username).replace(/^@/, '') : 'muvidb_',
+        externalAccountId: String(ig.id),
+        accessToken: page.access_token || longLivedToken,
+        profileImageUrl: ig.profile_picture_url || null,
+        actorId: state.actorId,
+        grantedScopes: META_SCOPES,
+      });
+      connectedIg = true;
+    }
+  }
+
+  const target = new URL('/admin/social-studio', requestOrigin(req));
+  target.searchParams.set('meta', 'connected');
+  target.searchParams.set('message', `Meta connected: Facebook (${connectedFb ? 'Ready' : 'Pending'}), Instagram (${connectedIg ? 'Ready' : 'Pending'})`);
+  return target.toString();
+}
+
+export async function createTikTokAuthorizationUrl(req: VercelRequest, actor: SocialActor): Promise<string> {
+  const clientKey = process.env.TIKTOK_CLIENT_KEY;
+  if (!clientKey) throw httpError(503, 'TIKTOK_CLIENT_KEY is not configured');
+
+  const redirectUri = `${requestOrigin(req)}/api/social?task=tiktok_callback`;
+  const state = signThreadsState({
+    actorId: actor.id,
+    redirectUri,
+    createdAt: Date.now(),
+    nonce: randomBytes(18).toString('hex'),
+  });
+
+  const { error } = await supabase.from('social_oauth_states').insert({
+    state_hash: stateHash(state),
+    provider: 'tiktok',
+    actor_user_id: actor.id,
+    redirect_uri: redirectUri,
+    expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+  });
+  if (error) throw error;
+
+  const url = new URL('https://www.tiktok.com/v2/auth/authorize/');
+  url.searchParams.set('client_key', clientKey);
+  url.searchParams.set('scope', 'user.info.basic,video.publish,video.upload');
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('state', state);
+  return url.toString();
+}
+
+export async function completeTikTokOAuth(req: VercelRequest): Promise<string> {
+  const code = String(req.query.code || '').replace(/#_$/, '').replace(/#$/, '').trim();
+  const rawState = String(req.query.state || '').replace(/#_$/, '').replace(/#$/, '').trim();
+  const state = verifyThreadsState(rawState);
+  if (!code) throw httpError(400, 'TikTok did not return an authorization code');
+
+  const clientKey = process.env.TIKTOK_CLIENT_KEY;
+  const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
+  if (!clientKey || !clientSecret) throw httpError(503, 'TikTok API credentials not configured');
+
+  const res = await threadsFetch('https://open.tiktokapis.com/v2/oauth/token/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_key: clientKey,
+      client_secret: clientSecret,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: state.redirectUri,
+    }),
+  });
+
+  const accessToken = res.access_token || res.data?.access_token;
+  const openId = res.open_id || res.data?.open_id;
+  if (!accessToken) throw httpError(502, 'TikTok did not return an access token');
+
+  const userRes = await threadsFetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }).catch(() => ({ data: { user: {} } }));
+
+  const userInfo = userRes.data?.user || {};
+  await savePlatformConnection({
+    platform: 'tiktok',
+    displayName: userInfo.display_name || 'MuviDB TikTok',
+    username: userInfo.display_name ? String(userInfo.display_name).replace(/^@/, '') : 'muvidb',
+    externalAccountId: String(openId || userInfo.open_id || 'tiktok_account'),
+    accessToken,
+    profileImageUrl: userInfo.avatar_url || null,
+    actorId: state.actorId,
+    grantedScopes: ['user.info.basic', 'video.publish', 'video.upload'],
+  });
+
+  const target = new URL('/admin/social-studio', requestOrigin(req));
+  target.searchParams.set('tiktok', 'connected');
+  return target.toString();
+}
+

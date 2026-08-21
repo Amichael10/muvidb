@@ -228,20 +228,42 @@ export default function AdminSocialStudio() {
   }, []);
 
   useEffect(() => {
-    const result = searchParams.get('threads');
-    if (!result) return;
-    if (result === 'connected') {
+    const threadsRes = searchParams.get('threads');
+    const metaRes = searchParams.get('meta');
+    const tiktokRes = searchParams.get('tiktok');
+    const message = searchParams.get('message');
+
+    if (threadsRes === 'connected') {
       toast.success('Threads is connected and ready for publishing.');
       fetchConnectionsStatus();
-    } else {
-      toast.error(searchParams.get('message') || 'Threads could not be connected. Please try again.');
+    } else if (threadsRes === 'error') {
+      toast.error(message || 'Threads could not be connected.');
     }
-    setSearchParams(current => {
-      const next = new URLSearchParams(current);
-      next.delete('threads');
-      next.delete('message');
-      return next;
-    }, { replace: true });
+
+    if (metaRes === 'connected') {
+      toast.success(message || 'Meta (Facebook & Instagram) connected successfully!');
+      fetchConnectionsStatus();
+    } else if (metaRes === 'error') {
+      toast.error(message || 'Meta connection failed.');
+    }
+
+    if (tiktokRes === 'connected') {
+      toast.success('TikTok connected successfully!');
+      fetchConnectionsStatus();
+    } else if (tiktokRes === 'error') {
+      toast.error(message || 'TikTok connection failed.');
+    }
+
+    if (threadsRes || metaRes || tiktokRes) {
+      setSearchParams(current => {
+        const next = new URLSearchParams(current);
+        next.delete('threads');
+        next.delete('meta');
+        next.delete('tiktok');
+        next.delete('message');
+        return next;
+      }, { replace: true });
+    }
   }, [searchParams, setSearchParams]);
 
   const refreshAll = () => {
@@ -263,6 +285,38 @@ export default function AdminSocialStudio() {
       window.location.assign(data.authorizationUrl);
     } catch (error) {
       toast.error(error.message || 'Threads connection could not start');
+      setConnections(current => ({ ...current, connecting: false }));
+    }
+  };
+
+  const connectMeta = async () => {
+    setConnections(current => ({ ...current, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=meta_oauth_start', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authorizationUrl) throw new Error(data.error || 'Meta connection could not start');
+      window.location.assign(data.authorizationUrl);
+    } catch (error) {
+      toast.error(error.message || 'Meta connection could not start');
+      setConnections(current => ({ ...current, connecting: false }));
+    }
+  };
+
+  const connectTikTok = async () => {
+    setConnections(current => ({ ...current, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=tiktok_oauth_start', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authorizationUrl) throw new Error(data.error || 'TikTok connection could not start');
+      window.location.assign(data.authorizationUrl);
+    } catch (error) {
+      toast.error(error.message || 'TikTok connection could not start');
       setConnections(current => ({ ...current, connecting: false }));
     }
   };
@@ -941,8 +995,13 @@ export default function AdminSocialStudio() {
               </button>
             </div>
 
+            {/* One-Click OAuth Banner */}
+            <div className="mt-4 rounded-lg border border-brand/20 bg-brand/5 p-3 text-xs text-text-muted">
+              <span className="font-bold text-text-primary">💡 One-Click OAuth Login:</span> Click the OAuth connect buttons below to authenticate directly via Meta (for Instagram & Facebook), Threads, or TikTok without needing to manually find access tokens.
+            </div>
+
             {/* Platform Grid */}
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Instagram */}
               <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
                 <div>
@@ -977,31 +1036,39 @@ export default function AdminSocialStudio() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
                   {connections.platforms.instagram ? (
                     <button
                       type="button"
                       onClick={() => disconnectAccount('instagram')}
                       disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
                     >
                       Disconnect
                     </button>
                   ) : null}
                   <button
                     type="button"
+                    onClick={connectMeta}
+                    disabled={connections.connecting}
+                    className="rounded bg-[#E1306C] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    ⚡ Connect via Meta
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       setManualConnectPlatform('instagram');
                       setManualFormData({
-                        username: connections.platforms.instagram?.username || 'muvidb',
+                        username: connections.platforms.instagram?.username || 'muvidb_',
                         displayName: connections.platforms.instagram?.displayName || 'MuviDB Instagram',
                         externalAccountId: connections.platforms.instagram?.externalAccountId || 'muvidb_ig_id',
                         accessToken: '',
                       });
                     }}
-                    className="ml-auto rounded bg-brand px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-hover"
+                    className="rounded border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text-primary"
                   >
-                    {connections.platforms.instagram ? 'Update Token' : 'Connect Instagram'}
+                    Token
                   </button>
                 </div>
               </div>
@@ -1040,17 +1107,25 @@ export default function AdminSocialStudio() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
                   {connections.platforms.facebook ? (
                     <button
                       type="button"
                       onClick={() => disconnectAccount('facebook')}
                       disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
                     >
                       Disconnect
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={connectMeta}
+                    disabled={connections.connecting}
+                    className="rounded bg-[#1877F2] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    ⚡ Connect via Meta
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1062,9 +1137,9 @@ export default function AdminSocialStudio() {
                         accessToken: '',
                       });
                     }}
-                    className="ml-auto rounded bg-brand px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-hover"
+                    className="rounded border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text-primary"
                   >
-                    {connections.platforms.facebook ? 'Update Token' : 'Connect Facebook'}
+                    Token
                   </button>
                 </div>
               </div>
@@ -1103,13 +1178,13 @@ export default function AdminSocialStudio() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
                   {connections.platforms.threads ? (
                     <button
                       type="button"
                       onClick={() => disconnectAccount('threads')}
                       disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
                     >
                       Disconnect
                     </button>
@@ -1118,7 +1193,7 @@ export default function AdminSocialStudio() {
                     type="button"
                     onClick={connectThreads}
                     disabled={connections.connecting}
-                    className="ml-auto rounded bg-text-primary px-3 py-1.5 text-xs font-bold text-background hover:opacity-90 disabled:opacity-50"
+                    className="rounded bg-text-primary px-3 py-1.5 text-xs font-bold text-background hover:opacity-90 disabled:opacity-50"
                   >
                     <span className="flex items-center gap-1">
                       <Icon icon="simple-icons:threads" width="12" />
@@ -1162,17 +1237,25 @@ export default function AdminSocialStudio() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center gap-2 border-t border-border/50 pt-3">
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
                   {connections.platforms.tiktok ? (
                     <button
                       type="button"
                       onClick={() => disconnectAccount('tiktok')}
                       disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
                     >
                       Disconnect
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={connectTikTok}
+                    disabled={connections.connecting}
+                    className="rounded bg-black border border-[#25F4EE]/40 text-[#25F4EE] px-3 py-1.5 text-xs font-bold hover:bg-surface-3 disabled:opacity-50"
+                  >
+                    ⚡ Connect via TikTok
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1184,9 +1267,9 @@ export default function AdminSocialStudio() {
                         accessToken: '',
                       });
                     }}
-                    className="ml-auto rounded bg-brand px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-hover"
+                    className="rounded border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text-primary"
                   >
-                    {connections.platforms.tiktok ? 'Update Token' : 'Connect TikTok'}
+                    Token
                   </button>
                 </div>
               </div>
@@ -1196,9 +1279,12 @@ export default function AdminSocialStudio() {
             {manualConnectPlatform && (
               <form onSubmit={saveManualConnection} className="mt-6 rounded-lg border border-brand/30 bg-surface-2 p-5">
                 <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                  <h4 className="text-sm font-bold text-brand uppercase tracking-wider">
-                    Connect {manualConnectPlatform.toUpperCase()}
-                  </h4>
+                  <div>
+                    <h4 className="text-sm font-bold text-brand uppercase tracking-wider">
+                      Configure {manualConnectPlatform.toUpperCase()} Connection
+                    </h4>
+                    <p className="text-[11px] text-text-muted">Enter your exact handle and API token to link this channel.</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setManualConnectPlatform(null)}
@@ -1210,15 +1296,20 @@ export default function AdminSocialStudio() {
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block text-[11px] font-bold text-text-muted uppercase">Handle / Username</label>
+                    <label className="block text-[11px] font-bold text-text-muted uppercase">
+                      {manualConnectPlatform === 'instagram' ? 'Instagram Handle' : manualConnectPlatform === 'facebook' ? 'Facebook Page Handle' : 'Account Handle'}
+                    </label>
                     <input
                       type="text"
                       required
                       value={manualFormData.username}
                       onChange={e => setManualFormData(prev => ({ ...prev, username: e.target.value }))}
-                      placeholder="@muvidb"
+                      placeholder={manualConnectPlatform === 'instagram' ? 'muvidb_' : 'muvidb'}
                       className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand"
                     />
+                    <p className="mt-0.5 text-[10px] text-text-muted">
+                      {manualConnectPlatform === 'instagram' ? 'e.g. muvidb_ (without leading @)' : 'e.g. muvidb'}
+                    </p>
                   </div>
 
                   <div>
@@ -1233,17 +1324,17 @@ export default function AdminSocialStudio() {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-text-muted uppercase">Access Token / API Key</label>
+                    <label className="block text-[11px] font-bold text-text-muted uppercase">API Access Token</label>
                     <input
                       type="password"
                       required
                       value={manualFormData.accessToken}
                       onChange={e => setManualFormData(prev => ({ ...prev, accessToken: e.target.value }))}
-                      placeholder="Paste permanent or long-lived API Access Token"
+                      placeholder="Paste API Access Token"
                       className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand font-mono"
                     />
                     <p className="mt-1 text-[10px] text-text-muted">
-                      Tokens are encrypted with AES-256-GCM before storage in database.
+                      All tokens are securely encrypted with AES-256-GCM prior to storage in database.
                     </p>
                   </div>
                 </div>

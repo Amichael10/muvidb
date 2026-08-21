@@ -61,6 +61,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    if (req.method === 'GET' && task === 'meta_callback') {
+      const { completeMetaOAuth } = await import('./_lib/threads_oauth.js');
+      try {
+        const dest = await completeMetaOAuth(req);
+        res.setHeader('Location', dest);
+        return res.status(302).end();
+      } catch (error) {
+        const errMsg = (error as Error)?.message || 'We could not connect Meta. Please check your Meta app permissions.';
+        console.error('Meta OAuth callback error:', errMsg);
+        res.setHeader('Location', `/admin/social-studio?meta=error&message=${encodeURIComponent(errMsg.slice(0, 150))}`);
+        return res.status(302).end();
+      }
+    }
+
+    if (req.method === 'GET' && task === 'tiktok_callback') {
+      const { completeTikTokOAuth } = await import('./_lib/threads_oauth.js');
+      try {
+        const dest = await completeTikTokOAuth(req);
+        res.setHeader('Location', dest);
+        return res.status(302).end();
+      } catch (error) {
+        const errMsg = (error as Error)?.message || 'We could not connect TikTok. Please check your TikTok app permissions.';
+        console.error('TikTok OAuth callback error:', errMsg);
+        res.setHeader('Location', `/admin/social-studio?tiktok=error&message=${encodeURIComponent(errMsg.slice(0, 150))}`);
+        return res.status(302).end();
+      }
+    }
+
     // Deauthorization & Data Deletion Callbacks required by Meta
     if (task === 'threads_deauth') {
       return res.status(200).json({ success: true, message: 'Threads deauthorized successfully' });
@@ -92,6 +120,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const {
       createThreadsAuthorizationUrl,
+      createMetaAuthorizationUrl,
+      createTikTokAuthorizationUrl,
       disconnectThreads,
       getThreadsConfiguration,
       getThreadsConnection,
@@ -169,6 +199,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (task === 'threads_oauth_start') {
         const actor = await requireSocialStudioAdmin(req);
         return res.status(200).json({ authorizationUrl: await createThreadsAuthorizationUrl(req, actor) });
+      }
+
+      if (task === 'meta_oauth_start') {
+        const actor = await requireSocialStudioAdmin(req);
+        return res.status(200).json({ authorizationUrl: await createMetaAuthorizationUrl(req, actor) });
+      }
+
+      if (task === 'tiktok_oauth_start') {
+        const actor = await requireSocialStudioAdmin(req);
+        return res.status(200).json({ authorizationUrl: await createTikTokAuthorizationUrl(req, actor) });
       }
 
       if (task === 'threads_disconnect') {
