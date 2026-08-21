@@ -56,25 +56,7 @@ async function main() {
         updates.imdb_vote_count = film.audience_rating_count || 120;
       }
 
-      // 3. Default baseline for unrated films
-      if (currentLiked == null && currentImdb == null) {
-        let hash = 0;
-        const titleStr = film.title || film.slug || 'film';
-        for (let i = 0; i < titleStr.length; i++) {
-          hash = (hash << 5) - hash + titleStr.charCodeAt(i);
-          hash |= 0;
-        }
-        const normalized = Math.abs(hash % 20) / 10.0; // 0.0 - 1.9
-        const baseScore = 6.5 + (normalized * 0.7); // 6.5 - 7.8
-        const roundedScore = Math.round(baseScore * 10) / 10;
-        const computedPct = pctLiked(roundedScore);
-
-        updates.imdb_rating = roundedScore;
-        updates.imdb_vote_count = 80 + Math.abs(hash % 600);
-        updates.liked_percent = computedPct;
-        updates.audience_rating = roundedScore;
-        updates.audience_rating_count = 40 + Math.abs(hash % 250);
-      }
+      // 3. Unrated films remain unrated (null) until verified ratings or comments exist
 
       if (Object.keys(updates).length > 0) {
         updatesBatch.push({ id: film.id, updates });

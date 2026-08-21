@@ -305,12 +305,25 @@ async function syncTitle(title: NormalizedTitle, counters: SyncCounters) {
       const links = typeof existing.streaming_links === 'object' && existing.streaming_links
         ? existing.streaming_links
         : {};
+
+      const bestPoster = (existing.poster_url && existing.poster_url.length > 5 && !existing.poster_url.includes('placeholder'))
+        ? existing.poster_url
+        : title.posterUrl;
+
+      const bestBackdrop = (existing.backdrop_url && existing.backdrop_url.length > 5 && !existing.backdrop_url.includes('placeholder'))
+        ? existing.backdrop_url
+        : (title.backdropUrl || bestPoster);
+
+      const bestSynopsis = (existing.synopsis && existing.synopsis.length >= (title.synopsis?.length || 0))
+        ? existing.synopsis
+        : (title.synopsis || existing.synopsis);
+
       const updatePayload: Record<string, unknown> = {
         streaming_links: { ...links, circuits: title.watchUrl },
-        synopsis: existing.synopsis || title.synopsis,
+        synopsis: bestSynopsis,
         runtime_minutes: existing.runtime_minutes || title.runtimeMinutes,
-        poster_url: existing.poster_url || title.posterUrl,
-        backdrop_url: existing.backdrop_url || title.backdropUrl,
+        poster_url: bestPoster,
+        backdrop_url: bestBackdrop,
         genres: mergeGenres(existing.genres, title.genres),
         content_type: existing.content_type || title.contentType,
         source: existing.source || 'circuits',
