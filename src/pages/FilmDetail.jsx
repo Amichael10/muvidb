@@ -594,10 +594,19 @@ export default function FilmDetail() {
             </div>
 
             <div className="flex-1 z-10 w-full">
+              {/* Breadcrumbs Navigation */}
+              <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-white/70 mb-3 flex-wrap">
+                <Link to="/" className="hover:text-brand transition-colors">Home</Link>
+                <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-white/40" />
+                <Link to="/browse" className="hover:text-brand transition-colors">Films</Link>
+                <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-white/40" />
+                <span className="text-white truncate max-w-[240px]">{formatFilmTitle(film.title)}</span>
+              </nav>
+
               {parentSeries && (
                 <Link 
                   to={`/films/${parentSeries.slug || parentSeries.id}`}
-                  className="inline-flex items-center gap-1.5 bg-brand/10 border border-brand/20 text-brand px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide uppercase mb-3 hover:bg-brand/20 transition-all"
+                  className="inline-flex items-center gap-1.5 bg-brand/15 border border-brand/30 text-brand px-3 py-1.5 rounded-md text-xs font-bold tracking-wide uppercase mb-3 hover:bg-brand/25 transition-all"
                 >
                   <Icon icon="solar:tv-bold" className="text-xs" />
                   <span>Part of Series: {parentSeries.title}</span>
@@ -607,19 +616,22 @@ export default function FilmDetail() {
                 {formatFilmTitle(film.title)}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-white/80 font-bold mb-4">
+              <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-white/90 font-bold mb-4">
                 <span>{film.year}</span>
-                <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                <span className="w-1 h-1 rounded-full bg-white/30"></span>
                 <span>
                   {film.content_type === 'series'
                     ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
                     : `${film.runtime_minutes || film.runtime || 0} min`}
                 </span>
-                {/* Language hidden until per-film detection is accurate (data is ~99.7% default English) */}
-                <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                <span className="bg-brand text-white px-2 py-0.5 rounded text-[10px] font-bold">
-                  {film.nfvcb_rating}
-                </span>
+                {film.nfvcb_rating && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
+                    <span className="bg-brand text-white px-2 py-0.5 rounded text-xs font-bold">
+                      {film.nfvcb_rating}
+                    </span>
+                  </>
+                )}
                 {(() => {
                   const domGross = film.box_office_domestic || film.streaming_links?.box_office?.domestic;
                   if (!domGross) return null;
@@ -631,8 +643,8 @@ export default function FilmDetail() {
 
                   return (
                     <>
-                      <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/30 to-brand/30 border border-amber-500/50 text-amber-300 px-2.5 py-0.5 rounded text-[10px] font-black shadow-lg backdrop-blur-md">
+                      <span className="w-1 h-1 rounded-full bg-white/30"></span>
+                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/30 to-brand/30 border border-amber-500/50 text-amber-300 px-2.5 py-0.5 rounded text-xs font-black shadow-lg backdrop-blur-md">
                         <Icon icon="solar:ticket-bold" className="text-amber-400 text-xs" />
                         <span>Box Office: {symbol}{formatted}</span>
                       </span>
@@ -640,7 +652,7 @@ export default function FilmDetail() {
                   );
                 })()}
                 {film.is_in_cinemas && (
-                  <span className="bg-gold text-bg px-2 py-0.5 rounded text-[10px] font-bold border border-gold uppercase tracking-wider">
+                  <span className="bg-gold text-bg px-2.5 py-0.5 rounded text-xs font-bold border border-gold uppercase tracking-wider">
                     In Cinemas
                   </span>
                 )}
@@ -793,20 +805,20 @@ export default function FilmDetail() {
             {/* Synopsis */}
             <section className="p-8 md:p-12 border-b border-border">
               <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-6 tracking-tight leading-none">Synopsis</h2>
-              <p className="text-text-muted text-lg leading-relaxed opacity-80 border-l-2 border-brand pl-6">
+              <p className="text-text-secondary text-base sm:text-lg leading-relaxed border-l-2 border-brand pl-6">
                 {toSentenceCase(film.synopsis)}
               </p>
               <div className="flex flex-wrap items-center gap-4 mt-6">
                 <button
                   onClick={() => setShowFilmEdit(true)}
-                  className="inline-flex items-center gap-1.5 text-text-muted hover:text-brand text-[11px] font-bold transition-colors"
+                  className="inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold transition-colors min-h-[36px]"
                 >
                   <Icon icon="solar:pen-2-linear" width="14" />
                   Suggest an edit
                 </button>
                 <button
                   onClick={() => setShowReport(true)}
-                  className="inline-flex items-center gap-1.5 text-text-muted hover:text-red-500 text-[11px] font-bold transition-colors"
+                  className="inline-flex items-center gap-1.5 text-text-secondary hover:text-red-500 text-xs font-bold transition-colors min-h-[36px]"
                 >
                   <Icon icon="solar:flag-linear" width="14" />
                   Report a broken / pirate link
@@ -1184,33 +1196,36 @@ export default function FilmDetail() {
               <button
                 onClick={handleWatchlist}
                 disabled={watchlistLoading}
-                className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-bold text-[10px] tracking-widest transition-all duration-300 active:scale-95 min-h-[44px] disabled:opacity-50 ${inWatchlist
-                  ? 'bg-brand text-white'
+                className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-bold text-xs tracking-wider transition-all duration-300 active:scale-95 min-h-[44px] disabled:opacity-50 ${inWatchlist
+                  ? 'bg-brand text-white shadow-lg shadow-brand/20'
                   : 'bg-surface-2 border border-border text-text-primary hover:border-brand hover:text-brand'
                   }`}
               >
-                {inWatchlist ? 'Added' : 'Add to Watchlist'}
+                <Icon icon={inWatchlist ? "solar:bookmark-bold" : "solar:bookmark-linear"} width="16" />
+                {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
               </button>
 
               <div className="flex gap-3 mt-3">
                 <button
                   onClick={() => handleReaction('dislike')}
                   disabled={reactionLoading}
-                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg border transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'dislike' ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-surface-2 border-border text-text-muted hover:border-white hover:text-white'}`}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg border min-h-[44px] transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'dislike' ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-surface-2 border-border text-text-secondary hover:border-white hover:text-white'}`}
                   title="Dislike"
+                  aria-label={`Dislike (${dislikesCount})`}
                 >
-                  <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-xl" />
-                  <span className="text-[10px] font-bold">{dislikesCount}</span>
+                  <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-lg" />
+                  <span className="text-xs font-bold">{dislikesCount}</span>
                 </button>
 
                 <button
                   onClick={() => handleReaction('like')}
                   disabled={reactionLoading}
-                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg border transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'like' ? 'bg-brand/10 border-brand text-brand' : 'bg-surface-2 border-border text-text-muted hover:border-white hover:text-white'}`}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg border min-h-[44px] transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'like' ? 'bg-brand/10 border-brand text-brand' : 'bg-surface-2 border-border text-text-secondary hover:border-white hover:text-white'}`}
                   title="Like"
+                  aria-label={`Like (${likesCount})`}
                 >
-                  <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-xl" />
-                  <span className="text-[10px] font-bold">{likesCount}</span>
+                  <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-lg" />
+                  <span className="text-xs font-bold">{likesCount}</span>
                 </button>
               </div>
 

@@ -102,14 +102,14 @@ export default function Search() {
   };
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg overflow-x-hidden">
       {/* Search Header */}
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-20 pt-32 border-x border-border relative z-10">
+        <div className="max-w-7xl mx-auto px-4 py-12 pt-28 sm:py-20 sm:pt-32 border-x border-border relative z-10">
           <div className="max-w-3xl mx-auto">
             <form onSubmit={handleSearch} className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-4 sm:pl-6 flex items-center pointer-events-none">
                 <Icon icon="solar:magnifer-linear" className="w-5 h-5 text-text-muted group-focus-within:text-brand transition-colors" />
               </div>
               <input 
@@ -117,14 +117,17 @@ export default function Search() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search movies, people, studios, theatre..."
-                className="w-full bg-surface border border-border rounded-xl py-6 pl-16 pr-32 text-xs font-black uppercase tracking-widest text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-all shadow-sm"
+                className="w-full bg-surface border border-border rounded-xl py-4 pl-12 pr-24 sm:py-6 sm:pl-16 sm:pr-32 text-xs font-black uppercase tracking-widest text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-all shadow-sm"
               />
-              <button type="submit" className="absolute inset-y-3 right-3 bg-brand text-white px-8 rounded-lg text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20">
+              <button 
+                type="submit" 
+                className="absolute inset-y-2 right-2 sm:inset-y-3 sm:right-3 bg-brand text-white px-5 sm:px-8 rounded-lg text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-brand/20 min-h-[36px] sm:min-h-[44px] flex items-center justify-center"
+              >
                 Search
               </button>
             </form>
             {initialQuery && (
-              <p className="mt-6 text-center text-xs font-bold text-text-muted opacity-60">
+              <p className="mt-4 sm:mt-6 text-center text-xs font-bold text-text-secondary opacity-80">
                 Results for <span className="text-brand">"{initialQuery}"</span>
               </p>
             )}
@@ -132,7 +135,7 @@ export default function Search() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto border-x border-border min-h-screen pb-20">
+      <div className="max-w-7xl mx-auto border-x border-border min-h-screen pb-20 overflow-x-hidden">
         {/* Categories Tabs */}
         <div className="flex justify-start md:justify-center border-b border-border bg-surface-2/5 divide-x divide-border overflow-x-auto scrollbar-hide">
           {[
@@ -144,15 +147,15 @@ export default function Search() {
             <button 
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-12 py-6 text-xs font-bold transition-all relative shrink-0 ${
+              className={`px-6 sm:px-12 py-4 sm:py-6 text-xs font-bold transition-all relative shrink-0 min-h-[44px] flex items-center justify-center ${
                 activeTab === tab.id 
-                  ? 'text-brand' 
-                  : 'text-text-muted hover:text-text-primary'
+                  ? 'text-brand font-black' 
+                  : 'text-text-secondary hover:text-text-primary'
               }`}
             >
-              {tab.label} <span className="ml-2 opacity-40">({tab.count})</span>
+              {tab.label} <span className="ml-2 opacity-60">({tab.count})</span>
               {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-brand" />
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-brand shadow-[0_0_8px_var(--color-brand)]" />
               )}
             </button>
           ))}

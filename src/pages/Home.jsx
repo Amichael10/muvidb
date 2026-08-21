@@ -792,6 +792,7 @@ export default function Home() {
 
   return (
     <div className="muvi-landing w-full pb-20 min-h-screen">
+      <h1 className="sr-only">MuviDB | The Ultimate African Film & Entertainment Database</h1>
       <div className="muvi-film-rail muvi-film-rail--left" aria-hidden="true" />
       <div className="muvi-film-rail muvi-film-rail--right" aria-hidden="true" />
       <PopcornField />

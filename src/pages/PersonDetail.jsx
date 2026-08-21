@@ -40,12 +40,12 @@ function PlatformBadge({ releaseType }) {
   if (key === 'showmax' || key === 'mubi') return null
   const style = PLATFORM_STYLES[key]
   if (!style) return (
-    <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted bg-surface-2 px-1.5 py-0.5 rounded">
+    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary bg-surface-2 px-2 py-0.5 rounded">
       {releaseType}
     </span>
   )
   return (
-    <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest ${style.text} ${style.bg} px-1.5 py-0.5 rounded`}>
+    <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${style.text} ${style.bg} px-2 py-0.5 rounded`}>
       <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
       {style.label}
     </span>
@@ -602,7 +602,7 @@ const PersonDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg overflow-x-hidden">
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
@@ -627,12 +627,21 @@ const PersonDetail = () => {
 
             <div className="flex-1 space-y-6">
               <div>
+                {/* Breadcrumbs Navigation */}
+                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-text-secondary mb-4 flex-wrap justify-center md:justify-start">
+                  <Link to="/" className="hover:text-brand transition-colors">Home</Link>
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+                  <Link to="/people" className="hover:text-brand transition-colors">People</Link>
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+                  <span className="text-text-primary truncate max-w-[240px]">{formatPersonName(person.name)}</span>
+                </nav>
+
                 <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start mb-2">
                   <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">
                     {formatPersonName(person.name)}
                   </h1>
                   {person.is_verified && (
-                    <span className="bg-brand/10 text-brand text-[10px] font-bold px-3 py-1 rounded-lg border border-brand/20">
+                    <span className="bg-brand/10 text-brand text-xs font-bold px-3 py-1 rounded-lg border border-brand/20">
                       Verified
                     </span>
                   )}
@@ -642,7 +651,7 @@ const PersonDetail = () => {
                   {heroRoles.map(role => (
                     <span
                       key={role}
-                      className="text-text-muted text-[10px] font-bold"
+                      className="text-text-secondary text-xs font-bold"
                     >
                       {formatRole(role)}
                     </span>
@@ -651,7 +660,7 @@ const PersonDetail = () => {
 
                 <button
                   onClick={() => setShowEdit(true)}
-                  className="mt-4 inline-flex items-center gap-1.5 text-text-muted hover:text-brand text-[11px] font-bold transition-colors"
+                  className="mt-4 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold transition-colors min-h-[36px]"
                 >
                   <Icon icon="solar:pen-2-linear" width="14" />
                   Suggest an edit
@@ -695,20 +704,20 @@ const PersonDetail = () => {
               {showImpactCard && (
                 <div className="lg:hidden w-full max-w-xl mx-auto md:mx-0">
                   <div className="grid grid-cols-2 divide-x divide-border border border-border rounded-2xl bg-surface shadow-lg overflow-hidden">
-                    <div className="flex flex-col items-start px-4 sm:px-6 py-5 gap-1.5 min-w-0">
-                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">Reported Film Box Office</p>
+                    <div className="flex flex-col items-start px-3 sm:px-6 py-4 sm:py-5 gap-1 min-w-0">
+                      <p className="text-text-secondary text-[10px] font-bold uppercase tracking-wider">Reported Box Office</p>
                       {hasBoxOffice
-                        ? <p className="text-brand text-[clamp(1.6rem,8vw,2.25rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtMoney(displayBoxOffice)}</p>
-                        : <p className="text-text-muted text-3xl font-black font-heading leading-none">—</p>}
+                        ? <p className="text-brand text-[clamp(1.4rem,6vw,2.25rem)] font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtMoney(displayBoxOffice)}</p>
+                        : <p className="text-text-muted text-2xl font-black font-heading leading-none">—</p>}
                     </div>
-                    <div className="flex flex-col items-start px-4 sm:px-6 py-5 gap-1.5 min-w-0">
-                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.18em] whitespace-nowrap">YouTube Views</p>
+                    <div className="flex flex-col items-start px-3 sm:px-6 py-4 sm:py-5 gap-1 min-w-0">
+                      <p className="text-text-secondary text-[10px] font-bold uppercase tracking-wider">YouTube Views</p>
                       {hasYtViews
-                        ? <p className="text-text-primary text-[clamp(1.6rem,8vw,2.25rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtViews(displayYtViews)}</p>
-                        : <p className="text-text-muted text-3xl font-black font-heading leading-none">—</p>}
+                        ? <p className="text-text-primary text-[clamp(1.4rem,6vw,2.25rem)] font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtViews(displayYtViews)}</p>
+                        : <p className="text-text-muted text-2xl font-black font-heading leading-none">—</p>}
                     </div>
                   </div>
-                  <p className="text-text-muted/60 text-[9px] font-semibold mt-1.5 tracking-wider uppercase">
+                  <p className="text-text-muted/70 text-[10px] font-semibold mt-1.5 tracking-wider uppercase">
                     Source-backed credited productions · not personal earnings
                   </p>
                 </div>

@@ -67,30 +67,27 @@ export default function CookieConsent() {
       role="dialog"
       aria-live="polite"
       aria-label="Cookie consent"
-      className="fixed inset-x-0 bottom-0 z-[60] p-4 pb-24 lg:pb-4 lg:p-6 pointer-events-none consent-rise"
+      className="fixed inset-x-0 bottom-0 z-[60] p-3 pb-20 sm:p-4 sm:pb-24 lg:pb-4 lg:p-6 pointer-events-none consent-rise"
     >
-      {/* Scrim: the banner sits over a busy hero, so fade the page out beneath it
-          rather than relying on the panel edge alone to separate the two. */}
-      <div className="absolute inset-x-0 bottom-0 -top-16 bg-gradient-to-t from-bg via-bg/70 to-transparent pointer-events-none" />
+      {/* Scrim: light fade to separate from hero without completely blinding the screen */}
+      <div className="absolute inset-x-0 bottom-0 -top-8 bg-gradient-to-t from-bg via-bg/80 to-transparent pointer-events-none" />
 
-      <div className="relative pointer-events-auto max-w-3xl mx-auto bg-surface border border-border rounded-2xl shadow-2xl shadow-black/60 overflow-hidden">
+      <div className="relative pointer-events-auto max-w-2xl lg:max-w-3xl mx-auto bg-surface/95 backdrop-blur-xl border border-border rounded-xl sm:rounded-2xl shadow-2xl shadow-black/80 overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/60 to-transparent pointer-events-none"></div>
         <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-        <div className="relative z-10 p-6 lg:p-7 flex flex-col lg:flex-row lg:items-center gap-6">
+        <div className="relative z-10 p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-6">
           {/* Copy */}
-          <div className="flex items-start gap-4 flex-1">
-            <div className="hidden sm:flex flex-shrink-0 w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 items-center justify-center">
-              <Icon icon="solar:cookie-bold" className="text-brand text-xl" />
+          <div className="flex items-start gap-3 sm:gap-4 flex-1">
+            <div className="flex flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-brand/15 border border-brand/30 items-center justify-center text-brand">
+              <Icon icon="solar:shield-check-bold" className="text-lg sm:text-xl" />
             </div>
-            <div className="space-y-2">
-              <h3 className="text-[11px] font-black text-text-primary uppercase tracking-[0.2em]">
-                We value your privacy
+            <div className="space-y-1 sm:space-y-1.5">
+              <h3 className="text-xs font-black text-text-primary uppercase tracking-wider flex items-center gap-2">
+                <span>Privacy & Cookies</span>
               </h3>
               <p className="text-xs text-text-secondary leading-relaxed">
                 MuviDB uses essential cookies to keep you signed in. Optional analytics
-                cookies (PostHog) run only if you accept — under Nigeria’s Data Protection Act
-                2023, this is separate from reading our Privacy Policy. Your choice is
-                remembered. Details in our{' '}
+                (PostHog) run only if you accept — under Nigeria’s NDPA 2023. Details in our{' '}
                 <Link to="/privacy" className="text-brand hover:underline font-bold">
                   Privacy Policy
                 </Link>.
@@ -98,21 +95,21 @@ export default function CookieConsent() {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col-reverse sm:flex-row gap-3 flex-shrink-0">
+          {/* Actions: Side-by-side on mobile to save vertical height */}
+          <div className="flex flex-row sm:flex-row gap-2 sm:gap-3 flex-shrink-0 pt-1 sm:pt-0">
             <button
               type="button"
               onClick={() => handleChoice(false)}
-              className="px-6 py-3 rounded-xl border border-border text-text-secondary text-[10px] font-black uppercase tracking-widest hover:border-text-muted hover:text-text-primary active:scale-95 transition-all"
+              className="flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border border-border bg-surface-2 text-text-secondary text-xs font-bold tracking-wider hover:border-text-muted hover:text-text-primary active:scale-95 transition-all min-h-[44px] flex items-center justify-center"
             >
               Decline
             </button>
             <button
               type="button"
               onClick={() => handleChoice(true)}
-              className="px-6 py-3 rounded-xl bg-brand text-on-brand text-[10px] font-black uppercase tracking-widest hover:bg-brand-hover active:scale-95 transition-all shadow-lg shadow-brand/20"
+              className="flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg sm:rounded-xl bg-brand text-on-brand text-xs font-bold tracking-wider hover:bg-brand-hover active:scale-95 transition-all shadow-lg shadow-brand/20 min-h-[44px] flex items-center justify-center"
             >
-              Accept Analytics
+              Accept
             </button>
           </div>
         </div>
