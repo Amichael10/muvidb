@@ -127,7 +127,7 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPE
 // Cohere: same multi-key rotation as Groq (chat + embed + rerank).
 const COHERE_KEYS = collectKeys('COHERE_API_KEY');
 let cohereKeyIdx = 0;
-const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL || 'command-a-03-2025';
+const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL || 'command-r-08-2024';
 const COHERE_EMBED_MODEL = process.env.COHERE_EMBED_MODEL || 'embed-v4.0';
 const COHERE_RERANK_MODEL = process.env.COHERE_RERANK_MODEL || 'rerank-v4.0-pro';
 
@@ -301,12 +301,22 @@ export async function generateAIContent(
     providers.push({
       name: 'cohere',
       execute: async () => withCohereRotation(async (client) => {
-        const response = await client.chat({
-          model: COHERE_CHAT_MODEL,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
-        });
-        return { text: extractCohereText(response), engine: 'cohere', headers: null };
+        const models = [COHERE_CHAT_MODEL, 'command-r-08-2024', 'command-r7b-12-2024'].filter(Boolean);
+        let lastErr: any;
+        for (const model of models) {
+          try {
+            const response = await client.chat({
+              model,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.4,
+            });
+            return { text: extractCohereText(response), engine: `cohere (${model})`, headers: null };
+          } catch (err: any) {
+            lastErr = err;
+            if (isCohereQuotaError(err) || isCohereDeadKeyError(err)) throw err;
+          }
+        }
+        throw lastErr;
       })
     });
   }

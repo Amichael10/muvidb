@@ -160,6 +160,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (task === 'ai_generate_copy') {
+        await requireSocialStudioAdmin(req);
+        const { generateAICaptions } = await import('./_lib/editorial/social_copy_ai.js');
+        const { candidate, series, tone, preferredProvider } = req.body || {};
+        if (!candidate || !candidate.name) {
+          return res.status(400).json({ error: 'candidate with name is required' });
+        }
+        const result = await generateAICaptions({
+          candidate,
+          series,
+          tone,
+          preferredProvider: preferredProvider || 'cohere',
+        });
+        return res.status(200).json({ success: true, ...result });
+      }
+
       if (task === 'approve_slot') {
         const actor = await requireSocialStudioAdmin(req);
         const { approveEditorialSlot } = await import('./_lib/social_studio.js');
