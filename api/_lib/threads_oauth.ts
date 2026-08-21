@@ -58,7 +58,7 @@ function requestOrigin(req: VercelRequest): string {
 export function threadsRedirectUri(req: VercelRequest): string {
   const configured = String(process.env.THREAD_REDIRECT_URI || '').trim();
   if (configured) return configured;
-  return `${requestOrigin(req)}/api/social?task=threads_callback`;
+  return `${requestOrigin(req)}/api/social/threads/callback`;
 }
 
 export function threadsAdminRedirect(req: VercelRequest, result: 'connected' | 'error', message?: string): string {
@@ -419,7 +419,7 @@ export async function createMetaAuthorizationUrl(req: VercelRequest, actor: Soci
   const appId = process.env.META_APP_ID || process.env.THREAD_APP_ID;
   if (!appId) throw httpError(503, 'META_APP_ID is not configured');
 
-  const redirectUri = `${requestOrigin(req)}/api/social?task=meta_callback`;
+  const redirectUri = `${requestOrigin(req)}/api/social/meta/callback`;
   const state = signThreadsState({
     actorId: actor.id,
     redirectUri,
@@ -536,7 +536,7 @@ export async function createTikTokAuthorizationUrl(req: VercelRequest, actor: So
   const clientKey = process.env.TIKTOK_CLIENT_KEY;
   if (!clientKey) throw httpError(503, 'TIKTOK_CLIENT_KEY is not configured');
 
-  const redirectUri = `${requestOrigin(req)}/api/social?task=tiktok_callback`;
+  const redirectUri = `${requestOrigin(req)}/api/social/tiktok/callback`;
   const state = signThreadsState({
     actorId: actor.id,
     redirectUri,
