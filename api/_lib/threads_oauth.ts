@@ -64,7 +64,11 @@ export function threadsRedirectUri(req: VercelRequest): string {
 export function tiktokRedirectUri(req: VercelRequest): string {
   const configured = String(process.env.TIKTOK_REDIRECT_URI || '').trim();
   if (configured) return configured;
-  return `${requestOrigin(req)}/api/social/tiktok/callback`;
+  const origin = requestOrigin(req);
+  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    return 'https://www.muvidb.com/api/social/tiktok/callback';
+  }
+  return `${origin}/api/social/tiktok/callback`;
 }
 
 export function threadsAdminRedirect(req: VercelRequest, result: 'connected' | 'error', message?: string): string {
@@ -559,9 +563,10 @@ export async function createTikTokAuthorizationUrl(req: VercelRequest, actor: So
   });
   if (error) throw error;
 
+  const scopes = String(process.env.TIKTOK_SCOPES || 'user.info.basic').trim();
   const url = new URL('https://www.tiktok.com/v2/auth/authorize/');
   url.searchParams.set('client_key', clientKey);
-  url.searchParams.set('scope', 'user.info.basic,video.publish,video.upload');
+  url.searchParams.set('scope', scopes);
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('redirect_uri', redirectUri);
   url.searchParams.set('state', state);
