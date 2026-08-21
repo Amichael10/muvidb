@@ -61,6 +61,12 @@ export function threadsRedirectUri(req: VercelRequest): string {
   return `${requestOrigin(req)}/api/social/threads/callback`;
 }
 
+export function tiktokRedirectUri(req: VercelRequest): string {
+  const configured = String(process.env.TIKTOK_REDIRECT_URI || '').trim();
+  if (configured) return configured;
+  return `${requestOrigin(req)}/api/social/tiktok/callback`;
+}
+
 export function threadsAdminRedirect(req: VercelRequest, result: 'connected' | 'error', message?: string): string {
   const target = new URL('/admin/social-studio', requestOrigin(req));
   target.searchParams.set('threads', result);
@@ -536,7 +542,7 @@ export async function createTikTokAuthorizationUrl(req: VercelRequest, actor: So
   const clientKey = process.env.TIKTOK_CLIENT_KEY;
   if (!clientKey) throw httpError(503, 'TIKTOK_CLIENT_KEY is not configured');
 
-  const redirectUri = `${requestOrigin(req)}/api/social/tiktok/callback`;
+  const redirectUri = tiktokRedirectUri(req);
   const state = signThreadsState({
     actorId: actor.id,
     redirectUri,
