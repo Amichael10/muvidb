@@ -44,7 +44,7 @@ export function getPlatformBranding(candidate, series) {
     return {
       name: 'Circuits',
       badge: 'NEW ON',
-      accent: '#FF5A1F',
+      accent: '#FF7A00',
       platformIcon: 'solar:play-bold',
       status: 'NOW STREAMING',
       subtext: 'Only on Circuits.tv',
@@ -55,7 +55,7 @@ export function getPlatformBranding(candidate, series) {
     return {
       name: 'In Cinemas',
       badge: 'IN CINEMAS',
-      accent: '#FF5A1F',
+      accent: '#FF7A00',
       platformIcon: 'solar:ticket-bold',
       status: 'IN CINEMAS NOW',
       subtext: 'Get tickets at cinema locations',
@@ -66,11 +66,11 @@ export function getPlatformBranding(candidate, series) {
   // Default to Where To Watch / African Cinema Spotlight
   return {
     name: candidate?.data?.platformDisplayName || 'Circuits',
-    badge: 'WHERE TO WATCH',
-    accent: '#FF5A1F',
+    badge: 'NEW ON',
+    accent: '#FF7A00',
     platformIcon: 'solar:play-bold',
     status: candidate?.data?.coming_soon ? 'COMING SOON' : 'NOW STREAMING',
-    subtext: candidate?.data?.watchAvailability || 'Available across Africa & Worldwide',
+    subtext: candidate?.data?.watchAvailability || 'Only on Circuits.tv',
     ctaText: 'EXPLORE ON MUVIDB.COM',
   };
 }
@@ -91,12 +91,12 @@ export default function FigmaSocialCardPreview({
   if (isPerson) {
     return (
       <div
-        className={`relative w-full aspect-[4/5] overflow-hidden rounded-2xl bg-[#FAF8F5] text-[#111111] shadow-2xl border border-black/5 select-none font-sans flex flex-col justify-between p-6 ${className}`}
+        className={`relative w-full aspect-square overflow-hidden rounded-2xl bg-[#FAF8F5] text-[#111111] shadow-2xl border border-black/5 select-none font-sans flex flex-col justify-between p-6 ${className}`}
       >
         {/* Decorative Grid Lines */}
         <div className="absolute left-[48%] top-0 bottom-0 w-px bg-black/[0.07] pointer-events-none" />
         <div className="absolute left-0 right-0 top-[14%] h-px bg-black/[0.07] pointer-events-none" />
-        <div className="absolute left-[47.6%] top-[14%] -translate-y-1/2 w-2 h-2 rounded-full bg-[#FF5A1F]" />
+        <div className="absolute left-[47.6%] top-[14%] -translate-y-1/2 w-2 h-2 rounded-full bg-[#FF7A00]" />
 
         {/* Top Header Lockup */}
         <div className="relative z-10 flex items-center justify-between">
@@ -114,16 +114,16 @@ export default function FigmaSocialCardPreview({
                 <span className="font-extrabold text-base tracking-tight text-[#111111] leading-none">
                   MuviDB
                 </span>
-                <span className="text-[8px] font-bold tracking-widest text-[#FF5A1F] uppercase mt-0.5">
+                <span className="text-[8px] font-bold tracking-widest text-[#FF7A00] uppercase mt-0.5">
                   EVERY FILM. EVERY CREDIT.
                 </span>
               </div>
             </div>
             <div className="h-6 w-px bg-black/15 mx-1" />
             <div className="flex flex-col text-[8px] font-black tracking-wider leading-tight text-[#111111]">
-              <span>DISCOVER<span className="text-[#FF5A1F]">.</span></span>
-              <span>CREDIT<span className="text-[#FF5A1F]">.</span></span>
-              <span>CELEBRATE<span className="text-[#FF5A1F]">.</span></span>
+              <span>DISCOVER<span className="text-[#FF7A00]">.</span></span>
+              <span>CREDIT<span className="text-[#FF7A00]">.</span></span>
+              <span>CELEBRATE<span className="text-[#FF7A00]">.</span></span>
             </div>
           </div>
 
@@ -131,7 +131,7 @@ export default function FigmaSocialCardPreview({
             <span className="text-[10px] font-black uppercase tracking-widest text-[#111111]">
               {series?.name || 'TALENT SPOTLIGHT'}
             </span>
-            <span className="text-[10px] font-bold text-[#FF5A1F]">01</span>
+            <span className="text-[10px] font-bold text-[#FF7A00]">01</span>
           </div>
         </div>
 
@@ -153,17 +153,17 @@ export default function FigmaSocialCardPreview({
 
         {/* Left Column: Actor Info */}
         <div className="relative z-10 mt-6 max-w-[46%] flex flex-col">
-          <span className="text-[10px] font-extrabold tracking-widest uppercase text-[#FF5A1F]">
+          <span className="text-[10px] font-extrabold tracking-widest uppercase text-[#FF7A00]">
             {candidate?.data?.department || 'ACTOR SPOTLIGHT'}
           </span>
-          <div className="h-0.5 w-16 bg-[#FF5A1F] mt-1 mb-3" />
+          <div className="h-0.5 w-16 bg-[#FF7A00] mt-1 mb-3" />
 
           <h1 className="text-2xl lg:text-3xl font-black uppercase tracking-tight text-[#111111] leading-[1.05] break-words">
             {title}
           </h1>
 
           <div className="flex items-center gap-2 mt-2 text-[10px] font-bold text-black/60 uppercase tracking-wider">
-            <Icon icon="solar:globus-linear" width="14" className="text-[#FF5A1F]" />
+            <Icon icon="solar:globus-linear" width="14" className="text-[#FF7A00]" />
             <span>{country}</span>
           </div>
 
@@ -181,7 +181,7 @@ export default function FigmaSocialCardPreview({
               </span>
               {candidate.data.knownFor.slice(0, 2).map((k, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-xs font-bold text-[#111111]">
-                  <Icon icon="solar:star-bold" width="12" className="text-[#FF5A1F]" />
+                  <Icon icon="solar:star-bold" width="12" className="text-[#FF7A00]" />
                   <span className="truncate">{k.title || k.name || k}</span>
                 </div>
               ))}
@@ -192,7 +192,7 @@ export default function FigmaSocialCardPreview({
         {/* Footer CTA */}
         <div className="relative z-10 flex items-center justify-between pt-4 border-t border-black/10 mt-auto">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#FF5A1F] text-[#FF5A1F]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#FF7A00] text-[#FF7A00]">
               <Icon icon="solar:arrow-right-linear" width="16" />
             </div>
             <div>
@@ -212,19 +212,95 @@ export default function FigmaSocialCardPreview({
     );
   }
 
-  // 2. Movie & "WHERE TO WATCH" Showcase Layout (Matching media_1787362114936.jpg)
+  // 2. Movie & "WHERE TO WATCH" Showcase Layout (Exact Figma Match 1:1)
   return (
     <div
-      className={`relative w-full aspect-[4/5] overflow-hidden rounded-2xl bg-[#FBF9F5] text-[#111111] shadow-2xl border border-black/5 select-none font-sans flex flex-col justify-between p-6 ${className}`}
+      className={`relative w-full aspect-square overflow-hidden rounded-2xl bg-[#FFFFFF] text-[#111111] shadow-2xl border border-black/10 select-none font-sans ${className}`}
     >
-      {/* Top Header Lockup */}
-      <div className="relative z-10 flex items-center justify-between">
+      {/* SVG Background Layer with Signature Organic Curved Poster Arch */}
+      <svg
+        viewBox="0 0 1000 1000"
+        className="absolute inset-0 h-full w-full pointer-events-none z-0"
+      >
+        <defs>
+          {/* Exact Organic Figma Cutout Path */}
+          <clipPath id="figma-where-to-watch-shield">
+            <path d="M 540 80 C 540 80, 430 350, 310 680 C 260 850, 310 960, 480 980 L 1000 1000 L 1000 0 L 680 0 C 580 0, 540 30, 540 80 Z" />
+          </clipPath>
+          <linearGradient id="poster-title-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#000000" stopOpacity="0" />
+            <stop offset="40%" stopColor="#000000" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#000000" stopOpacity="0.9" />
+          </linearGradient>
+        </defs>
+
+        {/* Top-Right Warm Olive Backdrop Tab */}
+        <path
+          d="M 640 0 C 640 0, 680 80, 780 80 L 1000 80 L 1000 0 Z"
+          fill="#D5CFB8"
+        />
+
+        {/* Clipped Movie Poster Art */}
+        <g clipPath="url(#figma-where-to-watch-shield)">
+          {displayImage ? (
+            <image
+              href={displayImage}
+              x="260"
+              y="0"
+              width="740"
+              height="1000"
+              preserveAspectRatio="xMidYMid slice"
+            />
+          ) : (
+            <rect x="260" y="0" width="740" height="1000" fill="#181B22" />
+          )}
+
+          {/* Bottom Shadow Gradient for Title Legibility */}
+          <rect
+            x="260"
+            y="700"
+            width="740"
+            height="300"
+            fill="url(#poster-title-gradient)"
+          />
+
+          {/* Film Title Overlay at Base of Poster */}
+          <text
+            x="630"
+            y="920"
+            textAnchor="middle"
+            fill="#FF7A00"
+            fontSize="20"
+            fontWeight="900"
+            letterSpacing="3"
+            fontFamily="sans-serif"
+          >
+            {`${country.toUpperCase()}${year ? ` • ${year}` : ''}`}
+          </text>
+          <text
+            x="630"
+            y="960"
+            textAnchor="middle"
+            fill="#FFFFFF"
+            fontSize="34"
+            fontWeight="900"
+            letterSpacing="1"
+            fontFamily="sans-serif"
+          >
+            {title.toUpperCase().slice(0, 24)}
+          </text>
+        </g>
+      </svg>
+
+      {/* Foreground Interactive Content Layer */}
+      <div className="relative z-10 flex flex-col justify-between h-full p-6">
+        {/* Top Header Lockup */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <img
               src="/images/MuviDB Brand/MuviDB Icon.png"
               alt="MuviDB"
-              className="h-7 w-auto object-contain"
+              className="h-8 w-auto object-contain"
               onError={e => {
                 e.target.style.display = 'none';
               }}
@@ -233,76 +309,63 @@ export default function FigmaSocialCardPreview({
               <span className="font-extrabold text-base tracking-tight text-[#111111] leading-none">
                 MuviDB
               </span>
-              <span className="text-[7.5px] font-extrabold tracking-widest text-[#FF5A1F] uppercase mt-0.5">
+              <span className="text-[7.5px] font-extrabold tracking-widest text-[#FF7A00] uppercase mt-0.5">
                 EVERY FILM. EVERY CREDIT.
               </span>
             </div>
           </div>
           <div className="h-6 w-px bg-black/15 mx-1" />
           <div className="flex flex-col text-[8px] font-black tracking-wider leading-tight text-[#111111]">
-            <span>DISCOVER<span className="text-[#FF5A1F]">.</span></span>
-            <span>CREDIT<span className="text-[#FF5A1F]">.</span></span>
-            <span>CELEBRATE<span className="text-[#FF5A1F]">.</span></span>
+            <span>DISCOVER<span className="text-[#FF7A00]">.</span></span>
+            <span>CREDIT<span className="text-[#FF7A00]">.</span></span>
+            <span>CELEBRATE<span className="text-[#FF7A00]">.</span></span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-widest text-[#111111]">
-            WHERE TO WATCH
-          </span>
-          <span className="text-[10px] font-bold text-[#FF5A1F]">01</span>
-        </div>
-      </div>
-
-      {/* Main Split Body: Left Details & Right Curved Poster Shield */}
-      <div className="relative z-10 grid grid-cols-12 gap-3 items-center flex-1 my-2">
-        {/* Left Platform Showcase Column (6 cols) */}
-        <div className="col-span-6 flex flex-col justify-center space-y-3.5 pr-2">
-          {/* Platform Badge */}
+        {/* Left Column Platform Details */}
+        <div className="max-w-[42%] space-y-4 my-auto pt-2">
+          {/* Orange Badge */}
           <div>
             <span
-              className="inline-flex items-center rounded-md px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm"
+              className="inline-flex items-center rounded-md px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-sm"
               style={{ backgroundColor: branding.accent }}
             >
               {branding.badge}
             </span>
           </div>
 
-          {/* Platform Icon & Title */}
+          {/* Platform Icon & Bold Condensed Title */}
           <div>
             <div
-              className="flex items-center gap-2 mb-1"
-              style={{ color: branding.accent }}
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 mb-2 shadow-sm"
+              style={{ borderColor: branding.accent, color: branding.accent }}
             >
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-xl border-2 shadow-sm"
-                style={{ borderColor: branding.accent, backgroundColor: `${branding.accent}12` }}
-              >
-                <Icon icon={branding.platformIcon} width="20" />
-              </div>
+              <Icon icon={branding.platformIcon} width="24" />
             </div>
-            <h2 className="text-2xl lg:text-3xl font-black tracking-tight text-[#183B56] leading-tight">
+            <h2
+              className="text-3xl lg:text-4xl font-black tracking-tight text-[#162D4A] leading-none"
+            >
               {branding.name}
             </h2>
             <div
-              className="h-1 w-16 rounded-full mt-1.5"
+              className="h-1 w-20 rounded-full mt-2"
               style={{ backgroundColor: branding.accent }}
             />
           </div>
 
-          {/* Availability Block */}
+          {/* Now Streaming Block */}
           <div className="flex items-start gap-2.5 pt-1">
             <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2"
               style={{ borderColor: branding.accent, color: branding.accent }}
             >
-              <Icon icon="solar:calendar-date-bold" width="15" />
+              <Icon icon="solar:calendar-date-bold" width="16" />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#183B56]">
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#162D4A]">
                 {branding.status}
               </span>
-              <span className="text-[10px] font-medium text-[#6E7C87] line-clamp-1">
+              <span className="text-[10px] font-semibold text-[#7E8B9B] line-clamp-1">
                 {branding.subtext}
               </span>
             </div>
@@ -311,14 +374,14 @@ export default function FigmaSocialCardPreview({
           {/* CTA Block */}
           <div className="flex items-center gap-2.5 pt-1">
             <div style={{ color: branding.accent }}>
-              <Icon icon="solar:play-circle-bold" width="28" />
+              <Icon icon="solar:play-circle-bold" width="30" />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-[8.5px] font-bold uppercase tracking-widest text-[#6E7C87]">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-[#7E8B9B]">
                 EXPLORE MORE ON
               </span>
               <span
-                className="text-[11px] font-black uppercase tracking-wider"
+                className="text-xs font-black uppercase tracking-wider"
                 style={{ color: branding.accent }}
               >
                 MUVIDB.COM
@@ -327,51 +390,14 @@ export default function FigmaSocialCardPreview({
           </div>
         </div>
 
-        {/* Right Column: Signature Curved Poster Shield (6 cols) */}
-        <div className="col-span-6 relative h-full min-h-[220px] flex items-center justify-end">
-          {/* Olive Wedge Accent Behind Poster Top Right */}
-          <div className="absolute -top-3 -right-3 w-32 h-32 bg-[#D5CFB8] rounded-full opacity-60 filter blur-xl" />
-          
-          {/* Framed Poster Container with Signature Rounded Arch */}
-          <div className="relative w-full h-[95%] overflow-hidden rounded-l-[42px] rounded-r-2xl border-2 border-black/10 bg-black shadow-2xl flex flex-col justify-end">
-            {displayImage ? (
-              <img
-                src={displayImage}
-                alt={title}
-                className="absolute inset-0 h-full w-full object-cover filter contrast-105 brightness-95"
-              />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#1A1C23] text-white/30 p-4 text-center">
-                <Icon icon="solar:film-strip-bold" width="40" />
-                <span className="text-xs mt-2 font-bold">{title}</span>
-              </div>
-            )}
-
-            {/* Bottom Gradient Overlay for Title Legibility */}
-            <div className="relative z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 pt-8 flex flex-col">
-              <span className="text-[8px] font-black uppercase tracking-widest text-[#FF5A1F]">
-                {country} {year ? `• ${year}` : ''}
-              </span>
-              <span className="text-xs font-black text-white leading-tight uppercase line-clamp-1">
-                {title}
-              </span>
-            </div>
+        {/* Bottom Footer Dot Matrix (6 cols x 4 rows) */}
+        <div className="pt-2">
+          <div className="grid grid-cols-6 gap-1.5 w-24">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <div key={i} className="h-1 w-1 rounded-full bg-[#FF7A00]/80" />
+            ))}
           </div>
         </div>
-      </div>
-
-      {/* Bottom Footer Row: Dot Grid + Brand Tagline */}
-      <div className="relative z-10 flex items-end justify-between pt-2 border-t border-black/10">
-        {/* Orange Dot Matrix (6 cols x 3 rows) */}
-        <div className="grid grid-cols-6 gap-1.5 py-1">
-          {Array.from({ length: 18 }).map((_, i) => (
-            <div key={i} className="h-1 w-1 rounded-full bg-[#FF5A1F]/75" />
-          ))}
-        </div>
-
-        <span className="text-[8px] font-extrabold uppercase tracking-widest text-black/40">
-          EVERY FILM. EVERY CREDIT. EVERY STORY.
-        </span>
       </div>
     </div>
   );

@@ -344,12 +344,12 @@ export default function AutoPilotReviewModal({
         </div>
 
         {/* Content Body: 2 Columns */}
-        <div className="grid flex-1 grid-cols-1 gap-5 overflow-y-auto p-5 md:grid-cols-12">
+        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 md:grid-cols-12">
           {/* Left: Graphic Poster Preview */}
-          <div className="space-y-2.5 md:col-span-5">
+          <div className="space-y-3 md:col-span-6 flex flex-col justify-center">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-wider text-text-muted">
-                Graphic Card Preview (4:5)
+                Figma Graphic Card Preview (1:1)
               </span>
               <div className="flex items-center gap-2.5">
                 <button
@@ -361,7 +361,7 @@ export default function AutoPilotReviewModal({
                   Export Figma PNG
                 </button>
                 <label className="cursor-pointer text-[11px] font-bold text-text-muted hover:text-text-primary hover:underline">
-                  {uploadingImage ? 'Uploading…' : '🖼️ Replace'}
+                  {uploadingImage ? 'Uploading…' : '🖼️ Replace Image'}
                   <input
                     type="file"
                     accept="image/*"
@@ -382,7 +382,7 @@ export default function AutoPilotReviewModal({
           </div>
 
           {/* Right: AI Angles, 3 Variations, Channels & Copy */}
-          <div className="space-y-3.5 md:col-span-7 flex flex-col justify-between">
+          <div className="space-y-3.5 md:col-span-6 flex flex-col justify-between">
             <div className="space-y-3">
               {/* Target Channels */}
               <div>
