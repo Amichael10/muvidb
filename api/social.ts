@@ -151,6 +151,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { fetchSeriesCandidates } = await import('./_lib/editorial/candidate_service.js');
         return res.status(200).json(await fetchSeriesCandidates(seriesSlug, 20));
       }
+      if (task === 'render_preview') {
+        const { candidate, format = 'portrait_4_5' } = (req.method === 'POST' ? req.body : req.query) || {};
+        if (!candidate) {
+          return res.status(400).json({ error: 'Candidate data is required for preview rendering' });
+        }
+        const parsedCandidate = typeof candidate === 'string' ? JSON.parse(candidate) : candidate;
+        const { renderSnapshotAsset } = await import('./_lib/social_render.js');
+        const isPerson = parsedCandidate.type === 'person';
+        const snapshot = isPerson
+          ? {
+              kind: 'actor_spotlight' as const,
+              capturedAt: new Date().toISOString(),
+              personId: parsedCandidate.id || 'preview-person',
+              name: parsedCandidate.name,
+              handle: parsedCandidate.data?.handle || null,
+              slug: parsedCandidate.data?.slug || null,
+              photoUrl: parsedCandidate.imageUrl || parsedCandidate.data?.photo_url || null,
+              photoCutoutUrl: parsedCandidate.data?.photoCutoutUrl || parsedCandidate.imageUrl || null,
+              nationality: parsedCandidate.country || parsedCandidate.data?.nationality || null,
+              knownForDepartment: parsedCandidate.data?.knownForDepartment || parsedCandidate.data?.department || 'Actor & Filmmaker',
+              bio: parsedCandidate.subtext || parsedCandidate.data?.bio || null,
+              knownFor: (parsedCandidate.data?.knownFor || []).map((k: any) => ({
+                filmId: k.id || 'f',
+                title: k.title || k.name || '',
+                slug: k.slug || null,
+                year: k.year || null,
+                posterUrl: k.poster_url || null,
+                character: k.character || null,
+              })),
+              creditCount: parsedCandidate.data?.creditCount || 10,
+            }
+          : {
+              kind: 'upcoming_movie' as const,
+              capturedAt: new Date().toISOString(),
+              filmId: parsedCandidate.id || 'preview-film',
+              title: parsedCandidate.name,
+              slug: parsedCandidate.data?.slug || null,
+              posterUrl: parsedCandidate.imageUrl || parsedCandidate.data?.poster_url || null,
+              backdropUrl: parsedCandidate.data?.backdrop_url || null,
+              releaseDate: parsedCandidate.data?.release_date || null,
+              watchAvailability: parsedCandidate.data?.platformDisplayName || parsedCandidate.data?.watchAvailability || (parsedCandidate.data?.is_in_cinemas ? 'In Cinemas Now' : 'Streaming Online'),
+              year: parsedCandidate.data?.year || null,
+              synopsis: parsedCandidate.data?.synopsis || parsedCandidate.subtext || null,
+              tagline: parsedCandidate.data?.tagline || null,
+              genres: parsedCandidate.data?.genres || ['African Cinema'],
+              countries: [parsedCandidate.country || 'Nigeria'],
+              languages: parsedCandidate.data?.languages || ['English'],
+              likedPercent: parsedCandidate.data?.liked_percent || 85,
+              comingSoon: parsedCandidate.data?.coming_soon || false,
+              isPublished: true,
+              topCast: (parsedCandidate.data?.topCast || []).map((c: any) => ({
+                personId: c.id || 'p',
+                name: c.name || '',
+                handle: c.handle || null,
+                character: c.character || null,
+              })),
+            };
+
+        const rendered = await renderSnapshotAsset({
+          snapshot: snapshot as any,
+          format: format as any,
+        });
+
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.status(200).send(rendered.png);
+      }
+
       const summary = await getSocialStudioSummary();
       const allConnections = await getAllPlatformConnections();
       return res.status(200).json({

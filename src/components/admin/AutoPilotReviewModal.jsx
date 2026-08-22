@@ -185,6 +185,29 @@ export default function AutoPilotReviewModal({
     }
   };
 
+  const handleDownloadRenderedCard = async () => {
+    if (!candidate) return;
+    const toastId = toast.loading('Rendering high-res Figma card (1080×1350)…');
+    try {
+      const res = await fetch('/api/social?task=render_preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate, format: 'portrait_4_5' }),
+      });
+      if (!res.ok) throw new Error('Failed to render graphic asset');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(candidate.name || 'muvidb').replace(/[^a-zA-Z0-9]/g, '_')}_figma_card.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Downloaded Figma 1080×1350 card!', { id: toastId });
+    } catch (err) {
+      toast.error('Failed to export rendered card', { id: toastId });
+    }
+  };
+
   const togglePlatform = p => {
     setSelectedPlatforms(prev =>
       prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
@@ -327,16 +350,26 @@ export default function AutoPilotReviewModal({
               <span className="text-xs font-black uppercase tracking-wider text-text-muted">
                 Graphic Card Preview (4:5)
               </span>
-              <label className="cursor-pointer text-[11px] font-bold text-brand hover:underline">
-                {uploadingImage ? 'Uploading…' : '🖼️ Replace Photo'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                  className="hidden"
-                />
-              </label>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleDownloadRenderedCard}
+                  className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
+                >
+                  <Icon icon="solar:download-square-linear" width="13" />
+                  Export Figma PNG
+                </button>
+                <label className="cursor-pointer text-[11px] font-bold text-text-muted hover:text-text-primary hover:underline">
+                  {uploadingImage ? 'Uploading…' : '🖼️ Replace'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             </div>
 
             {/* Poster Card Shell */}

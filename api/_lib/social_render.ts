@@ -848,166 +848,267 @@ function buildPersonSpotlightCard(
   );
 }
 
-function buildCard(copy: CardCopy, format: SocialAssetFormat, artwork: Artwork): SatoriNode {
+/**
+ * Platform Theme Helper for Movie Spotlights
+ */
+function getPlatformTheme(snapshot: UpcomingMovieSnapshot): {
+  accent: string;
+  name: string;
+  eyebrow: string;
+  cta: string;
+} {
+  const textVal = `${snapshot.watchAvailability || ''} ${snapshot.title || ''}`.toLowerCase();
+  if (textVal.includes('prime') || textVal.includes('amazon')) {
+    return { accent: '#00A8E1', name: 'Prime Video', eyebrow: 'NEW ON PRIME VIDEO', cta: 'STREAM ON PRIME VIDEO' };
+  }
+  if (textVal.includes('netflix')) {
+    return { accent: '#E50914', name: 'Netflix', eyebrow: 'NEW ON NETFLIX', cta: 'STREAM ON NETFLIX' };
+  }
+  if (textVal.includes('youtube')) {
+    return { accent: '#FF0000', name: 'YouTube', eyebrow: 'FREE ON YOUTUBE', cta: 'WATCH ON YOUTUBE' };
+  }
+  if (textVal.includes('cinema')) {
+    return { accent: '#FF5A1F', name: 'In Cinemas', eyebrow: 'IN CINEMAS NOW', cta: 'BUY TICKETS' };
+  }
+  return { accent: '#FF5A1F', name: 'MuviDB', eyebrow: snapshot.comingSoon ? 'COMING SOON' : 'STREAMING SPOTLIGHT', cta: 'DISCOVER ON MUVIDB' };
+}
+
+/**
+ * 2. Movie & Streaming Spotlight (Figma 4:5, 1:1, 9:16)
+ * Renders New on Prime, New on Netflix, Free on YouTube, In Cinemas Now
+ */
+function buildMovieSpotlightCard(
+  snapshot: UpcomingMovieSnapshot,
+  format: SocialAssetFormat,
+  poster: Artwork,
+  logo: BrandLockup,
+  decor: CardDecor,
+): SatoriNode {
   const { width, height } = ASSET_FORMAT_DIMENSIONS[format];
-  const scale = width / 1080;
+  const s = width / 1080;
+  const pad = 52 * s;
+  const splitX = width * (format === 'square_1_1' ? 0.52 : 0.48);
+  const gridY = height * (format === 'vertical_9_16' ? 0.105 : 0.145);
+
+  const theme = getPlatformTheme(snapshot);
+  const density = {
+    portrait_4_5: { synLen: 140, castCount: 3, headline: 1, gap: 1 },
+    square_1_1: { synLen: 75, castCount: 2, headline: 0.78, gap: 0.65 },
+    vertical_9_16: { synLen: 180, castCount: 3, headline: 1.05, gap: 1.15 },
+  }[format];
+
+  const g = s * density.gap;
+  const titleParts = splitHeadlineName(snapshot.title);
+  const castList = (snapshot.topCast || []).slice(0, density.castCount).map(c => c.name).join(', ');
+  const synopsis = snapshot.synopsis && snapshot.synopsis.length > density.synLen
+    ? `${snapshot.synopsis.slice(0, density.synLen - 3).trimEnd()}…`
+    : snapshot.synopsis;
 
   const children: unknown[] = [];
 
-  if (artwork) {
-    // Sized to an explicit cover box so the crop is deterministic across
-    // formats. Anchored above centre so faces survive the vertical crop.
-    const cover = Math.max(width / artwork.width, height / artwork.height);
-    const drawWidth = Math.ceil(artwork.width * cover);
-    const drawHeight = Math.ceil(artwork.height * cover);
+  // Decorative grid rules
+  children.push(
+    h('div', { position: 'absolute', left: `${splitX}px`, top: 0, width: `${Math.max(1, s)}px`, height: `${height}px`, backgroundColor: BRAND.rule, display: 'flex' }),
+    h('div', { position: 'absolute', left: 0, top: `${gridY}px`, width: `${width}px`, height: `${Math.max(1, s)}px`, backgroundColor: BRAND.rule, display: 'flex' }),
+    h('div', { position: 'absolute', left: `${splitX - 4.5 * s}px`, top: `${gridY + 10 * s}px`, width: `${9 * s}px`, height: `${9 * s}px`, borderRadius: `${9 * s}px`, backgroundColor: theme.accent, display: 'flex' }),
+  );
+
+  children.push(dotGrid(width - pad - 78 * s, gridY + 34 * s, s, theme.accent));
+
+  if (decor.filmStrip) {
+    const stripW = Math.round(380 * s);
+    children.push(
+      h(
+        'div',
+        { position: 'absolute', right: `${-40 * s}px`, bottom: `${-40 * s}px`, display: 'flex', opacity: 0.09 },
+        { type: 'img', props: { src: decor.filmStrip, width: stripW, height: stripW, style: { width: `${stripW}px`, height: `${stripW}px` } } },
+      ),
+    );
+  }
+
+  // Right column: High-Res Framed Poster Art
+  if (poster) {
+    const posterW = Math.round((width - splitX - pad) * 0.96);
+    const posterH = Math.round(posterW * 1.45);
+    const posterTop = gridY + (height - gridY - posterH) * 0.42;
 
     children.push(
       h(
         'div',
         {
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: `${width}px`,
-          height: `${height}px`,
-          display: 'flex',
+          left: `${splitX + 30 * s}px`,
+          top: `${posterTop}px`,
+          width: `${posterW}px`,
+          height: `${posterH}px`,
+          borderRadius: `${16 * s}px`,
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
           overflow: 'hidden',
+          display: 'flex',
+          border: `${Math.max(1, 2 * s)}px solid rgba(17,17,17,0.12)`,
         },
         {
           type: 'img',
           props: {
-            src: artwork.dataUri,
-            width: drawWidth,
-            height: drawHeight,
-            // Sized to the cover box, so the image's own aspect ratio already
-            // matches and satori's preserveAspectRatio has nothing to letterbox.
-            style: {
-              width: `${drawWidth}px`,
-              height: `${drawHeight}px`,
-              marginLeft: `${Math.round((width - drawWidth) / 2)}px`,
-              marginTop: `${Math.round((height - drawHeight) * 0.35)}px`,
-            },
+            src: poster.dataUri,
+            width: posterW,
+            height: posterH,
+            style: { width: `${posterW}px`, height: `${posterH}px`, objectFit: 'cover' },
           },
         },
       ),
     );
+
+    // Rating Badge on Poster
+    if (snapshot.likedPercent) {
+      children.push(
+        h(
+          'div',
+          {
+            position: 'absolute',
+            left: `${splitX + 44 * s}px`,
+            top: `${posterTop + 14 * s}px`,
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            paddingTop: `${6 * s}px`,
+            paddingBottom: `${6 * s}px`,
+            paddingLeft: `${12 * s}px`,
+            paddingRight: `${12 * s}px`,
+            borderRadius: `${8 * s}px`,
+            backdropFilter: 'blur(8px)',
+          },
+          [
+            h('div', { display: 'flex', marginRight: `${6 * s}px` }, icon('star', 16, s, '#FFB800')),
+            h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${17 * s}px`, color: '#FFFFFF' }, `${(snapshot.likedPercent / 10).toFixed(1)}/10`),
+          ],
+        ),
+      );
+    }
   }
 
-  // Scrim keeps the headline legible over any artwork.
-  children.push(
-    h('div', {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: `${width}px`,
-      height: `${height}px`,
-      backgroundImage: artwork
-        ? 'linear-gradient(180deg, rgba(11,11,15,0.35) 0%, rgba(11,11,15,0.15) 40%, rgba(11,11,15,0.92) 82%, rgba(11,11,15,0.99) 100%)'
-        : 'linear-gradient(160deg, #1A1526 0%, #0B0B0F 70%)',
-    }),
+  // Header Lockup
+  const lockupParts: unknown[] = [];
+  if (logo.icon) {
+    const iconH = Math.round(48 * s);
+    const iconW = Math.round((logo.icon.width / logo.icon.height) * iconH);
+    lockupParts.push({ type: 'img', props: { src: logo.icon.dataUri, width: iconW, height: iconH, style: { width: `${iconW}px`, height: `${iconH}px` } } });
+  }
+  lockupParts.push(
+    h('div', { display: 'flex', marginLeft: `${14 * s}px`, fontFamily: 'Outfit', fontWeight: 600, fontSize: `${44 * s}px`, letterSpacing: `${-1 * s}px`, color: BRAND.ink }, 'MuviDB'),
   );
 
-  children.push(
-    h(
-      'div',
-      {
-        position: 'absolute',
-        top: `${64 * scale}px`,
-        left: `${64 * scale}px`,
-        display: 'flex',
-        alignItems: 'center',
-        paddingTop: `${12 * scale}px`,
-        paddingBottom: `${12 * scale}px`,
-        paddingLeft: `${26 * scale}px`,
-        paddingRight: `${26 * scale}px`,
-        borderRadius: `${999}px`,
-        backgroundColor: '#E23E2D',
-        fontFamily: 'Outfit',
-        fontWeight: 600,
-        fontSize: `${26 * scale}px`,
-        letterSpacing: `${2 * scale}px`,
-        textTransform: 'uppercase',
-        color: '#FFFFFF',
-      },
-      copy.eyebrow,
-    ),
-  );
-
-  const block: unknown[] = [
-    h(
-      'div',
-      {
-        display: 'flex',
-        fontFamily: 'Syne',
-        fontWeight: 800,
-        fontSize: `${(copy.headline.length > 22 ? 76 : 96) * scale}px`,
-        lineHeight: 1.05,
-        color: '#FFFFFF',
-      },
-      copy.headline,
-    ),
-  ];
-
-  if (copy.support) {
-    block.push(
-      h(
-        'div',
-        {
-          display: 'flex',
-          marginTop: `${20 * scale}px`,
-          fontFamily: 'Outfit',
-          fontWeight: 400,
-          fontSize: `${36 * scale}px`,
-          color: 'rgba(255,255,255,0.78)',
-        },
-        copy.support,
-      ),
+  if (lockupParts.length) {
+    children.push(
+      h('div', { position: 'absolute', left: `${pad}px`, top: `${gridY - 82 * s}px`, display: 'flex', alignItems: 'center' }, lockupParts),
     );
   }
 
-  block.push(
-    h(
-      'div',
-      {
-        display: 'flex',
-        marginTop: `${36 * scale}px`,
-        fontFamily: 'Outfit',
-        fontWeight: 600,
-        fontSize: `${28 * scale}px`,
-        letterSpacing: `${4 * scale}px`,
-        textTransform: 'uppercase',
-        color: 'rgba(255,255,255,0.55)',
-      },
-      'MuviDB',
-    ),
-  );
-
   children.push(
     h(
       'div',
-      {
-        position: 'absolute',
-        left: `${64 * scale}px`,
-        right: `${64 * scale}px`,
-        bottom: `${72 * scale}px`,
-        display: 'flex',
-        flexDirection: 'column',
-      },
-      block,
+      { position: 'absolute', right: `${pad}px`, top: `${gridY - 68 * s}px`, display: 'flex', alignItems: 'center' },
+      [
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${21 * s}px`, letterSpacing: `${2.6 * s}px`, color: BRAND.ink }, theme.eyebrow),
+        h('div', { display: 'flex', marginLeft: `${14 * s}px`, fontFamily: 'Outfit', fontWeight: 600, fontSize: `${21 * s}px`, color: theme.accent }, '01'),
+      ],
     ),
   );
 
-  return h(
-    'div',
-    {
-      width: `${width}px`,
-      height: `${height}px`,
-      display: 'flex',
-      position: 'relative',
-      backgroundColor: '#0B0B0F',
-    },
-    children,
+  // Left Column
+  const column: unknown[] = [];
+
+  // Platform Eyebrow Pill
+  column.push(
+    h(
+      'div',
+      {
+        display: 'flex',
+        alignItems: 'center',
+        backgroundColor: theme.accent,
+        paddingTop: `${6 * s}px`,
+        paddingBottom: `${6 * s}px`,
+        paddingLeft: `${16 * s}px`,
+        paddingRight: `${16 * s}px`,
+        borderRadius: `${999}px`,
+        alignSelf: 'flex-start',
+        marginBottom: `${14 * g}px`,
+      },
+      h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${18 * s}px`, letterSpacing: `${3 * s}px`, color: '#FFFFFF' }, theme.name.toUpperCase()),
+    ),
   );
+
+  // Title Stack in Bebas Neue
+  const longestWord = Math.max(titleParts.top.length, titleParts.accent.length);
+  const headlineSize = (longestWord > 14 ? 90 : longestWord > 10 ? 108 : 124) * s * density.headline;
+  column.push(
+    h('div', { display: 'flex', fontFamily: 'Headline', fontSize: `${headlineSize}px`, lineHeight: 1.02, color: BRAND.ink }, titleParts.top.toUpperCase()),
+  );
+  if (titleParts.accent) {
+    column.push(
+      h('div', { display: 'flex', fontFamily: 'Headline', fontSize: `${headlineSize}px`, lineHeight: 1.02, color: theme.accent }, titleParts.accent.toUpperCase()),
+    );
+  }
+  if (titleParts.tail) {
+    column.push(
+      h('div', { display: 'flex', marginTop: `${6 * g}px`, fontFamily: 'Headline', fontSize: `${headlineSize * 0.62}px`, letterSpacing: `${8 * s}px`, color: BRAND.ink }, titleParts.tail.toUpperCase()),
+    );
+  }
+
+  column.push(
+    h('div', { display: 'flex', marginTop: `${16 * g}px`, marginBottom: `${20 * g}px` }, rule(`${splitX - pad - 40 * s}px`, s, `${theme.accent}55`)),
+  );
+
+  // Metadata Grid
+  if (snapshot.genres && snapshot.genres.length > 0) {
+    column.push(
+      h('div', { display: 'flex', alignItems: 'center', marginBottom: `${10 * g}px` }, [
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${18 * s}px`, letterSpacing: `${2.5 * s}px`, color: BRAND.muted, width: `${110 * s}px` }, 'GENRE'),
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${20 * s}px`, color: BRAND.ink }, snapshot.genres.slice(0, 2).join(' • ')),
+      ]),
+    );
+  }
+
+  if (snapshot.year || snapshot.releaseDate) {
+    column.push(
+      h('div', { display: 'flex', alignItems: 'center', marginBottom: `${10 * g}px` }, [
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${18 * s}px`, letterSpacing: `${2.5 * s}px`, color: BRAND.muted, width: `${110 * s}px` }, 'RELEASE'),
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${20 * s}px`, color: BRAND.ink }, `${snapshot.year || ''} ${snapshot.releaseDate ? `(${snapshot.releaseDate})` : ''}`.trim()),
+      ]),
+    );
+  }
+
+  if (castList) {
+    column.push(
+      h('div', { display: 'flex', alignItems: 'flex-start', marginBottom: `${16 * g}px` }, [
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${18 * s}px`, letterSpacing: `${2.5 * s}px`, color: BRAND.muted, width: `${110 * s}px` }, 'STARRING'),
+        h('div', { display: 'flex', flexWrap: 'wrap', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${20 * s}px`, color: BRAND.ink, width: `${splitX - pad - 140 * s}px` }, castList),
+      ]),
+    );
+  }
+
+  if (synopsis) {
+    column.push(
+      h('div', { display: 'flex', width: `${splitX - pad - 40 * s}px`, marginTop: `${10 * g}px`, fontFamily: 'Outfit', fontWeight: 400, fontSize: `${22 * s}px`, lineHeight: 1.4, color: BRAND.muted }, synopsis),
+    );
+  }
+
+  children.push(
+    h('div', { position: 'absolute', left: `${pad}px`, top: `${gridY + 54 * s}px`, width: `${splitX - pad}px`, display: 'flex', flexDirection: 'column' }, column),
+  );
+
+  // Footer CTA
+  children.push(
+    h('div', { position: 'absolute', left: `${pad}px`, bottom: `${64 * s}px`, display: 'flex', alignItems: 'center' }, [
+      circledIcon('arrowRight', 52, s, theme.accent),
+      h('div', { display: 'flex', flexDirection: 'column', marginLeft: `${18 * s}px` }, [
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${19 * s}px`, letterSpacing: `${3 * s}px`, color: BRAND.muted }, theme.cta),
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${27 * s}px`, color: BRAND.ink }, 'MuviDB.com'),
+      ]),
+    ]),
+  );
+
+  return h('div', { width: `${width}px`, height: `${height}px`, display: 'flex', position: 'relative', backgroundColor: BRAND.bg }, children);
 }
 
 export type RenderedAsset = {
@@ -1027,18 +1128,29 @@ export async function renderSnapshotAsset(input: {
   const copy = cardCopy(input.snapshot);
 
   const artwork = input.artwork !== undefined ? input.artwork : await loadArtwork(copy.imageUrl);
+  const brandLogo = await getBrandLockup();
+  const decor = await getCardDecor();
 
-  const element =
-    input.snapshot.kind === 'actor_spotlight' || input.snapshot.kind === 'birthday_spotlight'
-      ? buildPersonSpotlightCard(
-          input.snapshot,
-          personCardSpec(input.snapshot),
-          input.format,
-          artwork,
-          await getBrandLockup(),
-          await getCardDecor(),
-        )
-      : buildCard(copy, input.format, artwork);
+  let element: SatoriNode;
+
+  if (input.snapshot.kind === 'actor_spotlight' || input.snapshot.kind === 'birthday_spotlight') {
+    element = buildPersonSpotlightCard(
+      input.snapshot,
+      personCardSpec(input.snapshot),
+      input.format,
+      artwork,
+      brandLogo,
+      decor,
+    );
+  } else {
+    element = buildMovieSpotlightCard(
+      input.snapshot as UpcomingMovieSnapshot,
+      input.format,
+      artwork,
+      brandLogo,
+      decor,
+    );
+  }
 
   const { default: satori } = await import('satori');
   const { Resvg } = await import('@resvg/resvg-js');

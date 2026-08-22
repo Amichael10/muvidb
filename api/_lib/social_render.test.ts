@@ -57,3 +57,73 @@ describe('ASSET_FORMAT_DIMENSIONS', () => {
     expect(vertical_9_16.width / vertical_9_16.height).toBeCloseTo(9 / 16, 3);
   });
 });
+
+describe('renderSnapshotAsset', () => {
+  it('renders a movie spotlight card into a valid PNG buffer', async () => {
+    const { renderSnapshotAsset } = await import('./social_render.js');
+    const result = await renderSnapshotAsset({
+      snapshot: {
+        kind: 'upcoming_movie',
+        capturedAt: '2026-08-22T00:00:00Z',
+        filmId: 'test-film-1',
+        title: 'Delivery Boy',
+        slug: 'delivery-boy',
+        posterUrl: null,
+        backdropUrl: null,
+        releaseDate: '2024-05-10',
+        watchAvailability: 'Streaming on Circuits',
+        year: 2024,
+        synopsis: 'A runaway teen escapes an extremist camp across northern Nigeria.',
+        tagline: 'Freedom comes with a price.',
+        genres: ['Drama', 'Thriller'],
+        countries: ['Nigeria'],
+        languages: ['English', 'Hausa'],
+        likedPercent: 84,
+        comingSoon: false,
+        isPublished: true,
+        topCast: [
+          { personId: 'p1', name: 'Jemima Osunde', handle: '@jemimaosunde', character: 'Nkem' },
+          { personId: 'p2', name: 'Jammal Ibrahim', handle: null, character: 'Amir' },
+        ],
+      },
+      format: 'portrait_4_5',
+    });
+
+    expect(result.format).toBe('portrait_4_5');
+    expect(result.width).toBe(1080);
+    expect(result.height).toBe(1350);
+    expect(result.png).toBeInstanceOf(Buffer);
+    expect(result.png.length).toBeGreaterThan(1000);
+  });
+
+  it('renders an actor spotlight card into a valid square PNG buffer', async () => {
+    const { renderSnapshotAsset } = await import('./social_render.js');
+    const result = await renderSnapshotAsset({
+      snapshot: {
+        kind: 'actor_spotlight',
+        capturedAt: '2026-08-22T00:00:00Z',
+        personId: 'test-person-1',
+        name: 'Bisola Aiyeola',
+        handle: '@iambisola',
+        slug: 'bisola-aiyeola',
+        photoUrl: null,
+        photoCutoutUrl: null,
+        nationality: 'Nigerian',
+        knownForDepartment: 'Actor & Producer',
+        bio: 'Award-winning Nigerian actress and singer with prominent Nollywood roles.',
+        knownFor: [
+          { filmId: 'f1', title: 'Sugar Rush', slug: 'sugar-rush', year: 2019, posterUrl: null, character: 'Bola' },
+          { filmId: 'f2', title: 'Breaded Life', slug: 'breaded-life', year: 2021, posterUrl: null, character: 'Todowede' },
+        ],
+        creditCount: 18,
+      },
+      format: 'square_1_1',
+    });
+
+    expect(result.format).toBe('square_1_1');
+    expect(result.width).toBe(1080);
+    expect(result.height).toBe(1080);
+    expect(result.png).toBeInstanceOf(Buffer);
+    expect(result.png.length).toBeGreaterThan(1000);
+  });
+});
