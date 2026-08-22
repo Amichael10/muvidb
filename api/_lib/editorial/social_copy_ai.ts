@@ -1,5 +1,17 @@
 ﻿import { generateAIContent, parseJSON } from '../ai_service.js';
 
+export type SocialAngle =
+  | 'streaming_alert'
+  | 'discovery'
+  | 'dynamic_story'
+  | 'high_drama'
+  | 'critic_debate'
+  | 'character_question'
+  | 'behind_the_film'
+  | 'credit_connection'
+  | 'audience_debate'
+  | 'fun_relatable';
+
 export type AICopyRequest = {
   candidate: {
     id: string;
@@ -17,11 +29,27 @@ export type AICopyRequest = {
     category?: string;
     description?: string;
   };
-  tone?: 'dramatic' | 'debate' | 'streaming' | 'celebratory' | 'funny' | 'default';
+  angle?: SocialAngle;
   preferredProvider?: 'cohere' | 'gemini' | 'groq' | 'openai';
 };
 
-export type AICopyResult = {
+export type PlatformCaptions = {
+  instagram: string;
+  threads: string;
+  facebook: string;
+  tiktok: string;
+};
+
+export type AICopyVariation = {
+  key: 'A' | 'B' | 'C';
+  label: 'Informative' | 'Editorial' | 'Conversational';
+  captions: PlatformCaptions;
+};
+
+export type AICopyResponse = {
+  success: boolean;
+  variations: AICopyVariation[];
+  selectedVariation: 'A' | 'B' | 'C';
   instagram: string;
   threads: string;
   facebook: string;
@@ -30,139 +58,416 @@ export type AICopyResult = {
 };
 
 /**
- * Builds the copywriting prompt tailored to Nollywood & African entertainment standards
+ * Returns specific rules for the active editorial series / content type
  */
-function buildCopyPrompt(req: AICopyRequest): string {
-  const { candidate, series, tone } = req;
+function getContentTypeInstructions(seriesSlug: string, isPerson: boolean): string {
+  if (seriesSlug.includes('watch') || seriesSlug.includes('streaming') || seriesSlug === 'where_to_watch') {
+    return `
+CONTENT TYPE: WHERE TO WATCH / STREAMING ALERT
+Goal: Utility-first discovery.
+- Lead with the film title and viewing destination immediately.
+- The first two lines MUST answer: 1. What film? 2. Where can I watch it?
+- Then optionally use synopsis or cast details to give the reader a concrete reason to care.
+- Do NOT call a film "new" unless explicitly indicated in data.
+- Example structure:
+  Now streaming: [Film Title] 📺
+  You can currently watch [Film Title] on [Platform].
+  Starring [selected cast with @handles].
+  [1 factual sentence about the premise].
+  Have you seen it already, or is this going on your watchlist?
+  Find more places to watch on MuviDB.
+  #MuviDB #AfricanCinema #[FilmTitle]`;
+  }
+
+  if (seriesSlug.includes('critic') || seriesSlug === 'critics_say' || seriesSlug === 'the_critic') {
+    return `
+CONTENT TYPE: WHAT THE CRITICS SAY
+Goal: Frame the critical observation, debate, or review without marketing fluff.
+- The critic's perspective is the subject. Do NOT turn criticism into promotional marketing copy.
+- Accurately represent praise and criticisms from the data.
+- Attribute the opinion clearly to the reviewer/publication.
+- Example structure:
+  What the critics are saying about [Film Title].
+  [Critic/Pub] describes the film as "[short quote/paraphrase]".
+  Their review highlights [theme/performance].
+  Have you seen the film? Did you come away with the same impression?
+  Read more critic reviews on MuviDB.
+  #MuviDB #AfricanCinema #[FilmTitle]`;
+  }
+
+  if (seriesSlug.includes('behind') || seriesSlug === 'behind_the_camera' || (isPerson && seriesSlug.includes('crew'))) {
+    return `
+CONTENT TYPE: BEHIND THE CAMERA / CREW
+Goal: "Every Film. Every Credit." Spotlight directors, cinematographers, writers, and editors.
+- Highlight the person's specific craft (e.g. framing, lighting, editing, directing).
+- Connect their known credits.
+- Example structure:
+  You know the film. Meet the person behind the camera.
+  [Person] worked as [Role] on [Film].
+  Their other credits across African cinema include [Film 2], [Film 3] and [Film 4].
+  Explore the filmmakers behind African cinema on MuviDB.
+  #MuviDB #AfricanCinema #[PersonName]`;
+  }
+
+  if (isPerson || seriesSlug.includes('filmography') || seriesSlug === 'you_know_the_face') {
+    return `
+CONTENT TYPE: THE FILMOGRAPHY / ACTOR SPOTLIGHT
+Goal: Database-led credit discovery.
+- Avoid generic celebration like "Celebrating the incredible journey of...".
+- Start from the person's most recognisable credit and lead the reader into deeper discovery of other projects.
+- Example structure:
+  You know [Person] from [Popular Film]. But their filmography goes much further.
+  From [Film 2] to [Film 3] and [Film 4], here are a few credits from their work across African cinema.
+  Which performance do you know them from?
+  Explore the full filmography on MuviDB.
+  #MuviDB #AfricanCinema #[PersonName]`;
+  }
+
+  if (seriesSlug.includes('stage') || seriesSlug.includes('theatre')) {
+    return `
+CONTENT TYPE: WHAT'S ON STAGE / THEATRE
+Goal: Entertainment guide for African live theatre.
+- State production, venue 📍, dates 📅, and what the play explores.
+- Example structure:
+  On stage this weekend: [Production Name] 🎭
+  [Short factual description].
+  📍 [Venue]
+  📅 [Date]
+  If live theatre is on your weekend agenda, put this one on your radar.
+  Find more theatre events on MuviDB.
+  #MuviDB #AfricanTheatre #[ProductionName]`;
+  }
+
+  if (seriesSlug.includes('weekend') || seriesSlug === 'weekend_watchlist') {
+    return `
+CONTENT TYPE: WEEKEND WATCHLIST
+Goal: Thoughtful recommendation, not an advertisement.
+- Example structure:
+  Looking for something to watch this weekend?
+  Put [Film Title] on your radar.
+  [Short intriguing premise sentence without spoilers].
+  Available on [Platform].
+  Would you add this to your weekend list?
+  #MuviDB #AfricanCinema #[FilmTitle]`;
+  }
+
+  return `
+CONTENT TYPE: FILM CONVERSATION / DEBATE
+Goal: Make someone want to reply with an authentic opinion. NOT promotional.
+- The question is the content.
+- Example structure:
+  [Film Title] leaves you with an interesting question:
+  [Thematic/moral dilemma from the story].
+  Where do you stand?
+  #MuviDB #AfricanCinema #[FilmTitle]`;
+}
+
+/**
+ * Returns instructions for the chosen editorial angle
+ */
+function getAngleInstructions(angle: SocialAngle): string {
+  switch (angle) {
+    case 'streaming_alert':
+      return 'ANGLE: STREAMING ALERT -> Lead with TITLE + PLATFORM + DATE/availability. Utility and discovery first.';
+    case 'discovery':
+      return 'ANGLE: DISCOVERY -> Teach the audience a fascinating fact or credit connection they probably did not know.';
+    case 'high_drama':
+      return 'ANGLE: HIGH DRAMA -> Lead with the real stakes and moral conflict in the actual storyline. Never invent artificial drama.';
+    case 'critic_debate':
+      return 'ANGLE: CRITIC DEBATE -> Frame the critical reception, praise, or point of contention. Ask whether audiences agree.';
+    case 'character_question':
+      return 'ANGLE: CHARACTER QUESTION -> Center the post on a tough character decision, moral dilemma, or turning point.';
+    case 'behind_the_film':
+      return 'ANGLE: BEHIND THE FILM -> Focus on director/cinematographer/writer craft and visual language.';
+    case 'credit_connection':
+      return 'ANGLE: CREDIT CONNECTION -> Connect multiple films through a shared actor, director, or key crew member.';
+    case 'audience_debate':
+      return 'ANGLE: AUDIENCE DEBATE -> Ask a specific, thought-provoking opinion question grounded in the film.';
+    case 'fun_relatable':
+      return 'ANGLE: FUN & RELATABLE -> Conversational observation based on the premise or character dynamic. No forced slang.';
+    case 'dynamic_story':
+    default:
+      return 'ANGLE: DYNAMIC STORY -> Lead with an intriguing narrative hook and premise progression.';
+  }
+}
+
+/**
+ * Builds prompt following strict MuviDB guidelines
+ */
+function buildMuviDBPrompt(req: AICopyRequest): string {
+  const { candidate, series, angle = 'streaming_alert' } = req;
   const data = candidate.data || {};
   const isPerson = candidate.type === 'person';
-  const seriesName = series?.name || 'Nollywood Spotlight';
   const seriesSlug = series?.slug || '';
+  const seriesName = series?.name || 'African Cinema Spotlight';
 
-  // Extract metadata
   const title = candidate.name;
   const synopsis = data.synopsis || candidate.subtext || '';
   const tagline = data.tagline || '';
-  const year = data.year || '';
+  const year = data.year ? `${data.year}` : '';
   const releaseDate = data.release_date || '';
   const releaseType = data.release_type || '';
+  const platform = data.platformDisplayName || (data.streaming_links?.prime_video ? 'Prime Video' : data.streaming_links?.netflix ? 'Netflix' : data.is_in_cinemas ? 'Cinemas Nationwide' : (releaseType || 'Streaming Platforms'));
   const isCinemas = data.is_in_cinemas || false;
+
   const topCast = (data.topCast || []).map((c: any) => `${c.name}${c.handle ? ` (${c.handle})` : ''}`).join(', ');
   const directors = (data.directors || []).map((d: any) => `${d.name}${d.handle ? ` (${d.handle})` : ''}`).join(', ');
   const criticQuote = data.criticReview?.quote || data.quote || '';
   const criticName = data.criticReview?.criticName || data.criticName || '';
   const criticPub = data.criticReview?.publication || data.publication || '';
   const rating = data.criticReview?.rating || (data.liked_percent ? `${(data.liked_percent / 10).toFixed(1)}/10` : '');
-  const knownFor = (data.knownFor || []).map((k: any) => `${k.title} (${k.year || ''})`).join(', ');
+  const knownFor = (data.knownFor || []).map((k: any) => `${k.title}${k.year ? ` (${k.year})` : ''}`).join(', ');
   const bio = data.bio || '';
+  const venue = data.venue || '';
 
-  let contextDescription = '';
-  if (isPerson) {
-    contextDescription = `
-FEATURE TYPE: Actor/Filmmaker Spotlight (${seriesName})
-- Name: ${title}
-- Handle: ${data.handle || ''}
-- Department: ${data.department || data.known_for_department || 'Actor/Filmmaker'}
-- Known For Filmography: ${knownFor || 'Acclaimed Nollywood works'}
-- Bio Summary: ${bio || synopsis}
-- Focus: Highlight their artistic craft, versatility, impact on African cinema, and prompt the audience for their favorite role.`;
-  } else if (criticQuote || seriesSlug.includes('critic')) {
-    contextDescription = `
-FEATURE TYPE: Film Criticism & Review Debate (${seriesName})
-- Film Title: ${title} (${year})
-- Synopsis: ${synopsis}
-- Tagline: ${tagline}
-- Critic Review Quote: "${criticQuote}" by ${criticName} (${criticPub})
-- Rating: ${rating}
-- Cast: ${topCast}
-- Director: ${directors}
-- Focus: Hook readers with the critic's verdict/rating, present the central plot conflict, and ask whether the audience agrees with the review.`;
-  } else {
-    contextDescription = `
-FEATURE TYPE: Nollywood Movie Feature (${seriesName})
-- Title: ${title} (${year})
-- Synopsis: ${synopsis}
-- Tagline: ${tagline}
-- Release Info: ${releaseType ? `Streaming on ${releaseType}` : (isCinemas ? 'In Cinemas Nationwide' : (releaseDate ? `Releasing ${releaseDate}` : 'Now Available'))}
-- Top Cast: ${topCast || 'Nollywood stars'}
-- Director: ${directors || 'Acclaimed Filmmaker'}
-- Focus: Build suspense and curiosity around the storyline conflict. Do NOT start every post with "New Poster". Use an intriguing narrative hook, platform anchor, cast @handles, and discussion CTA.`;
-  }
+  const contentTypeRules = getContentTypeInstructions(seriesSlug, isPerson);
+  const angleRules = getAngleInstructions(angle);
 
-  const toneGuidance = tone && tone !== 'default'
-    ? `TONE REQUIREMENT: Adopt a ${tone.toUpperCase()} tone (e.g. ${tone === 'debate' ? 'spark intense debate/opinion' : tone === 'dramatic' ? 'high drama & suspense' : tone === 'funny' ? 'humorous & relatable' : 'exciting & energetic'}).`
-    : `TONE: High-engagement, authentic Nigerian entertainment voice (Partyjollof TV, Filmone, Pulse Nigeria style).`;
+  return `You are the social copywriter for MuviDB (muvidb.com), the definitive discovery database and publication for African Cinema.
+You are NOT an influencer and you are NOT writing generic social media hype.
 
-  return `You are the lead social media strategist for MuviDB (the IMDb for African Cinema).
-Write 4 platform-tailored social media captions for this feature.
+CORE RULES:
+1. Lead with the most interesting or useful factual information.
+2. NEVER write generic social media hype or cliché marketing sludge:
+   - STRICTLY FORBIDDEN: "Are you ready?", "Are you seated?", "This one is a must-watch", "You don't want to miss this", "Grab your popcorn", "Drop a 🍿", "Who else is excited?", "Get ready", "Tag a friend", "Celebrating the incredible journey of...".
+3. Do not invent excitement or drama. Let the real story, facts, or critical perspective create interest.
+4. Do not invent plot facts, cast, release dates, streaming services, or credits not in SOURCE DATA.
+5. Maximum 1-2 emoji (e.g. 📺, 🎬, 🎭, 📍, 📅).
+6. Do not embed hashtags in the middle of sentences. Place 3-5 clean hashtags at the very bottom (#MuviDB #AfricanCinema #[Tag]).
+7. Tone: Knowledgeable, curious, conversational, culturally aware. Write as MuviDB.
 
-${contextDescription}
+${contentTypeRules}
 
-${toneGuidance}
+${angleRules}
 
-STRICT PLATFORM REQUIREMENTS:
-1. "instagram":
-   - Line 1: Compelling, story-driven opening hook (tailored to the plot or subject. Do NOT write "New Poster for..." unless it's explicitly a poster drop).
-   - Line 2: Platform/Cinemas/Release date anchor (e.g. "Only on Prime Video August 15" or "Streaming on Netflix" or "In Cinemas Nationwide").
-   - Paragraph: Transform the story conflict into 2-3 provocative, curiosity-inducing questions.
-   - Cast List: "Starring:" followed by cast members with their @handles on separate lines.
-   - Director: "Directed by @handle"
-   - CTA: A question that urges followers to comment (e.g., "What would you do in this situation? Let's talk in the comments! 👇").
-   - Hashtags: 4-6 targeted hashtags (#Nollywood #MuviDB #AfricanCinema #[TitleTag]).
+SOURCE DATA:
+- TITLE / SUBJECT: ${title} ${year ? `(${year})` : ''}
+- TYPE: ${isPerson ? 'Talent / Filmmaker' : 'Film / Stage'}
+- SERIES CONTEXT: ${seriesName}
+- PLATFORM / AVAILABILITY: ${platform} ${isCinemas ? '(In Cinemas)' : ''}
+- RELEASE DATE: ${releaseDate}
+- SYNOPSIS: ${synopsis}
+- TAGLINE: ${tagline}
+- CAST: ${topCast}
+- DIRECTOR / CREW: ${directors}
+- CRITIC DATA: ${criticQuote ? `"${criticQuote}" by ${criticName} (${criticPub}) [Rating: ${rating}]` : (rating ? `Rated ${rating} on MuviDB` : 'N/A')}
+- KNOWN FOR / CREDITS: ${knownFor}
+- BIO / CONTEXT: ${bio}
+- VENUE / DATES: ${venue}
 
-2. "threads":
-   - Conversational, provocative, under 480 characters.
-   - Starts directly with the dilemma or debate question.
-   - Includes 2-3 key tags.
+TASK:
+Generate 3 DISTINCT copy variations:
+- Variation A (Informative / Utility-First): Clean, factual, answers what & where immediately, credit clarity.
+- Variation B (Editorial / Storytelling): Engaging premise hook, thematic depth, credit connection.
+- Variation C (Conversational / Discussion): Direct thought-provoking question, cultural context, authentic discussion.
 
-3. "facebook":
-   - Engaging storytelling format with paragraph breaks, plot context, watch availability, and community discussion question.
+For EACH variation, provide tailored text for:
+- "instagram": Full caption with clean formatting, bullet points where useful, cast @handles, and 3-5 hashtags at the bottom.
+- "threads": Punchy, conversation-first post strictly under 480 characters.
+- "facebook": Engaging storytelling paragraph with watch info and community discussion question.
+- "tiktok": Concise hook with key details and hashtags for video/slides.
 
-4. "tiktok":
-   - Punchy, high-energy hook suitable for short-form video/slides, watch info, and trending tags.
-
-OUTPUT REQUIREMENT:
-Return ONLY a valid JSON object matching this structure:
+OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without markdown code blocks outside:
 {
-  "instagram": "...",
-  "threads": "...",
-  "facebook": "...",
-  "tiktok": "..."
-}
-Do NOT include markdown backticks or commentary outside the JSON.`;
+  "variations": [
+    {
+      "key": "A",
+      "label": "Informative",
+      "captions": {
+        "instagram": "...",
+        "threads": "...",
+        "facebook": "...",
+        "tiktok": "..."
+      }
+    },
+    {
+      "key": "B",
+      "label": "Editorial",
+      "captions": {
+        "instagram": "...",
+        "threads": "...",
+        "facebook": "...",
+        "tiktok": "..."
+      }
+    },
+    {
+      "key": "C",
+      "label": "Conversational",
+      "captions": {
+        "instagram": "...",
+        "threads": "...",
+        "facebook": "...",
+        "tiktok": "..."
+      }
+    }
+  ]
+}`;
 }
 
 /**
- * Generates platform-specific social copy using Cohere with multi-provider fallback
+ * Clean fallback variations in case AI is unreachable
  */
-export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResult> {
-  const prompt = buildCopyPrompt(req);
+function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
+  const { candidate, series } = req;
+  const data = candidate.data || {};
+  const isPerson = candidate.type === 'person';
+  const name = candidate.name;
+  const year = data.year ? ` (${data.year})` : '';
+  const platform = data.platformDisplayName || (data.streaming_links?.prime_video ? 'Prime Video' : data.streaming_links?.netflix ? 'Netflix' : 'Streaming Platforms');
+  const cleanTag = name.replace(/[^a-zA-Z0-9]/g, '');
+  const synopsis = data.synopsis || candidate.subtext || '';
+
+  if (isPerson) {
+    const known = (data.knownFor || []).slice(0, 3).map((k: any) => `🎬 ${k.title}${k.year ? ` (${k.year})` : ''}`).join('\n');
+    return [
+      {
+        key: 'A',
+        label: 'Informative',
+        captions: {
+          instagram: `The Filmography: ${name} 🌟\n\nNotable credits across African cinema:\n${known || name}\n\nExplore the full verified credits on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+          threads: `Exploring the filmography of ${name} on MuviDB. Which of their performances do you know best? #MuviDB #AfricanCinema`,
+          facebook: `The Filmography: ${name}\n\nFrom standout performances to memorable roles, explore ${name}'s verified credits and filmography on MuviDB!`,
+          tiktok: `Spotlight on ${name} 🌟 Discover their full filmography on MuviDB! #AfricanCinema #${cleanTag}`,
+        },
+      },
+      {
+        key: 'B',
+        label: 'Editorial',
+        captions: {
+          instagram: `You may know ${name} from their acclaimed roles, but their work across African cinema goes deeper.\n\nKey credits include:\n${known}\n\nFollow their full filmography on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+          threads: `You know ${name}, but how many of their films have you seen? Check out their full credit history on MuviDB. #AfricanCinema`,
+          facebook: `You may know ${name} from recent roles, but their filmography spans several key African productions.\n\nExplore every film and every credit on MuviDB.`,
+          tiktok: `One actor, multiple memorable roles. Explore ${name}'s filmography on MuviDB! #MuviDB #${cleanTag}`,
+        },
+      },
+      {
+        key: 'C',
+        label: 'Conversational',
+        captions: {
+          instagram: `A great performance makes you remember the character long after the credits roll.\n\nWhat is your favorite ${name} role so far?\n\nExplore their full work on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+          threads: `What is the first film that comes to mind when you think of ${name}? Let's talk in the replies! 👇 #MuviDB`,
+          facebook: `Which performance made you a fan of ${name}? Share your favorite project below and explore their full credits on MuviDB.`,
+          tiktok: `Favorite ${name} role of all time? Drop your pick below! 👇 #MuviDB #${cleanTag}`,
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      key: 'A',
+      label: 'Informative',
+      captions: {
+        instagram: `Now streaming: ${name}${year} 📺\n\nYou can currently watch ${name} on ${platform}.\n\n${synopsis ? `${synopsis.slice(0, 180)}…` : ''}\n\nFind more viewing information on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+        threads: `${name}${year} is currently streaming on ${platform}. Have you seen it yet? Find more on MuviDB. #AfricanCinema`,
+        facebook: `Streaming Alert: ${name}${year}\n\nAvailable to watch on ${platform}.\n\n${synopsis ? `${synopsis.slice(0, 200)}…` : ''}\n\nExplore cast, crew, and reviews on MuviDB.`,
+        tiktok: `Now streaming: ${name} on ${platform} 📺 Check it out on MuviDB! #MuviDB #${cleanTag}`,
+      },
+    },
+    {
+      key: 'B',
+      label: 'Editorial',
+      captions: {
+        instagram: `Looking for something to watch? Put ${name}${year} on your radar.\n\n${synopsis ? `${synopsis.slice(0, 200)}…` : ''}\n\nCurrently available on ${platform}.\n\nExplore full cast and crew details on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+        threads: `Put ${name} on your watchlist. Currently streaming on ${platform}. Explore credits on MuviDB. #AfricanCinema`,
+        facebook: `Looking for your next watch? ${name}${year} is available on ${platform}.\n\n${synopsis ? `${synopsis.slice(0, 220)}…` : ''}\n\nFind more African films on MuviDB.`,
+        tiktok: `Looking for a compelling African film? ${name} is streaming on ${platform}. #MuviDB #${cleanTag}`,
+      },
+    },
+    {
+      key: 'C',
+      label: 'Conversational',
+      captions: {
+        instagram: `Have you seen ${name}${year} yet, or is this going on your watchlist?\n\n${synopsis ? `${synopsis.slice(0, 180)}…` : ''}\n\nCurrently streaming on ${platform}.\n\nShare your thoughts and discover more on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+        threads: `${name}: Currently streaming on ${platform}. If you've seen it, what did you think? 👇 #MuviDB #AfricanCinema`,
+        facebook: `Have you watched ${name}${year} yet? It's currently available on ${platform}.\n\nLet us know your review and discover more on MuviDB!`,
+        tiktok: `Have you watched ${name} on ${platform}? Drop your review below! 👇 #MuviDB #${cleanTag}`,
+      },
+    },
+  ];
+}
+
+/**
+ * Generates 3 intelligent, brand-aligned copy variations using Cohere / AI fallback
+ */
+export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResponse> {
+  const prompt = buildMuviDBPrompt(req);
   const preferred = req.preferredProvider || 'cohere';
 
   try {
     const aiRes = await generateAIContent(prompt, { preferredProvider: preferred });
     const parsed = parseJSON(aiRes.text);
 
-    if (parsed && (parsed.instagram || parsed.threads || parsed.facebook || parsed.tiktok)) {
+    let variations: AICopyVariation[] = [];
+
+    if (Array.isArray(parsed?.variations) && parsed.variations.length > 0) {
+      variations = parsed.variations.map((v: any, i: number) => ({
+        key: (v.key || ['A', 'B', 'C'][i] || 'A') as 'A' | 'B' | 'C',
+        label: (v.label || ['Informative', 'Editorial', 'Conversational'][i] || 'Informative') as 'Informative' | 'Editorial' | 'Conversational',
+        captions: {
+          instagram: v.captions?.instagram || v.instagram || '',
+          threads: v.captions?.threads || v.threads || '',
+          facebook: v.captions?.facebook || v.facebook || '',
+          tiktok: v.captions?.tiktok || v.tiktok || '',
+        },
+      }));
+    } else if (parsed?.variationA || parsed?.variationB || parsed?.variationC) {
+      const map = [
+        { key: 'A' as const, label: 'Informative' as const, raw: parsed.variationA },
+        { key: 'B' as const, label: 'Editorial' as const, raw: parsed.variationB },
+        { key: 'C' as const, label: 'Conversational' as const, raw: parsed.variationC },
+      ];
+      variations = map.filter(m => m.raw).map(m => ({
+        key: m.key,
+        label: m.label,
+        captions: {
+          instagram: m.raw.instagram || '',
+          threads: m.raw.threads || '',
+          facebook: m.raw.facebook || '',
+          tiktok: m.raw.tiktok || '',
+        },
+      }));
+    } else if (parsed?.instagram || parsed?.threads) {
+      variations = [
+        {
+          key: 'A',
+          label: 'Informative',
+          captions: {
+            instagram: parsed.instagram || '',
+            threads: parsed.threads || '',
+            facebook: parsed.facebook || '',
+            tiktok: parsed.tiktok || '',
+          },
+        },
+      ];
+    }
+
+    if (variations.length > 0) {
+      const primary = variations[0].captions;
       return {
-        instagram: parsed.instagram || '',
-        threads: parsed.threads || '',
-        facebook: parsed.facebook || '',
-        tiktok: parsed.tiktok || '',
+        success: true,
+        variations,
+        selectedVariation: 'A',
+        instagram: primary.instagram,
+        threads: primary.threads,
+        facebook: primary.facebook,
+        tiktok: primary.tiktok,
         engine: aiRes.telemetry?.engine || 'cohere',
       };
     }
   } catch (err) {
-    console.warn('[social_copy_ai] AI generation failed, falling back to rule builder:', (err as Error)?.message);
+    console.warn('[social_copy_ai] AI generation failed, using clean MuviDB fallbacks:', (err as Error)?.message);
   }
 
-  // Fallback if AI fails
-  const name = req.candidate.name;
+  const fallbackVars = buildCleanFallbackVariations(req);
   return {
-    instagram: `Spotlight on ${name}! 🎬\n\nDiscover the story and full credits on MuviDB.\n\n#Nollywood #MuviDB #AfricanCinema`,
-    threads: `What's your take on ${name}? Join the discussion on MuviDB! ✨ #Nollywood`,
-    facebook: `🎬 Feature Spotlight: ${name}\n\nExplore full cast, crew, and verified reviews on MuviDB!`,
-    tiktok: `Watch this! Spotlight on ${name} 🌟 #Nollywood #MuviDB`,
-    engine: 'rule_fallback',
+    success: true,
+    variations: fallbackVars,
+    selectedVariation: 'A',
+    instagram: fallbackVars[0].captions.instagram,
+    threads: fallbackVars[0].captions.threads,
+    facebook: fallbackVars[0].captions.facebook,
+    tiktok: fallbackVars[0].captions.tiktok,
+    engine: 'muvidb_clean_fallback',
   };
 }

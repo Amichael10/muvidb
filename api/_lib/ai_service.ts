@@ -287,7 +287,7 @@ export async function generateAIContent(
           } catch {
             const response = await client.chat.completions.create({
               messages: [{ role: 'user', content: prompt }],
-              model: 'llama3-8b-8192',
+              model: 'llama-3.1-8b-instant',
             }).asResponse();
             const data = await response.json();
             return { text: data.choices[0]?.message?.content || '', engine: 'groq-8b', headers: response.headers };

@@ -11,44 +11,18 @@ const PLATFORMS = [
   { value: 'tiktok', label: 'TikTok', icon: 'simple-icons:tiktok', color: '#25F4EE', maxLen: 2200 },
 ];
 
-const TONES = [
-  { value: 'default', label: '⚡ Dynamic Story', icon: 'solar:bolt-bold' },
-  { value: 'dramatic', label: '🔥 High Drama', icon: 'solar:flame-bold' },
-  { value: 'debate', label: '🎬 Critic Debate', icon: 'solar:dialog-bold' },
-  { value: 'streaming', label: '🍿 Streaming Alert', icon: 'solar:tv-bold' },
-  { value: 'funny', label: '😂 Fun & Relatable', icon: 'solar:emoji-funny-circle-bold' },
+const ANGLES = [
+  { value: 'streaming_alert', label: '🍿 Streaming Alert', desc: 'Title + Platform + Availability first' },
+  { value: 'discovery', label: '🔎 Discovery', desc: 'Teach audience an unknown credit/fact' },
+  { value: 'dynamic_story', label: '⚡ Dynamic Story', desc: 'Narrative development progression' },
+  { value: 'high_drama', label: '🔥 High Drama', desc: 'Real stakes & plot conflict' },
+  { value: 'critic_debate', label: '🎬 Critic Debate', desc: 'Review perspectives & consensus' },
+  { value: 'character_question', label: '🎭 Character Question', desc: 'Thematic character dilemma' },
+  { value: 'behind_the_film', label: '🎥 Behind the Film', desc: 'Director/cinematographer craft' },
+  { value: 'credit_connection', label: '🔗 Credit Connection', desc: 'Connecting films through credits' },
+  { value: 'audience_debate', label: '🗣️ Audience Debate', desc: 'Opinion question with context' },
+  { value: 'fun_relatable', label: '😂 Fun & Relatable', desc: 'Authentic premise banter' },
 ];
-
-/**
- * Fast local fallback caption generator
- */
-function generateFallbackCaptions(candidate, series) {
-  if (!candidate) return {};
-  const name = candidate.name || 'Nollywood Spotlight';
-  const data = candidate.data || {};
-  const isPerson = candidate.type === 'person';
-  const isCritic = series?.slug?.includes('critic');
-
-  const castList = (data.topCast || []).slice(0, 4).map(c => c.handle || `@${(c.name || '').toLowerCase().replace(/[^a-z0-9_]/g, '_')}`);
-  const castStr = castList.length ? `\n\nStarring:\n${castList.join('\n')}` : '';
-
-  if (isPerson) {
-    return {
-      instagram: `Actor Spotlight: ${name} 🌟\n\nFrom standout performances to incredible screen presence, celebrating exceptional talent in African cinema.${castStr}\n\nWhat is your favorite ${name} performance of all time? Drop your picks below! 👇\n\n#Nollywood #MuviDB #ActorSpotlight #${name.replace(/[^a-zA-Z0-9]/g, '')}`,
-      threads: `Spotlight on ${name}! ✨ What is your favorite performance of theirs? Drop your thoughts below! #Nollywood #MuviDB`,
-      facebook: `🌟 Spotlight on ${name}\n\nCelebrating the range and unforgettable screen presence across Nigerian cinema. Discover full filmography on MuviDB!`,
-      tiktok: `Spotlight on ${name}! 🌟 What's your favorite movie? #Nollywood #MuviDB`,
-    };
-  }
-
-  const hook = data.synopsis ? data.synopsis.slice(0, 160) + '…' : candidate.subtext || 'Discover exceptional African cinema stories.';
-  return {
-    instagram: `${name} (${data.year || 'Feature'}) 🎬\n\n${hook}${castStr}\n\nAre you seated for this one? Drop a 🍿 if this is on your watchlist! 👇\n\n#Nollywood #MuviDB #AfricanCinema #${name.replace(/[^a-zA-Z0-9]/g, '')}`,
-    threads: `${name}: ${hook.slice(0, 200)}\n\nHave you watched this yet? Join the discussion on MuviDB! 👇 #Nollywood`,
-    facebook: `🎬 Feature Spotlight: ${name} (${data.year || 'Feature'})\n\n${hook}\n\nExplore full cast, crew, and verified reviews on MuviDB!`,
-    tiktok: `Watch this! ${name} 🎬 Discover full cast on MuviDB! #Nollywood #AfricanCinema`,
-  };
-}
 
 export default function AutoPilotReviewModal({
   isOpen,
@@ -63,19 +37,21 @@ export default function AutoPilotReviewModal({
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState(['instagram', 'threads', 'facebook', 'tiktok']);
   const [activePlatformTab, setActivePlatformTab] = useState('instagram');
-  const [captions, setCaptions] = useState({});
   const [isEditingCaption, setIsEditingCaption] = useState(false);
   const [scheduledTime, setScheduledTime] = useState('11:00');
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [approving, setApproving] = useState(false);
 
-  // AI Copywriting State
+  // AI Copywriting & 3 Variations State
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [selectedTone, setSelectedTone] = useState('default');
+  const [selectedAngle, setSelectedAngle] = useState('streaming_alert');
+  const [variations, setVariations] = useState([]);
+  const [selectedVariationKey, setSelectedVariationKey] = useState('A');
+  const [captions, setCaptions] = useState({ instagram: '', threads: '', facebook: '', tiktok: '' });
   const [aiEngine, setAiEngine] = useState('');
 
-  const requestAICopy = async (cand, tone = selectedTone) => {
+  const requestAICopy = async (cand, angle = selectedAngle) => {
     if (!cand || !cand.name) return;
     setAiGenerating(true);
     try {
@@ -85,13 +61,19 @@ export default function AutoPilotReviewModal({
         body: JSON.stringify({
           candidate: cand,
           series: slot.social_content_series,
-          tone,
+          angle,
           preferredProvider: 'cohere',
         }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
+      if (res.ok && data.success && Array.isArray(data.variations) && data.variations.length > 0) {
+        setVariations(data.variations);
+        setSelectedVariationKey('A');
+        setCaptions(data.variations[0].captions || {});
+        setAiEngine(data.engine || 'cohere');
+        toast.success(`✨ 3 MuviDB variations generated!`);
+      } else if (data.instagram) {
         setCaptions({
           instagram: data.instagram || '',
           threads: data.threads || '',
@@ -99,12 +81,9 @@ export default function AutoPilotReviewModal({
           tiktok: data.tiktok || '',
         });
         setAiEngine(data.engine || 'cohere');
-        toast.success(`✨ Fresh copy generated with Cohere AI!`);
-      } else {
-        console.warn('AI Copy failed:', data.error);
       }
     } catch (err) {
-      console.warn('AI Copy request error:', err);
+      console.warn('AI Copy request failed:', err);
     } finally {
       setAiGenerating(false);
     }
@@ -116,22 +95,27 @@ export default function AutoPilotReviewModal({
       setCandidate(initialCandidate);
       setCustomImageUrl(initialCandidate?.imageUrl || '');
       setScheduledTime(slot.scheduled_time?.slice(0, 5) || '11:00');
-      
-      // Set instant fallback copy first
-      const defaults = generateFallbackCaptions(initialCandidate, slot.social_content_series);
-      setCaptions(defaults);
       setIsEditingCaption(false);
-      setSelectedTone('default');
 
-      // Request intelligent AI copy from Cohere immediately
+      // Select default angle based on series
+      const slug = slot.social_content_series?.slug || '';
+      let initialAngle = 'streaming_alert';
+      if (slug.includes('critic')) initialAngle = 'critic_debate';
+      else if (slug.includes('behind')) initialAngle = 'behind_the_film';
+      else if (slug.includes('filmography') || initialCandidate?.type === 'person') initialAngle = 'discovery';
+      else if (slug.includes('debate') || slug.includes('conversation')) initialAngle = 'audience_debate';
+      else if (slug.includes('stage')) initialAngle = 'discovery';
+
+      setSelectedAngle(initialAngle);
+
+      // Fetch AI variations
       if (initialCandidate) {
-        requestAICopy(initialCandidate, 'default');
+        requestAICopy(initialCandidate, initialAngle);
       }
 
-      // Load candidate pool for 1-click shuffle
-      const slug = slot.social_content_series?.slug || 'filmography';
+      // Load candidate pool for shuffle
       setLoadingCandidates(true);
-      fetch(`/api/social?task=slot_candidates&seriesSlug=${slug}`, {
+      fetch(`/api/social?task=slot_candidates&seriesSlug=${slug || 'filmography'}`, {
         headers: { 'Content-Type': 'application/json' },
       })
         .then(res => res.json())
@@ -168,15 +152,22 @@ export default function AutoPilotReviewModal({
     const nextCandidate = candidatePool[nextIdx];
     setCandidate(nextCandidate);
     setCustomImageUrl(nextCandidate.imageUrl || '');
-    setCaptions(generateFallbackCaptions(nextCandidate, series));
     toast.success(`Swapped to ${nextCandidate.name}!`);
-    // Automatically generate AI copy for the new candidate
-    requestAICopy(nextCandidate, selectedTone);
+    requestAICopy(nextCandidate, selectedAngle);
   };
 
-  const handleToneChange = (newTone) => {
-    setSelectedTone(newTone);
-    requestAICopy(candidate, newTone);
+  const handleAngleChange = (newAngle) => {
+    setSelectedAngle(newAngle);
+    requestAICopy(candidate, newAngle);
+  };
+
+  const handleSelectVariation = (varKey) => {
+    setSelectedVariationKey(varKey);
+    const target = variations.find(v => v.key === varKey);
+    if (target && target.captions) {
+      setCaptions(target.captions);
+      toast(`Switched to Option ${varKey} (${target.label})`);
+    }
   };
 
   const handleImageUpload = async e => {
@@ -247,9 +238,9 @@ export default function AutoPilotReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
-      <div className="relative flex max-h-[94vh] w-full max-w-4xl flex-col rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden">
+      <div className="relative flex max-h-[96vh] w-full max-w-5xl flex-col rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-surface-2/60">
+        <div className="flex items-center justify-between border-b border-border px-6 py-3.5 bg-surface-2/60">
           <div>
             <div className="flex items-center gap-2">
               <span className="rounded bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand uppercase tracking-wider">
@@ -259,8 +250,8 @@ export default function AutoPilotReviewModal({
                 {formattedDate}
               </span>
             </div>
-            <h3 className="mt-1 text-lg font-black tracking-tight text-text-primary">
-              Auto-Pilot Review & Instant Approval
+            <h3 className="mt-0.5 text-lg font-black tracking-tight text-text-primary">
+              Auto-Pilot Review & Publication
             </h3>
           </div>
           <button
@@ -273,14 +264,14 @@ export default function AutoPilotReviewModal({
         </div>
 
         {/* Candidate Selector Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-surface px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-surface px-6 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
               {displayImage ? (
                 <img src={displayImage} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-text-muted">
-                  <Icon icon="solar:user-linear" width="20" />
+                  <Icon icon="solar:user-linear" width="18" />
                 </div>
               )}
             </div>
@@ -289,12 +280,12 @@ export default function AutoPilotReviewModal({
                 <span className="font-black text-text-primary text-sm">
                   {candidate?.name || 'Auto-Selected Candidate'}
                 </span>
-                <span className="rounded bg-brand/10 px-2 py-0.5 text-[10px] font-bold text-brand uppercase">
-                  {candidate?.category || (isPerson ? 'Actor' : 'Film')}
+                <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand uppercase">
+                  {candidate?.category || (isPerson ? 'Talent' : 'Film')}
                 </span>
               </div>
               <p className="text-xs text-text-muted line-clamp-1">
-                {candidate?.subtext || 'Matched via Nollywood editorial guidelines'}
+                {candidate?.subtext || 'Verified via MuviDB structured filmography'}
               </p>
             </div>
           </div>
@@ -313,12 +304,12 @@ export default function AutoPilotReviewModal({
         </div>
 
         {/* Content Body: 2 Columns */}
-        <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 md:grid-cols-12">
-          {/* Left: High-End Graphic Card Preview */}
-          <div className="space-y-3 md:col-span-5">
+        <div className="grid flex-1 grid-cols-1 gap-5 overflow-y-auto p-5 md:grid-cols-12">
+          {/* Left: Graphic Poster Preview */}
+          <div className="space-y-2.5 md:col-span-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-wider text-text-muted">
-                Graphic Poster Preview (4:5)
+                Graphic Card Preview (4:5)
               </span>
               <label className="cursor-pointer text-[11px] font-bold text-brand hover:underline">
                 {uploadingImage ? 'Uploading…' : '🖼️ Replace Photo'}
@@ -373,7 +364,7 @@ export default function AutoPilotReviewModal({
                 {/* Kicker tag */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#FF5A1F]">
-                    {candidate?.category || (isPerson ? 'NOLLYWOOD TALENT' : 'FEATURE RELEASE')}
+                    {candidate?.category || (isPerson ? 'AFRICAN CINEMA TALENT' : 'FEATURE RELEASE')}
                   </span>
                   <span className="text-[10px] text-white/40">•</span>
                   <span className="text-[10px] font-bold text-white/70">
@@ -383,7 +374,7 @@ export default function AutoPilotReviewModal({
 
                 {/* Main Headline */}
                 <h4 className="text-xl font-black uppercase tracking-tight text-white leading-tight drop-shadow-md line-clamp-2">
-                  {candidate?.name || 'Nollywood Cinema'}
+                  {candidate?.name || 'African Cinema'}
                 </h4>
 
                 {/* Subtitle / Department / Platform */}
@@ -415,13 +406,13 @@ export default function AutoPilotReviewModal({
             </div>
           </div>
 
-          {/* Right: AI Copywriting & Multi-Platform Channels */}
-          <div className="space-y-4 md:col-span-7 flex flex-col justify-between">
+          {/* Right: AI Angles, 3 Variations, Channels & Copy */}
+          <div className="space-y-3.5 md:col-span-7 flex flex-col justify-between">
             <div className="space-y-3">
-              {/* Target Platforms Bar */}
+              {/* Target Channels */}
               <div>
-                <label className="block text-xs font-black uppercase tracking-wider text-text-muted mb-1.5">
-                  Target Channels
+                <label className="block text-[11px] font-black uppercase tracking-wider text-text-muted mb-1.5">
+                  Publishing Channels
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {PLATFORMS.map(p => {
@@ -431,7 +422,7 @@ export default function AutoPilotReviewModal({
                         key={p.value}
                         type="button"
                         onClick={() => togglePlatform(p.value)}
-                        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-all ${
                           active
                             ? 'border-brand bg-brand/10 text-brand'
                             : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
@@ -445,15 +436,12 @@ export default function AutoPilotReviewModal({
                 </div>
               </div>
 
-              {/* AI Copywriting Toolbar */}
-              <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 space-y-2">
+              {/* 10 AI Angles Toolbar */}
+              <div className="rounded-xl border border-border/80 bg-surface-2/60 p-2.5 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white text-[10px]">
-                      ✨
-                    </span>
                     <span className="text-xs font-black uppercase tracking-wider text-text-primary">
-                      AI Copywriter (Cohere)
+                      Editorial Angle
                     </span>
                     {aiEngine && (
                       <span className="rounded bg-surface px-1.5 py-0.5 text-[9px] font-mono text-text-muted">
@@ -463,7 +451,7 @@ export default function AutoPilotReviewModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() => requestAICopy(candidate, selectedTone)}
+                    onClick={() => requestAICopy(candidate, selectedAngle)}
                     disabled={aiGenerating}
                     className="inline-flex items-center gap-1.5 rounded-md bg-brand px-2.5 py-1 text-[11px] font-black text-white hover:bg-brand-hover transition-all disabled:opacity-50"
                   >
@@ -472,33 +460,58 @@ export default function AutoPilotReviewModal({
                       className={aiGenerating ? 'animate-spin' : ''}
                       width="13"
                     />
-                    {aiGenerating ? 'Writing Copy…' : 'Regenerate Copy'}
+                    {aiGenerating ? 'Writing 3 Options…' : 'Generate 3 Variations'}
                   </button>
                 </div>
 
-                {/* Tone Filter Pills */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[10px] font-bold text-text-muted">Angle:</span>
-                  {TONES.map(t => (
+                {/* 10 Angle Badges */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {ANGLES.map(a => (
                     <button
-                      key={t.value}
+                      key={a.value}
                       type="button"
-                      onClick={() => handleToneChange(t.value)}
+                      onClick={() => handleAngleChange(a.value)}
                       disabled={aiGenerating}
+                      title={a.desc}
                       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-all ${
-                        selectedTone === t.value
-                          ? 'bg-brand text-white shadow-sm'
+                        selectedAngle === a.value
+                          ? 'bg-brand text-white shadow-sm ring-1 ring-brand'
                           : 'bg-surface border border-border text-text-muted hover:text-text-primary'
                       }`}
                     >
-                      <Icon icon={t.icon} width="11" />
-                      {t.label}
+                      {a.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Copy Editor Tabs */}
+              {/* 3 Variations Selector (Option A / B / C) */}
+              {variations.length > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 p-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-brand pl-1">
+                    Variations:
+                  </span>
+                  <div className="flex flex-1 gap-1.5">
+                    {variations.map(v => (
+                      <button
+                        key={v.key}
+                        type="button"
+                        onClick={() => handleSelectVariation(v.key)}
+                        className={`flex-1 rounded-md px-2 py-1 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          selectedVariationKey === v.key
+                            ? 'bg-brand text-white shadow-sm'
+                            : 'bg-surface border border-border/80 text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        <span>Option {v.key}</span>
+                        <span className="text-[10px] font-normal opacity-80">({v.label})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Platform Tabs & Copy Editor */}
               <div>
                 <div className="flex items-center justify-between border-b border-border pb-1">
                   <div className="flex gap-2">
@@ -519,7 +532,7 @@ export default function AutoPilotReviewModal({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-mono text-text-muted">
+                    <span className={`text-[10px] font-mono ${currentCaption.length > currentPlatformLimit ? 'text-red-500 font-bold' : 'text-text-muted'}`}>
                       {currentCaption.length}/{currentPlatformLimit}
                     </span>
                     <button
@@ -527,7 +540,7 @@ export default function AutoPilotReviewModal({
                       onClick={() => setIsEditingCaption(!isEditingCaption)}
                       className="text-xs font-bold text-brand hover:underline"
                     >
-                      {isEditingCaption ? 'Done Editing' : '✏️ Edit Copy'}
+                      {isEditingCaption ? 'Done Editing' : '✏️ Edit Text'}
                     </button>
                   </div>
                 </div>
@@ -535,16 +548,16 @@ export default function AutoPilotReviewModal({
                 <div className="mt-2 rounded-lg border border-border bg-surface-2 p-3 relative min-h-[140px]">
                   {aiGenerating && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-lg bg-surface/90 backdrop-blur-sm space-y-2">
-                      <Icon icon="solar:magic-stick-bold" className="animate-bounce text-brand" width="24" />
+                      <Icon icon="solar:magic-stick-bold" className="animate-bounce text-brand" width="22" />
                       <span className="text-xs font-bold text-text-primary">
-                        Writing smart copy with Cohere AI…
+                        Writing 3 MuviDB variations with AI…
                       </span>
                     </div>
                   )}
 
                   {isEditingCaption ? (
                     <textarea
-                      rows={7}
+                      rows={6}
                       value={currentCaption}
                       onChange={e =>
                         setCaptions(prev => ({
@@ -555,7 +568,7 @@ export default function AutoPilotReviewModal({
                       className="w-full bg-transparent text-xs text-text-primary outline-none focus:ring-0 font-sans leading-relaxed resize-none"
                     />
                   ) : (
-                    <p className="whitespace-pre-wrap text-xs text-text-primary leading-relaxed max-h-48 overflow-y-auto font-sans">
+                    <p className="whitespace-pre-wrap text-xs text-text-primary leading-relaxed max-h-44 overflow-y-auto font-sans">
                       {currentCaption || 'No copy generated for this channel.'}
                     </p>
                   )}
@@ -581,7 +594,7 @@ export default function AutoPilotReviewModal({
             </div>
 
             {/* Actions Bar */}
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
               <button
                 type="button"
                 onClick={() => {
