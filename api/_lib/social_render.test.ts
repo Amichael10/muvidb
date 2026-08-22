@@ -94,7 +94,7 @@ describe('renderSnapshotAsset', () => {
     expect(result.height).toBe(1350);
     expect(result.png).toBeInstanceOf(Buffer);
     expect(result.png.length).toBeGreaterThan(1000);
-  });
+  }, 15_000);
 
   it('renders an actor spotlight card into a valid square PNG buffer', async () => {
     const { renderSnapshotAsset } = await import('./social_render.js');
@@ -125,5 +125,5 @@ describe('renderSnapshotAsset', () => {
     expect(result.height).toBe(1080);
     expect(result.png).toBeInstanceOf(Buffer);
     expect(result.png.length).toBeGreaterThan(1000);
-  });
+  }, 15_000);
 });

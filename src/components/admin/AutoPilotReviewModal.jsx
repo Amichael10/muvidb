@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
 import { uploadAdminImage } from '../../lib/imageUpload';
+import FigmaSocialCardPreview from './FigmaSocialCardPreview.jsx';
 
 const PLATFORMS = [
   { value: 'instagram', label: 'Instagram', icon: 'mdi:instagram', color: '#E1306C', maxLen: 2200 },
@@ -191,7 +192,7 @@ export default function AutoPilotReviewModal({
     try {
       const res = await fetch('/api/social?task=render_preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ candidate, format: 'portrait_4_5' }),
       });
       if (!res.ok) throw new Error('Failed to render graphic asset');
@@ -372,87 +373,12 @@ export default function AutoPilotReviewModal({
               </div>
             </div>
 
-            {/* Poster Card Shell */}
-            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0B0C10] shadow-2xl flex flex-col justify-between p-5 select-none font-sans">
-              {/* Cinematic Background Layer */}
-              <div className="absolute inset-0 z-0">
-                {displayImage ? (
-                  <img
-                    src={displayImage}
-                    alt=""
-                    className="h-full w-full object-cover opacity-50 filter contrast-125 brightness-75 scale-105"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-gradient-to-br from-[#1A1C23] to-[#0A0B0E]" />
-                )}
-                {/* Vignette Gradients */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#090A0D] via-[#090A0D]/50 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-b from-[#090A0D]/80 via-transparent to-[#090A0D]" />
-              </div>
-
-              {/* Top Header Lockup */}
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#FF5A1F] text-white shadow-lg shadow-[#FF5A1F]/30">
-                    <Icon icon="solar:film-strip-bold" width="14" />
-                  </div>
-                  <span className="font-extrabold text-sm tracking-tight text-white font-mono">
-                    MuviDB
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 rounded-full border border-[#FF5A1F]/40 bg-black/70 px-2.5 py-0.5 backdrop-blur-md">
-                  <span className="font-bold text-[9px] uppercase tracking-widest text-[#FF5A1F]">
-                    {(series.name || 'Spotlight').toUpperCase()}
-                  </span>
-                  <span className="text-[9px] font-bold text-white/50">01</span>
-                </div>
-              </div>
-
-              {/* Subject Content Presentation */}
-              <div className="relative z-10 mt-auto space-y-2 pt-12">
-                {/* Kicker tag */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#FF5A1F]">
-                    {candidate?.category || (isPerson ? 'AFRICAN CINEMA TALENT' : 'FEATURE RELEASE')}
-                  </span>
-                  <span className="text-[10px] text-white/40">•</span>
-                  <span className="text-[10px] font-bold text-white/70">
-                    {data.year || (data.country || 'Nollywood')}
-                  </span>
-                </div>
-
-                {/* Main Headline */}
-                <h4 className="text-xl font-black uppercase tracking-tight text-white leading-tight drop-shadow-md line-clamp-2">
-                  {candidate?.name || 'African Cinema'}
-                </h4>
-
-                {/* Subtitle / Department / Platform */}
-                <p className="text-[11px] font-medium text-white/80 line-clamp-2 leading-snug">
-                  {data.tagline || data.subtext || (data.bio ? data.bio.slice(0, 90) + '…' : 'Discover full credits on MuviDB')}
-                </p>
-
-                {/* Cast Chips */}
-                {data.topCast && data.topCast.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1 pt-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-white/60">Starring:</span>
-                    {data.topCast.slice(0, 3).map((c, i) => (
-                      <span
-                        key={i}
-                        className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-white/90 backdrop-blur-sm"
-                      >
-                        {c.handle || c.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Footer Watermark */}
-                <div className="flex items-center justify-between border-t border-white/15 pt-2 text-[9px] font-mono text-white/60">
-                  <span>muvidb.com</span>
-                  <span className="uppercase tracking-widest text-[#FF5A1F]">EVERY FILM. EVERY CREDIT.</span>
-                </div>
-              </div>
-            </div>
+            {/* Figma Social Design Card (Matching Figma Ensembla Design System) */}
+            <FigmaSocialCardPreview
+              candidate={candidate}
+              series={series}
+              displayImage={displayImage}
+            />
           </div>
 
           {/* Right: AI Angles, 3 Variations, Channels & Copy */}
