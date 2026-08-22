@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
@@ -196,6 +196,10 @@ export default function AutoPilotReviewModal({
       toast.error('Please select a subject or movie for this slot.');
       return;
     }
+    if (isArchivedPlay) {
+      toast.error('This live stage production has ended/archived. Social posts cannot be scheduled for past theatre events.');
+      return;
+    }
     if (!selectedPlatforms.length) {
       toast.error('Please select at least one publishing channel.');
       return;
@@ -232,13 +236,25 @@ export default function AutoPilotReviewModal({
 
   const displayImage = customImageUrl || candidate?.imageUrl;
   const isPerson = candidate?.type === 'person';
+  const isPlay = candidate?.type === 'play' || series?.slug?.includes('stage');
   const data = candidate?.data || {};
+  const isArchivedPlay = isPlay && (data.status === 'archived' || data.derivedStatus === 'archived');
   const currentCaption = captions[activePlatformTab] || '';
   const currentPlatformLimit = PLATFORMS.find(p => p.value === activePlatformTab)?.maxLen || 2200;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
       <div className="relative flex max-h-[96vh] w-full max-w-5xl flex-col rounded-2xl border border-border bg-surface shadow-2xl overflow-hidden">
+        {/* Archived Play Warning Banner */}
+        {isArchivedPlay && (
+          <div className="flex items-center gap-2.5 bg-amber-500/15 border-b border-amber-500/30 px-6 py-2 text-xs font-medium text-amber-300">
+            <Icon icon="solar:danger-triangle-bold" width="18" className="shrink-0 text-amber-400" />
+            <span>
+              <strong>Past Theatre Run (Archived):</strong> This stage production has already passed. Social Studio will not schedule or publish posts for ended theatre events.
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-3.5 bg-surface-2/60">
           <div>
@@ -624,7 +640,7 @@ export default function AutoPilotReviewModal({
                 <button
                   type="button"
                   onClick={handleApproveAndSchedule}
-                  disabled={approving || aiGenerating}
+                  disabled={approving || aiGenerating || isArchivedPlay}
                   className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2 text-xs font-black text-white transition-all hover:bg-brand-hover hover:shadow-lg hover:shadow-brand/20 disabled:opacity-50"
                 >
                   <Icon

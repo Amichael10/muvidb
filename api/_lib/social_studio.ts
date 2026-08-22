@@ -1298,6 +1298,23 @@ export async function approveEditorialSlot(
   const templateSlug = input.templateSlug || (input.candidateType === 'person' ? 'actor-spotlight-v1' : 'upcoming-movie-v1');
   const platforms = input.platforms && input.platforms.length ? input.platforms : (['instagram', 'threads', 'facebook', 'tiktok'] as SocialPlatform[]);
 
+  // Validate live theatre productions: reject archived / passed stage plays
+  if (input.candidateType === 'play' || (contentType as string) === 'theatre_spotlight' || (contentType as string) === 'whats_on_stage') {
+    const { data: play } = await supabase
+      .from('plays')
+      .select('id, title, status, run_start_date, run_end_date, year')
+      .eq('id', input.candidateId)
+      .single();
+
+    if (play) {
+      const { derivePlayStatus } = await import('./theatre_service.js');
+      const liveStatus = derivePlayStatus(play, new Date());
+      if (liveStatus === 'archived' || play.status === 'archived') {
+        throw httpError(400, `The stage production "${play.title}" has already ended / is archived. Social posts cannot be scheduled for past theatre events.`);
+      }
+    }
+  }
+
   // 1. Generate the draft
   const draft = await generateSocialDraft(
     {

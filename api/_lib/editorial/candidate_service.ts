@@ -64,6 +64,40 @@ function classifyCrewDepartment(professions: string[] = [], knownForDept?: strin
 }
 
 /**
+ * Derive live status ('upcoming' | 'currently_running' | 'archived') for plays
+ */
+export function derivePlayStatus(play: any, refDate = new Date()): 'upcoming' | 'currently_running' | 'archived' {
+  const todayStr = refDate.toISOString().slice(0, 10);
+  const currentYear = refDate.getFullYear();
+
+  const start = play?.run_start_date ? String(play.run_start_date).slice(0, 10) : null;
+  const end = play?.run_end_date ? String(play.run_end_date).slice(0, 10) : null;
+
+  if (start && end) {
+    if (end < todayStr) return 'archived';
+    if (start <= todayStr && end >= todayStr) return 'currently_running';
+    return 'upcoming';
+  }
+
+  if (start && !end) {
+    if (start < todayStr) return 'archived';
+    if (start === todayStr) return 'currently_running';
+    return 'upcoming';
+  }
+
+  if (!start && end) {
+    if (end < todayStr) return 'archived';
+    return 'currently_running';
+  }
+
+  if (play?.year && Number(play.year) < currentYear) {
+    return 'archived';
+  }
+
+  return (play?.status as any) || 'archived';
+}
+
+/**
  * Helper to batch enrich movie candidates with cast and director credits
  */
 async function enrichFilmCandidates(films: any[]): Promise<any[]> {
@@ -475,19 +509,25 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     case 'theatre_spotlight': {
       const { data: plays } = await supabase
         .from('plays')
-        .select('id, title, slug, venue, city, country, run_start_date, run_end_date, poster_url, status, synopsis, playwright')
+        .select('id, title, slug, venue, city, country, run_start_date, run_end_date, poster_url, status, synopsis, playwright, year')
+        .not('status', 'eq', 'archived')
         .order('run_start_date', { ascending: false })
-        .limit(limit);
+        .limit(limit * 3);
 
-      return (plays || []).map((p) => ({
+      const now = new Date();
+      // Filter out all archived or ended plays — only active/upcoming productions are eligible for social posts
+      const activePlays = (plays || []).filter((p) => {
+        const derived = derivePlayStatus(p, now);
+        return derived !== 'archived' && p.status !== 'archived';
+      });
+
+      return activePlays.slice(0, limit).map((p) => ({
         id: p.id,
-        type: 'play',
+        type: 'play' as const,
         name: p.title,
-        subtext: `${p.venue || 'Stage'} • ${p.city || 'Lagos'} (${p.status || 'upcoming'})`,
+        subtext: `${p.venue || 'Stage'} • ${p.city || 'Lagos'} (${p.status === 'currently_running' ? 'Now Showing' : 'Upcoming'})`,
         imageUrl: p.poster_url,
         country: p.country,
-        category: 'Theatre',
-        completenessScore: 0.85,
         data: p,
       }));
     }
