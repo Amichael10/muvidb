@@ -1,38 +1,48 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-
-if (!supabaseUrl) {
-  console.warn('CRITICAL: SUPABASE_URL is missing.');
-}
-
-if (!supabaseServiceRoleKey) {
-  console.warn('CRITICAL: SUPABASE_KEY is missing. Backend operations will fail.');
-}
-
-let supabaseClient: any;
-
-try {
-  if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
-    throw new Error('Invalid or missing SUPABASE_URL');
+function readEnv(name: string): string {
+  try {
+    return String((process.env as Record<string, string | undefined>)[name] || '').trim();
+  } catch {
+    return '';
   }
-  supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+}
+
+function resolveUrl(): string {
+  return readEnv('SUPABASE_URL') || readEnv('VITE_SUPABASE_URL') || 'https://pkenrmorywmuvnzfoylp.supabase.co';
+}
+
+function resolveKey(): string {
+  return (
+    readEnv('SUPABASE_SERVICE_ROLE_KEY') ||
+    readEnv('VITE_SUPABASE_SERVICE_ROLE_KEY') ||
+    readEnv('SUPABASE_ANON_KEY') ||
+    readEnv('VITE_SUPABASE_ANON_KEY') ||
+    'sb_publishable_fXxu9pH8yK8s6xEvEJWNgw_T3Nbbvdo'
+  );
+}
+
+let _supabaseClient: SupabaseClient | null = null;
+
+export function getSupabase(): SupabaseClient {
+  if (_supabaseClient) return _supabaseClient;
+  const url = resolveUrl();
+  const key = resolveKey();
+
+  _supabaseClient = createClient(url, key, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
     },
   });
-} catch (err: any) {
-  console.error('CRITICAL: Supabase client failed to initialize:', err.message);
-  // Provide a dummy client that fails gracefully instead of crashing on import
-  supabaseClient = new Proxy({}, {
-    get: (target, prop) => {
-      return () => {
-        throw new Error(`Supabase operation "${String(prop)}" failed because the client was not initialized. Check your environment variables.`);
-      };
-    }
-  });
+  return _supabaseClient;
 }
 
-export const supabase = supabaseClient;
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_t, prop, receiver) {
+    const client = getSupabase();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === 'function' ? value.bind(client) : value;
+  },
+});
+
