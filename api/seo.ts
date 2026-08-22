@@ -34,6 +34,25 @@ function isValidImageUrl(url: unknown): boolean {
   }
 }
 
+async function withRetry<T>(fn: () => Promise<{ data: T | null; error: any }>, retries = 3, delayMs = 300): Promise<T> {
+  let lastError: any = null;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fn();
+      if (!res.error && res.data !== null && res.data !== undefined) {
+        return res.data;
+      }
+      lastError = res.error || new Error('Query returned empty/null data');
+    } catch (err) {
+      lastError = err;
+    }
+    if (i < retries - 1) {
+      await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+  throw lastError || new Error('Database query failed after retries');
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { type, slug } = req.query;
   const host = req.headers.host || 'muvidb.com';
@@ -42,15 +61,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (type === 'sitemap') {
-      trackSeoHit(req, 'sitemap', String(slug || 'index'));
-      res.setHeader('Content-Type', 'text/xml; charset=utf-8');
-      res.setHeader('Cache-Control', 'public, max-age=43200, s-maxage=43200, stale-while-revalidate=86400');
-      res.setHeader('CDN-Cache-Control', 'public, s-maxage=43200, stale-while-revalidate=86400');
-      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=43200, stale-while-revalidate=86400');
+      const target = String(slug || 'index').replace(/\.xml$/, '').toLowerCase();
+      trackSeoHit(req, 'sitemap', target);
 
       const urlset = (entries: string, withImages = false) => {
         const imageNs = withImages ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : '';
         return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${imageNs}>\n${entries}\n</urlset>`;
+      };
+
+      const setSuccessHeaders = () => {
+        res.setHeader('Content-Type', 'text/xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400');
+        res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+        res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
       };
 
       // Helper for batched pagination (bypasses PostgREST 1000-row cap per request)
@@ -62,20 +85,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const start = fromOffset + i * BATCH_SIZE;
           const end = Math.min(start + BATCH_SIZE - 1, fromOffset + count - 1);
           promises.push(
-            supabase
-              .from('films')
-              .select('id, title, slug, poster_url, updated_at, created_at')
-              .eq('is_published', true)
-              .order('updated_at', { ascending: false, nullsFirst: false })
-              .range(start, end)
+            withRetry(async () => {
+              return await supabase
+                .from('films')
+                .select('id, title, slug, poster_url, updated_at, created_at')
+                .eq('is_published', true)
+                .order('updated_at', { ascending: false, nullsFirst: false })
+                .range(start, end);
+            })
           );
         }
         const results = await Promise.all(promises);
-        const rows: any[] = [];
-        for (const r of results) {
-          if (r.data) rows.push(...r.data);
-        }
-        return rows;
+        return results.flat();
       };
 
       const fetchPagedPeople = async (fromOffset: number, count: number) => {
@@ -86,24 +107,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const start = fromOffset + i * BATCH_SIZE;
           const end = Math.min(start + BATCH_SIZE - 1, fromOffset + count - 1);
           promises.push(
-            supabase
-              .from('people')
-              .select('id, name, slug, photo_url, updated_at, created_at')
-              .gt('film_count', 0)
-              .order('film_count', { ascending: false, nullsFirst: false })
-              .range(start, end)
+            withRetry(async () => {
+              return await supabase
+                .from('people')
+                .select('id, name, slug, photo_url, updated_at, created_at')
+                .gt('film_count', 0)
+                .order('film_count', { ascending: false, nullsFirst: false })
+                .range(start, end);
+            })
           );
         }
         const results = await Promise.all(promises);
-        const rows: any[] = [];
-        for (const r of results) {
-          if (r.data) rows.push(...r.data);
-        }
-        return rows;
+        return results.flat();
       };
 
       // 1. SITEMAP INDEX (/sitemap.xml)
-      if (slug === 'index') {
+      if (target === 'index') {
         const filmChunks = 8; // 8 chunks of 5000 = up to 40,000 films
         const peopleChunks = 7; // 7 chunks of 5000 = up to 35,000 indexable people
 
@@ -126,11 +145,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    <lastmod>${new Date().toISOString()}</lastmod>\n  </sitemap>`).join('\n')}
 </sitemapindex>`;
+        setSuccessHeaders();
         return res.status(200).send(sitemapIndex);
       }
 
       // 2. STATIC PAGES (/sitemap-static.xml) — Every page & feature on MubiDB
-      if (slug === 'static') {
+      if (target === 'static') {
         const staticPages: { url: string; priority: string; changefreq: string }[] = [
           // Core discovery pages
           { url: '', priority: '1.0', changefreq: 'daily' },
@@ -173,6 +193,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           { url: '/terms', priority: '0.3', changefreq: 'monthly' },
           { url: '/privacy', priority: '0.3', changefreq: 'monthly' },
         ];
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             staticPages
@@ -190,9 +211,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 3. FILMS SITEMAP (/sitemap-films.xml or /sitemap-films-1.xml .. films-8.xml)
-      const slugStr = String(slug || '');
-      if (slugStr === 'films' || slugStr.startsWith('films-')) {
-        const page = slugStr === 'films' ? 1 : Math.max(1, parseInt(slugStr.replace('films-', ''), 10) || 1);
+      if (target === 'films' || target.startsWith('films-')) {
+        const page = target === 'films' ? 1 : Math.max(1, parseInt(target.replace('films-', ''), 10) || 1);
         const CHUNK_SIZE = 5000;
         const fromOffset = (page - 1) * CHUNK_SIZE;
         const data = await fetchPagedFilms(fromOffset, CHUNK_SIZE);
@@ -206,12 +226,13 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>${imageTag}\n  </url>`;
         });
 
+        setSuccessHeaders();
         return res.status(200).send(urlset(filmUrls.join('\n'), true));
       }
 
       // 4. PEOPLE / ACTORS SITEMAP (/sitemap-people.xml or /sitemap-people-1.xml .. people-7.xml)
-      if (slugStr === 'people' || slugStr.startsWith('people-')) {
-        const page = slugStr === 'people' ? 1 : Math.max(1, parseInt(slugStr.replace('people-', ''), 10) || 1);
+      if (target === 'people' || target.startsWith('people-')) {
+        const page = target === 'people' ? 1 : Math.max(1, parseInt(target.replace('people-', ''), 10) || 1);
         const CHUNK_SIZE = 5000;
         const fromOffset = (page - 1) * CHUNK_SIZE;
         const data = await fetchPagedPeople(fromOffset, CHUNK_SIZE);
@@ -225,16 +246,20 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>${imageTag}\n  </url>`;
         });
 
+        setSuccessHeaders();
         return res.status(200).send(urlset(personUrls.join('\n'), true));
       }
 
       // 5. COMPANIES SITEMAP (/sitemap-companies.xml)
-      if (slug === 'companies') {
-        const { data } = await supabase
-          .from('companies')
-          .select('id, name, slug, updated_at')
-          .limit(50000);
+      if (target === 'companies') {
+        const data = await withRetry(async () => {
+          return await supabase
+            .from('companies')
+            .select('id, name, slug, updated_at')
+            .limit(50000);
+        });
 
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             (data || [])
@@ -252,13 +277,16 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 6. CINEMAS SITEMAP (/sitemap-cinemas.xml)
-      if (slug === 'cinemas') {
-        const { data } = await supabase
-          .from('cinemas')
-          .select('id, name, created_at, showtimes_last_fetched_at')
-          .eq('is_active', true)
-          .limit(50000);
+      if (target === 'cinemas') {
+        const data = await withRetry(async () => {
+          return await supabase
+            .from('cinemas')
+            .select('id, name, created_at, showtimes_last_fetched_at')
+            .eq('is_active', true)
+            .limit(50000);
+        });
 
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             (data || [])
@@ -276,12 +304,15 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 7. CHANNELS SITEMAP (/sitemap-channels.xml)
-      if (slug === 'channels') {
-        const { data } = await supabase
-          .from('channels')
-          .select('id, name, slug, created_at, videos_last_fetched_at')
-          .limit(50000);
+      if (target === 'channels') {
+        const data = await withRetry(async () => {
+          return await supabase
+            .from('channels')
+            .select('id, name, slug, created_at, videos_last_fetched_at')
+            .limit(50000);
+        });
 
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             (data || [])
@@ -299,12 +330,15 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 8. CRITICS SITEMAP (/sitemap-critics.xml)
-      if (slug === 'critics') {
-        const { data } = await supabase
-          .from('critics')
-          .select('id, name, slug, updated_at')
-          .limit(50000);
+      if (target === 'critics') {
+        const data = await withRetry(async () => {
+          return await supabase
+            .from('critics')
+            .select('id, name, slug, updated_at')
+            .limit(50000);
+        });
 
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             (data || [])
@@ -322,12 +356,15 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 9. THEATRE PLAYS SITEMAP (/sitemap-plays.xml)
-      if (slug === 'plays') {
-        const { data } = await supabase
-          .from('plays')
-          .select('id, title, slug, updated_at')
-          .limit(50000);
+      if (target === 'plays') {
+        const data = await withRetry(async () => {
+          return await supabase
+            .from('plays')
+            .select('id, title, slug, updated_at')
+            .limit(50000);
+        });
 
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             (data || [])
@@ -345,14 +382,17 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 10. CAREERS SITEMAP (/sitemap-careers.xml)
-      if (slug === 'careers') {
+      if (target === 'careers') {
         let items: any[] = [];
         try {
-          const { data } = await supabase.from('job_postings').select('id, slug, published_at, updated_at').limit(50000);
+          const data = await withRetry(async () => {
+            return await supabase.from('job_postings').select('id, slug, published_at, updated_at').limit(50000);
+          });
           items = data || [];
         } catch {
           items = [];
         }
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             items
@@ -370,7 +410,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 11. WATCH PLATFORMS SITEMAP (/sitemap-watch.xml)
-      if (slug === 'watch') {
+      if (target === 'watch') {
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             Object.keys(WATCH_NAMES)
@@ -388,8 +429,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 12. AWARDS SITEMAP (/sitemap-awards.xml) — awards hub + individual award programme pages
-      if (slug === 'awards') {
-        // Static awards hub + any DB-stored award ceremony pages
+      if (target === 'awards') {
         const awardPages = [
           { url: '/awards', priority: '0.8', changefreq: 'weekly' },
           { url: '/awards/amvca', priority: '0.8', changefreq: 'weekly' },
@@ -398,6 +438,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           { url: '/awards/golden-stars', priority: '0.7', changefreq: 'monthly' },
           { url: '/awards/afriff', priority: '0.7', changefreq: 'monthly' },
         ];
+        setSuccessHeaders();
         return res.status(200).send(
           urlset(
             awardPages
@@ -415,13 +456,15 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       }
 
       // 13. TV SHOWS SITEMAP (/sitemap-tvshows.xml)
-      if (slug === 'tvshows') {
-        const { data } = await supabase
-          .from('films')
-          .select('id, title, slug, poster_url, updated_at, created_at')
-          .eq('content_type', 'series')
-          .order('updated_at', { ascending: false, nullsFirst: false })
-          .limit(20000);
+      if (target === 'tvshows') {
+        const data = await withRetry(async () => {
+          return await supabase
+            .from('films')
+            .select('id, title, slug, poster_url, updated_at, created_at')
+            .eq('content_type', 'series')
+            .order('updated_at', { ascending: false, nullsFirst: false })
+            .limit(20000);
+        });
 
         const tvUrls = (data || []).map((f: any) => {
           const loc = `${baseUrl}/films/${f.slug || f.id}`;
@@ -432,6 +475,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>${imageTag}\n  </url>`;
         });
 
+        setSuccessHeaders();
         return res.status(200).send(urlset(tvUrls.join('\n'), true));
       }
 
@@ -444,6 +488,9 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
     });
   } catch (error: any) {
     console.error('SEO/Sitemap Error:', error);
-    return res.status(500).json({ error: error?.message || 'Internal error' });
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('CDN-Cache-Control', 'no-cache, no-store');
+    res.setHeader('Vercel-CDN-Cache-Control', 'no-cache, no-store');
+    return res.status(500).send(`<!-- Sitemap generation error: ${escapeXml(error?.message || 'Database error')} -->`);
   }
 }
