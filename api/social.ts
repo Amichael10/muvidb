@@ -220,6 +220,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await fetchSeriesCandidates(seriesSlug, 20));
       }
 
+      if (task === 'publish_due') {
+        await requireSocialPublisherAuth(req);
+        const result = await runSocialPublisher({
+          limit: Number(req.query?.limit || 10),
+          lockedBy: 'cron-runner',
+        });
+        return res.status(200).json(result);
+      }
+
       const summary = await getSocialStudioSummary();
       const allConnections = await getAllPlatformConnections();
       return res.status(200).json({

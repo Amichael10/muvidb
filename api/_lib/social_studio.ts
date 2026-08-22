@@ -1225,7 +1225,8 @@ export async function getEditorialCalendar(days = 30) {
     .select('id,scheduled_date,scheduled_time,status,priority,source,notes,series_id,social_content_series(id,name,slug,category,figma_template_key,description)')
     .gte('scheduled_date', today)
     .order('scheduled_date', { ascending: true })
-    .limit(days);
+    .order('scheduled_time', { ascending: true })
+    .limit(100);
 
   if (error) throw error;
   const slots = data || [];

@@ -365,7 +365,7 @@ export default function AdminSocialStudio() {
           }`}
         >
           <Icon icon="solar:calendar-mark-linear" width="16" />
-          30-Day Auto-Pilot Plan ({calendarSlots.length} Days)
+          30-Day Auto-Pilot Plan ({calendarSlots.length} Slots)
         </button>
 
         <button
