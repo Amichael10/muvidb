@@ -97,7 +97,8 @@ export async function personSeo(slug: string, base: string) {
     clean(data.bio).slice(0, 155) ||
     `Discover ${name}'s filmography, credits and videos on MuviDB — the home of Nollywood.`;
 
-  // Thin stubs stay noindex so Google can clear "Crawled - not indexed".
+  // Thin stubs stay noindex so Google doesn't index empty profiles.
+  // Use status 200 with noindex rather than 404 to avoid Soft 404 classification.
   if (!isIndexablePerson(data, creditCount)) {
     return {
       seo: {
@@ -105,7 +106,7 @@ export async function personSeo(slug: string, base: string) {
         description: `${name} on MuviDB.`,
         image, canonical, robots: 'noindex, follow', jsonLd: [],
       },
-      status: 404,
+      status: 200,
       data,
     };
   }
@@ -150,12 +151,12 @@ export async function filmSeo(slug: string, base: string) {
     .from('films')
     // Superset of what the SEO head needs and what FilmDetail renders, so one
     // round-trip serves both: film_genres(genre_id) and film_companies are for
-    // the page, credits(people) for the JSON-LD cast.
+    // the page, credits(people) for the JSON-LD cast and SSR cast table.
     .select(`
       *,
       film_genres(genre_id, genres(name)),
       film_companies(companies(id, name, logo_url)),
-      credits(role, character_name, billing_order, people(name, slug, id))
+      credits(id, role, character_name, billing_order, people(id, name, photo_url, popularity_score, slug))
     `)
     .eq(keyFor(slug), slug)
     // Kept deliberately: unpublished films stay out of the index. They simply

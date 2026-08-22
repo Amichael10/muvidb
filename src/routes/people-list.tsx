@@ -38,8 +38,10 @@ export function meta() {
     { title },
     { name: 'description', content: description },
     { name: 'robots', content: 'index, follow' },
+    { tagName: 'link', rel: 'canonical', href: 'https://muvidb.com/people' },
     { property: 'og:title', content: title },
     { property: 'og:description', content: description },
+    { property: 'og:url', content: 'https://muvidb.com/people' },
     { name: 'twitter:card', content: 'summary_large_image' },
   ];
 }

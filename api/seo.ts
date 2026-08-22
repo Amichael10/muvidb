@@ -53,12 +53,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${imageNs}>\n${entries}\n</urlset>`;
       };
 
+      // Helper for batched pagination (bypasses PostgREST 1000-row cap per request)
+      const fetchPagedFilms = async (fromOffset: number, count: number) => {
+        const BATCH_SIZE = 1000;
+        const numBatches = Math.ceil(count / BATCH_SIZE);
+        const promises = [];
+        for (let i = 0; i < numBatches; i++) {
+          const start = fromOffset + i * BATCH_SIZE;
+          const end = Math.min(start + BATCH_SIZE - 1, fromOffset + count - 1);
+          promises.push(
+            supabase
+              .from('films')
+              .select('id, title, slug, poster_url, updated_at, created_at')
+              .eq('is_published', true)
+              .order('updated_at', { ascending: false, nullsFirst: false })
+              .range(start, end)
+          );
+        }
+        const results = await Promise.all(promises);
+        const rows: any[] = [];
+        for (const r of results) {
+          if (r.data) rows.push(...r.data);
+        }
+        return rows;
+      };
+
+      const fetchPagedPeople = async (fromOffset: number, count: number) => {
+        const BATCH_SIZE = 1000;
+        const numBatches = Math.ceil(count / BATCH_SIZE);
+        const promises = [];
+        for (let i = 0; i < numBatches; i++) {
+          const start = fromOffset + i * BATCH_SIZE;
+          const end = Math.min(start + BATCH_SIZE - 1, fromOffset + count - 1);
+          promises.push(
+            supabase
+              .from('people')
+              .select('id, name, slug, photo_url, updated_at, created_at')
+              .gt('film_count', 0)
+              .order('film_count', { ascending: false, nullsFirst: false })
+              .range(start, end)
+          );
+        }
+        const results = await Promise.all(promises);
+        const rows: any[] = [];
+        for (const r of results) {
+          if (r.data) rows.push(...r.data);
+        }
+        return rows;
+      };
+
       // 1. SITEMAP INDEX (/sitemap.xml)
       if (slug === 'index') {
-        const maps = [
-          'static',
-          'films',
-          'people',
+        const filmChunks = 8; // 8 chunks of 5000 = up to 40,000 films
+        const peopleChunks = 7; // 7 chunks of 5000 = up to 35,000 indexable people
+
+        const maps: string[] = ['static'];
+        for (let i = 1; i <= filmChunks; i++) maps.push(`films-${i}`);
+        for (let i = 1; i <= peopleChunks; i++) maps.push(`people-${i}`);
+        maps.push(
           'watch',
           'companies',
           'cinemas',
@@ -67,8 +119,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'plays',
           'careers',
           'awards',
-          'tvshows',
-        ];
+          'tvshows'
+        );
+
         const sitemapIndex = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    <lastmod>${new Date().toISOString()}</lastmod>\n  </sitemap>`).join('\n')}
@@ -136,13 +189,13 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         );
       }
 
-      // 3. FILMS SITEMAP (/sitemap-films.xml) — Includes Google Images extension
-      if (slug === 'films') {
-        const { data } = await supabase
-          .from('films')
-          .select('id, title, slug, poster_url, updated_at, created_at')
-          .order('updated_at', { ascending: false, nullsFirst: false })
-          .limit(50000);
+      // 3. FILMS SITEMAP (/sitemap-films.xml or /sitemap-films-1.xml .. films-8.xml)
+      const slugStr = String(slug || '');
+      if (slugStr === 'films' || slugStr.startsWith('films-')) {
+        const page = slugStr === 'films' ? 1 : Math.max(1, parseInt(slugStr.replace('films-', ''), 10) || 1);
+        const CHUNK_SIZE = 5000;
+        const fromOffset = (page - 1) * CHUNK_SIZE;
+        const data = await fetchPagedFilms(fromOffset, CHUNK_SIZE);
 
         const filmUrls = (data || []).map((f: any) => {
           const loc = `${baseUrl}/films/${f.slug || f.id}`;
@@ -156,13 +209,12 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         return res.status(200).send(urlset(filmUrls.join('\n'), true));
       }
 
-      // 4. PEOPLE / ACTORS SITEMAP (/sitemap-people.xml) — Unfiltered, all actors
-      if (slug === 'people') {
-        const { data } = await supabase
-          .from('people')
-          .select('id, name, slug, photo_url, updated_at, created_at')
-          .order('film_count', { ascending: false, nullsFirst: false })
-          .limit(50000);
+      // 4. PEOPLE / ACTORS SITEMAP (/sitemap-people.xml or /sitemap-people-1.xml .. people-7.xml)
+      if (slugStr === 'people' || slugStr.startsWith('people-')) {
+        const page = slugStr === 'people' ? 1 : Math.max(1, parseInt(slugStr.replace('people-', ''), 10) || 1);
+        const CHUNK_SIZE = 5000;
+        const fromOffset = (page - 1) * CHUNK_SIZE;
+        const data = await fetchPagedPeople(fromOffset, CHUNK_SIZE);
 
         const personUrls = (data || []).map((p: any) => {
           const loc = `${baseUrl}/people/${p.slug || p.id}`;
@@ -203,7 +255,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       if (slug === 'cinemas') {
         const { data } = await supabase
           .from('cinemas')
-          .select('id, name, slug, updated_at')
+          .select('id, name, created_at, showtimes_last_fetched_at')
+          .eq('is_active', true)
           .limit(50000);
 
         return res.status(200).send(
@@ -211,8 +264,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
             (data || [])
               .map(
                 (c: any) => `  <url>
-    <loc>${baseUrl}/cinemas/${c.slug || c.id}</loc>
-    ${c.updated_at ? `<lastmod>${new Date(c.updated_at).toISOString()}</lastmod>` : ''}
+    <loc>${baseUrl}/cinemas/${c.id}</loc>
+    ${c.showtimes_last_fetched_at || c.created_at ? `<lastmod>${new Date(c.showtimes_last_fetched_at || c.created_at).toISOString()}</lastmod>` : ''}
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>`
@@ -226,7 +279,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
       if (slug === 'channels') {
         const { data } = await supabase
           .from('channels')
-          .select('id, name, slug, updated_at')
+          .select('id, name, slug, created_at, videos_last_fetched_at')
           .limit(50000);
 
         return res.status(200).send(
@@ -235,6 +288,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
               .map(
                 (c: any) => `  <url>
     <loc>${baseUrl}/channels/${c.slug || c.id}</loc>
+    ${c.videos_last_fetched_at || c.created_at ? `<lastmod>${new Date(c.videos_last_fetched_at || c.created_at).toISOString()}</lastmod>` : ''}
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>`
@@ -342,7 +396,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           { url: '/awards/amaa', priority: '0.8', changefreq: 'weekly' },
           { url: '/awards/tinff', priority: '0.7', changefreq: 'monthly' },
           { url: '/awards/golden-stars', priority: '0.7', changefreq: 'monthly' },
-          { url: '/awards/yomafa', priority: '0.7', changefreq: 'monthly' },
+          { url: '/awards/afriff', priority: '0.7', changefreq: 'monthly' },
         ];
         return res.status(200).send(
           urlset(
@@ -365,15 +419,15 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         const { data } = await supabase
           .from('films')
           .select('id, title, slug, poster_url, updated_at, created_at')
-          .eq('type', 'series')
+          .eq('content_type', 'series')
           .order('updated_at', { ascending: false, nullsFirst: false })
           .limit(20000);
 
         const tvUrls = (data || []).map((f: any) => {
           const loc = `${baseUrl}/films/${f.slug || f.id}`;
           const lastmod = f.updated_at || f.created_at ? new Date(f.updated_at || f.created_at).toISOString() : new Date().toISOString();
-          const imageTag = f.poster_url
-            ? `\n    <image:image>\n      <image:loc>${escapeXml(f.poster_url)}</image:loc>\n      <image:title>${escapeXml(f.title)} Poster</image:title>\n    </image:image>`
+          const imageTag = isValidImageUrl(f.poster_url)
+            ? `\n    <image:image>\n      <image:loc>${escapeXml(String(f.poster_url).trim())}</image:loc>\n      <image:title>${escapeXml(f.title)} Poster</image:title>\n    </image:image>`
             : '';
           return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>${imageTag}\n  </url>`;
         });

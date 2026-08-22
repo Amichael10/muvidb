@@ -100,8 +100,10 @@ export function meta() {
     { title },
     { name: 'description', content: description },
     { name: 'robots', content: 'index, follow' },
+    { tagName: 'link', rel: 'canonical', href: 'https://muvidb.com/browse' },
     { property: 'og:title', content: title },
     { property: 'og:description', content: description },
+    { property: 'og:url', content: 'https://muvidb.com/browse' },
     { name: 'twitter:card', content: 'summary_large_image' },
   ];
 }

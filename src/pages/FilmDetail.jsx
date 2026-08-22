@@ -131,19 +131,64 @@ const FilmDetailSkeleton = () => (
     </div>
 )
 
+const deduplicateAndMerge = (members) => {
+  const map = new Map();
+  members.forEach(m => {
+    if (!map.has(m.id)) {
+      map.set(m.id, { ...m });
+    } else {
+      const existing = map.get(m.id);
+      if (m.role && !existing.role.includes(m.role)) {
+        existing.role = `${existing.role}, ${m.role}`;
+      }
+    }
+  });
+  return Array.from(map.values());
+};
+
+const parseFilmCredits = (credits = []) => {
+  const castMembersRaw = credits
+    .filter(c => {
+      const role = (c.role || '').trim().toLowerCase();
+      return role === 'actor' || role === 'cast';
+    })
+    .map(c => {
+      const person = Array.isArray(c.people) ? c.people[0] : c.people;
+      return person ? { ...person, role: c.character_name || 'Cast' } : null;
+    })
+    .filter(Boolean);
+    
+  const crewMembersRaw = credits
+    .filter(c => {
+      const role = (c.role || '').trim().toLowerCase();
+      return role !== 'actor' && role !== 'cast';
+    })
+    .map(c => {
+      const person = Array.isArray(c.people) ? c.people[0] : c.people;
+      return person ? { ...person, role: formatRole(c.role) || 'Crew' } : null;
+    })
+    .filter(Boolean);
+
+  const cast = deduplicateAndMerge(castMembersRaw);
+  const crew = deduplicateAndMerge(crewMembersRaw);
+  const dir = crew.find(m => (m.role || '').toLowerCase().includes('director'));
+
+  return { cast, crew, director: dir ? dir.name : null };
+};
+
 export default function FilmDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // The route loader (src/routes/film-detail.tsx) already fetched this film
-  // server-side to build the SEO head, so the same row seeds the page and the
-  // first paint has real content. Unpublished films aren't seeded (the loader
-  // filters on is_published) and fall back to the client fetch below.
+  // The route loader (src/routes/film-detail.tsx) already fetched this film and
+  // credits server-side, so the same row seeds the page and cast list on SSR.
   const loaderData = useLoaderData();
+  const seededParsed = loaderData?.film?.credits?.length ? parseFilmCredits(loaderData.film.credits) : null;
   const seededFilm = loaderData?.film
     ? {
         ...loaderData.film,
+        director: seededParsed?.director || loaderData.film.director || null,
         genres: dedupeGenres(
           loaderData.film.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || []
         ),
@@ -152,6 +197,8 @@ export default function FilmDetail() {
 
   const [film, setFilm] = useState(seededFilm);
   const [filmId, setFilmId] = useState(seededFilm?.id ?? null); // actual UUID for sub-queries
+  const [cast, setCast] = useState(seededParsed?.cast || []);
+  const [crew, setCrew] = useState(seededParsed?.crew || []);
   const [relatedFilms, setRelatedFilms] = useState([]);
   // Starts false when seeded — otherwise the server renders the loading state
   // and SSR gains nothing.
@@ -228,8 +275,6 @@ export default function FilmDetail() {
     toggleReaction
   } = useReactions(filmId, user);
 
-  const [cast, setCast] = useState([]);
-  const [crew, setCrew] = useState([]);
   const [criticSummary, setCriticSummary] = useState({ score: null, count: 0 });
   const [showFilmEdit, setShowFilmEdit] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -296,53 +341,12 @@ export default function FilmDetail() {
         }
       }
 
-      const deduplicateAndMerge = (members) => {
-        const map = new Map();
-        members.forEach(m => {
-          if (!map.has(m.id)) {
-            map.set(m.id, { ...m });
-          } else {
-            const existing = map.get(m.id);
-            if (m.role && !existing.role.includes(m.role)) {
-              existing.role = `${existing.role}, ${m.role}`;
-            }
-          }
-        });
-        return Array.from(map.values());
-      };
-
-      const castMembersRaw = data
-        .filter(c => {
-          const role = (c.role || '').trim().toLowerCase();
-          return role === 'actor' || role === 'cast';
-        })
-        .map(c => {
-          const person = Array.isArray(c.people) ? c.people[0] : c.people;
-          return person ? { ...person, role: c.character_name || 'Cast' } : null;
-        })
-        .filter(Boolean);
-        
-      const crewMembersRaw = data
-        .filter(c => {
-          const role = (c.role || '').trim().toLowerCase();
-          return role !== 'actor' && role !== 'cast';
-        })
-        .map(c => {
-          const person = Array.isArray(c.people) ? c.people[0] : c.people;
-          return person ? { ...person, role: formatRole(c.role) || 'Crew' } : null;
-        })
-        .filter(Boolean);
-
-      const castMembers = deduplicateAndMerge(castMembersRaw);
-      const crewMembers = deduplicateAndMerge(crewMembersRaw);
-
+      const { cast: castMembers, crew: crewMembers, director: dirName } = parseFilmCredits(data);
       setCast(castMembers);
       setCrew(crewMembers);
       
-      // Extract director if available
-      const dir = crewMembers.find(m => (m.role || '').toLowerCase().includes('director'));
-      if (dir) {
-        setFilm(prev => prev ? { ...prev, director: dir.name } : null);
+      if (dirName) {
+        setFilm(prev => prev ? { ...prev, director: dirName } : null);
       }
     } catch (error) {
       console.error('Error fetching credits:', error);
@@ -398,13 +402,16 @@ export default function FilmDetail() {
 
       setFilm(mappedFilm);
       setFilmId(data.id);
-      // Title comes from the route's `meta` export now — setting it here would
-      // overwrite the server-rendered one after hydration.
-      // Render the page as soon as the main film row is in — everything below
-      // (credits, episodes, related) loads in the background instead of blocking.
       setLoading(false);
 
-      fetchCredits(data.id);
+      if (data.credits && data.credits.length > 0) {
+        const { cast: parsedCast, crew: parsedCrew, director: parsedDir } = parseFilmCredits(data.credits);
+        setCast(parsedCast);
+        setCrew(parsedCrew);
+        if (parsedDir) setFilm(prev => prev ? { ...prev, director: parsedDir } : null);
+      } else {
+        fetchCredits(data.id);
+      }
       fetchCriticSummary(data.id);
       if (data.content_type === 'series') {
         fetchEpisodes(data.id, getShowName(data.title));

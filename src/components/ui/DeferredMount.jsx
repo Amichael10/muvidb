@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
  */
 export default function DeferredMount({
   children,
+  fallback = null,
   rootMargin = '400px 0px',
   minHeight = 280,
   onActivate,
@@ -66,9 +67,8 @@ export default function DeferredMount({
       ref={ref}
       className={className}
       style={active ? undefined : { minHeight }}
-      aria-hidden={active ? undefined : true}
     >
-      {active ? children : null}
+      {active ? children : fallback}
     </div>
   );
 }
