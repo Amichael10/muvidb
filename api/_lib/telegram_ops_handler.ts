@@ -8,6 +8,7 @@ import {
   isAllowedOpsChat,
   sendTelegramMessage,
   sendTelegramPhoto,
+  sendTelegramVideo,
   telegramConfigured,
 } from './telegram.js';
 import {
@@ -425,6 +426,15 @@ Return a clear markdown list of discovered films and people with their respectiv
   await answerTelegramCallback(callbackId, 'Unknown action');
 }
 
+function cleanInstagramImageUrl(url: string | null): string | null {
+  if (!url) return null;
+  let cleaned = url.replace(/&amp;/g, '&');
+  // Strip out dynamic cropping instructions from Meta CDN so the flyer/poster is not cropped into a square
+  cleaned = cleaned.replace(/stp=c\d+\.\d+\.\d+\.\d+a_dst-jpg/g, 'stp=dst-jpg');
+  cleaned = cleaned.replace(/_s\d+x\d+_/g, '_');
+  return cleaned;
+}
+
 function decodeHtmlEntities(str: string): string {
   if (!str) return '';
   return str
@@ -458,6 +468,7 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
   let eventType = 'manual';
   let authorName: string | null = null;
   let imageUrl: string | null = null;
+  let videoUrl: string | null = null;
 
   if (sourceUrl) {
     if (/instagram\.com/i.test(sourceUrl)) {
@@ -491,9 +502,16 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
           const ogImg =
             html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1] ||
             html.match(/content="([^"]*)"\s+property="og:image"/i)?.[1];
+          const ogVid =
+            html.match(/<meta property="og:video(?::secure_url)?" content="([^"]*)"/i)?.[1] ||
+            html.match(/content="([^"]*)"\s+property="og:video(?::secure_url)?"/i)?.[1];
 
           if (ogImg) {
-            imageUrl = ogImg.replace(/&amp;/g, '&');
+            imageUrl = cleanInstagramImageUrl(ogImg);
+          }
+
+          if (ogVid) {
+            videoUrl = ogVid.replace(/&amp;/g, '&');
           }
 
           if (ogTitle) {
@@ -641,7 +659,7 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
     title = rawText.slice(0, 80).split('\n')[0] || 'Direct Note';
   }
 
-  return { eventType, platformLabel, title, description, authorName, imageUrl };
+  return { eventType, platformLabel, title, description, authorName, imageUrl, videoUrl };
 }
 
 async function handleSocialIntake(chatId: string | number, message: any) {
@@ -649,6 +667,7 @@ async function handleSocialIntake(chatId: string | number, message: any) {
   const photo = Array.isArray(message.photo) && message.photo.length > 0
     ? message.photo[message.photo.length - 1]
     : null;
+  const directVideo = message.video || null;
 
   // Extract URLs if present
   const urlMatch = text.match(/https?:\/\/[^\s]+/i);
@@ -660,6 +679,10 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     meta.eventType = 'image_upload';
     meta.platformLabel = 'Photo / Screenshot';
     if (!text) meta.title = 'Photo forwarded from Telegram';
+  } else if (directVideo && !sourceUrl) {
+    meta.eventType = 'video_upload';
+    meta.platformLabel = 'Video Clip';
+    if (!text) meta.title = 'Video forwarded from Telegram';
   }
 
   const { data: newEvent, error } = await supabase
@@ -678,7 +701,9 @@ async function handleSocialIntake(chatId: string | number, message: any) {
         forward_from: message.forward_from?.username || message.forward_from_chat?.title || null,
         has_photo: Boolean(photo),
         photo_file_id: photo?.file_id || null,
+        video_file_id: directVideo?.file_id || null,
         image_url: meta.imageUrl,
+        video_url: meta.videoUrl,
         raw_text: text,
         author_name: meta.authorName,
         received_at: new Date().toISOString(),
@@ -696,10 +721,11 @@ async function handleSocialIntake(chatId: string | number, message: any) {
   const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
   const adminUrl = `${site}/admin/social-studio`;
 
-  const snippet = meta.description.length > 300 ? meta.description.slice(0, 300) + '…' : meta.description;
+  const isLongCaption = meta.description && meta.description.length > 280;
+  const snippet = isLongCaption ? meta.description.slice(0, 280) + '…' : meta.description;
 
   const promptMsg = [
-    `📥 *New ${meta.platformLabel} Post Captured!*`,
+    `📥 *New ${meta.platformLabel} Captured!*`,
     '',
     `📌 *Title:* ${meta.title}`,
     meta.authorName ? `👤 *Account:* ${meta.authorName}` : null,
@@ -720,7 +746,14 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     [{ text: '🌐 Open Social Studio', url: adminUrl }],
   ];
 
-  if (meta.imageUrl) {
+  if (meta.videoUrl) {
+    await sendTelegramVideo({
+      video: meta.videoUrl,
+      caption: promptMsg,
+      chatId: String(chatId),
+      replyMarkup: { inline_keyboard: inlineKeyboard },
+    });
+  } else if (meta.imageUrl) {
     await sendTelegramPhoto({
       photo: meta.imageUrl,
       caption: promptMsg,
@@ -733,6 +766,15 @@ async function handleSocialIntake(chatId: string | number, message: any) {
       chatId: String(chatId),
       disablePreview: false,
       replyMarkup: { inline_keyboard: inlineKeyboard },
+    });
+  }
+
+  // If caption was long, deliver full unabridged text immediately so no text is lost
+  if (isLongCaption) {
+    await sendTelegramMessage({
+      text: `📜 *Full Extracted Caption:*\n\n${meta.description}`,
+      chatId: String(chatId),
+      disablePreview: true,
     });
   }
 }
