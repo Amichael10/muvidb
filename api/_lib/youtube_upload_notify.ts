@@ -106,17 +106,38 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate) {
 export async function notifyYouTubeUploads(
   channel: ChannelRow,
   candidates: UploadCandidate[],
-  { knownVideoIds }: { knownVideoIds?: Set<string> } = {},
 ) {
   if (!telegramConfigured() || !candidates.length) {
     return { notified: 0, skipped: candidates.length };
   }
 
+  const filmLength = candidates.filter((v) => isFilmLengthDuration(v.duration_seconds || 0));
+  if (!filmLength.length) return { notified: 0, skipped: candidates.length };
+
+  const candidateIds = filmLength.map((v) => v.video_id);
+
+  // Check which candidate videos are already imported into channel_videos
+  const { data: existingRows } = await supabase
+    .from('channel_videos')
+    .select('video_id')
+    .eq('channel_id', channel.id)
+    .in('video_id', candidateIds);
+
+  const existingSet = new Set((existingRows || []).map((r) => r.video_id));
+
+  // Check which candidate videos have already been alerted on
+  const { data: alertedRows } = await supabase
+    .from('youtube_upload_alert_log')
+    .select('video_id')
+    .eq('channel_id', channel.id)
+    .in('video_id', candidateIds);
+
+  const alertedSet = new Set((alertedRows || []).map((r) => r.video_id));
+
   let notified = 0;
-  for (const video of candidates) {
-    if (!isFilmLengthDuration(video.duration_seconds || 0)) continue;
-    if (knownVideoIds?.has(video.video_id)) continue;
-    if (await alreadyNotified(channel.id, video.video_id)) continue;
+  for (const video of filmLength) {
+    if (existingSet.has(video.video_id)) continue;
+    if (alertedSet.has(video.video_id)) continue;
 
     const sent = await sendUploadAlert(channel, video);
     if (sent.ok) notified += 1;
@@ -190,25 +211,13 @@ export async function runYouTubeUploadWatch() {
   if (error) throw error;
   if (!channels?.length) return { ok: true, channels: 0, notified: 0 };
 
-  const { data: stored } = await supabase
-    .from('channel_videos')
-    .select('channel_id, video_id');
-
-  const knownByChannel = new Map<string, Set<string>>();
-  for (const row of stored || []) {
-    if (!knownByChannel.has(row.channel_id)) knownByChannel.set(row.channel_id, new Set());
-    knownByChannel.get(row.channel_id)!.add(row.video_id);
-  }
-
   let totalNotified = 0;
   const details: { channel: string; notified: number }[] = [];
 
   for (const ch of channels) {
     try {
       const uploads = await pollChannelUploads(ch);
-      const known = knownByChannel.get(ch.id) || new Set();
-      const filmLength = uploads.filter((u) => isFilmLengthDuration(u.duration_seconds));
-      const result = await notifyYouTubeUploads(ch, filmLength, { knownVideoIds: known });
+      const result = await notifyYouTubeUploads(ch, uploads);
       totalNotified += result.notified;
       if (result.notified > 0) {
         details.push({ channel: ch.name, notified: result.notified });

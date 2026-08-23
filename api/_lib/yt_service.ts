@@ -21,7 +21,6 @@ function collectYtKeys(): string[] {
   ];
 }
 
-const YT_KEYS = collectYtKeys();
 let ytKeyIdx = 0; // persists across calls so we stay on a working key
 
 // A key is "dead" (rotate to the next one) when it's quota-exhausted (403) OR
@@ -39,13 +38,15 @@ function isDeadKeyError(status: number, body: string): boolean {
  * configured key when the current one is quota-exhausted or invalid.
  */
 export async function ytGet(endpoint: string, params: Record<string, string>): Promise<any> {
-  if (!YT_KEYS.length) throw new Error('No YouTube API key configured (YOUTUBE_API_KEY)');
+  const keys = collectYtKeys();
+  if (!keys.length) throw new Error('No YouTube API key configured (YOUTUBE_API_KEY)');
 
   let lastDetail = '';
   // Try each key at most once per call, starting from the current one.
-  for (let attempt = 0; attempt < YT_KEYS.length; attempt++) {
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const key = keys[ytKeyIdx % keys.length];
     const url = new URL(`${YT_BASE}/${endpoint}`);
-    Object.entries({ ...params, key: YT_KEYS[ytKeyIdx] }).forEach(([k, v]) => url.searchParams.set(k, v));
+    Object.entries({ ...params, key }).forEach(([k, v]) => url.searchParams.set(k, v));
 
     const res = await fetch(url.toString(), { signal: AbortSignal.timeout(30000) });
     if (res.ok) return res.json();
@@ -54,16 +55,16 @@ export async function ytGet(endpoint: string, params: Record<string, string>): P
     let detail = body;
     try { detail = JSON.parse(body).error?.message || body; } catch (e) {}
 
-    if (isDeadKeyError(res.status, body) && YT_KEYS.length > 1) {
-      console.warn(`[ytGet] key #${ytKeyIdx + 1}/${YT_KEYS.length} unusable (${res.status}), rotating…`);
-      ytKeyIdx = (ytKeyIdx + 1) % YT_KEYS.length;
+    if (isDeadKeyError(res.status, body) && keys.length > 1) {
+      console.warn(`[ytGet] key #${(ytKeyIdx % keys.length) + 1}/${keys.length} unusable (${res.status}), rotating…`);
+      ytKeyIdx = (ytKeyIdx + 1) % keys.length;
       lastDetail = detail;
       continue; // retry with the next key
     }
     // Genuine request error (404/bad params/etc.) — fail fast, rotating won't help.
     throw new Error(`YouTube /${endpoint} ${res.status}: ${detail}`);
   }
-  throw new Error(`YouTube /${endpoint}: all ${YT_KEYS.length} API keys unusable (${lastDetail})`);
+  throw new Error(`All ${keys.length} YouTube API key(s) exhausted or invalid. Last error: ${lastDetail}`);
 }
 
 /**

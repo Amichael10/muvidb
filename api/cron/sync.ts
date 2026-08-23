@@ -11,6 +11,7 @@ import { pruneSocialAssets, runSocialPublisher } from '../_lib/social_studio.js'
 import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
 import { sweepAndUpdatePlayStatuses } from '../_lib/theatre_service.js';
+import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
 
 
 /**
@@ -134,6 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'classify_film_kinds': result = await classifyFilmKinds({ limit: 100 }); break;
       case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
+      case 'youtube_watch':        result = await runYouTubeUploadWatch(); break;
       case 'kava':      
         return res.status(200).json({ 
           task: 'kava', 

@@ -272,6 +272,95 @@ async function handleCallback(query: any) {
   await answerTelegramCallback(callbackId, 'Unknown action');
 }
 
+async function handleSocialIntake(chatId: string | number, message: any) {
+  const text = String(message.text || message.caption || '').trim();
+  const photo = Array.isArray(message.photo) && message.photo.length > 0
+    ? message.photo[message.photo.length - 1]
+    : null;
+
+  // Extract URLs if present
+  const urlMatch = text.match(/https?:\/\/[^\s]+/i);
+  const sourceUrl = urlMatch ? urlMatch[0] : null;
+
+  let eventType = 'manual';
+  let platformLabel = 'Direct Note';
+
+  if (sourceUrl) {
+    if (/instagram\.com/i.test(sourceUrl)) {
+      eventType = 'instagram_post';
+      platformLabel = 'Instagram';
+    } else if (/youtube\.com|youtu\.be/i.test(sourceUrl)) {
+      eventType = 'youtube_video';
+      platformLabel = 'YouTube';
+    } else if (/twitter\.com|x\.com/i.test(sourceUrl)) {
+      eventType = 'x_post';
+      platformLabel = 'X / Twitter';
+    } else if (/tiktok\.com/i.test(sourceUrl)) {
+      eventType = 'tiktok_post';
+      platformLabel = 'TikTok';
+    } else {
+      eventType = 'web_link';
+      platformLabel = 'Web Article';
+    }
+  } else if (photo) {
+    eventType = 'image_upload';
+    platformLabel = 'Photo / Screenshot';
+  }
+
+  const title = text.slice(0, 100).split('\n')[0] || (photo ? 'Photo submission from Telegram' : 'Telegram Intake');
+  const description = text || (photo ? 'Image forwarded via Telegram bot' : '');
+
+  const { error } = await supabase.from('social_news_events').insert({
+    event_type: eventType,
+    title: title.slice(0, 200),
+    description,
+    source_type: 'telegram_bot',
+    source_url: sourceUrl,
+    urgency: 'high',
+    status: 'new',
+    metadata: {
+      telegram_message_id: message.message_id,
+      from_user: message.from?.username || message.from?.first_name || 'Admin',
+      forward_from: message.forward_from?.username || message.forward_from_chat?.title || null,
+      has_photo: Boolean(photo),
+      photo_file_id: photo?.file_id || null,
+      raw_text: text,
+      received_at: new Date().toISOString(),
+    },
+  });
+
+  if (error) {
+    console.error('[telegram_social_intake] DB insert failed:', error.message);
+    await reply(chatId, `⚠️ Failed to save intake to Social Studio: ${error.message}`);
+    return;
+  }
+
+  const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+  const adminUrl = `${site}/admin/social-studio`;
+
+  const replyMsg = [
+    '📥 Saved to Social Studio!',
+    '',
+    `🏷️ Source: ${platformLabel}`,
+    sourceUrl ? `🔗 Link: ${sourceUrl}` : null,
+    text ? `📝 Text: "${text.length > 120 ? text.slice(0, 120) + '…' : text}"` : null,
+    photo ? '🖼️ Photo attached: Yes' : null,
+    '',
+    '✅ Added to the Content & News Opportunities Queue for draft generation.',
+  ].filter(Boolean).join('\n');
+
+  await sendTelegramMessage({
+    text: replyMsg,
+    chatId: String(chatId),
+    disablePreview: false,
+    replyMarkup: {
+      inline_keyboard: [
+        [{ text: '🎨 Open Social Studio', url: adminUrl }],
+      ],
+    },
+  });
+}
+
 export async function handleTelegramOps(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -302,7 +391,7 @@ export async function handleTelegramOps(req: VercelRequest, res: VercelResponse)
     }
 
     const message = update.message || update.edited_message;
-    if (!message?.text) {
+    if (!message) {
       return res.status(200).json({ ok: true });
     }
 
@@ -312,9 +401,11 @@ export async function handleTelegramOps(req: VercelRequest, res: VercelResponse)
       return res.status(200).json({ ok: true });
     }
 
-    const text = String(message.text || '');
+    const text = String(message.text || message.caption || '').trim();
     if (text.startsWith('/')) {
       await handleCommand(chatId, text);
+    } else if (text || message.photo || message.document) {
+      await handleSocialIntake(chatId, message);
     }
 
     return res.status(200).json({ ok: true });
