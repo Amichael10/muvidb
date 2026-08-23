@@ -524,9 +524,9 @@ const PeopleList = () => {
   const fetchPeople = async (pageNum, reset = false) => {
     setLoading(true)
 
-    const roleValue = roleFilter !== 'All' ? PEOPLE_FILTER_TO_ROLE[roleFilter] : null
+    const roleValue = roleFilter !== 'All' ? canonicalizeRole(roleFilter) : null
     const roleLabel = roleFilter !== 'All' ? (formatDepartment(roleValue) || roleFilter) : null
-    const fetchSize = roleValue ? PAGE_SIZE * 3 : PAGE_SIZE
+    const fetchSize = PAGE_SIZE
 
     try {
       if (debouncedSearch.trim()) {
@@ -619,7 +619,100 @@ const PeopleList = () => {
         return
       }
 
-      // Browse Mode (Direct DB Query)
+      // Role Filter Dual-Source Query (Department + Credits Join)
+      if (roleValue) {
+        const deptQuery = supabase
+          .from('people')
+          .select(`
+            id, slug, name, photo_url,
+            popularity_score, is_verified, is_spotlight,
+            known_for_department, film_count, gender, nationality,
+            created_at, updated_at,
+            credits(id, role)
+          `)
+          .or(`known_for_department.ilike.%${roleLabel}%,known_for_department.ilike.%${roleValue}%`)
+
+        const credsQuery = supabase
+          .from('credits')
+          .select(`
+            person_id, role,
+            people(
+              id, slug, name, photo_url,
+              popularity_score, is_verified, is_spotlight,
+              known_for_department, film_count, gender, nationality,
+              created_at, updated_at,
+              credits(id, role)
+            )
+          `)
+          .ilike('role', `%${roleValue}%`)
+          .limit(150)
+
+        const [deptRes, credsRes] = await Promise.all([
+          deptQuery.limit(100),
+          credsQuery
+        ])
+
+        const map = new Map()
+        ;(deptRes.data || []).forEach((p) => {
+          if (p) map.set(p.id, p)
+        })
+        ;(credsRes.data || []).forEach((c) => {
+          if (c?.people && !map.has(c.people.id)) {
+            map.set(c.people.id, c.people)
+          }
+        })
+
+        let merged = Array.from(map.values())
+
+        // Double check canonical department/credit match
+        merged = merged.filter((p) => {
+          const dept = canonicalizeRole(p.known_for_department)
+          if (dept === roleValue) return true
+          return (p.credits || []).some((c) => canonicalizeRole(c.role) === roleValue)
+        })
+
+        if (verifiedOnly) merged = merged.filter((p) => p.is_verified)
+        if (spotlightOnly) merged = merged.filter((p) => p.is_spotlight)
+        if (photoOnly) merged = merged.filter((p) => Boolean(p.photo_url))
+        if (gender !== 'all') merged = merged.filter((p) => (p.gender || '').toLowerCase() === gender.toLowerCase())
+        if (nationality !== 'all') {
+          if (nationality === 'Other') {
+            merged = merged.filter((p) => !['Nigerian', 'Ghanaian', 'South African', 'Kenyan'].includes(p.nationality))
+          } else {
+            merged = merged.filter((p) => (p.nationality || '').toLowerCase() === nationality.toLowerCase())
+          }
+        }
+        if (experience !== 'all') {
+          merged = merged.filter((p) => {
+            const count = p.film_count ?? (p.credits?.length || 0)
+            if (experience === '20+') return count >= 20
+            if (experience === '10-19') return count >= 10 && count <= 19
+            if (experience === '5-9') return count >= 5 && count <= 9
+            if (experience === '1-4') return count >= 1 && count <= 4
+            return true
+          })
+        }
+
+        // Sorting
+        if (sortBy === 'name_asc') {
+          merged.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        } else if (sortBy === 'name_desc') {
+          merged.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
+        } else if (sortBy === 'films_desc') {
+          merged.sort((a, b) => (b.film_count ?? (b.credits?.length || 0)) - (a.film_count ?? (a.credits?.length || 0)))
+        } else if (sortBy === 'recent') {
+          merged.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+        } else {
+          merged.sort((a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0))
+        }
+
+        const slice = merged.slice(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE)
+        setHasMore((pageNum + 1) * PAGE_SIZE < merged.length)
+        setPeople(reset ? slice : (prev) => [...prev, ...slice])
+        return
+      }
+
+      // Default Browse Mode (All Roles)
       let query = supabase.from('people').select(`
         id, slug, name, photo_url,
         popularity_score, is_verified, is_spotlight,
@@ -627,10 +720,6 @@ const PeopleList = () => {
         created_at, updated_at,
         credits(id, role)
       `)
-
-      if (roleLabel) {
-        query = query.ilike('known_for_department', roleLabel)
-      }
 
       if (verifiedOnly) {
         query = query.eq('is_verified', true)
@@ -686,22 +775,12 @@ const PeopleList = () => {
       const { data, error } = await query
       if (error) throw error
 
-      let filtered = data || []
-      if (roleValue) {
-        filtered = filtered
-          .filter((p) => {
-            const dept = canonicalizeRole(p.known_for_department)
-            if (dept === roleValue) return true
-            return (p.credits || []).some((c) => canonicalizeRole(c.role) === roleValue)
-          })
-          .slice(0, PAGE_SIZE)
-      }
-
-      if (!data || data.length < fetchSize || filtered.length < PAGE_SIZE) {
+      const list = data || []
+      if (!data || data.length < fetchSize) {
         setHasMore(false)
       }
 
-      setPeople(reset ? filtered : (prev) => [...prev, ...filtered])
+      setPeople(reset ? list : (prev) => [...prev, ...list])
     } catch (err) {
       console.error('fetchPeople failed:', err)
       setHasMore(false)
