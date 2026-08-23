@@ -1217,7 +1217,7 @@ export async function attachCustomAsset(
   return assetRow;
 }
 
-export async function getEditorialCalendar(days = 30) {
+export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   const today = new Date().toISOString().split('T')[0];
   const { data, error } = await supabase
@@ -1240,7 +1240,7 @@ export async function getEditorialCalendar(days = 30) {
     await Promise.all(
       seriesSlugs.map(async (slug) => {
         try {
-          candidatePools[slug] = await fetchSeriesCandidates(slug, 20);
+          candidatePools[slug] = await fetchSeriesCandidates(slug, 25);
         } catch {
           candidatePools[slug] = [];
         }
@@ -1252,9 +1252,11 @@ export async function getEditorialCalendar(days = 30) {
     return slots.map((slot: any) => {
       const slug = slot.social_content_series?.slug || 'filmography';
       const pool = candidatePools[slug] || [];
-      const idx = usageCount[slug] || 0;
-      usageCount[slug] = (idx + 1) % Math.max(pool.length, 1);
-      const candidate = pool[idx] || null;
+      const currentIdx = usageCount[slug] || 0;
+      usageCount[slug] = currentIdx + 1;
+      
+      const candidateIdx = pool.length > 0 ? (currentIdx + (Number(shuffleOffset) || 0)) % pool.length : 0;
+      const candidate = pool[candidateIdx] || null;
 
       return {
         ...slot,
@@ -1269,6 +1271,7 @@ export async function getEditorialCalendar(days = 30) {
               completenessScore: candidate.completenessScore,
               contentType: candidate.type === 'person' ? 'actor_spotlight' : 'upcoming_movie',
               templateSlug: candidate.type === 'person' ? 'actor-spotlight-v1' : 'upcoming-movie-v1',
+              data: candidate.data || {},
             }
           : null,
       };
@@ -1277,6 +1280,34 @@ export async function getEditorialCalendar(days = 30) {
     console.warn('Failed to attach candidates to calendar slots:', (err as Error)?.message);
     return slots;
   }
+}
+
+export async function updateEditorialCalendarSlot(input: {
+  slotId: string;
+  scheduledDate: string;
+  scheduledTime?: string;
+}) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  if (!input.slotId || !input.scheduledDate) {
+    throw httpError(400, 'slotId and scheduledDate are required');
+  }
+
+  const updates: Record<string, any> = {
+    scheduled_date: input.scheduledDate,
+  };
+  if (input.scheduledTime) {
+    updates.scheduled_time = input.scheduledTime.includes(':') ? (input.scheduledTime.length === 5 ? `${input.scheduledTime}:00` : input.scheduledTime) : input.scheduledTime;
+  }
+
+  const { data, error } = await supabase
+    .from('social_calendar')
+    .update(updates)
+    .eq('id', input.slotId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { success: true, slot: data };
 }
 
 export async function approveEditorialSlot(
@@ -1370,9 +1401,9 @@ export async function approveEditorialSlot(
   };
 }
 
-export async function seedEditorialCalendarSlots(days = 30) {
+export async function seedEditorialCalendarSlots(options: any = 30) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   const { seedRollingCalendar } = await import('./editorial/calendar_service.js');
-  const count = await seedRollingCalendar(days);
+  const count = await seedRollingCalendar(options);
   return { seeded: count };
 }

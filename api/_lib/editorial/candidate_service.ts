@@ -584,4 +584,114 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   }
 }
 
+/**
+ * Search people and films across MuviDB for manual candidate assignment in Social Studio.
+ */
+export async function searchCandidates(
+  query: string,
+  type: 'all' | 'person' | 'movie' | 'play' = 'all',
+  limit = 20,
+): Promise<CandidateEntity[]> {
+  const trimmed = (query || '').trim();
+  if (!trimmed) return [];
+
+  const results: CandidateEntity[] = [];
+
+  // 1. Search People
+  if (type === 'all' || type === 'person') {
+    const { data: people } = await supabase
+      .from('people')
+      .select('id, name, slug, photo_url, photo_cutout_url, country, film_count, professions, bio, profile_completeness, instagram_url, twitter_url')
+      .ilike('name', `%${trimmed}%`)
+      .order('profile_completeness', { ascending: false })
+      .limit(limit);
+
+    if (people && people.length > 0) {
+      const enrichedPeople = await enrichPeopleCandidates(people);
+      enrichedPeople.forEach((p) => {
+        results.push({
+          id: p.id,
+          type: 'person',
+          name: p.name,
+          subtext: `${p.film_count || 0} credits • ${p.country || 'Nollywood'} • ${(p.professions || [])[0] || 'Talent'}`,
+          imageUrl: p.photo_cutout_url || p.photo_url,
+          country: p.country,
+          category: (p.professions || [])[0] || 'Actor Spotlight',
+          completenessScore: p.profile_completeness || 0.8,
+          data: {
+            ...p,
+            handle: extractSocialHandle(p),
+            socialHandles: {
+              instagram: p.instagram_url,
+              twitter: p.twitter_url,
+            },
+          },
+        });
+      });
+    }
+  }
+
+  // 2. Search Films
+  if (type === 'all' || type === 'movie') {
+    const { data: films } = await supabase
+      .from('films')
+      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, is_in_cinemas, synopsis, tagline, genres, liked_percent')
+      .ilike('title', `%${trimmed}%`)
+      .order('year', { ascending: false })
+      .limit(limit);
+
+    if (films && films.length > 0) {
+      const enrichedFilms = await enrichFilmCandidates(films);
+      enrichedFilms.forEach((f) => {
+        const platformName = PLATFORM_DISPLAY_NAMES[f.release_type || ''] || (f.is_in_cinemas ? 'In Cinemas' : 'Streaming');
+        results.push({
+          id: f.id,
+          type: 'movie',
+          name: f.title,
+          subtext: `${f.year || 'Film'} • ${platformName} • ${(f.genres || []).slice(0, 2).join(', ') || 'Nollywood'}`,
+          imageUrl: f.poster_url,
+          completenessScore: 0.85,
+          category: platformName,
+          data: {
+            ...f,
+            platform: f.release_type,
+            platformDisplayName: platformName,
+          },
+        });
+      });
+    }
+  }
+
+  // 3. Search Plays
+  if (type === 'all' || type === 'play') {
+    const { data: plays } = await supabase
+      .from('plays')
+      .select('id, title, slug, poster_url, backdrop_url, year, venue, city, country, run_start_date, run_end_date, synopsis, status')
+      .ilike('title', `%${trimmed}%`)
+      .limit(5);
+
+    if (plays && plays.length > 0) {
+      plays.forEach((pl: any) => {
+        const derivedStatus = derivePlayStatus(pl);
+        results.push({
+          id: pl.id,
+          type: 'play',
+          name: pl.title,
+          subtext: `${pl.venue || 'Theatre'} • ${pl.city || 'Lagos'} • Live Production`,
+          imageUrl: pl.poster_url || pl.backdrop_url,
+          country: pl.country || 'Nigeria',
+          category: 'Stage to Screen',
+          completenessScore: 0.8,
+          data: {
+            ...pl,
+            derivedStatus,
+          },
+        });
+      });
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
 

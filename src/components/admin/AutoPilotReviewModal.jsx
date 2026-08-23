@@ -39,10 +39,17 @@ export default function AutoPilotReviewModal({
   const [selectedPlatforms, setSelectedPlatforms] = useState(['instagram', 'threads', 'facebook', 'tiktok']);
   const [activePlatformTab, setActivePlatformTab] = useState('instagram');
   const [isEditingCaption, setIsEditingCaption] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('11:00');
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [approving, setApproving] = useState(false);
+
+  // Manual Candidate Search & Swap State
+  const [manualSearchOpen, setManualSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // AI Copywriting & 3 Variations State
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -90,13 +97,41 @@ export default function AutoPilotReviewModal({
     }
   };
 
+  // Live candidate search
+  useEffect(() => {
+    if (!manualSearchOpen || !searchQuery.trim() || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/social?task=search_candidates&q=${encodeURIComponent(searchQuery.trim())}`, {
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        });
+        const data = await res.json().catch(() => []);
+        setSearchResults(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.warn('Failed to search candidates:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, manualSearchOpen]);
+
   useEffect(() => {
     if (slot && isOpen) {
       const initialCandidate = slot.candidate || null;
       setCandidate(initialCandidate);
       setCustomImageUrl(initialCandidate?.imageUrl || '');
+      setScheduledDate(slot.scheduled_date || new Date().toISOString().split('T')[0]);
       setScheduledTime(slot.scheduled_time?.slice(0, 5) || '11:00');
       setIsEditingCaption(false);
+      setManualSearchOpen(false);
+      setSearchQuery('');
+      setSearchResults([]);
 
       // Select default angle based on series
       const slug = slot.social_content_series?.slug || '';
@@ -231,6 +266,22 @@ export default function AutoPilotReviewModal({
 
     setApproving(true);
     try {
+      const finalDate = scheduledDate || slot.scheduled_date;
+      const finalTime = `${scheduledTime}:00`;
+
+      // If scheduled date or time was edited, update slot record
+      if (finalDate !== slot.scheduled_date || scheduledTime !== slot.scheduled_time?.slice(0, 5)) {
+        await fetch('/api/social?task=update_slot_date', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slotId: slot.id,
+            scheduledDate: finalDate,
+            scheduledTime: finalTime,
+          }),
+        }).catch(() => {});
+      }
+
       const res = await fetch('/api/social?task=approve_slot', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -238,8 +289,8 @@ export default function AutoPilotReviewModal({
           slotId: slot.id,
           candidateId: candidate.id,
           candidateType: candidate.type || (series.slug === 'filmography' ? 'person' : 'movie'),
-          scheduledDate: slot.scheduled_date,
-          scheduledTime: `${scheduledTime}:00`,
+          scheduledDate: finalDate,
+          scheduledTime: finalTime,
           platforms: selectedPlatforms,
           customCaptions: captions,
         }),
@@ -248,7 +299,7 @@ export default function AutoPilotReviewModal({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      toast.success(`🚀 Approved & Scheduled for ${formattedDate} (${scheduledTime})!`);
+      toast.success(`🚀 Approved & Scheduled for ${finalDate} (${scheduledTime})!`);
       onApproved(data);
       onClose();
     } catch (err) {
@@ -256,6 +307,16 @@ export default function AutoPilotReviewModal({
     } finally {
       setApproving(false);
     }
+  };
+
+  const handleSelectSearchedCandidate = (selectedItem) => {
+    setCandidate(selectedItem);
+    setCustomImageUrl(selectedItem.imageUrl || '');
+    setManualSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    toast.success(`Swapped candidate to ${selectedItem.name}!`);
+    requestAICopy(selectedItem, selectedAngle);
   };
 
   const displayImage = customImageUrl || candidate?.imageUrl;
@@ -333,15 +394,103 @@ export default function AutoPilotReviewModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setManualSearchOpen(prev => !prev)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                manualSearchOpen
+                  ? 'border-brand bg-brand/10 text-brand'
+                  : 'border-border bg-surface-2 text-text-primary hover:border-brand hover:text-brand'
+              }`}
+            >
+              <Icon icon="solar:magnifer-linear" width="14" />
+              Search & Select Manually
+            </button>
+            <button
+              type="button"
               onClick={handleShuffleCandidate}
               disabled={loadingCandidates || aiGenerating}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-bold text-text-primary hover:border-brand hover:text-brand transition-all disabled:opacity-50"
             >
               <Icon icon="solar:shuffle-linear" width="14" />
-              Shuffle Candidate ({poolIndex + 1}/{Math.max(candidatePool.length, 1)})
+              Shuffle ({poolIndex + 1}/{Math.max(candidatePool.length, 1)})
             </button>
           </div>
         </div>
+
+        {/* Manual Search Flyout / Dropdown */}
+        {manualSearchOpen && (
+          <div className="border-b border-border bg-surface-2/80 p-4 backdrop-blur-md">
+            <div className="relative">
+              <Icon
+                icon="solar:magnifer-linear"
+                width="16"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+              />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search any actor, director, or film across MuviDB (e.g. Stan Nze, Bimbo Ademoye, Jagun Jagun)…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full rounded-xl border border-border bg-surface pl-9 pr-10 py-2 text-xs font-medium text-text-primary placeholder:text-text-muted outline-none focus:border-brand"
+              />
+              {isSearching && (
+                <Icon
+                  icon="solar:spinner-linear"
+                  width="16"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-brand"
+                />
+              )}
+            </div>
+
+            {/* Results Grid / List */}
+            {searchResults.length > 0 && (
+              <div className="mt-3 max-h-56 overflow-y-auto rounded-xl border border-border bg-surface p-2 space-y-1.5">
+                {searchResults.map(item => (
+                  <button
+                    key={`${item.type}-${item.id}`}
+                    type="button"
+                    onClick={() => handleSelectSearchedCandidate(item)}
+                    className="flex w-full items-center justify-between rounded-lg p-2 text-left hover:bg-surface-2 transition-colors group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-text-muted">
+                            <Icon icon={item.type === 'person' ? 'solar:user-bold' : 'solar:clapperboard-bold'} width="16" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-text-primary group-hover:text-brand">
+                            {item.name}
+                          </span>
+                          <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[9px] font-bold text-brand uppercase">
+                            {item.category || (item.type === 'person' ? 'Talent' : 'Film')}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-text-muted line-clamp-1">
+                          {item.subtext || item.country || 'Nollywood'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-brand opacity-0 group-hover:opacity-100 transition-opacity">
+                      Select →
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
+              <p className="mt-2 text-center text-xs text-text-muted py-2">
+                No actors or movies found matching "{searchQuery}".
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Content Body: 2 Columns */}
         <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 md:grid-cols-12">
@@ -349,7 +498,7 @@ export default function AutoPilotReviewModal({
           <div className="space-y-3 md:col-span-6 flex flex-col justify-center">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-wider text-text-muted">
-                Figma Graphic Card Preview (1:1)
+                Graphic Card Preview (1:1)
               </span>
               <div className="flex items-center gap-2.5">
                 <button
@@ -358,7 +507,7 @@ export default function AutoPilotReviewModal({
                   className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
                 >
                   <Icon icon="solar:download-square-linear" width="13" />
-                  Export Figma PNG
+                  Export PNG
                 </button>
                 <label className="cursor-pointer text-[11px] font-bold text-text-muted hover:text-text-primary hover:underline">
                   {uploadingImage ? 'Uploading…' : '🖼️ Replace Image'}
@@ -373,37 +522,38 @@ export default function AutoPilotReviewModal({
               </div>
             </div>
 
-            {/* Figma Social Design Card (Matching Figma Ensembla Design System) */}
-            <FigmaSocialCardPreview
-              candidate={candidate}
-              series={series}
-              displayImage={displayImage}
-            />
+            <div className="overflow-hidden rounded-2xl border border-border shadow-2xl bg-surface-2">
+              <FigmaSocialCardPreview
+                candidate={candidate}
+                series={series}
+                displayImage={displayImage}
+              />
+            </div>
           </div>
 
-          {/* Right: AI Angles, 3 Variations, Channels & Copy */}
-          <div className="space-y-3.5 md:col-span-6 flex flex-col justify-between">
-            <div className="space-y-3">
-              {/* Target Channels */}
+          {/* Right: AI Editorial Copywriting & Schedule Controls */}
+          <div className="space-y-4 md:col-span-6 flex flex-col justify-between">
+            <div className="space-y-3.5">
+              {/* Publishing Channels */}
               <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-text-muted mb-1.5">
-                  Publishing Channels
-                </label>
-                <div className="flex flex-wrap gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">
+                  PUBLISHING CHANNELS
+                </span>
+                <div className="mt-1.5 flex flex-wrap gap-2">
                   {PLATFORMS.map(p => {
-                    const active = selectedPlatforms.includes(p.value);
+                    const isSelected = selectedPlatforms.includes(p.value);
                     return (
                       <button
                         key={p.value}
                         type="button"
                         onClick={() => togglePlatform(p.value)}
-                        className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-all ${
-                          active
-                            ? 'border-brand bg-brand/10 text-brand'
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                          isSelected
+                            ? 'border-brand bg-brand/10 text-brand shadow-sm'
                             : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
                         }`}
                       >
-                        <Icon icon={p.icon} width="14" style={{ color: active ? undefined : p.color }} />
+                        <Icon icon={p.icon} width="14" />
                         {p.label}
                       </button>
                     );
@@ -411,47 +561,37 @@ export default function AutoPilotReviewModal({
                 </div>
               </div>
 
-              {/* 10 AI Angles Toolbar */}
-              <div className="rounded-xl border border-border/80 bg-surface-2/60 p-2.5 space-y-2">
+              {/* Editorial Angle Selector & AI Generator */}
+              <div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black uppercase tracking-wider text-text-primary">
-                      Editorial Angle
-                    </span>
-                    {aiEngine && (
-                      <span className="rounded bg-surface px-1.5 py-0.5 text-[9px] font-mono text-text-muted">
-                        {aiEngine}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">
+                    EDITORIAL ANGLE
+                  </span>
                   <button
                     type="button"
                     onClick={() => requestAICopy(candidate, selectedAngle)}
-                    disabled={aiGenerating}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-brand px-2.5 py-1 text-[11px] font-black text-white hover:bg-brand-hover transition-all disabled:opacity-50"
+                    disabled={aiGenerating || !candidate}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1 text-xs font-bold text-white hover:bg-brand-hover transition-all disabled:opacity-50 shadow-sm"
                   >
                     <Icon
-                      icon={aiGenerating ? 'solar:spinner-linear' : 'solar:magic-stick-bold'}
+                      icon={aiGenerating ? 'solar:spinner-linear' : 'solar:magic-stick-3-bold'}
                       className={aiGenerating ? 'animate-spin' : ''}
-                      width="13"
+                      width="14"
                     />
-                    {aiGenerating ? 'Writing 3 Options…' : 'Generate 3 Variations'}
+                    {aiGenerating ? 'Generating…' : 'Generate 3 Variations'}
                   </button>
                 </div>
 
-                {/* 10 Angle Badges */}
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {ANGLES.map(a => (
                     <button
                       key={a.value}
                       type="button"
                       onClick={() => handleAngleChange(a.value)}
-                      disabled={aiGenerating}
-                      title={a.desc}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-all ${
+                      className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-all ${
                         selectedAngle === a.value
-                          ? 'bg-brand text-white shadow-sm ring-1 ring-brand'
-                          : 'bg-surface border border-border text-text-muted hover:text-text-primary'
+                          ? 'border-brand bg-brand/15 text-brand shadow-sm'
+                          : 'border-border bg-surface-2 text-text-muted hover:border-border/80 hover:text-text-primary'
                       }`}
                     >
                       {a.label}
@@ -460,33 +600,41 @@ export default function AutoPilotReviewModal({
                 </div>
               </div>
 
-              {/* 3 Variations Selector (Option A / B / C) */}
+              {/* 3 Variations Selector (If available) */}
               {variations.length > 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-brand/30 bg-brand/5 p-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-brand pl-1">
-                    Variations:
-                  </span>
-                  <div className="flex flex-1 gap-1.5">
+                <div className="rounded-xl border border-border bg-surface-2/60 p-2.5">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-text-muted">
+                    <span>Select Copywriting Variation</span>
+                    <span className="text-brand font-mono text-[9px]">Engine: {aiEngine || 'cohere'}</span>
+                  </div>
+                  <div className="mt-1.5 grid grid-cols-3 gap-2">
                     {variations.map(v => (
                       <button
                         key={v.key}
                         type="button"
                         onClick={() => handleSelectVariation(v.key)}
-                        className={`flex-1 rounded-md px-2 py-1 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        className={`rounded-lg border p-2 text-left transition-all ${
                           selectedVariationKey === v.key
-                            ? 'bg-brand text-white shadow-sm'
-                            : 'bg-surface border border-border/80 text-text-muted hover:text-text-primary'
+                            ? 'border-brand bg-brand/15 shadow-sm'
+                            : 'border-border bg-surface hover:border-border/80'
                         }`}
                       >
-                        <span>Option {v.key}</span>
-                        <span className="text-[10px] font-normal opacity-80">({v.label})</span>
+                        <div className="flex items-center justify-between text-xs font-black text-text-primary">
+                          <span>Option {v.key}</span>
+                          {selectedVariationKey === v.key && (
+                            <Icon icon="solar:check-circle-bold" className="text-brand" width="14" />
+                          )}
+                        </div>
+                        <span className="text-[10px] font-medium text-text-muted line-clamp-1 mt-0.5">
+                          {v.label}
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Platform Tabs & Copy Editor */}
+              {/* Captions Tabs & Preview */}
               <div>
                 <div className="flex items-center justify-between border-b border-border pb-1">
                   <div className="flex gap-2">
@@ -495,7 +643,7 @@ export default function AutoPilotReviewModal({
                         key={p.value}
                         type="button"
                         onClick={() => setActivePlatformTab(p.value)}
-                        className={`border-b-2 px-2 py-1 text-xs font-bold transition-colors ${
+                        className={`border-b-2 px-2 py-1 text-xs font-bold transition-all ${
                           activePlatformTab === p.value
                             ? 'border-brand text-brand'
                             : 'border-transparent text-text-muted hover:text-text-primary'
@@ -505,22 +653,22 @@ export default function AutoPilotReviewModal({
                       </button>
                     ))}
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className={`text-[10px] font-mono ${currentCaption.length > currentPlatformLimit ? 'text-red-500 font-bold' : 'text-text-muted'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-text-muted">
                       {currentCaption.length}/{currentPlatformLimit}
                     </span>
                     <button
                       type="button"
-                      onClick={() => setIsEditingCaption(!isEditingCaption)}
-                      className="text-xs font-bold text-brand hover:underline"
+                      onClick={() => setIsEditingCaption(prev => !prev)}
+                      className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
                     >
-                      {isEditingCaption ? 'Done Editing' : '✏️ Edit Text'}
+                      <Icon icon="solar:pen-linear" width="12" />
+                      {isEditingCaption ? 'Done Editing' : 'Edit Text'}
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-2 rounded-lg border border-border bg-surface-2 p-3 relative min-h-[140px]">
+                <div className="mt-2 rounded-lg border border-border bg-surface-2 p-3 relative min-h-[130px]">
                   {aiGenerating && (
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-lg bg-surface/90 backdrop-blur-sm space-y-2">
                       <Icon icon="solar:magic-stick-bold" className="animate-bounce text-brand" width="22" />
@@ -532,7 +680,7 @@ export default function AutoPilotReviewModal({
 
                   {isEditingCaption ? (
                     <textarea
-                      rows={6}
+                      rows={5}
                       value={currentCaption}
                       onChange={e =>
                         setCaptions(prev => ({
@@ -543,26 +691,32 @@ export default function AutoPilotReviewModal({
                       className="w-full bg-transparent text-xs text-text-primary outline-none focus:ring-0 font-sans leading-relaxed resize-none"
                     />
                   ) : (
-                    <p className="whitespace-pre-wrap text-xs text-text-primary leading-relaxed max-h-44 overflow-y-auto font-sans">
+                    <p className="whitespace-pre-wrap text-xs text-text-primary leading-relaxed max-h-40 overflow-y-auto font-sans">
                       {currentCaption || 'No copy generated for this channel.'}
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* Scheduled Time */}
-              <div className="flex items-center justify-between rounded-lg border border-border/80 bg-surface-2 px-4 py-2">
+              {/* Scheduled Date & Time Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/80 bg-surface-2 px-4 py-2.5">
                 <div className="flex items-center gap-2">
-                  <Icon icon="solar:clock-circle-linear" className="text-brand" width="16" />
-                  <span className="text-xs font-bold text-text-primary">Publishing Schedule:</span>
+                  <Icon icon="solar:calendar-date-bold" className="text-brand" width="16" />
+                  <span className="text-xs font-bold text-text-primary">Schedule Publication:</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-text-muted font-mono">{slot.scheduled_date} at</span>
+                  <input
+                    type="date"
+                    value={scheduledDate}
+                    onChange={e => setScheduledDate(e.target.value)}
+                    className="rounded border border-border bg-surface px-2.5 py-1 text-xs font-mono text-text-primary outline-none focus:border-brand"
+                  />
+                  <span className="text-xs text-text-muted">at</span>
                   <input
                     type="time"
                     value={scheduledTime}
                     onChange={e => setScheduledTime(e.target.value)}
-                    className="rounded border border-border bg-surface px-2 py-1 text-xs font-mono text-text-primary outline-none focus:border-brand"
+                    className="rounded border border-border bg-surface px-2.5 py-1 text-xs font-mono text-text-primary outline-none focus:border-brand"
                   />
                 </div>
               </div>
@@ -577,7 +731,7 @@ export default function AutoPilotReviewModal({
                   if (onOpenManualComposer) {
                     onOpenManualComposer({
                       slotId: slot.id,
-                      scheduledDate: slot.scheduled_date,
+                      scheduledDate: scheduledDate || slot.scheduled_date,
                       dayName: formattedDate,
                       seriesSlug: series.slug,
                     });
