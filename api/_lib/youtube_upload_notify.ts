@@ -111,10 +111,20 @@ export async function notifyYouTubeUploads(
     return { notified: 0, skipped: candidates.length };
   }
 
-  const filmLength = candidates.filter((v) => isFilmLengthDuration(v.duration_seconds || 0));
-  if (!filmLength.length) return { notified: 0, skipped: candidates.length };
+  // STRICT NO-BACKFILL SAFEGUARD: Only alert on uploads published in the last 48 hours.
+  // Anything older was published in the past and should not spam Telegram.
+  const MAX_UPLOAD_AGE_MS = 48 * 3600 * 1000;
+  const now = Date.now();
+  const recentFilmLength = candidates.filter((v) => {
+    if (!isFilmLengthDuration(v.duration_seconds || 0)) return false;
+    if (!v.published_at) return false;
+    const pubTime = new Date(v.published_at).getTime();
+    return !isNaN(pubTime) && (now - pubTime) <= MAX_UPLOAD_AGE_MS;
+  });
 
-  const candidateIds = filmLength.map((v) => v.video_id);
+  if (!recentFilmLength.length) return { notified: 0, skipped: candidates.length };
+
+  const candidateIds = recentFilmLength.map((v) => v.video_id);
 
   // Check which candidate videos are already imported into channel_videos
   const { data: existingRows } = await supabase
@@ -135,7 +145,7 @@ export async function notifyYouTubeUploads(
   const alertedSet = new Set((alertedRows || []).map((r) => r.video_id));
 
   let notified = 0;
-  for (const video of filmLength) {
+  for (const video of recentFilmLength) {
     if (existingSet.has(video.video_id)) continue;
     if (alertedSet.has(video.video_id)) continue;
 
