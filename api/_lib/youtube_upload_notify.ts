@@ -206,8 +206,12 @@ export async function pollChannelUploads(channel: ChannelRow): Promise<UploadCan
   });
 }
 
-/** Run from GitHub Actions every ~2h — alert before the full sync auto-imports. */
+/** Run from GitHub Actions — alert before the full sync auto-imports. */
 export async function runYouTubeUploadWatch() {
+  if (process.env.ENABLE_YOUTUBE_WATCH !== 'true') {
+    return { ok: true, message: 'YouTube upload watch is currently paused/disabled.', channels: 0, notified: 0 };
+  }
+
   if (!telegramConfigured()) {
     return { ok: false, message: 'Telegram not configured (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID)' };
   }

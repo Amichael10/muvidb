@@ -6,8 +6,6 @@ on:
     - cron: '0 5 * * *'
     # YouTube Sync: 3 times a day (every 8 hours)
     - cron: '0 */8 * * *'
-    # YouTube upload watch (Telegram alert before auto-import): every 2 hours
-    - cron: '0 */2 * * *'
     # 10:00 AM WAT (UTC+1) = 9:00 AM UTC (TMDB/Kava - Daily)
     - cron: '0 9 * * *'
     # AI Maintenance: Twice a day (every 12 hours)
@@ -156,8 +154,8 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
 
-      - name: Watch YouTube Uploads (Telegram, every 2 hours)
-        if: github.event.schedule == '0 */2 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'youtube_watch'))
+      - name: Watch YouTube Uploads (Telegram, manual only)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'youtube_watch'
         run: |
           echo "Watching YouTube channels for new uploads..."
           npx tsx scripts/youtube_upload_watch.ts
