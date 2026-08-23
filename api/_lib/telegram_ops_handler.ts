@@ -461,9 +461,10 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
 
   if (sourceUrl) {
     if (/instagram\.com/i.test(sourceUrl)) {
-      eventType = 'instagram_post';
-      platformLabel = 'Instagram';
-      const match = sourceUrl.match(/instagram\.com\/(?:p|reel|tv)\/([^/?#&]+)/i);
+      const isReel = /\/reels?\/|\/tv\//i.test(sourceUrl);
+      eventType = isReel ? 'instagram_reel' : 'instagram_post';
+      platformLabel = isReel ? 'Instagram Reel' : 'Instagram';
+      const match = sourceUrl.match(/instagram\.com\/(?:p|reel|reels|tv)\/([^/?#&]+)/i);
       const shortcode = match ? match[1] : '';
 
       try {
@@ -524,14 +525,56 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
 
       if (!authorName) {
         authorName = sourceUrl.match(/instagram\.com\/([^/?#&]+)/i)?.[1] || null;
-        if (['p', 'reel', 'tv', 'stories', 'explore'].includes(authorName || '')) authorName = null;
+        if (['p', 'reel', 'reels', 'tv', 'stories', 'explore'].includes(authorName || '')) authorName = null;
       }
 
       title = authorName
-        ? `${authorName} on Instagram`
+        ? `${authorName} on Instagram (${isReel ? 'Reel' : 'Post'})`
         : shortcode
-          ? `Instagram Post (${shortcode})`
-          : 'Instagram Post';
+          ? `Instagram ${isReel ? 'Reel' : 'Post'} (${shortcode})`
+          : `Instagram ${isReel ? 'Reel' : 'Post'}`;
+    } else if (/threads\.net/i.test(sourceUrl)) {
+      eventType = 'threads_post';
+      platformLabel = 'Threads';
+      try {
+        const res = await fetch(sourceUrl, {
+          headers: {
+            'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res.ok) {
+          const html = await res.text();
+          const ogTitle =
+            html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] ||
+            html.match(/<title>([^<]*)<\/title>/i)?.[1];
+          const ogDesc =
+            html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] ||
+            html.match(/<meta name="description" content="([^"]*)"/i)?.[1];
+          const ogImg = html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1];
+
+          if (ogTitle) {
+            const decoded = decodeHtmlEntities(ogTitle);
+            const author = decoded.match(/^([^:]+?)\s+on\s+Threads/i) || decoded.match(/^([^(]+)\s*\(@/);
+            if (author) authorName = author[1].trim();
+            title = decoded;
+          }
+          if (ogDesc) {
+            const decodedDesc = decodeHtmlEntities(ogDesc);
+            if (decodedDesc.length > 10 && !decodedDesc.includes('Join Threads to share')) {
+              description = decodedDesc;
+            }
+          }
+          if (ogImg && !ogImg.includes('static.cdninstagram.com')) {
+            imageUrl = ogImg.replace(/&amp;/g, '&');
+          }
+        }
+      } catch (err: any) {
+        console.warn('[resolveIntakeMetadata] Threads scrape warning:', err.message);
+      }
+      if (!title) title = authorName ? `${authorName} on Threads` : 'Threads Post';
     } else if (/youtube\.com|youtu\.be/i.test(sourceUrl)) {
       eventType = 'youtube_video';
       platformLabel = 'YouTube';
