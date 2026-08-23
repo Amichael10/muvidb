@@ -9,7 +9,6 @@ import { Icon } from '@iconify/react'
 import { formatPersonName, toTitleCase } from '../utils/format'
 import {
   PEOPLE_ROLE_FILTERS,
-  PEOPLE_FILTER_TO_ROLE,
   canonicalizeRole,
   formatDepartment,
 } from '../lib/creditRoles'
@@ -27,10 +26,46 @@ const PRIMARY_ROLE_FILTERS = [
   'Editor',
 ]
 
-// Secondary roles available in "More Roles" dropdown
-const SECONDARY_ROLE_FILTERS = PEOPLE_ROLE_FILTERS.filter(
-  (r) => !PRIMARY_ROLE_FILTERS.includes(r)
-)
+// Categorized roles for the full role selection modal
+const ROLE_CATEGORIES = [
+  {
+    category: 'Directing & Writing',
+    icon: 'solar:clapperboard-edit-bold',
+    roles: ['Director', 'Assistant director', 'Writer', 'Continuity'],
+  },
+  {
+    category: 'Production & Management',
+    icon: 'solar:suitcase-tag-bold',
+    roles: [
+      'Producer',
+      'Executive producer',
+      'Production manager',
+      'Production assistant',
+      'Location manager',
+      'Casting director',
+    ],
+  },
+  {
+    category: 'Camera & Lighting',
+    icon: 'solar:camera-bold',
+    roles: ['Cinematographer', 'Camera assistant', 'Gaffer'],
+  },
+  {
+    category: 'Art, Costume & Makeup',
+    icon: 'solar:mask-happly-bold',
+    roles: [
+      'Costume designer',
+      'Makeup artist',
+      'Art director',
+      'Production designer',
+    ],
+  },
+  {
+    category: 'Sound, Music & Post-Production',
+    icon: 'solar:music-library-2-bold',
+    roles: ['Editor', 'Sound recordist', 'Composer', 'Colorist', 'VFX', 'Stunts'],
+  },
+]
 
 const EXPERIENCE_OPTIONS = [
   { value: 'all', label: 'All Experience Levels' },
@@ -62,6 +97,156 @@ const NATIONALITY_OPTIONS = [
   { value: 'Kenyan', label: 'Kenyan' },
   { value: 'Other', label: 'International / Diaspora' },
 ]
+
+// Modal for selecting from all technical & creative roles
+const RolesModal = ({ isOpen, onClose, selectedRole, onSelectRole }) => {
+  const [query, setQuery] = useState('')
+
+  if (!isOpen) return null
+
+  const filteredCategories = ROLE_CATEGORIES.map((cat) => {
+    const matchingRoles = cat.roles.filter((r) =>
+      r.toLowerCase().includes(query.toLowerCase().trim())
+    )
+    return { ...cat, roles: matchingRoles }
+  }).filter((cat) => cat.roles.length > 0)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div
+        className="w-full sm:max-w-2xl bg-surface border border-border sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between gap-3 bg-surface-2/40">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+              <Icon icon="solar:users-group-two-rounded-bold" width="18" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-text-primary">
+                Select Filmmaker Role
+              </h3>
+              <p className="text-[11px] text-text-muted">
+                Explore filmmakers by their specific crew discipline
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-surface border border-border text-text-muted hover:text-text-primary hover:border-text-muted/40 flex items-center justify-center transition-colors"
+          >
+            <Icon icon="solar:close-circle-bold" width="18" />
+          </button>
+        </div>
+
+        {/* Modal Search Box */}
+        <div className="p-3 sm:p-4 border-b border-border bg-surface">
+          <div className="relative">
+            <Icon
+              icon="solar:magnifer-linear"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-sm"
+            />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search roles (e.g. Costume, Gaffer, Sound, VFX)..."
+              className="w-full bg-surface-2 border border-border text-text-primary rounded-xl pl-9 pr-9 py-2.5 text-xs font-semibold placeholder:text-text-muted/60 focus:border-brand focus:outline-none"
+              autoFocus
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+              >
+                <Icon icon="solar:close-circle-bold" width="14" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Role Categories */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Quick Option: All Filmmakers */}
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                onSelectRole('All')
+                onClose()
+              }}
+              className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                selectedRole === 'All'
+                  ? 'bg-brand/10 border-brand text-brand font-bold'
+                  : 'bg-surface-2/40 border-border text-text-primary hover:border-brand/40 hover:bg-surface-2'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Icon icon="solar:globus-bold" className="text-base text-brand" />
+                <span className="text-xs font-bold uppercase tracking-wider">
+                  All Roles & Departments
+                </span>
+              </div>
+              {selectedRole === 'All' && (
+                <Icon icon="solar:check-circle-bold" className="text-brand text-base" />
+              )}
+            </button>
+          </div>
+
+          {filteredCategories.map((cat) => (
+            <div key={cat.category} className="space-y-2.5">
+              <div className="flex items-center gap-2 text-text-muted text-[11px] font-black uppercase tracking-wider">
+                <Icon icon={cat.icon} className="text-brand" width="14" />
+                <span>{cat.category}</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {cat.roles.map((role) => {
+                  const isSelected = selectedRole === role
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => {
+                        onSelectRole(role)
+                        onClose()
+                      }}
+                      className={`p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
+                        isSelected
+                          ? 'bg-brand text-white border-brand shadow-md shadow-brand/20'
+                          : 'bg-surface-2/40 border-border text-text-primary hover:border-brand/40 hover:bg-surface-2'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">{toTitleCase(role)}</span>
+                      {isSelected ? (
+                        <Icon icon="solar:check-circle-bold" className="text-white text-base" />
+                      ) : (
+                        <Icon
+                          icon="solar:alt-arrow-right-linear"
+                          className="text-text-muted opacity-40 text-xs"
+                        />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          {filteredCategories.length === 0 && (
+            <div className="text-center py-10 text-text-muted text-xs">
+              No roles found matching "{query}".
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Grid View Card
 const PersonCard = ({ person, currentUser }) => {
@@ -115,7 +300,9 @@ const PersonCard = ({ person, currentUser }) => {
               <Icon icon="solar:verified-check-bold" width="12" />
               VERIFIED
             </span>
-          ) : <span />}
+          ) : (
+            <span />
+          )}
 
           {person.is_spotlight && (
             <span className="inline-flex items-center gap-1 bg-amber-500/90 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shadow-md backdrop-blur-sm">
@@ -128,33 +315,35 @@ const PersonCard = ({ person, currentUser }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-bg/90 via-bg/20 to-transparent opacity-70 group-hover:opacity-40 transition-opacity" />
       </div>
 
-      <div className="p-4 flex-1 flex flex-col justify-between">
+      <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between">
         <div>
-          <h3 className="text-text-primary font-bold text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1">
+          <h3 className="text-text-primary font-bold text-xs sm:text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1">
             {formatPersonName(person.name)}
           </h3>
 
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="inline-block bg-surface-2 text-text-muted text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+            <span className="inline-block bg-surface-2 text-text-muted text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded uppercase tracking-wider">
               {toTitleCase(primaryRole)}
             </span>
             {person.nationality && person.nationality !== 'Unknown' && (
-              <span className="text-[10px] text-text-muted font-medium opacity-75">
+              <span className="text-[9px] sm:text-[10px] text-text-muted font-medium opacity-75 truncate max-w-[90px]">
                 • {person.nationality}
               </span>
             )}
           </div>
         </div>
 
-        <div className="pt-4 mt-3 border-t border-border/50">
-          <div className="flex items-center justify-between mb-3 text-text-muted text-[10px] font-bold">
-            <div className="flex items-center gap-1.5">
-              <Icon icon="solar:clapperboard-play-linear" className="text-brand" width="13" />
-              <span>{creditCount} {creditCount === 1 ? 'Film' : 'Films'}</span>
+        <div className="pt-3 sm:pt-4 mt-2 sm:mt-3 border-t border-border/50">
+          <div className="flex items-center justify-between mb-2.5 text-text-muted text-[10px] font-bold">
+            <div className="flex items-center gap-1">
+              <Icon icon="solar:clapperboard-play-linear" className="text-brand" width="12" />
+              <span>
+                {creditCount} {creditCount === 1 ? 'Film' : 'Films'}
+              </span>
             </div>
             {person.popularity_score > 0 && (
               <div className="flex items-center gap-1 opacity-70">
-                <Icon icon="solar:fire-linear" width="12" />
+                <Icon icon="solar:fire-linear" width="11" />
                 <span>{Math.round(person.popularity_score)}</span>
               </div>
             )}
@@ -164,7 +353,7 @@ const PersonCard = ({ person, currentUser }) => {
             type="button"
             onClick={handleFollow}
             disabled={followLoading}
-            className={`w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+            className={`w-full py-1.5 sm:py-2 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-1.5 ${
               isFollowing
                 ? 'bg-surface-2 border border-border text-text-muted hover:border-red-500/50 hover:text-red-500'
                 : 'bg-brand/10 hover:bg-brand text-brand hover:text-white border border-brand/20 hover:border-brand shadow-sm'
@@ -174,12 +363,12 @@ const PersonCard = ({ person, currentUser }) => {
               '...'
             ) : isFollowing ? (
               <>
-                <Icon icon="solar:check-circle-bold" width="13" />
+                <Icon icon="solar:check-circle-bold" width="12" />
                 FOLLOWING
               </>
             ) : (
               <>
-                <Icon icon="solar:user-plus-bold" width="13" />
+                <Icon icon="solar:user-plus-bold" width="12" />
                 + FOLLOW
               </>
             )}
@@ -221,10 +410,10 @@ const PersonRow = ({ person, currentUser }) => {
   return (
     <Link
       to={`/people/${person.slug || person.id}`}
-      className="group flex items-center justify-between gap-4 p-3.5 sm:p-4 bg-surface rounded-xl border border-border/80 hover:border-brand/60 hover:bg-surface-2/40 transition-all duration-200 shadow-sm"
+      className="group flex items-center justify-between gap-3 p-3 sm:p-4 bg-surface rounded-xl border border-border/80 hover:border-brand/60 hover:bg-surface-2/40 transition-all duration-200 shadow-sm"
     >
-      <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-        <div className="relative w-12 h-14 sm:w-14 sm:h-16 rounded-lg overflow-hidden bg-surface-2 flex-shrink-0 border border-border">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="relative w-11 h-13 sm:w-14 sm:h-16 rounded-lg overflow-hidden bg-surface-2 flex-shrink-0 border border-border">
           <ImageWithFallback
             src={person.photo_url}
             alt={person.name}
@@ -238,28 +427,28 @@ const PersonRow = ({ person, currentUser }) => {
         </div>
 
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="text-text-primary font-bold text-sm sm:text-base group-hover:text-brand transition-colors truncate">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <h3 className="text-text-primary font-bold text-xs sm:text-base group-hover:text-brand transition-colors truncate">
               {formatPersonName(person.name)}
             </h3>
             {person.is_verified && (
               <span title="Verified Talent" className="text-brand flex-shrink-0">
-                <Icon icon="solar:verified-check-bold" width="16" />
+                <Icon icon="solar:verified-check-bold" width="15" />
               </span>
             )}
             {person.is_spotlight && (
               <span title="Spotlight Feature" className="text-amber-500 flex-shrink-0">
-                <Icon icon="solar:star-bold" width="14" />
+                <Icon icon="solar:star-bold" width="13" />
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2 mt-1 text-xs flex-wrap">
-            <span className="inline-block bg-surface-2 text-text-muted text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 text-xs flex-wrap">
+            <span className="inline-block bg-surface-2 text-text-muted text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded uppercase tracking-wider">
               {toTitleCase(primaryRole)}
             </span>
             {person.nationality && person.nationality !== 'Unknown' && (
-              <span className="text-[11px] text-text-muted font-medium opacity-75">
+              <span className="text-[10px] sm:text-[11px] text-text-muted font-medium opacity-75 truncate">
                 {person.nationality}
               </span>
             )}
@@ -267,12 +456,14 @@ const PersonRow = ({ person, currentUser }) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 sm:gap-6 flex-shrink-0">
+      <div className="flex items-center gap-2.5 sm:gap-6 flex-shrink-0">
         <div className="hidden sm:flex flex-col items-end text-right">
           <div className="flex items-center gap-1.5 text-text-primary font-bold text-xs">
             <Icon icon="solar:clapperboard-play-linear" className="text-brand" width="14" />
             <span>{creditCount}</span>
-            <span className="text-text-muted font-normal text-[11px]">{creditCount === 1 ? 'film' : 'films'}</span>
+            <span className="text-text-muted font-normal text-[11px]">
+              {creditCount === 1 ? 'film' : 'films'}
+            </span>
           </div>
           {person.popularity_score > 0 && (
             <span className="text-[10px] text-text-muted mt-0.5 opacity-70">
@@ -285,7 +476,7 @@ const PersonRow = ({ person, currentUser }) => {
           type="button"
           onClick={handleFollow}
           disabled={followLoading}
-          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1.5 ${
+          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center gap-1 ${
             isFollowing
               ? 'bg-surface-2 border border-border text-text-muted hover:border-red-500/50 hover:text-red-500'
               : 'bg-brand text-white hover:shadow-lg hover:shadow-brand/20'
@@ -313,25 +504,25 @@ const PersonRow = ({ person, currentUser }) => {
 const PersonSkeleton = () => (
   <div className="bg-surface rounded-2xl overflow-hidden border border-border/80">
     <div className="aspect-[4/5] bg-surface-2 animate-shimmer" />
-    <div className="p-4 space-y-3">
-      <div className="h-4 w-3/4 bg-surface-2 rounded animate-shimmer" />
-      <div className="h-3 w-1/2 bg-surface-2 rounded animate-shimmer opacity-60" />
-      <div className="h-3 w-1/3 bg-surface-2 rounded animate-shimmer pt-2" />
-      <div className="h-9 w-full bg-surface-2 rounded-lg mt-3 animate-shimmer" />
+    <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
+      <div className="h-3.5 sm:h-4 w-3/4 bg-surface-2 rounded animate-shimmer" />
+      <div className="h-2.5 sm:h-3 w-1/2 bg-surface-2 rounded animate-shimmer opacity-60" />
+      <div className="h-2.5 sm:h-3 w-1/3 bg-surface-2 rounded animate-shimmer pt-2" />
+      <div className="h-8 sm:h-9 w-full bg-surface-2 rounded-lg mt-2 sm:mt-3 animate-shimmer" />
     </div>
   </div>
 )
 
 const PersonRowSkeleton = () => (
-  <div className="flex items-center justify-between p-4 bg-surface rounded-xl border border-border animate-pulse">
-    <div className="flex items-center gap-4">
-      <div className="w-14 h-16 rounded-lg bg-surface-2" />
+  <div className="flex items-center justify-between p-3 sm:p-4 bg-surface rounded-xl border border-border animate-pulse">
+    <div className="flex items-center gap-3 sm:gap-4">
+      <div className="w-11 h-13 sm:w-14 sm:h-16 rounded-lg bg-surface-2" />
       <div className="space-y-2">
-        <div className="h-4 w-36 bg-surface-2 rounded" />
-        <div className="h-3 w-20 bg-surface-2 rounded opacity-60" />
+        <div className="h-3.5 sm:h-4 w-28 sm:w-36 bg-surface-2 rounded" />
+        <div className="h-2.5 sm:h-3 w-16 sm:w-20 bg-surface-2 rounded opacity-60" />
       </div>
     </div>
-    <div className="w-24 h-8 bg-surface-2 rounded-lg" />
+    <div className="w-20 sm:w-24 h-7 sm:h-8 bg-surface-2 rounded-lg" />
   </div>
 )
 
@@ -370,8 +561,7 @@ const PeopleList = () => {
 
   // UI state
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false)
-  const [isMoreRolesOpen, setIsMoreRolesOpen] = useState(false)
-  const moreRolesRef = useRef(null)
+  const [isRolesModalOpen, setIsRolesModalOpen] = useState(false)
 
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
@@ -389,17 +579,6 @@ const PeopleList = () => {
       initialNationality === 'all' &&
       initialSort === 'popularity'
   )
-
-  // Close "More Roles" dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (moreRolesRef.current && !moreRolesRef.current.contains(e.target)) {
-        setIsMoreRolesOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   // Debounce search input
   useEffect(() => {
@@ -424,7 +603,6 @@ const PeopleList = () => {
 
   const handleRoleSelect = (role) => {
     setRoleFilter(role)
-    setIsMoreRolesOpen(false)
     updateUrlParams({ role: role === 'All' ? null : role })
   }
 
@@ -587,9 +765,13 @@ const PeopleList = () => {
         // Nationality filter
         if (nationality !== 'all') {
           if (nationality === 'Other') {
-            filtered = filtered.filter((p) => !['Nigerian', 'Ghanaian', 'South African', 'Kenyan'].includes(p.nationality))
+            filtered = filtered.filter(
+              (p) => !['Nigerian', 'Ghanaian', 'South African', 'Kenyan'].includes(p.nationality)
+            )
           } else {
-            filtered = filtered.filter((p) => (p.nationality || '').toLowerCase() === nationality.toLowerCase())
+            filtered = filtered.filter(
+              (p) => (p.nationality || '').toLowerCase() === nationality.toLowerCase()
+            )
           }
         }
 
@@ -600,11 +782,14 @@ const PeopleList = () => {
           filtered = [...filtered].sort((a, b) => (b.name || '').localeCompare(a.name || ''))
         } else if (sortBy === 'films_desc') {
           filtered = [...filtered].sort(
-            (a, b) => (b.film_count ?? (b.credits?.length || 0)) - (a.film_count ?? (a.credits?.length || 0))
+            (a, b) =>
+              (b.film_count ?? (b.credits?.length || 0)) -
+              (a.film_count ?? (a.credits?.length || 0))
           )
         } else if (sortBy === 'recent') {
           filtered = [...filtered].sort(
-            (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+            (a, b) =>
+              new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
           )
         } else {
           // popularity
@@ -649,7 +834,7 @@ const PeopleList = () => {
 
         const [deptRes, credsRes] = await Promise.all([
           deptQuery.limit(100),
-          credsQuery
+          credsQuery,
         ])
 
         const map = new Map()
@@ -674,12 +859,17 @@ const PeopleList = () => {
         if (verifiedOnly) merged = merged.filter((p) => p.is_verified)
         if (spotlightOnly) merged = merged.filter((p) => p.is_spotlight)
         if (photoOnly) merged = merged.filter((p) => Boolean(p.photo_url))
-        if (gender !== 'all') merged = merged.filter((p) => (p.gender || '').toLowerCase() === gender.toLowerCase())
+        if (gender !== 'all')
+          merged = merged.filter((p) => (p.gender || '').toLowerCase() === gender.toLowerCase())
         if (nationality !== 'all') {
           if (nationality === 'Other') {
-            merged = merged.filter((p) => !['Nigerian', 'Ghanaian', 'South African', 'Kenyan'].includes(p.nationality))
+            merged = merged.filter(
+              (p) => !['Nigerian', 'Ghanaian', 'South African', 'Kenyan'].includes(p.nationality)
+            )
           } else {
-            merged = merged.filter((p) => (p.nationality || '').toLowerCase() === nationality.toLowerCase())
+            merged = merged.filter(
+              (p) => (p.nationality || '').toLowerCase() === nationality.toLowerCase()
+            )
           }
         }
         if (experience !== 'all') {
@@ -699,9 +889,16 @@ const PeopleList = () => {
         } else if (sortBy === 'name_desc') {
           merged.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
         } else if (sortBy === 'films_desc') {
-          merged.sort((a, b) => (b.film_count ?? (b.credits?.length || 0)) - (a.film_count ?? (a.credits?.length || 0)))
+          merged.sort(
+            (a, b) =>
+              (b.film_count ?? (b.credits?.length || 0)) -
+              (a.film_count ?? (a.credits?.length || 0))
+          )
         } else if (sortBy === 'recent') {
-          merged.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+          merged.sort(
+            (a, b) =>
+              new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+          )
         } else {
           merged.sort((a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0))
         }
@@ -795,7 +992,7 @@ const PeopleList = () => {
     fetchPeople(nextPage)
   }
 
-  const isMoreRoleActive = SECONDARY_ROLE_FILTERS.includes(roleFilter)
+  const isSecondaryRoleActive = roleFilter !== 'All' && !PRIMARY_ROLE_FILTERS.includes(roleFilter)
 
   return (
     <div className="min-h-screen bg-bg">
@@ -808,7 +1005,7 @@ const PeopleList = () => {
         <button
           type="button"
           onClick={() => setShowSuggest(true)}
-          className="mt-2 inline-flex items-center gap-2 bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
+          className="mt-2 inline-flex items-center gap-2 bg-brand text-white font-bold px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
         >
           <Icon icon="solar:user-plus-linear" width="16" />
           Suggest a missing person
@@ -816,43 +1013,51 @@ const PeopleList = () => {
       </PageHeader>
       {showSuggest && <SuggestPersonModal onClose={() => setShowSuggest(false)} />}
 
+      {/* Full Roles Selection Modal (Unclipped & Mobile-Friendly) */}
+      <RolesModal
+        isOpen={isRolesModalOpen}
+        onClose={() => setIsRolesModalOpen(false)}
+        selectedRole={roleFilter}
+        onSelectRole={handleRoleSelect}
+      />
+
       <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-24">
         {/* Tier 1: Main Search & Filter Toolbar */}
         <div className="bg-surface/80 backdrop-blur-md border-b border-border sticky top-16 z-20 transition-all">
-          <div className="p-4 sm:p-6 space-y-4">
-            {/* Top Toolbar Row */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+          <div className="p-3.5 sm:p-6 space-y-3 sm:space-y-4">
+            {/* Top Toolbar: Search + Action Controls */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5 sm:gap-3">
               {/* Search Box */}
               <div className="relative flex-1">
                 <Icon
                   icon="solar:magnifer-linear"
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-lg pointer-events-none"
+                  className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-base sm:text-lg pointer-events-none"
                 />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search filmmakers, actors, directors..."
-                  className="w-full bg-surface-2 border border-border text-text-primary rounded-xl pl-11 pr-10 py-3 text-xs font-semibold placeholder:text-text-muted/60 focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none transition-all shadow-inner"
+                  className="w-full bg-surface-2 border border-border text-text-primary rounded-xl pl-10 sm:pl-11 pr-10 py-2.5 sm:py-3 text-xs sm:text-xs font-semibold placeholder:text-text-muted/60 focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none transition-all shadow-inner"
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch('')}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-1 rounded-full hover:bg-surface transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-1 rounded-full hover:bg-surface transition-colors"
                   >
                     <Icon icon="solar:close-circle-bold" width="16" />
                   </button>
                 )}
               </div>
 
-              {/* Action Controls: Sort, Filter Toggle, View Switcher */}
-              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-between lg:justify-end">
+              {/* Action Controls: Filters Button, Sort Dropdown, View Switcher */}
+              <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end">
                 {/* Advanced Filters Button */}
                 <button
                   type="button"
                   onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                  className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all border flex-shrink-0 ${
                     isFilterPanelOpen || activeFiltersCount > 0
                       ? 'bg-brand/10 border-brand text-brand'
                       : 'bg-surface-2 border-border text-text-primary hover:border-text-muted/40'
@@ -861,23 +1066,23 @@ const PeopleList = () => {
                   <Icon icon="solar:filter-bold-duotone" width="16" />
                   <span>Filters</span>
                   {activeFiltersCount > 0 && (
-                    <span className="bg-brand text-white text-[10px] font-black px-1.5 py-0.2 rounded-full min-w-[18px] text-center">
+                    <span className="bg-brand text-white text-[10px] font-black px-1.5 py-0.2 rounded-full min-w-[17px] text-center">
                       {activeFiltersCount}
                     </span>
                   )}
                   <Icon
                     icon="solar:alt-arrow-down-linear"
                     className={`transition-transform duration-200 ${isFilterPanelOpen ? 'rotate-180' : ''}`}
-                    width="14"
+                    width="13"
                   />
                 </button>
 
                 {/* Sort Dropdown */}
-                <div className="relative flex-1 sm:flex-initial">
+                <div className="relative flex-1 md:w-44">
                   <select
                     value={sortBy}
                     onChange={(e) => handleSortChange(e.target.value)}
-                    className="w-full sm:w-44 bg-surface-2 border border-border text-text-primary rounded-xl px-3.5 py-2.5 text-xs font-bold appearance-none cursor-pointer focus:border-brand focus:outline-none pr-8 transition-all"
+                    className="w-full bg-surface-2 border border-border text-text-primary rounded-xl pl-3 pr-7 py-2 sm:py-2.5 text-xs font-bold appearance-none cursor-pointer focus:border-brand focus:outline-none transition-all truncate"
                   >
                     {SORT_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -887,12 +1092,12 @@ const PeopleList = () => {
                   </select>
                   <Icon
                     icon="solar:sort-vertical-linear"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-sm"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-xs"
                   />
                 </div>
 
                 {/* View Switcher */}
-                <div className="flex items-center bg-surface-2 p-1 rounded-xl border border-border">
+                <div className="flex items-center bg-surface-2 p-1 rounded-xl border border-border flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => handleViewToggle('grid')}
@@ -903,7 +1108,7 @@ const PeopleList = () => {
                         : 'text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    <Icon icon="solar:widget-2-bold" width="16" />
+                    <Icon icon="solar:widget-2-bold" width="15" />
                   </button>
                   <button
                     type="button"
@@ -915,20 +1120,20 @@ const PeopleList = () => {
                         : 'text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    <Icon icon="solar:list-bold" width="16" />
+                    <Icon icon="solar:list-bold" width="15" />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Quick Role Pills Bar */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1 pb-0.5">
+            {/* Quick Role Pills Bar (Clean Horizontal Scrolling on Mobile, Never Clipped) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pt-0.5 pb-1">
               {PRIMARY_ROLE_FILTERS.map((role) => (
                 <button
                   key={role}
                   type="button"
                   onClick={() => handleRoleSelect(role)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap flex-shrink-0 ${
+                  className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap flex-shrink-0 ${
                     roleFilter === role
                       ? 'bg-brand text-white shadow-md shadow-brand/20 ring-2 ring-brand/40'
                       : 'bg-surface-2 border border-border text-text-muted hover:text-text-primary hover:border-text-muted/30'
@@ -938,64 +1143,35 @@ const PeopleList = () => {
                 </button>
               ))}
 
-              {/* More Roles Dropdown Menu */}
-              <div className="relative flex-shrink-0" ref={moreRolesRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsMoreRolesOpen(!isMoreRolesOpen)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                    isMoreRoleActive
-                      ? 'bg-brand text-white shadow-md shadow-brand/20'
-                      : 'bg-surface-2 border border-border text-text-muted hover:text-text-primary hover:border-text-muted/30'
-                  }`}
-                >
-                  <span>{isMoreRoleActive ? roleFilter : 'More Roles'}</span>
-                  <Icon
-                    icon="solar:alt-arrow-down-linear"
-                    className={`transition-transform duration-200 ${isMoreRolesOpen ? 'rotate-180' : ''}`}
-                    width="14"
-                  />
-                </button>
-
-                {isMoreRolesOpen && (
-                  <div className="absolute left-0 mt-2 w-64 bg-surface border border-border rounded-2xl shadow-2xl z-50 p-2 max-h-80 overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-2">
-                    <div className="px-3 py-1.5 text-[10px] font-black text-text-muted uppercase tracking-widest border-b border-border/50">
-                      Technical & Creative Roles
-                    </div>
-                    {SECONDARY_ROLE_FILTERS.map((role) => (
-                      <button
-                        key={role}
-                        type="button"
-                        onClick={() => handleRoleSelect(role)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-between ${
-                          roleFilter === role
-                            ? 'bg-brand/10 text-brand font-bold'
-                            : 'text-text-primary hover:bg-surface-2'
-                        }`}
-                      >
-                        <span>{role}</span>
-                        {roleFilter === role && <Icon icon="solar:check-circle-bold" width="14" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* More Roles Modal Trigger Button */}
+              <button
+                type="button"
+                onClick={() => setIsRolesModalOpen(true)}
+                className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 flex-shrink-0 border ${
+                  isSecondaryRoleActive
+                    ? 'bg-brand text-white border-brand shadow-md shadow-brand/20 ring-2 ring-brand/40'
+                    : 'bg-surface-2 border-border text-text-muted hover:text-text-primary hover:border-text-muted/30'
+                }`}
+              >
+                <span>{isSecondaryRoleActive ? roleFilter : 'More Roles'}</span>
+                <Icon icon="solar:alt-arrow-down-linear" width="13" />
+              </button>
             </div>
           </div>
 
           {/* Tier 2: Expandable Filter Drawer / Panel */}
           {isFilterPanelOpen && (
-            <div className="p-6 bg-surface-2/40 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-top-3">
+            <div className="p-4 sm:p-6 bg-surface-2/40 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 animate-in fade-in slide-in-from-top-3">
               {/* Experience / Filmography Depth */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Icon icon="solar:clapperboard-bold" className="text-brand" width="14" />
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                  <Icon icon="solar:clapperboard-bold" className="text-brand" width="13" />
                   Filmography Depth
                 </label>
                 <select
                   value={experience}
                   onChange={(e) => handleExperienceChange(e.target.value)}
-                  className="w-full bg-surface border border-border text-text-primary rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:border-brand focus:outline-none"
+                  className="w-full bg-surface border border-border text-text-primary rounded-xl px-3.5 py-2 sm:py-2.5 text-xs font-semibold focus:border-brand focus:outline-none"
                 >
                   {EXPERIENCE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -1006,15 +1182,15 @@ const PeopleList = () => {
               </div>
 
               {/* Gender Filter */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Icon icon="solar:user-bold" className="text-brand" width="14" />
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                  <Icon icon="solar:user-bold" className="text-brand" width="13" />
                   Gender
                 </label>
                 <select
                   value={gender}
                   onChange={(e) => handleGenderChange(e.target.value)}
-                  className="w-full bg-surface border border-border text-text-primary rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:border-brand focus:outline-none"
+                  className="w-full bg-surface border border-border text-text-primary rounded-xl px-3.5 py-2 sm:py-2.5 text-xs font-semibold focus:border-brand focus:outline-none"
                 >
                   {GENDER_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -1025,15 +1201,15 @@ const PeopleList = () => {
               </div>
 
               {/* Nationality / Region */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Icon icon="solar:global-bold" className="text-brand" width="14" />
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                  <Icon icon="solar:global-bold" className="text-brand" width="13" />
                   Nationality / Region
                 </label>
                 <select
                   value={nationality}
                   onChange={(e) => handleNationalityChange(e.target.value)}
-                  className="w-full bg-surface border border-border text-text-primary rounded-xl px-3.5 py-2.5 text-xs font-semibold focus:border-brand focus:outline-none"
+                  className="w-full bg-surface border border-border text-text-primary rounded-xl px-3.5 py-2 sm:py-2.5 text-xs font-semibold focus:border-brand focus:outline-none"
                 >
                   {NATIONALITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -1044,49 +1220,49 @@ const PeopleList = () => {
               </div>
 
               {/* Profile Attributes Toggles */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Icon icon="solar:shield-check-bold" className="text-brand" width="14" />
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                  <Icon icon="solar:shield-check-bold" className="text-brand" width="13" />
                   Attributes & Badges
                 </label>
-                <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-0.5">
                   <button
                     type="button"
                     onClick={handleVerifiedToggle}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 border ${
                       verifiedOnly
                         ? 'bg-brand text-white border-brand shadow-sm'
                         : 'bg-surface border-border text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    <Icon icon="solar:verified-check-bold" width="14" />
-                    <span>Verified Only</span>
+                    <Icon icon="solar:verified-check-bold" width="13" />
+                    <span>Verified</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleSpotlightToggle}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 border ${
                       spotlightOnly
                         ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
                         : 'bg-surface border-border text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    <Icon icon="solar:star-bold" width="14" />
+                    <Icon icon="solar:star-bold" width="13" />
                     <span>Spotlight</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handlePhotoOnlyToggle}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center gap-1 border ${
                       photoOnly
                         ? 'bg-brand/20 border-brand text-brand'
                         : 'bg-surface border-border text-text-muted hover:text-text-primary'
                     }`}
                   >
-                    <Icon icon="solar:camera-bold" width="14" />
-                    <span>With Headshot</span>
+                    <Icon icon="solar:camera-bold" width="13" />
+                    <span>With Photo</span>
                   </button>
                 </div>
               </div>
@@ -1094,81 +1270,113 @@ const PeopleList = () => {
           )}
 
           {/* Tier 3: Active Filters & Results Summary */}
-          <div className="px-4 sm:px-6 py-3 bg-surface border-t border-border/60 flex items-center justify-between gap-4 flex-wrap text-xs">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-text-muted text-[11px] uppercase tracking-wider">
+          <div className="px-3.5 sm:px-6 py-2.5 sm:py-3 bg-surface border-t border-border/60 flex items-center justify-between gap-3 flex-wrap text-xs">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <span className="font-bold text-text-muted text-[10px] sm:text-[11px] uppercase tracking-wider">
                 {loading ? 'Finding talent...' : `Showing ${people.length} filmmakers & talent`}
               </span>
 
               {/* Active Filter Chips */}
               {roleFilter !== 'All' && (
-                <span className="inline-flex items-center gap-1 bg-brand/10 border border-brand/30 text-brand text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 bg-brand/10 border border-brand/30 text-brand text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
                   Role: {roleFilter}
-                  <button type="button" onClick={() => handleRoleSelect('All')} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                  <button
+                    type="button"
+                    onClick={() => handleRoleSelect('All')}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
 
               {search && (
-                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
                   Query: "{search}"
-                  <button type="button" onClick={() => setSearch('')} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
 
               {experience !== 'all' && (
-                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                  Experience: {experience}
-                  <button type="button" onClick={() => handleExperienceChange('all')} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
+                  Exp: {experience}
+                  <button
+                    type="button"
+                    onClick={() => handleExperienceChange('all')}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
 
               {verifiedOnly && (
-                <span className="inline-flex items-center gap-1 bg-brand/10 border border-brand/30 text-brand text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                  Verified Only
-                  <button type="button" onClick={handleVerifiedToggle} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                <span className="inline-flex items-center gap-1 bg-brand/10 border border-brand/30 text-brand text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
+                  Verified
+                  <button
+                    type="button"
+                    onClick={handleVerifiedToggle}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
 
               {spotlightOnly && (
-                <span className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 text-amber-500 text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
                   Spotlight
-                  <button type="button" onClick={handleSpotlightToggle} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                  <button
+                    type="button"
+                    onClick={handleSpotlightToggle}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
 
               {photoOnly && (
-                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
                   With Photo
-                  <button type="button" onClick={handlePhotoOnlyToggle} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                  <button
+                    type="button"
+                    onClick={handlePhotoOnlyToggle}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
 
               {gender !== 'all' && (
-                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
                   Gender: {gender}
-                  <button type="button" onClick={() => handleGenderChange('all')} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                  <button
+                    type="button"
+                    onClick={() => handleGenderChange('all')}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
 
               {nationality !== 'all' && (
-                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                  Nationality: {nationality}
-                  <button type="button" onClick={() => handleNationalityChange('all')} className="hover:text-red-500">
-                    <Icon icon="solar:close-circle-bold" width="13" />
+                <span className="inline-flex items-center gap-1 bg-surface-2 border border-border text-text-primary text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full">
+                  Region: {nationality}
+                  <button
+                    type="button"
+                    onClick={() => handleNationalityChange('all')}
+                    className="hover:text-red-500"
+                  >
+                    <Icon icon="solar:close-circle-bold" width="12" />
                   </button>
                 </span>
               )}
@@ -1179,41 +1387,43 @@ const PeopleList = () => {
               <button
                 type="button"
                 onClick={handleResetAll}
-                className="text-[11px] font-black text-brand hover:underline uppercase tracking-wider flex items-center gap-1 flex-shrink-0"
+                className="text-[10px] sm:text-[11px] font-black text-brand hover:underline uppercase tracking-wider flex items-center gap-1 flex-shrink-0"
               >
                 <Icon icon="solar:restart-bold" width="12" />
-                Reset All Filters
+                Reset Filters
               </button>
             )}
           </div>
         </div>
 
         {/* Content Section (Grid vs List View) */}
-        <div className="p-4 sm:p-6 lg:p-10">
+        <div className="p-3 sm:p-6 lg:p-10">
           {loading && people.length === 0 ? (
             viewMode === 'grid' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-6">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => (
                   <PersonSkeleton key={i} />
                 ))}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5 sm:space-y-3">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                   <PersonRowSkeleton key={i} />
                 ))}
               </div>
             )
           ) : people.length === 0 ? (
-            <div className="text-center py-24 bg-surface-2/10 rounded-2xl border-2 border-dashed border-border max-w-lg mx-auto p-8">
-              <div className="w-16 h-16 rounded-full bg-brand/10 text-brand mx-auto flex items-center justify-center mb-4">
-                <Icon icon="solar:user-linear" className="text-3xl" />
+            <div className="text-center py-20 sm:py-24 bg-surface-2/10 rounded-2xl border-2 border-dashed border-border max-w-lg mx-auto p-6 sm:p-8">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-brand/10 text-brand mx-auto flex items-center justify-center mb-4">
+                <Icon icon="solar:user-linear" className="text-2xl sm:text-3xl" />
               </div>
-              <h3 className="text-text-primary font-bold text-base mb-1">No filmmakers found</h3>
+              <h3 className="text-text-primary font-bold text-sm sm:text-base mb-1">
+                No filmmakers found
+              </h3>
               <p className="text-text-muted text-xs mb-6">
                 We couldn't find any talent matching your current filter criteria.
               </p>
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-3 flex-wrap">
                 <button
                   type="button"
                   onClick={handleResetAll}
@@ -1231,15 +1441,15 @@ const PeopleList = () => {
               </div>
             </div>
           ) : (
-            <div className="space-y-10">
+            <div className="space-y-8 sm:space-y-10">
               {viewMode === 'grid' ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-6">
                   {people.map((person) => (
                     <PersonCard key={person.id} person={person} currentUser={user} />
                   ))}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {people.map((person) => (
                     <PersonRow key={person.id} person={person} currentUser={user} />
                   ))}
@@ -1248,16 +1458,19 @@ const PeopleList = () => {
 
               {/* Load More Pagination */}
               {hasMore && (
-                <div className="text-center pt-8 border-t border-border/50">
+                <div className="text-center pt-6 sm:pt-8 border-t border-border/50">
                   <button
                     type="button"
                     onClick={loadMore}
                     disabled={loading}
-                    className="bg-surface border border-border text-text-primary px-10 py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.2em] hover:border-brand hover:text-brand transition-all disabled:opacity-50 shadow-sm"
+                    className="w-full sm:w-auto bg-surface border border-border text-text-primary px-8 sm:px-10 py-3 sm:py-3.5 rounded-xl text-xs font-black uppercase tracking-[0.2em] hover:border-brand hover:text-brand transition-all disabled:opacity-50 shadow-sm"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <Icon icon="solar:refresh-circle-linear" className="animate-spin text-base" />
+                        <Icon
+                          icon="solar:refresh-circle-linear"
+                          className="animate-spin text-base"
+                        />
                         Loading Talent...
                       </span>
                     ) : (
