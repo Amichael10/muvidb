@@ -721,57 +721,178 @@ export async function purgeStaleUnmappedChannelVideos(opts: { maxAgeDays?: numbe
 }
 
 /**
- * Syncs trending Nigerian movies from TMDB Discover API
+ * Syncs new & trending Nigerian movies from TMDB Discover API across
+ * current year releases, streaming, and popularity.
  */
 export async function runTMDBSync() {
   const TMDB_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
   if (!TMDB_KEY) throw new Error('TMDB_API_KEY missing');
 
-  const url = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_origin_country=NG&sort_by=popularity.desc`;
-  const resData = await fetch(url).then(r => r.json());
-  const movies = resData.results || [];
-  
+  const currentYear = new Date().getFullYear();
+  const discoveryUrls = [
+    // 1. Current year new releases sorted by release date (Pages 1-2)
+    `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_origin_country=NG&primary_release_year=${currentYear}&sort_by=primary_release_date.desc&page=1`,
+    `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_origin_country=NG&primary_release_year=${currentYear}&sort_by=primary_release_date.desc&page=2`,
+    // 2. Previous year releases
+    `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_origin_country=NG&primary_release_year=${currentYear - 1}&sort_by=popularity.desc&page=1`,
+    // 3. Trending by all-time popularity
+    `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_origin_country=NG&sort_by=popularity.desc&page=1`,
+  ];
+
+  const movieMap = new Map<number, any>();
+  for (const url of discoveryUrls) {
+    try {
+      const resData = await fetch(url).then((r) => r.json());
+      for (const m of resData.results || []) {
+        if (m?.id && !movieMap.has(m.id)) {
+          movieMap.set(m.id, m);
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[runTMDBSync] discovery URL failed: ${e.message}`);
+    }
+  }
+
+  const movies = Array.from(movieMap.values());
   if (movies.length === 0) return { task: 'tmdb', imported: 0, message: 'No movies found' };
 
-  let { data: channel } = await supabase.from('channels').select('id').eq('name', 'TMDB Discover').maybeSingle();
-  if (!channel) {
-    const { data: newChannel, error: chErr } = await supabase.from('channels').insert([{ 
-      name: 'TMDB Discover', category: 'Discovery', description: 'Auto-fetched from TMDB Discover API (Nigeria Origin)'
-    }]).select().single();
-    if (chErr) throw chErr;
-    channel = newChannel;
+  let filmsCreated = 0;
+  let filmsEnriched = 0;
+
+  for (const m of movies) {
+    try {
+      const tmdbIdStr = String(m.id);
+      const title = m.title?.trim();
+      if (!title) continue;
+
+      const year = m.release_date ? parseInt(m.release_date.slice(0, 4), 10) : currentYear;
+
+      // Check if film already exists in films table by tmdb_id or title
+      const { data: byTmdb } = await supabase
+        .from('films')
+        .select('id, tmdb_id, poster_url, backdrop_url, synopsis')
+        .eq('tmdb_id', tmdbIdStr)
+        .maybeSingle();
+
+      let existing = byTmdb;
+      if (!existing) {
+        const { data: byTitle } = await supabase
+          .from('films')
+          .select('id, tmdb_id, poster_url, backdrop_url, synopsis')
+          .ilike('title', title)
+          .maybeSingle();
+        existing = byTitle;
+      }
+
+      if (existing) {
+        // Enrich existing film if TMDB ID or posters are missing
+        const updates: any = {};
+        if (!existing.tmdb_id) updates.tmdb_id = tmdbIdStr;
+        if (!existing.poster_url && m.poster_path) updates.poster_url = `https://image.tmdb.org/t/p/original${m.poster_path}`;
+        if (!existing.backdrop_url && m.backdrop_path) updates.backdrop_url = `https://image.tmdb.org/t/p/original${m.backdrop_path}`;
+        if (!existing.synopsis && m.overview) updates.synopsis = m.overview;
+
+        if (Object.keys(updates).length > 0) {
+          await supabase.from('films').update(updates).eq('id', existing.id);
+          filmsEnriched++;
+        }
+        continue;
+      }
+
+      // Fetch full details with credits
+      let detail: any = m;
+      try {
+        const detailRes = await fetch(
+          `https://api.themoviedb.org/3/movie/${m.id}?api_key=${TMDB_KEY}&append_to_response=credits,watch/providers`
+        );
+        if (detailRes.ok) detail = await detailRes.json();
+      } catch (e) {}
+
+      const slugBase = `${title}-${year}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const posterUrl = detail.poster_path ? `https://image.tmdb.org/t/p/original${detail.poster_path}` : null;
+      const backdropUrl = detail.backdrop_path ? `https://image.tmdb.org/t/p/original${detail.backdrop_path}` : posterUrl;
+      const genres = (detail.genres || []).map((g: any) => g.name).filter(Boolean);
+
+      let finalSlug = slugBase;
+      const { data: slugCheck } = await supabase.from('films').select('id').eq('slug', finalSlug).maybeSingle();
+      if (slugCheck) {
+        finalSlug = `${slugBase}-${m.id}`;
+      }
+
+      const { data: newFilm, error: insErr } = await supabase
+        .from('films')
+        .insert({
+          title,
+          slug: finalSlug,
+          year,
+          release_date: detail.release_date || null,
+          synopsis: detail.overview || null,
+          poster_url: posterUrl,
+          backdrop_url: backdropUrl,
+          runtime_minutes: detail.runtime || null,
+          tmdb_id: tmdbIdStr,
+          tmdb_rating: detail.vote_average || null,
+          tmdb_vote_count: detail.vote_count || null,
+          genres: genres.length ? genres : ['Drama'],
+          countries: ['Nigeria'],
+          status: 'released',
+          is_nollywood: true,
+          is_published: true,
+          content_type: 'movie',
+        })
+        .select('id')
+        .single();
+
+      if (insErr) {
+        console.warn(`[runTMDBSync] insert film failed for "${title}":`, insErr.message);
+        continue;
+      }
+
+      filmsCreated++;
+
+      // Link top cast and director credits
+      const cast = detail.credits?.cast?.slice(0, 8) || [];
+      const directors = (detail.credits?.crew || []).filter((c: any) => c.job === 'Director' || c.department === 'Directing').slice(0, 2);
+
+      const creditsToInsert = [
+        ...cast.map((c: any, idx: number) => ({ name: c.name, role: 'actor', char: c.character || null, order: idx + 1, dept: 'Acting' })),
+        ...directors.map((c: any, idx: number) => ({ name: c.name, role: 'director', char: null, order: idx + 1, dept: 'Directing' })),
+      ];
+
+      for (const p of creditsToInsert) {
+        if (!p.name?.trim()) continue;
+        let { data: personRow } = await supabase.from('people').select('id').ilike('name', p.name.trim()).maybeSingle();
+        let personId = personRow?.id;
+        if (!personId) {
+          const pSlug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          const { data: createdPerson } = await supabase
+            .from('people')
+            .insert({ name: p.name.trim(), slug: pSlug, known_for_department: p.dept })
+            .select('id')
+            .maybeSingle();
+          personId = createdPerson?.id;
+        }
+
+        if (personId && newFilm?.id) {
+          await supabase.from('credits').insert({
+            film_id: newFilm.id,
+            person_id: personId,
+            role: p.role,
+            character_name: p.char,
+            billing_order: p.order,
+            source: 'tmdb',
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[runTMDBSync] Failed processing movie ${m.title}:`, e.message);
+    }
   }
 
-  const { data: storedVids } = await supabase
-    .from('channel_videos')
-    .select('video_id,is_hidden,title,description,thumbnail_url,published_at')
-    .eq('channel_id', channel.id);
-  const hiddenSet = new Set((storedVids || []).filter((v: any) => v.is_hidden).map((v: any) => v.video_id));
-  const storedByVideo = new Map((storedVids || []).map((v: any) => [v.video_id, v]));
-
-  const videoRows = movies.map((m: any) => ({
-    channel_id: channel!.id,
-    video_id: `TMDB_${m.id}`,
-    title: m.title,
-    description: m.overview,
-    thumbnail_url: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : null,
-    published_at: m.release_date ? new Date(m.release_date).toISOString() : new Date().toISOString()
-  })).filter(row => !hiddenSet.has(row.video_id));
-
-  // Same reasoning as the YouTube path: skip rows that have not changed.
-  const changedRows = videoRows.filter((row: any) =>
-    channelVideoChanged(storedByVideo.get(row.video_id), row, [
-      'title',
-      'description',
-      'thumbnail_url',
-      'published_at',
-    ]),
-  );
-
-  if (changedRows.length > 0) {
-    await supabase.from('channel_videos').upsert(changedRows, { onConflict: 'channel_id,video_id' });
-  }
-
-  await supabase.from('channels').update({ videos_last_fetched_at: new Date().toISOString() }).eq('id', channel.id);
-  return { task: 'tmdb', imported: movies.length, channel_id: channel.id };
+  return {
+    task: 'tmdb',
+    discovered: movies.length,
+    films_created: filmsCreated,
+    films_enriched: filmsEnriched,
+  };
 }
