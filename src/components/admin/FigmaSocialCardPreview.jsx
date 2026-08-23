@@ -111,9 +111,20 @@ export default function FigmaSocialCardPreview({
   displayImage,
   className = '',
 }) {
-  const isPerson = candidate?.type === 'person' || series?.slug?.includes('spotlight') || series?.slug?.includes('actor') || series?.slug?.includes('birthday') || series?.slug?.includes('behind_the_camera') || series?.slug?.includes('face');
+  const seriesSlug = (series?.slug || '').toLowerCase();
+  const isPerson = candidate?.type === 'person' ||
+    series?.category === 'people' ||
+    series?.category === 'craft' ||
+    seriesSlug.includes('spotlight') ||
+    seriesSlug.includes('actor') ||
+    seriesSlug.includes('talent') ||
+    seriesSlug.includes('filmography') ||
+    seriesSlug.includes('face') ||
+    seriesSlug.includes('camera') ||
+    seriesSlug.includes('birthday');
+
   const branding = getPlatformBranding(candidate, series);
-  const title = candidate?.name || 'African Cinema';
+  const title = candidate?.name || (isPerson ? 'Nollywood Star' : 'Featured Film');
   const year = candidate?.data?.year || candidate?.year || '';
   const country = candidate?.country || candidate?.data?.country || 'Nollywood';
   const heroImage = displayImage || candidate?.imageUrl || candidate?.data?.photo_url || candidate?.data?.poster_url;

@@ -159,7 +159,14 @@ export default function AutoPilotReviewModal({
           if (Array.isArray(data) && data.length) {
             setCandidatePool(data);
             const foundIdx = data.findIndex(c => c.id === initialCandidate?.id);
-            setPoolIndex(foundIdx >= 0 ? foundIdx : 0);
+            const activeIdx = foundIdx >= 0 ? foundIdx : 0;
+            setPoolIndex(activeIdx);
+            if (!initialCandidate && data[activeIdx]) {
+              const autoCandidate = data[activeIdx];
+              setCandidate(autoCandidate);
+              setCustomImageUrl(autoCandidate.imageUrl || '');
+              requestAICopy(autoCandidate, initialAngle);
+            }
           }
         })
         .catch(() => {})
@@ -320,8 +327,17 @@ export default function AutoPilotReviewModal({
   };
 
   const displayImage = customImageUrl || candidate?.imageUrl;
-  const isPerson = candidate?.type === 'person';
-  const isPlay = candidate?.type === 'play' || series?.slug?.includes('stage');
+  const seriesSlug = (series?.slug || '').toLowerCase();
+  const isPerson = candidate?.type === 'person' ||
+    series?.category === 'people' ||
+    series?.category === 'craft' ||
+    seriesSlug.includes('spotlight') ||
+    seriesSlug.includes('actor') ||
+    seriesSlug.includes('talent') ||
+    seriesSlug.includes('filmography') ||
+    seriesSlug.includes('face') ||
+    seriesSlug.includes('camera');
+  const isPlay = candidate?.type === 'play' || seriesSlug.includes('stage');
   const data = candidate?.data || {};
   const isArchivedPlay = isPlay && (data.status === 'archived' || data.derivedStatus === 'archived');
   const currentCaption = captions[activePlatformTab] || '';
