@@ -6,6 +6,19 @@ import { Icon } from '@iconify/react';
  */
 export function getPlatformBranding(candidate, series) {
   const text = `${candidate?.data?.watchAvailability || ''} ${candidate?.data?.platformDisplayName || ''} ${candidate?.data?.platform || ''} ${candidate?.category || ''} ${candidate?.name || ''} ${series?.slug || ''} ${series?.name || ''}`.toLowerCase();
+
+  if (candidate?.data?.lifecycle === 'upcoming' || candidate?.data?.coming_soon) {
+    return {
+      name: 'Coming Soon',
+      badge: 'UPCOMING RELEASE',
+      accent: '#FF7A00',
+      bgGlow: 'rgba(255, 122, 0, 0.25)',
+      platformIcon: 'solar:calendar-date-bold',
+      status: candidate?.data?.release_date ? `RELEASES ${candidate.data.release_date}` : 'COMING SOON',
+      subtext: 'Track this release on MuviDB',
+      ctaText: 'EXPLORE ON MUVIDB.COM',
+    };
+  }
   
   if (text.includes('nollistream')) {
     return {
@@ -92,14 +105,14 @@ export function getPlatformBranding(candidate, series) {
     };
   }
 
-  // Default to African Cinema Spotlight
+  // Neutral fallback: never make an unsupported streaming or "new" claim.
   return {
-    name: candidate?.data?.platformDisplayName || 'NolliStream',
-    badge: 'NEW ON STREAMING',
+    name: candidate?.data?.platformDisplayName || 'MuviDB Spotlight',
+    badge: candidate?.data?.lifecycleLabel || 'FILM SPOTLIGHT',
     accent: '#FF7A00',
     bgGlow: 'rgba(255, 122, 0, 0.25)',
     platformIcon: 'solar:play-bold',
-    status: candidate?.data?.coming_soon ? 'COMING SOON' : 'NOW STREAMING',
+    status: candidate?.data?.lifecycleLabel || 'DISCOVER THIS FILM',
     subtext: candidate?.data?.watchAvailability || 'Verified Nollywood & African Cinema',
     ctaText: 'EXPLORE ON MUVIDB.COM',
   };

@@ -1,5 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { extractSocialHandle } from '../social-studio/content/snapshots.js';
+import {
+  classifyFilmLifecycle,
+  getSeriesIntent,
+  normalizeSeriesSlug,
+  rankAndDedupeFilms,
+  resolveFilmPlatform,
+} from './candidate_strategy.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
@@ -17,8 +24,6 @@ export interface CandidateEntity {
   completenessScore: number;
   data: Record<string, any>;
 }
-
-const EMERGING_PLATFORMS = ['nollistream', 'docuth', 'ebonylife', 'kava', 'circuits'];
 
 const PLATFORM_DISPLAY_NAMES: Record<string, string> = {
   nollistream: 'NolliStream',
@@ -190,23 +195,29 @@ async function enrichPeopleCandidates(people: any[]): Promise<any[]> {
  * Fetch candidate entities for a given content series from MuviDB Postgres tables.
  */
 export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Promise<CandidateEntity[]> {
-  const norm = (seriesSlug || '').toLowerCase().replace(/^the[_-]/, '').replace(/-/g, '_');
+  const norm = normalizeSeriesSlug(seriesSlug);
+  const intent = getSeriesIntent(seriesSlug);
 
   // ── 1. RISING STARS & SUPPORTING ACTORS (you_know_the_face / rising_stars) ─
   if (norm.includes('face') || norm.includes('rising') || norm.includes('supporting')) {
-    let { data: people } = await supabase
+    let { data: people, error: peopleError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, country, film_count, professions, bio, profile_completeness, popularity_score, instagram_url, twitter_url')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, updated_at')
       .not('photo_url', 'is', null)
-      .order('profile_completeness', { ascending: false, nullsFirst: false })
+      .gte('film_count', 3)
+      .lte('film_count', 15)
+      .order('updated_at', { ascending: false })
       .limit(limit * 2);
+    if (peopleError) throw peopleError;
 
     if (!people || people.length === 0) {
-      const { data: fallbackPeople } = await supabase
+      const { data: fallbackPeople, error: fallbackError } = await supabase
         .from('people')
-        .select('id, name, slug, photo_url, photo_cutout_url, country, film_count, professions, bio, profile_completeness, popularity_score, instagram_url, twitter_url')
-        .order('profile_completeness', { ascending: false, nullsFirst: false })
+        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, updated_at')
+        .not('photo_url', 'is', null)
+        .order('updated_at', { ascending: false })
         .limit(limit);
+      if (fallbackError) throw fallbackError;
       people = fallbackPeople || [];
     }
 
@@ -216,11 +227,11 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       id: p.id,
       type: 'person',
       name: p.name,
-      subtext: `${p.film_count || 0} credits • ${p.country || 'Nollywood'} • ✨ Rising Star`,
+      subtext: `${p.film_count || 0} credits • ${p.nationality || 'Nollywood'} • ✨ Rising Star`,
       imageUrl: p.photo_cutout_url || p.photo_url,
-      country: p.country,
+      country: p.nationality,
       category: 'Rising Star',
-      completenessScore: p.profile_completeness || (p.bio ? 0.9 : 0.75),
+      completenessScore: p.bio ? 0.9 : 0.75,
       data: {
         ...p,
         isRisingStar: true,
@@ -235,29 +246,18 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
 
   // ── 2. CREW & BEHIND THE CAMERA (DP, Writer, Director, Editor, Sound, Costume) ─
   if (norm.includes('camera') || norm.includes('crew') || norm.includes('craft') || norm.includes('director')) {
-    const { data: crew } = await supabase
+    const { data: crew, error: crewError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, country, film_count, professions, bio, profile_completeness, known_for_department, instagram_url, twitter_url')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url')
       .not('photo_url', 'is', null)
-      .order('profile_completeness', { ascending: false, nullsFirst: false })
+      .not('known_for_department', 'is', null)
+      .order('film_count', { ascending: false, nullsFirst: false })
       .limit(limit * 3);
+    if (crewError) throw crewError;
 
     const craftCrew = (crew || []).filter((p) => {
-      const profs = (p.professions || []).map((pr: string) => pr.toLowerCase());
       const dept = (p.known_for_department || '').toLowerCase();
       return (
-        profs.some((pr: string) =>
-          pr.includes('cinematograph') ||
-          pr.includes('camera') ||
-          pr.includes('director of photography') ||
-          pr.includes('writer') ||
-          pr.includes('screenplay') ||
-          pr.includes('director') ||
-          pr.includes('editor') ||
-          pr.includes('costume') ||
-          pr.includes('sound') ||
-          pr.includes('producer')
-        ) ||
         dept.includes('camera') ||
         dept.includes('writing') ||
         dept.includes('directing') ||
@@ -271,16 +271,16 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     const enriched = await enrichPeopleCandidates(targetList.slice(0, limit));
 
     return enriched.map((p) => {
-      const department = classifyCrewDepartment(p.professions, p.known_for_department);
+      const department = classifyCrewDepartment([], p.known_for_department);
       return {
         id: p.id,
         type: 'person',
         name: p.name,
-        subtext: `${department} • ${p.country || 'African Cinema'} • 🎬 Craft Spotlight`,
+        subtext: `${department} • ${p.nationality || 'African Cinema'} • 🎬 Craft Spotlight`,
         imageUrl: p.photo_cutout_url || p.photo_url,
-        country: p.country,
+        country: p.nationality,
         category: department,
-        completenessScore: p.profile_completeness || 0.85,
+        completenessScore: p.bio ? 0.9 : 0.8,
         data: {
           ...p,
           isCrew: true,
@@ -306,19 +306,21 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     norm.includes('talent') ||
     norm.includes('people')
   ) {
-    let { data: people } = await supabase
+    let { data: people, error: peopleError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, country, film_count, professions, bio, profile_completeness, instagram_url, twitter_url, date_of_birth')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
       .not('photo_url', 'is', null)
-      .order('profile_completeness', { ascending: false, nullsFirst: false })
+      .order('film_count', { ascending: false, nullsFirst: false })
       .limit(limit * 2);
+    if (peopleError) throw peopleError;
 
     if (!people || people.length === 0) {
-      const { data: fallbackPeople } = await supabase
+      const { data: fallbackPeople, error: fallbackError } = await supabase
         .from('people')
-        .select('id, name, slug, photo_url, photo_cutout_url, country, film_count, professions, bio, profile_completeness, instagram_url, twitter_url, date_of_birth')
-        .order('profile_completeness', { ascending: false, nullsFirst: false })
+        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
+        .order('film_count', { ascending: false, nullsFirst: false })
         .limit(limit);
+      if (fallbackError) throw fallbackError;
       people = fallbackPeople || [];
     }
 
@@ -328,11 +330,11 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       id: p.id,
       type: 'person',
       name: p.name,
-      subtext: `${p.film_count || 0} credits • ${p.country || 'African Cinema'} • Verified Talent`,
+      subtext: `${p.film_count || 0} credits • ${p.nationality || 'African Cinema'} • Verified Talent`,
       imageUrl: p.photo_cutout_url || p.photo_url,
-      country: p.country,
-      category: (p.professions || [])[0] || 'Actor Spotlight',
-      completenessScore: p.profile_completeness || 0.85,
+      country: p.nationality,
+      category: p.known_for_department || 'Actor Spotlight',
+      completenessScore: p.bio ? 0.9 : 0.8,
       data: {
         ...p,
         handle: extractSocialHandle(p),
@@ -363,6 +365,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       subtext: `${p.venue || 'Stage'} • ${p.city || 'Lagos'} (${p.status === 'currently_running' ? 'Now Showing' : 'Upcoming'})`,
       imageUrl: p.poster_url,
       country: p.country,
+      completenessScore: p.poster_url ? 0.9 : 0.7,
       data: p,
     }));
   }
@@ -409,138 +412,95 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     }
   }
 
-  // ── 6. WHERE TO WATCH, STREAMING, & WATCHLIST (Nollistream, Docuth, EbonyLife, YouTube, Netflix, Prime) ──
-  const candidates: any[] = [];
+  // Person, theatre and critic series must never fall through to a film pool.
+  if (intent === 'people' || intent === 'crew' || intent === 'theatre' || intent === 'critics') return [];
 
-  // 1. Fetch Emerging Platform Releases (Nollistream, Docuth, EbonyLife, Kava, Circuits)
-  const { data: emergingFilms } = await supabase
-    .from('films')
-    .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, youtube_watch_url, liked_percent, imdb_rating, synopsis, tagline, genres')
-    .not('poster_url', 'is', null)
-    .in('release_type', EMERGING_PLATFORMS)
-    .order('year', { ascending: false })
-    .limit(limit);
+  // Fetch a broad film pool once, then apply lifecycle eligibility and editorial ranking.
+  // This deliberately avoids the old "any recent row" fallback, which mixed stale cinema,
+  // upcoming and streaming titles into every series.
+  const filmSelect = 'id, title, slug, poster_url, backdrop_url, backdrop, release_date, year, release_type, streaming_links, youtube_watch_url, liked_percent, imdb_rating, synopsis, tagline, genres, coming_soon, is_in_cinemas, trailer_youtube_id, trailer_external_url, created_at, updated_at';
+  const poolLimit = Math.max(limit * 6, 100);
+  let filmRows: any[] = [];
 
-  (emergingFilms || []).forEach((f) => {
-    const platformName = PLATFORM_DISPLAY_NAMES[f.release_type || ''] || 'African Platform';
-    candidates.push({
-      id: f.id,
-      type: 'movie',
-      name: f.title,
-      subtext: `Stream on ${platformName} • ${f.year || 'New'}`,
-      imageUrl: f.poster_url,
-      completenessScore: f.poster_url ? 0.95 : 0.6,
-      category: platformName,
-      data: {
-        ...f,
-        isEmergingPlatform: true,
-        platform: f.release_type,
-        platformDisplayName: platformName,
-      },
-    });
-  });
-
-  // 2. Fetch YouTube Titles & compute Outperformance / Hidden Gem scores
-  const { data: ytFilms } = await supabase
-    .from('films')
-    .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, youtube_watch_url, liked_percent, imdb_rating, synopsis, tagline, genres, youtube_stats(*)')
-    .not('poster_url', 'is', null)
-    .not('youtube_watch_url', 'is', null)
-    .order('year', { ascending: false })
-    .limit(limit);
-
-  (ytFilms || []).forEach((f: any) => {
-    const stats = Array.isArray(f.youtube_stats) ? f.youtube_stats[0] : f.youtube_stats;
-    const views = stats?.view_count || 0;
-    const likes = stats?.like_count || 0;
-    const likedPct = f.liked_percent || 70;
-    const outperformanceRatio = views > 0 ? views / 25000 : 0;
-    const isYoutubeGem = (outperformanceRatio >= 1.2 || (views >= 30000 && (likes / Math.max(views, 1)) > 0.035)) && likedPct >= 65;
-
-    candidates.push({
-      id: f.id,
-      type: 'movie',
-      name: f.title,
-      subtext: isYoutubeGem
-        ? `💎 YouTube Gem (${Math.max(1, outperformanceRatio).toFixed(1)}x Reach) • ${f.year || 'Nollywood'}`
-        : `YouTube Nollywood • ${f.year || 'Trending'}`,
-      imageUrl: f.poster_url,
-      completenessScore: 0.9,
-      category: isYoutubeGem ? 'YouTube Hidden Gem' : 'YouTube Nollywood',
-      data: {
-        ...f,
-        isYoutubeGem,
-        outperformanceRatio: Number(outperformanceRatio.toFixed(2)),
-        views,
-        likes,
-        platform: 'youtube',
-        platformDisplayName: 'YouTube',
-      },
-    });
-  });
-
-  // 3. Fetch Mainstream Streamers & Cinema (Netflix, Prime Video, In Cinemas)
-  const { data: mainstreamFilms } = await supabase
-    .from('films')
-    .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, is_in_cinemas, liked_percent, imdb_rating, synopsis, tagline, genres, streaming_links')
-    .not('poster_url', 'is', null)
-    .or('is_in_cinemas.eq.true,release_type.in.(netflix,prime_video)')
-    .order('year', { ascending: false })
-    .limit(limit);
-
-  (mainstreamFilms || []).forEach((f) => {
-    const platformLabel = f.is_in_cinemas
-      ? 'In Cinemas'
-      : PLATFORM_DISPLAY_NAMES[f.release_type || ''] || 'Streaming';
-    candidates.push({
-      id: f.id,
-      type: 'movie',
-      name: f.title,
-      subtext: `${platformLabel} • ${f.year || 'Feature'}`,
-      imageUrl: f.poster_url,
-      completenessScore: 0.85,
-      category: f.is_in_cinemas ? 'In Cinemas' : platformLabel,
-      data: {
-        ...f,
-        isMainstream: true,
-        platform: f.is_in_cinemas ? 'cinema' : f.release_type,
-        platformDisplayName: platformLabel,
-      },
-    });
-  });
-
-  // 4. If candidates are still fewer than 5, fallback to ANY films with posters
-  if (candidates.length < 5) {
-    const { data: fallbackFilms } = await supabase
-      .from('films')
-      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, liked_percent, imdb_rating, synopsis, tagline, genres')
+  if (intent === 'streaming') {
+    // Query active destinations directly so NolliStream/Docuth titles cannot be
+    // pushed out of the pool by unrelated rows with newer update timestamps.
+    const platformQueries = ['nollistream', 'docuth', 'ebonylife', 'kava', 'circuits', 'netflix', 'prime_video'].map(platform =>
+      supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
+        .eq('release_type', platform).order('updated_at', { ascending: false }).limit(Math.max(limit * 2, 20))
+    );
+    const [platformResults, youtubeRows, linkedRows] = await Promise.all([
+      Promise.all(platformQueries),
+      supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
+        .not('youtube_watch_url', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit),
+      supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
+        .not('streaming_links', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit),
+    ]);
+    const firstError = platformResults.find(result => result.error)?.error || youtubeRows.error || linkedRows.error;
+    if (firstError) throw firstError;
+    filmRows = [...platformResults.flatMap(result => result.data || []), ...(youtubeRows.data || []), ...(linkedRows.data || [])];
+  } else if (intent === 'upcoming') {
+    const today = new Date();
+    const horizon = new Date(today.getTime() + 366 * 86_400_000);
+    const { data, error } = await supabase.from('films').select(filmSelect)
       .not('poster_url', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    (fallbackFilms || []).forEach((f) => {
-      candidates.push({
-        id: f.id,
-        type: 'movie',
-        name: f.title,
-        subtext: `${f.year || 'Nollywood'} • Featured Film`,
-        imageUrl: f.poster_url,
-        completenessScore: 0.8,
-        category: 'Nollywood Spotlight',
-        data: f,
-      });
-    });
+      .gt('release_date', today.toISOString().slice(0, 10))
+      .lte('release_date', horizon.toISOString().slice(0, 10))
+      .order('release_date', { ascending: true })
+      .limit(poolLimit);
+    if (error) throw error;
+    filmRows = data || [];
+  } else {
+    const { data, error } = await supabase.from('films').select(filmSelect)
+      .not('poster_url', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit);
+    if (error) throw error;
+    filmRows = data || [];
   }
 
-  const enriched = await enrichFilmCandidates(candidates.map(c => ({ ...c.data, candidateId: c.id })));
-  return candidates.slice(0, limit).map((c, i) => ({
-    ...c,
-    data: {
-      ...c.data,
-      topCast: enriched[i]?.topCast || [],
-      directors: enriched[i]?.directors || [],
-    },
-  }));
+  const rankedFilms = rankAndDedupeFilms(filmRows, intent, limit);
+  const enriched = await enrichFilmCandidates(rankedFilms);
+
+  return enriched.map((f: any) => {
+    const platform = resolveFilmPlatform(f);
+    const lifecycle = classifyFilmLifecycle(f);
+    const platformName = platform
+      ? (PLATFORM_DISPLAY_NAMES[platform] || platform)
+      : lifecycle === 'now_in_cinemas'
+        ? 'In Cinemas'
+        : null;
+    const lifecycleLabel = lifecycle === 'upcoming'
+      ? 'Coming Soon'
+      : lifecycle === 'now_in_cinemas'
+        ? 'In Cinemas Now'
+        : lifecycle === 'now_streaming'
+          ? `Now Streaming on ${platformName || 'a verified platform'}`
+          : 'Film Spotlight';
+
+    return {
+      id: f.id,
+      type: 'movie' as const,
+      name: f.title,
+      subtext: `${lifecycleLabel}${f.year ? ` • ${f.year}` : ''}`,
+      imageUrl: f.poster_url,
+      completenessScore: f.poster_url ? 0.95 : 0.7,
+      category: lifecycleLabel,
+      data: {
+        ...f,
+        lifecycle,
+        lifecycleLabel,
+        platform,
+        platformDisplayName: platformName,
+        watchAvailability: lifecycleLabel,
+        coming_soon: lifecycle === 'upcoming',
+        editorialIntent: intent,
+        selectionReason: intent === 'streaming'
+          ? `${platformName || 'Verified platform'} availability and platform priority`
+          : lifecycle === 'upcoming'
+            ? 'Verified future release date'
+            : 'Eligible catalogue title',
+      },
+    };
+  });
 }
 
 /**
@@ -558,12 +518,13 @@ export async function searchCandidates(
 
   // 1. Search People
   if (type === 'all' || type === 'person') {
-    const { data: people } = await supabase
+    const { data: people, error: peopleError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, country, film_count, professions, bio, profile_completeness, instagram_url, twitter_url')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url')
       .ilike('name', `%${trimmed}%`)
-      .order('profile_completeness', { ascending: false })
+      .order('film_count', { ascending: false, nullsFirst: false })
       .limit(limit);
+    if (peopleError) throw peopleError;
 
     if (people && people.length > 0) {
       const enrichedPeople = await enrichPeopleCandidates(people);
@@ -572,11 +533,11 @@ export async function searchCandidates(
           id: p.id,
           type: 'person',
           name: p.name,
-          subtext: `${p.film_count || 0} credits • ${p.country || 'Nollywood'} • ${(p.professions || [])[0] || 'Talent'}`,
+          subtext: `${p.film_count || 0} credits • ${p.nationality || 'Nollywood'} • ${p.known_for_department || 'Talent'}`,
           imageUrl: p.photo_cutout_url || p.photo_url,
-          country: p.country,
-          category: (p.professions || [])[0] || 'Actor Spotlight',
-          completenessScore: p.profile_completeness || 0.8,
+          country: p.nationality,
+          category: p.known_for_department || 'Actor Spotlight',
+          completenessScore: p.bio ? 0.9 : 0.8,
           data: {
             ...p,
             handle: extractSocialHandle(p),

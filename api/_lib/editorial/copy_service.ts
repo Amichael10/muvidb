@@ -1,5 +1,6 @@
 import { generateAIContent, parseJSON } from '../ai_service.js';
 import type { FactPack } from './fact_pack_service';
+import { selectCaptionBankStarters } from './caption_bank.js';
 
 export interface EditorialAngle {
   id: string;
@@ -62,6 +63,40 @@ export async function generateEditorialCopy(
   chosenAngle: EditorialAngle,
   figmaTemplateKey = 'people-filmography'
 ): Promise<MultiPlatformCopy> {
+  const vaultCandidate = {
+    id: factPack.entity.id,
+    type: factPack.entity.type,
+    name: factPack.entity.name,
+    country: factPack.facts?.country,
+    data: {
+      ...factPack.facts,
+      platformDisplayName: factPack.watchLinks?.[0]?.distributor,
+      knownFor: (factPack.credits || []).map(credit => ({ title: credit.film || credit.name, year: credit.year })),
+      topCast: factPack.entity.type === 'movie'
+        ? (factPack.credits || []).filter(credit => credit.role === 'actor').map(credit => ({ name: credit.name }))
+        : [],
+      directors: factPack.entity.type === 'movie'
+        ? (factPack.credits || []).filter(credit => credit.role === 'director').map(credit => ({ name: credit.name }))
+        : [],
+      criticReview: factPack.reviews?.[0]
+        ? {
+            quote: factPack.reviews[0].quote,
+            rating: factPack.reviews[0].rating,
+            criticName: factPack.reviews[0].critic_name,
+            publication: factPack.reviews[0].publication,
+          }
+        : undefined,
+    },
+  };
+  const captionVault = selectCaptionBankStarters({
+    seriesSlug: figmaTemplateKey,
+    candidate: vaultCandidate,
+    limit: 8,
+  });
+  const captionVaultExamples = captionVault.starters.length
+    ? captionVault.starters.map((starter, index) => `${index + 1}. ${starter}`).join('\n')
+    : 'No fully verifiable starter is available. Write directly from the fact pack.';
+
   const prompt = `
 You are the lead editor for MuviDB, the premier African cinema database.
 Entity: ${factPack.entity.name}
@@ -71,10 +106,14 @@ Figma Template: ${figmaTemplateKey}
 FACT PACK (STRICT TRUTH SOURCE):
 ${JSON.stringify(factPack, null, 2)}
 
+APPROVED MUVIDB COPY VAULT STRUCTURES (${captionVault.category}):
+${captionVaultExamples}
+
 Instructions:
 Write informative, film-loving editorial copy.
 DO NOT use buzzwords ("thrilled", "banger", "legendary", "iconic").
 DO NOT make claims not supported by the FACT PACK.
+Use no more than one resolved Copy Vault structure per platform. Never introduce a placeholder or infer a missing metric, platform, date, credit, person, or venue.
 
 Return strict JSON object matching this schema:
 {
@@ -104,6 +143,9 @@ Return strict JSON object matching this schema:
     console.error('[generateEditorialCopy] Failed:', err);
   }
 
+  const fallbackStarter = captionVault.starters[0];
+  const fallbackLead = fallbackStarter ? `${fallbackStarter}\n\n` : '';
+
   // Fallback Copy Structure
   return {
     headline: `${factPack.entity.name}`,
@@ -118,12 +160,12 @@ Return strict JSON object matching this schema:
       })),
     },
     instagram: {
-      caption: `Exploring the career and credits of ${factPack.entity.name} on MuviDB.\n\nDiscover full filmographies, reviews, and showtimes at muvidb.com`,
+      caption: `${fallbackLead}Exploring the career and credits of ${factPack.entity.name} on MuviDB.\n\nDiscover full filmographies, reviews, and showtimes at muvidb.com`,
       cta: 'Link in bio to view full profile on MuviDB.',
       hashtags: ['#MuviDB', '#AfricanCinema', '#Nollywood'],
     },
     threads: {
-      text: `Exploring the credits of ${factPack.entity.name} on MuviDB. What is your favourite performance?`,
+      text: `${fallbackLead}Exploring the credits of ${factPack.entity.name} on MuviDB. What is your favourite performance?`.slice(0, 480).trim(),
     },
     x: {
       text: `Career spotlight: ${factPack.entity.name}. Full credits & profile on MuviDB: https://muvidb.com`,

@@ -137,6 +137,7 @@ export default function AutoPilotReviewModal({
       const slug = slot.social_content_series?.slug || '';
       let initialAngle = 'streaming_alert';
       if (slug.includes('critic')) initialAngle = 'critic_debate';
+      else if (slug.includes('upcoming') || slug.includes('announcement')) initialAngle = 'dynamic_story';
       else if (slug.includes('behind')) initialAngle = 'behind_the_film';
       else if (slug.includes('filmography') || initialCandidate?.type === 'person') initialAngle = 'discovery';
       else if (slug.includes('debate') || slug.includes('conversation')) initialAngle = 'audience_debate';
@@ -151,11 +152,13 @@ export default function AutoPilotReviewModal({
 
       // Load candidate pool for shuffle
       setLoadingCandidates(true);
-      fetch(`/api/social?task=slot_candidates&seriesSlug=${slug || 'filmography'}`, {
-        headers: { 'Content-Type': 'application/json' },
-      })
-        .then(res => res.json())
-        .then(data => {
+      const loadCandidatePool = async () => {
+        try {
+          const res = await fetch(`/api/social?task=slot_candidates&seriesSlug=${slug || 'filmography'}`, {
+            headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          });
+          const data = await res.json().catch(() => []);
+          if (!res.ok) throw new Error(data?.error || 'Candidate list could not be loaded');
           if (Array.isArray(data) && data.length) {
             setCandidatePool(data);
             const foundIdx = data.findIndex(c => c.id === initialCandidate?.id);
@@ -167,10 +170,17 @@ export default function AutoPilotReviewModal({
               setCustomImageUrl(autoCandidate.imageUrl || '');
               requestAICopy(autoCandidate, initialAngle);
             }
+          } else {
+            setCandidatePool([]);
           }
-        })
-        .catch(() => {})
-        .finally(() => setLoadingCandidates(false));
+        } catch (err) {
+          setCandidatePool([]);
+          toast.error(err.message || 'Candidate list could not be loaded');
+        } finally {
+          setLoadingCandidates(false);
+        }
+      };
+      loadCandidatePool();
     }
   }, [slot, isOpen]);
 

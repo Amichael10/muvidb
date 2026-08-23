@@ -1,5 +1,7 @@
 ﻿import { generateAIContent, parseJSON } from '../ai_service.js';
 
+import { selectCaptionBankStarters } from './caption_bank.js';
+
 export type SocialAngle =
   | 'streaming_alert'
   | 'discovery'
@@ -61,6 +63,17 @@ export type AICopyResponse = {
  * Returns specific rules for the active editorial series / content type
  */
 function getContentTypeInstructions(seriesSlug: string, isPerson: boolean): string {
+  if (seriesSlug.includes('upcoming') || seriesSlug.includes('coming_soon') || seriesSlug.includes('announcement')) {
+    return `
+CONTENT TYPE: VERIFIED UPCOMING RELEASE
+Goal: A precise release announcement, never a streaming claim.
+- State the film title and verified release date when supplied.
+- Use "coming soon" or "upcoming"; NEVER say "now streaming", "now showing", "available now", or name a viewing platform.
+- If no exact release date is supplied, say the title is upcoming without inventing a date.
+- Use synopsis, trailer, cast or crew facts only when supplied in source data.
+- Ask a specific question grounded in the film, not generic excitement.`;
+  }
+
   if (seriesSlug.includes('watch') || seriesSlug.includes('streaming') || seriesSlug === 'where_to_watch') {
     return `
 CONTENT TYPE: WHERE TO WATCH / STREAMING ALERT
@@ -207,7 +220,8 @@ function buildMuviDBPrompt(req: AICopyRequest): string {
   const year = data.year ? `${data.year}` : '';
   const releaseDate = data.release_date || '';
   const releaseType = data.release_type || '';
-  const platform = data.platformDisplayName || (data.streaming_links?.prime_video ? 'Prime Video' : data.streaming_links?.netflix ? 'Netflix' : data.is_in_cinemas ? 'Cinemas Nationwide' : (releaseType || 'Streaming Platforms'));
+  const lifecycle = data.lifecycle || (data.coming_soon ? 'upcoming' : 'unknown');
+  const platform = data.platformDisplayName || (data.streaming_links?.prime_video ? 'Prime Video' : data.streaming_links?.netflix ? 'Netflix' : data.is_in_cinemas ? 'Cinemas Nationwide' : (releaseType || (lifecycle === 'upcoming' ? 'Not announced' : 'Streaming Platforms')));
   const isCinemas = data.is_in_cinemas || false;
 
   const topCast = (data.topCast || []).map((c: any) => `${c.name}${c.handle ? ` (${c.handle})` : ''}`).join(', ');
@@ -222,6 +236,10 @@ function buildMuviDBPrompt(req: AICopyRequest): string {
 
   const contentTypeRules = getContentTypeInstructions(seriesSlug, isPerson);
   const angleRules = getAngleInstructions(angle);
+  const captionVault = selectCaptionBankStarters({ seriesSlug, candidate, limit: 8 });
+  const captionVaultExamples = captionVault.starters.length
+    ? captionVault.starters.map((starter, index) => `${index + 1}. ${starter}`).join('\n')
+    : 'No fully verifiable starter is available for this candidate. Write directly from source data.';
 
   return `You are the social copywriter for MuviDB (muvidb.com), the definitive discovery database and publication for African Cinema.
 You are NOT an influencer and you are NOT writing generic social media hype.
@@ -240,11 +258,20 @@ ${contentTypeRules}
 
 ${angleRules}
 
+APPROVED MUVIDB COPY VAULT STRUCTURES (${captionVault.category}):
+${captionVaultExamples}
+
+COPY VAULT RULES:
+- Use at most one starter structure per variation and adapt it naturally; do not paste several together.
+- Every value in these resolved starters came from the source candidate. Do not add a date, platform, metric, credit, quote, venue, or person that is absent from SOURCE DATA.
+- The starters are openings and structures, not permission to change the verified lifecycle.
+
 SOURCE DATA:
 - TITLE / SUBJECT: ${title} ${year ? `(${year})` : ''}
 - TYPE: ${isPerson ? 'Talent / Filmmaker' : 'Film / Stage'}
 - SERIES CONTEXT: ${seriesName}
 - PLATFORM / AVAILABILITY: ${platform} ${isCinemas ? '(In Cinemas)' : ''}
+- VERIFIED LIFECYCLE: ${lifecycle}
 - RELEASE DATE: ${releaseDate}
 - SYNOPSIS: ${synopsis}
 - TAGLINE: ${tagline}
@@ -317,6 +344,42 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
   const cleanTag = name.replace(/[^a-zA-Z0-9]/g, '');
   const synopsis = data.synopsis || candidate.subtext || '';
 
+  if (data.lifecycle === 'upcoming' || data.coming_soon) {
+    const releaseLine = data.release_date ? `Releases ${data.release_date}.` : 'Coming soon.';
+    return [
+      {
+        key: 'A',
+        label: 'Informative',
+        captions: {
+          instagram: `${name}${year} is upcoming.\n\n${releaseLine}${synopsis ? `\n\n${synopsis.slice(0, 180)}…` : ''}\n\nFollow the film on MuviDB for verified release information.\n\n#MuviDB #AfricanCinema #ComingSoon #${cleanTag}`,
+          threads: `${name}${year} is coming soon. ${releaseLine} Follow its release details on MuviDB. #AfricanCinema`,
+          facebook: `Upcoming release: ${name}${year}\n\n${releaseLine}${synopsis ? `\n\n${synopsis.slice(0, 200)}…` : ''}\n\nSee cast, crew and verified release information on MuviDB.`,
+          tiktok: `${name} is coming soon. Track the release on MuviDB. #AfricanCinema #ComingSoon #${cleanTag}`,
+        },
+      },
+      {
+        key: 'B',
+        label: 'Editorial',
+        captions: {
+          instagram: `${name}${year} is on the way.\n\n${synopsis ? `${synopsis.slice(0, 200)}…\n\n` : ''}${releaseLine}\n\nExplore the film and its credits on MuviDB.\n\n#MuviDB #AfricanCinema #ComingSoon #${cleanTag}`,
+          threads: `${name} is an upcoming African film. ${releaseLine} What part of its story has your attention? #MuviDB`,
+          facebook: `${name}${year} is upcoming. ${releaseLine}${synopsis ? `\n\n${synopsis.slice(0, 220)}…` : ''}\n\nExplore the project on MuviDB.`,
+          tiktok: `Upcoming: ${name}. ${releaseLine} #MuviDB #ComingSoon #${cleanTag}`,
+        },
+      },
+      {
+        key: 'C',
+        label: 'Conversational',
+        captions: {
+          instagram: `${name}${year} is coming soon.\n\n${synopsis ? `${synopsis.slice(0, 180)}…\n\n` : ''}What about this story has your attention?\n\n#MuviDB #AfricanCinema #ComingSoon #${cleanTag}`,
+          threads: `${name} is coming soon. What about the story has your attention so far? #MuviDB #AfricanCinema`,
+          facebook: `${name}${year} is an upcoming release. What are you most interested to learn about the film?\n\n${releaseLine}`,
+          tiktok: `${name} is coming soon. What do you want to know about it? #MuviDB #${cleanTag}`,
+        },
+      },
+    ];
+  }
+
   if (isPerson) {
     const known = (data.knownFor || []).slice(0, 3).map((k: any) => `🎬 ${k.title}${k.year ? ` (${k.year})` : ''}`).join('\n');
     return [
@@ -387,6 +450,52 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
   ];
 }
 
+function applyCaptionBankToFallback(variations: AICopyVariation[], req: AICopyRequest): AICopyVariation[] {
+  const { starters } = selectCaptionBankStarters({
+    seriesSlug: req.series?.slug || '',
+    candidate: req.candidate,
+    limit: 3,
+  });
+  if (!starters.length) return variations;
+
+  return variations.map((variation, index) => {
+    const starter = starters[index % starters.length];
+    const captions = Object.fromEntries(
+      Object.entries(variation.captions).map(([platform, caption]) => {
+        if (!caption || caption.toLowerCase().includes(starter.toLowerCase())) return [platform, caption];
+        const combined = `${starter}\n\n${caption}`;
+        return [platform, platform === 'threads' ? combined.slice(0, 480).trim() : combined];
+      }),
+    ) as PlatformCaptions;
+    return { ...variation, captions };
+  });
+}
+
+export function generateGroundedFallbackCaptions(req: AICopyRequest): AICopyVariation[] {
+  return applyCaptionBankToFallback(buildCleanFallbackVariations(req), req);
+}
+
+export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: AICopyVariation[]): boolean {
+  if (!variations.length) return false;
+  const lifecycle = req.candidate?.data?.lifecycle;
+  const seriesSlug = (req.series?.slug || '').toLowerCase();
+  const platform = req.candidate?.data?.platformDisplayName;
+  const allCaptions = variations.flatMap(variation => Object.values(variation.captions));
+
+  if (allCaptions.some(caption => /\[[^\]]+\]/.test(caption))) return false;
+  if (lifecycle === 'upcoming' && allCaptions.some(caption => /\b(now streaming|currently streaming|available now|now showing|in cinemas now)\b/i.test(caption))) {
+    return false;
+  }
+  if (lifecycle === 'now_streaming' && allCaptions.some(caption => /\b(coming soon|upcoming release|releases on)\b/i.test(caption))) {
+    return false;
+  }
+  if (seriesSlug === 'where_to_watch' && platform) {
+    const normalizedPlatform = String(platform).toLowerCase();
+    if (allCaptions.some(caption => !caption.toLowerCase().includes(normalizedPlatform))) return false;
+  }
+  return true;
+}
+
 /**
  * Generates 3 intelligent, brand-aligned copy variations using Cohere / AI fallback
  */
@@ -442,7 +551,7 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
       ];
     }
 
-    if (variations.length > 0) {
+    if (areGeneratedVariationsGrounded(req, variations)) {
       const primary = variations[0].captions;
       return {
         success: true,
@@ -459,7 +568,7 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
     console.warn('[social_copy_ai] AI generation failed, using clean MuviDB fallbacks:', (err as Error)?.message);
   }
 
-  const fallbackVars = buildCleanFallbackVariations(req);
+  const fallbackVars = generateGroundedFallbackCaptions(req);
   return {
     success: true,
     variations: fallbackVars,
