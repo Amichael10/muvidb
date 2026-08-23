@@ -479,61 +479,86 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
       const shortcode = match ? match[1] : '';
 
       try {
-        const cleanUrl = shortcode ? `https://www.instagram.com/p/${shortcode}/` : sourceUrl;
-        const res = await fetch(cleanUrl, {
+        const targetUrl = shortcode ? `https://www.instagram.com/p/${shortcode}/` : sourceUrl;
+        
+        // Strategy 1: Official Instagram Web oEmbed API with X-IG-App-ID
+        const oembedRes = await fetch(`https://www.instagram.com/api/v1/oembed/?url=${encodeURIComponent(targetUrl)}`, {
           headers: {
             'User-Agent':
-              'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'X-IG-App-ID': '936619743392459',
+            'Accept': 'application/json',
           },
-          signal: AbortSignal.timeout(6000),
+          signal: AbortSignal.timeout(5000),
         });
 
-        if (res.ok) {
-          const html = await res.text();
-          const ogTitle =
-            html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] ||
-            html.match(/content="([^"]*)"\s+property="og:title"/i)?.[1];
-          const ogDesc =
-            html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] ||
-            html.match(/<meta name="description" content="([^"]*)"/i)?.[1] ||
-            html.match(/content="([^"]*)"\s+property="og:description"/i)?.[1];
-          const ogImg =
-            html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1] ||
-            html.match(/content="([^"]*)"\s+property="og:image"/i)?.[1];
-          const ogVid =
-            html.match(/<meta property="og:video(?::secure_url)?" content="([^"]*)"/i)?.[1] ||
-            html.match(/content="([^"]*)"\s+property="og:video(?::secure_url)?"/i)?.[1];
-
-          if (ogImg) {
-            imageUrl = cleanInstagramImageUrl(ogImg);
+        if (oembedRes.ok) {
+          const oembedData = await oembedRes.json();
+          if (oembedData.title) {
+            description = decodeHtmlEntities(oembedData.title.trim());
           }
-
-          if (ogVid) {
-            videoUrl = ogVid.replace(/&amp;/g, '&');
+          if (oembedData.author_name) {
+            authorName = oembedData.author_name.trim();
           }
+          if (oembedData.thumbnail_url) {
+            imageUrl = oembedData.thumbnail_url;
+          }
+        }
 
-          if (ogTitle) {
-            const decodedTitle = decodeHtmlEntities(ogTitle);
-            const authorMatch =
-              decodedTitle.match(/^([^:]+?)\s+on\s+Instagram/i) || decodedTitle.match(/^(.+?)\s*:\s*"/);
-            if (authorMatch) authorName = authorMatch[1].trim();
+        // Strategy 2: HTML scrape fallback if needed
+        if (!imageUrl || !description || description === rawText) {
+          const res = await fetch(targetUrl, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+            signal: AbortSignal.timeout(5000),
+          });
 
-            const captionQuoteMatch =
-              decodedTitle.match(/on\s+Instagram:\s*"([\s\S]*)"/i) || decodedTitle.match(/:\s*"([\s\S]*)"/i);
-            if (captionQuoteMatch && captionQuoteMatch[1]?.trim()) {
-              description = decodeHtmlEntities(captionQuoteMatch[1].trim());
+          if (res.ok) {
+            const html = await res.text();
+            const ogTitle =
+              html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] ||
+              html.match(/content="([^"]*)"\s+property="og:title"/i)?.[1];
+            const ogDesc =
+              html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] ||
+              html.match(/<meta name="description" content="([^"]*)"/i)?.[1] ||
+              html.match(/content="([^"]*)"\s+property="og:description"/i)?.[1];
+            const ogImg =
+              html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1] ||
+              html.match(/content="([^"]*)"\s+property="og:image"/i)?.[1];
+            const ogVid =
+              html.match(/<meta property="og:video(?::secure_url)?" content="([^"]*)"/i)?.[1] ||
+              html.match(/content="([^"]*)"\s+property="og:video(?::secure_url)?"/i)?.[1];
+
+            if (!imageUrl && ogImg) {
+              imageUrl = ogImg.replace(/&amp;/g, '&');
             }
-          }
 
-          if ((!description || description === rawText) && ogDesc) {
-            const decodedDesc = decodeHtmlEntities(ogDesc);
-            const descQuoteMatch = decodedDesc.match(/:\s*"([\s\S]*)"/i);
-            if (descQuoteMatch && descQuoteMatch[1]?.trim()) {
-              description = descQuoteMatch[1].trim();
-            } else if (!decodedDesc.startsWith('Instagram') && decodedDesc.length > 20) {
-              description = decodedDesc;
+            if (ogVid) {
+              videoUrl = ogVid.replace(/&amp;/g, '&');
+            }
+
+            if (!description || description === rawText) {
+              if (ogTitle) {
+                const decodedTitle = decodeHtmlEntities(ogTitle);
+                const captionQuoteMatch =
+                  decodedTitle.match(/on\s+Instagram:\s*"([\s\S]*)"/i) || decodedTitle.match(/:\s*"([\s\S]*)"/i);
+                if (captionQuoteMatch && captionQuoteMatch[1]?.trim()) {
+                  description = decodeHtmlEntities(captionQuoteMatch[1].trim());
+                }
+              }
+              if ((!description || description === rawText) && ogDesc) {
+                const decodedDesc = decodeHtmlEntities(ogDesc);
+                const descQuoteMatch = decodedDesc.match(/:\s*"([\s\S]*)"/i);
+                if (descQuoteMatch && descQuoteMatch[1]?.trim()) {
+                  description = descQuoteMatch[1].trim();
+                } else if (!decodedDesc.startsWith('Instagram') && decodedDesc.length > 20) {
+                  description = decodedDesc;
+                }
+              }
             }
           }
         }
