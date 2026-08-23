@@ -259,16 +259,16 @@ export default function Browse() {
               <div className="space-y-1 pr-2">
                 <div className="flex items-center gap-2">
                   <span className="flex h-2 w-2 rounded-full bg-brand animate-pulse" />
-                  <p className="text-text-primary text-xs sm:text-sm font-bold">Something missing?</p>
+                  <p className="text-text-primary text-xs sm:text-sm font-bold">Know a missing movie?</p>
                 </div>
-                <p className="text-text-muted text-[11px] sm:text-xs">Send us the film and an editor will review it.</p>
+                <p className="text-text-muted text-[11px] sm:text-xs">Add title details, cast credits, or streaming links.</p>
               </div>
               <Link
-                to="/submit"
+                to="/submit/film"
                 className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-white transition-all hover:opacity-90 active:scale-95 shadow-md shadow-brand/20 whitespace-nowrap flex-shrink-0"
               >
                 <Icon icon="solar:clapperboard-add-bold" width="15" />
-                <span>Add to MuviDB</span>
+                <span>Submit Movie</span>
               </Link>
             </div>
           </div>

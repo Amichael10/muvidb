@@ -1006,7 +1006,7 @@ const PeopleList = () => {
             <div className="space-y-1 pr-2">
               <div className="flex items-center gap-2">
                 <span className="flex h-2 w-2 rounded-full bg-brand animate-pulse" />
-                <p className="text-text-primary text-xs sm:text-sm font-bold">Missing a profile?</p>
+                <p className="text-text-primary text-xs sm:text-sm font-bold">Know a missing filmmaker?</p>
               </div>
               <p className="text-text-muted text-[11px] sm:text-xs">Suggest an actor, director, or crew member.</p>
             </div>
