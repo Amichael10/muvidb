@@ -19,6 +19,7 @@ import {
 } from './ip_blocklist.js';
 import { recentHitsForIp, topHitters } from './scrape_guard.js';
 import { supabase } from './supabase.js';
+import { generateAIContent } from './ai_service.js';
 
 const IP_RE = /^(?:\d{1,3}\.){3}\d{1,3}$|^(?:[a-fA-F0-9:]+)$/;
 
@@ -255,6 +256,157 @@ async function handleCallback(query: any) {
     return;
   }
 
+  if (data.startsWith('intake_draft:')) {
+    const eventId = data.slice('intake_draft:'.length).trim();
+    const { data: event, error: evErr } = await supabase
+      .from('social_news_events')
+      .select('*')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (evErr || !event) {
+      await answerTelegramCallback(callbackId, 'Event not found');
+      return;
+    }
+
+    await answerTelegramCallback(callbackId, '🎨 Generating draft with AI...');
+    if (chatId) await reply(chatId, '⏳ Crafting social media headline, angle, and captions with AI...');
+
+    try {
+      const prompt = `You are the lead social media editor for MuviDB, the premier Nollywood and African cinema database.
+Based on this intake item:
+Title: ${event.title}
+Source URL: ${event.source_url || 'N/A'}
+Content/Context: ${event.description}
+
+Generate a high-converting, engaging social media pack for MuviDB:
+1. headline: Punchy, exciting, cinema-focused headline (max 10 words)
+2. angle: Why fans or the industry care (1-2 sentences)
+3. instagram_caption: An engaging storytelling caption with 5-8 relevant hashtags like #Nollywood #AfricanCinema #MuviDB
+4. x_post: Punchy Twitter/X post under 250 characters with emojis
+
+Respond ONLY with a valid JSON object matching this schema:
+{
+  "headline": "...",
+  "angle": "...",
+  "instagram_caption": "...",
+  "x_post": "..."
+}`;
+
+      const aiRes = await generateAIContent(prompt);
+      let aiJson: any = {};
+      try {
+        const cleaned = (aiRes.text || '').replace(/```json/g, '').replace(/```/g, '').trim();
+        aiJson = JSON.parse(cleaned);
+      } catch {
+        aiJson = {
+          headline: event.title,
+          angle: event.description.slice(0, 150),
+          instagram_caption: `${event.description}\n\n#Nollywood #AfricanCinema #MuviDB`,
+          x_post: event.title,
+        };
+      }
+
+      const { data: draft, error: draftErr } = await supabase
+        .from('social_drafts')
+        .insert({
+          status: 'draft',
+          angle_json: {
+            id: 1,
+            title: aiJson.headline || event.title,
+            reason: aiJson.angle || event.description,
+            confidence: 'High',
+          },
+          content_json: {
+            headline: aiJson.headline || event.title,
+            subheadline: aiJson.angle || '',
+            instagram: { caption: aiJson.instagram_caption || '' },
+            x: { post: aiJson.x_post || '' },
+            threads: { post: aiJson.x_post || '' },
+          },
+          figma_template_key: 'breaking_news',
+        })
+        .select('id')
+        .single();
+
+      if (draftErr) throw draftErr;
+
+      await supabase
+        .from('social_news_events')
+        .update({ status: 'converted_to_draft', draft_id: draft.id })
+        .eq('id', eventId);
+
+      const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+      const studioUrl = `${site}/admin/social-studio`;
+
+      const responseText = [
+        '✨ Social Draft Created!',
+        '',
+        `📌 *Headline:* ${aiJson.headline || event.title}`,
+        `💡 *Angle:* ${aiJson.angle || 'Latest Nollywood Update'}`,
+        '',
+        '📱 *Instagram Caption:*',
+        aiJson.instagram_caption || '',
+        '',
+        '🧵 *Threads / X Post:*',
+        aiJson.x_post || '',
+      ].join('\n');
+
+      if (chatId) {
+        await sendTelegramMessage({
+          text: responseText,
+          chatId: String(chatId),
+          replyMarkup: {
+            inline_keyboard: [
+              [{ text: '🎨 Open in Social Studio', url: studioUrl }],
+            ],
+          },
+        });
+      }
+    } catch (e: any) {
+      if (chatId) await reply(chatId, `⚠️ AI Draft generation failed: ${e.message}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('intake_news:')) {
+    const eventId = data.slice('intake_news:'.length).trim();
+    await supabase.from('social_news_events').update({ status: 'reviewed' }).eq('id', eventId);
+    await answerTelegramCallback(callbackId, '✅ Saved to News Opportunities');
+    if (chatId) {
+      const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+      await sendTelegramMessage({
+        text: '📰 Added to the Content & News Opportunities queue in Social Studio.',
+        chatId: String(chatId),
+        replyMarkup: {
+          inline_keyboard: [[{ text: '🌐 View in Social Studio', url: `${site}/admin/social-studio` }]],
+        },
+      });
+    }
+    return;
+  }
+
+  if (data.startsWith('intake_credits:')) {
+    const eventId = data.slice('intake_credits:'.length).trim();
+    const { data: event } = await supabase.from('social_news_events').select('*').eq('id', eventId).maybeSingle();
+    await answerTelegramCallback(callbackId, 'Extracting cast & crew...');
+    if (chatId) await reply(chatId, '🔍 Scanning text for Nollywood cast, director, and film references with AI...');
+
+    try {
+      const prompt = `Extract all movie titles, actor names, directors, producers, and character roles mentioned in this text:
+"${event?.description || event?.title || ''}"
+
+Return a clear markdown list of discovered films and people with their respective roles.`;
+      const res = await generateAIContent(prompt);
+      if (chatId) {
+        await reply(chatId, `🎭 Extracted Credits & Names:\n\n${res.text || 'No specific cast/crew names identified.'}`);
+      }
+    } catch (e: any) {
+      if (chatId) await reply(chatId, `⚠️ Credit extraction failed: ${e.message}`);
+    }
+    return;
+  }
+
   if (data.startsWith('ignore:')) {
     const ip = data.slice('ignore:'.length).trim();
     // Stretch cooldown so we don't re-alert for 30m
@@ -272,6 +424,87 @@ async function handleCallback(query: any) {
   await answerTelegramCallback(callbackId, 'Unknown action');
 }
 
+async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) {
+  let title = '';
+  let description = rawText || '';
+  let platformLabel = 'Direct Submission';
+  let eventType = 'manual';
+  let authorName: string | null = null;
+
+  if (sourceUrl) {
+    if (/instagram\.com/i.test(sourceUrl)) {
+      eventType = 'instagram_post';
+      platformLabel = 'Instagram';
+      const match = sourceUrl.match(/instagram\.com\/(?:p|reel|tv)\/([^/?#&]+)/i);
+      const shortcode = match ? match[1] : '';
+      authorName = sourceUrl.match(/instagram\.com\/([^/?#&]+)/i)?.[1] || null;
+      if (['p', 'reel', 'tv', 'stories', 'explore'].includes(authorName || '')) authorName = null;
+
+      title = authorName ? `@${authorName} on Instagram` : (shortcode ? `Instagram Post (${shortcode})` : 'Instagram Post');
+      const cleanText = rawText.replace(sourceUrl, '').trim();
+      if (cleanText) {
+        description = cleanText;
+      } else {
+        description = `Instagram Post / Reel: ${sourceUrl}`;
+      }
+    } else if (/youtube\.com|youtu\.be/i.test(sourceUrl)) {
+      eventType = 'youtube_video';
+      platformLabel = 'YouTube';
+      try {
+        const oembed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`).then((r) => r.json());
+        if (oembed) {
+          title = oembed.title || 'YouTube Video';
+          authorName = oembed.author_name || null;
+        }
+      } catch {}
+      if (!title) title = 'YouTube Video';
+    } else if (/twitter\.com|x\.com/i.test(sourceUrl)) {
+      eventType = 'x_post';
+      platformLabel = 'X / Twitter';
+      try {
+        const oembed = await fetch(`https://publish.twitter.com/oembed?url=${encodeURIComponent(sourceUrl)}`).then((r) => r.json());
+        if (oembed) {
+          authorName = oembed.author_name || null;
+          const tweetText = (oembed.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          title = authorName ? `Post by ${authorName}` : 'X / Twitter Post';
+          if (tweetText) description = tweetText;
+        }
+      } catch {}
+      if (!title) title = 'X / Twitter Post';
+    } else if (/tiktok\.com/i.test(sourceUrl)) {
+      eventType = 'tiktok_post';
+      platformLabel = 'TikTok';
+      title = 'TikTok Video';
+    } else {
+      eventType = 'web_link';
+      platformLabel = 'Web Article';
+      try {
+        const res = await fetch(sourceUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; MuviDBBot/1.0; +https://muvidb.com)',
+            'Accept': 'text/html,application/xhtml+xml',
+          },
+          signal: AbortSignal.timeout(4000),
+        });
+        if (res.ok) {
+          const html = await res.text();
+          const ogTitle = html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] || html.match(/<title>([^<]*)<\/title>/i)?.[1];
+          const ogDesc = html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] || html.match(/<meta name="description" content="([^"]*)"/i)?.[1];
+          if (ogTitle) title = ogTitle.trim();
+          if (ogDesc) description = ogDesc.trim();
+        }
+      } catch {}
+      if (!title) title = 'Web Article';
+    }
+  }
+
+  if (!title) {
+    title = rawText.slice(0, 80).split('\n')[0] || 'Direct Note';
+  }
+
+  return { eventType, platformLabel, title, description, authorName };
+}
+
 async function handleSocialIntake(chatId: string | number, message: any) {
   const text = String(message.text || message.caption || '').trim();
   const photo = Array.isArray(message.photo) && message.photo.length > 0
@@ -282,38 +515,18 @@ async function handleSocialIntake(chatId: string | number, message: any) {
   const urlMatch = text.match(/https?:\/\/[^\s]+/i);
   const sourceUrl = urlMatch ? urlMatch[0] : null;
 
-  let eventType = 'manual';
-  let platformLabel = 'Direct Note';
+  const meta = await resolveIntakeMetadata(sourceUrl, text);
 
-  if (sourceUrl) {
-    if (/instagram\.com/i.test(sourceUrl)) {
-      eventType = 'instagram_post';
-      platformLabel = 'Instagram';
-    } else if (/youtube\.com|youtu\.be/i.test(sourceUrl)) {
-      eventType = 'youtube_video';
-      platformLabel = 'YouTube';
-    } else if (/twitter\.com|x\.com/i.test(sourceUrl)) {
-      eventType = 'x_post';
-      platformLabel = 'X / Twitter';
-    } else if (/tiktok\.com/i.test(sourceUrl)) {
-      eventType = 'tiktok_post';
-      platformLabel = 'TikTok';
-    } else {
-      eventType = 'web_link';
-      platformLabel = 'Web Article';
-    }
-  } else if (photo) {
-    eventType = 'image_upload';
-    platformLabel = 'Photo / Screenshot';
+  if (photo && !sourceUrl) {
+    meta.eventType = 'image_upload';
+    meta.platformLabel = 'Photo / Screenshot';
+    if (!text) meta.title = 'Photo forwarded from Telegram';
   }
 
-  const title = text.slice(0, 100).split('\n')[0] || (photo ? 'Photo submission from Telegram' : 'Telegram Intake');
-  const description = text || (photo ? 'Image forwarded via Telegram bot' : '');
-
-  const { error } = await supabase.from('social_news_events').insert({
-    event_type: eventType,
-    title: title.slice(0, 200),
-    description,
+  const { data: newEvent, error } = await supabase.from('social_news_events').insert({
+    event_type: meta.eventType,
+    title: meta.title.slice(0, 200),
+    description: meta.description || text || (photo ? 'Photo forwarded via Telegram' : ''),
     source_type: 'telegram_bot',
     source_url: sourceUrl,
     urgency: 'high',
@@ -325,37 +538,51 @@ async function handleSocialIntake(chatId: string | number, message: any) {
       has_photo: Boolean(photo),
       photo_file_id: photo?.file_id || null,
       raw_text: text,
+      author_name: meta.authorName,
       received_at: new Date().toISOString(),
     },
-  });
+  }).select('id').single();
 
-  if (error) {
-    console.error('[telegram_social_intake] DB insert failed:', error.message);
-    await reply(chatId, `⚠️ Failed to save intake to Social Studio: ${error.message}`);
+  if (error || !newEvent) {
+    console.error('[telegram_social_intake] DB insert failed:', error?.message);
+    await reply(chatId, `⚠️ Failed to save intake: ${error?.message || 'DB error'}`);
     return;
   }
 
   const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
   const adminUrl = `${site}/admin/social-studio`;
 
-  const replyMsg = [
-    '📥 Saved to Social Studio!',
+  const snippet = meta.description.length > 140 ? meta.description.slice(0, 140) + '…' : meta.description;
+
+  const promptMsg = [
+    `📥 *New Intake Received!*`,
     '',
-    `🏷️ Source: ${platformLabel}`,
-    sourceUrl ? `🔗 Link: ${sourceUrl}` : null,
-    text ? `📝 Text: "${text.length > 120 ? text.slice(0, 120) + '…' : text}"` : null,
-    photo ? '🖼️ Photo attached: Yes' : null,
+    `🏷️ *Source:* ${meta.platformLabel}`,
+    `📌 *Title:* ${meta.title}`,
+    meta.authorName ? `👤 *Account:* ${meta.authorName}` : null,
+    snippet ? `📝 *Content:* "${snippet}"` : null,
+    sourceUrl ? `🔗 *Link:* ${sourceUrl}` : null,
+    photo ? '🖼️ *Photo Attached:* Yes' : null,
     '',
-    '✅ Added to the Content & News Opportunities Queue for draft generation.',
+    '👇 *What would you like to do with this?*',
   ].filter(Boolean).join('\n');
 
   await sendTelegramMessage({
-    text: replyMsg,
+    text: promptMsg,
     chatId: String(chatId),
     disablePreview: false,
     replyMarkup: {
       inline_keyboard: [
-        [{ text: '🎨 Open Social Studio', url: adminUrl }],
+        [
+          { text: '🎨 Create Social Graphic Draft', callback_data: `intake_draft:${newEvent.id}` },
+        ],
+        [
+          { text: '📰 Add to News Opportunities', callback_data: `intake_news:${newEvent.id}` },
+          { text: '🎭 Extract Credits', callback_data: `intake_credits:${newEvent.id}` },
+        ],
+        [
+          { text: '🌐 Open Social Studio', url: adminUrl },
+        ],
       ],
     },
   });
