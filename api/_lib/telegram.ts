@@ -53,6 +53,71 @@ export async function sendTelegramMessage(
   }
 }
 
+export type TelegramPhotoOpts = {
+  photo: string;
+  caption?: string;
+  chatId?: string;
+  replyMarkup?: { inline_keyboard: TelegramInlineButton[][] };
+};
+
+export async function sendTelegramPhoto(
+  photoOrOpts: string | TelegramPhotoOpts,
+  caption?: string,
+  replyMarkup?: { inline_keyboard: TelegramInlineButton[][] },
+  chatId?: string,
+): Promise<{ ok: boolean; error?: string; messageId?: number }> {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const defaultChatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+  if (!token || !defaultChatId) {
+    return { ok: false, error: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set' };
+  }
+
+  const opts: TelegramPhotoOpts =
+    typeof photoOrOpts === 'string'
+      ? { photo: photoOrOpts, caption, replyMarkup, chatId }
+      : photoOrOpts;
+
+  const targetChatId = (opts.chatId || defaultChatId).trim();
+  if (!targetChatId) return { ok: false, error: 'chat id missing' };
+
+  try {
+    const body: Record<string, unknown> = {
+      chat_id: targetChatId,
+      photo: opts.photo,
+    };
+    if (opts.caption) body.caption = opts.caption.slice(0, 1024);
+    if (opts.replyMarkup) body.reply_markup = opts.replyMarkup;
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      // If photo failed (e.g. invalid URL), fallback to message
+      if (opts.caption) {
+        return sendTelegramMessage({
+          text: opts.caption,
+          chatId: targetChatId,
+          replyMarkup: opts.replyMarkup,
+        });
+      }
+      return { ok: false, error: json?.description || `HTTP ${res.status}` };
+    }
+    return { ok: true, messageId: json.result?.message_id };
+  } catch (e: any) {
+    if (opts.caption) {
+      return sendTelegramMessage({
+        text: opts.caption,
+        chatId: targetChatId,
+        replyMarkup: opts.replyMarkup,
+      });
+    }
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 export async function answerTelegramCallback(
   callbackQueryId: string,
   text?: string,

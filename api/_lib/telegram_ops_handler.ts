@@ -7,6 +7,7 @@ import {
   answerTelegramCallback,
   isAllowedOpsChat,
   sendTelegramMessage,
+  sendTelegramPhoto,
   telegramConfigured,
 } from './telegram.js';
 import {
@@ -424,12 +425,39 @@ Return a clear markdown list of discovered films and people with their respectiv
   await answerTelegramCallback(callbackId, 'Unknown action');
 }
 
+function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#064;/g, '@')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+      try {
+        return String.fromCodePoint(parseInt(hex, 16));
+      } catch {
+        return '';
+      }
+    })
+    .replace(/&#([0-9]+);/g, (_, dec) => {
+      try {
+        return String.fromCodePoint(parseInt(dec, 10));
+      } catch {
+        return '';
+      }
+    });
+}
+
 async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) {
   let title = '';
   let description = rawText || '';
   let platformLabel = 'Direct Submission';
   let eventType = 'manual';
   let authorName: string | null = null;
+  let imageUrl: string | null = null;
 
   if (sourceUrl) {
     if (/instagram\.com/i.test(sourceUrl)) {
@@ -437,24 +465,84 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
       platformLabel = 'Instagram';
       const match = sourceUrl.match(/instagram\.com\/(?:p|reel|tv)\/([^/?#&]+)/i);
       const shortcode = match ? match[1] : '';
-      authorName = sourceUrl.match(/instagram\.com\/([^/?#&]+)/i)?.[1] || null;
-      if (['p', 'reel', 'tv', 'stories', 'explore'].includes(authorName || '')) authorName = null;
 
-      title = authorName ? `@${authorName} on Instagram` : (shortcode ? `Instagram Post (${shortcode})` : 'Instagram Post');
-      const cleanText = rawText.replace(sourceUrl, '').trim();
-      if (cleanText) {
-        description = cleanText;
-      } else {
-        description = `Instagram Post / Reel: ${sourceUrl}`;
+      try {
+        const cleanUrl = shortcode ? `https://www.instagram.com/p/${shortcode}/` : sourceUrl;
+        const res = await fetch(cleanUrl, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+          signal: AbortSignal.timeout(6000),
+        });
+
+        if (res.ok) {
+          const html = await res.text();
+          const ogTitle =
+            html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] ||
+            html.match(/content="([^"]*)"\s+property="og:title"/i)?.[1];
+          const ogDesc =
+            html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] ||
+            html.match(/<meta name="description" content="([^"]*)"/i)?.[1] ||
+            html.match(/content="([^"]*)"\s+property="og:description"/i)?.[1];
+          const ogImg =
+            html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1] ||
+            html.match(/content="([^"]*)"\s+property="og:image"/i)?.[1];
+
+          if (ogImg) {
+            imageUrl = ogImg.replace(/&amp;/g, '&');
+          }
+
+          if (ogTitle) {
+            const decodedTitle = decodeHtmlEntities(ogTitle);
+            const authorMatch =
+              decodedTitle.match(/^([^:]+?)\s+on\s+Instagram/i) || decodedTitle.match(/^(.+?)\s*:\s*"/);
+            if (authorMatch) authorName = authorMatch[1].trim();
+
+            const captionQuoteMatch =
+              decodedTitle.match(/on\s+Instagram:\s*"([\s\S]*)"/i) || decodedTitle.match(/:\s*"([\s\S]*)"/i);
+            if (captionQuoteMatch && captionQuoteMatch[1]?.trim()) {
+              description = decodeHtmlEntities(captionQuoteMatch[1].trim());
+            }
+          }
+
+          if ((!description || description === rawText) && ogDesc) {
+            const decodedDesc = decodeHtmlEntities(ogDesc);
+            const descQuoteMatch = decodedDesc.match(/:\s*"([\s\S]*)"/i);
+            if (descQuoteMatch && descQuoteMatch[1]?.trim()) {
+              description = descQuoteMatch[1].trim();
+            } else if (!decodedDesc.startsWith('Instagram') && decodedDesc.length > 20) {
+              description = decodedDesc;
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('[resolveIntakeMetadata] Instagram scrape warning:', err.message);
       }
+
+      if (!authorName) {
+        authorName = sourceUrl.match(/instagram\.com\/([^/?#&]+)/i)?.[1] || null;
+        if (['p', 'reel', 'tv', 'stories', 'explore'].includes(authorName || '')) authorName = null;
+      }
+
+      title = authorName
+        ? `${authorName} on Instagram`
+        : shortcode
+          ? `Instagram Post (${shortcode})`
+          : 'Instagram Post';
     } else if (/youtube\.com|youtu\.be/i.test(sourceUrl)) {
       eventType = 'youtube_video';
       platformLabel = 'YouTube';
       try {
-        const oembed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`).then((r) => r.json());
+        const oembed = await fetch(
+          `https://www.youtube.com/oembed?url=${encodeURIComponent(sourceUrl)}&format=json`,
+        ).then((r) => r.json());
         if (oembed) {
           title = oembed.title || 'YouTube Video';
           authorName = oembed.author_name || null;
+          imageUrl = oembed.thumbnail_url || null;
         }
       } catch {}
       if (!title) title = 'YouTube Video';
@@ -462,12 +550,14 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
       eventType = 'x_post';
       platformLabel = 'X / Twitter';
       try {
-        const oembed = await fetch(`https://publish.twitter.com/oembed?url=${encodeURIComponent(sourceUrl)}`).then((r) => r.json());
+        const oembed = await fetch(
+          `https://publish.twitter.com/oembed?url=${encodeURIComponent(sourceUrl)}`,
+        ).then((r) => r.json());
         if (oembed) {
           authorName = oembed.author_name || null;
           const tweetText = (oembed.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
           title = authorName ? `Post by ${authorName}` : 'X / Twitter Post';
-          if (tweetText) description = tweetText;
+          if (tweetText) description = decodeHtmlEntities(tweetText);
         }
       } catch {}
       if (!title) title = 'X / Twitter Post';
@@ -484,14 +574,20 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
             'User-Agent': 'Mozilla/5.0 (compatible; MuviDBBot/1.0; +https://muvidb.com)',
             'Accept': 'text/html,application/xhtml+xml',
           },
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(5000),
         });
         if (res.ok) {
           const html = await res.text();
-          const ogTitle = html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] || html.match(/<title>([^<]*)<\/title>/i)?.[1];
-          const ogDesc = html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] || html.match(/<meta name="description" content="([^"]*)"/i)?.[1];
-          if (ogTitle) title = ogTitle.trim();
-          if (ogDesc) description = ogDesc.trim();
+          const ogTitle =
+            html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] ||
+            html.match(/<title>([^<]*)<\/title>/i)?.[1];
+          const ogDesc =
+            html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] ||
+            html.match(/<meta name="description" content="([^"]*)"/i)?.[1];
+          const ogImg = html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1];
+          if (ogTitle) title = decodeHtmlEntities(ogTitle.trim());
+          if (ogDesc) description = decodeHtmlEntities(ogDesc.trim());
+          if (ogImg) imageUrl = ogImg.trim();
         }
       } catch {}
       if (!title) title = 'Web Article';
@@ -502,7 +598,7 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
     title = rawText.slice(0, 80).split('\n')[0] || 'Direct Note';
   }
 
-  return { eventType, platformLabel, title, description, authorName };
+  return { eventType, platformLabel, title, description, authorName, imageUrl };
 }
 
 async function handleSocialIntake(chatId: string | number, message: any) {
@@ -523,25 +619,30 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     if (!text) meta.title = 'Photo forwarded from Telegram';
   }
 
-  const { data: newEvent, error } = await supabase.from('social_news_events').insert({
-    event_type: meta.eventType,
-    title: meta.title.slice(0, 200),
-    description: meta.description || text || (photo ? 'Photo forwarded via Telegram' : ''),
-    source_type: 'telegram_bot',
-    source_url: sourceUrl,
-    urgency: 'high',
-    status: 'new',
-    metadata: {
-      telegram_message_id: message.message_id,
-      from_user: message.from?.username || message.from?.first_name || 'Admin',
-      forward_from: message.forward_from?.username || message.forward_from_chat?.title || null,
-      has_photo: Boolean(photo),
-      photo_file_id: photo?.file_id || null,
-      raw_text: text,
-      author_name: meta.authorName,
-      received_at: new Date().toISOString(),
-    },
-  }).select('id').single();
+  const { data: newEvent, error } = await supabase
+    .from('social_news_events')
+    .insert({
+      event_type: meta.eventType,
+      title: meta.title.slice(0, 200),
+      description: meta.description || text || (photo ? 'Photo forwarded via Telegram' : ''),
+      source_type: 'telegram_bot',
+      source_url: sourceUrl,
+      urgency: 'high',
+      status: 'new',
+      metadata: {
+        telegram_message_id: message.message_id,
+        from_user: message.from?.username || message.from?.first_name || 'Admin',
+        forward_from: message.forward_from?.username || message.forward_from_chat?.title || null,
+        has_photo: Boolean(photo),
+        photo_file_id: photo?.file_id || null,
+        image_url: meta.imageUrl,
+        raw_text: text,
+        author_name: meta.authorName,
+        received_at: new Date().toISOString(),
+      },
+    })
+    .select('id')
+    .single();
 
   if (error || !newEvent) {
     console.error('[telegram_social_intake] DB insert failed:', error?.message);
@@ -552,40 +653,45 @@ async function handleSocialIntake(chatId: string | number, message: any) {
   const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
   const adminUrl = `${site}/admin/social-studio`;
 
-  const snippet = meta.description.length > 140 ? meta.description.slice(0, 140) + '…' : meta.description;
+  const snippet = meta.description.length > 300 ? meta.description.slice(0, 300) + '…' : meta.description;
 
   const promptMsg = [
-    `📥 *New Intake Received!*`,
+    `📥 *New ${meta.platformLabel} Post Captured!*`,
     '',
-    `🏷️ *Source:* ${meta.platformLabel}`,
     `📌 *Title:* ${meta.title}`,
     meta.authorName ? `👤 *Account:* ${meta.authorName}` : null,
-    snippet ? `📝 *Content:* "${snippet}"` : null,
+    snippet ? `📝 *Caption:* "${snippet}"` : null,
     sourceUrl ? `🔗 *Link:* ${sourceUrl}` : null,
-    photo ? '🖼️ *Photo Attached:* Yes' : null,
     '',
     '👇 *What would you like to do with this?*',
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
-  await sendTelegramMessage({
-    text: promptMsg,
-    chatId: String(chatId),
-    disablePreview: false,
-    replyMarkup: {
-      inline_keyboard: [
-        [
-          { text: '🎨 Create Social Graphic Draft', callback_data: `intake_draft:${newEvent.id}` },
-        ],
-        [
-          { text: '📰 Add to News Opportunities', callback_data: `intake_news:${newEvent.id}` },
-          { text: '🎭 Extract Credits', callback_data: `intake_credits:${newEvent.id}` },
-        ],
-        [
-          { text: '🌐 Open Social Studio', url: adminUrl },
-        ],
-      ],
-    },
-  });
+  const inlineKeyboard = [
+    [{ text: '🎨 Create Social Graphic Draft', callback_data: `intake_draft:${newEvent.id}` }],
+    [
+      { text: '📰 Add to News Opportunities', callback_data: `intake_news:${newEvent.id}` },
+      { text: '🎭 Extract Credits', callback_data: `intake_credits:${newEvent.id}` },
+    ],
+    [{ text: '🌐 Open Social Studio', url: adminUrl }],
+  ];
+
+  if (meta.imageUrl) {
+    await sendTelegramPhoto({
+      photo: meta.imageUrl,
+      caption: promptMsg,
+      chatId: String(chatId),
+      replyMarkup: { inline_keyboard: inlineKeyboard },
+    });
+  } else {
+    await sendTelegramMessage({
+      text: promptMsg,
+      chatId: String(chatId),
+      disablePreview: false,
+      replyMarkup: { inline_keyboard: inlineKeyboard },
+    });
+  }
 }
 
 export async function handleTelegramOps(req: VercelRequest, res: VercelResponse) {
