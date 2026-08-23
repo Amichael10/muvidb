@@ -116,9 +116,18 @@ export default function AdminSocialStudio() {
   const [manualFormData, setManualFormData] = useState({ username: '', displayName: '', externalAccountId: '', accessToken: '' });
 
   // 30-Day Calendar State
+  const getTomorrowDateStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
+
   const [calendarSlots, setCalendarSlots] = useState([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [seedingCalendar, setSeedingCalendar] = useState(false);
+  const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
+  const [postsPerDay, setPostsPerDay] = useState(1);
+  const [shuffleOffset, setShuffleOffset] = useState(0);
 
   // Selected slot state for creating draft directly from a calendar day
   const [selectedThemeId, setSelectedThemeId] = useState('actor_spotlight');
@@ -175,10 +184,10 @@ export default function AdminSocialStudio() {
     }
   };
 
-  const fetchCalendar = async () => {
+  const fetchCalendar = async (offset = shuffleOffset) => {
     setLoadingCalendar(true);
     try {
-      const res = await fetch('/api/social?task=calendar_plan&days=30', { headers: await authHeaders() });
+      const res = await fetch(`/api/social?task=calendar_plan&days=30&offset=${offset}`, { headers: await authHeaders() });
       const data = await res.json().catch(() => ([]));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setCalendarSlots(Array.isArray(data) ? data : []);
@@ -189,18 +198,30 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const handleShuffleAllCandidates = () => {
+    const nextOffset = shuffleOffset + 1;
+    setShuffleOffset(nextOffset);
+    toast.success('🎲 Shuffled all candidates across the 30-day plan!');
+    fetchCalendar(nextOffset);
+  };
+
   const seedCalendar = async () => {
     setSeedingCalendar(true);
     try {
       const res = await fetch('/api/social?task=seed_calendar', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: 30 }),
+        body: JSON.stringify({
+          days: 30,
+          startDate: calendarStartDate,
+          postsPerDay,
+          clearExistingPlanned: true,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success(`Refreshed ${data.seeded || 30} days of rolling content plan!`);
-      await fetchCalendar();
+      toast.success(`✨ Generated ${data.seeded || 30} slots starting ${calendarStartDate} (${postsPerDay} post${postsPerDay > 1 ? 's' : ''}/day)!`);
+      await fetchCalendar(shuffleOffset);
     } catch (err) {
       toast.error(err.message || 'Failed to seed 30-day calendar');
     } finally {
@@ -398,24 +419,89 @@ export default function AdminSocialStudio() {
       {/* TAB 1: 30-Day Auto-Pilot Editorial Plan */}
       {activeTab === 'calendar' && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 lg:flex-row lg:items-center lg:justify-between shadow-sm">
             <div>
-              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
-                30-Day Auto-Pilot Editorial Plan
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
+                  30-Day Auto-Pilot Editorial Plan
+                </h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-400">
+                  <Icon icon="solar:crown-bold" width="11" />
+                  Nollistream, Docuth & EbonyLife Priority
+                </span>
+              </div>
               <p className="mt-1 text-xs text-text-muted">
-                Each day is pre-matched with high-quality Nollywood candidates. Click <strong>"Review & Schedule"</strong> to approve in 1 click or shuffle candidates.
+                Pre-matched daily schedule with verified Nollywood stars, crew, and streamers. Approve in 1 click or manually search/swap any candidate.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={seedCalendar}
-              disabled={seedingCalendar}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
-            >
-              <Icon icon={seedingCalendar ? 'solar:spinner-linear' : 'solar:magic-stick-3-linear'} className={seedingCalendar ? 'animate-spin' : ''} width="16" />
-              {seedingCalendar ? 'Refreshing…' : 'Refresh 30-Day Plan'}
-            </button>
+
+            {/* Editorial Control Toolbar */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Start Date Selector */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs">
+                <Icon icon="solar:calendar-date-bold" className="text-brand" width="14" />
+                <span className="text-[11px] font-bold text-text-muted">Start:</span>
+                <input
+                  type="date"
+                  value={calendarStartDate}
+                  onChange={e => setCalendarStartDate(e.target.value)}
+                  className="bg-transparent font-mono text-xs font-bold text-text-primary outline-none"
+                />
+              </div>
+
+              {/* Posts Per Day Toggle */}
+              <div className="flex items-center rounded-lg border border-border bg-surface-2 p-0.5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setPostsPerDay(1)}
+                  className={`rounded-md px-2.5 py-1 transition-all ${
+                    postsPerDay === 1
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  1 Post/Day
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostsPerDay(2)}
+                  className={`rounded-md px-2.5 py-1 transition-all ${
+                    postsPerDay === 2
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  2 Posts/Day
+                </button>
+              </div>
+
+              {/* Shuffle All Candidates Button */}
+              <button
+                type="button"
+                onClick={handleShuffleAllCandidates}
+                disabled={loadingCalendar}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-bold text-text-primary hover:border-brand hover:text-brand transition-all disabled:opacity-50"
+                title="Shuffle and rotate all candidate actors, crew, and movies across the plan"
+              >
+                <Icon icon="solar:shuffle-bold" width="14" />
+                Shuffle All ({calendarSlots.length})
+              </button>
+
+              {/* Generate / Refresh Plan Button */}
+              <button
+                type="button"
+                onClick={seedCalendar}
+                disabled={seedingCalendar}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-bold text-white transition-all hover:bg-brand-hover hover:shadow-lg hover:shadow-brand/20 disabled:opacity-50 shadow-sm"
+              >
+                <Icon
+                  icon={seedingCalendar ? 'solar:spinner-linear' : 'solar:magic-stick-3-bold'}
+                  className={seedingCalendar ? 'animate-spin' : ''}
+                  width="14"
+                />
+                {seedingCalendar ? 'Generating Plan…' : '⚡ Generate Schedule'}
+              </button>
+            </div>
           </div>
 
           {loadingCalendar ? (

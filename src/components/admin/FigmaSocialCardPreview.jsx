@@ -2,16 +2,53 @@ import React from 'react';
 import { Icon } from '@iconify/react';
 
 /**
- * Returns platform-specific branding for the Figma card
+ * Returns platform-specific branding with authentic colors and icons
  */
 export function getPlatformBranding(candidate, series) {
-  const text = `${candidate?.data?.watchAvailability || ''} ${candidate?.data?.platformDisplayName || ''} ${candidate?.name || ''} ${series?.slug || ''} ${series?.name || ''}`.toLowerCase();
+  const text = `${candidate?.data?.watchAvailability || ''} ${candidate?.data?.platformDisplayName || ''} ${candidate?.data?.platform || ''} ${candidate?.category || ''} ${candidate?.name || ''} ${series?.slug || ''} ${series?.name || ''}`.toLowerCase();
   
+  if (text.includes('nollistream')) {
+    return {
+      name: 'NolliStream',
+      badge: 'NOLLISTREAM EXCLUSIVE',
+      accent: '#FF7A00',
+      bgGlow: 'rgba(255, 122, 0, 0.25)',
+      platformIcon: 'solar:play-circle-bold',
+      status: 'NOW STREAMING',
+      subtext: 'Watch on Nollistream.com',
+      ctaText: 'STREAM ON NOLLISTREAM',
+    };
+  }
+  if (text.includes('docuth')) {
+    return {
+      name: 'Docuth',
+      badge: 'NOW ON DOCUTH',
+      accent: '#06B6D4',
+      bgGlow: 'rgba(6, 182, 212, 0.25)',
+      platformIcon: 'solar:tv-bold',
+      status: 'NOW STREAMING',
+      subtext: 'Documentaries & Cinema on Docuth',
+      ctaText: 'STREAM ON DOCUTH',
+    };
+  }
+  if (text.includes('ebonylife')) {
+    return {
+      name: 'EbonyLife ON',
+      badge: 'EBONYLIFE ON PLUS',
+      accent: '#E11D48',
+      bgGlow: 'rgba(225, 29, 72, 0.25)',
+      platformIcon: 'solar:clapperboard-bold',
+      status: 'NOW STREAMING',
+      subtext: 'Stream on EbonyLife ON Plus',
+      ctaText: 'STREAM ON EBONYLIFE ON',
+    };
+  }
   if (text.includes('prime') || text.includes('amazon')) {
     return {
       name: 'Prime Video',
-      badge: 'NEW ON',
+      badge: 'NOW ON PRIME',
       accent: '#00A8E1',
+      bgGlow: 'rgba(0, 168, 225, 0.25)',
       platformIcon: 'ri:amazon-fill',
       status: 'NOW STREAMING',
       subtext: 'Only on Prime Video',
@@ -21,8 +58,9 @@ export function getPlatformBranding(candidate, series) {
   if (text.includes('netflix')) {
     return {
       name: 'Netflix',
-      badge: 'NEW ON',
+      badge: 'NOW ON NETFLIX',
       accent: '#E50914',
+      bgGlow: 'rgba(229, 9, 20, 0.25)',
       platformIcon: 'simple-icons:netflix',
       status: 'NOW STREAMING',
       subtext: 'Only on Netflix',
@@ -32,45 +70,37 @@ export function getPlatformBranding(candidate, series) {
   if (text.includes('youtube')) {
     return {
       name: 'YouTube',
-      badge: 'FREE ON',
+      badge: 'FREE ON YOUTUBE',
       accent: '#FF0000',
+      bgGlow: 'rgba(255, 0, 0, 0.25)',
       platformIcon: 'ri:youtube-fill',
       status: 'NOW STREAMING',
-      subtext: 'Free on YouTube',
+      subtext: 'Free Nollywood on YouTube',
       ctaText: 'WATCH ON YOUTUBE',
-    };
-  }
-  if (text.includes('circuit')) {
-    return {
-      name: 'Circuits',
-      badge: 'NEW ON',
-      accent: '#FF7A00',
-      platformIcon: 'solar:play-bold',
-      status: 'NOW STREAMING',
-      subtext: 'Only on Circuits.tv',
-      ctaText: 'STREAM ON CIRCUITS.TV',
     };
   }
   if (text.includes('cinema') || candidate?.data?.is_in_cinemas) {
     return {
       name: 'In Cinemas',
-      badge: 'IN CINEMAS',
-      accent: '#FF7A00',
+      badge: 'IN CINEMAS NOW',
+      accent: '#F59E0B',
+      bgGlow: 'rgba(245, 158, 11, 0.25)',
       platformIcon: 'solar:ticket-bold',
       status: 'IN CINEMAS NOW',
-      subtext: 'Get tickets at cinema locations',
+      subtext: 'Check showtimes at cinemas near you',
       ctaText: 'BOOK CINEMA TICKETS',
     };
   }
 
-  // Default to Where To Watch / African Cinema Spotlight
+  // Default to African Cinema Spotlight
   return {
-    name: candidate?.data?.platformDisplayName || 'Circuits',
-    badge: 'NEW ON',
+    name: candidate?.data?.platformDisplayName || 'NolliStream',
+    badge: 'NEW ON STREAMING',
     accent: '#FF7A00',
+    bgGlow: 'rgba(255, 122, 0, 0.25)',
     platformIcon: 'solar:play-bold',
     status: candidate?.data?.coming_soon ? 'COMING SOON' : 'NOW STREAMING',
-    subtext: candidate?.data?.watchAvailability || 'Only on Circuits.tv',
+    subtext: candidate?.data?.watchAvailability || 'Verified Nollywood & African Cinema',
     ctaText: 'EXPLORE ON MUVIDB.COM',
   };
 }
@@ -81,22 +111,28 @@ export default function FigmaSocialCardPreview({
   displayImage,
   className = '',
 }) {
-  const isPerson = candidate?.type === 'person' || series?.slug?.includes('spotlight') || series?.slug?.includes('actor') || series?.slug?.includes('birthday');
+  const isPerson = candidate?.type === 'person' || series?.slug?.includes('spotlight') || series?.slug?.includes('actor') || series?.slug?.includes('birthday') || series?.slug?.includes('behind_the_camera') || series?.slug?.includes('face');
   const branding = getPlatformBranding(candidate, series);
-  const title = candidate?.name || 'Film Title';
+  const title = candidate?.name || 'African Cinema';
   const year = candidate?.data?.year || candidate?.year || '';
   const country = candidate?.country || candidate?.data?.country || 'Nollywood';
+  const heroImage = displayImage || candidate?.imageUrl || candidate?.data?.photo_url || candidate?.data?.poster_url;
 
-  // 1. Person / Talent Spotlight Layout
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. TALENT / ACTOR SPOTLIGHT CARD (Dark Luxury Editorial Aesthetic)
+  // ──────────────────────────────────────────────────────────────────────────
   if (isPerson) {
+    const knownForList = candidate?.data?.knownFor || [];
+    const department = candidate?.data?.department || candidate?.category || 'Actor Spotlight';
+    const filmCount = candidate?.data?.film_count || knownForList.length || null;
+
     return (
       <div
-        className={`relative w-full aspect-square overflow-hidden rounded-2xl bg-[#FAF8F5] text-[#111111] shadow-2xl border border-black/5 select-none font-sans flex flex-col justify-between p-6 ${className}`}
+        className={`relative w-full aspect-square overflow-hidden rounded-2xl bg-[#090C12] text-white shadow-2xl border border-white/10 select-none font-sans flex flex-col justify-between p-6 ${className}`}
       >
-        {/* Decorative Grid Lines */}
-        <div className="absolute left-[48%] top-0 bottom-0 w-px bg-black/[0.07] pointer-events-none" />
-        <div className="absolute left-0 right-0 top-[14%] h-px bg-black/[0.07] pointer-events-none" />
-        <div className="absolute left-[47.6%] top-[14%] -translate-y-1/2 w-2 h-2 rounded-full bg-[#FF7A00]" />
+        {/* Background Ambient Glows */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#FF7A00]/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#E5A00D]/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Top Header Lockup */}
         <div className="relative z-10 flex items-center justify-between">
@@ -105,106 +141,134 @@ export default function FigmaSocialCardPreview({
               <img
                 src="/images/MuviDB Brand/MuviDB Icon.png"
                 alt="MuviDB"
-                className="h-7 w-auto object-contain"
+                className="h-7 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,122,0,0.4)]"
                 onError={e => {
                   e.target.style.display = 'none';
                 }}
               />
               <div className="flex flex-col">
-                <span className="font-extrabold text-base tracking-tight text-[#111111] leading-none">
+                <span className="font-black text-base tracking-tight text-white leading-none">
                   MuviDB
                 </span>
-                <span className="text-[8px] font-bold tracking-widest text-[#FF7A00] uppercase mt-0.5">
+                <span className="text-[7.5px] font-extrabold tracking-widest text-[#FF7A00] uppercase mt-0.5">
                   EVERY FILM. EVERY CREDIT.
                 </span>
               </div>
             </div>
-            <div className="h-6 w-px bg-black/15 mx-1" />
-            <div className="flex flex-col text-[8px] font-black tracking-wider leading-tight text-[#111111]">
+            <div className="h-5 w-px bg-white/20 mx-1" />
+            <div className="flex flex-col text-[7.5px] font-black tracking-wider leading-tight text-white/70">
               <span>DISCOVER<span className="text-[#FF7A00]">.</span></span>
               <span>CREDIT<span className="text-[#FF7A00]">.</span></span>
               <span>CELEBRATE<span className="text-[#FF7A00]">.</span></span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase tracking-widest text-[#111111]">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#FF7A00] backdrop-blur-md">
+              <Icon icon="solar:star-bold" width="10" />
               {series?.name || 'TALENT SPOTLIGHT'}
             </span>
-            <span className="text-[10px] font-bold text-[#FF7A00]">01</span>
           </div>
         </div>
 
-        {/* Talent Portrait on the right */}
-        <div className="absolute right-0 bottom-0 top-[14%] w-[52%] overflow-hidden flex items-end justify-center pointer-events-none">
-          {displayImage ? (
+        {/* Hero Talent Portrait Blend on the Right */}
+        <div className="absolute right-0 top-0 bottom-0 w-[52%] overflow-hidden pointer-events-none">
+          {heroImage ? (
             <img
-              src={displayImage}
+              src={heroImage}
               alt={title}
               className="h-full w-full object-cover object-top filter contrast-105"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-black/5 text-black/20">
-              <Icon icon="solar:user-bold" width="64" />
+            <div className="flex h-full w-full items-center justify-center bg-white/5 text-white/20">
+              <Icon icon="solar:user-bold" width="80" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#FAF8F5] via-transparent to-transparent opacity-40" />
+          {/* Gradient Masks */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#090C12] via-[#090C12]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#090C12] via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#090C12] via-transparent to-transparent opacity-80" />
         </div>
 
-        {/* Left Column: Actor Info */}
-        <div className="relative z-10 mt-6 max-w-[46%] flex flex-col">
-          <span className="text-[10px] font-extrabold tracking-widest uppercase text-[#FF7A00]">
-            {candidate?.data?.department || 'ACTOR SPOTLIGHT'}
-          </span>
-          <div className="h-0.5 w-16 bg-[#FF7A00] mt-1 mb-3" />
+        {/* Left Column: Actor Info & Filmography */}
+        <div className="relative z-10 my-auto max-w-[55%] flex flex-col pt-3">
+          {/* Category Tag */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-md bg-[#FF7A00]/20 border border-[#FF7A00]/40 px-2 py-0.5 text-[9.5px] font-black uppercase tracking-widest text-[#FF7A00]">
+              <Icon icon="solar:clapperboard-play-bold" width="10" />
+              {department}
+            </span>
+            {filmCount && (
+              <span className="text-[10px] font-bold text-white/60">
+                • {filmCount} Verified Credits
+              </span>
+            )}
+          </div>
 
-          <h1 className="text-2xl lg:text-3xl font-black uppercase tracking-tight text-[#111111] leading-[1.05] break-words">
+          {/* Hero Name */}
+          <h1 className="mt-2 text-2xl lg:text-3xl font-black uppercase tracking-tight text-white leading-[1.05] drop-shadow-md">
             {title}
           </h1>
 
-          <div className="flex items-center gap-2 mt-2 text-[10px] font-bold text-black/60 uppercase tracking-wider">
-            <Icon icon="solar:globus-linear" width="14" className="text-[#FF7A00]" />
+          {/* Nationality Pill */}
+          <div className="flex items-center gap-2 mt-2 text-[10px] font-bold text-white/80 uppercase tracking-wider">
+            <Icon icon="solar:globus-bold" width="12" className="text-[#FF7A00]" />
             <span>{country}</span>
           </div>
 
+          {/* Bio Snippet */}
           {candidate?.subtext && (
-            <p className="text-[11px] text-black/70 mt-3 line-clamp-3 leading-relaxed font-normal">
-              {candidate.subtext}
-            </p>
+            <div className="mt-3 rounded-lg bg-white/[0.06] border border-white/10 p-2.5 backdrop-blur-md">
+              <p className="text-[10.5px] text-white/85 line-clamp-2 leading-relaxed font-normal">
+                {candidate.subtext}
+              </p>
+            </div>
           )}
 
-          {/* Known For Chips */}
-          {candidate?.data?.knownFor && candidate.data.knownFor.length > 0 && (
-            <div className="mt-4 space-y-1.5">
-              <span className="text-[9px] font-black uppercase tracking-widest text-black/50">
+          {/* Known For Strip */}
+          {knownForList.length > 0 && (
+            <div className="mt-3.5 space-y-1.5">
+              <span className="text-[8.5px] font-black uppercase tracking-widest text-[#FF7A00]">
                 KNOWN FOR
               </span>
-              {candidate.data.knownFor.slice(0, 2).map((k, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-xs font-bold text-[#111111]">
-                  <Icon icon="solar:star-bold" width="12" className="text-[#FF7A00]" />
-                  <span className="truncate">{k.title || k.name || k}</span>
-                </div>
-              ))}
+              <div className="flex flex-col gap-1.5">
+                {knownForList.slice(0, 2).map((k, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 rounded-lg bg-white/[0.08] border border-white/15 px-2.5 py-1.5 backdrop-blur-md"
+                  >
+                    <Icon icon="solar:film-bold" width="12" className="text-[#FF7A00] shrink-0" />
+                    <span className="text-[11px] font-black text-white truncate">
+                      {k.title || k.name || k}
+                    </span>
+                    {k.year && (
+                      <span className="text-[9px] font-bold text-white/50 shrink-0 ml-auto">
+                        {k.year}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer CTA */}
-        <div className="relative z-10 flex items-center justify-between pt-4 border-t border-black/10 mt-auto">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#FF7A00] text-[#FF7A00]">
-              <Icon icon="solar:arrow-right-linear" width="16" />
+        <div className="relative z-10 flex items-center justify-between pt-3 border-t border-white/10 mt-auto">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF7A00] text-black shadow-lg shadow-[#FF7A00]/40">
+              <Icon icon="solar:arrow-right-bold" width="14" />
             </div>
             <div>
-              <div className="text-[9px] font-bold uppercase tracking-widest text-black/50">
-                VIEW FULL PROFILE
+              <div className="text-[8px] font-bold uppercase tracking-widest text-white/50">
+                VIEW FULL FILMOGRAPHY
               </div>
-              <div className="text-xs font-black text-[#111111]">
+              <div className="text-xs font-black text-white tracking-wide">
                 MuviDB.com
               </div>
             </div>
           </div>
-          <span className="text-[8px] font-extrabold uppercase tracking-widest text-black/40">
+          <span className="text-[7.5px] font-extrabold uppercase tracking-widest text-white/40">
             EVERY FILM. EVERY CREDIT.
           </span>
         </div>
@@ -212,101 +276,48 @@ export default function FigmaSocialCardPreview({
     );
   }
 
-  // 2. Movie & "WHERE TO WATCH" Showcase Layout (Exact Figma Match 1:1)
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. MOVIE & "WHERE TO WATCH" SHOWCASE CARD (Cinematic Poster & Platform Lockup)
+  // ──────────────────────────────────────────────────────────────────────────
+  const genres = Array.isArray(candidate?.data?.genres) ? candidate.data.genres.slice(0, 2).join(' • ') : 'African Cinema';
+
   return (
     <div
-      className={`relative w-full aspect-square overflow-hidden rounded-2xl bg-[#FFFFFF] text-[#111111] shadow-2xl border border-black/10 select-none font-sans ${className}`}
+      className={`relative w-full aspect-square overflow-hidden rounded-2xl bg-[#090C12] text-white shadow-2xl border border-white/10 select-none font-sans flex flex-col justify-between p-6 ${className}`}
     >
-      {/* SVG Background Layer with Signature Organic Curved Poster Arch */}
-      <svg
-        viewBox="0 0 1000 1000"
-        className="absolute inset-0 h-full w-full pointer-events-none z-0"
-      >
-        <defs>
-          {/* Exact Organic Figma Cutout Path */}
-          <clipPath id="figma-where-to-watch-shield">
-            <path d="M 540 80 C 540 80, 430 350, 310 680 C 260 850, 310 960, 480 980 L 1000 1000 L 1000 0 L 680 0 C 580 0, 540 30, 540 80 Z" />
-          </clipPath>
-          <linearGradient id="poster-title-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#000000" stopOpacity="0" />
-            <stop offset="40%" stopColor="#000000" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#000000" stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
-
-        {/* Top-Right Warm Olive Backdrop Tab */}
-        <path
-          d="M 640 0 C 640 0, 680 80, 780 80 L 1000 80 L 1000 0 Z"
-          fill="#D5CFB8"
-        />
-
-        {/* Clipped Movie Poster Art */}
-        <g clipPath="url(#figma-where-to-watch-shield)">
-          {displayImage ? (
-            <image
-              href={displayImage}
-              x="260"
-              y="0"
-              width="740"
-              height="1000"
-              preserveAspectRatio="xMidYMid slice"
-            />
-          ) : (
-            <rect x="260" y="0" width="740" height="1000" fill="#181B22" />
-          )}
-
-          {/* Bottom Shadow Gradient for Title Legibility */}
-          <rect
-            x="260"
-            y="700"
-            width="740"
-            height="300"
-            fill="url(#poster-title-gradient)"
+      {/* Background Poster Artwork */}
+      <div className="absolute right-0 top-0 bottom-0 w-[55%] overflow-hidden pointer-events-none">
+        {heroImage ? (
+          <img
+            src={heroImage}
+            alt={title}
+            className="h-full w-full object-cover object-center filter contrast-105"
           />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-white/5 text-white/20">
+            <Icon icon="solar:clapperboard-bold" width="80" />
+          </div>
+        )}
+        {/* Gradient Overlays */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#090C12] via-[#090C12]/75 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#090C12] via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#090C12] via-transparent to-transparent opacity-80" />
+      </div>
 
-          {/* Film Title Overlay at Base of Poster */}
-          <text
-            x="630"
-            y="920"
-            textAnchor="middle"
-            fill="#FF7A00"
-            fontSize="20"
-            fontWeight="900"
-            letterSpacing="3"
-            fontFamily="sans-serif"
-          >
-            {`${country.toUpperCase()}${year ? ` • ${year}` : ''}`}
-          </text>
-          <text
-            x="630"
-            y="960"
-            textAnchor="middle"
-            fill="#FFFFFF"
-            fontSize="34"
-            fontWeight="900"
-            letterSpacing="1"
-            fontFamily="sans-serif"
-          >
-            {title.toUpperCase().slice(0, 24)}
-          </text>
-        </g>
-      </svg>
-
-      {/* Foreground Interactive Content Layer */}
-      <div className="relative z-10 flex flex-col justify-between h-full p-6">
-        {/* Top Header Lockup */}
+      {/* Top Header Lockup */}
+      <div className="relative z-10 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <img
               src="/images/MuviDB Brand/MuviDB Icon.png"
               alt="MuviDB"
-              className="h-8 w-auto object-contain"
+              className="h-7 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,122,0,0.4)]"
               onError={e => {
                 e.target.style.display = 'none';
               }}
             />
             <div className="flex flex-col">
-              <span className="font-extrabold text-base tracking-tight text-[#111111] leading-none">
+              <span className="font-black text-base tracking-tight text-white leading-none">
                 MuviDB
               </span>
               <span className="text-[7.5px] font-extrabold tracking-widest text-[#FF7A00] uppercase mt-0.5">
@@ -314,90 +325,103 @@ export default function FigmaSocialCardPreview({
               </span>
             </div>
           </div>
-          <div className="h-6 w-px bg-black/15 mx-1" />
-          <div className="flex flex-col text-[8px] font-black tracking-wider leading-tight text-[#111111]">
+          <div className="h-5 w-px bg-white/20 mx-1" />
+          <div className="flex flex-col text-[7.5px] font-black tracking-wider leading-tight text-white/70">
             <span>DISCOVER<span className="text-[#FF7A00]">.</span></span>
             <span>CREDIT<span className="text-[#FF7A00]">.</span></span>
             <span>CELEBRATE<span className="text-[#FF7A00]">.</span></span>
           </div>
         </div>
 
-        {/* Left Column Platform Details */}
-        <div className="max-w-[42%] space-y-4 my-auto pt-2">
-          {/* Orange Badge */}
-          <div>
-            <span
-              className="inline-flex items-center rounded-md px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-sm"
-              style={{ backgroundColor: branding.accent }}
-            >
-              {branding.badge}
+        {/* Where To Watch Header Pill */}
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#FF7A00] backdrop-blur-md">
+            <Icon icon="solar:play-stream-bold" width="10" />
+            {series?.name || 'WHERE TO WATCH'}
+          </span>
+        </div>
+      </div>
+
+      {/* Left Column Platform & Movie Details */}
+      <div className="relative z-10 my-auto max-w-[55%] flex flex-col pt-3">
+        {/* Streaming Platform Badge */}
+        <div>
+          <span
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-lg backdrop-blur-md"
+            style={{
+              backgroundColor: branding.accent,
+              boxShadow: `0 0 16px ${branding.bgGlow}`,
+            }}
+          >
+            <Icon icon={branding.platformIcon} width="13" />
+            {branding.badge}
+          </span>
+        </div>
+
+        {/* Platform Display Name */}
+        <h2 className="mt-2 text-2xl lg:text-3xl font-black uppercase tracking-tight text-white leading-none drop-shadow-md">
+          {branding.name}
+        </h2>
+        <div
+          className="h-1 w-16 rounded-full mt-1.5 mb-2.5"
+          style={{ backgroundColor: branding.accent }}
+        />
+
+        {/* Film Title */}
+        <div className="rounded-xl bg-white/[0.07] border border-white/15 p-3 backdrop-blur-md shadow-xl">
+          <div className="text-[8.5px] font-black uppercase tracking-widest text-[#FF7A00]">
+            FEATURED FILM
+          </div>
+          <h3 className="text-base lg:text-lg font-black uppercase text-white leading-tight mt-0.5 line-clamp-2">
+            {title}
+          </h3>
+          <div className="flex items-center gap-2 mt-1 text-[9.5px] font-semibold text-white/60">
+            <span>{country}</span>
+            {year && <span>• {year}</span>}
+            {genres && <span>• {genres}</span>}
+          </div>
+        </div>
+
+        {/* Now Streaming Status */}
+        <div className="flex items-center gap-2 mt-2.5">
+          <div
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border"
+            style={{ borderColor: branding.accent, color: branding.accent }}
+          >
+            <Icon icon="solar:calendar-date-bold" width="12" />
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span className="text-[9px] font-black uppercase tracking-wider text-white">
+              {branding.status}
+            </span>
+            <span className="text-[8.5px] font-medium text-white/50 truncate">
+              {branding.subtext}
             </span>
           </div>
+        </div>
+      </div>
 
-          {/* Platform Icon & Bold Condensed Title */}
+      {/* Bottom Footer Lockup */}
+      <div className="relative z-10 flex items-center justify-between pt-3 border-t border-white/10 mt-auto">
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-full text-black shadow-md"
+            style={{ backgroundColor: branding.accent }}
+          >
+            <Icon icon="solar:play-bold" width="12" />
+          </div>
           <div>
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 mb-2 shadow-sm"
-              style={{ borderColor: branding.accent, color: branding.accent }}
-            >
-              <Icon icon={branding.platformIcon} width="24" />
+            <div className="text-[8px] font-bold uppercase tracking-widest text-white/50">
+              EXPLORE FULL CREDITS ON
             </div>
-            <h2
-              className="text-3xl lg:text-4xl font-black tracking-tight text-[#162D4A] leading-none"
-            >
-              {branding.name}
-            </h2>
-            <div
-              className="h-1 w-20 rounded-full mt-2"
-              style={{ backgroundColor: branding.accent }}
-            />
-          </div>
-
-          {/* Now Streaming Block */}
-          <div className="flex items-start gap-2.5 pt-1">
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2"
-              style={{ borderColor: branding.accent, color: branding.accent }}
-            >
-              <Icon icon="solar:calendar-date-bold" width="16" />
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-[11px] font-black uppercase tracking-wider text-[#162D4A]">
-                {branding.status}
-              </span>
-              <span className="text-[10px] font-semibold text-[#7E8B9B] line-clamp-1">
-                {branding.subtext}
-              </span>
-            </div>
-          </div>
-
-          {/* CTA Block */}
-          <div className="flex items-center gap-2.5 pt-1">
-            <div style={{ color: branding.accent }}>
-              <Icon icon="solar:play-circle-bold" width="30" />
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-[#7E8B9B]">
-                EXPLORE MORE ON
-              </span>
-              <span
-                className="text-xs font-black uppercase tracking-wider"
-                style={{ color: branding.accent }}
-              >
-                MUVIDB.COM
-              </span>
+            <div className="text-xs font-black text-white tracking-wide">
+              MuviDB.com
             </div>
           </div>
         </div>
-
-        {/* Bottom Footer Dot Matrix (6 cols x 4 rows) */}
-        <div className="pt-2">
-          <div className="grid grid-cols-6 gap-1.5 w-24">
-            {Array.from({ length: 24 }).map((_, i) => (
-              <div key={i} className="h-1 w-1 rounded-full bg-[#FF7A00]/80" />
-            ))}
-          </div>
-        </div>
+        <span className="text-[7.5px] font-extrabold uppercase tracking-widest text-white/40">
+          EVERY FILM. EVERY CREDIT.
+        </span>
       </div>
     </div>
   );

@@ -50,24 +50,74 @@ export const WEEKDAY_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
   ],
 };
 
+export const SINGLE_POST_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
+  // Monday: Emerging Faces / Rising Stars
+  1: [{ seriesSlug: 'you_know_the_face', time: '11:00:00', format: 'carousel', notes: 'Daily Spotlight: Emerging Nollywood Stars' }],
+  // Tuesday: Where to Watch (Nollistream, Docuth, EbonyLife Priority)
+  2: [{ seriesSlug: 'where_to_watch', time: '11:00:00', priority: 'high', format: 'carousel', notes: 'Daily Streaming Alert: Nollistream, Docuth, EbonyLife' }],
+  // Wednesday: Critics Review Consensus & Verdict
+  3: [{ seriesSlug: 'critics_say', time: '11:00:00', format: 'carousel', notes: 'Daily Review: Critic Consensus & Verdicts' }],
+  // Thursday: Crew & Behind The Camera (DP, Writer, Editor, Director)
+  4: [{ seriesSlug: 'behind_the_camera', time: '11:00:00', priority: 'high', format: 'carousel', notes: 'Daily Craft: Crew & Filmmaker Spotlight' }],
+  // Friday: Weekend 5-Film Watchlist
+  5: [{ seriesSlug: 'weekend_watchlist', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Weekend Watchlist: 5 Nollywood & African Gems' }],
+  // Saturday: Theatre / What's On Stage
+  6: [{ seriesSlug: 'whats_on_stage', time: '11:00:00', format: 'carousel', notes: 'Weekend Stage: Live African Theatre & Productions' }],
+  // Sunday: African Cinema Debate & Community Question
+  0: [{ seriesSlug: 'film_conversation', time: '14:00:00', format: 'text', notes: 'Sunday Cinema: Community Debate & Conversation' }],
+};
+
+export interface SeedCalendarOptions {
+  daysAhead?: number;
+  startDate?: string;
+  postsPerDay?: 1 | 2;
+  clearExistingPlanned?: boolean;
+}
+
 /**
- * Seed or refresh 30 days of rolling editorial calendar slots with multi-slot support.
+ * Seed or refresh rolling editorial calendar slots with configurable cadence and start date.
  */
-export async function seedRollingCalendar(daysAhead = 30): Promise<number> {
+export async function seedRollingCalendar(options: SeedCalendarOptions | number = 30): Promise<number> {
+  const opts: SeedCalendarOptions =
+    typeof options === 'number' ? { daysAhead: options } : options || {};
+  const daysAhead = opts.daysAhead || 30;
+  const postsPerDay = opts.postsPerDay || 2;
+  const clearExisting = Boolean(opts.clearExistingPlanned);
+
   const { data: seriesList } = await supabase.from('social_content_series').select('id, slug');
   if (!seriesList || !seriesList.length) return 0;
 
   const seriesMap = new Map(seriesList.map((s) => [s.slug, s.id]));
-  const today = new Date();
+
+  let startBaseDate = new Date();
+  if (opts.startDate) {
+    const parsed = new Date(opts.startDate);
+    if (!isNaN(parsed.getTime())) {
+      startBaseDate = parsed;
+    }
+  }
+
+  const startDateStr = startBaseDate.toISOString().split('T')[0];
+
+  // Optionally remove un-published planned slots from startDate onwards
+  if (clearExisting) {
+    await supabase
+      .from('social_calendar')
+      .delete()
+      .gte('scheduled_date', startDateStr)
+      .eq('status', 'planned');
+  }
+
   let createdCount = 0;
 
   for (let i = 0; i < daysAhead; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
+    const d = new Date(startBaseDate);
+    d.setDate(startBaseDate.getDate() + i);
     const dateStr = d.toISOString().split('T')[0];
     const dayOfWeek = d.getDay();
 
-    const slotConfigs = WEEKDAY_SCHEDULE[dayOfWeek] || [
+    const scheduleMap = postsPerDay === 1 ? SINGLE_POST_SCHEDULE : WEEKDAY_SCHEDULE;
+    const slotConfigs = scheduleMap[dayOfWeek] || [
       { seriesSlug: 'filmography', time: '11:00:00' },
     ];
 

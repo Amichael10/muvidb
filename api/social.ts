@@ -212,12 +212,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (task === 'calendar_plan') {
         const days = Number(req.query?.days || 30);
-        return res.status(200).json(await getEditorialCalendar(days));
+        const offset = Number(req.query?.offset || req.query?.shuffleOffset || 0);
+        return res.status(200).json(await getEditorialCalendar(days, offset));
       }
       if (task === 'slot_candidates') {
         const seriesSlug = String(req.query?.seriesSlug || 'filmography');
         const { fetchSeriesCandidates } = await import('./_lib/editorial/candidate_service.js');
-        return res.status(200).json(await fetchSeriesCandidates(seriesSlug, 20));
+        return res.status(200).json(await fetchSeriesCandidates(seriesSlug, 25));
+      }
+      if (task === 'search_candidates') {
+        const q = String(req.query?.q || '');
+        const type = (req.query?.type || 'all') as any;
+        const limit = Number(req.query?.limit || 20);
+        const { searchCandidates } = await import('./_lib/editorial/candidate_service.js');
+        return res.status(200).json(await searchCandidates(q, type, limit));
       }
 
       if (task === 'publish_due') {
@@ -238,6 +246,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (task === 'search_candidates') {
+        const { q, type = 'all', limit = 20 } = req.body || {};
+        const { searchCandidates } = await import('./_lib/editorial/candidate_service.js');
+        return res.status(200).json(await searchCandidates(String(q || ''), type, Number(limit)));
+      }
+
+      if (task === 'update_slot_date') {
+        await requireSocialStudioAdmin(req);
+        const { updateEditorialCalendarSlot } = await import('./_lib/social_studio.js');
+        return res.status(200).json(await updateEditorialCalendarSlot(req.body));
+      }
+
       if (task === 'ai_generate_copy') {
         await requireSocialStudioAdmin(req);
         const { generateAICaptions } = await import('./_lib/editorial/social_copy_ai.js');
@@ -262,8 +282,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'seed_calendar') {
         await requireSocialStudioAdmin(req);
-        const days = Number(req.body?.days || 30);
-        return res.status(200).json(await seedEditorialCalendarSlots(days));
+        return res.status(200).json(await seedEditorialCalendarSlots(req.body || { days: 30 }));
       }
 
       if (task === 'disconnect_platform') {
