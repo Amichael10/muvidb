@@ -73,7 +73,7 @@ export default function PageHeader({
             {children && <div className="mt-6">{children}</div>}
           </div>
 
-          {actions && <div className="shrink-0">{actions}</div>}
+          {actions && <div className="shrink-0 w-full md:w-auto">{actions}</div>}
         </div>
       </div>
     </header>

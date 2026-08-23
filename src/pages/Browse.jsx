@@ -245,13 +245,33 @@ export default function Browse() {
         count={films.length}
         countLabel="titles in view"
         actions={
-          <button
-            className="md:hidden flex items-center justify-center gap-2 bg-surface border border-border px-6 py-3 rounded-lg text-xs font-bold text-text-primary"
-            onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
-          >
-            <Icon icon="solar:filter-linear" width="16" />
-            Filters
-          </button>
+          <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-stretch sm:items-center md:items-stretch lg:items-center gap-3 w-full md:w-auto">
+            <button
+              type="button"
+              className="md:hidden flex items-center justify-center gap-2 bg-surface-2 border border-border px-5 py-2.5 rounded-xl text-xs font-bold text-text-primary hover:border-brand transition-all"
+              onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+            >
+              <Icon icon="solar:filter-bold-duotone" width="16" className="text-brand" />
+              <span>{isMobileFiltersOpen ? 'Hide Filters' : 'Filter Movies'}</span>
+            </button>
+
+            <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/80 bg-surface/90 backdrop-blur-md p-4 sm:p-5 shadow-lg max-w-md w-full">
+              <div className="space-y-1 pr-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-brand animate-pulse" />
+                  <p className="text-text-primary text-xs sm:text-sm font-bold">Something missing?</p>
+                </div>
+                <p className="text-text-muted text-[11px] sm:text-xs">Send us the film and an editor will review it.</p>
+              </div>
+              <Link
+                to="/submit"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-white transition-all hover:opacity-90 active:scale-95 shadow-md shadow-brand/20 whitespace-nowrap flex-shrink-0"
+              >
+                <Icon icon="solar:clapperboard-add-bold" width="15" />
+                <span>Add to MuviDB</span>
+              </Link>
+            </div>
+          </div>
         }
       />
 
@@ -407,21 +427,6 @@ export default function Browse() {
                   <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">Reset Filters</button>
                   <Link to="/submit/film" className="border border-border text-text-primary text-[10px] font-bold px-8 py-3 rounded-lg hover:border-brand hover:text-brand transition-all">Add a Missing Film</Link>
                 </div>
-              </div>
-            )}
-
-            {!loading && (
-              <div className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-6 py-5">
-                <div>
-                  <p className="text-text-primary text-sm font-bold">Something missing from this list?</p>
-                  <p className="text-text-muted text-xs mt-1">Send us the film and an editor will review it.</p>
-                </div>
-                <Link
-                  to="/submit"
-                  className="rounded-lg bg-brand px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:opacity-90 active:scale-95"
-                >
-                  Add to MuviDB
-                </Link>
               </div>
             )}
           </div>

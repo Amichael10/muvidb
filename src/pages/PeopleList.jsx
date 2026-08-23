@@ -1001,16 +1001,26 @@ const PeopleList = () => {
         eyebrow="Directory"
         title="People"
         description="The actors, directors, writers, and visionaries shaping the future of Nollywood cinema. Explore their full filmography and creative journeys."
-      >
-        <button
-          type="button"
-          onClick={() => setShowSuggest(true)}
-          className="mt-2 inline-flex items-center gap-2 bg-brand text-white font-bold px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs tracking-wide hover:opacity-90 transition-all shadow-lg shadow-brand/20"
-        >
-          <Icon icon="solar:user-plus-linear" width="16" />
-          Suggest a missing person
-        </button>
-      </PageHeader>
+        actions={
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/80 bg-surface/90 backdrop-blur-md p-4 sm:p-5 shadow-lg max-w-md w-full">
+            <div className="space-y-1 pr-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-brand animate-pulse" />
+                <p className="text-text-primary text-xs sm:text-sm font-bold">Missing a profile?</p>
+              </div>
+              <p className="text-text-muted text-[11px] sm:text-xs">Suggest an actor, director, or crew member.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSuggest(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-white transition-all hover:opacity-90 active:scale-95 shadow-md shadow-brand/20 whitespace-nowrap flex-shrink-0"
+            >
+              <Icon icon="solar:user-plus-bold" width="15" />
+              <span>Suggest Person</span>
+            </button>
+          </div>
+        }
+      />
       {showSuggest && <SuggestPersonModal onClose={() => setShowSuggest(false)} />}
 
       {/* Full Roles Selection Modal (Unclipped & Mobile-Friendly) */}
