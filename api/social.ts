@@ -217,8 +217,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (task === 'slot_candidates') {
         const seriesSlug = String(req.query?.seriesSlug || 'filmography');
+        const scheduledDate = String(req.query?.scheduledDate || '');
         const { fetchSeriesCandidates } = await import('./_lib/editorial/candidate_service.js');
-        return res.status(200).json(await fetchSeriesCandidates(seriesSlug, 25));
+        const { rankEditorialCandidates } = await import('./_lib/editorial/editorial_selection_engine.js');
+        const candidates = await fetchSeriesCandidates(seriesSlug, 60);
+        const { supabase } = await import('./_lib/supabase.js');
+        const cooldownCutoff = new Date(Date.now() - 60 * 86_400_000).toISOString();
+        const { data: recentItems } = await supabase
+          .from('social_content_items')
+          .select('source_entity_id,status,created_at')
+          .gte('created_at', cooldownCutoff)
+          .limit(500);
+        const recentlyFeaturedIds = new Set(
+          (recentItems || [])
+            .filter((item: any) => item.source_entity_id && !['failed', 'rejected', 'archived'].includes(item.status))
+            .map((item: any) => item.source_entity_id),
+        );
+        const referenceDate = scheduledDate
+          ? new Date(`${scheduledDate}T12:00:00Z`)
+          : new Date();
+        const ranked = rankEditorialCandidates(candidates, seriesSlug, { referenceDate, recentlyFeaturedIds });
+        return res.status(200).json(ranked.slice(0, 20).map(({ candidate, assessment }) => ({
+          ...candidate,
+          editorialScore: assessment.score,
+          whyNow: assessment.whyNow,
+          editorialReasons: assessment.reasons,
+          editorialWarnings: assessment.warnings,
+        })));
       }
       if (task === 'search_candidates') {
         const q = String(req.query?.q || '');

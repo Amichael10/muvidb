@@ -202,20 +202,21 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   if (norm.includes('face') || norm.includes('rising') || norm.includes('supporting')) {
     let { data: people, error: peopleError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, updated_at')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, updated_at')
       .not('photo_url', 'is', null)
       .gte('film_count', 3)
       .lte('film_count', 15)
-      .order('updated_at', { ascending: false })
-      .limit(limit * 2);
+      .order('popularity_score', { ascending: false, nullsFirst: false })
+      .order('profile_views', { ascending: false, nullsFirst: false })
+      .limit(limit * 4);
     if (peopleError) throw peopleError;
 
     if (!people || people.length === 0) {
       const { data: fallbackPeople, error: fallbackError } = await supabase
         .from('people')
-        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, updated_at')
+        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, updated_at')
         .not('photo_url', 'is', null)
-        .order('updated_at', { ascending: false })
+        .order('popularity_score', { ascending: false, nullsFirst: false })
         .limit(limit);
       if (fallbackError) throw fallbackError;
       people = fallbackPeople || [];
@@ -248,7 +249,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   if (norm.includes('camera') || norm.includes('crew') || norm.includes('craft') || norm.includes('director')) {
     const { data: crew, error: crewError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
       .not('photo_url', 'is', null)
       .not('known_for_department', 'is', null)
       .order('film_count', { ascending: false, nullsFirst: false })
@@ -308,16 +309,18 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   ) {
     let { data: people, error: peopleError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
       .not('photo_url', 'is', null)
+      .order('popularity_score', { ascending: false, nullsFirst: false })
+      .order('profile_views', { ascending: false, nullsFirst: false })
       .order('film_count', { ascending: false, nullsFirst: false })
-      .limit(limit * 2);
+      .limit(limit * 4);
     if (peopleError) throw peopleError;
 
     if (!people || people.length === 0) {
       const { data: fallbackPeople, error: fallbackError } = await supabase
         .from('people')
-        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
+        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
         .order('film_count', { ascending: false, nullsFirst: false })
         .limit(limit);
       if (fallbackError) throw fallbackError;
@@ -374,7 +377,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   if (norm.includes('critic') || norm.includes('review') || norm.includes('take')) {
     const { data: reviews } = await supabase
       .from('critic_reviews')
-      .select('id, film_id, critic_name, publication, quote, rating, films!inner(id, title, slug, poster_url, backdrop_url, release_date, year, synopsis, tagline, liked_percent, imdb_rating, genres)')
+      .select('id, film_id, critic_name, publication, quote, rating, films!inner(id, title, slug, poster_url, backdrop_url, release_date, year, synopsis, tagline, liked_percent, imdb_rating, view_count, genres)')
       .not('quote', 'is', null)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -418,7 +421,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   // Fetch a broad film pool once, then apply lifecycle eligibility and editorial ranking.
   // This deliberately avoids the old "any recent row" fallback, which mixed stale cinema,
   // upcoming and streaming titles into every series.
-  const filmSelect = 'id, title, slug, poster_url, backdrop_url, backdrop, release_date, year, release_type, streaming_links, youtube_watch_url, liked_percent, imdb_rating, synopsis, tagline, genres, coming_soon, is_in_cinemas, trailer_youtube_id, trailer_external_url, created_at, updated_at';
+  const filmSelect = 'id, title, slug, poster_url, backdrop_url, backdrop, release_date, year, release_type, streaming_links, youtube_watch_url, liked_percent, imdb_rating, view_count, synopsis, tagline, genres, coming_soon, is_in_cinemas, trailer_youtube_id, trailer_external_url, created_at, updated_at';
   const poolLimit = Math.max(limit * 6, 100);
   let filmRows: any[] = [];
 
@@ -520,7 +523,7 @@ export async function searchCandidates(
   if (type === 'all' || type === 'person') {
     const { data: people, error: peopleError } = await supabase
       .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, bio, popularity_score, known_for_department, instagram_url, twitter_url')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
       .ilike('name', `%${trimmed}%`)
       .order('film_count', { ascending: false, nullsFirst: false })
       .limit(limit);
@@ -555,7 +558,7 @@ export async function searchCandidates(
   if (type === 'all' || type === 'movie') {
     const { data: films } = await supabase
       .from('films')
-      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, is_in_cinemas, synopsis, tagline, genres, liked_percent')
+      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, is_in_cinemas, synopsis, tagline, genres, liked_percent, imdb_rating, view_count')
       .ilike('title', `%${trimmed}%`)
       .order('year', { ascending: false })
       .limit(limit);

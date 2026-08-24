@@ -193,7 +193,7 @@ export default function AutoPilotReviewModal({
       setLoadingCandidates(true);
       const loadCandidatePool = async () => {
         try {
-          const res = await fetch(`/api/social?task=slot_candidates&seriesSlug=${slug || 'filmography'}`, {
+          const res = await fetch(`/api/social?task=slot_candidates&seriesSlug=${slug || 'filmography'}&scheduledDate=${encodeURIComponent(slot.scheduled_date || '')}`, {
             headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
           });
           const data = await res.json().catch(() => []);
@@ -345,6 +345,8 @@ export default function AutoPilotReviewModal({
           slotId: slot.id,
           candidateId: candidate.id,
           candidateType: candidate.type || (series.slug === 'filmography' ? 'person' : 'movie'),
+          contentType: candidate.contentType,
+          templateSlug: candidate.templateSlug,
           scheduledDate: finalDate,
           scheduledTime: finalTime,
           platforms: selectedPlatforms,
@@ -366,13 +368,18 @@ export default function AutoPilotReviewModal({
   };
 
   const handleSelectSearchedCandidate = (selectedItem) => {
-    setCandidate(selectedItem);
-    setCustomImageUrl(selectedItem.imageUrl || '');
+    const manualCandidate = {
+      ...selectedItem,
+      whyNow: 'Manually selected by the MuviDB editor',
+      editorialScore: null,
+    };
+    setCandidate(manualCandidate);
+    setCustomImageUrl(manualCandidate.imageUrl || '');
     setManualSearchOpen(false);
     setSearchQuery('');
     setSearchResults([]);
     toast.success(`Swapped candidate to ${selectedItem.name}!`);
-    requestAICopy(selectedItem, selectedAngle);
+    requestAICopy(manualCandidate, selectedAngle);
   };
 
   const displayImage = customImageUrl || candidate?.imageUrl;
@@ -480,6 +487,21 @@ export default function AutoPilotReviewModal({
             </button>
           </div>
         </div>
+
+        {(candidate?.whyNow || slot.selection?.whyNow) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/60 bg-emerald-500/5 px-6 py-2.5">
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-400">
+              <Icon icon="solar:graph-up-bold" width="12" />
+              {candidate?.editorialScore
+                ? `Editorial score ${candidate.editorialScore}/100`
+                : 'Editor selected'}
+            </span>
+            <p className="text-xs text-text-muted">
+              <span className="font-bold text-text-primary">Why now:</span>{' '}
+              {candidate?.whyNow || slot.selection?.whyNow}
+            </p>
+          </div>
+        )}
 
         {/* Manual Search Flyout / Dropdown */}
         {manualSearchOpen && (

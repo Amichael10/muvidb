@@ -597,6 +597,20 @@ export default function AdminSocialStudio() {
                           </p>
                         </div>
                       </div>
+
+                      {slot.selection && candidate && (
+                        <div className="mt-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400">Why this post</span>
+                            <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
+                              {slot.selection.score}/100
+                            </span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-text-muted">
+                            {slot.selection.whyNow}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Footer */}

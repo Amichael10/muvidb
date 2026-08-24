@@ -19,7 +19,7 @@ export async function handleEditorialTask(req: VercelRequest, res: VercelRespons
     if (task === 'candidates') {
       const seriesSlug = (req.query.seriesSlug || 'filmography').toString();
       const rawCandidates = await fetchSeriesCandidates(seriesSlug, 30);
-      const scored = rawCandidates.map((c) => scoreCandidate(c));
+      const scored = rawCandidates.map((c) => scoreCandidate(c, [], new Set(), seriesSlug));
       scored.sort((a, b) => b.score - a.score);
 
       return res.status(200).json({

@@ -14,39 +14,40 @@ export interface CalendarSlotConfig {
 }
 
 export const WEEKDAY_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
-  // Monday: Emerging Faces / Rising Stars (No superstar bias)
+  // Monday: useful discovery first, then one qualified emerging professional.
   1: [
-    { seriesSlug: 'you_know_the_face', time: '11:00:00', format: 'carousel', notes: 'Morning Carousel: Emerging Nollywood Stars & Supporting Faces' },
+    { seriesSlug: 'where_to_watch', time: '11:00:00', priority: 'high', format: 'carousel', notes: 'Utility Post: A verified current destination to watch' },
+    { seriesSlug: 'you_know_the_face', time: '18:30:00', format: 'carousel', notes: 'Emerging professional with a verified current-project reason' },
   ],
-  // Tuesday: Critics Review Consensus & Evening Community Debate
+  // Tuesday: timely release information and conversation.
   2: [
-    { seriesSlug: 'critics_say', time: '11:00:00', format: 'carousel', notes: 'Morning Carousel: Critic Consensus & Review Highlights' },
+    { seriesSlug: 'new_and_upcoming', time: '11:00:00', priority: 'high', format: 'single_image', notes: 'Verified upcoming release, trailer or announcement' },
     { seriesSlug: 'film_conversation', time: '18:30:00', format: 'text', notes: 'Evening Post: African Cinema Discussion & Debate Prompt' },
   ],
-  // Wednesday: Where to Watch (Emerging Streamers Priority) + Evening Video Clip
+  // Wednesday: streaming utility and filmmaking craft.
   3: [
     { seriesSlug: 'where_to_watch', time: '11:00:00', priority: 'high', format: 'carousel', notes: 'Morning Carousel: Where to Watch (Nollistream, Docuth, EbonyLife, Kava)' },
-    { seriesSlug: 'new_and_upcoming', time: '18:30:00', format: 'video', notes: 'Evening Video Snippet: New Scene Clip or Trailer Drop' },
+    { seriesSlug: 'behind_the_camera', time: '18:30:00', format: 'carousel', notes: 'Qualified filmmaker or craft professional with a current-project connection' },
   ],
-  // Thursday: Behind The Camera (Crew Spotlight: DP, Writer, Editor) + Director/Craft Stills
+  // Thursday: another timely release; critics only when review material exists.
   4: [
-    { seriesSlug: 'behind_the_camera', time: '11:00:00', priority: 'high', format: 'carousel', notes: 'Morning Carousel: Crew Spotlight (Cinematographer, Screenwriter, Editor, Director)' },
-    { seriesSlug: 'filmography', time: '19:00:00', format: 'single_image', notes: 'Evening Card: Director/DP Craft & Frame Stills' },
+    { seriesSlug: 'new_and_upcoming', time: '11:00:00', priority: 'high', format: 'single_image', notes: 'Verified release announcement or trailer' },
+    { seriesSlug: 'critics_say', time: '18:30:00', format: 'carousel', notes: 'Critic material only when a qualified review exists' },
   ],
-  // Friday: 5-Film Weekend Watchlist (Balanced & Gem-heavy) + Video Snippet Drop
+  // Friday: practical weekend viewing decisions.
   5: [
     { seriesSlug: 'weekend_watchlist', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday Carousel: 5-Film Weekend Guide (Nollistream, Docuth, YouTube Gems, Netflix)' },
-    { seriesSlug: 'new_and_upcoming', time: '18:00:00', format: 'video', notes: 'Evening Video Snippet: #1 Weekend Recommendation Scene/Trailer' },
+    { seriesSlug: 'where_to_watch', time: '18:00:00', priority: 'high', format: 'single_image', notes: 'Evening utility post with a verified destination' },
   ],
-  // Saturday: Theatre & Stage to Screen + Indie Scene
+  // Saturday: live culture and community conversation.
   6: [
     { seriesSlug: 'whats_on_stage', time: '11:00:00', format: 'carousel', notes: 'Morning Carousel: What’s On Stage / Live Performance' },
-    { seriesSlug: 'stage_to_screen', time: '17:30:00', format: 'video', notes: 'Evening Video/Clip: Stage to Screen Performer Highlight' },
+    { seriesSlug: 'film_conversation', time: '17:30:00', format: 'text', notes: 'Specific film question backed by usable story or audience data' },
   ],
-  // Sunday: Sunday Film Conversation + Data Story / Collaboration Map
+  // Sunday: one recognizable career story and one timely title.
   0: [
-    { seriesSlug: 'film_conversation', time: '14:00:00', format: 'text', notes: 'Afternoon Discussion: Community Topic' },
-    { seriesSlug: 'by_the_numbers', time: '19:00:00', format: 'single_image', notes: 'Evening Deep-Dive: MuviDB Data Story & Collaboration Map' },
+    { seriesSlug: 'filmography', time: '14:00:00', format: 'carousel', notes: 'Recognizable professional with a defensible editorial reason' },
+    { seriesSlug: 'new_and_upcoming', time: '19:00:00', format: 'single_image', notes: 'Next-week release radar' },
   ],
 };
 

@@ -1220,46 +1220,178 @@ export async function attachCustomAsset(
 export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   const today = new Date().toISOString().split('T')[0];
+  const endDate = new Date();
+  endDate.setUTCDate(endDate.getUTCDate() + Math.max(1, days) - 1);
+  const endDateString = endDate.toISOString().split('T')[0];
   const { data, error } = await supabase
     .from('social_calendar')
-    .select('id,scheduled_date,scheduled_time,status,priority,source,notes,series_id,social_content_series(id,name,slug,category,figma_template_key,description)')
+    .select('id,scheduled_date,scheduled_time,status,priority,source,notes,series_id,subject_entity_type,subject_entity_id,selection_locked,created_at,social_content_series(id,name,slug,category,figma_template_key,description)')
     .gte('scheduled_date', today)
+    .lte('scheduled_date', endDateString)
     .order('scheduled_date', { ascending: true })
     .order('scheduled_time', { ascending: true })
-    .limit(100);
+    .limit(200);
 
   if (error) throw error;
-  const slots = data || [];
+  const rawSlots = data || [];
 
-  // Group candidate fetches by series slug to pre-populate smart candidates
+  // Candidate selection is a deterministic editorial decision, not a rotation
+  // through whatever rows were most recently updated in the database.
   try {
     const { fetchSeriesCandidates } = await import('./editorial/candidate_service.js');
+    const {
+      editorialIdentity,
+      rankEditorialCandidates,
+      shouldSuppressCalendarSlot,
+    } = await import('./editorial/editorial_selection_engine.js');
+    const { getSeriesIntent } = await import('./editorial/candidate_strategy.js');
+
+    // Remove overlapping seed artefacts. Prefer a real time and a non-planned
+    // slot when the same date/series exists more than once.
+    const slotPriority = (slot: any) => (slot.status === 'planned' ? 0 : 100) + (slot.scheduled_time ? 10 : 0);
+    const dedupedByDateAndSeries = new Map<string, any>();
+    for (const slot of rawSlots) {
+      const slug = slot.social_content_series?.slug || 'unknown';
+      const key = `${slot.scheduled_date}:${slug}`;
+      const existing = dedupedByDateAndSeries.get(key);
+      if (!existing || slotPriority(slot) > slotPriority(existing)) dedupedByDateAndSeries.set(key, slot);
+    }
+    const slots = [...dedupedByDateAndSeries.values()].sort((a: any, b: any) =>
+      String(a.scheduled_date).localeCompare(String(b.scheduled_date)) ||
+      String(a.scheduled_time || '23:59:59').localeCompare(String(b.scheduled_time || '23:59:59')),
+    );
+
     const seriesSlugs = [...new Set(slots.map((s: any) => s.social_content_series?.slug).filter(Boolean))];
     const candidatePools: Record<string, any[]> = {};
 
     await Promise.all(
       seriesSlugs.map(async (slug) => {
         try {
-          candidatePools[slug] = await fetchSeriesCandidates(slug, 25);
+          candidatePools[slug] = await fetchSeriesCandidates(slug, 60);
         } catch {
           candidatePools[slug] = [];
         }
       })
     );
 
-    const usageCount: Record<string, number> = {};
+    const cooldownCutoff = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const eventCutoff = new Date(Date.now() - 45 * 86_400_000).toISOString();
+    const [historyResult, contentResult, eventResult] = await Promise.all([
+      supabase
+        .from('social_entity_history')
+        .select('entity_id,published_at')
+        .gte('published_at', cooldownCutoff)
+        .limit(500),
+      supabase
+        .from('social_content_items')
+        .select('source_entity_id,status,created_at')
+        .gte('created_at', cooldownCutoff)
+        .limit(500),
+      supabase
+        .from('social_news_events')
+        .select('entity_id,title,event_type,event_date,urgency,status,detected_at')
+        .gte('detected_at', eventCutoff)
+        .in('status', ['new', 'reviewed'])
+        .order('detected_at', { ascending: false })
+        .limit(200),
+    ]);
 
-    return slots.map((slot: any) => {
+    const recentlyFeaturedIds = new Set<string>();
+    for (const row of historyResult.data || []) if (row.entity_id) recentlyFeaturedIds.add(row.entity_id);
+    for (const row of contentResult.data || []) {
+      if (row.source_entity_id && !['failed', 'rejected', 'archived'].includes(row.status)) {
+        recentlyFeaturedIds.add(row.source_entity_id);
+      }
+    }
+
+    const eventsByEntityId = new Map<string, any[]>();
+    for (const event of eventResult.data || []) {
+      if (!event.entity_id) continue;
+      const events = eventsByEntityId.get(event.entity_id) || [];
+      events.push({
+        entityId: event.entity_id,
+        title: event.title,
+        eventType: event.event_type,
+        eventDate: event.event_date,
+        urgency: event.urgency,
+      });
+      eventsByEntityId.set(event.entity_id, events);
+    }
+
+    const reservedIds = new Set<string>();
+    const reservedIdentities = new Set<string>();
+    const seriesByDate = new Map<string, Set<string>>();
+    const peopleByDate = new Map<string, number>();
+    const peopleByWeek = new Map<string, number>();
+    const curatedSlots: any[] = [];
+
+    const weekKey = (dateString: string) => {
+      const date = new Date(`${dateString}T12:00:00Z`);
+      const day = date.getUTCDay() || 7;
+      date.setUTCDate(date.getUTCDate() - day + 1);
+      return date.toISOString().slice(0, 10);
+    };
+
+    for (const slot of slots as any[]) {
       const slug = slot.social_content_series?.slug || 'filmography';
       const pool = candidatePools[slug] || [];
-      const currentIdx = usageCount[slug] || 0;
-      usageCount[slug] = currentIdx + 1;
-      
-      const candidateIdx = pool.length > 0 ? (currentIdx + (Number(shuffleOffset) || 0)) % pool.length : 0;
-      const candidate = pool[candidateIdx] || null;
+      const dateKey = String(slot.scheduled_date);
+      const week = weekKey(dateKey);
+      const usedSeries = seriesByDate.get(dateKey) || new Set<string>();
+      const suppressionReason = shouldSuppressCalendarSlot({
+        status: slot.status,
+        seriesSlug: slug,
+        dailyPeopleCount: peopleByDate.get(dateKey) || 0,
+        weeklyPeopleCount: peopleByWeek.get(week) || 0,
+        seriesAlreadyUsedToday: usedSeries.has(slug),
+      });
+      if (suppressionReason && slot.status === 'planned') continue;
 
-      return {
+      const referenceDate = new Date(`${dateKey}T12:00:00Z`);
+      const ranked = rankEditorialCandidates(pool, slug, {
+        referenceDate,
+        recentlyFeaturedIds,
+        reservedIds,
+        reservedIdentities,
+        eventsByEntityId,
+      });
+      const shortlistSize = Math.min(5, ranked.length);
+      const selectedIndex = shortlistSize ? Math.abs(Number(shuffleOffset) || 0) % shortlistSize : 0;
+      const selected = ranked[selectedIndex] || null;
+
+      // Quality over quota: an unqualified planned slot is omitted instead of
+      // publishing a weak, repetitive or unsupported post just to fill a date.
+      if (!selected && slot.status === 'planned') continue;
+
+      const candidate = selected?.candidate || null;
+      const assessment = selected?.assessment || null;
+      if (candidate) {
+        reservedIds.add(candidate.id);
+        reservedIdentities.add(editorialIdentity(candidate));
+      }
+      usedSeries.add(slug);
+      seriesByDate.set(dateKey, usedSeries);
+
+      const intent = getSeriesIntent(slug);
+      const isDailyProfileSeries = intent === 'people' || intent === 'crew';
+      if (isDailyProfileSeries && candidate) {
+        peopleByDate.set(dateKey, (peopleByDate.get(dateKey) || 0) + 1);
+      }
+      if (intent === 'people' && candidate) {
+        peopleByWeek.set(week, (peopleByWeek.get(week) || 0) + 1);
+      }
+
+      curatedSlots.push({
         ...slot,
+        selection: assessment
+          ? {
+              score: assessment.score,
+              whyNow: assessment.whyNow,
+              reasons: assessment.reasons,
+              warnings: assessment.warnings,
+              signals: assessment.signals,
+            }
+          : null,
         candidate: candidate
           ? {
               id: candidate.id,
@@ -1272,13 +1404,17 @@ export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
               contentType: candidate.type === 'person' ? 'actor_spotlight' : 'upcoming_movie',
               templateSlug: candidate.type === 'person' ? 'actor-spotlight-v1' : 'upcoming-movie-v1',
               data: candidate.data || {},
+              editorialScore: assessment?.score || 0,
+              whyNow: assessment?.whyNow || '',
             }
           : null,
-      };
-    });
+      });
+    }
+
+    return curatedSlots;
   } catch (err) {
     console.warn('Failed to attach candidates to calendar slots:', (err as Error)?.message);
-    return slots;
+    return rawSlots;
   }
 }
 
