@@ -69,6 +69,43 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
   let authorUsername: string | null = null;
   let authorName: string | null = null;
 
+  // ── Strategy 0: Dedicated Render Microservice (yt-dlp) ──
+  const extractorUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || '').replace(/\/$/, '');
+  const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
+
+  if (extractorUrl) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (extractorSecret) headers['Authorization'] = `Bearer ${extractorSecret}`;
+
+      const res = await fetch(`${extractorUrl}/extract`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ url }),
+        signal: AbortSignal.timeout(12000),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && (data.video_url || data.image_url)) {
+          return {
+            shortcode,
+            isReel,
+            isVideo: Boolean(data.video_url || isReel),
+            videoUrl: data.video_url || null,
+            imageUrl: data.image_url ? cleanInstagramUrl(data.image_url) : null,
+            caption: data.caption ? decodeHtmlEntities(data.caption) : '',
+            authorName: data.author || null,
+            authorUsername: data.author || null,
+            title: data.title || `${data.author || 'Instagram'} on Instagram`,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn('[instagram_downloader] Microservice extractor error:', err.message);
+    }
+  }
+
   // ── Strategy 1: Official Instagram oEmbed API (Fastest for caption + author) ──
   if (shortcode) {
     try {

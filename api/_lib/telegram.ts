@@ -251,3 +251,20 @@ export function isAllowedOpsChat(chatId: string | number | undefined | null): bo
   if (!allowed || chatId == null) return false;
   return String(chatId).trim() === allowed;
 }
+
+export async function getTelegramFileUrl(fileId: string): Promise<string | null> {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!token || !fileId) return null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.ok && json.result?.file_path) {
+      return `https://api.telegram.org/file/bot${token}/${json.result.file_path}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+

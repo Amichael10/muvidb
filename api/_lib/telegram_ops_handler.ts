@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   answerTelegramCallback,
+  getTelegramFileUrl,
   isAllowedOpsChat,
   sendTelegramMessage,
   sendTelegramPhoto,
@@ -612,14 +613,20 @@ async function handleSocialIntake(chatId: string | number, message: any) {
 
   const meta = await resolveIntakeMetadata(sourceUrl, text);
 
-  if (photo && !sourceUrl) {
-    meta.eventType = 'image_upload';
-    meta.platformLabel = 'Photo / Screenshot';
-    if (!text) meta.title = 'Photo forwarded from Telegram';
-  } else if (directVideo && !sourceUrl) {
-    meta.eventType = 'video_upload';
-    meta.platformLabel = 'Video Clip';
-    if (!text) meta.title = 'Video forwarded from Telegram';
+  if (photo && !meta.imageUrl) {
+    meta.imageUrl = await getTelegramFileUrl(photo.file_id);
+    if (!sourceUrl) {
+      meta.eventType = 'image_upload';
+      meta.platformLabel = 'Photo / Screenshot';
+      if (!text) meta.title = 'Photo forwarded from Telegram';
+    }
+  } else if (directVideo && !meta.videoUrl) {
+    meta.videoUrl = await getTelegramFileUrl(directVideo.file_id);
+    if (!sourceUrl) {
+      meta.eventType = 'video_upload';
+      meta.platformLabel = 'Video Clip';
+      if (!text) meta.title = 'Video forwarded from Telegram';
+    }
   }
 
   const { data: newEvent, error } = await supabase
