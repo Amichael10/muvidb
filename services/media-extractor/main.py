@@ -1,4 +1,5 @@
 import os
+import tempfile
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 import yt_dlp
@@ -10,10 +11,35 @@ AUTH_SECRET = os.getenv("EXTRACTOR_SECRET", "").strip()
 class ExtractRequest(BaseModel):
     url: str
 
+def get_cookie_file():
+    cookies_raw = os.getenv("INSTAGRAM_COOKIES", "").strip()
+    session_id = os.getenv("INSTAGRAM_SESSION_ID", "").strip()
+
+    if cookies_raw:
+        tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt")
+        tmp.write(cookies_raw)
+        tmp.close()
+        return tmp.name
+
+    if session_id:
+        # Generate Netscape cookie file for instagram.com
+        tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt")
+        content = f"# Netscape HTTP Cookie File\n.instagram.com\tTRUE\t/\tTRUE\t2147483647\tsessionid\t{session_id}\n"
+        tmp.write(content)
+        tmp.close()
+        return tmp.name
+
+    return None
+
 @app.get("/")
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "media-extractor", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "service": "media-extractor",
+        "version": "1.1.0",
+        "has_cookies": bool(os.getenv("INSTAGRAM_COOKIES") or os.getenv("INSTAGRAM_SESSION_ID"))
+    }
 
 @app.post("/extract")
 def extract_media(req: ExtractRequest, authorization: str = Header(None)):
@@ -32,7 +58,15 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'skip_download': True,
         'extract_flat': False,
         'format': 'best',
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
     }
+
+    cookie_path = get_cookie_file()
+    if cookie_path:
+        ydl_opts['cookiefile'] = cookie_path
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -49,7 +83,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
 
             return {
                 "success": True,
-                "title": info.get("title") or info.get("description", "")[:80] or "Instagram Video",
+                "title": info.get("title") or info.get("description", "")[:80] or "Video",
                 "caption": info.get("description") or info.get("title") or "",
                 "author": info.get("uploader") or info.get("uploader_id") or info.get("channel") or None,
                 "video_url": video_url,
@@ -62,3 +96,9 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
             "success": False,
             "error": str(e)
         }
+    finally:
+        if cookie_path and os.path.exists(cookie_path):
+            try:
+                os.remove(cookie_path)
+            except Exception:
+                pass
