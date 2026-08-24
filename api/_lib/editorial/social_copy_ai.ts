@@ -59,6 +59,20 @@ export type AICopyResponse = {
   engine?: string;
 };
 
+async function withGenerationTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error('AI copy generation timed out')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 /**
  * Returns specific rules for the active editorial series / content type
  */
@@ -338,11 +352,13 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
   const { candidate, series } = req;
   const data = candidate.data || {};
   const isPerson = candidate.type === 'person';
-  const name = candidate.name;
+  const name = String(candidate.name || 'MuviDB feature');
   const year = data.year ? ` (${data.year})` : '';
-  const platform = data.platformDisplayName || (data.streaming_links?.prime_video ? 'Prime Video' : data.streaming_links?.netflix ? 'Netflix' : 'Streaming Platforms');
+  const platform = String(data.platformDisplayName || (data.streaming_links?.prime_video ? 'Prime Video' : data.streaming_links?.netflix ? 'Netflix' : 'Streaming Platforms'));
   const cleanTag = name.replace(/[^a-zA-Z0-9]/g, '');
-  const synopsis = data.synopsis || candidate.subtext || '';
+  const synopsis = typeof data.synopsis === 'string'
+    ? data.synopsis
+    : (typeof candidate.subtext === 'string' ? candidate.subtext : '');
 
   if (data.lifecycle === 'upcoming' || data.coming_soon) {
     const releaseLine = data.release_date ? `Releases ${data.release_date}.` : 'Coming soon.';
@@ -381,7 +397,8 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
   }
 
   if (isPerson) {
-    const known = (data.knownFor || []).slice(0, 3).map((k: any) => `🎬 ${k.title}${k.year ? ` (${k.year})` : ''}`).join('\n');
+    const knownFor = Array.isArray(data.knownFor) ? data.knownFor : [];
+    const known = knownFor.slice(0, 3).map((k: any) => `🎬 ${k.title}${k.year ? ` (${k.year})` : ''}`).join('\n');
     return [
       {
         key: 'A',
@@ -500,11 +517,14 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
  * Generates 3 intelligent, brand-aligned copy variations using Cohere / AI fallback
  */
 export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResponse> {
-  const prompt = buildMuviDBPrompt(req);
   const preferred = req.preferredProvider || 'cohere';
 
   try {
-    const aiRes = await generateAIContent(prompt, { preferredProvider: preferred });
+    const prompt = buildMuviDBPrompt(req);
+    const aiRes = await withGenerationTimeout(
+      generateAIContent(prompt, { preferredProvider: preferred }),
+      25_000,
+    );
     const parsed = parseJSON(aiRes.text);
 
     let variations: AICopyVariation[] = [];

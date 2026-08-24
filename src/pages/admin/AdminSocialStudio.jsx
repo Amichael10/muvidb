@@ -416,6 +416,17 @@ export default function AdminSocialStudio() {
         </button>
       </div>
 
+      {/* TAB 3: Ad-Hoc Custom Composer */}
+      {activeTab === 'composer' && (
+        <SocialDraftComposer
+          disabled={!summary.enabled}
+          selectedThemeId={selectedThemeId}
+          slotContext={slotContext}
+          onClearSlot={() => setSlotContext(null)}
+          onGenerated={refreshAll}
+        />
+      )}
+
       {/* TAB 1: 30-Day Auto-Pilot Editorial Plan */}
       {activeTab === 'calendar' && (
         <div className="space-y-4">

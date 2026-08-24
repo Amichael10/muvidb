@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   areGeneratedVariationsGrounded,
+  generateAICaptions,
   generateGroundedFallbackCaptions,
   type AICopyRequest,
   type AICopyVariation,
@@ -47,5 +48,28 @@ describe('generated social copy grounding', () => {
     expect(fallback).toHaveLength(3);
     expect(fallback.every(variation => !Object.values(variation.captions).some(caption => /\[[^\]]+\]/.test(caption)))).toBe(true);
     expect(fallback.every(variation => Object.values(variation.captions).every(caption => caption.includes('Docuth')))).toBe(true);
+  });
+
+  it('returns usable fallback copy when candidate metadata is malformed', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const response = await generateAICaptions({
+      candidate: {
+        id: '5',
+        type: 'movie',
+        name: 'Resilient Film',
+        data: {
+          lifecycle: 'upcoming',
+          topCast: { invalid: true },
+          synopsis: { invalid: true },
+        },
+      },
+      series: { slug: 'new_and_upcoming' },
+    });
+
+    expect(response.success).toBe(true);
+    expect(response.engine).toBe('muvidb_clean_fallback');
+    expect(response.variations).toHaveLength(3);
+    expect(response.variations.every(variation => Object.values(variation.captions).every(Boolean))).toBe(true);
+    warning.mockRestore();
   });
 });

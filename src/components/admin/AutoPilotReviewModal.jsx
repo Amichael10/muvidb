@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
@@ -58,14 +58,24 @@ export default function AutoPilotReviewModal({
   const [selectedVariationKey, setSelectedVariationKey] = useState('A');
   const [captions, setCaptions] = useState({ instagram: '', threads: '', facebook: '', tiktok: '' });
   const [aiEngine, setAiEngine] = useState('');
+  const [aiError, setAiError] = useState('');
+  const aiRequestIdRef = useRef(0);
 
   const requestAICopy = async (cand, angle = selectedAngle) => {
-    if (!cand || !cand.name) return;
+    if (!cand || !cand.name) {
+      setAiError('Select a film or professional before generating copy.');
+      return;
+    }
+    const requestId = ++aiRequestIdRef.current;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 50_000);
     setAiGenerating(true);
+    setAiError('');
     try {
       const res = await fetch('/api/social?task=ai_generate_copy', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           candidate: cand,
           series: slot.social_content_series,
@@ -74,13 +84,32 @@ export default function AutoPilotReviewModal({
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success && Array.isArray(data.variations) && data.variations.length > 0) {
-        setVariations(data.variations);
+      const responseText = await res.text();
+      let data = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error('Copy could not be generated right now. Please try again.');
+      }
+      if (!res.ok) {
+        console.warn('Copy generation API error:', res.status, data?.error || 'Unknown server error');
+        if (res.status === 401) throw new Error('Your session has expired. Please sign in again.');
+        if (res.status === 403) throw new Error('Administrator access is required to generate copy.');
+        if (res.status === 429) throw new Error('Copy generation is busy right now. Please try again shortly.');
+        throw new Error('Copy could not be generated right now. Please try again.');
+      }
+      if (requestId !== aiRequestIdRef.current) return;
+
+      if (data.success && Array.isArray(data.variations) && data.variations.length > 0) {
+        const usableVariations = data.variations.filter(variation =>
+          variation?.captions && Object.values(variation.captions).some(Boolean),
+        );
+        if (!usableVariations.length) throw new Error('No usable copy was returned. Please try again.');
+        setVariations(usableVariations);
         setSelectedVariationKey('A');
-        setCaptions(data.variations[0].captions || {});
+        setCaptions(usableVariations[0].captions);
         setAiEngine(data.engine || 'cohere');
-        toast.success(`✨ 3 MuviDB variations generated!`);
+        toast.success(`${usableVariations.length} MuviDB copy variation${usableVariations.length === 1 ? '' : 's'} generated.`);
       } else if (data.instagram) {
         setCaptions({
           instagram: data.instagram || '',
@@ -89,11 +118,21 @@ export default function AutoPilotReviewModal({
           tiktok: data.tiktok || '',
         });
         setAiEngine(data.engine || 'cohere');
+        toast.success('MuviDB copy generated.');
+      } else {
+        throw new Error('No usable copy was returned. Please try again.');
       }
     } catch (err) {
       console.warn('AI Copy request failed:', err);
+      if (requestId !== aiRequestIdRef.current) return;
+      const message = err?.name === 'AbortError'
+        ? 'Copy generation took too long. Please try again.'
+        : (err.message || 'Copy could not be generated right now.');
+      setAiError(message);
+      toast.error(message);
     } finally {
-      setAiGenerating(false);
+      window.clearTimeout(timeout);
+      if (requestId === aiRequestIdRef.current) setAiGenerating(false);
     }
   };
 
@@ -657,6 +696,22 @@ export default function AutoPilotReviewModal({
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {aiError && !aiGenerating && (
+                <div className="flex items-start justify-between gap-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <Icon icon="solar:danger-circle-linear" className="mt-0.5 shrink-0 text-red-400" width="15" />
+                    <p className="text-xs leading-relaxed text-red-300">{aiError}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => requestAICopy(candidate, selectedAngle)}
+                    className="shrink-0 text-[11px] font-bold text-red-300 underline underline-offset-2 hover:text-red-200"
+                  >
+                    Try again
+                  </button>
                 </div>
               )}
 

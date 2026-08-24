@@ -407,7 +407,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[api/social]', err);
     return res.status(err?.status || 500).json({
       error: err?.message || 'Social Studio request failed',
-      stack: (err?.stack || '').split('\n').slice(0, 5),
     });
   }
 }
