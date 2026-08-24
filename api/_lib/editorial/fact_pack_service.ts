@@ -99,9 +99,17 @@ export async function buildFactPack(entityType: string, entityId: string): Promi
 
     const { data: filmCredits } = await supabase
       .from('credits')
-      .select('id, role, character_name, people(id, name, photo_url)')
+      .select('id, role, character_name, people(id, name, photo_url, instagram_url)')
       .eq('film_id', entityId)
-      .limit(15);
+      .limit(40);
+
+    const { data: channelVideo } = await supabase
+      .from('channel_videos')
+      .select('channels!inner(name,channel_handle)')
+      .eq('film_id', entityId)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
 
     fact_ids.push(`film:${film?.id}`);
 
@@ -120,6 +128,8 @@ export async function buildFactPack(entityType: string, entityId: string): Promi
         synopsis: film?.synopsis,
         is_in_cinemas: film?.is_in_cinemas || false,
         youtube_watch_url: film?.youtube_watch_url,
+        youtube_channel_name: (channelVideo as any)?.channels?.name || null,
+        youtube_channel_handle: (channelVideo as any)?.channels?.channel_handle || null,
         imdb_rating: film?.imdb_rating,
         liked_percent: film?.liked_percent,
       },
@@ -129,6 +139,7 @@ export async function buildFactPack(entityType: string, entityId: string): Promi
         name: c.people?.name,
         role: c.role,
         character: c.character_name,
+        instagram_url: c.people?.instagram_url,
       })),
       fact_ids,
     };

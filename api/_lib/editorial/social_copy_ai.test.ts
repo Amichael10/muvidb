@@ -50,6 +50,31 @@ describe('generated social copy grounding', () => {
     expect(fallback.every(variation => Object.values(variation.captions).every(caption => caption.includes('Docuth')))).toBe(true);
   });
 
+  it('enforces a linked YouTube channel and verified Instagram credit tags in fallback copy', () => {
+    const req: AICopyRequest = {
+      candidate: {
+        id: 'youtube-film',
+        type: 'movie',
+        name: 'Direct Release',
+        data: {
+          lifecycle: 'now_streaming',
+          platformDisplayName: 'YouTube',
+          youtubeChannelName: 'Example Pictures',
+          creditedPeople: [
+            { name: 'Actor One', role: 'actor', handle: '@actor.one' },
+            { name: 'Director One', role: 'director', handle: '@director.one' },
+          ],
+        },
+      },
+      series: { slug: 'where_to_watch' },
+    };
+
+    const fallback = generateGroundedFallbackCaptions(req);
+    expect(fallback.every(variation => Object.values(variation.captions).every(caption => caption.includes('Example Pictures')))).toBe(true);
+    expect(fallback.every(variation => variation.captions.instagram.includes('@actor.one') && variation.captions.instagram.includes('@director.one'))).toBe(true);
+    expect(areGeneratedVariationsGrounded(req, fallback)).toBe(true);
+  });
+
   it('returns usable fallback copy when candidate metadata is malformed', async () => {
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const response = await generateAICaptions({

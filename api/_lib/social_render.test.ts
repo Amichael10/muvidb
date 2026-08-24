@@ -81,6 +81,9 @@ describe('renderSnapshotAsset', () => {
         likedPercent: 84,
         comingSoon: false,
         isPublished: true,
+        creditedPeople: [],
+        youtubeChannelName: null,
+        youtubeChannelHandle: null,
         topCast: [
           { personId: 'p1', name: 'Jemima Osunde', handle: '@jemimaosunde', character: 'Nkem' },
           { personId: 'p2', name: 'Jammal Ibrahim', handle: null, character: 'Amir' },

@@ -97,6 +97,27 @@ describe('buildVariantContent', () => {
     expect(content.hashtags).toContain('ComingSoon');
   });
 
+  it('names the YouTube channel and includes verified cast and crew Instagram handles', () => {
+    const snapshot = buildUpcomingMovieSnapshot({
+      capturedAt: CAPTURED_AT,
+      film: {
+        id: 'yt-film',
+        title: 'Direct Release',
+        youtube_watch_url: 'https://youtube.com/watch?v=abc',
+        youtube_channel_name: 'Example Pictures',
+      },
+      credits: [
+        { role: 'actor', people: { id: 'a1', name: 'Actor One', instagram_url: 'https://instagram.com/actor.one' } },
+        { role: 'director', people: { id: 'd1', name: 'Director One', instagram_url: 'https://instagram.com/director.one' } },
+      ],
+    });
+    const content = buildVariantContent({ snapshot, platform: 'instagram' });
+
+    expect(content.caption).toContain('Watch on YouTube via Example Pictures');
+    expect(content.caption).toContain('Starring:\n@actor.one');
+    expect(content.caption).toContain('Crew:\ndirector — @director.one');
+  });
+
   it('only sets a title for TikTok', () => {
     expect(buildVariantContent({ snapshot: movieSnapshot, platform: 'tiktok' }).title).toBe('Jagun Jagun');
     expect(buildVariantContent({ snapshot: movieSnapshot, platform: 'instagram' }).title).toBeNull();

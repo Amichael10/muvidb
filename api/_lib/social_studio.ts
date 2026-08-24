@@ -511,17 +511,33 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   if (error) throw error;
   if (!film) throw httpError(404, 'Film not found');
 
-  const { data: credits, error: creditsError } = await supabase
-    .from('credits')
-    .select('character_name,billing_order,people!inner(id,name,instagram_url,twitter_url,tiktok_url,youtube_handle)')
-    .eq('film_id', filmId)
-    .eq('role', 'actor')
-    .order('billing_order', { ascending: true, nullsFirst: false })
-    .limit(8);
+  const [creditsResult, channelVideoResult] = await Promise.all([
+    supabase
+      .from('credits')
+      .select('role,character_name,billing_order,people!inner(id,name,instagram_url)')
+      .eq('film_id', filmId)
+      .order('billing_order', { ascending: true, nullsFirst: false })
+      .limit(40),
+    supabase
+      .from('channel_videos')
+      .select('published_at,channels!inner(name,channel_handle)')
+      .eq('film_id', filmId)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  if (creditsError) throw creditsError;
+  if (creditsResult.error) throw creditsResult.error;
+  if (channelVideoResult.error) throw channelVideoResult.error;
 
-  return buildUpcomingMovieSnapshot({ film, credits: credits || [], capturedAt });
+  const linkedChannel = (channelVideoResult.data as any)?.channels;
+  const filmWithChannel = {
+    ...film,
+    youtube_channel_name: linkedChannel?.name || null,
+    youtube_channel_handle: linkedChannel?.channel_handle || null,
+  };
+
+  return buildUpcomingMovieSnapshot({ film: filmWithChannel, credits: creditsResult.data || [], capturedAt, castLimit: 8 });
 }
 
 function getAssetBucket(): string {

@@ -238,8 +238,13 @@ function buildMuviDBPrompt(req: AICopyRequest): string {
   const platform = data.platformDisplayName || (data.streaming_links?.prime_video ? 'Prime Video' : data.streaming_links?.netflix ? 'Netflix' : data.is_in_cinemas ? 'Cinemas Nationwide' : (releaseType || (lifecycle === 'upcoming' ? 'Not announced' : 'Streaming Platforms')));
   const isCinemas = data.is_in_cinemas || false;
 
-  const topCast = (data.topCast || []).map((c: any) => `${c.name}${c.handle ? ` (${c.handle})` : ''}`).join(', ');
-  const directors = (data.directors || []).map((d: any) => `${d.name}${d.handle ? ` (${d.handle})` : ''}`).join(', ');
+  const topCastRows = Array.isArray(data.topCast) ? data.topCast : [];
+  const directorRows = Array.isArray(data.directors) ? data.directors : [];
+  const creditedRows = Array.isArray(data.creditedPeople) ? data.creditedPeople : [];
+  const topCast = topCastRows.map((c: any) => `${c.name}${c.handle ? ` (${c.handle})` : ''}`).join(', ');
+  const directors = directorRows.map((d: any) => `${d.name}${d.handle ? ` (${d.handle})` : ''}`).join(', ');
+  const creditedPeople = creditedRows.map((credit: any) => `${credit.name} — ${credit.role || 'credit'} (${credit.handle})`).join(', ');
+  const youtubeChannel = data.youtubeChannelName || '';
   const criticQuote = data.criticReview?.quote || data.quote || '';
   const criticName = data.criticReview?.criticName || data.criticName || '';
   const criticPub = data.criticReview?.publication || data.publication || '';
@@ -285,12 +290,14 @@ SOURCE DATA:
 - TYPE: ${isPerson ? 'Talent / Filmmaker' : 'Film / Stage'}
 - SERIES CONTEXT: ${seriesName}
 - PLATFORM / AVAILABILITY: ${platform} ${isCinemas ? '(In Cinemas)' : ''}
+- YOUTUBE CHANNEL: ${youtubeChannel || 'N/A'}
 - VERIFIED LIFECYCLE: ${lifecycle}
 - RELEASE DATE: ${releaseDate}
 - SYNOPSIS: ${synopsis}
 - TAGLINE: ${tagline}
 - CAST: ${topCast}
 - DIRECTOR / CREW: ${directors}
+- VERIFIED INSTAGRAM CREDIT TAGS: ${creditedPeople || 'N/A'}
 - CRITIC DATA: ${criticQuote ? `"${criticQuote}" by ${criticName} (${criticPub}) [Rating: ${rating}]` : (rating ? `Rated ${rating} on MuviDB` : 'N/A')}
 - KNOWN FOR / CREDITS: ${knownFor}
 - BIO / CONTEXT: ${bio}
@@ -303,7 +310,8 @@ Generate 3 DISTINCT copy variations:
 - Variation C (Conversational / Discussion): Direct thought-provoking question, cultural context, authentic discussion.
 
 For EACH variation, provide tailored text for:
-- "instagram": Full caption with clean formatting, bullet points where useful, cast @handles, and 3-5 hashtags at the bottom.
+- "instagram": Full caption with clean formatting, every supplied verified cast/crew @handle, and 3-5 hashtags at the bottom.
+- When YOUTUBE CHANNEL is supplied, name it in every platform's copy. Never replace it with generic "YouTube" wording.
 - "threads": Punchy, conversation-first post strictly under 480 characters.
 - "facebook": Engaging storytelling paragraph with watch info and community discussion question.
 - "tiktok": Concise hook with key details and hashtags for video/slides.
@@ -343,6 +351,75 @@ OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without mark
     }
   ]
 }`;
+}
+
+const COPY_LIMITS: Record<keyof PlatformCaptions, number> = {
+  instagram: 2200,
+  threads: 500,
+  facebook: 2000,
+  tiktok: 2200,
+};
+
+function verifiedInstagramHandles(data: any): string[] {
+  const rows = Array.isArray(data?.creditedPeople) ? data.creditedPeople : [];
+  const fallbackRows = [
+    ...(Array.isArray(data?.topCast) ? data.topCast : []),
+    ...(Array.isArray(data?.directors) ? data.directors : []),
+  ];
+  const seen = new Set<string>();
+  const handles: string[] = [];
+
+  for (const row of [...rows, ...fallbackRows]) {
+    const raw = String(row?.handle || row?.instagramHandle || '').trim();
+    if (!/^@[a-zA-Z0-9._]+$/.test(raw)) continue;
+    const key = raw.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    handles.push(raw);
+  }
+
+  return handles;
+}
+
+function appendBeforeHashtags(text: string, additions: string[], limit: number): string {
+  const cleanAdditions = additions.filter(Boolean);
+  if (!cleanAdditions.length) return text.slice(0, limit).trim();
+
+  const lines = String(text || '').trim().split('\n');
+  const hashtagIndex = lines.findIndex(line => line.trim().startsWith('#'));
+  const body = (hashtagIndex >= 0 ? lines.slice(0, hashtagIndex) : lines).join('\n').trim();
+  const hashtags = (hashtagIndex >= 0 ? lines.slice(hashtagIndex) : []).join('\n').trim();
+  const suffix = cleanAdditions.join('\n\n');
+  const reserved = suffix.length + (hashtags ? hashtags.length + 2 : 0) + 2;
+  const bodyLimit = Math.max(0, limit - reserved);
+  const shortenedBody = body.length <= bodyLimit
+    ? body
+    : `${body.slice(0, Math.max(0, bodyLimit - 1)).replace(/\s+\S*$/, '').trim()}…`;
+  return [shortenedBody, suffix, hashtags].filter(Boolean).join('\n\n').slice(0, limit).trim();
+}
+
+/** Enforce verified attribution even when the model or fallback omits it. */
+function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVariation[]): AICopyVariation[] {
+  if (req.candidate?.type !== 'movie') return variations;
+  const data = req.candidate.data || {};
+  const channelName = String(data.youtubeChannelName || '').trim();
+  const handles = verifiedInstagramHandles(data);
+
+  return variations.map(variation => {
+    const captions = { ...variation.captions };
+    for (const platform of Object.keys(captions) as Array<keyof PlatformCaptions>) {
+      const additions: string[] = [];
+      if (channelName && !captions[platform].toLowerCase().includes(channelName.toLowerCase())) {
+        additions.push(`Watch on YouTube via ${channelName}.`);
+      }
+      if (platform === 'instagram' && handles.length) {
+        const missingHandles = handles.filter(handle => !captions.instagram.toLowerCase().includes(handle.toLowerCase()));
+        if (missingHandles.length) additions.push(`Cast & crew: ${missingHandles.join(' ')}`);
+      }
+      captions[platform] = appendBeforeHashtags(captions[platform], additions, COPY_LIMITS[platform]);
+    }
+    return { ...variation, captions };
+  });
 }
 
 /**
@@ -489,7 +566,7 @@ function applyCaptionBankToFallback(variations: AICopyVariation[], req: AICopyRe
 }
 
 export function generateGroundedFallbackCaptions(req: AICopyRequest): AICopyVariation[] {
-  return applyCaptionBankToFallback(buildCleanFallbackVariations(req), req);
+  return applyVerifiedMovieAttribution(req, applyCaptionBankToFallback(buildCleanFallbackVariations(req), req));
 }
 
 export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: AICopyVariation[]): boolean {
@@ -497,6 +574,8 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
   const lifecycle = req.candidate?.data?.lifecycle;
   const seriesSlug = (req.series?.slug || '').toLowerCase();
   const platform = req.candidate?.data?.platformDisplayName;
+  const youtubeChannelName = String(req.candidate?.data?.youtubeChannelName || '').trim();
+  const requiredInstagramHandles = verifiedInstagramHandles(req.candidate?.data || {});
   const allCaptions = variations.flatMap(variation => Object.values(variation.captions));
 
   if (allCaptions.some(caption => /\[[^\]]+\]/.test(caption))) return false;
@@ -510,6 +589,8 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
     const normalizedPlatform = String(platform).toLowerCase();
     if (allCaptions.some(caption => !caption.toLowerCase().includes(normalizedPlatform))) return false;
   }
+  if (youtubeChannelName && allCaptions.some(caption => !caption.toLowerCase().includes(youtubeChannelName.toLowerCase()))) return false;
+  if (requiredInstagramHandles.length && variations.some(variation => requiredInstagramHandles.some(handle => !variation.captions.instagram.toLowerCase().includes(handle.toLowerCase())))) return false;
   return true;
 }
 
@@ -570,6 +651,8 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
         },
       ];
     }
+
+    variations = applyVerifiedMovieAttribution(req, variations);
 
     if (areGeneratedVariationsGrounded(req, variations)) {
       const primary = variations[0].captions;

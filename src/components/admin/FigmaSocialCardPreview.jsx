@@ -81,6 +81,7 @@ export function getPlatformBranding(candidate, series) {
     };
   }
   if (text.includes('youtube')) {
+    const channelName = candidate?.data?.youtubeChannelName;
     return {
       name: 'YouTube',
       badge: 'FREE ON YOUTUBE',
@@ -88,7 +89,7 @@ export function getPlatformBranding(candidate, series) {
       bgGlow: 'rgba(255, 0, 0, 0.25)',
       platformIcon: 'ri:youtube-fill',
       status: 'NOW STREAMING',
-      subtext: 'Free Nollywood on YouTube',
+      subtext: channelName ? `Watch via ${channelName}` : 'Free Nollywood on YouTube',
       ctaText: 'WATCH ON YOUTUBE',
     };
   }

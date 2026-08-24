@@ -1,6 +1,7 @@
 import { generateAIContent, parseJSON } from '../ai_service.js';
 import type { FactPack } from './fact_pack_service';
 import { selectCaptionBankStarters } from './caption_bank.js';
+import { extractInstagramHandle } from '../social-studio/content/snapshots.js';
 
 export interface EditorialAngle {
   id: string;
@@ -73,11 +74,15 @@ export async function generateEditorialCopy(
       platformDisplayName: factPack.watchLinks?.[0]?.distributor,
       knownFor: (factPack.credits || []).map(credit => ({ title: credit.film || credit.name, year: credit.year })),
       topCast: factPack.entity.type === 'movie'
-        ? (factPack.credits || []).filter(credit => credit.role === 'actor').map(credit => ({ name: credit.name }))
+        ? (factPack.credits || []).filter(credit => credit.role === 'actor').map(credit => ({ name: credit.name, handle: extractInstagramHandle(credit) }))
         : [],
       directors: factPack.entity.type === 'movie'
-        ? (factPack.credits || []).filter(credit => credit.role === 'director').map(credit => ({ name: credit.name }))
+        ? (factPack.credits || []).filter(credit => credit.role === 'director').map(credit => ({ name: credit.name, handle: extractInstagramHandle(credit) }))
         : [],
+      creditedPeople: factPack.entity.type === 'movie'
+        ? (factPack.credits || []).map(credit => ({ name: credit.name, role: credit.role, handle: extractInstagramHandle(credit) })).filter(credit => credit.handle)
+        : [],
+      youtubeChannelName: factPack.facts?.youtube_channel_name,
       criticReview: factPack.reviews?.[0]
         ? {
             quote: factPack.reviews[0].quote,

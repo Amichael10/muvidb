@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { SocialSourceSnapshot } from './social-studio/content/snapshots.js';
+import type { SocialSourceSnapshot, UpcomingMovieSnapshot } from './social-studio/content/snapshots.js';
 import { SOCIAL_ICONS, type SocialIconName } from './social_icons.js';
 
 export type SocialAssetFormat = 'portrait_4_5' | 'square_1_1' | 'vertical_9_16';
@@ -1074,6 +1074,15 @@ function buildMovieSpotlightCard(
       h('div', { display: 'flex', alignItems: 'center', marginBottom: `${10 * g}px` }, [
         h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${18 * s}px`, letterSpacing: `${2.5 * s}px`, color: BRAND.muted, width: `${110 * s}px` }, 'RELEASE'),
         h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${20 * s}px`, color: BRAND.ink }, `${snapshot.year || ''} ${snapshot.releaseDate ? `(${snapshot.releaseDate})` : ''}`.trim()),
+      ]),
+    );
+  }
+
+  if (theme.name === 'YouTube' && snapshot.youtubeChannelName) {
+    column.push(
+      h('div', { display: 'flex', alignItems: 'center', marginBottom: `${10 * g}px` }, [
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${18 * s}px`, letterSpacing: `${2.5 * s}px`, color: BRAND.muted, width: `${110 * s}px` }, 'CHANNEL'),
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: `${20 * s}px`, color: theme.accent, width: `${splitX - pad - 140 * s}px` }, snapshot.youtubeChannelName),
       ]),
     );
   }

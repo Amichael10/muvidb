@@ -25,6 +25,14 @@ export type SnapshotCastMember = {
   character: string | null;
 };
 
+export type SnapshotCreditedPerson = {
+  personId: string;
+  name: string;
+  instagramHandle: string;
+  role: string;
+  character: string | null;
+};
+
 export type ActorSpotlightSnapshot = {
   kind: 'actor_spotlight';
   capturedAt: string;
@@ -61,6 +69,9 @@ export type UpcomingMovieSnapshot = {
   comingSoon: boolean;
   isPublished: boolean;
   topCast: SnapshotCastMember[];
+  creditedPeople: SnapshotCreditedPerson[];
+  youtubeChannelName: string | null;
+  youtubeChannelHandle: string | null;
 };
 
 /**
@@ -238,6 +249,18 @@ export function extractSocialHandle(person: {
   return null;
 }
 
+/** Instagram mentions must come from a stored Instagram URL, never another network's handle. */
+export function extractInstagramHandle(person: { instagram_url?: string | null }): string | null {
+  if (!person?.instagram_url) return null;
+  const clean = String(person.instagram_url)
+    .trim()
+    .split(/[?#]/, 1)[0]
+    .replace(/\/$/, '');
+  const match = clean.match(/(?:instagram\.com\/|@)?([a-zA-Z0-9._]+)$/i);
+  if (!match?.[1] || ['p', 'reel', 'tv', 'stories', 'explore'].includes(match[1].toLowerCase())) return null;
+  return `@${match[1]}`;
+}
+
 function formatDateNice(dateStr: string): string {
   try {
     const d = new Date(dateStr);
@@ -254,6 +277,7 @@ export function formatWatchAvailability(film: {
   release_date?: string | null;
   streaming_links?: Record<string, string> | null;
   youtube_watch_url?: string | null;
+  youtube_channel_name?: string | null;
 }): string | null {
   if (!film) return null;
   const links = film.streaming_links || {};
@@ -272,7 +296,8 @@ export function formatWatchAvailability(film: {
     return releaseStr ? `In Cinemas • ${releaseStr} 🎟️` : `In Cinemas Now 🎟️`;
   }
   if (hasYoutube) {
-    return `Watch on YouTube 📺`;
+    const channelName = text(film.youtube_channel_name);
+    return channelName ? `Watch on YouTube via ${channelName} 📺` : `Watch on YouTube 📺`;
   }
   if (film.coming_soon) {
     return releaseStr ? `Coming Soon • ${releaseStr} ⏳` : `Coming Soon ⏳`;
@@ -315,14 +340,25 @@ export function buildUpcomingMovieSnapshot(input: {
   const limit = input.castLimit ?? 4;
 
   const topCast: SnapshotCastMember[] = credits
+    .filter(credit => (!credit?.role || String(credit.role).toLowerCase() === 'actor') && credit?.people?.id && text(credit.people.name))
+    .map(credit => ({
+      personId: String(credit.people.id),
+      name: String(text(credit.people.name)),
+      handle: extractInstagramHandle(credit.people),
+      character: text(credit.character_name),
+    }))
+    .slice(0, limit);
+
+  const creditedPeople: SnapshotCreditedPerson[] = credits
     .filter(credit => credit?.people?.id && text(credit.people.name))
     .map(credit => ({
       personId: String(credit.people.id),
       name: String(text(credit.people.name)),
-      handle: extractSocialHandle(credit.people),
+      instagramHandle: extractInstagramHandle(credit.people),
+      role: String(text(credit.role) || 'actor').toLowerCase(),
       character: text(credit.character_name),
     }))
-    .slice(0, limit);
+    .filter((credit): credit is SnapshotCreditedPerson => Boolean(credit.instagramHandle));
 
   const liked = input.film.liked_percent;
   const likedPercent = liked === null || liked === undefined ? null : integer(liked);
@@ -347,6 +383,9 @@ export function buildUpcomingMovieSnapshot(input: {
     comingSoon: Boolean(input.film.coming_soon),
     isPublished: Boolean(input.film.is_published),
     topCast,
+    creditedPeople,
+    youtubeChannelName: text(input.film.youtube_channel_name),
+    youtubeChannelHandle: text(input.film.youtube_channel_handle),
   };
 }
 

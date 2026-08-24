@@ -71,6 +71,29 @@ describe('buildUpcomingMovieSnapshot', () => {
 
     expect(snapshot.backdropUrl).toBe('https://cdn.example/b.jpg');
   });
+
+  it('captures the linked YouTube channel and only verified Instagram credit handles', () => {
+    const snapshot = buildUpcomingMovieSnapshot({
+      capturedAt: CAPTURED_AT,
+      film: {
+        id: 'f',
+        title: 'YouTube Film',
+        youtube_watch_url: 'https://youtube.com/watch?v=abc',
+        youtube_channel_name: 'Example Pictures',
+        youtube_channel_handle: '@examplepictures',
+      },
+      credits: [
+        { role: 'actor', people: { id: 'p1', name: 'Actor One', instagram_url: 'https://instagram.com/actor.one/' } },
+        { role: 'director', people: { id: 'p2', name: 'Director Two', instagram_url: '@director.two' } },
+        { role: 'producer', people: { id: 'p3', name: 'Producer Three', twitter_url: 'https://x.com/producer3' } },
+      ],
+    });
+
+    expect(snapshot.watchAvailability).toContain('YouTube via Example Pictures');
+    expect(snapshot.youtubeChannelName).toBe('Example Pictures');
+    expect(snapshot.topCast[0].handle).toBe('@actor.one');
+    expect(snapshot.creditedPeople.map(person => person.instagramHandle)).toEqual(['@actor.one', '@director.two']);
+  });
 });
 
 describe('collectSnapshotWarnings', () => {

@@ -1,5 +1,5 @@
 import type { SocialPlatform } from '../domain/platform-types.js';
-import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SnapshotCastMember, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots.js';
+import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SnapshotCastMember, SnapshotCreditedPerson, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots.js';
 import { firstUsableCopy } from './copy-quality.js';
 
 export type PlatformCaptionLimits = {
@@ -116,6 +116,12 @@ function formatCastList(cast: SnapshotCastMember[]): string {
   return `Starring:\n${handlesOrNames.join('\n')}`;
 }
 
+function formatCrewList(credits: SnapshotCreditedPerson[]): string {
+  const crew = credits.filter(credit => credit.role !== 'actor');
+  if (!crew.length) return '';
+  return `Crew:\n${crew.map(credit => `${credit.role.replace(/_/g, ' ')} — ${credit.instagramHandle}`).join('\n')}`;
+}
+
 function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
   const lines: string[] = [];
   const handleOrName = snapshot.handle ? `${snapshot.name} (${snapshot.handle})` : snapshot.name;
@@ -181,6 +187,11 @@ function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
   const castBlock = formatCastList(snapshot.topCast);
   if (castBlock) {
     lines.push(castBlock);
+  }
+
+  const crewBlock = formatCrewList(snapshot.creditedPeople || []);
+  if (crewBlock) {
+    lines.push(crewBlock);
   }
 
   // 5. High-engagement question CTA to spark comments

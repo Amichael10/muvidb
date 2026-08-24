@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { extractSocialHandle } from '../social-studio/content/snapshots.js';
+import { extractInstagramHandle, extractSocialHandle } from '../social-studio/content/snapshots.js';
 import {
   classifyFilmLifecycle,
   getSeriesIntent,
@@ -111,27 +111,49 @@ async function enrichFilmCandidates(films: any[]): Promise<any[]> {
   if (!filmIds.length) return films;
 
   try {
-    const { data: credits } = await supabase
-      .from('credits')
-      .select('film_id, role, character_name, billing_order, people(id, name, instagram_url, twitter_url, tiktok_url, photo_url)')
-      .in('film_id', filmIds)
-      .order('billing_order', { ascending: true, nullsFirst: false });
+    const [creditsResult, channelVideosResult] = await Promise.all([
+      supabase
+        .from('credits')
+        .select('film_id, role, character_name, billing_order, people(id, name, instagram_url, photo_url)')
+        .in('film_id', filmIds)
+        .order('billing_order', { ascending: true, nullsFirst: false }),
+      supabase
+        .from('channel_videos')
+        .select('film_id,published_at,channels!inner(name,channel_handle)')
+        .in('film_id', filmIds)
+        .not('film_id', 'is', null)
+        .order('published_at', { ascending: false, nullsFirst: false }),
+    ]);
 
-    const creditsByFilm: Record<string, { topCast: any[]; directors: any[] }> = {};
-    for (const c of (credits || []) as any[]) {
+    if (creditsResult.error) throw creditsResult.error;
+    if (channelVideosResult.error) throw channelVideosResult.error;
+
+    const creditsByFilm: Record<string, { topCast: any[]; directors: any[]; creditedPeople: any[] }> = {};
+    for (const c of (creditsResult.data || []) as any[]) {
       if (!c.film_id || !c.people) continue;
-      if (!creditsByFilm[c.film_id]) creditsByFilm[c.film_id] = { topCast: [], directors: [] };
+      if (!creditsByFilm[c.film_id]) creditsByFilm[c.film_id] = { topCast: [], directors: [], creditedPeople: [] };
       const person = c.people;
-      const handle = extractSocialHandle(person);
+      const handle = extractInstagramHandle(person);
+      const role = String(c.role || 'actor').toLowerCase();
 
-      if ((c.role === 'actor' || !c.role) && creditsByFilm[c.film_id].topCast.length < 6) {
+      if (handle && !creditsByFilm[c.film_id].creditedPeople.some(entry => entry.id === person.id && entry.role === role)) {
+        creditsByFilm[c.film_id].creditedPeople.push({
+          id: person.id,
+          name: person.name,
+          handle,
+          role,
+          character: c.character_name,
+        });
+      }
+
+      if ((role === 'actor' || !c.role) && creditsByFilm[c.film_id].topCast.length < 8) {
         creditsByFilm[c.film_id].topCast.push({
           id: person.id,
           name: person.name,
           handle,
           character: c.character_name,
         });
-      } else if (c.role === 'director' && creditsByFilm[c.film_id].directors.length < 2) {
+      } else if (role === 'director' && creditsByFilm[c.film_id].directors.length < 2) {
         creditsByFilm[c.film_id].directors.push({
           id: person.id,
           name: person.name,
@@ -140,10 +162,22 @@ async function enrichFilmCandidates(films: any[]): Promise<any[]> {
       }
     }
 
+    const channelByFilm = new Map<string, { name: string; handle: string | null }>();
+    for (const video of (channelVideosResult.data || []) as any[]) {
+      if (!video.film_id || channelByFilm.has(video.film_id) || !video.channels?.name) continue;
+      channelByFilm.set(video.film_id, {
+        name: video.channels.name,
+        handle: video.channels.channel_handle || null,
+      });
+    }
+
     return films.map(f => ({
       ...f,
       topCast: creditsByFilm[f.id]?.topCast || [],
       directors: creditsByFilm[f.id]?.directors || [],
+      creditedPeople: creditsByFilm[f.id]?.creditedPeople || [],
+      youtubeChannelName: channelByFilm.get(f.id)?.name || null,
+      youtubeChannelHandle: channelByFilm.get(f.id)?.handle || null,
     }));
   } catch (err) {
     console.warn('Failed to enrich films with credits:', err);
@@ -558,7 +592,7 @@ export async function searchCandidates(
   if (type === 'all' || type === 'movie') {
     const { data: films } = await supabase
       .from('films')
-      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, is_in_cinemas, synopsis, tagline, genres, liked_percent, imdb_rating, view_count')
+      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, youtube_watch_url, is_in_cinemas, synopsis, tagline, genres, liked_percent, imdb_rating, view_count')
       .ilike('title', `%${trimmed}%`)
       .order('year', { ascending: false })
       .limit(limit);
@@ -566,7 +600,9 @@ export async function searchCandidates(
     if (films && films.length > 0) {
       const enrichedFilms = await enrichFilmCandidates(films);
       enrichedFilms.forEach((f) => {
-        const platformName = PLATFORM_DISPLAY_NAMES[f.release_type || ''] || (f.is_in_cinemas ? 'In Cinemas' : 'Streaming');
+        const platformName = f.youtube_watch_url
+          ? 'YouTube'
+          : PLATFORM_DISPLAY_NAMES[f.release_type || ''] || (f.is_in_cinemas ? 'In Cinemas' : 'Streaming');
         results.push({
           id: f.id,
           type: 'movie',
@@ -577,7 +613,7 @@ export async function searchCandidates(
           category: platformName,
           data: {
             ...f,
-            platform: f.release_type,
+            platform: f.youtube_watch_url ? 'youtube' : f.release_type,
             platformDisplayName: platformName,
           },
         });
