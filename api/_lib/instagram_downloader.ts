@@ -70,7 +70,7 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
   let authorName: string | null = null;
 
   // ── Strategy 0: Dedicated Render Microservice (yt-dlp) ──
-  const extractorUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || '').replace(/\/$/, '');
+  const extractorUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
   const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
 
   if (extractorUrl) {
