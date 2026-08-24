@@ -149,6 +149,7 @@ export async function sendTelegramVideo(
     const body: Record<string, unknown> = {
       chat_id: targetChatId,
       video: opts.video,
+      supports_streaming: true,
     };
     if (opts.caption) body.caption = opts.caption.slice(0, 1024);
     if (opts.replyMarkup) body.reply_markup = opts.replyMarkup;
@@ -160,6 +161,40 @@ export async function sendTelegramVideo(
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.ok) {
+      // If Telegram's servers cannot directly fetch the external CDN URL, fetch buffer and upload directly
+      if (typeof opts.video === 'string' && opts.video.startsWith('http')) {
+        try {
+          const vidFetch = await fetch(opts.video, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Referer': 'https://www.instagram.com/',
+            },
+          });
+          if (vidFetch.ok) {
+            const arrayBuffer = await vidFetch.arrayBuffer();
+            const blob = new Blob([arrayBuffer], { type: 'video/mp4' });
+            const formData = new FormData();
+            formData.append('chat_id', targetChatId);
+            formData.append('video', blob, 'video.mp4');
+            formData.append('supports_streaming', 'true');
+            if (opts.caption) formData.append('caption', opts.caption.slice(0, 1024));
+            if (opts.replyMarkup) formData.append('reply_markup', JSON.stringify(opts.replyMarkup));
+
+            const uploadRes = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, {
+              method: 'POST',
+              body: formData,
+            });
+            const uploadJson = await uploadRes.json().catch(() => ({}));
+            if (uploadRes.ok && uploadJson.ok) {
+              return { ok: true, messageId: uploadJson.result?.message_id };
+            }
+          }
+        } catch (uploadErr) {
+          console.warn('[sendTelegramVideo] Upload fallback error:', uploadErr);
+        }
+      }
+
       if (opts.caption) {
         return sendTelegramMessage({
           text: opts.caption,

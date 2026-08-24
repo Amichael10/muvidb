@@ -961,8 +961,9 @@ async function upsertFilm(meta: FilmMeta, cp: Checkpoint, forceFilmId?: string) 
       imdb_vote_count: meta.voteCount,
       source: 'imdb',
       status: 'released',
-      needs_review: true,
+      needs_review: false,
       is_published: true,
+      is_nollywood: true,
     })
     .select('id')
     .single();
@@ -999,8 +1000,10 @@ async function upsertPerson(
           slug,
           photo_url: photo,
           source: 'imdb',
+          nationality: 'Nigerian',
           known_for_department: role === 'director' ? 'Directing' : 'Acting',
-          needs_review: true,
+          needs_review: false,
+          is_verified: true,
         })
         .select('id,name,bio,photo_url,date_of_birth,birthplace,nationality,source')
         .single();
@@ -1168,6 +1171,28 @@ async function main() {
         cp.stats.errors++;
       }
     }
+  }
+
+  if (!DRY) {
+    console.log('\n🔄 Recalculating verified film counts across all enriched people...');
+    const { data: allCredits } = await supabase.from('credits').select('person_id');
+    const countMap: Record<string, number> = {};
+    for (const c of (allCredits || [])) {
+      if (c.person_id) countMap[c.person_id] = (countMap[c.person_id] || 0) + 1;
+    }
+    const pIds = Object.keys(countMap);
+    for (let i = 0; i < pIds.length; i += 50) {
+      const batch = pIds.slice(i, i + 50);
+      await Promise.all(
+        batch.map((id) =>
+          supabase
+            .from('people')
+            .update({ film_count: countMap[id], is_verified: true, nationality: 'Nigerian' })
+            .eq('id', id)
+        )
+      );
+    }
+    console.log('✅ Film counts recalculated.');
   }
 
   saveCheckpoint(cp);

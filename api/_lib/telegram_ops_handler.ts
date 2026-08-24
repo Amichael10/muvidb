@@ -22,6 +22,7 @@ import {
 import { recentHitsForIp, topHitters } from './scrape_guard.js';
 import { supabase } from './supabase.js';
 import { generateAIContent } from './ai_service.js';
+import { extractInstagramMedia } from './instagram_downloader.js';
 
 const IP_RE = /^(?:\d{1,3}\.){3}\d{1,3}$|^(?:[a-fA-F0-9:]+)$/;
 
@@ -472,110 +473,21 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
 
   if (sourceUrl) {
     if (/instagram\.com/i.test(sourceUrl)) {
-      const isReel = /\/reels?\/|\/tv\//i.test(sourceUrl);
-      eventType = isReel ? 'instagram_reel' : 'instagram_post';
-      platformLabel = isReel ? 'Instagram Reel' : 'Instagram';
-      const match = sourceUrl.match(/instagram\.com\/(?:p|reel|reels|tv)\/([^/?#&]+)/i);
-      const shortcode = match ? match[1] : '';
-
       try {
-        const targetUrl = shortcode ? `https://www.instagram.com/p/${shortcode}/` : sourceUrl;
-        
-        // Strategy 1: Official Instagram Web oEmbed API with X-IG-App-ID
-        const oembedRes = await fetch(`https://www.instagram.com/api/v1/oembed/?url=${encodeURIComponent(targetUrl)}`, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'X-IG-App-ID': '936619743392459',
-            'Accept': 'application/json',
-          },
-          signal: AbortSignal.timeout(5000),
-        });
-
-        if (oembedRes.ok) {
-          const oembedData = await oembedRes.json();
-          if (oembedData.title) {
-            description = decodeHtmlEntities(oembedData.title.trim());
-          }
-          if (oembedData.author_name) {
-            authorName = oembedData.author_name.trim();
-          }
-          if (oembedData.thumbnail_url) {
-            imageUrl = oembedData.thumbnail_url;
-          }
-        }
-
-        // Strategy 2: HTML scrape fallback if needed
-        if (!imageUrl || !description || description === rawText) {
-          const res = await fetch(targetUrl, {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9',
-            },
-            signal: AbortSignal.timeout(5000),
-          });
-
-          if (res.ok) {
-            const html = await res.text();
-            const ogTitle =
-              html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] ||
-              html.match(/content="([^"]*)"\s+property="og:title"/i)?.[1];
-            const ogDesc =
-              html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] ||
-              html.match(/<meta name="description" content="([^"]*)"/i)?.[1] ||
-              html.match(/content="([^"]*)"\s+property="og:description"/i)?.[1];
-            const ogImg =
-              html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1] ||
-              html.match(/content="([^"]*)"\s+property="og:image"/i)?.[1];
-            const ogVid =
-              html.match(/<meta property="og:video(?::secure_url)?" content="([^"]*)"/i)?.[1] ||
-              html.match(/content="([^"]*)"\s+property="og:video(?::secure_url)?"/i)?.[1];
-
-            if (!imageUrl && ogImg) {
-              imageUrl = ogImg.replace(/&amp;/g, '&');
-            }
-
-            if (ogVid) {
-              videoUrl = ogVid.replace(/&amp;/g, '&');
-            }
-
-            if (!description || description === rawText) {
-              if (ogTitle) {
-                const decodedTitle = decodeHtmlEntities(ogTitle);
-                const captionQuoteMatch =
-                  decodedTitle.match(/on\s+Instagram:\s*"([\s\S]*)"/i) || decodedTitle.match(/:\s*"([\s\S]*)"/i);
-                if (captionQuoteMatch && captionQuoteMatch[1]?.trim()) {
-                  description = decodeHtmlEntities(captionQuoteMatch[1].trim());
-                }
-              }
-              if ((!description || description === rawText) && ogDesc) {
-                const decodedDesc = decodeHtmlEntities(ogDesc);
-                const descQuoteMatch = decodedDesc.match(/:\s*"([\s\S]*)"/i);
-                if (descQuoteMatch && descQuoteMatch[1]?.trim()) {
-                  description = descQuoteMatch[1].trim();
-                } else if (!decodedDesc.startsWith('Instagram') && decodedDesc.length > 20) {
-                  description = decodedDesc;
-                }
-              }
-            }
-          }
-        }
+        const igMedia = await extractInstagramMedia(sourceUrl);
+        eventType = igMedia.isReel ? 'instagram_reel' : 'instagram_post';
+        platformLabel = igMedia.isReel ? 'Instagram Reel' : 'Instagram';
+        title = igMedia.title;
+        if (igMedia.caption) description = igMedia.caption;
+        if (igMedia.authorName) authorName = igMedia.authorName;
+        if (igMedia.imageUrl) imageUrl = igMedia.imageUrl;
+        if (igMedia.videoUrl) videoUrl = igMedia.videoUrl;
       } catch (err: any) {
         console.warn('[resolveIntakeMetadata] Instagram scrape warning:', err.message);
+        eventType = 'instagram_post';
+        platformLabel = 'Instagram';
+        title = 'Instagram Post';
       }
-
-      if (!authorName) {
-        authorName = sourceUrl.match(/instagram\.com\/([^/?#&]+)/i)?.[1] || null;
-        if (['p', 'reel', 'reels', 'tv', 'stories', 'explore'].includes(authorName || '')) authorName = null;
-      }
-
-      title = authorName
-        ? `${authorName} on Instagram (${isReel ? 'Reel' : 'Post'})`
-        : shortcode
-          ? `Instagram ${isReel ? 'Reel' : 'Post'} (${shortcode})`
-          : `Instagram ${isReel ? 'Reel' : 'Post'}`;
     } else if (/threads\.net/i.test(sourceUrl)) {
       eventType = 'threads_post';
       platformLabel = 'Threads';
