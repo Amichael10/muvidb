@@ -9,6 +9,8 @@ scripts/
 .git/
 node_modules/
 dist/
+apps/
+rust/
 
 # Ignore big media assets at root level only (NOT inside public/)
 /*.mp4

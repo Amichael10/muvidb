@@ -3,14 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "workspaces": [
-    "apps/*"
-  ],
   "scripts": {
     "dev": "react-router dev --port=3001 --host=0.0.0.0",
-    "dev:opencut": "npm --workspace=@opencut/web run dev",
+    "dev:opencut": "npm --prefix apps/opencut run dev",
     "build": "react-router build",
-    "build:opencut": "npm --workspace=@opencut/web run build",
+    "build:opencut": "npm --prefix apps/opencut run build",
     "build:emails": "node scripts/build_email_templates.mjs",
     "build:ssr": "react-router build",
     "preview": "vite preview",
