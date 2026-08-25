@@ -246,6 +246,12 @@ async function processJob(job: any, lockedBy: string, now: Date) {
   if (contentError) throw contentError;
 
   let assetUrl: string | null = null;
+  let assetUrls: string[] = Array.isArray(variant.platform_options?.carousel_asset_urls)
+    ? variant.platform_options.carousel_asset_urls.filter(
+        (url: unknown): url is string => typeof url === 'string' && /^https:\/\//i.test(url),
+      )
+    : [];
+
   if (variant.selected_asset_id) {
     const { data: asset, error: assetError } = await supabase
       .from('social_assets')
@@ -255,6 +261,8 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     if (assetError) throw assetError;
     assetUrl = asset?.public_url || null;
   }
+  if (assetUrls.length) assetUrl = assetUrls[0];
+  else if (assetUrl) assetUrls = [assetUrl];
 
   await supabase.from('social_platform_variants').update({ status: 'publishing' }).eq('id', variant.id);
   await supabase.from('social_content_items').update({ status: 'publishing' }).eq('id', contentItem.id);
@@ -312,6 +320,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       caption: variant.caption || '',
       title: variant.title,
       assetUrl,
+      assetUrls,
       scheduledFor: job.scheduled_for,
       options: variant.platform_options,
       sourceSnapshot: contentItem.source_snapshot,
@@ -938,7 +947,7 @@ export async function scheduleContentItem(
 
   const { data: variants, error: variantError } = await supabase
     .from('social_platform_variants')
-    .select('id,platform,status,selected_asset_id')
+    .select('id,platform,status,selected_asset_id,platform_options')
     .eq('content_item_id', input.contentItemId)
     .eq('status', 'approved');
 
@@ -948,7 +957,12 @@ export async function scheduleContentItem(
   // Every platform here posts media. Scheduling a variant with no asset would
   // only fail later inside the publisher, so it is caught up front and names
   // the offending platforms.
-  const missingAsset = variants.filter(variant => !variant.selected_asset_id).map(v => v.platform);
+  const missingAsset = variants
+    .filter(variant =>
+      !variant.selected_asset_id &&
+      (!Array.isArray(variant.platform_options?.carousel_asset_urls) || !variant.platform_options.carousel_asset_urls.length),
+    )
+    .map(v => v.platform);
   if (missingAsset.length) {
     throw httpError(409, `These variants have no rendered asset: ${missingAsset.join(', ')}`);
   }
@@ -1193,9 +1207,31 @@ export async function attachCustomAsset(
   actor: SocialActor,
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  if (!/^https:\/\//i.test(String(input.publicUrl || ''))) {
+    throw httpError(400, 'The custom artwork must have a public HTTPS URL');
+  }
   const format: SocialAssetFormat = input.format || 'square_1_1';
   const width = input.width || 1080;
   const height = input.height || 1080;
+  let storageBucket = 'external';
+  let storagePath = input.publicUrl;
+  try {
+    const parsed = new URL(input.publicUrl);
+    const marker = '/storage/v1/object/public/';
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex >= 0) {
+      const storageParts = parsed.pathname.slice(markerIndex + marker.length).split('/');
+      storageBucket = decodeURIComponent(storageParts.shift() || 'external');
+      storagePath = storageParts.map(part => decodeURIComponent(part)).join('/');
+    }
+  } catch {
+    throw httpError(400, 'The custom artwork URL is invalid');
+  }
+  const mimeType = /\.jpe?g(?:$|\?)/i.test(input.publicUrl)
+    ? 'image/jpeg'
+    : /\.webp(?:$|\?)/i.test(input.publicUrl)
+      ? 'image/webp'
+      : 'image/png';
 
   const { data: assetRow, error: assetError } = await supabase
     .from('social_assets')
@@ -1203,10 +1239,10 @@ export async function attachCustomAsset(
       {
         content_item_id: input.contentItemId,
         format,
-        storage_bucket: 'custom-upload',
-        storage_path: input.publicUrl,
+        storage_bucket: storageBucket,
+        storage_path: storagePath,
         public_url: input.publicUrl,
-        mime_type: 'image/png',
+        mime_type: mimeType,
         width,
         height,
         file_size_bytes: 0,
@@ -1231,6 +1267,112 @@ export async function attachCustomAsset(
   });
 
   return assetRow;
+}
+
+export async function attachCarouselAssets(
+  input: {
+    contentItemId: string;
+    publicUrls: string[];
+    format?: SocialAssetFormat;
+    width?: number;
+    height?: number;
+  },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const publicUrls = [...new Set((input.publicUrls || []).map(url => String(url).trim()).filter(Boolean))];
+  if (publicUrls.length < 2 || publicUrls.length > 10) {
+    throw httpError(400, 'A carousel needs between 2 and 10 images');
+  }
+  if (publicUrls.some(url => !/^https:\/\//i.test(url))) {
+    throw httpError(400, 'Every carousel image must have a public HTTPS URL');
+  }
+
+  const format: SocialAssetFormat = input.format || 'square_1_1';
+  const width = input.width || 1080;
+  const height = input.height || 1080;
+
+  const { data: variants, error: variantError } = await supabase
+    .from('social_platform_variants')
+    .select('id,platform,platform_options')
+    .eq('content_item_id', input.contentItemId);
+  if (variantError) throw variantError;
+  if (!variants?.length) throw httpError(404, 'No platform variants were found for this draft');
+
+  for (const variant of variants) {
+    const { error: updateError } = await supabase
+      .from('social_platform_variants')
+      .update({
+        platform_options: {
+          ...(variant.platform_options || {}),
+          post_format: 'carousel',
+          carousel_asset_urls: publicUrls,
+        },
+      })
+      .eq('id', variant.id);
+    if (updateError) throw updateError;
+  }
+
+  const assets = publicUrls.map((publicUrl, position) => ({
+    id: publicUrl,
+    public_url: publicUrl,
+    format,
+    width,
+    height,
+    position,
+  }));
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'carousel_assets_attached',
+    eventData: {
+      actor_id: actor.id,
+      public_urls: publicUrls,
+      image_count: assets.length,
+      platforms: variants.map(variant => variant.platform),
+    },
+  });
+
+  return { assets, imageCount: assets.length };
+}
+
+export async function reorderCarouselAssets(
+  input: { contentItemId: string; publicUrls: string[] },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const publicUrls = (input.publicUrls || []).map(url => String(url).trim()).filter(Boolean);
+  if (publicUrls.length < 2 || publicUrls.length > 10 || new Set(publicUrls).size !== publicUrls.length) {
+    throw httpError(400, 'Provide 2–10 unique carousel image URLs in the desired order');
+  }
+  if (publicUrls.some(url => !/^https:\/\//i.test(url))) throw httpError(400, 'Every carousel image must use HTTPS');
+
+  const { data: variants, error: variantError } = await supabase
+    .from('social_platform_variants')
+    .select('id,platform_options')
+    .eq('content_item_id', input.contentItemId);
+  if (variantError) throw variantError;
+  if (!variants?.length) throw httpError(404, 'No platform variants were found for this draft');
+
+  for (const variant of variants) {
+    const { error: updateError } = await supabase
+      .from('social_platform_variants')
+      .update({
+        platform_options: {
+          ...(variant.platform_options || {}),
+          post_format: 'carousel',
+          carousel_asset_urls: publicUrls,
+        },
+      })
+      .eq('id', variant.id);
+    if (updateError) throw updateError;
+  }
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'carousel_assets_reordered',
+    eventData: { actor_id: actor.id, public_urls: publicUrls },
+  });
+  return { success: true, publicUrls };
 }
 
 export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
@@ -1473,6 +1615,7 @@ export async function approveEditorialSlot(
     scheduledTime?: string;
     platforms?: SocialPlatform[];
     customCaptions?: Record<string, string>;
+    customImageUrl?: string | null;
   },
   actor: SocialActor,
 ) {
@@ -1509,6 +1652,13 @@ export async function approveEditorialSlot(
     },
     actor,
   );
+
+  if (input.customImageUrl) {
+    await attachCustomAsset(
+      { contentItemId: draft.contentItem.id, publicUrl: input.customImageUrl },
+      actor,
+    );
+  }
 
   // 2. Compute scheduled time ISO string
   const time = input.scheduledTime || '11:00:00';

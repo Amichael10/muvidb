@@ -44,6 +44,26 @@ describe('ThreadsPlatformAdapter', () => {
     expect(createBody.get('image_url')).toBe('https://cdn.example.com/post.jpg');
   });
 
+  it('publishes multiple images through a carousel container', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child-1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child-2' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'carousel-1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'post-1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ permalink: 'https://threads.net/@muvidb/post/carousel' }), { status: 200 }));
+    const adapter = new ThreadsPlatformAdapter({ accessToken: 'token', userId: 'user-1', fetchImpl });
+
+    await adapter.publish(request({
+      assetUrls: ['https://cdn.example.com/one.jpg', 'https://cdn.example.com/two.jpg'],
+    }));
+
+    expect((fetchImpl.mock.calls[0][1].body as URLSearchParams).get('is_carousel_item')).toBe('true');
+    const parentBody = fetchImpl.mock.calls[2][1].body as URLSearchParams;
+    expect(parentBody.get('media_type')).toBe('CAROUSEL');
+    expect(parentBody.get('children')).toBe('child-1,child-2');
+    expect(parentBody.get('text')).toBe('A MuviDB test post');
+  });
+
   it('marks rate limits as retryable', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ error: { message: 'Slow down', code: 4 } }), { status: 429 }),

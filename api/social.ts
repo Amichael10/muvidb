@@ -114,6 +114,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       runSocialPublisher,
       parseGenerateDraftRequest,
       attachCustomAsset,
+      attachCarouselAssets,
+      reorderCarouselAssets,
       getEditorialCalendar,
       seedEditorialCalendarSlots,
     } = await import('./_lib/social_studio.js');
@@ -343,6 +345,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'contentItemId and publicUrl are required' });
         }
         return res.status(200).json(await attachCustomAsset({ contentItemId, publicUrl, format, width, height }, actor));
+      }
+
+      if (task === 'attach_carousel_assets') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, publicUrls, format, width, height } = req.body || {};
+        if (!contentItemId || !Array.isArray(publicUrls)) {
+          return res.status(400).json({ error: 'contentItemId and publicUrls are required' });
+        }
+        return res.status(200).json(
+          await attachCarouselAssets({ contentItemId, publicUrls, format, width, height }, actor),
+        );
+      }
+
+      if (task === 'reorder_carousel_assets') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, publicUrls } = req.body || {};
+        if (!contentItemId || !Array.isArray(publicUrls)) {
+          return res.status(400).json({ error: 'contentItemId and publicUrls are required' });
+        }
+        return res.status(200).json(await reorderCarouselAssets({ contentItemId, publicUrls }, actor));
       }
 
       if (task === 'threads_oauth_start') {

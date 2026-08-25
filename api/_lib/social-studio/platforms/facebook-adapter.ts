@@ -97,14 +97,73 @@ export class FacebookPlatformAdapter implements SocialPlatformAdapter {
   }
 
   async publish(request: SocialPublishRequest): Promise<SocialPublishResult> {
+    const mediaUrls = (request.assetUrls?.length ? request.assetUrls : request.assetUrl ? [request.assetUrl] : [])
+      .filter(Boolean);
+    if (mediaUrls.length > 10) {
+      throw new SocialPlatformError({
+        platform: 'facebook',
+        code: 'facebook_carousel_too_large',
+        message: 'Facebook multi-photo posts can contain no more than 10 images.',
+      });
+    }
+
+    if (mediaUrls.length > 1) {
+      if (mediaUrls.some(url => /\.(mp4|mov|webm)(\?.*)?$/i.test(url))) {
+        throw new SocialPlatformError({
+          platform: 'facebook',
+          code: 'facebook_carousel_images_only',
+          message: 'Facebook carousel publishing currently supports images only.',
+        });
+      }
+
+      const photoIds: string[] = [];
+      for (const mediaUrl of mediaUrls) {
+        const uploaded = await this.post(
+          `/${encodeURIComponent(this.pageId)}/photos`,
+          new URLSearchParams({ url: mediaUrl, published: 'false' }),
+        );
+        if (!uploaded.id) {
+          throw new SocialPlatformError({
+            platform: 'facebook',
+            code: 'facebook_photo_upload_missing_id',
+            message: 'Facebook did not return an ID for one of the carousel images.',
+          });
+        }
+        photoIds.push(String(uploaded.id));
+      }
+
+      const feedParams = new URLSearchParams({ message: request.caption });
+      photoIds.forEach((id, index) => {
+        feedParams.set(`attached_media[${index}]`, JSON.stringify({ media_fbid: id }));
+      });
+      const feed = await this.post(`/${encodeURIComponent(this.pageId)}/feed`, feedParams);
+      if (!feed.id) {
+        throw new SocialPlatformError({
+          platform: 'facebook',
+          code: 'facebook_feed_missing_id',
+          message: 'Facebook did not return an ID for the carousel post.',
+        });
+      }
+      const externalPermalink = await this.permalink(String(feed.id));
+      return {
+        platform: 'facebook',
+        providerPublishId: String(feed.id),
+        externalPostId: String(feed.id),
+        externalPermalink,
+        providerResponse: { ...feed, photo_ids: photoIds, carousel_size: photoIds.length },
+        variantStatus: 'published',
+      };
+    }
+
     const params = new URLSearchParams();
 
     // Photo Post
-    if (request.assetUrl) {
-      const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(request.assetUrl);
+    if (mediaUrls[0]) {
+      const assetUrl = mediaUrls[0];
+      const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(assetUrl);
       if (isVideo) {
         params.set('description', request.caption);
-        params.set('file_url', request.assetUrl);
+        params.set('file_url', assetUrl);
         const res = await this.post(`/${encodeURIComponent(this.pageId)}/videos`, params);
         const externalPostId = res.id;
         const externalPermalink = await this.permalink(externalPostId);
@@ -119,7 +178,7 @@ export class FacebookPlatformAdapter implements SocialPlatformAdapter {
       }
 
       params.set('caption', request.caption);
-      params.set('url', request.assetUrl);
+      params.set('url', assetUrl);
       const res = await this.post(`/${encodeURIComponent(this.pageId)}/photos`, params);
       const externalPostId = res.post_id || res.id;
       const externalPermalink = await this.permalink(externalPostId);

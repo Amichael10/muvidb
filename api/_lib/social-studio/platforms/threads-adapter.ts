@@ -106,12 +106,52 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
-    const create = new URLSearchParams({
-      access_token: this.accessToken,
-      media_type: request.assetUrl ? 'IMAGE' : 'TEXT',
-      text: request.caption,
-    });
-    if (request.assetUrl) create.set('image_url', request.assetUrl);
+    const mediaUrls = (request.assetUrls?.length ? request.assetUrls : request.assetUrl ? [request.assetUrl] : [])
+      .filter(Boolean);
+    if (mediaUrls.length > 10) {
+      throw new SocialPlatformError({
+        platform: 'threads',
+        code: 'threads_carousel_too_large',
+        message: 'This carousel contains more than the supported 10 images.',
+      });
+    }
+
+    let create: URLSearchParams;
+    if (mediaUrls.length > 1) {
+      const childIds: string[] = [];
+      for (const mediaUrl of mediaUrls) {
+        const childIsVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(mediaUrl);
+        const child = new URLSearchParams({
+          access_token: this.accessToken,
+          media_type: childIsVideo ? 'VIDEO' : 'IMAGE',
+          is_carousel_item: 'true',
+        });
+        child.set(childIsVideo ? 'video_url' : 'image_url', mediaUrl);
+        const childContainer = await this.post(`/${encodeURIComponent(this.userId)}/threads`, child);
+        if (!childContainer.id) {
+          throw new SocialPlatformError({
+            platform: 'threads',
+            code: 'threads_carousel_child_missing',
+            message: 'Threads did not return an ID for one of the carousel items.',
+            retryable: true,
+          });
+        }
+        childIds.push(String(childContainer.id));
+      }
+      create = new URLSearchParams({
+        access_token: this.accessToken,
+        media_type: 'CAROUSEL',
+        children: childIds.join(','),
+        text: request.caption,
+      });
+    } else {
+      create = new URLSearchParams({
+        access_token: this.accessToken,
+        media_type: mediaUrls.length ? 'IMAGE' : 'TEXT',
+        text: request.caption,
+      });
+      if (mediaUrls[0]) create.set('image_url', mediaUrls[0]);
+    }
 
     const container = await this.post(`/${encodeURIComponent(this.userId)}/threads`, create);
     if (!container.id) {

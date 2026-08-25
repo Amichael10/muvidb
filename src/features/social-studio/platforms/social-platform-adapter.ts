@@ -8,6 +8,7 @@ export type SocialPublishRequest = {
   caption: string;
   title?: string | null;
   assetUrl?: string | null;
+  assetUrls?: string[];
   scheduledFor: string;
   options?: Record<string, unknown> | null;
   sourceSnapshot?: unknown;

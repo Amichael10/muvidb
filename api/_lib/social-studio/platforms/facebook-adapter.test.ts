@@ -53,4 +53,24 @@ describe('FacebookPlatformAdapter', () => {
     const body = fetchImpl.mock.calls[0][1].body as URLSearchParams;
     expect(body.get('message')).toBe('A MuviDB Facebook post');
   });
+
+  it('publishes multiple photos as one Facebook feed post', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'photo_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'photo_2' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'page_post_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ permalink_url: 'https://facebook.com/page/posts/carousel' }), { status: 200 }));
+    const adapter = new FacebookPlatformAdapter({ accessToken: 'fb-token', pageId: 'page_123', fetchImpl });
+
+    const result = await adapter.publish(request({
+      assetUrls: ['https://cdn.example.com/one.jpg', 'https://cdn.example.com/two.jpg'],
+    }));
+
+    expect(result.externalPostId).toBe('page_post_1');
+    expect((fetchImpl.mock.calls[0][1].body as URLSearchParams).get('published')).toBe('false');
+    const feedBody = fetchImpl.mock.calls[2][1].body as URLSearchParams;
+    expect(feedBody.get('message')).toBe('A MuviDB Facebook post');
+    expect(feedBody.get('attached_media[0]')).toBe(JSON.stringify({ media_fbid: 'photo_1' }));
+    expect(feedBody.get('attached_media[1]')).toBe(JSON.stringify({ media_fbid: 'photo_2' }));
+  });
 });

@@ -35,13 +35,13 @@ export async function validateImage(file) {
 
 // Decode and re-encode to a clean WebP blob (strips metadata + any payload,
 // caps dimensions). Runs in the browser; rejects if the image can't decode.
-function canvasBlob(canvas, quality) {
+function canvasBlob(canvas, quality, mimeType = 'image/webp') {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Encode failed'))), 'image/webp', quality);
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Encode failed'))), mimeType, quality);
   });
 }
 
-export function reencodeToWebp(fileOrBlob, targetBytes = TARGET_BYTES) {
+function reencodeImage(fileOrBlob, targetBytes, mimeType) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(fileOrBlob);
     const img = new Image();
@@ -62,7 +62,7 @@ export function reencodeToWebp(fileOrBlob, targetBytes = TARGET_BYTES) {
           context.imageSmoothingQuality = 'high';
           context.drawImage(img, 0, 0, w, h);
           for (const quality of [0.88, 0.8, 0.72, 0.64, 0.56]) {
-            const blob = await canvasBlob(canvas, quality);
+            const blob = await canvasBlob(canvas, quality, mimeType);
             if (blob.size <= targetBytes) {
               resolve(blob);
               return;
@@ -83,6 +83,14 @@ export function reencodeToWebp(fileOrBlob, targetBytes = TARGET_BYTES) {
     };
     img.src = url;
   });
+}
+
+export function reencodeToWebp(fileOrBlob, targetBytes = TARGET_BYTES) {
+  return reencodeImage(fileOrBlob, targetBytes, 'image/webp');
+}
+
+export function reencodeToJpeg(fileOrBlob, targetBytes = TARGET_BYTES) {
+  return reencodeImage(fileOrBlob, targetBytes, 'image/jpeg');
 }
 
 // Validate → re-encode → upload to the private quarantine bucket.
@@ -143,6 +151,34 @@ export async function uploadAdminImage(file, bucket = 'film-images') {
       contentType: 'image/webp',
       upsert: false,
       cacheControl: '31536000', // 1 year — the UUID name makes it immutable
+    });
+  if (upErr) return { error: upErr.message };
+
+  const base = import.meta.env.VITE_SUPABASE_URL || '';
+  return { url: `${base}/storage/v1/object/public/${bucket}/${path}` };
+}
+
+// Meta's Instagram publishing API accepts JPEG images for feed publishing.
+// Carousel artwork is therefore re-encoded locally to JPEG before upload;
+// this keeps compression free and prevents a later provider-side format error.
+export async function uploadAdminSocialImage(file, bucket = 'film-images') {
+  const err = await validateImage(file);
+  if (err) return { error: err };
+
+  let blob;
+  try {
+    blob = await reencodeToJpeg(file);
+  } catch {
+    return { error: 'Could not process that image. Try a different file.' };
+  }
+
+  const path = `social/${crypto.randomUUID()}.jpg`;
+  const { error: upErr } = await supabase.storage
+    .from(bucket)
+    .upload(path, blob, {
+      contentType: 'image/jpeg',
+      upsert: false,
+      cacheControl: '31536000',
     });
   if (upErr) return { error: upErr.message };
 

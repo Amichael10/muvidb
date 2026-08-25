@@ -61,6 +61,32 @@ describe('InstagramPlatformAdapter', () => {
     expect(containerBody.get('video_url')).toBe('https://cdn.example.com/trailer.mp4');
   });
 
+  it('publishes ordered images as one carousel', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child_2' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'carousel_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'media_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ permalink: 'https://instagram.com/p/carousel' }), { status: 200 }));
+    const adapter = new InstagramPlatformAdapter({
+      accessToken: 'token',
+      instagramAccountId: 'ig-user-1',
+      fetchImpl,
+    });
+
+    const result = await adapter.publish(request({
+      assetUrls: ['https://cdn.example.com/one.jpg', 'https://cdn.example.com/two.jpg'],
+    }));
+
+    expect(result.externalPostId).toBe('media_1');
+    expect((fetchImpl.mock.calls[0][1].body as URLSearchParams).get('is_carousel_item')).toBe('true');
+    expect((fetchImpl.mock.calls[1][1].body as URLSearchParams).get('image_url')).toBe('https://cdn.example.com/two.jpg');
+    const parentBody = fetchImpl.mock.calls[2][1].body as URLSearchParams;
+    expect(parentBody.get('media_type')).toBe('CAROUSEL');
+    expect(parentBody.get('children')).toBe('child_1,child_2');
+    expect(parentBody.get('caption')).toBe('A MuviDB Instagram test post');
+  });
+
   it('rejects requests without media asset', async () => {
     const adapter = new InstagramPlatformAdapter({
       accessToken: 'token',

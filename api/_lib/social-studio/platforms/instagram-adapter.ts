@@ -144,7 +144,9 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
   }
 
   async publish(request: SocialPublishRequest): Promise<SocialPublishResult> {
-    if (!request.assetUrl) {
+    const mediaUrls = (request.assetUrls?.length ? request.assetUrls : request.assetUrl ? [request.assetUrl] : [])
+      .filter(Boolean);
+    if (!mediaUrls.length) {
       throw new SocialPlatformError({
         platform: 'instagram',
         code: 'instagram_media_required',
@@ -152,15 +154,90 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
-    const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(request.assetUrl);
+    if (mediaUrls.length > 10) {
+      throw new SocialPlatformError({
+        platform: 'instagram',
+        code: 'instagram_carousel_too_large',
+        message: 'Instagram carousels can contain no more than 10 items.',
+      });
+    }
+
+    if (mediaUrls.length > 1) {
+      const childIds: string[] = [];
+      for (const mediaUrl of mediaUrls) {
+        const childParams = new URLSearchParams({ is_carousel_item: 'true' });
+        const childIsVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(mediaUrl);
+        if (childIsVideo) {
+          childParams.set('media_type', 'VIDEO');
+          childParams.set('video_url', mediaUrl);
+        } else {
+          childParams.set('image_url', mediaUrl);
+        }
+        const child = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, childParams);
+        if (!child.id) {
+          throw new SocialPlatformError({
+            platform: 'instagram',
+            code: 'instagram_carousel_child_missing',
+            message: 'Instagram did not return an ID for one of the carousel items.',
+          });
+        }
+        if (childIsVideo) await this.waitForContainer(String(child.id));
+        childIds.push(String(child.id));
+      }
+
+      const carousel = await this.post(
+        `/${encodeURIComponent(this.instagramAccountId)}/media`,
+        new URLSearchParams({
+          media_type: 'CAROUSEL',
+          children: childIds.join(','),
+          caption: request.caption,
+        }),
+      );
+      if (!carousel.id) {
+        throw new SocialPlatformError({
+          platform: 'instagram',
+          code: 'instagram_container_missing',
+          message: 'Instagram did not return a carousel container ID.',
+        });
+      }
+
+      const publishRes = await this.post(
+        `/${encodeURIComponent(this.instagramAccountId)}/media_publish`,
+        new URLSearchParams({ creation_id: String(carousel.id) }),
+      );
+      if (!publishRes.id) {
+        throw new SocialPlatformError({
+          platform: 'instagram',
+          code: 'instagram_publish_missing_id',
+          message: 'Instagram did not return a published carousel ID.',
+        });
+      }
+      const externalPermalink = await this.permalink(String(publishRes.id));
+      return {
+        platform: 'instagram',
+        providerPublishId: String(carousel.id),
+        externalPostId: String(publishRes.id),
+        externalPermalink,
+        providerResponse: {
+          container_id: String(carousel.id),
+          media_id: String(publishRes.id),
+          child_container_ids: childIds,
+          carousel_size: childIds.length,
+        },
+        variantStatus: 'published',
+      };
+    }
+
+    const assetUrl = mediaUrls[0];
+    const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(assetUrl);
     const containerParams = new URLSearchParams();
     containerParams.set('caption', request.caption);
 
     if (isVideo) {
       containerParams.set('media_type', 'REELS');
-      containerParams.set('video_url', request.assetUrl);
+      containerParams.set('video_url', assetUrl);
     } else {
-      containerParams.set('image_url', request.assetUrl);
+      containerParams.set('image_url', assetUrl);
     }
 
     // 1. Create Media Container

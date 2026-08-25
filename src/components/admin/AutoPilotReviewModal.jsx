@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
-import { uploadAdminImage } from '../../lib/imageUpload';
+import { uploadAdminSocialImage } from '../../lib/imageUpload';
 import FigmaSocialCardPreview from './FigmaSocialCardPreview.jsx';
 
 const PLATFORMS = [
@@ -267,8 +267,9 @@ export default function AutoPilotReviewModal({
     if (!file) return;
     setUploadingImage(true);
     try {
-      const { publicUrl } = await uploadAdminImage(file, 'social');
-      setCustomImageUrl(publicUrl);
+      const upload = await uploadAdminSocialImage(file, 'social-published-assets');
+      if (upload.error || !upload.url) throw new Error(upload.error || 'The uploaded image has no public URL');
+      setCustomImageUrl(upload.url);
       toast.success('Custom graphic artwork uploaded!');
     } catch (err) {
       toast.error(err.message || 'Image upload failed');
@@ -351,6 +352,7 @@ export default function AutoPilotReviewModal({
           scheduledTime: finalTime,
           platforms: selectedPlatforms,
           customCaptions: captions,
+          customImageUrl: customImageUrl || null,
         }),
       });
 

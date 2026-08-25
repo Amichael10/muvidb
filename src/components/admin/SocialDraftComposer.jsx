@@ -3,7 +3,7 @@ import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
-import { uploadAdminImage } from '../../lib/imageUpload';
+import { uploadAdminSocialImage } from '../../lib/imageUpload';
 
 export const EDITORIAL_THEMES = [
   {
@@ -142,7 +142,10 @@ export default function SocialDraftComposer({
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
+  const [postFormat, setPostFormat] = useState('single');
+  const [carouselAssets, setCarouselAssets] = useState([]);
   const [uploadingCustom, setUploadingCustom] = useState(false);
+  const [reorderingCarousel, setReorderingCarousel] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [customScheduleDate, setCustomScheduleDate] = useState('');
   const fileInputRef = useRef(null);
@@ -168,6 +171,8 @@ export default function SocialDraftComposer({
     setResults([]);
     setQuery('');
     setResult(null);
+    setPostFormat('single');
+    setCarouselAssets([]);
   }, [themeId]);
 
   useEffect(() => {
@@ -216,6 +221,7 @@ export default function SocialDraftComposer({
 
     setGenerating(true);
     setResult(null);
+    setCarouselAssets([]);
     try {
       const res = await fetch('/api/social?task=generate_draft', {
         method: 'POST',
@@ -242,11 +248,47 @@ export default function SocialDraftComposer({
   };
 
   const handleCustomImageUpload = async event => {
-    const file = event.target.files?.[0];
-    if (!file || !result?.contentItem?.id) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length || !result?.contentItem?.id) return;
     setUploadingCustom(true);
     try {
-      const uploadRes = await uploadAdminImage(file, 'film-images');
+      if (postFormat === 'carousel') {
+        if (files.length < 2 || files.length > 10) {
+          throw new Error('Choose between 2 and 10 images for a carousel');
+        }
+        if (platforms.includes('tiktok')) {
+          throw new Error('Carousel publishing is available for Instagram, Facebook, and Threads. Remove TikTok first.');
+        }
+
+        const publicUrls = [];
+        for (const file of files) {
+          const uploadRes = await uploadAdminSocialImage(file, 'film-images');
+          if (uploadRes.error) throw new Error(`${file.name}: ${uploadRes.error}`);
+          publicUrls.push(uploadRes.url);
+        }
+
+        const res = await fetch('/api/social?task=attach_carousel_assets', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentItemId: result.contentItem.id, publicUrls }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        const attached = (data.assets || []).map((asset, index) => ({
+          id: asset.id,
+          publicUrl: asset.public_url,
+          format: 'carousel_image',
+          width: asset.width || 1080,
+          height: asset.height || 1080,
+          position: index,
+        }));
+        setCarouselAssets(attached);
+        toast.success(`${attached.length}-image carousel attached to this draft`);
+        return;
+      }
+
+      const uploadRes = await uploadAdminSocialImage(files[0], 'social-published-assets');
       if (uploadRes.error) throw new Error(uploadRes.error);
       const url = uploadRes.url;
 
@@ -269,7 +311,7 @@ export default function SocialDraftComposer({
           ...(curr?.assets || []),
         ],
       }));
-      onGenerated?.(result);
+      onGenerated?.({ ...result, assets: [{ id: data.id, publicUrl: url, format: 'custom_design', width: data.width || 1080, height: data.height || 1080 }, ...(result.assets || [])] });
     } catch (err) {
       toast.error(err.message || 'Failed to upload custom design');
     } finally {
@@ -315,6 +357,33 @@ export default function SocialDraftComposer({
       toast.error(err.message || 'Scheduling failed');
     } finally {
       setScheduling(false);
+    }
+  };
+
+  const moveCarouselSlide = async (fromIndex, direction) => {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= carouselAssets.length || reorderingCarousel) return;
+    const previous = carouselAssets;
+    const next = [...carouselAssets];
+    [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+    setCarouselAssets(next);
+    setReorderingCarousel(true);
+    try {
+      const res = await fetch('/api/social?task=reorder_carousel_assets', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentItemId: result.contentItem.id,
+          publicUrls: next.map(asset => asset.publicUrl),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    } catch (err) {
+      setCarouselAssets(previous);
+      toast.error(err.message || 'Could not change the slide order');
+    } finally {
+      setReorderingCarousel(false);
     }
   };
 
@@ -574,9 +643,42 @@ export default function SocialDraftComposer({
                   <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
                     Post Visual & Artwork
                   </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-surface p-1.5">
+                  {[
+                    { value: 'single', label: 'Single image', icon: 'solar:gallery-linear' },
+                    { value: 'carousel', label: 'Carousel', icon: 'solar:gallery-wide-linear' },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setPostFormat(option.value);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-bold transition-colors ${
+                        postFormat === option.value
+                          ? 'bg-brand text-white'
+                          : 'text-text-muted hover:bg-surface-2 hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon icon={option.icon} width="16" />
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] leading-relaxed text-text-muted">
+                    {postFormat === 'carousel'
+                      ? 'Choose 2–10 images together. Their selected order becomes the swipe order.'
+                      : 'Replace the generated artwork with one custom image.'}
+                  </span>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
+                    multiple={postFormat === 'carousel'}
                     ref={fileInputRef}
                     onChange={handleCustomImageUpload}
                     className="hidden"
@@ -592,21 +694,55 @@ export default function SocialDraftComposer({
                       className={uploadingCustom ? 'animate-spin' : ''}
                       width="14"
                     />
-                    {uploadingCustom ? 'Uploading…' : 'Upload Custom Artwork'}
+                    {uploadingCustom
+                      ? postFormat === 'carousel' ? 'Building carousel…' : 'Uploading…'
+                      : postFormat === 'carousel' ? 'Choose carousel images' : 'Upload artwork'}
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                  {result.assets?.map(asset => (
+                {postFormat === 'carousel' && carouselAssets.length > 0 && (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs font-bold text-emerald-400">
+                    <Icon icon="solar:check-circle-bold" className="mr-1.5 inline" width="15" />
+                    {carouselAssets.length} images attached. Approval will publish them as one swipeable post.
+                  </div>
+                )}
+
+                <div className={postFormat === 'carousel' ? 'grid grid-cols-2 gap-3' : 'flex flex-wrap gap-3'}>
+                  {(postFormat === 'carousel' ? carouselAssets : result.assets || []).map((asset, index) => (
                     <div
                       key={asset.id}
                       className="group relative w-full overflow-hidden rounded-lg border border-border bg-surface"
                     >
+                      {postFormat === 'carousel' && (
+                        <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
+                          <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/80 px-1.5 text-[10px] font-black text-white">
+                            {index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Move slide ${index + 1} left`}
+                            onClick={() => moveCarouselSlide(index, -1)}
+                            disabled={index === 0 || reorderingCarousel}
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/80 text-white disabled:opacity-30"
+                          >
+                            <Icon icon="solar:arrow-left-linear" width="13" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Move slide ${index + 1} right`}
+                            onClick={() => moveCarouselSlide(index, 1)}
+                            disabled={index === carouselAssets.length - 1 || reorderingCarousel}
+                            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/80 text-white disabled:opacity-30"
+                          >
+                            <Icon icon="solar:arrow-right-linear" width="13" />
+                          </button>
+                        </div>
+                      )}
                       <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="block">
                         <img
                           src={asset.publicUrl}
                           alt={asset.format}
-                          className="h-56 w-full object-cover transition-opacity group-hover:opacity-90"
+                          className={`${postFormat === 'carousel' ? 'h-40' : 'h-56'} w-full object-cover transition-opacity group-hover:opacity-90`}
                         />
                       </a>
                       <div className="p-2.5 flex items-center justify-between bg-surface">
@@ -617,7 +753,11 @@ export default function SocialDraftComposer({
                               : 'bg-surface-2 text-text-muted'
                           }`}
                         >
-                          {asset.format === 'custom_design' ? 'Custom Artwork' : asset.format}
+                          {asset.format === 'custom_design'
+                            ? 'Custom Artwork'
+                            : asset.format === 'carousel_image'
+                              ? `Slide ${index + 1}`
+                              : asset.format}
                         </span>
                         <span className="text-[10px] font-mono text-text-muted">
                           {asset.width}×{asset.height}

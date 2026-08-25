@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
 import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
-import { uploadAdminImage } from '../../lib/imageUpload';
+import { uploadAdminSocialImage } from '../../lib/imageUpload';
 import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
 import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
 
@@ -171,7 +171,7 @@ export default function AdminSocialStudio() {
           content_type,
           created_at,
           rejection_reason,
-          social_platform_variants(id,platform,status,caption,title,hashtags,scheduled_for,published_at),
+          social_platform_variants(id,platform,status,caption,title,hashtags,selected_asset_id,platform_options,scheduled_for,published_at),
           social_assets(id,public_url,format,width,height)
         `)
         .order('created_at', { ascending: false })
@@ -668,22 +668,30 @@ export default function AdminSocialStudio() {
             </div>
           ) : (
             <div className="space-y-4">
-              {drafts.map(item => (
+              {drafts.map(item => {
+                const selectedAssetId = item.social_platform_variants?.find(variant => variant.selected_asset_id)?.selected_asset_id;
+                const carouselPreviewUrl = item.social_platform_variants?.find(variant =>
+                  Array.isArray(variant.platform_options?.carousel_asset_urls) && variant.platform_options.carousel_asset_urls.length
+                )?.platform_options.carousel_asset_urls[0];
+                const previewAsset = carouselPreviewUrl
+                  ? { public_url: carouselPreviewUrl, format: 'carousel' }
+                  : item.social_assets?.find(asset => asset.id === selectedAssetId) || item.social_assets?.[0];
+                return (
                 <div
                   key={item.id}
                   className="rounded-lg border border-border bg-surface p-5 transition-shadow hover:shadow-sm"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex shrink-0 items-start gap-4">
-                      {item.social_assets && item.social_assets.length > 0 ? (
+                      {previewAsset ? (
                         <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
                           <img
-                            src={item.social_assets[0].public_url}
+                            src={previewAsset.public_url}
                             alt=""
                             className="h-full w-full object-cover"
                           />
                           <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
-                            {item.social_assets[0].format === 'custom_design' ? 'Custom Design' : item.social_assets[0].format}
+                            {previewAsset.format === 'custom_design' ? 'Custom Design' : previewAsset.format}
                           </span>
                         </div>
                       ) : (
@@ -715,20 +723,33 @@ export default function AdminSocialStudio() {
                               if (!file) return;
                               setUploadingAssetId(item.id);
                               try {
-                                const { publicUrl } = await uploadAdminImage(file, 'social');
+                                const upload = await uploadAdminSocialImage(file, 'social-published-assets');
+                                if (upload.error || !upload.url) throw new Error(upload.error || 'The uploaded image has no public URL');
+                                const publicUrl = upload.url;
                                 const res = await fetch('/api/social?task=attach_custom_asset', {
                                   method: 'POST',
-                                  headers: await authHeaders(),
+                                  headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
                                     contentItemId: item.id,
                                     publicUrl,
-                                    format: 'custom_design',
                                   }),
                                 });
                                 const data = await res.json().catch(() => ({}));
                                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                                 toast.success('Custom artwork uploaded & attached!');
-                                fetchDrafts();
+                                setDrafts(current => current.map(draft => draft.id === item.id
+                                  ? {
+                                      ...draft,
+                                      social_assets: [
+                                        { id: data.id, public_url: publicUrl, format: data.format, width: data.width, height: data.height },
+                                        ...(draft.social_assets || []).filter(asset => asset.id !== data.id),
+                                      ],
+                                      social_platform_variants: (draft.social_platform_variants || []).map(variant => ({
+                                        ...variant,
+                                        selected_asset_id: data.id,
+                                      })),
+                                    }
+                                  : draft));
                               } catch (err) {
                                 toast.error(err.message || 'Failed to upload custom asset');
                               } finally {
@@ -854,7 +875,8 @@ export default function AdminSocialStudio() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

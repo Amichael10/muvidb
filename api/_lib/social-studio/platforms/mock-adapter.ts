@@ -40,6 +40,7 @@ export class MockSocialPlatformAdapter implements SocialPlatformAdapter {
         job_id: request.jobId,
         variant_id: request.variantId,
         asset_url: request.assetUrl ?? null,
+        asset_urls: request.assetUrls ?? (request.assetUrl ? [request.assetUrl] : []),
         accepted_at: new Date().toISOString(),
       },
       variantStatus,
