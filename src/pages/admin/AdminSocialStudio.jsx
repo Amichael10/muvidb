@@ -90,6 +90,35 @@ function Pill({ children, tone = 'brand' }) {
   );
 }
 
+function asRelationArray(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (value && typeof value === 'object') return [value];
+  return [];
+}
+
+function getPlatformOptions(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string') return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeSocialContentItem(item) {
+  return {
+    ...item,
+    social_platform_variants: asRelationArray(item?.social_platform_variants).map(variant => ({
+      ...variant,
+      platform_options: getPlatformOptions(variant?.platform_options),
+    })),
+    social_assets: asRelationArray(item?.social_assets),
+  };
+}
+
 export default function AdminSocialStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('calendar'); // 'calendar' | 'drafts' | 'composer'
@@ -98,6 +127,8 @@ export default function AdminSocialStudio() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [drafts, setDrafts] = useState([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+  const [draftsError, setDraftsError] = useState('');
   const [reviewingId, setReviewingId] = useState(null);
   const [scheduleAt, setScheduleAt] = useState({});
   const [connections, setConnections] = useState({
@@ -161,6 +192,8 @@ export default function AdminSocialStudio() {
   };
 
   const fetchDrafts = async () => {
+    setDraftsLoading(true);
+    setDraftsError('');
     try {
       const { data, error } = await supabase
         .from('social_content_items')
@@ -178,9 +211,12 @@ export default function AdminSocialStudio() {
         .limit(25);
 
       if (error) throw error;
-      setDrafts(data || []);
+      setDrafts(asRelationArray(data).map(normalizeSocialContentItem));
     } catch (err) {
       console.warn('Failed to load social drafts:', err.message);
+      setDraftsError('We could not load your drafts and scheduled posts right now. Please try again.');
+    } finally {
+      setDraftsLoading(false);
     }
   };
 
@@ -294,6 +330,120 @@ export default function AdminSocialStudio() {
     fetchDrafts();
     fetchConnectionsStatus();
     fetchCalendar();
+  };
+
+  const reviewActions = status => {
+    if (status === 'draft') return [{ action: 'submit', label: 'Submit for review', tone: 'brand' }];
+    if (status === 'ready_for_review') {
+      return [
+        { action: 'approve', label: 'Approve', tone: 'green' },
+        { action: 'reject', label: 'Reject', tone: 'red' },
+        { action: 'reopen', label: 'Back to draft', tone: 'plain' },
+      ];
+    }
+    if (status === 'rejected') return [{ action: 'reopen', label: 'Reopen', tone: 'plain' }];
+    if (status === 'approved') return [{ action: 'reopen', label: 'Undo approval', tone: 'plain' }];
+    return [];
+  };
+
+  const runReview = async (contentItemId, action) => {
+    let reason = null;
+    if (action === 'reject') {
+      reason = window.prompt('Why is this being rejected?');
+      if (reason === null) return;
+      if (!reason.trim()) {
+        toast.error('A rejection reason is required');
+        return;
+      }
+    }
+
+    setReviewingId(contentItemId);
+    try {
+      const res = await fetch('/api/social?task=review', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId, action, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`${data.from} → ${data.status}`);
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Review action failed');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const runSchedule = async (contentItemId, explicitDate) => {
+    const value = explicitDate || scheduleAt[contentItemId];
+    if (!value) {
+      toast.error('Pick a date and time first');
+      return;
+    }
+
+    const scheduledFor = new Date(value);
+    if (Number.isNaN(scheduledFor.getTime())) {
+      toast.error('Choose a valid date and time');
+      return;
+    }
+
+    setReviewingId(contentItemId);
+    try {
+      const res = await fetch('/api/social?task=schedule', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId, scheduledFor: scheduledFor.toISOString() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const platforms = Array.isArray(data.platforms) ? data.platforms.join(', ') : 'selected channels';
+      toast.success(`Scheduled ${data.jobs || 0} job(s): ${platforms}`);
+      setScheduleAt(current => ({ ...current, [contentItemId]: '' }));
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Scheduling failed');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const runQuickSchedulePreset = (contentItemId, preset) => {
+    const target = new Date();
+    if (preset === 'today_6pm') {
+      target.setHours(18, 0, 0, 0);
+      if (target.getTime() < Date.now()) target.setDate(target.getDate() + 1);
+    } else if (preset === 'tomorrow_10am') {
+      target.setDate(target.getDate() + 1);
+      target.setHours(10, 0, 0, 0);
+    } else if (preset === 'tomorrow_6pm') {
+      target.setDate(target.getDate() + 1);
+      target.setHours(18, 0, 0, 0);
+    }
+    runSchedule(contentItemId, target.toISOString());
+  };
+
+  const runCancelSchedule = async contentItemId => {
+    setReviewingId(contentItemId);
+    try {
+      const res = await fetch('/api/social?task=cancel_schedule', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(
+        data.inFlight
+          ? `Cancelled ${data.cancelledJobs || 0} job(s); ${data.inFlight} already publishing`
+          : `Cancelled ${data.cancelledJobs || 0} job(s) — back to approved`,
+      );
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Cancel failed');
+    } finally {
+      setReviewingId(null);
+    }
   };
 
   const counts = summary.counts || emptySummary.counts;
@@ -662,20 +812,41 @@ export default function AdminSocialStudio() {
             </button>
           </div>
 
-          {drafts.length === 0 ? (
+          {draftsLoading ? (
+            <div className="rounded-lg border border-border bg-surface p-8 text-center">
+              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="28" />
+              <p className="mt-3 text-sm font-bold text-text-primary">Loading your content queue…</p>
+              <p className="mt-1 text-xs text-text-muted">Fetching drafts, scheduled posts, and their artwork.</p>
+            </div>
+          ) : draftsError ? (
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-8 text-center">
+              <Icon icon="solar:danger-triangle-linear" className="mx-auto text-red-500" width="28" />
+              <p className="mt-3 text-sm font-bold text-text-primary">Couldn’t load this section</p>
+              <p className="mx-auto mt-1 max-w-lg text-xs text-text-muted">{draftsError}</p>
+              <button
+                type="button"
+                onClick={fetchDrafts}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-xs font-bold text-white hover:bg-brand-hover"
+              >
+                <Icon icon="solar:refresh-linear" width="14" /> Try again
+              </button>
+            </div>
+          ) : drafts.length === 0 ? (
             <div className="rounded-lg border border-border bg-surface p-8 text-center">
               <p className="text-sm text-text-muted">No content items yet. Approve one in the 30-Day Plan tab or create one in Composer.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {drafts.map(item => {
-                const selectedAssetId = item.social_platform_variants?.find(variant => variant.selected_asset_id)?.selected_asset_id;
-                const carouselPreviewUrl = item.social_platform_variants?.find(variant =>
+                const variants = asRelationArray(item.social_platform_variants);
+                const assets = asRelationArray(item.social_assets);
+                const selectedAssetId = variants.find(variant => variant.selected_asset_id)?.selected_asset_id;
+                const carouselPreviewUrl = variants.find(variant =>
                   Array.isArray(variant.platform_options?.carousel_asset_urls) && variant.platform_options.carousel_asset_urls.length
                 )?.platform_options.carousel_asset_urls[0];
                 const previewAsset = carouselPreviewUrl
                   ? { public_url: carouselPreviewUrl, format: 'carousel' }
-                  : item.social_assets?.find(asset => asset.id === selectedAssetId) || item.social_assets?.[0];
+                  : assets.find(asset => asset.id === selectedAssetId) || assets[0];
                 return (
                 <div
                   key={item.id}
@@ -742,9 +913,9 @@ export default function AdminSocialStudio() {
                                       ...draft,
                                       social_assets: [
                                         { id: data.id, public_url: publicUrl, format: data.format, width: data.width, height: data.height },
-                                        ...(draft.social_assets || []).filter(asset => asset.id !== data.id),
+                                        ...asRelationArray(draft.social_assets).filter(asset => asset.id !== data.id),
                                       ],
-                                      social_platform_variants: (draft.social_platform_variants || []).map(variant => ({
+                                      social_platform_variants: asRelationArray(draft.social_platform_variants).map(variant => ({
                                         ...variant,
                                         selected_asset_id: data.id,
                                       })),
@@ -773,7 +944,7 @@ export default function AdminSocialStudio() {
 
                     {/* Actions & Status Controls */}
                     <div className="flex flex-wrap items-center gap-2">
-                      {(item.social_platform_variants || []).map(variant => (
+                      {variants.map(variant => (
                         <span
                           key={variant.id}
                           className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1 text-[10px] font-bold text-text-muted"
@@ -869,9 +1040,9 @@ export default function AdminSocialStudio() {
                   )}
 
                   {/* Caption preview snippet */}
-                  {item.social_platform_variants?.[0]?.caption && (
+                  {variants[0]?.caption && (
                     <div className="mt-3 rounded-md bg-surface-2 p-3 text-xs text-text-muted whitespace-pre-wrap max-h-28 overflow-y-auto font-mono">
-                      {item.social_platform_variants[0].caption}
+                      {variants[0].caption}
                     </div>
                   )}
                 </div>
