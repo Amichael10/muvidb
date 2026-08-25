@@ -524,6 +524,23 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
             }
           }
 
+          // Do not turn an AI outage into bad catalogue data. Deterministically
+          // extracted prefixes are safe, but ordinary titles that received no
+          // enrichment remain in channel_videos for a later retry/review.
+          const deferredForEnrichment = new Set(
+            eligibleVideos
+              .filter((v: any) =>
+                !aiMap.has(v.video_id)
+                && titlePolicies.get(v.video_id)?.action === 'accept'
+              )
+              .map((v: any) => v.video_id),
+          );
+          if (deferredForEnrichment.size > 0) {
+            console.warn(
+              `[runVideosSync] Deferred ${deferredForEnrichment.size} upload(s) for ${ch.name} because AI enrichment returned no metadata`,
+            );
+          }
+
           if (eligibleVideos.length > 0) {
             const processVids = eligibleVideos.map((v: any) => v.video_id);
             const { data: existingFilms } = await supabase
@@ -538,6 +555,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
 
             for (const v of eligibleVideos) {
               if (!existingFilmsMap.has(v.video_id)) {
+                if (deferredForEnrichment.has(v.video_id)) continue;
                 const rawTitle = v.title;
                 const ai = aiMap.get(v.video_id);
                 const titlePolicy = titlePolicies.get(v.video_id)!;

@@ -21,7 +21,10 @@ function collectKeys(base: string): string[] {
 
 // Gemini: rotate on 429/RESOURCE_EXHAUSTED before falling back to OpenAI/Groq.
 const GEMINI_KEYS = collectKeys('GEMINI_API_KEY');
-const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
+const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite')
+  .split(',')
+  .map((model) => model.trim())
+  .filter(Boolean);
 const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite')
   .split(',')
   .map((model) => model.trim())
@@ -75,6 +78,10 @@ async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): 
 
 // Groq: same multi-key rotation as Gemini.
 const GROQ_KEYS = collectKeys('GROQ_API_KEY');
+const GROQ_TEXT_MODELS = (process.env.GROQ_TEXT_MODELS || 'llama-3.3-70b-versatile')
+  .split(',')
+  .map((model) => model.trim())
+  .filter(Boolean);
 let groqKeyIdx = 0;
 const groqClientFor = () => new Groq({ apiKey: GROQ_KEYS[groqKeyIdx] || '' });
 
@@ -239,8 +246,19 @@ export async function generateAIContent(
     providers.push({
       name: 'gemini',
       execute: async () => {
-        const result = await withGeminiRotation(GEMINI_TEXT_MODEL, (m) => m.generateContent(prompt));
-        return { text: result.response.text(), engine: 'gemini', headers: null };
+        let lastErr: any;
+        for (const model of GEMINI_TEXT_MODELS) {
+          try {
+            const result = await withGeminiRotation(model, (m) => m.generateContent(prompt));
+            const text = result.response.text();
+            if (!text.trim()) throw new Error(`Gemini model ${model} returned an empty response`);
+            return { text, engine: `gemini (${model})`, headers: null };
+          } catch (err: any) {
+            lastErr = err;
+            console.warn(`[gemini] model ${model} failed; trying the next configured model: ${err.message}`);
+          }
+        }
+        throw lastErr;
       }
     });
   }
@@ -264,35 +282,25 @@ export async function generateAIContent(
     providers.push({
       name: 'groq',
       execute: async () => withGroqRotation(async (client) => {
-        // Primary Groq Model
-        try {
-          const response = await client.chat.completions.create({
-            messages: [{ role: 'user', content: prompt }],
-            model: 'llama-3.3-70b-versatile',
-          }).asResponse();
-          const data = await response.json();
-          if (data.error) throw new Error(data.error.message);
-          return { text: data.choices[0]?.message?.content || '', engine: 'groq', headers: response.headers };
-        } catch (err: any) {
-          if (isGroqQuotaError(err)) throw err; // let rotation handle quota
-          // If 70b is otherwise limited, try the smaller 8b model as a sub-fallback
-          console.warn('Groq 70b limited, trying gemma2-9b-it / llama3-8b-8192...');
+        let lastErr: any;
+        for (const model of GROQ_TEXT_MODELS) {
           try {
             const response = await client.chat.completions.create({
               messages: [{ role: 'user', content: prompt }],
-              model: 'gemma2-9b-it',
+              model,
             }).asResponse();
             const data = await response.json();
-            return { text: data.choices[0]?.message?.content || '', engine: 'groq-gemma', headers: response.headers };
-          } catch {
-            const response = await client.chat.completions.create({
-              messages: [{ role: 'user', content: prompt }],
-              model: 'llama-3.1-8b-instant',
-            }).asResponse();
-            const data = await response.json();
-            return { text: data.choices[0]?.message?.content || '', engine: 'groq-8b', headers: response.headers };
+            if (data.error) throw new Error(data.error.message);
+            const text = data.choices[0]?.message?.content || '';
+            if (!text.trim()) throw new Error(`Groq model ${model} returned an empty response`);
+            return { text, engine: `groq (${model})`, headers: response.headers };
+          } catch (err: any) {
+            lastErr = err;
+            if (isGroqQuotaError(err)) throw err;
+            console.warn(`[groq] model ${model} unavailable; trying the next configured model: ${err.message}`);
           }
         }
+        throw lastErr;
       })
     });
   }

@@ -31,7 +31,7 @@ export function synopsisNeedsRewrite(value: string | null | undefined): boolean 
  */
 export async function enrichMissingSynopsesConcurrent(
   filmIds?: string[],
-  options: { replaceNoisy?: boolean } = {},
+  options: { replaceNoisy?: boolean; batchLimit?: number; throwOnFailure?: boolean } = {},
 ): Promise<number> {
   let filmsToEnrich: { id: string; title: string; year?: number | null; synopsis?: string | null }[] = [];
 
@@ -50,7 +50,7 @@ export async function enrichMissingSynopsesConcurrent(
         .select('id, title, year, synopsis')
         .or('synopsis.is.null,synopsis.eq.')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(Math.max(1, Math.min(options.batchLimit || 20, 500)));
       filmsToEnrich = data || [];
     }
   } catch (err: any) {
@@ -64,7 +64,7 @@ export async function enrichMissingSynopsesConcurrent(
 
   console.log(`[Cohere Sync] Generating film synopses concurrently for ${filmsToEnrich.length} films...`);
 
-  const prompt = `
+  const buildPrompt = (films: typeof filmsToEnrich) => `
     You are a Nollywood database editor. Write a concise, 2-sentence factual movie logline for each film below.
     Base the summary ONLY on the title and context. Keep tone cinematic and objective.
 
@@ -72,34 +72,41 @@ export async function enrichMissingSynopsesConcurrent(
 
     Do not include hashtags, links, cast lists, calls to subscribe, or marketing language.
 
-    Films: ${JSON.stringify(filmsToEnrich.map(f => ({ id: f.id, title: f.title, year: f.year })))}
+    Films: ${JSON.stringify(films.map(f => ({ id: f.id, title: f.title, year: f.year })))}
   `;
 
   let updatedCount = 0;
   try {
-    const { text, telemetry } = await generateAIContent(prompt, { preferredProvider: 'cohere' });
-    const parsed = parseJSON(text);
+    let engine = 'unknown';
+    for (let offset = 0; offset < filmsToEnrich.length; offset += 20) {
+      const batch = filmsToEnrich.slice(offset, offset + 20);
+      const { text, telemetry } = await generateAIContent(buildPrompt(batch), { preferredProvider: 'cohere' });
+      engine = telemetry.engine;
+      const parsed = parseJSON(text);
 
-    if (Array.isArray(parsed)) {
-      for (const item of parsed) {
-        if (item.id && item.synopsis && item.synopsis.trim().length > 15) {
-          const { error } = await supabase
-            .from('films')
-            .update({ 
-              synopsis: item.synopsis.trim(),
-              needs_review: false 
-            })
-            .eq('id', item.id);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item.id && item.synopsis && item.synopsis.trim().length > 15) {
+            const { error } = await supabase
+              .from('films')
+              .update({
+                synopsis: item.synopsis.trim(),
+                needs_review: false
+              })
+              .eq('id', item.id);
 
-          if (!error) {
-            updatedCount++;
+            if (!error) updatedCount++;
           }
         }
       }
     }
-    console.log(`[Cohere Sync] ✅ Updated ${updatedCount}/${filmsToEnrich.length} film synopses using engine: ${telemetry.engine}`);
+    if (options.throwOnFailure && updatedCount === 0) {
+      throw new Error(`AI returned no usable synopses for ${filmsToEnrich.length} candidate films`);
+    }
+    console.log(`[Cohere Sync] ✅ Updated ${updatedCount}/${filmsToEnrich.length} film synopses using engine: ${engine}`);
   } catch (err: any) {
     console.warn(`[Cohere Sync] ⚠️ Synopsis generation failed: ${err.message}`);
+    if (options.throwOnFailure) throw err;
   }
 
   return updatedCount;

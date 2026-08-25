@@ -58,7 +58,10 @@ Items:
 ${JSON.stringify(chunk)}`;
 
     try {
-      const { text } = await generateAIContent(prompt);
+      // Cohere is provisioned specifically for catalogue text work. Prefer it
+      // here so a retired Gemini/Groq model cannot silently disable the entire
+      // title/cast/synopsis pass during a YouTube sync.
+      const { text } = await generateAIContent(prompt, { preferredProvider: 'cohere' });
       const parsed = parseJSON(text);
       if (Array.isArray(parsed)) {
         for (const row of parsed) {

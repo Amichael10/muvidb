@@ -5,8 +5,10 @@ import { generateAIContent, parseJSON } from './ai_service.js';
  * Modularized AI Maintenance logic to keep sync.ts lean.
  */
 
-export async function runCastExtraction() {
+export async function runCastExtraction(options: { limit?: number } = {}) {
   console.log('[AI Maintenance] Starting cast extraction...');
+  const totalLimit = Math.max(1, Math.min(options.limit || 70, 300));
+  const selectorLimit = Math.ceil(totalLimit / 3);
   
   // Find films whose titles likely contain embedded cast names
   const { data: starringFilms } = await supabase
@@ -14,14 +16,14 @@ export async function runCastExtraction() {
     .select('id, title')
     .or('title.ilike.%starring%,title.ilike.%feat%,title.ilike.%ft.%,title.ilike.%ft %')
     .order('created_at', { ascending: false })
-    .limit(30);
+    .limit(selectorLimit);
 
   const { data: pipeFilms } = await supabase
     .from('films')
     .select('id, title')
     .ilike('title', '%|%')
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(selectorLimit);
 
   // Nollywood YouTube titles often list the cast in brackets rather than after
   // a keyword — "Holy Romance (Eso Dike, Uche Montana) - Brand New". Neither
@@ -34,7 +36,7 @@ export async function runCastExtraction() {
     .like('title', '%(%')
     .like('title', '%,%')
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(selectorLimit);
 
   // Merge and deduplicate
   const allCastFilms = [...(starringFilms || [])];
@@ -45,6 +47,7 @@ export async function runCastExtraction() {
       seenIds.add(f.id);
     }
   }
+  allCastFilms.splice(totalLimit);
 
   if (allCastFilms.length === 0) {
     return { analyzed: 0, message: 'No films with embedded cast patterns found' };
@@ -75,7 +78,7 @@ export async function runCastExtraction() {
     Titles: ${JSON.stringify(allCastFilms)}
   `;
 
-  const { text: castText } = await generateAIContent(castPrompt);
+  const { text: castText } = await generateAIContent(castPrompt, { preferredProvider: 'cohere' });
   const castParsed = parseJSON(castText);
 
   // Build lookup for cross-reference
@@ -91,7 +94,9 @@ export async function runCastExtraction() {
     .filter((f: any) => f.id && f.cast.length > 0);
 
   // 1. Collect all unique actor names
-  const allActorNames = Array.from(new Set(castExtracted.flatMap((f: any) => f.cast)));
+  const allActorNames: string[] = Array.from(
+    new Set<string>(castExtracted.flatMap((f: any) => f.cast.map((name: any) => String(name))))
+  );
   const personIds = new Map();
 
   // 2. Resolve or create each actor
@@ -191,15 +196,16 @@ export async function runCastExtraction() {
   };
 }
 
-export async function runTitleCleanup() {
+export async function runTitleCleanup(options: { limit?: number } = {}) {
   console.log('[AI Maintenance] Starting title cleanup...');
+  const limit = Math.max(1, Math.min(options.limit || 40, 500));
   
   const { data: messyFilms } = await supabase
     .from('films')
     .select('id, title')
     .or('title.ilike.%|%,title.ilike.%YORUBA%,title.ilike.%MOVIE%,title.ilike.%PART%,title.ilike.%2024%,title.ilike.%2025%,title.ilike.%FULL%,title.ilike.%NIGERIAN%,title.ilike.%(%,title.ilike.%[%,title.ilike.%-%,title.ilike.%LATEST%')
     .order('created_at', { ascending: false })
-    .limit(40);
+    .limit(limit);
 
   if (!messyFilms || messyFilms.length === 0) {
     return { analyzed: 0, message: 'No messy titles found' };
@@ -207,7 +213,7 @@ export async function runTitleCleanup() {
 
   console.log(`[AI Maintenance] Cleaning ${messyFilms.length} messy titles...`);
 
-  const titlePrompt = `
+  const buildTitlePrompt = (films: { id: string; title: string }[]) => `
     You are a Nollywood database editor. 
     Clean up these movie titles by removing common YouTube marketing noise, years, and category labels.
     
@@ -220,12 +226,20 @@ export async function runTitleCleanup() {
     
     Return ONLY JSON: [{"id": "...", "old_title": "...", "new_title": "..."}]
     
-    Titles to clean: ${JSON.stringify(messyFilms)}
+    Titles to clean: ${JSON.stringify(films)}
   `;
 
-  const { text: titleText } = await generateAIContent(titlePrompt);
-  const titleParsed = parseJSON(titleText);
-  const titleChanges = titleParsed.filter((f: any) => f.old_title && f.new_title && f.old_title.trim() !== f.new_title.trim());
+  const titleChanges: any[] = [];
+  for (let offset = 0; offset < messyFilms.length; offset += 25) {
+    const batch = messyFilms.slice(offset, offset + 25);
+    const { text: titleText } = await generateAIContent(buildTitlePrompt(batch), { preferredProvider: 'cohere' });
+    const titleParsed = parseJSON(titleText);
+    if (Array.isArray(titleParsed)) {
+      titleChanges.push(...titleParsed.filter((f: any) =>
+        f.old_title && f.new_title && f.old_title.trim() !== f.new_title.trim()
+      ));
+    }
+  }
 
   let titlesApplied = 0;
   const titleUpdatePromises = titleChanges.map((item: any) => 
