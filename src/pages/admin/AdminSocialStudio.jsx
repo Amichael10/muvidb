@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { uploadAdminSocialImage } from '../../lib/imageUpload';
 import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
 import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
+import SocialIntakeInbox from '../../components/admin/SocialIntakeInbox';
 
 const STATUS_TONES = {
   draft: 'blue',
@@ -121,7 +122,7 @@ function normalizeSocialContentItem(item) {
 
 export default function AdminSocialStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('calendar'); // 'calendar' | 'drafts' | 'composer'
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'intake' ? 'intake' : 'calendar'); // 'calendar' | 'drafts' | 'composer' | 'intake'
   const [selectedSlotForReview, setSelectedSlotForReview] = useState(null);
   const [summary, setSummary] = useState(emptySummary);
   const [loading, setLoading] = useState(true);
@@ -623,7 +624,20 @@ export default function AdminSocialStudio() {
       </div>
 
       {/* Main Tab Navigation */}
-      <div className="flex border-b border-border">
+      <div className="flex overflow-x-auto border-b border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTab('intake')}
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+            activeTab === 'intake'
+              ? 'border-brand text-brand'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Icon icon="solar:inbox-in-linear" width="16" />
+          Telegram Approval Inbox
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab('calendar')}
@@ -663,6 +677,15 @@ export default function AdminSocialStudio() {
           Ad-Hoc Custom Composer
         </button>
       </div>
+
+      {activeTab === 'intake' && (
+        <SocialIntakeInbox
+          onCreateSocialDraft={async () => {
+            await refreshAll();
+            setActiveTab('drafts');
+          }}
+        />
+      )}
 
       {/* TAB 3: Ad-Hoc Custom Composer */}
       {activeTab === 'composer' && (

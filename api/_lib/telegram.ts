@@ -130,7 +130,7 @@ export async function sendTelegramVideo(
   caption?: string,
   replyMarkup?: { inline_keyboard: TelegramInlineButton[][] },
   chatId?: string,
-): Promise<{ ok: boolean; error?: string; messageId?: number }> {
+): Promise<{ ok: boolean; error?: string; messageId?: number; fileId?: string }> {
   const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
   const defaultChatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
   if (!token || !defaultChatId) {
@@ -187,7 +187,11 @@ export async function sendTelegramVideo(
             });
             const uploadJson = await uploadRes.json().catch(() => ({}));
             if (uploadRes.ok && uploadJson.ok) {
-              return { ok: true, messageId: uploadJson.result?.message_id };
+              return {
+                ok: true,
+                messageId: uploadJson.result?.message_id,
+                fileId: uploadJson.result?.video?.file_id,
+              };
             }
           }
         } catch (uploadErr) {
@@ -204,7 +208,11 @@ export async function sendTelegramVideo(
       }
       return { ok: false, error: json?.description || `HTTP ${res.status}` };
     }
-    return { ok: true, messageId: json.result?.message_id };
+    return {
+      ok: true,
+      messageId: json.result?.message_id,
+      fileId: json.result?.video?.file_id,
+    };
   } catch (e: any) {
     if (opts.caption) {
       return sendTelegramMessage({

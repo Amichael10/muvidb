@@ -24,6 +24,7 @@ import { recentHitsForIp, topHitters } from './scrape_guard.js';
 import { supabase } from './supabase.js';
 import { generateAIContent } from './ai_service.js';
 import { extractInstagramMedia } from './instagram_downloader.js';
+import { createSocialDraftFromIntake } from './social_intake.js';
 
 const IP_RE = /^(?:\d{1,3}\.){3}\d{1,3}$|^(?:[a-fA-F0-9:]+)$/;
 
@@ -49,6 +50,9 @@ function helpText() {
     '',
     'YouTube: new film-length uploads alert here before auto-import.',
     'Use Hide on the alert to skip a video on the next sync.',
+    '',
+    'Content intake: forward a YouTube Short, social link, screenshot, review, poster, or video.',
+    'The bot can return playable Shorts and prepare films, critic reviews, credits, news, and social drafts for admin approval.',
     '',
     'Tip: browse muvidb.com, then /hits to find your home IP → /allow <ip>',
   ].join('\n');
@@ -260,6 +264,103 @@ async function handleCallback(query: any) {
     return;
   }
 
+  if (data.startsWith('intake_download:')) {
+    const eventId = data.slice('intake_download:'.length).trim();
+    const { data: event } = await supabase
+      .from('social_news_events')
+      .select('*')
+      .eq('id', eventId)
+      .eq('source_type', 'telegram_bot')
+      .maybeSingle();
+    if (!event?.source_url) {
+      await answerTelegramCallback(callbackId, 'Video source not found');
+      return;
+    }
+    const existingMetadata = intakeMetadata(event.metadata);
+    if (existingMetadata.telegram_video_file_id) {
+      await answerTelegramCallback(callbackId, 'Sending saved video…');
+      const resent = await sendTelegramVideo({
+        video: existingMetadata.telegram_video_file_id,
+        caption: `✅ ${event.title || 'Video ready'}\n\nYou can play or save this MP4 from Telegram.`,
+        chatId: String(chatId),
+      });
+      if (!resent.ok && chatId) await reply(chatId, `⚠️ Telegram could not resend the saved video: ${resent.error || 'unknown error'}`);
+      return;
+    }
+    await answerTelegramCallback(callbackId, 'Preparing playable video…');
+    if (chatId) await reply(chatId, '⏳ Downloading and preparing the Short for Telegram…');
+    try {
+      const media = await extractRemoteMedia(event.source_url);
+      const metadata = intakeMetadata(event.metadata);
+      const sent = await sendTelegramVideo({
+        video: media.video_url,
+        caption: [
+          `✅ ${media.title || event.title || 'Video ready'}`,
+          media.author ? `Channel: ${media.author}` : null,
+          '',
+          'You can play or save this MP4 from Telegram. Only reuse media you own or have permission to publish.',
+        ].filter(Boolean).join('\n'),
+        chatId: String(chatId),
+        replyMarkup: {
+          inline_keyboard: [
+            [{ text: '🎨 Create Social Post', callback_data: `intake_draft:${eventId}` }],
+            [{ text: '📥 Open Approval Inbox', url: `${(process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '')}/admin/social-studio?tab=intake` }],
+          ],
+        },
+      });
+      if (!sent.ok) throw new Error(sent.error || 'Telegram could not receive the video');
+      metadata.video_url = media.video_url;
+      metadata.video_duration = media.duration || null;
+      metadata.telegram_video_file_id = sent.fileId || null;
+      metadata.telegram_video_message_id = sent.messageId || null;
+      metadata.downloaded_at = new Date().toISOString();
+      metadata.workflow_status = metadata.workflow_status || 'received';
+      await supabase.from('social_news_events').update({ metadata, updated_at: new Date().toISOString() }).eq('id', eventId);
+    } catch (error: any) {
+      if (chatId) await reply(chatId, `⚠️ I couldn’t prepare this video. ${error?.message || 'The source may be private, restricted, or unavailable.'}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('intake_film:') || data.startsWith('intake_review:')) {
+    const isFilm = data.startsWith('intake_film:');
+    const prefix = isFilm ? 'intake_film:' : 'intake_review:';
+    const eventId = data.slice(prefix.length).trim();
+    const label = isFilm ? 'film record' : 'critic review';
+    await answerTelegramCallback(callbackId, `Preparing ${label}…`);
+    if (chatId) await reply(chatId, `🔎 Extracting a structured ${label} for admin approval…`);
+    try {
+      const { payload } = await prepareStructuredIntake(eventId, isFilm ? 'film' : 'critic_review');
+      const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+      const summary = isFilm
+        ? [`🎞 *Film intake prepared*`, `Title: ${payload.title || 'Needs correction'}`, payload.year ? `Year: ${payload.year}` : null, payload.synopsis ? `Synopsis: ${String(payload.synopsis).slice(0, 260)}${String(payload.synopsis).length > 260 ? '…' : ''}` : 'Synopsis: Missing']
+        : [`📝 *Critic review prepared*`, `Film: ${payload.film_title || 'Needs matching'}`, `Critic: ${payload.critic_name || 'Needs correction'}`, payload.quote ? `Quote: “${String(payload.quote).slice(0, 260)}${String(payload.quote).length > 260 ? '…' : ''}”` : 'Quote: Missing'];
+      if (chatId) {
+        await sendTelegramMessage({
+          text: [...summary.filter(Boolean), '', 'Nothing is public yet. Review and approve it in the admin inbox.'].join('\n'),
+          chatId: String(chatId),
+          replyMarkup: { inline_keyboard: [[{ text: '✅ Open Approval Inbox', url: `${site}/admin/social-studio?tab=intake` }]] },
+        });
+      }
+    } catch (error: any) {
+      if (chatId) await reply(chatId, `⚠️ Could not prepare the ${label}: ${error?.message || 'Extraction failed'}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('intake_ignore:')) {
+    const eventId = data.slice('intake_ignore:'.length).trim();
+    const { data: event } = await supabase.from('social_news_events').select('metadata').eq('id', eventId).maybeSingle();
+    const metadata = intakeMetadata(event?.metadata);
+    metadata.workflow_status = 'rejected';
+    metadata.rejected_at = new Date().toISOString();
+    metadata.rejection_reason = 'Ignored from Telegram';
+    await supabase.from('social_news_events').update({ status: 'ignored', metadata, updated_at: new Date().toISOString() }).eq('id', eventId);
+    await answerTelegramCallback(callbackId, 'Ignored');
+    if (chatId) await reply(chatId, '🗑 Intake item ignored. You can still see it using the Rejected filter in the admin inbox.');
+    return;
+  }
+
   if (data.startsWith('intake_draft:')) {
     const eventId = data.slice('intake_draft:'.length).trim();
     const { data: event, error: evErr } = await supabase
@@ -270,6 +371,20 @@ async function handleCallback(query: any) {
 
     if (evErr || !event) {
       await answerTelegramCallback(callbackId, 'Event not found');
+      return;
+    }
+
+    const existingDraftId = intakeMetadata(event.metadata).canonical_content_item_id || event.draft_id;
+    if (existingDraftId) {
+      const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+      await answerTelegramCallback(callbackId, 'Draft already exists');
+      if (chatId) {
+        await sendTelegramMessage({
+          text: '🎨 A Social Studio draft already exists for this intake item.',
+          chatId: String(chatId),
+          replyMarkup: { inline_keyboard: [[{ text: 'Open Social Studio', url: `${site}/admin/social-studio` }]] },
+        });
+      }
       return;
     }
 
@@ -286,15 +401,19 @@ Content/Context: ${event.description}
 Generate a high-converting, engaging social media pack for MuviDB:
 1. headline: Punchy, exciting, cinema-focused headline (max 10 words)
 2. angle: Why fans or the industry care (1-2 sentences)
-3. instagram_caption: An engaging storytelling caption with 5-8 relevant hashtags like #Nollywood #AfricanCinema #MuviDB
-4. x_post: Punchy Twitter/X post under 250 characters with emojis
+3. instagram_caption: An engaging storytelling caption with no more than 3 relevant hashtags
+4. facebook_caption: A conversational Facebook caption with no more than 3 hashtags
+5. threads_post: A concise Threads post under 450 characters with no more than 3 hashtags
+6. tiktok_caption: A short TikTok caption with no more than 3 hashtags
 
 Respond ONLY with a valid JSON object matching this schema:
 {
   "headline": "...",
   "angle": "...",
   "instagram_caption": "...",
-  "x_post": "..."
+  "facebook_caption": "...",
+  "threads_post": "...",
+  "tiktok_caption": "..."
 }`;
 
       const aiRes = await generateAIContent(prompt);
@@ -305,40 +424,15 @@ Respond ONLY with a valid JSON object matching this schema:
       } catch {
         aiJson = {
           headline: event.title,
-          angle: event.description.slice(0, 150),
-          instagram_caption: `${event.description}\n\n#Nollywood #AfricanCinema #MuviDB`,
-          x_post: event.title,
+          angle: String(event.description || '').slice(0, 150),
+          instagram_caption: `${event.description || event.title}\n\n#Nollywood #AfricanCinema #MuviDB`,
+          facebook_caption: `${event.description || event.title}\n\n#Nollywood #AfricanCinema #MuviDB`,
+          threads_post: event.title,
+          tiktok_caption: `${event.title}\n\n#Nollywood #AfricanCinema #MuviDB`,
         };
       }
 
-      const { data: draft, error: draftErr } = await supabase
-        .from('social_drafts')
-        .insert({
-          status: 'draft',
-          angle_json: {
-            id: 1,
-            title: aiJson.headline || event.title,
-            reason: aiJson.angle || event.description,
-            confidence: 'High',
-          },
-          content_json: {
-            headline: aiJson.headline || event.title,
-            subheadline: aiJson.angle || '',
-            instagram: { caption: aiJson.instagram_caption || '' },
-            x: { post: aiJson.x_post || '' },
-            threads: { post: aiJson.x_post || '' },
-          },
-          figma_template_key: 'breaking_news',
-        })
-        .select('id')
-        .single();
-
-      if (draftErr) throw draftErr;
-
-      await supabase
-        .from('social_news_events')
-        .update({ status: 'converted_to_draft', draft_id: draft.id })
-        .eq('id', eventId);
+      await createSocialDraftFromIntake({ intakeId: eventId, captions: aiJson });
 
       const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
       const studioUrl = `${site}/admin/social-studio`;
@@ -353,7 +447,7 @@ Respond ONLY with a valid JSON object matching this schema:
         aiJson.instagram_caption || '',
         '',
         '🧵 *Threads / X Post:*',
-        aiJson.x_post || '',
+        aiJson.threads_post || '',
       ].join('\n');
 
       if (chatId) {
@@ -362,7 +456,7 @@ Respond ONLY with a valid JSON object matching this schema:
           chatId: String(chatId),
           replyMarkup: {
             inline_keyboard: [
-              [{ text: '🎨 Open in Social Studio', url: studioUrl }],
+              [{ text: '🎨 Open Editable Draft', url: `${studioUrl}?tab=drafts` }],
             ],
           },
         });
@@ -375,7 +469,11 @@ Respond ONLY with a valid JSON object matching this schema:
 
   if (data.startsWith('intake_news:')) {
     const eventId = data.slice('intake_news:'.length).trim();
-    await supabase.from('social_news_events').update({ status: 'reviewed' }).eq('id', eventId);
+    const { data: event } = await supabase.from('social_news_events').select('metadata').eq('id', eventId).maybeSingle();
+    const metadata = intakeMetadata(event?.metadata);
+    metadata.intake_kind = 'news';
+    metadata.workflow_status = 'needs_review';
+    await supabase.from('social_news_events').update({ status: 'new', metadata, updated_at: new Date().toISOString() }).eq('id', eventId);
     await answerTelegramCallback(callbackId, '✅ Saved to News Opportunities');
     if (chatId) {
       const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
@@ -392,18 +490,20 @@ Respond ONLY with a valid JSON object matching this schema:
 
   if (data.startsWith('intake_credits:')) {
     const eventId = data.slice('intake_credits:'.length).trim();
-    const { data: event } = await supabase.from('social_news_events').select('*').eq('id', eventId).maybeSingle();
     await answerTelegramCallback(callbackId, 'Extracting cast & crew...');
-    if (chatId) await reply(chatId, '🔍 Scanning text for Nollywood cast, director, and film references with AI...');
+    if (chatId) await reply(chatId, '🔍 Preparing cast and crew as a structured approval item…');
 
     try {
-      const prompt = `Extract all movie titles, actor names, directors, producers, and character roles mentioned in this text:
-"${event?.description || event?.title || ''}"
-
-Return a clear markdown list of discovered films and people with their respective roles.`;
-      const res = await generateAIContent(prompt);
+      const { payload } = await prepareStructuredIntake(eventId, 'credits');
+      const credits = Array.isArray(payload.credits) ? payload.credits : [];
+      const lines = credits.slice(0, 20).map((credit: any) => `• ${credit.name || 'Unknown'} — ${credit.role || 'Role needed'}${credit.character_name ? ` (${credit.character_name})` : ''}`);
+      const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
       if (chatId) {
-        await reply(chatId, `🎭 Extracted Credits & Names:\n\n${res.text || 'No specific cast/crew names identified.'}`);
+        await sendTelegramMessage({
+          text: [`🎭 *Credit intake prepared*`, `Film: ${payload.film_title || 'Needs matching'}`, '', ...(lines.length ? lines : ['No definite credits were found.']), '', 'Review and match these names before anything is added.'].join('\n'),
+          chatId: String(chatId),
+          replyMarkup: { inline_keyboard: [[{ text: '✅ Open Approval Inbox', url: `${site}/admin/social-studio?tab=intake` }]] },
+        });
       }
     } catch (e: any) {
       if (chatId) await reply(chatId, `⚠️ Credit extraction failed: ${e.message}`);
@@ -461,6 +561,105 @@ function decodeHtmlEntities(str: string): string {
         return '';
       }
     });
+}
+
+function intakeMetadata(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? { ...(value as Record<string, any>) }
+    : {};
+}
+
+function parseAiJson(text: string): Record<string, any> {
+  const cleaned = String(text || '')
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start < 0 || end <= start) throw new Error('AI returned an unreadable response');
+  return JSON.parse(cleaned.slice(start, end + 1));
+}
+
+async function extractRemoteMedia(url: string) {
+  const extractorUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
+  const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (extractorSecret) headers.Authorization = `Bearer ${extractorSecret}`;
+  const response = await fetch(`${extractorUrl}/extract`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ url }),
+    signal: AbortSignal.timeout(25_000),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success || !data.video_url) {
+    throw new Error(data.error || data.detail || 'The video could not be prepared');
+  }
+  return data as {
+    video_url: string;
+    image_url?: string | null;
+    title?: string | null;
+    caption?: string | null;
+    author?: string | null;
+    duration?: number | null;
+  };
+}
+
+async function prepareStructuredIntake(eventId: string, kind: 'film' | 'critic_review' | 'credits') {
+  const { data: event, error } = await supabase
+    .from('social_news_events')
+    .select('*')
+    .eq('id', eventId)
+    .eq('source_type', 'telegram_bot')
+    .maybeSingle();
+  if (error) throw error;
+  if (!event) throw new Error('Intake item not found');
+
+  const metadata = intakeMetadata(event.metadata);
+  metadata.intake_kind = kind;
+  metadata.workflow_status = 'processing';
+  await supabase.from('social_news_events').update({ metadata }).eq('id', eventId);
+
+  const context = [
+    `Title: ${event.title || ''}`,
+    `Text: ${event.description || ''}`,
+    `Source: ${event.source_url || ''}`,
+    `Account: ${metadata.author_name || metadata.from_user || ''}`,
+  ].join('\n');
+
+  let prompt = '';
+  if (kind === 'film') {
+    prompt = `Extract a possible African film or series record from this forwarded source. Do not invent facts. Use null for anything not present.\n${context}\n\nReturn ONLY JSON with: {"title":string|null,"year":number|null,"synopsis":string|null,"genres":string[],"runtime_minutes":number|null,"release_date":string|null,"status":"released"|"upcoming"|"announced"|"filming"|null,"content_type":"movie"|"series"|null,"countries":string[],"platform":string|null,"cast":string[],"crew":[{"name":string,"role":string}],"poster_url":string|null}`;
+  } else if (kind === 'critic_review') {
+    prompt = `Extract a film critic review from this forwarded source. Preserve one concise review quote exactly when possible and do not invent a rating. Use null for unknown fields.\n${context}\n\nReturn ONLY JSON with: {"film_title":string|null,"film_id":null,"critic_name":string|null,"critic_title":string|null,"publication":string|null,"quote":string|null,"rating":number|null,"rating_scale":number|null,"review_url":string|null,"is_anonymous":false,"is_featured":true}`;
+  } else {
+    prompt = `Extract film credits from this forwarded source. Do not invent names or roles.\n${context}\n\nReturn ONLY JSON with: {"film_title":string|null,"film_id":null,"credits":[{"name":string,"role":string,"character_name":string|null}],"notes":string|null}`;
+  }
+
+  try {
+    const ai = await generateAIContent(prompt);
+    const payload = parseAiJson(ai.text || '');
+    if (kind === 'film' && !payload.poster_url && metadata.image_url) payload.poster_url = metadata.image_url;
+    if (kind === 'critic_review' && !payload.review_url) payload.review_url = event.source_url;
+    metadata.extracted_payload = payload;
+    metadata.workflow_status = 'needs_review';
+    metadata.extracted_at = new Date().toISOString();
+    await supabase
+      .from('social_news_events')
+      .update({
+        event_type: kind === 'film' ? 'movie_announcement' : kind,
+        status: 'new',
+        metadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', eventId);
+    return { event, payload };
+  } catch (error: any) {
+    metadata.workflow_status = 'failed';
+    metadata.processing_error = String(error?.message || error).slice(0, 1000);
+    await supabase.from('social_news_events').update({ metadata, updated_at: new Date().toISOString() }).eq('id', eventId);
+    throw error;
+  }
 }
 
 async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) {
@@ -640,6 +839,8 @@ async function handleSocialIntake(chatId: string | number, message: any) {
       urgency: 'high',
       status: 'new',
       metadata: {
+        intake_kind: 'unclassified',
+        workflow_status: 'received',
         telegram_message_id: message.message_id,
         from_user: message.from?.username || message.from?.first_name || 'Admin',
         forward_from: message.forward_from?.username || message.forward_from_chat?.title || null,
@@ -682,12 +883,22 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     .join('\n');
 
   const inlineKeyboard = [
-    [{ text: '🎨 Create Social Graphic Draft', callback_data: `intake_draft:${newEvent.id}` }],
+    ...(/(?:youtube\.com|youtu\.be)/i.test(sourceUrl || '')
+      ? [[{ text: '▶️ Get Playable Video', callback_data: `intake_download:${newEvent.id}` }]]
+      : []),
+    [{ text: '🎨 Create Editable Social Draft', callback_data: `intake_draft:${newEvent.id}` }],
     [
-      { text: '📰 Add to News Opportunities', callback_data: `intake_news:${newEvent.id}` },
-      { text: '🎭 Extract Credits', callback_data: `intake_credits:${newEvent.id}` },
+      { text: '🎞 Prepare Film', callback_data: `intake_film:${newEvent.id}` },
+      { text: '📝 Add Critic Review', callback_data: `intake_review:${newEvent.id}` },
     ],
-    [{ text: '🌐 Open Social Studio', url: adminUrl }],
+    [
+      { text: '🎭 Extract Credits', callback_data: `intake_credits:${newEvent.id}` },
+      { text: '📰 Save as News', callback_data: `intake_news:${newEvent.id}` },
+    ],
+    [
+      { text: '📥 Approval Inbox', url: `${adminUrl}?tab=intake` },
+      { text: '🗑 Ignore', callback_data: `intake_ignore:${newEvent.id}` },
+    ],
   ];
 
   if (meta.videoUrl) {
@@ -766,7 +977,7 @@ export async function handleTelegramOps(req: VercelRequest, res: VercelResponse)
     const text = String(message.text || message.caption || '').trim();
     if (text.startsWith('/')) {
       await handleCommand(chatId, text);
-    } else if (text || message.photo || message.document) {
+    } else if (text || message.photo || message.video || message.document) {
       await handleSocialIntake(chatId, message);
     }
 

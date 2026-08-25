@@ -208,6 +208,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'GET') {
       await requireSocialStudioAdmin(req);
+      if (task === 'intake_list') {
+        const { listSocialIntake } = await import('./_lib/social_intake.js');
+        return res.status(200).json(await listSocialIntake({
+          limit: Number(req.query?.limit || 50),
+          workflowStatus: String(req.query?.workflowStatus || '') || null,
+          kind: String(req.query?.kind || '') || null,
+        }));
+      }
       if (task === 'threads_status' || task === 'connections_status') {
         const connection = await getThreadsConnection();
         const allConnections = await getAllPlatformConnections();
@@ -278,6 +286,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (task === 'intake_update') {
+        await requireSocialStudioAdmin(req);
+        const { updateSocialIntake } = await import('./_lib/social_intake.js');
+        return res.status(200).json(await updateSocialIntake(req.body || {}));
+      }
+
+      if (task === 'intake_approve') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { approveSocialIntake } = await import('./_lib/social_intake.js');
+        return res.status(200).json(await approveSocialIntake(req.body || {}, actor.id));
+      }
+
+      if (task === 'intake_reject') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { rejectSocialIntake } = await import('./_lib/social_intake.js');
+        return res.status(200).json(await rejectSocialIntake(req.body || {}, actor.id));
+      }
+
+      if (task === 'intake_create_social') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { createSocialDraftFromIntake } = await import('./_lib/social_intake.js');
+        return res.status(201).json(await createSocialDraftFromIntake({
+          intakeId: String(req.body?.intakeId || ''),
+          captions: req.body?.captions || {},
+          actorId: actor.id,
+        }));
+      }
+
       if (task === 'search_candidates') {
         const { q, type = 'all', limit = 20 } = req.body || {};
         const { searchCandidates } = await import('./_lib/editorial/candidate_service.js');

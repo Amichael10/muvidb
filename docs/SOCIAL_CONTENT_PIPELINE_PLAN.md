@@ -1,8 +1,8 @@
 # MuviDB Social Content Pipeline and Meta Publishing Plan
 
-Last updated: 2026-08-18
+Last updated: 2026-08-25
 
-Status: **Implementation in progress. Threads OAuth/live adapter built locally; staging deployment and real-account authorization are pending.**
+Status: **Implementation in progress. Telegram structured intake and approval inbox are implemented; Instagram, Facebook, Threads, and TikTok publishing adapters are implemented and still depend on healthy provider authorization.**
 
 This is the canonical handoff for expanding MuviDB's existing Social Studio into:
 
@@ -79,7 +79,33 @@ The Threads implementation now includes:
 - retry classification and a no-automatic-retry state for ambiguous publish results;
 - independent `SOCIAL_THREADS_PUBLISH_ENABLED` protection in addition to global live mode.
 
-The mock flow remains the default. Instagram/Facebook live adapters and Telegram content intake are not implemented yet.
+The Telegram intake implementation now includes:
+
+- allowlisted forwarding of links, text, photos, and videos;
+- YouTube Short recognition and a playable-MP4 return action through the existing Render extractor;
+- Telegram `file_id` reuse so repeated downloads do not consume extraction compute;
+- structured AI preparation for film records, critic reviews, and credits;
+- news, social-draft, ignore, and approval-inbox actions;
+- an admin-only Telegram Approval Inbox inside Social Studio;
+- canonical, editable Social Studio drafts for Instagram, Facebook, Threads, and TikTok;
+- source-artwork attachment when the forwarded thumbnail is a safe public URL;
+- a three-hashtag maximum in generated Telegram draft copy;
+- editable extracted facts with source evidence retained;
+- catalogue writes only after full-admin approval;
+- duplicate protection for social drafts and film-title/year matches;
+- required synopsis validation for films and required film/quote attribution for critic reviews.
+
+No new serverless route or third content model was added. Telegram intake continues to use
+`social_news_events`; workflow state and extracted data live in its `metadata` JSON until the
+admin applies the item. The canonical social publisher continues to use
+`social_content_items`, `social_platform_variants`, `social_assets`, and
+`social_publish_jobs`.
+
+Known boundary: the bot can return a playable YouTube Short inside the private Telegram chat,
+but that downloaded video is not automatically republished. The Social Studio draft uses a
+safe public source thumbnail when one exists and requires an administrator to confirm media
+rights or replace the artwork before approval. Native video ingestion and watermarking should
+be added only with an explicit rights-confirmation step and durable media storage.
 
 ## Important schema issue
 
