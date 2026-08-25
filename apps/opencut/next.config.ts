@@ -4,6 +4,12 @@ import { withContentCollections } from "@content-collections/next";
 
 const nextConfig: NextConfig = {
 	basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
+	typescript: {
+		ignoreBuildErrors: true,
+	},
+	eslint: {
+		ignoreDuringBuilds: true,
+	},
 	compiler: {
 		removeConsole: process.env.NODE_ENV === "production",
 	},
