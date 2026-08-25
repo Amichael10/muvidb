@@ -843,6 +843,181 @@ export async function updateSocialVariantCaption(
   return { success: true, id: variant.id, platform, caption };
 }
 
+const NON_EDITABLE_CONTENT_STATUSES = ['publishing', 'partially_published', 'published'] as const;
+const NON_EDITABLE_VARIANT_STATUSES = ['publishing', 'published', 'uploaded_as_draft'] as const;
+
+async function assertContentItemCanBeChanged(contentItemId: string) {
+  const { data: item, error } = await supabase
+    .from('social_content_items')
+    .select('id,title,status,social_platform_variants(id,status,platform)')
+    .eq('id', contentItemId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!item) throw httpError(404, 'Content item not found');
+  if (NON_EDITABLE_CONTENT_STATUSES.includes(item.status as any)) {
+    throw httpError(409, 'This post can no longer be changed because publishing has started');
+  }
+
+  const variants = asArray(item.social_platform_variants as any[]);
+  if (variants.some(variant => NON_EDITABLE_VARIANT_STATUSES.includes(variant.status as any))) {
+    throw httpError(409, 'This post can no longer be changed because one of its platform posts is already publishing or published');
+  }
+
+  const variantIds = variants.map(variant => variant.id);
+  if (variantIds.length) {
+    const { count, error: jobError } = await supabase
+      .from('social_publish_jobs')
+      .select('id', { count: 'exact', head: true })
+      .in('platform_variant_id', variantIds)
+      .eq('status', 'processing');
+    if (jobError) throw jobError;
+    if (count) throw httpError(409, 'This post is being published right now and can no longer be changed');
+  }
+
+  return { item, variants, variantIds };
+}
+
+/** Returns any pre-publication queue item to an editable draft without regenerating it. */
+export async function prepareSocialContentItemForEdit(
+  input: { contentItemId: string },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const { item, variantIds } = await assertContentItemCanBeChanged(input.contentItemId);
+  const now = new Date().toISOString();
+
+  if (variantIds.length) {
+    const { error: jobError } = await supabase
+      .from('social_publish_jobs')
+      .update({ status: 'cancelled', completed_at: now })
+      .in('platform_variant_id', variantIds)
+      .in('status', ['queued', 'retrying']);
+    if (jobError) throw jobError;
+
+    const { error: variantError } = await supabase
+      .from('social_platform_variants')
+      .update({ status: 'draft', scheduled_for: null })
+      .in('id', variantIds)
+      .in('status', ['draft', 'approved', 'scheduled', 'failed', 'skipped']);
+    if (variantError) throw variantError;
+  }
+
+  const { error: updateError } = await supabase
+    .from('social_content_items')
+    .update({
+      status: 'draft',
+      approved_by: null,
+      approved_at: null,
+      rejected_by: null,
+      rejected_at: null,
+      rejection_reason: null,
+    })
+    .eq('id', input.contentItemId);
+  if (updateError) throw updateError;
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'queue_item_opened_for_edit',
+    eventData: { actor_id: actor.id, from: item.status, cancelled_schedule: item.status === 'scheduled' },
+  });
+
+  return { id: item.id, title: item.title, from: item.status, status: 'draft' };
+}
+
+/** Saves the queue editor's title and platform captions in one guarded request. */
+export async function updateSocialContentItemDraft(
+  input: { contentItemId: string; title: string; variants: Array<{ id: string; caption: string }> },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const title = String(input.title || '').trim();
+  if (!title) throw httpError(400, 'Post title cannot be empty');
+  if (title.length > 180) throw httpError(400, 'Post title is too long');
+
+  const { variants: existingVariants } = await assertContentItemCanBeChanged(input.contentItemId);
+  const existingById = new Map(existingVariants.map(variant => [variant.id, variant]));
+  const updates = Array.isArray(input.variants) ? input.variants : [];
+  if (!updates.length) throw httpError(400, 'At least one platform caption is required');
+
+  for (const update of updates) {
+    const existing = existingById.get(update.id);
+    if (!existing) throw httpError(400, 'A platform caption does not belong to this post');
+    const caption = String(update.caption || '').trim();
+    if (!caption) throw httpError(400, 'Platform captions cannot be empty');
+    const platform = (existing as any).platform as SocialPlatform;
+    const limit = PLATFORM_CAPTION_LIMITS[platform]?.captionLimit || 2200;
+    if (caption.length > limit) throw httpError(400, `${platform} caption exceeds ${limit} characters`);
+  }
+
+  const { error: itemError } = await supabase
+    .from('social_content_items')
+    .update({ title })
+    .eq('id', input.contentItemId);
+  if (itemError) throw itemError;
+
+  for (const update of updates) {
+    const { error: variantError } = await supabase
+      .from('social_platform_variants')
+      .update({ caption: String(update.caption).trim() })
+      .eq('id', update.id)
+      .eq('content_item_id', input.contentItemId);
+    if (variantError) throw variantError;
+  }
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'queue_item_edited',
+    eventData: { actor_id: actor.id, variant_ids: updates.map(update => update.id) },
+  });
+
+  return { success: true, id: input.contentItemId, title, status: 'draft' };
+}
+
+/** Permanently removes an unpublished queue item and its database-owned render files. */
+export async function deleteSocialContentItem(
+  input: { contentItemId: string },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const { item, variantIds } = await assertContentItemCanBeChanged(input.contentItemId);
+
+  if (variantIds.length) {
+    const { error: jobError } = await supabase
+      .from('social_publish_jobs')
+      .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+      .in('platform_variant_id', variantIds)
+      .in('status', ['queued', 'retrying']);
+    if (jobError) throw jobError;
+  }
+
+  const { data: assets, error: assetError } = await supabase
+    .from('social_assets')
+    .select('storage_bucket,storage_path')
+    .eq('content_item_id', input.contentItemId);
+  if (assetError) throw assetError;
+
+  const { error: deleteError } = await supabase
+    .from('social_content_items')
+    .delete()
+    .eq('id', input.contentItemId);
+  if (deleteError) throw deleteError;
+
+  const byBucket = new Map<string, string[]>();
+  for (const asset of assets || []) {
+    if (!asset.storage_bucket || asset.storage_bucket === 'external' || !asset.storage_path) continue;
+    const paths = byBucket.get(asset.storage_bucket) || [];
+    paths.push(asset.storage_path);
+    byBucket.set(asset.storage_bucket, paths);
+  }
+  for (const [bucket, paths] of byBucket) {
+    const { error: removeError } = await supabase.storage.from(bucket).remove(paths);
+    if (removeError) console.warn(`Social Studio: queue item ${item.id} deleted, but asset cleanup failed`, removeError);
+  }
+
+  return { success: true, id: item.id, title: item.title, deletedBy: actor.id };
+}
+
 /**
  * Moves a content item through the review states.
  *

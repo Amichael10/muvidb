@@ -117,6 +117,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       attachCarouselAssets,
       reorderCarouselAssets,
       updateSocialVariantCaption,
+      prepareSocialContentItemForEdit,
+      updateSocialContentItemDraft,
+      deleteSocialContentItem,
       getEditorialCalendar,
       seedEditorialCalendarSlots,
     } = await import('./_lib/social_studio.js');
@@ -378,6 +381,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'caption is required' });
         }
         return res.status(200).json(await updateSocialVariantCaption({ variantId, caption }, actor));
+      }
+
+      if (task === 'prepare_queue_item_edit') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId } = req.body || {};
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+        return res.status(200).json(await prepareSocialContentItemForEdit({ contentItemId }, actor));
+      }
+
+      if (task === 'update_queue_item') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, title, variants } = req.body || {};
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+        return res.status(200).json(await updateSocialContentItemDraft({ contentItemId, title, variants }, actor));
+      }
+
+      if (task === 'delete_queue_item') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId } = req.body || {};
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+        return res.status(200).json(await deleteSocialContentItem({ contentItemId }, actor));
       }
 
       if (task === 'threads_oauth_start') {

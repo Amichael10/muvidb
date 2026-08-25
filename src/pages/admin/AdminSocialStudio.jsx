@@ -131,6 +131,10 @@ export default function AdminSocialStudio() {
   const [draftsError, setDraftsError] = useState('');
   const [reviewingId, setReviewingId] = useState(null);
   const [scheduleAt, setScheduleAt] = useState({});
+  const [editingQueueItem, setEditingQueueItem] = useState(null);
+  const [queueEditTitle, setQueueEditTitle] = useState('');
+  const [queueEditCaptions, setQueueEditCaptions] = useState({});
+  const [savingQueueEdit, setSavingQueueEdit] = useState(false);
   const [connections, setConnections] = useState({
     loading: true,
     connecting: false,
@@ -441,6 +445,97 @@ export default function AdminSocialStudio() {
       refreshAll();
     } catch (err) {
       toast.error(err.message || 'Cancel failed');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const openQueueEditor = async item => {
+    setReviewingId(item.id);
+    try {
+      const res = await fetch('/api/social?task=prepare_queue_item_edit', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId: item.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      const editableItem = { ...item, status: 'draft' };
+      setEditingQueueItem(editableItem);
+      setQueueEditTitle(item.title || '');
+      setQueueEditCaptions(Object.fromEntries(
+        asRelationArray(item.social_platform_variants).map(variant => [variant.id, variant.caption || '']),
+      ));
+      setDrafts(current => current.map(entry => entry.id === item.id ? editableItem : entry));
+      if (data.from === 'scheduled') toast.success('Schedule cancelled. You can now edit this post.');
+    } catch (err) {
+      toast.error(err.message || 'This post could not be opened for editing');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const saveQueueEditor = async () => {
+    if (!editingQueueItem) return;
+    const variants = asRelationArray(editingQueueItem.social_platform_variants);
+    if (!queueEditTitle.trim()) {
+      toast.error('Post title cannot be empty');
+      return;
+    }
+    if (variants.some(variant => !String(queueEditCaptions[variant.id] || '').trim())) {
+      toast.error('Every selected platform needs a caption');
+      return;
+    }
+
+    setSavingQueueEdit(true);
+    try {
+      const payloadVariants = variants.map(variant => ({
+        id: variant.id,
+        caption: queueEditCaptions[variant.id],
+      }));
+      const res = await fetch('/api/social?task=update_queue_item', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentItemId: editingQueueItem.id,
+          title: queueEditTitle,
+          variants: payloadVariants,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success('Queue post updated and saved as a draft');
+      setEditingQueueItem(null);
+      await fetchDrafts();
+      fetchSummary();
+    } catch (err) {
+      toast.error(err.message || 'Could not save this post');
+    } finally {
+      setSavingQueueEdit(false);
+    }
+  };
+
+  const deleteQueueItem = async item => {
+    const confirmed = window.confirm(
+      `Delete “${item.title}”? This removes the unpublished post, its captions, schedule, and generated artwork. This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setReviewingId(item.id);
+    try {
+      const res = await fetch('/api/social?task=delete_queue_item', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId: item.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setDrafts(current => current.filter(entry => entry.id !== item.id));
+      toast.success('Queue post deleted');
+      fetchSummary();
+    } catch (err) {
+      toast.error(err.message || 'Could not delete this post');
     } finally {
       setReviewingId(null);
     }
@@ -847,6 +942,7 @@ export default function AdminSocialStudio() {
                 const previewAsset = carouselPreviewUrl
                   ? { public_url: carouselPreviewUrl, format: 'carousel' }
                   : assets.find(asset => asset.id === selectedAssetId) || assets[0];
+                const canChangeQueueItem = !['publishing', 'partially_published', 'published'].includes(item.status);
                 return (
                 <div
                   key={item.id}
@@ -954,6 +1050,29 @@ export default function AdminSocialStudio() {
                         </span>
                       ))}
 
+                      {canChangeQueueItem && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openQueueEditor(item)}
+                            disabled={reviewingId === item.id}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-bold text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
+                          >
+                            <Icon icon="solar:pen-new-square-linear" width="14" />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteQueueItem(item)}
+                            disabled={reviewingId === item.id}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                          >
+                            <Icon icon="solar:trash-bin-trash-linear" width="14" />
+                            Delete
+                          </button>
+                        </>
+                      )}
+
                       {reviewActions(item.status).map(({ action, label, tone }) => (
                         <button
                           key={action}
@@ -1050,6 +1169,96 @@ export default function AdminSocialStudio() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Queue Item Editor */}
+      {editingQueueItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-surface p-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Icon icon="solar:pen-new-square-linear" className="text-brand" width="20" />
+                  <h3 className="text-lg font-black tracking-tight text-text-primary">Edit queued post</h3>
+                  <Pill tone="blue">Draft</Pill>
+                </div>
+                <p className="mt-1 text-xs text-text-muted">
+                  Update the internal title and each platform’s caption. Artwork and carousel slides stay attached.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingQueueItem(null)}
+                disabled={savingQueueEdit}
+                className="rounded-lg p-1.5 text-text-muted hover:bg-surface-2 hover:text-text-primary disabled:opacity-50"
+                aria-label="Close queue editor"
+              >
+                <Icon icon="solar:close-circle-linear" width="22" />
+              </button>
+            </div>
+
+            <div className="space-y-5 p-5">
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">Post title</span>
+                <input
+                  value={queueEditTitle}
+                  onChange={event => setQueueEditTitle(event.target.value)}
+                  maxLength={180}
+                  className="mt-2 h-11 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm font-bold text-text-primary outline-none focus:border-brand"
+                />
+                <span className="mt-1 block text-right text-[10px] text-text-muted">{queueEditTitle.length}/180</span>
+              </label>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {asRelationArray(editingQueueItem.social_platform_variants).map(variant => {
+                  const caption = queueEditCaptions[variant.id] || '';
+                  const limit = variant.platform === 'threads' ? 500 : variant.platform === 'facebook' ? 2000 : 2200;
+                  return (
+                    <label key={variant.id} className="block rounded-lg border border-border bg-surface-2 p-4">
+                      <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-text-primary">
+                        <Icon icon={`simple-icons:${variant.platform}`} className="text-brand" width="15" />
+                        {variant.platform} caption
+                      </span>
+                      <textarea
+                        value={caption}
+                        onChange={event => setQueueEditCaptions(current => ({ ...current, [variant.id]: event.target.value }))}
+                        maxLength={limit}
+                        rows={12}
+                        className="mt-3 w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm leading-relaxed text-text-primary outline-none focus:border-brand"
+                      />
+                      <span className={`mt-1 block text-right text-[10px] ${caption.length >= limit ? 'text-red-500' : 'text-text-muted'}`}>
+                        {caption.length}/{limit}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface p-5">
+              <p className="text-xs text-text-muted">Saving keeps this item in Draft so you can review or schedule it when ready.</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingQueueItem(null)}
+                  disabled={savingQueueEdit}
+                  className="rounded-lg border border-border bg-surface-2 px-4 py-2 text-xs font-bold text-text-muted hover:text-text-primary disabled:opacity-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={saveQueueEditor}
+                  disabled={savingQueueEdit}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50"
+                >
+                  <Icon icon={savingQueueEdit ? 'solar:spinner-linear' : 'solar:diskette-linear'} className={savingQueueEdit ? 'animate-spin' : ''} width="15" />
+                  {savingQueueEdit ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
