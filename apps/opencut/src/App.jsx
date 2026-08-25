@@ -1,0 +1,3249 @@
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import './index.css';
+import { defaultConfig } from './defaultConfig.js';
+
+const DEFAULT_CANVAS_WIDTH = 1080;
+const DEFAULT_CANVAS_HEIGHT = 1920;
+
+function getCanvasSize(config) {
+  return {
+    width: Math.max(16, Number(config?.width) || DEFAULT_CANVAS_WIDTH),
+    height: Math.max(16, Number(config?.height) || DEFAULT_CANVAS_HEIGHT),
+  };
+}
+
+const FRAME_PRESETS = [
+  { id: 'ig-reel', label: 'Instagram Reel', width: 1080, height: 1920, ratio: '9:16' },
+  { id: 'tiktok', label: 'TikTok', width: 1080, height: 1920, ratio: '9:16' },
+  { id: 'ig-post', label: 'Instagram Post', width: 1080, height: 1080, ratio: '1:1' },
+  { id: 'ig-portrait', label: 'Instagram 4:5', width: 1080, height: 1350, ratio: '4:5' },
+  { id: 'twitter', label: 'Twitter / X', width: 1600, height: 900, ratio: '16:9' },
+];
+
+function matchFramePreset(config) {
+  const { width, height } = getCanvasSize(config);
+  const preferred = FRAME_PRESETS.find((preset) => preset.id === config?.framePreset);
+  if (preferred && preferred.width === width && preferred.height === height) return preferred.id;
+  return FRAME_PRESETS.find((preset) => preset.width === width && preset.height === height)?.id
+    || config?.framePreset
+    || 'custom';
+}
+const STORAGE_KEY = 'muvidb-video-studio-project';
+
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const sceneDuration = (scene) => Math.max(0, Number((scene?.end || 0) - (scene?.start || 0)));
+const sceneTimelineEnd = (config) => Math.max(...(config?.scenes || []).map((scene) => Number(scene.end) || 0), 1);
+const timelineDuration = (config) => sceneTimelineEnd(config);
+
+function setProjectDuration(config, value) {
+  const scenes = config.scenes || [];
+  const last = scenes.at(-1);
+  if (!last) {
+    config.duration = Math.max(1, Number(value) || 1);
+    return;
+  }
+  const previous = scenes.length > 1 ? scenes.at(-2) : null;
+  const minimumEnd = previous ? previous.end + 0.2 : last.start + 0.2;
+  last.end = Number(Math.max(minimumEnd, Number(value) || minimumEnd).toFixed(1));
+  config.duration = last.end;
+}
+const families = [
+  { id: 'Manrope', label: 'Manrope' },
+  { id: 'Inter', label: 'Inter' },
+  { id: 'InstrumentSans', label: 'Instrument Sans' },
+  { id: 'Georgia', label: 'Georgia' },
+  { id: 'Palatino', label: 'Palatino' },
+  { id: 'Baskerville', label: 'Baskerville' },
+  { id: 'TimesNewRoman', label: 'Times New Roman' },
+  { id: 'NewYork', label: 'New York' },
+  { id: 'CormorantGaramond', label: 'Cormorant Garamond' },
+  { id: 'Cinzel', label: 'Cinzel' },
+];
+
+const fontMap = {
+  Manrope: 'Manrope',
+  Inter: 'Inter',
+  InstrumentSans: 'Instrument Sans',
+  Georgia: 'Georgia',
+  Palatino: 'Palatino',
+  Baskerville: 'Baskerville',
+  TimesNewRoman: 'Times New Roman',
+  NewYork: 'New York',
+  CormorantGaramond: 'Cormorant Garamond',
+  Cinzel: 'Cinzel',
+};
+
+const animationFieldLabels = {
+  startX: 'Start left/right',
+  startY: 'Start up/down',
+  endX: 'End left/right',
+  endY: 'End up/down',
+  startZoom: 'Start scale',
+  endZoom: 'End scale',
+};
+
+const selectedLabel = {
+  scene: 'Scene timing',
+  background: 'Background',
+  layer: 'Layer',
+};
+
+const initialConfig = {
+  ...clone(defaultConfig),
+  fonts: {
+    defaultFamily: defaultConfig.fonts?.defaultFamily || 'Manrope',
+    families: defaultConfig.fonts?.families || families,
+  },
+};
+
+const initialState = {
+  config: initialConfig,
+  selectedSceneIndex: 0,
+  selectedLayerIndex: 0,
+  selectedTarget: 'scene',
+  currentTime: 0,
+  isPlaying: false,
+  past: [],
+  future: [],
+};
+
+function syncTimelineDuration(config) {
+  const requestedDuration = Number(config.duration) || 0;
+  const actualEnd = sceneTimelineEnd(config);
+  if (requestedDuration > actualEnd) {
+    setProjectDuration(config, requestedDuration);
+    return;
+  }
+  config.duration = Number(actualEnd.toFixed(1));
+}
+
+function normalizeTimeline(config) {
+  const next = clone(config);
+  syncTimelineDuration(next);
+  return next;
+}
+
+function retimeFrom(config, index) {
+  for (let i = Math.max(1, index); i < config.scenes.length; i += 1) {
+    const previous = config.scenes[i - 1];
+    const item = config.scenes[i];
+    const duration = Math.max(0.2, sceneDuration(item));
+    item.start = Number(previous.end.toFixed(1));
+    item.end = Number((item.start + duration).toFixed(1));
+  }
+  syncTimelineDuration(config);
+}
+
+function withHistory(state, mutate, ui = {}) {
+  const config = clone(state.config);
+  const next = { ...state, ...ui, config, past: [...state.past.slice(-79), clone(state.config)], future: [] };
+  mutate(config, next);
+  next.selectedSceneIndex = Math.min(next.selectedSceneIndex, Math.max(0, config.scenes.length - 1));
+  const layers = config.scenes[next.selectedSceneIndex]?.layers || [];
+  next.selectedLayerIndex = Math.min(next.selectedLayerIndex, Math.max(0, layers.length - 1));
+  syncTimelineDuration(config);
+  next.currentTime = Math.min(next.currentTime, timelineDuration(config));
+  return next;
+}
+
+function updateSceneLayer(config, sceneIndex, layerIndex, mutate) {
+  const next = clone(config);
+  const layer = next.scenes[sceneIndex]?.layers?.[layerIndex];
+  if (layer) mutate(layer);
+  return next;
+}
+
+function updateSceneBackground(config, sceneIndex, mutate) {
+  const next = clone(config);
+  const scene = next.scenes[sceneIndex];
+  if (!scene) return next;
+  scene.background = scene.background || {};
+  mutate(scene.background);
+  return next;
+}
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'undo': {
+      const previous = state.past.at(-1);
+      if (!previous) return state;
+      return {
+        ...state,
+        config: previous,
+        past: state.past.slice(0, -1),
+        future: [clone(state.config), ...state.future].slice(0, 80),
+        selectedSceneIndex: Math.min(state.selectedSceneIndex, previous.scenes.length - 1),
+        selectedLayerIndex: 0,
+      };
+    }
+    case 'redo': {
+      const next = state.future[0];
+      if (!next) return state;
+      return {
+        ...state,
+        config: next,
+        past: [...state.past.slice(-79), clone(state.config)],
+        future: state.future.slice(1),
+        selectedSceneIndex: Math.min(state.selectedSceneIndex, next.scenes.length - 1),
+        selectedLayerIndex: 0,
+      };
+    }
+    case 'reset':
+      return { ...initialState, config: clone(initialConfig) };
+    case 'begin-interaction':
+      return { ...state, past: [...state.past.slice(-79), clone(state.config)], future: [] };
+    case 'ui':
+      return { ...state, ...action.patch };
+    case 'replace-config':
+      return { ...state, config: normalizeTimeline(action.config), past: [...state.past, clone(state.config)], future: [], selectedSceneIndex: 0, selectedLayerIndex: 0, currentTime: 0 };
+    case 'project':
+      return withHistory(state, (config) => {
+        config[action.key] = action.value;
+        if (action.key === 'duration') setProjectDuration(config, action.value);
+        if (action.key === 'fps') config.fps = Math.max(1, Number(action.value) || 30);
+      });
+    case 'default-font':
+      return withHistory(state, (config) => {
+        config.fonts = config.fonts || {};
+        config.fonts.defaultFamily = action.value;
+        config.fonts.families = config.fonts.families || families;
+        config.scenes.forEach((scene) => {
+          scene.layers?.forEach((layer) => {
+            if (layer.type === 'text' || layer.type === 'pill') delete layer.fontFamily;
+          });
+        });
+      });
+    case 'scene':
+      return withHistory(state, (config) => {
+        const item = config.scenes[state.selectedSceneIndex];
+        if (!item) return;
+        if (action.key === 'duration') {
+          item.end = Number((item.start + Math.max(0.2, Number(action.value) || 1)).toFixed(1));
+          retimeFrom(config, state.selectedSceneIndex + 1);
+          return;
+        }
+        item[action.key] = ['start', 'end'].includes(action.key) ? Number(action.value) || 0 : action.value;
+        if (action.key === 'end') item.end = Math.max(item.start + 0.2, item.end);
+        syncTimelineDuration(config);
+      });
+    case 'transition':
+      return withHistory(state, (config) => {
+        const item = config.scenes[state.selectedSceneIndex];
+        item.transition = item.transition || {};
+        item.transition[action.key] = action.key === 'duration' ? Math.max(0, Number(action.value) || 0) : action.value;
+      });
+    case 'background':
+      return withHistory(state, (config) => {
+        const item = config.scenes[state.selectedSceneIndex];
+        item.background = item.background || {};
+        item.background[action.key] = ['x', 'y', 'zoom'].includes(action.key) ? Number(action.value) || 0 : action.value;
+      });
+    case 'background-animation':
+      return withHistory(state, (config) => {
+        const bg = config.scenes[state.selectedSceneIndex].background || {};
+        bg.animation = bg.animation || {};
+        bg.animation[action.key] = action.key === 'type' ? action.value : Number(action.value) || 0;
+        config.scenes[state.selectedSceneIndex].background = bg;
+      });
+    case 'fit-bg':
+      return withHistory(state, (config) => {
+        const bg = config.scenes[state.selectedSceneIndex].background || {};
+        bg.x = 0;
+        bg.y = 0;
+        bg.zoom = action.mode === 'fill' ? 1.08 : 1;
+        bg.animation = { type: 'kenBurns', startX: 0, startY: 0, endX: -28, endY: -18, startZoom: bg.zoom, endZoom: bg.zoom + 0.04 };
+        config.scenes[state.selectedSceneIndex].background = bg;
+      });
+    case 'apply-clip':
+      return withHistory(state, (config, next) => {
+        const clipIn = Math.max(0, Number(action.clipIn) || 0);
+        const clipOut = Math.max(clipIn + 0.2, Number(action.clipOut) || clipIn + 0.2);
+        const length = Number((clipOut - clipIn).toFixed(2));
+        const logo = config.assets?.logo || 'assets/images/muvidb-logo.svg';
+        config.scenes = [{
+          id: `clip-${Date.now()}`,
+          name: action.title || 'Clip',
+          start: 0,
+          end: length,
+          transition: { type: 'none', duration: 0 },
+          background: {
+            image: action.source,
+            mediaKind: 'video',
+            clipIn,
+            clipOut,
+            sourceDuration: action.sourceDuration != null ? Number(action.sourceDuration) : clipOut,
+            noOverlay: true,
+            zoom: 1,
+            x: 0,
+            y: 0,
+            animation: { type: 'none' },
+            color: '#000000',
+          },
+          layers: [
+            {
+              id: 'brand-logo',
+              type: 'image',
+              source: logo,
+              x: 72,
+              y: 72,
+              width: 92,
+              height: 92,
+              opacity: 1,
+            },
+            {
+              id: 'clip-title',
+              type: 'text',
+              text: action.title || 'Your title here',
+              x: 84,
+              y: 1480,
+              width: 912,
+              height: 160,
+              fontSize: 52,
+              weight: 'heavy',
+              color: '#FFFFFF',
+              align: 'center',
+              opacity: 1,
+            },
+          ],
+        }];
+        config.duration = length;
+        config.coverSceneId = config.scenes[0].id;
+        if (action.outputName) config.outputName = action.outputName;
+        next.selectedSceneIndex = 0;
+        next.selectedLayerIndex = 1;
+        next.selectedTarget = 'layer';
+        next.currentTime = 0;
+        next.isPlaying = false;
+      });
+    case 'clip-window':
+      return withHistory(state, (config, next) => {
+        const scene = config.scenes[state.selectedSceneIndex];
+        if (!scene?.background) return;
+        const maxOut = Number(scene.background.sourceDuration) || Number(action.clipOut) || 99999;
+        const clipIn = action.clipIn != null ? Math.max(0, Number(action.clipIn)) : (scene.background.clipIn ?? 0);
+        let clipOut = action.clipOut != null ? Number(action.clipOut) : (scene.background.clipOut ?? clipIn + 1);
+        clipOut = Math.min(maxOut, Math.max(clipIn + 0.2, clipOut));
+        const safeIn = Math.min(clipIn, clipOut - 0.2);
+        scene.background.clipIn = Number(safeIn.toFixed(2));
+        scene.background.clipOut = Number(clipOut.toFixed(2));
+        const length = Number((clipOut - safeIn).toFixed(2));
+        scene.start = 0;
+        scene.end = length;
+        if (config.scenes.length === 1) {
+          config.duration = length;
+          next.currentTime = Math.min(next.currentTime, length);
+        } else {
+          retimeFrom(config, state.selectedSceneIndex + 1);
+        }
+      });
+    case 'set-frame':
+      return withHistory(state, (config) => {
+        const { width: oldW, height: oldH } = getCanvasSize(config);
+        const newW = Math.max(16, Number(action.width) || oldW);
+        const newH = Math.max(16, Number(action.height) || oldH);
+        if (oldW === newW && oldH === newH) {
+          config.framePreset = action.id || config.framePreset;
+          return;
+        }
+        const sx = newW / oldW;
+        const sy = newH / oldH;
+        config.width = newW;
+        config.height = newH;
+        config.framePreset = action.id || 'custom';
+        config.scenes.forEach((scene) => {
+          (scene.layers || []).forEach((layer) => {
+            layer.x = Math.round((Number(layer.x) || 0) * sx);
+            layer.y = Math.round((Number(layer.y) || 0) * sy);
+            layer.width = Math.round((Number(layer.width) || 0) * sx);
+            layer.height = Math.round((Number(layer.height) || 0) * sy);
+          });
+        });
+      });
+    case 'add-scene':
+      return withHistory(state, (config, next) => {
+        const last = config.scenes.at(-1);
+        const start = last ? last.end : 0;
+        config.scenes.push({
+          id: `scene-${Date.now()}`,
+          name: 'New Scene',
+          start,
+          end: Number((start + 3).toFixed(1)),
+          transition: { type: 'crossfade', duration: 0.45 },
+          background: clone(last?.background || { image: config.assets?.background, zoom: 1, x: 0, y: 0 }),
+          layers: [],
+        });
+        retimeFrom(config, config.scenes.length - 1);
+        next.selectedSceneIndex = config.scenes.length - 1;
+        next.selectedLayerIndex = 0;
+        next.selectedTarget = 'scene';
+      });
+    case 'delete-scene':
+      if (state.config.scenes.length <= 1) return state;
+      return withHistory(state, (config, next) => {
+        config.scenes.splice(state.selectedSceneIndex, 1);
+        retimeFrom(config, state.selectedSceneIndex);
+        next.selectedSceneIndex = Math.max(0, state.selectedSceneIndex - 1);
+        next.selectedLayerIndex = 0;
+      });
+    case 'split-scene':
+      return withHistory(state, (config, next) => {
+        const index = action.index ?? state.selectedSceneIndex;
+        const scene = config.scenes[index];
+        if (!scene) return;
+        const splitTime = Number(action.time);
+        if (!(splitTime > scene.start + 0.2 && splitTime < scene.end - 0.2)) return;
+        const second = clone(scene);
+        second.id = `scene-${Date.now()}`;
+        second.name = `${scene.name || 'Scene'} B`;
+        second.start = Number(splitTime.toFixed(1));
+        second.end = scene.end;
+        second.transition = { type: 'none', duration: 0 };
+        scene.end = Number(splitTime.toFixed(1));
+        config.scenes.splice(index + 1, 0, second);
+        syncTimelineDuration(config);
+        next.selectedSceneIndex = index;
+      });
+    case 'duplicate-scene':
+      return withHistory(state, (config, next) => {
+        const index = state.selectedSceneIndex;
+        const scene = config.scenes[index];
+        if (!scene) return;
+        const copy = clone(scene);
+        copy.id = `scene-${Date.now()}`;
+        copy.name = `${scene.name || 'Scene'} copy`;
+        config.scenes.splice(index + 1, 0, copy);
+        retimeFrom(config, index + 1);
+        next.selectedSceneIndex = index + 1;
+      });
+    case 'duplicate-layer':
+      return withHistory(state, (config, next) => {
+        const layers = config.scenes[state.selectedSceneIndex]?.layers;
+        const layer = layers?.[state.selectedLayerIndex];
+        if (!layer) return;
+        const copy = clone(layer);
+        copy.id = `${layer.type}-${Date.now()}`;
+        copy.x = (copy.x || 0) + 28;
+        copy.y = (copy.y || 0) + 28;
+        layers.splice(state.selectedLayerIndex + 1, 0, copy);
+        next.selectedLayerIndex = state.selectedLayerIndex + 1;
+        next.selectedTarget = 'layer';
+      });
+    case 'toggle-layer-flag':
+      return withHistory(state, (config) => {
+        const layer = config.scenes[action.sceneIndex ?? state.selectedSceneIndex]?.layers?.[action.layerIndex ?? state.selectedLayerIndex];
+        if (layer) layer[action.key] = !layer[action.key];
+      });
+    case 'layer-window':
+      return {
+        ...state,
+        config: updateSceneLayer(state.config, action.sceneIndex, action.layerIndex, (layer) => {
+          if (action.offset != null) layer.offset = Math.max(0, Number(action.offset.toFixed(2)));
+          if (action.duration != null) layer.duration = Math.max(0.2, Number(action.duration.toFixed(2)));
+        }),
+      };
+    case 'layer-animation':
+      return withHistory(state, (config) => {
+        const layer = config.scenes[state.selectedSceneIndex]?.layers?.[state.selectedLayerIndex];
+        if (!layer) return;
+        layer.animation = layer.animation || {};
+        layer.animation[action.key] = action.key === 'duration' ? Math.max(0.05, Number(action.value) || 0.5) : action.value;
+      });
+    case 'set-audio':
+      return withHistory(state, (config) => {
+        if (action.audio === null) delete config.audio;
+        else config.audio = { ...(config.audio || {}), ...action.audio };
+      });
+    case 'theme':
+      return withHistory(state, (config) => {
+        config.theme = config.theme || {};
+        config.theme[action.key] = action.value;
+      });
+    case 'add-layer':
+      return withHistory(state, (config, next) => {
+        const item = config.scenes[state.selectedSceneIndex];
+        const { width: canvasW, height: canvasH } = getCanvasSize(config);
+        let base;
+        if (action.layerType === 'shape') {
+          const shapeDef = SHAPE_LIBRARY.find((shape) => shape.id === action.shapeId || shape.shapeKind === action.shapeKind) || SHAPE_LIBRARY[0];
+          base = shapeDefaults(shapeDef, canvasW, canvasH);
+        } else {
+          base = { id: `${action.layerType}-${Date.now()}`, type: action.layerType, x: 120, y: 900, width: 840, height: 120, opacity: 1, rotation: 0 };
+          if (action.layerType === 'text') Object.assign(base, { text: 'New text', fontSize: 50, weight: 'bold', color: '#FFFFFF', align: 'center' });
+          if (action.layerType === 'image') Object.assign(base, { source: config.assets?.logo, width: 160, height: 160, x: Math.round((canvasW - 160) / 2), y: Math.round((canvasH - 160) / 2) });
+          if (action.layerType === 'pill') Object.assign(base, { text: 'now showing', fontSize: 28, weight: 'bold', color: '#FFFFFF', fill: 'rgba(255,92,0,0.18)', stroke: 'rgba(255,92,0,0.45)', width: 360, height: 84, x: Math.round((canvasW - 360) / 2), y: Math.round(canvasH * 0.72) });
+          if (action.layerType === 'card') Object.assign(base, { width: 840, height: 420, radius: 36, fill: 'rgba(11,13,14,0.72)', stroke: 'rgba(255,255,255,0.13)', x: Math.round((canvasW - 840) / 2), y: Math.round((canvasH - 420) / 2) });
+        }
+        if (action.preset) Object.assign(base, action.preset);
+        item.layers.push(base);
+        next.selectedLayerIndex = item.layers.length - 1;
+        next.selectedTarget = 'layer';
+      });
+    case 'add-media-layer':
+      return withHistory(state, (config, next) => {
+        const item = config.scenes[state.selectedSceneIndex];
+        const isVideo = action.layerType === 'video';
+        item.layers.push({
+          id: `${action.layerType}-${Date.now()}`,
+          type: action.layerType,
+          source: action.source,
+          x: isVideo ? 140 : 240,
+          y: 660,
+          width: isVideo ? 800 : 600,
+          height: isVideo ? 450 : 600,
+          opacity: 1,
+        });
+        next.selectedLayerIndex = item.layers.length - 1;
+        next.selectedTarget = 'layer';
+      });
+    case 'select-layer':
+      return {
+        ...state,
+        selectedSceneIndex: action.sceneIndex ?? state.selectedSceneIndex,
+        selectedLayerIndex: action.layerIndex,
+        selectedTarget: 'layer',
+        isPlaying: false,
+      };
+    case 'select-background':
+      return {
+        ...state,
+        selectedSceneIndex: action.sceneIndex ?? state.selectedSceneIndex,
+        selectedTarget: 'background',
+        isPlaying: false,
+      };
+    case 'drag-layer':
+      return {
+        ...state,
+        config: updateSceneLayer(state.config, action.sceneIndex, action.layerIndex, (layer) => {
+          layer.x = Math.round(action.x);
+          layer.y = Math.round(action.y);
+        }),
+      };
+    case 'drag-background':
+      return {
+        ...state,
+        config: updateSceneBackground(state.config, action.sceneIndex, (bg) => {
+          bg.x = Math.round(action.x);
+          bg.y = Math.round(action.y);
+          if (bg.animation?.type === 'kenBurns') {
+            const dx = bg.x - action.previousX;
+            const dy = bg.y - action.previousY;
+            bg.animation.startX = Math.round((bg.animation.startX ?? action.previousX) + dx);
+            bg.animation.startY = Math.round((bg.animation.startY ?? action.previousY) + dy);
+            bg.animation.endX = Math.round((bg.animation.endX ?? action.previousX) + dx);
+            bg.animation.endY = Math.round((bg.animation.endY ?? action.previousY) + dy);
+          }
+        }),
+      };
+    case 'resize-layer':
+      return {
+        ...state,
+        config: updateSceneLayer(state.config, action.sceneIndex, action.layerIndex, (layer) => {
+          layer.x = Math.round(action.x);
+          layer.y = Math.round(action.y);
+          layer.width = Math.round(action.width);
+          layer.height = Math.round(action.height);
+        }),
+      };
+    case 'rotate-layer':
+      return {
+        ...state,
+        config: updateSceneLayer(state.config, action.sceneIndex, action.layerIndex, (layer) => {
+          let degrees = Number(action.rotation) || 0;
+          degrees = ((degrees % 360) + 360) % 360;
+          if (degrees > 180) degrees -= 360;
+          layer.rotation = Number(degrees.toFixed(1));
+        }),
+      };
+    case 'delete-layer':
+      return withHistory(state, (config, next) => {
+        const layers = config.scenes[state.selectedSceneIndex]?.layers || [];
+        layers.splice(state.selectedLayerIndex, 1);
+        next.selectedLayerIndex = Math.max(0, state.selectedLayerIndex - 1);
+      });
+    case 'move-layer':
+      return withHistory(state, (config, next) => {
+        const layers = config.scenes[state.selectedSceneIndex]?.layers || [];
+        const target = state.selectedLayerIndex + action.direction;
+        if (target < 0 || target >= layers.length) return;
+        const [selected] = layers.splice(state.selectedLayerIndex, 1);
+        layers.splice(target, 0, selected);
+        next.selectedLayerIndex = target;
+      });
+    case 'reorder-layer':
+      return withHistory(state, (config, next) => {
+        const layers = config.scenes[state.selectedSceneIndex]?.layers || [];
+        const from = Number(action.fromIndex);
+        let to = Number(action.toIndex);
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from >= layers.length) return;
+        to = Math.max(0, Math.min(layers.length - 1, to));
+        if (from === to) return;
+        const [selected] = layers.splice(from, 1);
+        layers.splice(to, 0, selected);
+        next.selectedLayerIndex = to;
+        next.selectedTarget = 'layer';
+      });
+    case 'align-layer':
+      return withHistory(state, (config) => {
+        const { width: canvasW, height: canvasH } = getCanvasSize(config);
+        const selected = config.scenes[state.selectedSceneIndex]?.layers?.[state.selectedLayerIndex];
+        if (!selected || selected.locked) return;
+        const w = Number(selected.width) || 0;
+        const h = Number(selected.height) || 0;
+        if (action.align === 'left') selected.x = 0;
+        if (action.align === 'centerX') selected.x = Math.round((canvasW - w) / 2);
+        if (action.align === 'right') selected.x = Math.round(canvasW - w);
+        if (action.align === 'top') selected.y = 0;
+        if (action.align === 'centerY') selected.y = Math.round((canvasH - h) / 2);
+        if (action.align === 'bottom') selected.y = Math.round(canvasH - h);
+      });
+    case 'layer':
+      return withHistory(state, (config) => {
+        const selected = config.scenes[state.selectedSceneIndex]?.layers?.[state.selectedLayerIndex];
+        if (!selected) return;
+        if (['x', 'y', 'width', 'height', 'fontSize', 'lineHeight', 'opacity', 'radius', 'paddingX', 'paddingY', 'rotation', 'strokeWidth'].includes(action.key)) {
+          selected[action.key] = Number(action.value) || 0;
+        } else if (action.key === 'offset') {
+          selected.offset = Math.max(0, Number(action.value) || 0);
+        } else if (action.key === 'duration') {
+          if (action.value === '' || action.value == null) delete selected.duration;
+          else selected.duration = Math.max(0.2, Number(action.value) || 0.2);
+        } else if (action.key === 'fontFamily') {
+          if (action.value) selected.fontFamily = action.value;
+          else delete selected.fontFamily;
+        } else if (action.key === 'flipX' || action.key === 'flipY') {
+          selected[action.key] = Boolean(action.value);
+        } else {
+          selected[action.key] = action.value;
+        }
+      });
+    default:
+      return state;
+  }
+}
+
+function resolveAssetPath(path) {
+  if (!path) return '';
+  if (path.startsWith('blob:') || path.startsWith('data:') || /^https?:/.test(path)) return path;
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
+function loadImage(cache, path) {
+  const resolved = resolveAssetPath(path);
+  if (!resolved) return Promise.resolve(null);
+  const key = `image:${resolved}`;
+  if (cache.has(key)) return cache.get(key);
+  const promise = new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = resolved;
+  });
+  cache.set(key, promise);
+  return promise;
+}
+
+function loadVideo(cache, path) {
+  const resolved = resolveAssetPath(path);
+  if (!resolved) return Promise.resolve(null);
+  const key = `video:${resolved}`;
+  if (cache.has(key)) return cache.get(key);
+  const promise = new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.loop = false;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.onloadeddata = () => resolve(video);
+    video.onerror = () => resolve(null);
+    video.src = resolved;
+    video.load();
+  });
+  cache.set(key, promise);
+  return promise;
+}
+
+/** Avoid seeking every paint frame while playing — that stalls long MP4s. Scrubbing always jumps. */
+function syncVideoToTime(video, targetTime, { playing = false, force = false } = {}) {
+  if (!video || !Number.isFinite(targetTime)) return;
+  const drift = Math.abs((video.currentTime || 0) - targetTime);
+  const seekThreshold = playing ? 0.85 : 0.05;
+
+  const applySeek = (time) => {
+    // Always push the latest time so scrubbing isn't stuck behind an in-flight seek.
+    video.__seekTarget = time;
+    try { video.currentTime = time; } catch { video.__seekLock = false; return; }
+    if (video.__seekLock) return;
+    video.__seekLock = true;
+    const token = (video.__seekToken = (video.__seekToken || 0) + 1);
+    const unlock = () => {
+      if (video.__seekToken !== token) return;
+      video.__seekLock = false;
+    };
+    video.addEventListener('seeked', unlock, { once: true });
+    setTimeout(unlock, 1500);
+  };
+
+  if (playing) {
+    if (video.paused) {
+      if (drift > 0.04) applySeek(targetTime);
+      video.play().catch(() => {});
+      return;
+    }
+    if (force || drift > seekThreshold) {
+      if (video.__seekLock && Math.abs((video.__seekTarget ?? video.currentTime) - targetTime) <= seekThreshold) return;
+      applySeek(targetTime);
+    }
+    return;
+  }
+
+  // Paused / scrubbing: always honor the latest playhead.
+  if (!video.paused) video.pause();
+  if (!force && drift <= seekThreshold) return;
+  applySeek(targetTime);
+}
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = (value) => Math.min(Math.max(value, 0), 1);
+const smoothstep = (value) => {
+  const t = clamp01(value);
+  return t * t * (3 - 2 * t);
+};
+
+function backgroundMotion(item, time) {
+  const bg = item?.background || {};
+  const animation = bg.animation || {};
+  const duration = Math.max(0.1, sceneDuration(item));
+  const progress = smoothstep(((time || 0) - (item.start || 0)) / duration);
+  if (animation.type !== 'kenBurns') return { x: bg.x || 0, y: bg.y || 0, zoom: bg.zoom || 1 };
+  return {
+    x: lerp(animation.startX ?? bg.x ?? 0, animation.endX ?? bg.x ?? 0, progress),
+    y: lerp(animation.startY ?? bg.y ?? 0, animation.endY ?? bg.y ?? 0, progress),
+    zoom: lerp(animation.startZoom ?? bg.zoom ?? 1, animation.endZoom ?? bg.zoom ?? 1, progress),
+  };
+}
+
+function layerFont(item, config, fontSize = item.fontSize || 32) {
+  const weights = { regular: 400, medium: 500, semiBold: 700, bold: 800, heavy: 900 };
+  const family = item.fontFamily || config.fonts?.defaultFamily || 'Manrope';
+  return `${weights[item.weight] || 400} ${fontSize}px "${fontMap[family] || family}", Georgia, Palatino, serif`;
+}
+
+const SHAPE_LIBRARY = [
+  { id: 'rect', label: 'Rectangle', shapeKind: 'rect', width: 520, height: 320, radius: 28, fill: 'rgba(255,92,0,0.85)', stroke: 'rgba(255,255,255,0.35)' },
+  { id: 'round-rect', label: 'Round rect', shapeKind: 'rect', width: 520, height: 280, radius: 80, fill: 'rgba(52,211,153,0.85)', stroke: 'rgba(255,255,255,0.3)' },
+  { id: 'ellipse', label: 'Ellipse', shapeKind: 'ellipse', width: 420, height: 420, fill: 'rgba(139,92,246,0.85)', stroke: 'rgba(255,255,255,0.3)' },
+  { id: 'triangle', label: 'Triangle', shapeKind: 'triangle', width: 420, height: 380, fill: 'rgba(234,179,8,0.9)', stroke: 'rgba(255,255,255,0.3)' },
+  { id: 'diamond', label: 'Diamond', shapeKind: 'diamond', width: 380, height: 380, fill: 'rgba(56,189,248,0.85)', stroke: 'rgba(255,255,255,0.3)' },
+  { id: 'hexagon', label: 'Hexagon', shapeKind: 'hexagon', width: 420, height: 380, fill: 'rgba(244,114,182,0.85)', stroke: 'rgba(255,255,255,0.3)' },
+  { id: 'star', label: 'Star', shapeKind: 'star', width: 420, height: 420, fill: 'rgba(255,92,0,0.95)', stroke: 'rgba(255,255,255,0.35)' },
+  { id: 'line', label: 'Line', shapeKind: 'line', width: 560, height: 36, fill: 'transparent', stroke: '#ffffff', strokeWidth: 10 },
+  { id: 'arrow', label: 'Arrow', shapeKind: 'arrow', width: 560, height: 120, fill: 'rgba(255,255,255,0.95)', stroke: 'rgba(255,255,255,0.2)', strokeWidth: 4 },
+];
+
+const ELEMENT_EXTRAS = [
+  { id: 'pill', label: 'Pill badge', layerType: 'pill', hint: 'Rounded label with text' },
+  { id: 'card', label: 'Card', layerType: 'card', hint: 'Rounded panel behind content' },
+  { id: 'logo', label: 'Logo', layerType: 'image', hint: 'Project logo as a layer' },
+];
+
+function layerRotationRad(layer) {
+  return ((Number(layer?.rotation) || 0) * Math.PI) / 180;
+}
+
+function layerCenter(layer) {
+  return {
+    x: (Number(layer?.x) || 0) + (Number(layer?.width) || 0) / 2,
+    y: (Number(layer?.y) || 0) + (Number(layer?.height) || 0) / 2,
+  };
+}
+
+function rotatePoint(point, center, radians) {
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return { x: center.x + dx * cos - dy * sin, y: center.y + dx * sin + dy * cos };
+}
+
+function worldToLocal(layer, point) {
+  return rotatePoint(point, layerCenter(layer), -layerRotationRad(layer));
+}
+
+function localToWorld(layer, point) {
+  return rotatePoint(point, layerCenter(layer), layerRotationRad(layer));
+}
+
+function applyLayerBoxTransform(ctx, item) {
+  const center = layerCenter(item);
+  const rotation = layerRotationRad(item);
+  ctx.translate(center.x, center.y);
+  if (rotation) ctx.rotate(rotation);
+  if (item.flipX) ctx.scale(-1, 1);
+  if (item.flipY) ctx.scale(1, -1);
+  ctx.translate(-center.x, -center.y);
+}
+
+function buildShapePath(ctx, item) {
+  const x = Number(item.x) || 0;
+  const y = Number(item.y) || 0;
+  const w = Math.max(2, Number(item.width) || 2);
+  const h = Math.max(2, Number(item.height) || 2);
+  const kind = item.shapeKind || 'rect';
+  ctx.beginPath();
+  if (kind === 'ellipse') {
+    ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    return;
+  }
+  if (kind === 'triangle') {
+    ctx.moveTo(x + w / 2, y);
+    ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x, y + h);
+    ctx.closePath();
+    return;
+  }
+  if (kind === 'diamond') {
+    ctx.moveTo(x + w / 2, y);
+    ctx.lineTo(x + w, y + h / 2);
+    ctx.lineTo(x + w / 2, y + h);
+    ctx.lineTo(x, y + h / 2);
+    ctx.closePath();
+    return;
+  }
+  if (kind === 'hexagon') {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (Math.PI / 3) * i - Math.PI / 6;
+      const px = cx + (w / 2) * Math.cos(angle);
+      const py = cy + (h / 2) * Math.sin(angle);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    return;
+  }
+  if (kind === 'star') {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const spikes = 5;
+    const outerX = w / 2;
+    const outerY = h / 2;
+    const innerX = outerX * 0.45;
+    const innerY = outerY * 0.45;
+    for (let i = 0; i < spikes * 2; i += 1) {
+      const angle = (Math.PI * i) / spikes - Math.PI / 2;
+      const radiusX = i % 2 === 0 ? outerX : innerX;
+      const radiusY = i % 2 === 0 ? outerY : innerY;
+      const px = cx + Math.cos(angle) * radiusX;
+      const py = cy + Math.sin(angle) * radiusY;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    return;
+  }
+  if (kind === 'line') {
+    ctx.moveTo(x, y + h / 2);
+    ctx.lineTo(x + w, y + h / 2);
+    return;
+  }
+  if (kind === 'arrow') {
+    const shaft = h * 0.34;
+    const head = Math.min(w * 0.32, h);
+    ctx.moveTo(x, y + (h - shaft) / 2);
+    ctx.lineTo(x + w - head, y + (h - shaft) / 2);
+    ctx.lineTo(x + w - head, y);
+    ctx.lineTo(x + w, y + h / 2);
+    ctx.lineTo(x + w - head, y + h);
+    ctx.lineTo(x + w - head, y + (h + shaft) / 2);
+    ctx.lineTo(x, y + (h + shaft) / 2);
+    ctx.closePath();
+    return;
+  }
+  roundedRect(ctx, x, y, w, h, item.radius ?? 24);
+}
+
+function paintShape(ctx, item) {
+  buildShapePath(ctx, item);
+  const kind = item.shapeKind || 'rect';
+  if (kind === 'line') {
+    ctx.strokeStyle = item.stroke || item.fill || '#ffffff';
+    ctx.lineWidth = Math.max(2, Number(item.strokeWidth) || Math.max(4, (Number(item.height) || 8) * 0.55));
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    return;
+  }
+  if (item.fill && item.fill !== 'transparent') {
+    ctx.fillStyle = item.fill;
+    ctx.fill();
+  }
+  if (item.stroke) {
+    ctx.strokeStyle = item.stroke;
+    ctx.lineWidth = Math.max(1, Number(item.strokeWidth) || 2);
+    ctx.stroke();
+  }
+}
+
+function shapeDefaults(shapeDef, canvasW = DEFAULT_CANVAS_WIDTH, canvasH = DEFAULT_CANVAS_HEIGHT) {
+  const width = shapeDef.width;
+  const height = shapeDef.height;
+  return {
+    id: `shape-${shapeDef.shapeKind}-${Date.now()}`,
+    type: 'shape',
+    shapeKind: shapeDef.shapeKind,
+    x: Math.round((canvasW - width) / 2),
+    y: Math.round((canvasH - height) / 2),
+    width,
+    height,
+    opacity: 1,
+    rotation: 0,
+    radius: shapeDef.radius ?? 0,
+    fill: shapeDef.fill,
+    stroke: shapeDef.stroke,
+    strokeWidth: shapeDef.strokeWidth ?? 2,
+  };
+}
+
+function roundedRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+function wrapTextLines(ctx, text, maxWidth) {
+  const lines = [];
+  String(text || '').split('\n').forEach((part) => {
+    let line = '';
+    part.split(/\s+/).filter(Boolean).forEach((word) => {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    });
+    if (line) lines.push(line);
+  });
+  return lines.length ? lines : [''];
+}
+
+function fitTextLayout(ctx, item, config) {
+  const paddingX = item.paddingX ?? 0;
+  const paddingY = item.paddingY ?? 0;
+  const textWidth = Math.max(20, item.width - paddingX * 2);
+  const textHeight = Math.max(20, item.height - paddingY * 2);
+  const minFontSize = Math.min(18, item.fontSize || 32);
+  let fontSize = item.fontSize || 32;
+  let lineHeight = fontSize * (item.lineHeight || 1.08);
+  let lines = [];
+
+  while (fontSize >= minFontSize) {
+    ctx.font = layerFont(item, config, fontSize);
+    lineHeight = fontSize * (item.lineHeight || 1.08);
+    lines = wrapTextLines(ctx, item.text, textWidth);
+    if (lines.length * lineHeight <= textHeight) break;
+    fontSize -= 1;
+  }
+
+  return { lines, lineHeight, paddingX, paddingY, fontSize };
+}
+
+function drawWrappedText(ctx, item, config) {
+  const { lines, lineHeight, paddingX, paddingY } = fitTextLayout(ctx, item, config);
+  const blockHeight = lines.length * lineHeight;
+  let y = item.y + paddingY + Math.max(0, item.height - paddingY * 2) / 2 - blockHeight / 2 + lineHeight * 0.78;
+  ctx.textAlign = item.align || 'center';
+  ctx.textBaseline = 'alphabetic';
+  const x = item.align === 'left'
+    ? item.x + paddingX
+    : item.align === 'right'
+      ? item.x + item.width - paddingX
+      : item.x + item.width / 2;
+  lines.forEach((line) => {
+    ctx.fillText(line, x, y);
+    y += lineHeight;
+  });
+}
+
+async function drawLayer(ctx, item, config, cache, layerTime = 0, playing = false) {
+  ctx.save();
+  const entrance = item.animation || {};
+  let entranceAlpha = 1;
+  let shiftY = 0;
+  let entranceScale = 1;
+  if (entrance.type && entrance.type !== 'none') {
+    const entranceDuration = Math.max(0.05, Number(entrance.duration) || 0.5);
+    const progress = smoothstep(layerTime / entranceDuration);
+    entranceAlpha = progress;
+    if (entrance.type === 'slideUp') shiftY = (1 - progress) * 90;
+    if (entrance.type === 'slideDown') shiftY = -(1 - progress) * 90;
+    if (entrance.type === 'zoomIn') entranceScale = 0.82 + 0.18 * progress;
+  }
+  ctx.globalAlpha = (item.opacity ?? 1) * entranceAlpha;
+  if (shiftY) ctx.translate(0, shiftY);
+  applyLayerBoxTransform(ctx, item);
+  if (entranceScale !== 1) {
+    const centerX = item.x + item.width / 2;
+    const centerY = item.y + item.height / 2;
+    ctx.translate(centerX, centerY);
+    ctx.scale(entranceScale, entranceScale);
+    ctx.translate(-centerX, -centerY);
+  }
+  if (item.type === 'text') {
+    ctx.fillStyle = item.color || '#ffffff';
+    drawWrappedText(ctx, item, config);
+  }
+  const rendersAsVideo = item.type === 'video' || (item.type === 'image' && isVideoPath(item.source));
+  if (rendersAsVideo) {
+    const video = await loadVideo(cache, item.source);
+    if (video) {
+      const localTime = Math.max(0, layerTime || 0);
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        const targetTime = localTime % video.duration;
+        syncVideoToTime(video, targetTime, { playing, force: !playing });
+      }
+      ctx.drawImage(video, item.x, item.y, item.width, item.height);
+    }
+  } else if (item.type === 'image') {
+    const image = await loadImage(cache, item.source);
+    if (image) ctx.drawImage(image, item.x, item.y, item.width, item.height);
+  }
+  if (item.type === 'shape') {
+    paintShape(ctx, item);
+  }
+  if (item.type === 'pill' || item.type === 'card') {
+    roundedRect(ctx, item.x, item.y, item.width, item.height, item.radius || (item.type === 'pill' ? item.height / 2 : 36));
+    ctx.fillStyle = item.fill || 'rgba(243,232,255,0.16)';
+    ctx.fill();
+    ctx.strokeStyle = item.stroke || 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = Math.max(1, Number(item.strokeWidth) || 2);
+    ctx.stroke();
+    if (item.type === 'pill') {
+      ctx.fillStyle = item.color || '#ffffff';
+      drawWrappedText(ctx, item, config);
+    }
+  }
+  ctx.restore();
+}
+
+function activeSceneInfo(state) {
+  const scene = sceneAtTime(state.config, state.currentTime) || state.config.scenes[state.selectedSceneIndex];
+  return { scene, sceneIndex: Math.max(0, state.config.scenes.indexOf(scene)) };
+}
+
+function pointInLayer(layer, point) {
+  const local = worldToLocal(layer, point);
+  return local.x >= layer.x && local.x <= layer.x + layer.width && local.y >= layer.y && local.y <= layer.y + layer.height;
+}
+
+const RESIZE_HANDLE_RADIUS = 28;
+const ROTATE_HANDLE_OFFSET = 48;
+
+function layerHandlePoints(layer) {
+  const x = Number(layer.x) || 0;
+  const y = Number(layer.y) || 0;
+  const w = Number(layer.width) || 0;
+  const h = Number(layer.height) || 0;
+  const locals = {
+    tl: { x, y },
+    tr: { x: x + w, y },
+    bl: { x, y: y + h },
+    br: { x: x + w, y: y + h },
+    t: { x: x + w / 2, y },
+    b: { x: x + w / 2, y: y + h },
+    l: { x, y: y + h / 2 },
+    r: { x: x + w, y: y + h / 2 },
+    rotate: { x: x + w / 2, y: y - ROTATE_HANDLE_OFFSET },
+  };
+  return Object.fromEntries(Object.entries(locals).map(([id, local]) => [id, localToWorld(layer, local)]));
+}
+
+function handleAtPoint(layer, point) {
+  if (!layer) return null;
+  const handles = layerHandlePoints(layer);
+  let best = null;
+  let bestDist = RESIZE_HANDLE_RADIUS;
+  for (const [id, handle] of Object.entries(handles)) {
+    const dist = Math.hypot(point.x - handle.x, point.y - handle.y);
+    const radius = id === 'rotate' ? RESIZE_HANDLE_RADIUS + 8 : RESIZE_HANDLE_RADIUS;
+    if (dist <= radius && dist <= bestDist) {
+      best = id;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+function hitTestScene(scene, point) {
+  const layers = scene?.layers || [];
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    const layer = layers[index];
+    if (layer.hidden || layer.locked) continue;
+    if (pointInLayer(layer, point)) return index;
+  }
+  return -1;
+}
+
+function selectedTargetLabel(target, scene) {
+  if (target === 'scene') return `${scene?.name || 'Scene'} timing`;
+  if (target === 'background') return `${scene?.name || 'Scene'} background`;
+  return selectedLabel[target] || 'Selection';
+}
+
+function drawSelection(ctx, state, scene, sceneIndex) {
+  const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(state.config);
+  ctx.save();
+  ctx.lineWidth = 5;
+  ctx.setLineDash([18, 12]);
+  ctx.strokeStyle = '#FF5C00';
+  ctx.fillStyle = 'rgba(255,92,0,0.08)';
+  if (state.selectedTarget === 'background' && sceneIndex === state.selectedSceneIndex) {
+    ctx.strokeRect(18, 18, CANVAS_WIDTH - 36, CANVAS_HEIGHT - 36);
+    ctx.fillRect(18, 18, CANVAS_WIDTH - 36, CANVAS_HEIGHT - 36);
+  }
+  if (state.selectedTarget === 'layer' && sceneIndex === state.selectedSceneIndex) {
+    const layer = scene?.layers?.[state.selectedLayerIndex];
+    if (layer) {
+      ctx.save();
+      applyLayerBoxTransform(ctx, layer);
+      ctx.strokeRect(layer.x, layer.y, layer.width, layer.height);
+      ctx.fillRect(layer.x, layer.y, layer.width, layer.height);
+      ctx.restore();
+      ctx.setLineDash([]);
+      const handles = layerHandlePoints(layer);
+      ctx.strokeStyle = '#FF5C00';
+      ctx.fillStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      // Rotate stem + knob
+      ctx.beginPath();
+      ctx.moveTo(handles.t.x, handles.t.y);
+      ctx.lineTo(handles.rotate.x, handles.rotate.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(handles.rotate.x, handles.rotate.y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      for (const id of ['tl', 'tr', 'bl', 'br', 't', 'b', 'l', 'r']) {
+        const handle = handles[id];
+        const size = ['t', 'b', 'l', 'r'].includes(id) ? 14 : 18;
+        ctx.fillRect(handle.x - size / 2, handle.y - size / 2, size, size);
+        ctx.strokeRect(handle.x - size / 2, handle.y - size / 2, size, size);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawCoverMedia(ctx, media, mediaWidth, mediaHeight, motion, canvasW = DEFAULT_CANVAS_WIDTH, canvasH = DEFAULT_CANVAS_HEIGHT) {
+  if (!mediaWidth || !mediaHeight) return;
+  const scale = Math.max(canvasW / mediaWidth, canvasH / mediaHeight) * (motion.zoom || 1);
+  const drawWidth = mediaWidth * scale;
+  const drawHeight = mediaHeight * scale;
+  const drawX = (motion.x || 0) + (canvasW - drawWidth) / 2;
+  const drawY = (motion.y || 0) + (canvasH - drawHeight) / 2;
+  ctx.drawImage(media, drawX, drawY, drawWidth, drawHeight);
+}
+
+async function drawBackground(ctx, item, config, time, cache, playing = false) {
+  const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(config);
+  const bg = item?.background || {};
+  ctx.fillStyle = bg.color || config.theme?.backgroundColor || '#0B0D0E';
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  // An empty string means "solid color": don't fall back to the project default
+  const source = bg.image ?? config.assets?.background;
+  if (!source) return;
+  const motion = backgroundMotion(item, time);
+  const treatAsVideo = bg.mediaKind === 'video' || isVideoPath(source);
+  if (treatAsVideo) {
+    const video = await loadVideo(cache, source);
+    if (video) {
+      const localTime = Math.max(0, (time || 0) - (item?.start || 0));
+      const clipIn = Number(bg.clipIn) || 0;
+      const clipOut = bg.clipOut != null && bg.clipOut !== ''
+        ? Number(bg.clipOut)
+        : (Number.isFinite(video.duration) ? video.duration : clipIn + localTime);
+      const span = Math.max(0.1, clipOut - clipIn);
+      const targetTime = clipIn + Math.min(localTime, span - 0.01);
+      syncVideoToTime(video, targetTime, { playing, force: !playing });
+      drawCoverMedia(ctx, video, video.videoWidth, video.videoHeight, motion, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
+  } else {
+    const image = await loadImage(cache, source);
+    if (image) drawCoverMedia(ctx, image, image.naturalWidth || image.width, image.naturalHeight || image.height, motion, CANVAS_WIDTH, CANVAS_HEIGHT);
+  }
+  if (bg.noOverlay) return;
+  const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  gradient.addColorStop(0, config.theme?.overlayTop || 'rgba(11,13,14,0.56)');
+  gradient.addColorStop(0.5, config.theme?.overlayMid || 'rgba(11,13,14,0.76)');
+  gradient.addColorStop(1, config.theme?.overlayBottom || 'rgba(11,13,14,0.95)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+}
+
+async function drawScene(ctx, item, config, time, cache, alpha = 1, offsetX = 0, offsetY = 0, playing = false) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(offsetX, offsetY);
+  await drawBackground(ctx, item, config, time, cache, playing);
+  const sceneLocal = (time || 0) - (item.start || 0);
+  for (const layer of item.layers || []) {
+    if (layer.hidden) continue;
+    const layerOffset = Math.max(0, Number(layer.offset) || 0);
+    const layerWindow = layer.duration != null && layer.duration !== '' ? Math.max(0.1, Number(layer.duration)) : null;
+    if (sceneLocal < layerOffset) continue;
+    if (layerWindow != null && sceneLocal > layerOffset + layerWindow) continue;
+    await drawLayer(ctx, layer, config, cache, sceneLocal - layerOffset, playing);
+  }
+  ctx.restore();
+}
+
+function sceneAtTime(config, time) {
+  return config.scenes.find((item) => time >= item.start && time < item.end) || config.scenes.at(-1);
+}
+
+// Land the playhead just past the incoming transition so the scene being
+// edited shows fully instead of blended with the previous scene.
+function sceneEditTime(scene) {
+  if (!scene) return 0;
+  const transition = scene.transition?.type && scene.transition.type !== 'none' ? Number(scene.transition.duration) || 0 : 0;
+  const target = scene.start + Math.min(transition + 0.05, Math.max(0, sceneDuration(scene) - 0.1));
+  return Number(target.toFixed(2));
+}
+
+function isGifPath(path) {
+  if (!path) return false;
+  const value = String(path).toLowerCase();
+  return value.startsWith('data:image/gif') || value.includes('.gif') || value.includes('image/gif');
+}
+
+function isVideoPath(path) {
+  if (!path) return false;
+  const value = String(path).toLowerCase();
+  return value.startsWith('data:video/') || value.includes('.mp4') || value.includes('.mov') || value.includes('.m4v') || value.includes('.webm') || value.includes('video/');
+}
+
+function isMotionPath(path) {
+  return isGifPath(path) || isVideoPath(path);
+}
+
+function sceneHasMotionBackground(scene) {
+  const bg = scene?.background;
+  if (!bg) return false;
+  if (bg.mediaKind === 'video') return true;
+  return isMotionPath(bg.image ?? '');
+}
+
+function sceneHasMotionLayers(scene) {
+  return (scene?.layers || []).some((layer) => layer.type === 'video' || isVideoPath(layer.source));
+}
+
+const AVAILABLE_VIDEOS = [
+  { value: '', label: 'No video (solid color)' },
+];
+
+const STOCK_BACKGROUND_VIDEOS = [
+  'assets/videos/water-ripples.mp4',
+  'assets/videos/glowing-particle-cloud.mp4',
+];
+
+function stripStockBackgrounds(config) {
+  if (!config || typeof config !== 'object') return config;
+  if (STOCK_BACKGROUND_VIDEOS.includes(config.assets?.background)) {
+    config.assets.background = '';
+  }
+  (config.scenes || []).forEach((scene) => {
+    if (STOCK_BACKGROUND_VIDEOS.includes(scene?.background?.image)) {
+      scene.background.image = '';
+    }
+  });
+  return config;
+}
+
+const BACKGROUND_SWATCHES = ['#FFFFFF', '#000000', '#0B0D0E', '#FF5C00', '#FC4D04', '#FFD3B8'];
+
+function activeBackgroundPath(state) {
+  const { scene } = activeSceneInfo(state);
+  return scene?.background?.image ?? state.config.assets?.background ?? '';
+}
+
+function pickRecorderMimeType(withAudio = false) {
+  if (typeof MediaRecorder === 'undefined') return '';
+  const candidates = withAudio
+    ? ['video/mp4;codecs=avc1.64002A,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm']
+    : ['video/mp4;codecs=avc1.64002A', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+}
+
+async function recordTimeline(config, cache, onProgress) {
+  const hasAudio = Boolean(config.audio?.source);
+  const mimeType = pickRecorderMimeType(hasAudio);
+  if (!mimeType) throw new Error('This browser does not support video recording. Try Chrome or Edge.');
+
+  const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(config);
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_WIDTH;
+  canvas.height = CANVAS_HEIGHT;
+  const fps = Math.min(60, Math.max(10, Number(config.fps) || 30));
+  const duration = timelineDuration(config);
+  const frameState = {
+    config,
+    currentTime: 0,
+    selectedTarget: 'none',
+    selectedSceneIndex: -1,
+    selectedLayerIndex: -1,
+  };
+
+  // Warm caches so the recording does not open on a black frame
+  await paintPreview(canvas, frameState, cache);
+
+  const stream = canvas.captureStream(fps);
+
+  let audioElement = null;
+  let audioContext = null;
+  if (hasAudio) {
+    audioElement = document.createElement('audio');
+    audioElement.src = resolveAssetPath(config.audio.source);
+    audioElement.loop = true;
+    await new Promise((resolve) => {
+      audioElement.oncanplaythrough = resolve;
+      audioElement.onerror = resolve;
+      audioElement.load();
+    });
+    try {
+      audioContext = new AudioContext();
+      const sourceNode = audioContext.createMediaElementSource(audioElement);
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = Math.min(1, Math.max(0, config.audio.volume ?? 1));
+      const destination = audioContext.createMediaStreamDestination();
+      sourceNode.connect(gainNode);
+      gainNode.connect(destination);
+      destination.stream.getAudioTracks().forEach((track) => stream.addTrack(track));
+    } catch {
+      audioElement = null;
+    }
+  }
+
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 12_000_000 });
+  const chunks = [];
+  recorder.ondataavailable = (event) => {
+    if (event.data?.size) chunks.push(event.data);
+  };
+  const stopped = new Promise((resolve, reject) => {
+    recorder.onstop = resolve;
+    recorder.onerror = (event) => reject(event.error || new Error('Recording failed.'));
+  });
+
+  recorder.start(250);
+  if (audioElement) {
+    audioElement.currentTime = 0;
+    audioElement.play().catch(() => {});
+  }
+  const startedAt = performance.now();
+  let painting = false;
+  await new Promise((resolve) => {
+    const tick = (now) => {
+      const elapsed = (now - startedAt) / 1000;
+      if (elapsed >= duration) {
+        resolve();
+        return;
+      }
+      if (!painting) {
+        painting = true;
+        frameState.currentTime = elapsed;
+        paintPreview(canvas, frameState, cache).finally(() => {
+          painting = false;
+        });
+        onProgress?.(elapsed, duration);
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+  recorder.stop();
+  await stopped;
+  if (audioElement) audioElement.pause();
+  if (audioContext) audioContext.close().catch(() => {});
+  stream.getTracks().forEach((track) => track.stop());
+  return {
+    blob: new Blob(chunks, { type: mimeType.split(';')[0] }),
+    extension: mimeType.startsWith('video/mp4') ? 'mp4' : 'webm',
+  };
+}
+
+async function paintPreview(canvas, state, cache) {
+  if (!canvas) return;
+  const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(state.config);
+  if (canvas.width !== CANVAS_WIDTH) canvas.width = CANVAS_WIDTH;
+  if (canvas.height !== CANVAS_HEIGHT) canvas.height = CANVAS_HEIGHT;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  const item = sceneAtTime(state.config, state.currentTime);
+  if (!item) return;
+  const playing = Boolean(state.isPlaying);
+  const index = state.config.scenes.indexOf(item);
+  const transition = item.transition || {};
+  const transitionDuration = transition.type === 'none' ? 0 : Number(transition.duration || 0);
+  const progress = transitionDuration > 0 ? clamp01((state.currentTime - item.start) / transitionDuration) : 1;
+  if (index > 0 && transitionDuration > 0 && progress < 1) {
+    const previous = state.config.scenes[index - 1];
+    if (transition.type === 'crossfade' || transition.type === 'fade') {
+      await drawScene(ctx, previous, state.config, Math.max(previous.start, item.start - 0.01), cache, 1 - progress, 0, 0, playing);
+      await drawScene(ctx, item, state.config, state.currentTime, cache, progress, 0, 0, playing);
+      return;
+    }
+    if (transition.type === 'slide-up') {
+      await drawScene(ctx, previous, state.config, Math.max(previous.start, item.start - 0.01), cache, 1, 0, -CANVAS_HEIGHT * progress, playing);
+      await drawScene(ctx, item, state.config, state.currentTime, cache, 1, 0, CANVAS_HEIGHT * (1 - progress), playing);
+      return;
+    }
+    if (transition.type === 'slide-left') {
+      await drawScene(ctx, previous, state.config, Math.max(previous.start, item.start - 0.01), cache, 1, -CANVAS_WIDTH * progress, 0, playing);
+      await drawScene(ctx, item, state.config, state.currentTime, cache, 1, CANVAS_WIDTH * (1 - progress), 0, playing);
+      return;
+    }
+  }
+  await drawScene(ctx, item, state.config, state.currentTime, cache, 1, 0, 0, playing);
+  drawSelection(ctx, state, item, state.config.scenes.indexOf(item));
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function saveDataUrlAsset(dataUrl, filename) {
+  const response = await fetch('/api/save-asset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataUrl, filename }),
+  });
+  if (!response.ok) throw new Error('Failed to save asset');
+  const result = await response.json();
+  return result.path;
+}
+
+// Store uploads on disk via the dev server so large files (videos) don't
+// blow the localStorage quota; fall back to inline data URLs if it fails.
+async function persistUpload(file) {
+  const dataUrl = await readFileAsDataUrl(file);
+  try {
+    return await saveDataUrlAsset(dataUrl, file.name);
+  } catch {
+    return dataUrl;
+  }
+}
+
+function loadSavedProject() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    return saved ? stripStockBackgrounds(normalizeTimeline(JSON.parse(saved))) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveProject(config) {
+  if (typeof window === 'undefined') return null;
+  const saved = normalizeTimeline(config);
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+  return saved;
+}
+
+function clearSavedProject() {
+  if (typeof window !== 'undefined') window.localStorage.removeItem(STORAGE_KEY);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadJson(config) {
+  const exportConfig = normalizeTimeline(config);
+  const blob = new Blob([JSON.stringify(exportConfig, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, 'config.json');
+}
+
+const RAIL_ITEMS = [
+  { id: 'media', label: 'Media' },
+  { id: 'text', label: 'Text' },
+  { id: 'elements', label: 'Elements' },
+  { id: 'audio', label: 'Audio' },
+  { id: 'layers', label: 'Layers' },
+  { id: 'scenes', label: 'Scenes' },
+  { id: 'clip', label: 'Clip' },
+  { id: 'project', label: 'Project' },
+  { id: 'settings', label: 'Settings' },
+];
+
+const PREVIEW_ZOOMS = [0.5, 0.75, 1, 1.25, 1.5];
+const TRACK_LABEL_WIDTH = 156;
+const TRACK_COLORS = {
+  text: '#a78bfa',
+  image: '#34d399',
+  video: '#fb923c',
+  pill: '#fbbf24',
+  card: '#64748b',
+  shape: '#38bdf8',
+};
+
+const TEXT_PRESETS = [
+  { id: 'headline', label: 'Headline', preset: { text: 'Headline text', fontSize: 84, weight: 'heavy', x: 84, y: 470, width: 912, height: 280, lineHeight: 0.92 } },
+  { id: 'subheading', label: 'Subheading', preset: { text: 'Subheading', fontSize: 52, weight: 'bold', x: 84, y: 800, width: 912, height: 140 } },
+  { id: 'body', label: 'Body', preset: { text: 'Body copy goes here', fontSize: 38, weight: 'medium', x: 120, y: 980, width: 840, height: 160, lineHeight: 1.05 } },
+  { id: 'caption', label: 'Caption', preset: { text: 'caption', fontSize: 30, weight: 'semiBold', x: 84, y: 1330, width: 912, height: 80 } },
+];
+
+function formatTime(seconds) {
+  const safe = Math.max(0, Number(seconds) || 0);
+  const minutes = String(Math.floor(safe / 60)).padStart(2, '0');
+  const wholeSeconds = String(Math.floor(safe % 60)).padStart(2, '0');
+  const centiseconds = String(Math.floor((safe % 1) * 100)).padStart(2, '0');
+  return `${minutes}:${wholeSeconds}.${centiseconds}`;
+}
+
+function layerDisplayName(layer) {
+  if (!layer) return 'Layer';
+  if (layer.type === 'shape') {
+    const label = SHAPE_LIBRARY.find((shape) => shape.shapeKind === layer.shapeKind)?.label;
+    return label || layer.shapeKind || 'Shape';
+  }
+  if (layer.text) return layer.text.length > 20 ? `${layer.text.slice(0, 20)}...` : layer.text;
+  return layer.id || layer.type;
+}
+
+function ShapeThumb({ kind, className = 'h-10 w-10' }) {
+  const common = 'stroke-current fill-current';
+  if (kind === 'ellipse') return <svg viewBox="0 0 40 40" className={className}><ellipse cx="20" cy="20" rx="14" ry="12" className={common} opacity="0.85" /></svg>;
+  if (kind === 'triangle') return <svg viewBox="0 0 40 40" className={className}><polygon points="20,6 34,32 6,32" className={common} opacity="0.85" /></svg>;
+  if (kind === 'diamond') return <svg viewBox="0 0 40 40" className={className}><polygon points="20,5 35,20 20,35 5,20" className={common} opacity="0.85" /></svg>;
+  if (kind === 'hexagon') return <svg viewBox="0 0 40 40" className={className}><polygon points="20,5 33,12 33,28 20,35 7,28 7,12" className={common} opacity="0.85" /></svg>;
+  if (kind === 'star') return <svg viewBox="0 0 40 40" className={className}><polygon points="20,4 24,15 36,15 26,22 30,34 20,27 10,34 14,22 4,15 16,15" className={common} opacity="0.9" /></svg>;
+  if (kind === 'line') return <svg viewBox="0 0 40 40" className={className}><line x1="6" y1="20" x2="34" y2="20" stroke="currentColor" strokeWidth="4" strokeLinecap="round" /></svg>;
+  if (kind === 'arrow') return <svg viewBox="0 0 40 40" className={className}><polygon points="4,15 24,15 24,8 36,20 24,32 24,25 4,25" className={common} opacity="0.9" /></svg>;
+  return <svg viewBox="0 0 40 40" className={className}><rect x="7" y="10" width="26" height="20" rx={kind === 'round-rect' ? 8 : 4} className={common} opacity="0.85" /></svg>;
+}
+
+function Icon({ name, className = 'h-5 w-5' }) {
+  const icons = {
+    project: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />,
+    scenes: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M3 15h18M8 4v16M16 4v16" /></>,
+    layers: <><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></>,
+    media: <><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M5 17l5-5 4 4 3-3 3 3" /></>,
+    text: <path d="M5 6h14M12 6v12M9 18h6" />,
+    elements: <><circle cx="8" cy="8" r="4" /><rect x="12" y="12" width="8" height="8" rx="1" /></>,
+    audio: <><path d="M9 17V6l10-2v11" /><circle cx="7" cy="17" r="2.5" /><circle cx="17" cy="15" r="2.5" /></>,
+    clip: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3V9z" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" /></>,
+    eye: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" /><circle cx="12" cy="12" r="2.5" /></>,
+    eyeOff: <><path d="M4 4l16 16" /><path d="M2 12s3.5-6 10-6c1.8 0 3.4.4 4.8 1M22 12s-3.5 6-10 6c-1.8 0-3.4-.4-4.8-1" /></>,
+    lock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
+    unlock: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 7.5-2" /></>,
+    undo: <path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />,
+    redo: <path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h-3" />,
+    play: <path d="M7 5l12 7-12 7V5z" />,
+    pause: <path d="M7 5h4v14H7zM13 5h4v14h-4z" />,
+    skipBack: <path d="M19 5l-9 7 9 7V5zM7 5v14H5V5h2z" />,
+    skipFwd: <path d="M5 5l9 7-9 7V5zM17 5v14h2V5h-2z" />,
+    trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />,
+    grip: <><circle cx="9" cy="7" r="1.2" fill="currentColor" stroke="none" /><circle cx="15" cy="7" r="1.2" fill="currentColor" stroke="none" /><circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none" /><circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none" /><circle cx="9" cy="17" r="1.2" fill="currentColor" stroke="none" /><circle cx="15" cy="17" r="1.2" fill="currentColor" stroke="none" /></>,
+    rotate: <path d="M20 12a8 8 0 1 1-2.3-5.5M20 4v5h-5" />,
+    align: <path d="M4 6h16M7 12h10M5 18h14" />,
+  };
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {icons[name] || null}
+    </svg>
+  );
+}
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const [saveStatus, setSaveStatus] = useState('Not saved yet');
+  const [renderStatus, setRenderStatus] = useState('Ready to export');
+  const [isRendering, setIsRendering] = useState(false);
+  const [uploads, setUploads] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [activePanel, setActivePanel] = useState('media');
+  const [inspectorTab, setInspectorTab] = useState('inspector');
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [timelineZoom, setTimelineZoom] = useState(1.25);
+  const [timelineDropIndex, setTimelineDropIndex] = useState(null);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [clipDraft, setClipDraft] = useState(null);
+  const [clipStatus, setClipStatus] = useState('');
+  const [clipBusy, setClipBusy] = useState(false);
+  const [clipProgress, setClipProgress] = useState(null);
+  const clipBlobRef = useRef(null);
+  const canvasRef = useRef(null);
+  const dragRef = useRef(null);
+  const barDragRef = useRef(null);
+  const layerDragRef = useRef(null);
+  const audioRef = useRef(null);
+  const imageCacheRef = useRef(new Map());
+  const latestStateRef = useRef(state);
+
+  const selectedScene = state.config.scenes[state.selectedSceneIndex];
+  const selectedLayer = selectedScene?.layers?.[state.selectedLayerIndex];
+  const bg = selectedScene?.background || {};
+  const animation = bg.animation || {};
+  const fontOptions = state.config.fonts?.families || families;
+  const totalDuration = timelineDuration(state.config);
+  const sceneDur = Math.max(0.2, sceneDuration(selectedScene));
+  const audioTrack = state.config.audio;
+  const { width: canvasW, height: canvasH } = getCanvasSize(state.config);
+  const activeFrameId = matchFramePreset(state.config);
+  const selectedName = state.selectedTarget === 'layer'
+    ? layerDisplayName(selectedLayer)
+    : selectedTargetLabel(state.selectedTarget, selectedScene);
+
+  useEffect(() => {
+    const saved = loadSavedProject();
+    if (saved) {
+      dispatch({ type: 'replace-config', config: saved });
+      setSaveStatus('Loaded saved project');
+    }
+    refreshUploads();
+  }, []);
+
+  async function refreshUploads() {
+    try {
+      const response = await fetch('/api/list-assets');
+      if (response.ok) setUploads(await response.json());
+    } catch {
+      // dev server endpoint unavailable; the panel just stays empty
+    }
+  }
+
+  useEffect(() => {
+    latestStateRef.current = state;
+    paintPreview(canvasRef.current, state, imageCacheRef.current);
+  }, [state]);
+
+  const previewNeedsAnimation = sceneHasMotionBackground(activeSceneInfo(state).scene) || sceneHasMotionLayers(activeSceneInfo(state).scene);
+
+  useEffect(() => {
+    if (!previewNeedsAnimation) return undefined;
+    let frame = 0;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      paintPreview(canvasRef.current, latestStateRef.current, imageCacheRef.current);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [previewNeedsAnimation, state.currentTime, state.selectedSceneIndex, selectedScene?.background?.image, state.config.assets?.background]);
+
+  useEffect(() => {
+    if (!state.isPlaying) return undefined;
+    const scene = sceneAtTime(state.config, state.currentTime) || selectedScene;
+    const bg = scene?.background;
+    const isClipVideo = Boolean(bg?.mediaKind === 'video' && bg?.image && bg?.clipOut != null);
+    let frame = 0;
+    let cancelled = false;
+
+    if (isClipVideo) {
+      const clipIn = Number(bg.clipIn) || 0;
+      const clipOut = Number(bg.clipOut);
+      const span = Math.max(0.2, clipOut - clipIn);
+      const startLocal = Math.max(0, Math.min(span - 0.05, state.currentTime - (scene.start || 0)));
+      (async () => {
+        const video = await loadVideo(imageCacheRef.current, bg.image);
+        if (!video || cancelled) return;
+        video.loop = false;
+        try { video.currentTime = clipIn + startLocal; } catch { /* ignore */ }
+        await video.play().catch(() => {});
+        const tick = () => {
+          if (cancelled) return;
+          const local = Math.max(0, (video.currentTime || 0) - clipIn);
+          if (video.ended || video.currentTime >= clipOut - 0.05) {
+            dispatch({ type: 'ui', patch: { currentTime: Number(span.toFixed(2)), isPlaying: false } });
+            video.pause();
+            return;
+          }
+          dispatch({ type: 'ui', patch: { currentTime: Number(Math.min(span, local).toFixed(2)) } });
+          frame = requestAnimationFrame(tick);
+        };
+        frame = requestAnimationFrame(tick);
+      })();
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(frame);
+        loadVideo(imageCacheRef.current, bg.image).then((video) => video?.pause());
+      };
+    }
+
+    const startedAt = performance.now();
+    const startTime = state.currentTime;
+    const tick = (now) => {
+      const elapsed = (now - startedAt) / 1000;
+      const nextTime = (startTime + elapsed) % Math.max(1, timelineDuration(state.config));
+      dispatch({ type: 'ui', patch: { currentTime: Number(nextTime.toFixed(2)) } });
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [state.isPlaying]);
+
+  function nudgePlayhead(deltaSeconds) {
+    seekTo(state.currentTime + deltaSeconds);
+  }
+
+  function jumpPlayheadToSource(sourceSeconds) {
+    if (!bg || bg.mediaKind !== 'video') {
+      seekTo(Number(sourceSeconds) || 0);
+      return;
+    }
+    const clipIn = Number(bg.clipIn) || 0;
+    const clipOut = bg.clipOut != null ? Number(bg.clipOut) : clipIn + totalDuration;
+    const absolute = Math.max(clipIn, Math.min(clipOut - 0.05, Number(sourceSeconds) || 0));
+    seekTo(Math.max(0, absolute - clipIn));
+  }
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (!audioTrack?.source) {
+      audio.pause();
+      return;
+    }
+    const resolved = resolveAssetPath(audioTrack.source);
+    if (audio.dataset.src !== resolved) {
+      audio.src = resolved;
+      audio.dataset.src = resolved;
+    }
+    audio.loop = true;
+    audio.volume = Math.min(1, Math.max(0, audioTrack.volume ?? 1));
+    if (state.isPlaying) {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = latestStateRef.current.currentTime % audio.duration;
+      }
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  }, [state.isPlaying, audioTrack?.source, audioTrack?.volume]);
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.target.closest('input, textarea, select')) return;
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === 'z') {
+        event.preventDefault();
+        dispatch({ type: event.shiftKey ? 'redo' : 'undo' });
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && key === 'y') {
+        event.preventDefault();
+        dispatch({ type: 'redo' });
+        return;
+      }
+      if (event.key === ' ') {
+        event.preventDefault();
+        dispatch({ type: 'ui', patch: { isPlaying: !latestStateRef.current.isPlaying } });
+        return;
+      }
+      if (key === 's') handleSplitScene();
+      if (key === 'd') handleDuplicate();
+      if (key === 'delete' || key === 'backspace') handleDelete();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const selectedLayerFields = useMemo(() => selectedLayer || {}, [selectedLayer]);
+
+  async function importJson(file) {
+    const text = await file.text();
+    const config = JSON.parse(text);
+    dispatch({ type: 'replace-config', config });
+  }
+
+  async function importAsset(file, action) {
+    const source = await persistUpload(file);
+    imageCacheRef.current.clear();
+    dispatch(action(source));
+    refreshUploads();
+  }
+
+  async function importMediaLayer(file, layerType) {
+    const source = await persistUpload(file);
+    imageCacheRef.current.clear();
+    dispatch({ type: 'add-media-layer', layerType, source });
+    refreshUploads();
+  }
+
+  async function handleUploadFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setUploadStatus(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`);
+    for (const file of files) await persistUpload(file);
+    await refreshUploads();
+    setUploadStatus(`${files.length} file${files.length > 1 ? 's' : ''} uploaded`);
+  }
+
+  function addUploadToScene(item) {
+    imageCacheRef.current.clear();
+    dispatch({ type: 'add-media-layer', layerType: item.kind === 'video' ? 'video' : 'image', source: item.path });
+  }
+
+  function setUploadAsBackground(item) {
+    imageCacheRef.current.clear();
+    dispatch({ type: 'background', key: 'image', value: item.path });
+  }
+
+  async function importAudio(file) {
+    const source = await persistUpload(file);
+    dispatch({ type: 'set-audio', audio: { source, name: file.name, volume: 0.9 } });
+    refreshUploads();
+  }
+
+  function revokeClipBlob() {
+    if (clipBlobRef.current) {
+      URL.revokeObjectURL(clipBlobRef.current);
+      clipBlobRef.current = null;
+    }
+  }
+
+  function probeVideoMeta(source) {
+    return new Promise((resolveMeta) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        resolveMeta({
+          duration: Number.isFinite(video.duration) ? video.duration : 10,
+          width: video.videoWidth || 0,
+          height: video.videoHeight || 0,
+        });
+        video.src = '';
+      };
+      video.onerror = () => resolveMeta({ duration: 10, width: 0, height: 0 });
+      video.src = resolveAssetPath(source);
+    });
+  }
+
+  async function warmClipVideo(source) {
+    const video = await loadVideo(imageCacheRef.current, source);
+    if (!video) return null;
+    await new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve(video);
+      };
+      video.addEventListener('seeked', finish, { once: true });
+      video.addEventListener('loadeddata', finish, { once: true });
+      try {
+        video.currentTime = Math.min(0.05, Math.max(0, (video.duration || 1) * 0.01));
+      } catch {
+        finish();
+      }
+      setTimeout(finish, 2500);
+    });
+    return video;
+  }
+
+  async function applyClipToEditor({ source, title, duration, clipIn = 0, clipOut = null }) {
+    const safeIn = Math.max(0, Number(clipIn) || 0);
+    const safeOut = Math.max(safeIn + 0.2, clipOut != null ? Number(clipOut) : Number(duration) || safeIn + 0.2);
+    // Put the video on the canvas immediately — don't wait for warm/buffer.
+    dispatch({
+      type: 'apply-clip',
+      source,
+      title: title || 'Clip',
+      clipIn: safeIn,
+      clipOut: safeOut,
+      sourceDuration: duration,
+      outputName: `${(title || 'muvidb-clip').replace(/[^\w\-]+/g, '-').slice(0, 40)}.mp4`,
+    });
+    setClipDraft({
+      source,
+      title: title || 'Clip',
+      temporary: true,
+      duration: Number(Number(duration).toFixed(2)),
+      clipIn: safeIn,
+      clipOut: safeOut,
+      applied: true,
+    });
+    setClipStatus(`On the editor · scrub, Set In/Out, switch frame size, then Export.`);
+    setActivePanel('clip');
+    setClipProgress({ stage: 'loading', percent: 92, message: 'Buffering preview…' });
+    warmClipVideo(source).finally(() => {
+      setClipProgress(null);
+    });
+  }
+
+  async function loadClipSource({ source, title, temporary, duration: knownDuration, autoApply = false }) {
+    imageCacheRef.current.clear();
+    const meta = await probeVideoMeta(source);
+    const duration = knownDuration && knownDuration > 0 ? knownDuration : meta.duration;
+    const draft = {
+      source,
+      title: title || 'Clip',
+      temporary: Boolean(temporary),
+      duration: Number(duration.toFixed(2)),
+      clipIn: 0,
+      clipOut: Number(duration.toFixed(2)),
+    };
+    setClipDraft(draft);
+    if (autoApply) {
+      await applyClipToEditor(draft);
+    } else {
+      setClipStatus(`Loaded · ${formatTime(duration)} total. Open in editor to trim.`);
+    }
+  }
+
+  async function handleFetchYoutube() {
+    const url = youtubeUrl.trim();
+    if (!url) {
+      setClipStatus('Paste a YouTube URL first.');
+      return;
+    }
+    setClipBusy(true);
+    setClipProgress({ stage: 'queued', percent: 0, message: 'Starting...' });
+    setClipStatus('Fetching from YouTube (temporary file, not your media library)...');
+    try {
+      const start = await fetch('/api/fetch-youtube', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const started = await start.json();
+      if (!start.ok) throw new Error(started.error || 'Fetch failed');
+
+      const jobId = started.jobId;
+      setClipProgress({
+        stage: started.stage || 'queued',
+        percent: started.percent || 0,
+        message: started.message || 'Queued...',
+      });
+
+      let result = null;
+      for (;;) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, 500));
+        const statusResponse = await fetch(`/api/fetch-youtube?jobId=${encodeURIComponent(jobId)}`);
+        const status = await statusResponse.json();
+        if (!statusResponse.ok) throw new Error(status.error || 'Lost fetch progress.');
+        setClipProgress({
+          stage: status.stage,
+          percent: Number(status.percent) || 0,
+          message: status.message || 'Working...',
+        });
+        setClipStatus(status.message || 'Fetching...');
+        if (status.done) {
+          if (status.error) throw new Error(status.error);
+          result = status.result;
+          break;
+        }
+      }
+
+      if (!result?.path) throw new Error('Fetch finished without a video file.');
+      revokeClipBlob();
+      await loadClipSource({
+        source: result.path,
+        title: result.title,
+        temporary: true,
+        duration: result.duration,
+        autoApply: true,
+      });
+      setClipProgress(null);
+    } catch (error) {
+      setClipProgress(null);
+      setClipStatus(error.message || 'Could not fetch that video. You can use optional upload instead.');
+    } finally {
+      setClipBusy(false);
+    }
+  }
+
+  async function handleOptionalClipUpload(file) {
+    if (!file) return;
+    setClipBusy(true);
+    setClipProgress({ stage: 'loading', percent: 20, message: 'Loading local file...' });
+    setClipStatus('Loading local file into memory (not saved to the media library)...');
+    try {
+      revokeClipBlob();
+      const blobUrl = URL.createObjectURL(file);
+      clipBlobRef.current = blobUrl;
+      await loadClipSource({
+        source: blobUrl,
+        title: file.name.replace(/\.[^.]+$/, ''),
+        temporary: true,
+        autoApply: true,
+      });
+      setClipProgress(null);
+    } catch (error) {
+      setClipProgress(null);
+      setClipStatus(error.message || 'Could not load that file.');
+    } finally {
+      setClipBusy(false);
+    }
+  }
+
+  function applyClipDraft() {
+    if (!clipDraft?.source) return;
+    applyClipToEditor(clipDraft);
+  }
+
+  function setClipMark(kind) {
+    if (!bg || bg.mediaKind !== 'video' || bg.clipOut == null) return;
+    const sourceIn = Number(bg.clipIn) || 0;
+    const sourceOut = Number(bg.clipOut);
+    const absolute = sourceIn + Math.max(0, state.currentTime);
+    if (kind === 'in') {
+      const nextIn = Math.min(absolute, sourceOut - 0.2);
+      dispatch({ type: 'clip-window', clipIn: nextIn, clipOut: sourceOut });
+      seekTo(0);
+    } else {
+      const nextOut = Math.max(absolute, sourceIn + 0.2);
+      dispatch({ type: 'clip-window', clipIn: sourceIn, clipOut: nextOut });
+    }
+  }
+
+  async function clearClipDraft() {
+    const path = clipDraft?.source;
+    revokeClipBlob();
+    setClipDraft(null);
+    setClipStatus('Cleared temporary clip.');
+    if (path && String(path).startsWith('output/temp-clips/')) {
+      try {
+        await fetch('/api/clear-temp-clip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path }),
+        });
+      } catch {
+        // ignore cleanup failures
+      }
+    }
+  }
+
+  function handleSave() {
+    const hasTempBlob = state.config.scenes.some((scene) => {
+      if (String(scene.background?.image || '').startsWith('blob:')) return true;
+      return (scene.layers || []).some((layer) => String(layer.source || '').startsWith('blob:'));
+    });
+    const saved = saveProject(state.config);
+    if (saved) {
+      dispatch({ type: 'replace-config', config: saved });
+      setSaveStatus(hasTempBlob
+        ? 'Saved text/layout. Temporary clip blob will not survive a refresh — Export first.'
+        : 'All changes saved');
+    }
+  }
+
+  function handleReset() {
+    clearSavedProject();
+    imageCacheRef.current.clear();
+    dispatch({ type: 'reset' });
+    setSaveStatus('Reset to default');
+    setRenderStatus('Ready to export');
+  }
+
+  async function handleExportVideo() {
+    setIsRendering(true);
+    setRenderStatus('Starting recording...');
+    try {
+      const exportConfig = normalizeTimeline(state.config);
+      const result = await recordTimeline(exportConfig, imageCacheRef.current, (elapsed, duration) => {
+        setRenderStatus(`Recording ${elapsed.toFixed(1)}s of ${duration.toFixed(1)}s...`);
+      });
+      const baseName = (exportConfig.outputName || 'muvidb-reel.mp4').replace(/\.[a-z0-9]+$/i, '');
+      downloadBlob(result.blob, `${baseName}.${result.extension}`);
+      setRenderStatus(`Video downloaded as .${result.extension}`);
+    } catch (error) {
+      setRenderStatus(error.message || 'Recording failed.');
+    } finally {
+      setIsRendering(false);
+    }
+  }
+
+  function handleSplitScene() {
+    const current = latestStateRef.current;
+    const scene = sceneAtTime(current.config, current.currentTime);
+    const index = current.config.scenes.indexOf(scene);
+    dispatch({ type: 'split-scene', index, time: current.currentTime });
+  }
+
+  function handleDuplicate() {
+    const current = latestStateRef.current;
+    dispatch({ type: current.selectedTarget === 'layer' ? 'duplicate-layer' : 'duplicate-scene' });
+  }
+
+  function handleDelete() {
+    const current = latestStateRef.current;
+    dispatch({ type: current.selectedTarget === 'layer' ? 'delete-layer' : 'delete-scene' });
+  }
+
+  function seekTo(time) {
+    dispatch({ type: 'ui', patch: { currentTime: Number(Math.max(0, Math.min(totalDuration, time)).toFixed(2)), isPlaying: false } });
+  }
+
+  function canvasPoint(event) {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const { width: canvasW, height: canvasH } = getCanvasSize(state.config);
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * canvasW,
+      y: ((event.clientY - rect.top) / rect.height) * canvasH,
+    };
+  }
+
+  function handleCanvasPointerDown(event) {
+    const point = canvasPoint(event);
+    const { scene, sceneIndex } = activeSceneInfo(state);
+    if (!scene) return;
+    if (state.selectedTarget === 'layer' && sceneIndex === state.selectedSceneIndex) {
+      const layer = scene.layers?.[state.selectedLayerIndex];
+      const handle = layer && !layer.locked ? handleAtPoint(layer, point) : null;
+      if (handle === 'rotate') {
+        dispatch({ type: 'begin-interaction' });
+        const center = layerCenter(layer);
+        dragRef.current = {
+          mode: 'rotate',
+          sceneIndex,
+          layerIndex: state.selectedLayerIndex,
+          center,
+          startAngle: Math.atan2(point.y - center.y, point.x - center.x),
+          startRotation: Number(layer.rotation) || 0,
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
+      if (handle) {
+        dispatch({ type: 'begin-interaction' });
+        dragRef.current = {
+          mode: 'resize',
+          sceneIndex,
+          layerIndex: state.selectedLayerIndex,
+          handle,
+          startBox: { x: layer.x, y: layer.y, width: layer.width, height: layer.height, rotation: Number(layer.rotation) || 0 },
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
+    }
+    const layerIndex = hitTestScene(scene, point);
+    dispatch({ type: 'begin-interaction' });
+    if (layerIndex >= 0) {
+      const layer = scene.layers[layerIndex];
+      dispatch({ type: 'select-layer', sceneIndex, layerIndex });
+      dragRef.current = {
+        mode: 'layer',
+        sceneIndex,
+        layerIndex,
+        offsetX: point.x - layer.x,
+        offsetY: point.y - layer.y,
+      };
+    } else {
+      const sceneBg = scene.background || {};
+      dispatch({ type: 'select-background', sceneIndex });
+      dragRef.current = {
+        mode: 'background',
+        sceneIndex,
+        startPointerX: point.x,
+        startPointerY: point.y,
+        startX: sceneBg.x ?? 0,
+        startY: sceneBg.y ?? 0,
+      };
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleCanvasPointerMove(event) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const point = canvasPoint(event);
+    if (drag.mode === 'rotate') {
+      const angle = Math.atan2(point.y - drag.center.y, point.x - drag.center.x);
+      let degrees = drag.startRotation + ((angle - drag.startAngle) * 180) / Math.PI;
+      if (event.shiftKey) degrees = Math.round(degrees / 15) * 15;
+      dispatch({ type: 'rotate-layer', sceneIndex: drag.sceneIndex, layerIndex: drag.layerIndex, rotation: degrees });
+      return;
+    }
+    if (drag.mode === 'resize') {
+      const box = drag.startBox;
+      const local = worldToLocal(box, point);
+      const right = box.x + box.width;
+      const bottom = box.y + box.height;
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      let { x, y, width, height } = box;
+      const handle = drag.handle || '';
+      const fixedLocal = {
+        tl: { x: right, y: bottom },
+        tr: { x: box.x, y: bottom },
+        bl: { x: right, y: box.y },
+        br: { x: box.x, y: box.y },
+        t: { x: cx, y: bottom },
+        b: { x: cx, y: box.y },
+        l: { x: right, y: cy },
+        r: { x: box.x, y: cy },
+      }[handle];
+      const fixedWorld = fixedLocal ? localToWorld(box, fixedLocal) : null;
+      if (handle.includes('l')) {
+        x = Math.min(local.x, right - 20);
+        width = right - x;
+      }
+      if (handle.includes('r')) width = Math.max(20, local.x - box.x);
+      if (handle.includes('t')) {
+        y = Math.min(local.y, bottom - 20);
+        height = bottom - y;
+      }
+      if (handle.includes('b')) height = Math.max(20, local.y - box.y);
+      if (fixedWorld) {
+        const nextFixedLocal = {
+          tl: { x: x + width, y: y + height },
+          tr: { x, y: y + height },
+          bl: { x: x + width, y },
+          br: { x, y },
+          t: { x: x + width / 2, y: y + height },
+          b: { x: x + width / 2, y },
+          l: { x: x + width, y: y + height / 2 },
+          r: { x, y: y + height / 2 },
+        }[handle];
+        const nextFixedWorld = localToWorld({ ...box, x, y, width, height }, nextFixedLocal);
+        x += fixedWorld.x - nextFixedWorld.x;
+        y += fixedWorld.y - nextFixedWorld.y;
+      }
+      dispatch({ type: 'resize-layer', sceneIndex: drag.sceneIndex, layerIndex: drag.layerIndex, x, y, width, height });
+      return;
+    }
+    if (drag.mode === 'layer') {
+      dispatch({
+        type: 'drag-layer',
+        sceneIndex: drag.sceneIndex,
+        layerIndex: drag.layerIndex,
+        x: point.x - drag.offsetX,
+        y: point.y - drag.offsetY,
+      });
+    }
+    if (drag.mode === 'background') {
+      const nextX = drag.startX + (point.x - drag.startPointerX);
+      const nextY = drag.startY + (point.y - drag.startPointerY);
+      dispatch({
+        type: 'drag-background',
+        sceneIndex: drag.sceneIndex,
+        x: nextX,
+        y: nextY,
+        previousX: drag.startX,
+        previousY: drag.startY,
+      });
+    }
+  }
+
+  function handleCanvasPointerUp(event) {
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleBarPointerDown(event, layerIndex, mode) {
+    event.stopPropagation();
+    const track = event.currentTarget.closest('[data-track]');
+    const layer = selectedScene?.layers?.[layerIndex];
+    if (!track || !layer || layer.locked) return;
+    const rect = track.getBoundingClientRect();
+    dispatch({ type: 'begin-interaction' });
+    dispatch({ type: 'select-layer', layerIndex });
+    barDragRef.current = {
+      mode,
+      layerIndex,
+      startX: event.clientX,
+      width: Math.max(1, rect.width),
+      sceneDur,
+      startOffset: Math.max(0, Number(layer.offset) || 0),
+      startDuration: layer.duration != null ? Number(layer.duration) : sceneDur - (Number(layer.offset) || 0),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleBarPointerMove(event) {
+    const drag = barDragRef.current;
+    if (!drag) return;
+    const deltaSeconds = ((event.clientX - drag.startX) / drag.width) * drag.sceneDur;
+    if (drag.mode === 'move') {
+      const maxOffset = Math.max(0, drag.sceneDur - drag.startDuration);
+      const offset = Math.min(maxOffset, Math.max(0, drag.startOffset + deltaSeconds));
+      dispatch({ type: 'layer-window', sceneIndex: state.selectedSceneIndex, layerIndex: drag.layerIndex, offset });
+    } else {
+      const duration = Math.min(drag.sceneDur - drag.startOffset, Math.max(0.2, drag.startDuration + deltaSeconds));
+      dispatch({ type: 'layer-window', sceneIndex: state.selectedSceneIndex, layerIndex: drag.layerIndex, duration });
+    }
+  }
+
+  function handleBarPointerUp() {
+    barDragRef.current = null;
+  }
+
+  function seekFromTimelineClientX(clientX, trackEl) {
+    if (!selectedScene || !trackEl) return;
+    const rect = trackEl.getBoundingClientRect();
+    if (!rect.width) return;
+    const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    seekTo(selectedScene.start + fraction * sceneDur);
+  }
+
+  function handleRulerSeek(event) {
+    const track = event.currentTarget;
+    seekFromTimelineClientX(event.clientX, track);
+    if (event.pointerId != null && track.setPointerCapture) {
+      try { track.setPointerCapture(event.pointerId); } catch { /* ignore */ }
+    }
+  }
+
+  function handleRulerScrub(event) {
+    if (event.buttons !== 1 && event.pressure === 0) return;
+    seekFromTimelineClientX(event.clientX, event.currentTarget);
+  }
+
+  function beginLayerReorder(fromIndex, event) {
+    layerDragRef.current = { fromIndex };
+    if (event?.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(fromIndex));
+    }
+    dispatch({ type: 'select-layer', layerIndex: fromIndex });
+  }
+
+  function completeLayerReorder(toIndex) {
+    const fromIndex = layerDragRef.current?.fromIndex;
+    layerDragRef.current = null;
+    setTimelineDropIndex(null);
+    if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) return;
+    dispatch({ type: 'reorder-layer', fromIndex, toIndex });
+  }
+
+  function renderScenesList() {
+    return (
+      <section className="mt-2">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold">Scenes</h2>
+          <button className="btn px-3" onClick={() => dispatch({ type: 'add-scene' })}>Add</button>
+        </div>
+        <div className="grid gap-2">
+          {state.config.scenes.map((item, index) => (
+            <button key={item.id} className={`rounded-lg border px-3 py-2 text-left ${index === state.selectedSceneIndex ? 'border-muvi-accent bg-muvi-accent/15' : 'border-white/10 bg-white/5'}`} onClick={() => dispatch({ type: 'ui', patch: { selectedSceneIndex: index, selectedLayerIndex: 0, selectedTarget: 'scene', isPlaying: false, currentTime: sceneEditTime(item) } })}>
+              <span className="flex items-center justify-between gap-3 text-sm font-bold">
+                {item.name || item.id}
+                <span className="text-xs text-muvi-muted">{sceneDuration(item).toFixed(1)}s</span>
+              </span>
+              <span className="mt-1 block text-xs text-muvi-muted">{item.start}s to {item.end}s</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  function renderLeftPanel() {
+    if (activePanel === 'clip') {
+      const activeClipIn = bg.clipIn;
+      const activeClipOut = bg.clipOut;
+      const hasActiveClip = Boolean(bg.mediaKind === 'video' && bg.clipOut != null);
+      return (
+        <>
+          <h2 className="mb-1 text-sm font-bold">Clip</h2>
+          <p className="mb-3 text-xs text-muvi-muted">Paste a YouTube link — it loads straight into the editor. Trim In/Out on the timeline, switch social frame sizes, then Export only the cut.</p>
+
+          <label className="label">YouTube URL
+            <input className="control" placeholder="https://www.youtube.com/watch?v=..." value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') handleFetchYoutube(); }} />
+          </label>
+          <button className="btn mb-3 w-full bg-muvi-accent/80 hover:bg-muvi-accent disabled:opacity-50" disabled={clipBusy} onClick={handleFetchYoutube}>
+            {clipBusy ? (clipProgress?.message ? 'Fetching…' : 'Working...') : 'Fetch'}
+          </button>
+
+          {clipProgress && (
+            <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+              <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate font-semibold text-white">{clipProgress.message}</span>
+                <span className="shrink-0 tabular-nums text-muvi-muted">{Math.round(clipProgress.percent)}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full rounded-full bg-muvi-accent transition-[width] duration-300 ease-out" style={{ width: `${Math.max(2, Math.min(100, clipProgress.percent))}%` }} />
+              </div>
+              <p className="mt-2 text-[11px] capitalize text-muvi-muted">Stage: {clipProgress.stage}</p>
+            </div>
+          )}
+
+          <div className="mb-3">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muvi-muted">Frame size</p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {FRAME_PRESETS.map((preset) => (
+                <button
+                  key={`clip-frame-${preset.id}`}
+                  type="button"
+                  aria-label={`Frame ${preset.label}`}
+                  className={`rounded-lg border px-3 py-2 text-left text-xs transition ${activeFrameId === preset.id ? 'border-muvi-accent bg-muvi-accent/15 text-white' : 'border-white/10 bg-white/5 text-muvi-muted hover:bg-white/10 hover:text-white'}`}
+                  onClick={() => dispatch({ type: 'set-frame', id: preset.id, width: preset.width, height: preset.height })}
+                >
+                  <span className="font-bold text-white">{preset.label}</span>
+                  <span className="mt-0.5 block text-[10px]">{preset.ratio} · {preset.width}×{preset.height}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-3 rounded-lg border border-dashed border-white/15 bg-white/[0.03] p-3">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muvi-muted">Optional</p>
+            <label className="btn block text-center text-sm">Upload a video instead
+              <input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { handleOptionalClipUpload(event.target.files?.[0]); event.target.value = ''; }} />
+            </label>
+            <p className="mt-2 text-[11px] text-muvi-muted">Stays in browser memory only — not saved to Uploads.</p>
+          </div>
+
+          {clipDraft && !hasActiveClip && (
+            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-3">
+              <p className="truncate text-xs font-bold">{clipDraft.title}</p>
+              <p className="mt-1 text-[11px] text-muvi-muted">Source length {formatTime(clipDraft.duration)}</p>
+              <button className="btn mt-3 w-full bg-muvi-accent/80 hover:bg-muvi-accent" onClick={applyClipDraft}>Open in editor</button>
+              <button className="btn mt-2 w-full" onClick={clearClipDraft}>Clear</button>
+            </div>
+          )}
+
+          {hasActiveClip && (
+            <div className="mb-3 rounded-lg border border-muvi-accent/30 bg-muvi-accent/10 p-3">
+              <p className="text-xs font-bold">Trim on the editor</p>
+              <p className="mt-1 text-[11px] text-muvi-muted">Play or jump through the film, then mark In/Out. Export records only this cut.</p>
+              <p className="mt-2 text-[11px] text-muvi-muted">Source window {formatTime(activeClipIn || 0)} → {formatTime(activeClipOut || 0)} · playhead {formatTime((Number(activeClipIn) || 0) + state.currentTime)}</p>
+              <div className="mt-2 grid grid-cols-4 gap-1.5">
+                <button type="button" className="btn px-1 text-[11px]" onClick={() => nudgePlayhead(-60)}>-1m</button>
+                <button type="button" className="btn px-1 text-[11px]" onClick={() => nudgePlayhead(-10)}>-10s</button>
+                <button type="button" className="btn px-1 text-[11px]" onClick={() => nudgePlayhead(10)}>+10s</button>
+                <button type="button" className="btn px-1 text-[11px]" onClick={() => nudgePlayhead(60)}>+1m</button>
+              </div>
+              <label className="label mt-2">Jump to source time (seconds)
+                <div className="flex gap-2">
+                  <input
+                    className="control"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="e.g. 90"
+                    id="clip-jump-input"
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') jumpPlayheadToSource(Number(event.currentTarget.value));
+                    }}
+                  />
+                  <button type="button" className="btn shrink-0 px-3 text-xs" onClick={() => {
+                    const input = document.getElementById('clip-jump-input');
+                    jumpPlayheadToSource(Number(input?.value));
+                  }}>Go</button>
+                </div>
+              </label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button className="btn px-2 text-xs" onClick={() => setClipMark('in')}>Set In here</button>
+                <button className="btn px-2 text-xs" onClick={() => setClipMark('out')}>Set Out here</button>
+              </div>
+              <label className="label mt-2">In (source seconds)
+                <input className="control" type="number" min="0" step="0.1" value={activeClipIn ?? 0} onChange={(event) => dispatch({ type: 'clip-window', clipIn: Number(event.target.value) })} />
+              </label>
+              <label className="label">Out (source seconds)
+                <input className="control" type="number" min="0.2" step="0.1" value={activeClipOut ?? 1} onChange={(event) => dispatch({ type: 'clip-window', clipOut: Number(event.target.value) })} />
+              </label>
+              <button className="btn mt-2 w-full" onClick={clearClipDraft}>Clear temp source</button>
+            </div>
+          )}
+
+          {clipStatus && <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">{clipStatus}</p>}
+        </>
+      );
+    }
+    if (activePanel === 'project') {
+      return (
+        <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold">Project</h2>
+            <button className="btn px-3" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}>Undo</button>
+          </div>
+          <label className="label">Title<input className="control" value={state.config.title || ''} onChange={(event) => dispatch({ type: 'project', key: 'title', value: event.target.value })} /></label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="label">Duration<input className="control" type="number" min="1" step="0.5" value={totalDuration} onChange={(event) => dispatch({ type: 'project', key: 'duration', value: event.target.value })} /></label>
+            <label className="label">FPS<input className="control" type="number" min="1" step="1" value={state.config.fps || 30} onChange={(event) => dispatch({ type: 'project', key: 'fps', value: event.target.value })} /></label>
+          </div>
+          <label className="label">Output file<input className="control" value={state.config.outputName || ''} onChange={(event) => dispatch({ type: 'project', key: 'outputName', value: event.target.value })} /></label>
+          <label className="label">Project font
+            <select className="control" value={state.config.fonts?.defaultFamily || 'Manrope'} onChange={(event) => dispatch({ type: 'default-font', value: event.target.value })}>
+              {fontOptions.map((font) => <option key={font.id} value={font.id}>{font.label}</option>)}
+            </select>
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <button className="btn bg-muvi-accent/80 hover:bg-muvi-accent" onClick={handleSave}>Save</button>
+            <label className="btn text-center">Import JSON<input className="hidden" type="file" accept="application/json" onChange={(event) => event.target.files?.[0] && importJson(event.target.files[0])} /></label>
+            <button className="btn" onClick={handleReset}>Reset</button>
+          </div>
+          <button className="btn mt-2 w-full" onClick={() => downloadJson(state.config)}>Export JSON</button>
+          <p className={`mt-3 rounded-lg bg-white/[0.04] px-3 py-2 text-xs ${saveStatus === 'All changes saved' ? 'text-emerald-400' : 'text-muvi-muted'}`}>{saveStatus}</p>
+          <div className="section">{renderScenesList()}</div>
+        </>
+      );
+    }
+    if (activePanel === 'scenes') {
+      return (
+        <>
+          {renderScenesList()}
+          <div className="section grid grid-cols-2 gap-2">
+            <button className="btn" onClick={() => dispatch({ type: 'duplicate-scene' })}>Duplicate</button>
+            <button className="btn border-muvi-danger/30 text-muvi-danger" onClick={() => dispatch({ type: 'delete-scene' })}>Delete</button>
+          </div>
+        </>
+      );
+    }
+    if (activePanel === 'layers') {
+      const layers = selectedScene?.layers || [];
+      // CapCut-style: top of list = front (drawn last)
+      const rows = layers.map((layer, index) => ({ layer, index })).reverse();
+      return (
+        <>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-bold">Layers</h2>
+            <span className="text-xs text-muvi-muted">{selectedScene?.name}</span>
+          </div>
+          <p className="mb-2 text-[11px] text-muvi-muted">Drag to reorder · top = front</p>
+          {layers.length === 0 && <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">No layers yet. Add shapes from Elements, or text/media from those panels.</p>}
+          <div className="grid gap-1">
+            {rows.map(({ layer, index }) => {
+              const selected = state.selectedTarget === 'layer' && index === state.selectedLayerIndex;
+              return (
+                <div
+                  key={layer.id || index}
+                  draggable={!layer.locked}
+                  onDragStart={(event) => beginLayerReorder(index, event)}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    completeLayerReorder(index);
+                  }}
+                  onDragEnd={() => { layerDragRef.current = null; setTimelineDropIndex(null); }}
+                  className={`flex cursor-grab items-center gap-1 rounded-lg border px-2 py-1.5 active:cursor-grabbing ${selected ? 'border-muvi-accent bg-muvi-accent/15' : 'border-white/[0.08] bg-white/[0.04]'} ${layer.locked ? 'opacity-60' : ''}`}
+                >
+                  <span className="text-muvi-muted" title="Drag to reorder"><Icon name="grip" className="h-3.5 w-3.5" /></span>
+                  <button className="text-muvi-muted hover:text-white" title={layer.hidden ? 'Show layer' : 'Hide layer'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: index, key: 'hidden' })}><Icon name={layer.hidden ? 'eyeOff' : 'eye'} className="h-4 w-4" /></button>
+                  <button className="text-muvi-muted hover:text-white" title={layer.locked ? 'Unlock layer' : 'Lock layer'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: index, key: 'locked' })}><Icon name={layer.locked ? 'lock' : 'unlock'} className="h-4 w-4" /></button>
+                  <button className="min-w-0 flex-1 truncate text-left text-xs font-semibold" onClick={() => dispatch({ type: 'select-layer', layerIndex: index })}>{layerDisplayName(layer)}</button>
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase text-muvi-muted">{layer.type === 'shape' ? layer.shapeKind : layer.type}</span>
+                </div>
+              );
+            })}
+          </div>
+          {state.selectedTarget === 'layer' && selectedLayer && (
+            <div className="section grid grid-cols-2 gap-2">
+              <button className="btn px-2 text-sm" onClick={() => dispatch({ type: 'reorder-layer', fromIndex: state.selectedLayerIndex, toIndex: layers.length - 1 })}>Bring front</button>
+              <button className="btn px-2 text-sm" onClick={() => dispatch({ type: 'reorder-layer', fromIndex: state.selectedLayerIndex, toIndex: 0 })}>Send back</button>
+              <button className="btn px-2 text-sm" onClick={() => dispatch({ type: 'duplicate-layer' })}>Duplicate</button>
+              <button className="btn px-2 text-sm border-muvi-danger/30 text-muvi-danger" onClick={() => dispatch({ type: 'delete-layer' })}>Delete</button>
+            </div>
+          )}
+        </>
+      );
+    }
+    if (activePanel === 'media') {
+      return (
+        <>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-bold">Media</h2>
+            <label className="btn px-3">Upload<input className="hidden" type="file" multiple accept="image/*,video/*,audio/*,.gif,.mp4,.mov,.m4v,.webm,.mp3,.wav,.m4a,.ogg" onChange={(event) => { handleUploadFiles(event.target.files); event.target.value = ''; }} /></label>
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <label className="btn text-center text-sm">Import image<input className="hidden" type="file" accept="image/*,.gif" onChange={(event) => { const file = event.target.files?.[0]; if (file) importMediaLayer(file, 'image'); event.target.value = ''; }} /></label>
+            <label className="btn text-center text-sm">Import video<input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importMediaLayer(file, 'video'); event.target.value = ''; }} /></label>
+          </div>
+          {uploads.length === 0 ? (
+            <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">No uploads yet. Click Upload to add images, videos, or music.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {uploads.map((item) => (
+                <div key={item.path} className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
+                  {item.kind === 'video' && <video src={resolveAssetPath(item.path)} muted preload="metadata" className="h-16 w-full object-cover" />}
+                  {item.kind === 'image' && <img src={resolveAssetPath(item.path)} alt={item.name} className="h-16 w-full object-cover" />}
+                  {item.kind === 'audio' && <div className="grid h-16 w-full place-items-center text-muvi-muted"><Icon name="audio" className="h-7 w-7" /></div>}
+                  {item.kind === 'audio' ? (
+                    <button className="w-full bg-white/10 px-1 py-1 text-[11px] font-bold transition hover:bg-muvi-accent/40" onClick={() => dispatch({ type: 'set-audio', audio: { source: item.path, name: item.name, volume: 0.9 } })}>Use as music</button>
+                  ) : (
+                    <div className="grid grid-cols-2">
+                      <button className="bg-white/10 px-1 py-1 text-[11px] font-bold transition hover:bg-muvi-accent/40" title="Add to selected scene as a layer" onClick={() => addUploadToScene(item)}>+ Scene</button>
+                      <button className="bg-white/5 px-1 py-1 text-[11px] font-bold transition hover:bg-muvi-accent/40" title="Use as the selected scene's background" onClick={() => setUploadAsBackground(item)}>BG</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {uploadStatus && <p className="mt-3 rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">{uploadStatus}</p>}
+        </>
+      );
+    }
+    if (activePanel === 'text') {
+      return (
+        <>
+          <h2 className="mb-3 text-sm font-bold">Text</h2>
+          <div className="grid gap-2">
+            {TEXT_PRESETS.map((preset) => (
+              <button key={preset.id} className="btn text-left" onClick={() => dispatch({ type: 'add-layer', layerType: 'text', preset: preset.preset })}>
+                <span className="block text-sm font-bold">{preset.label}</span>
+                <span className="block text-xs text-muvi-muted">{preset.preset.fontSize}px {preset.preset.weight}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      );
+    }
+    if (activePanel === 'elements') {
+      return (
+        <>
+          <h2 className="mb-1 text-sm font-bold">Elements</h2>
+          <p className="mb-3 text-[11px] text-muvi-muted">Tap a shape, then stretch or rotate it on the canvas.</p>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-muvi-muted">Shapes</p>
+          <div className="grid grid-cols-3 gap-2">
+            {SHAPE_LIBRARY.map((shape) => (
+              <button
+                key={shape.id}
+                className="group flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-3 transition hover:border-muvi-accent/50 hover:bg-muvi-accent/10"
+                title={shape.label}
+                onClick={() => dispatch({ type: 'add-layer', layerType: 'shape', shapeId: shape.id, shapeKind: shape.shapeKind })}
+              >
+                <span className="text-muvi-accent transition group-hover:scale-110"><ShapeThumb kind={shape.id === 'round-rect' ? 'round-rect' : shape.shapeKind} /></span>
+                <span className="text-[11px] font-semibold text-white/90">{shape.label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mb-2 mt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muvi-muted">Extras</p>
+          <div className="grid gap-2">
+            {ELEMENT_EXTRAS.map((item) => (
+              <button key={item.id} className="btn text-left" onClick={() => dispatch({ type: 'add-layer', layerType: item.layerType })}>
+                <span className="block text-sm font-bold">{item.label}</span>
+                <span className="block text-xs text-muvi-muted">{item.hint}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      );
+    }
+    if (activePanel === 'audio') {
+      return (
+        <>
+          <h2 className="mb-3 text-sm font-bold">Audio</h2>
+          {audioTrack?.source ? (
+            <>
+              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                <Icon name="audio" className="h-5 w-5 text-muvi-accent" />
+                <span className="min-w-0 flex-1 truncate text-xs font-semibold">{audioTrack.name || audioTrack.source.split('/').pop()}</span>
+              </div>
+              <label className="label mt-3">Volume ({Math.round((audioTrack.volume ?? 1) * 100)}%)
+                <input className="accent-[#ff5c00]" type="range" min="0" max="1" step="0.05" value={audioTrack.volume ?? 1} onChange={(event) => dispatch({ type: 'set-audio', audio: { volume: Number(event.target.value) } })} />
+              </label>
+              <button className="btn mt-2 w-full border-muvi-danger/30 text-muvi-danger" onClick={() => dispatch({ type: 'set-audio', audio: null })}>Remove music</button>
+            </>
+          ) : (
+            <label className="btn block text-center">Import music<input className="hidden" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAudio(file); event.target.value = ''; }} /></label>
+          )}
+          <p className="mt-3 rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">The music plays during preview and is mixed into the exported video, looping to fill the full duration.</p>
+        </>
+      );
+    }
+    if (activePanel === 'settings') {
+      const theme = state.config.theme || {};
+      return (
+        <>
+          <h2 className="mb-3 text-sm font-bold">Theme</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="label">Background<input className="control h-[42px]" type="color" value={theme.backgroundColor || '#0B0D0E'} onChange={(event) => dispatch({ type: 'theme', key: 'backgroundColor', value: event.target.value })} /></label>
+            <label className="label">Accent<input className="control h-[42px]" type="color" value={theme.accent || '#FF5C00'} onChange={(event) => dispatch({ type: 'theme', key: 'accent', value: event.target.value })} /></label>
+            <label className="label">Text<input className="control h-[42px]" type="color" value={theme.text || '#FFFFFF'} onChange={(event) => dispatch({ type: 'theme', key: 'text', value: event.target.value })} /></label>
+            <label className="label">Muted<input className="control h-[42px]" type="color" value={theme.muted || '#FFD3B8'} onChange={(event) => dispatch({ type: 'theme', key: 'muted', value: event.target.value })} /></label>
+          </div>
+          <label className="label">Overlay top<input className="control" value={theme.overlayTop || ''} onChange={(event) => dispatch({ type: 'theme', key: 'overlayTop', value: event.target.value })} /></label>
+          <label className="label">Overlay middle<input className="control" value={theme.overlayMid || ''} onChange={(event) => dispatch({ type: 'theme', key: 'overlayMid', value: event.target.value })} /></label>
+          <label className="label">Overlay bottom<input className="control" value={theme.overlayBottom || ''} onChange={(event) => dispatch({ type: 'theme', key: 'overlayBottom', value: event.target.value })} /></label>
+          <p className="mt-2 rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">Overlays are CSS colors (e.g. rgba(11,13,14,0.7)) drawn as a gradient over every background.</p>
+        </>
+      );
+    }
+    return null;
+  }
+
+  function renderInspectorTab() {
+    if (state.selectedTarget === 'scene') {
+      return (
+        <section className="p-4">
+          <h2 className="mb-3 text-sm font-bold">Scene Timing</h2>
+          <div className="mb-4 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm text-muvi-muted">
+            <span className="font-semibold text-white">{sceneDuration(selectedScene).toFixed(1)} seconds</span>
+            <span> on screen, from {selectedScene?.start ?? 0}s to {selectedScene?.end ?? 0}s.</span>
+          </div>
+          <label className="label">Scene name<input className="control" value={selectedScene?.name || ''} onChange={(event) => dispatch({ type: 'scene', key: 'name', value: event.target.value })} /></label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className="label">Starts at<input className="control" type="number" step="0.1" value={selectedScene?.start ?? 0} onChange={(event) => dispatch({ type: 'scene', key: 'start', value: event.target.value })} /></label>
+            <label className="label">Ends at<input className="control" type="number" step="0.1" value={selectedScene?.end ?? 0} onChange={(event) => dispatch({ type: 'scene', key: 'end', value: event.target.value })} /></label>
+            <label className="label">Screen time<input className="control" type="number" step="0.1" min="0.2" value={sceneDuration(selectedScene).toFixed(1)} onChange={(event) => dispatch({ type: 'scene', key: 'duration', value: event.target.value })} /></label>
+          </div>
+        </section>
+      );
+    }
+    if (state.selectedTarget === 'background') {
+      return (
+        <section className="p-4">
+          <h2 className="mb-1 text-sm font-bold">Background</h2>
+          <p className="mb-3 text-xs text-muvi-muted">Click empty preview space to select this. Drag the preview to reposition it.</p>
+          <label className="label">Video preset
+            <select className="control" value={AVAILABLE_VIDEOS.some((v) => v.value === (bg.image || '')) ? (bg.image || '') : '__custom__'} onChange={(event) => { if (event.target.value !== '__custom__') { imageCacheRef.current.clear(); dispatch({ type: 'background', key: 'image', value: event.target.value }); } }}>
+              {AVAILABLE_VIDEOS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+              {!AVAILABLE_VIDEOS.some((v) => v.value === (bg.image || '')) && <option value="__custom__">Custom ({(bg.image || '').substring(0, 30)}...)</option>}
+            </select>
+          </label>
+          <label className="label">Background color
+            <span className="flex items-center gap-2">
+              <input className="control h-[42px] w-[72px] cursor-pointer p-1" type="color" value={bg.color || state.config.theme?.backgroundColor || '#0B0D0E'} onChange={(event) => dispatch({ type: 'background', key: 'color', value: event.target.value })} />
+              {BACKGROUND_SWATCHES.map((swatch) => (
+                <button key={swatch} type="button" title={swatch} className={`h-6 w-6 rounded-md border transition hover:scale-110 ${(bg.color || '').toLowerCase() === swatch.toLowerCase() ? 'border-muvi-accent ring-1 ring-muvi-accent' : 'border-white/25'}`} style={{ background: swatch }} onClick={() => dispatch({ type: 'background', key: 'color', value: swatch })} />
+              ))}
+            </span>
+          </label>
+          <p className="-mt-1 mb-3 text-[11px] text-muvi-muted">The color shows when the preset is "No video (solid color)" and no file is set below.</p>
+          <label className="label">Image, GIF, or video path<input className="control" value={bg.image || ''} onChange={(event) => dispatch({ type: 'background', key: 'image', value: event.target.value })} /></label>
+          <label className="btn mb-3 block text-center">Replace file<input className="hidden" type="file" accept="image/*,video/*,.gif,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAsset(file, (value) => ({ type: 'background', key: 'image', value })); event.target.value = ''; }} /></label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className="label">X<input className="control" type="number" value={bg.x ?? 0} onChange={(event) => dispatch({ type: 'background', key: 'x', value: event.target.value })} /></label>
+            <label className="label">Y<input className="control" type="number" value={bg.y ?? 0} onChange={(event) => dispatch({ type: 'background', key: 'y', value: event.target.value })} /></label>
+            <label className="label">Scale<input className="control" type="number" step="0.01" value={bg.zoom ?? 1} onChange={(event) => dispatch({ type: 'background', key: 'zoom', value: event.target.value })} /></label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button className="btn" onClick={() => dispatch({ type: 'fit-bg', mode: 'fit' })}>Fit image</button>
+            <button className="btn" onClick={() => dispatch({ type: 'fit-bg', mode: 'fill' })}>Fill frame</button>
+          </div>
+        </section>
+      );
+    }
+    if (state.selectedTarget === 'layer' && selectedLayer) {
+      return (
+        <section className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold">Layer</h2>
+            <div className="flex gap-1">
+              <button className="btn px-2 py-1" title={selectedLayer.hidden ? 'Show' : 'Hide'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: state.selectedLayerIndex, key: 'hidden' })}><Icon name={selectedLayer.hidden ? 'eyeOff' : 'eye'} className="h-4 w-4" /></button>
+              <button className="btn px-2 py-1" title={selectedLayer.locked ? 'Unlock' : 'Lock'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: state.selectedLayerIndex, key: 'locked' })}><Icon name={selectedLayer.locked ? 'lock' : 'unlock'} className="h-4 w-4" /></button>
+              <button className="btn px-2 py-1 border-muvi-danger/30 text-muvi-danger" title="Delete layer" onClick={() => dispatch({ type: 'delete-layer' })}><Icon name="trash" className="h-4 w-4" /></button>
+            </div>
+          </div>
+          <select className="control mb-3" value={state.selectedLayerIndex} onChange={(event) => dispatch({ type: 'select-layer', layerIndex: Number(event.target.value) })}>
+            {(selectedScene?.layers || []).map((item, index) => <option key={item.id || index} value={index}>{index + 1}. {layerDisplayName(item)}</option>)}
+          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="label">Layer name<input className="control" value={selectedLayerFields.id || ''} onChange={(event) => dispatch({ type: 'layer', key: 'id', value: event.target.value })} /></label>
+            <label className="label">Type<input className="control" value={selectedLayerFields.type === 'shape' ? `shape · ${selectedLayerFields.shapeKind || 'rect'}` : (selectedLayerFields.type || '')} disabled /></label>
+          </div>
+          {['text', 'pill'].includes(selectedLayer.type) && <label className="label">Text<textarea className="control min-h-[96px]" value={selectedLayerFields.text || ''} onChange={(event) => dispatch({ type: 'layer', key: 'text', value: event.target.value })} /></label>}
+          {['image', 'video'].includes(selectedLayer.type) && (
+            <>
+              <label className="label">Media path<input className="control" value={selectedLayerFields.source || ''} onChange={(event) => dispatch({ type: 'layer', key: 'source', value: event.target.value })} /></label>
+              <label className="btn mb-3 block text-center">Replace file<input className="hidden" type="file" accept="image/*,video/*,.gif,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAsset(file, (value) => ({ type: 'layer', key: 'source', value })); event.target.value = ''; }} /></label>
+            </>
+          )}
+          <div className="mb-3 grid grid-cols-3 gap-1.5">
+            {[
+              ['left', 'Left'], ['centerX', 'Center'], ['right', 'Right'],
+              ['top', 'Top'], ['centerY', 'Middle'], ['bottom', 'Bottom'],
+            ].map(([align, label]) => (
+              <button key={align} type="button" className="btn px-1 py-1.5 text-[11px]" onClick={() => dispatch({ type: 'align-layer', align })}>{label}</button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="label">X<input className="control" type="number" value={selectedLayerFields.x ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'x', value: event.target.value })} /></label>
+            <label className="label">Y<input className="control" type="number" value={selectedLayerFields.y ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'y', value: event.target.value })} /></label>
+            <label className="label">Width<input className="control" type="number" value={selectedLayerFields.width ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'width', value: event.target.value })} /></label>
+            <label className="label">Height<input className="control" type="number" value={selectedLayerFields.height ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'height', value: event.target.value })} /></label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="label">Rotation (°)<input className="control" type="number" step="1" value={selectedLayerFields.rotation ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'rotation', value: event.target.value })} /></label>
+            <label className="label">Opacity<input className="control" type="number" min="0" max="1" step="0.05" value={selectedLayerFields.opacity ?? 1} onChange={(event) => dispatch({ type: 'layer', key: 'opacity', value: event.target.value })} /></label>
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <button type="button" className={`btn text-sm ${selectedLayer.flipX ? 'border-muvi-accent bg-muvi-accent/20' : ''}`} onClick={() => dispatch({ type: 'layer', key: 'flipX', value: !selectedLayer.flipX })}>Flip H</button>
+            <button type="button" className={`btn text-sm ${selectedLayer.flipY ? 'border-muvi-accent bg-muvi-accent/20' : ''}`} onClick={() => dispatch({ type: 'layer', key: 'flipY', value: !selectedLayer.flipY })}>Flip V</button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="label">Shows after (s)<input className="control" type="number" min="0" step="0.1" value={selectedLayerFields.offset ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'offset', value: event.target.value })} /></label>
+            <label className="label">Visible for (s)<input className="control" type="number" min="0.2" step="0.1" placeholder="full scene" value={selectedLayerFields.duration ?? ''} onChange={(event) => dispatch({ type: 'layer', key: 'duration', value: event.target.value })} /></label>
+          </div>
+          {['text', 'pill'].includes(selectedLayer.type) && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="label">Padding X<input className="control" type="number" value={selectedLayerFields.paddingX ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'paddingX', value: event.target.value })} /></label>
+                <label className="label">Padding Y<input className="control" type="number" value={selectedLayerFields.paddingY ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'paddingY', value: event.target.value })} /></label>
+                <label className="label">Font size<input className="control" type="number" value={selectedLayerFields.fontSize ?? 32} onChange={(event) => dispatch({ type: 'layer', key: 'fontSize', value: event.target.value })} /></label>
+                <label className="label">Line spacing<input className="control" type="number" min="0.6" max="2" step="0.05" value={selectedLayerFields.lineHeight ?? 1.08} onChange={(event) => dispatch({ type: 'layer', key: 'lineHeight', value: event.target.value })} /></label>
+                <label className="label">Weight
+                  <select className="control" value={selectedLayerFields.weight || 'regular'} onChange={(event) => dispatch({ type: 'layer', key: 'weight', value: event.target.value })}>
+                    {['regular', 'medium', 'semiBold', 'bold', 'heavy'].map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+                <label className="label">Alignment
+                  <select className="control" value={selectedLayerFields.align || 'center'} onChange={(event) => dispatch({ type: 'layer', key: 'align', value: event.target.value })}>
+                    {['left', 'center', 'right'].map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label className="label">Font family
+                <select className="control" value={selectedLayerFields.fontFamily || ''} onChange={(event) => dispatch({ type: 'layer', key: 'fontFamily', value: event.target.value })}>
+                  <option value="">Use project font</option>
+                  {fontOptions.map((font) => <option key={font.id} value={font.id}>{font.label}</option>)}
+                </select>
+              </label>
+              <label className="label">Text color<input className="control h-[42px]" type="color" value={selectedLayerFields.color || '#ffffff'} onChange={(event) => dispatch({ type: 'layer', key: 'color', value: event.target.value })} /></label>
+            </>
+          )}
+          {(['pill', 'card', 'shape'].includes(selectedLayer.type)) && (
+            <div className="grid grid-cols-2 gap-3">
+              {selectedLayer.type !== 'shape' || selectedLayer.shapeKind === 'rect' ? (
+                <label className="label">Corners<input className="control" type="number" value={selectedLayerFields.radius ?? 24} onChange={(event) => dispatch({ type: 'layer', key: 'radius', value: event.target.value })} /></label>
+              ) : null}
+              <label className="label">Stroke width<input className="control" type="number" min="0" step="1" value={selectedLayerFields.strokeWidth ?? 2} onChange={(event) => dispatch({ type: 'layer', key: 'strokeWidth', value: event.target.value })} /></label>
+              <label className="label">Fill
+                <span className="flex items-center gap-2">
+                  <input className="control h-[42px] w-[72px] cursor-pointer p-1" type="color" value={/^#([0-9a-f]{6})$/i.test(selectedLayerFields.fill || '') ? selectedLayerFields.fill : '#ff5c00'} onChange={(event) => dispatch({ type: 'layer', key: 'fill', value: event.target.value })} />
+                  <input className="control" value={selectedLayerFields.fill || ''} onChange={(event) => dispatch({ type: 'layer', key: 'fill', value: event.target.value })} />
+                </span>
+              </label>
+              <label className="label">Stroke
+                <span className="flex items-center gap-2">
+                  <input className="control h-[42px] w-[72px] cursor-pointer p-1" type="color" value={/^#([0-9a-f]{6})$/i.test(selectedLayerFields.stroke || '') ? selectedLayerFields.stroke : '#ffffff'} onChange={(event) => dispatch({ type: 'layer', key: 'stroke', value: event.target.value })} />
+                  <input className="control" value={selectedLayerFields.stroke || ''} onChange={(event) => dispatch({ type: 'layer', key: 'stroke', value: event.target.value })} />
+                </span>
+              </label>
+            </div>
+          )}
+          {selectedLayer.type === 'shape' && (
+            <label className="label">Shape
+              <select className="control" value={selectedLayerFields.shapeKind || 'rect'} onChange={(event) => dispatch({ type: 'layer', key: 'shapeKind', value: event.target.value })}>
+                {['rect', 'ellipse', 'triangle', 'diamond', 'hexagon', 'star', 'line', 'arrow'].map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+              </select>
+            </label>
+          )}
+        </section>
+      );
+    }
+    return <p className="p-4 text-xs text-muvi-muted">Select a scene, layer, or the background to edit it.</p>;
+  }
+
+  function renderAnimationTab() {
+    if (state.selectedTarget === 'scene') {
+      return (
+        <section className="p-4">
+          <h2 className="mb-3 text-sm font-bold">Scene Entrance</h2>
+          <label className="label">Entrance style
+            <select className="control" value={selectedScene?.transition?.type || 'none'} onChange={(event) => dispatch({ type: 'transition', key: 'type', value: event.target.value })}>
+              <option value="none">Cut in</option>
+              <option value="crossfade">Crossfade</option>
+              <option value="fade">Fade</option>
+              <option value="slide-up">Slide up</option>
+              <option value="slide-left">Slide left</option>
+            </select>
+          </label>
+          <label className="label">Transition time (s)<input className="control" type="number" min="0" step="0.05" value={selectedScene?.transition?.duration ?? 0} onChange={(event) => dispatch({ type: 'transition', key: 'duration', value: event.target.value })} /></label>
+        </section>
+      );
+    }
+    if (state.selectedTarget === 'background') {
+      return (
+        <section className="p-4">
+          <h2 className="mb-3 text-sm font-bold">Background Movement</h2>
+          <label className="label">Movement
+            <select className="control" value={animation.type || 'none'} onChange={(event) => dispatch({ type: 'background-animation', key: 'type', value: event.target.value })}>
+              <option value="none">Still</option>
+              <option value="kenBurns">Slow pan and zoom</option>
+            </select>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {['startX', 'startY', 'endX', 'endY', 'startZoom', 'endZoom'].map((key) => (
+              <label className="label" key={key}>{animationFieldLabels[key]}<input className="control" type="number" step={key.includes('Zoom') ? '0.01' : '1'} value={animation[key] ?? (key.includes('Zoom') ? bg.zoom ?? 1 : bg[key.replace('start', '').replace('end', '').toLowerCase()] ?? 0)} onChange={(event) => dispatch({ type: 'background-animation', key, value: event.target.value })} /></label>
+            ))}
+          </div>
+        </section>
+      );
+    }
+    if (state.selectedTarget === 'layer' && selectedLayer) {
+      const layerAnimation = selectedLayer.animation || {};
+      return (
+        <section className="p-4">
+          <h2 className="mb-3 text-sm font-bold">Layer Entrance</h2>
+          <label className="label">Animation
+            <select className="control" value={layerAnimation.type || 'none'} onChange={(event) => dispatch({ type: 'layer-animation', key: 'type', value: event.target.value })}>
+              <option value="none">None</option>
+              <option value="fadeIn">Fade in</option>
+              <option value="slideUp">Slide up</option>
+              <option value="slideDown">Slide down</option>
+              <option value="zoomIn">Zoom in</option>
+            </select>
+          </label>
+          <label className="label">Duration (s)<input className="control" type="number" min="0.1" max="3" step="0.1" value={layerAnimation.duration ?? 0.5} onChange={(event) => dispatch({ type: 'layer-animation', key: 'duration', value: event.target.value })} /></label>
+          <p className="mt-2 rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">The animation plays when the layer first appears, after its "Shows after" delay.</p>
+        </section>
+      );
+    }
+    return <p className="p-4 text-xs text-muvi-muted">Select a scene, layer, or the background to animate it.</p>;
+  }
+
+  function renderTimeline() {
+    if (!selectedScene) return null;
+    const layers = selectedScene.layers || [];
+    // CapCut: top track = front (last drawn)
+    const trackRows = layers.map((layer, index) => ({ layer, index })).reverse();
+    const playheadFraction = (state.currentTime - selectedScene.start) / sceneDur;
+    const tickCount = Math.max(1, Math.ceil(sceneDur));
+    const bgSource = bg.image ?? state.config.assets?.background;
+    const bgLabel = !bgSource
+      ? `Solid · ${bg.color || state.config.theme?.backgroundColor || '#0B0D0E'}`
+      : String(bgSource).startsWith('blob:')
+        ? 'Temporary clip'
+        : String(bgSource).includes('temp-clips/')
+          ? `Temp · ${String(bgSource).split('/').pop()}`
+          : String(bgSource).split('/').pop();
+
+    return (
+      <div className="flex h-[270px] shrink-0 flex-col border-t border-white/[0.08] bg-[#121417]">
+        <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+            {(state.config.scenes || []).map((scene, index) => (
+              <button
+                key={scene.id || index}
+                type="button"
+                className={`chip shrink-0 ${index === state.selectedSceneIndex ? 'chip-active' : ''}`}
+                onClick={() => dispatch({ type: 'ui', patch: { selectedSceneIndex: index, selectedLayerIndex: 0, selectedTarget: 'scene', isPlaying: false, currentTime: sceneEditTime(scene) } })}
+              >
+                {scene.name || `Scene ${index + 1}`}
+                <span className="ml-1 opacity-60">{sceneDuration(scene).toFixed(0)}s</span>
+              </button>
+            ))}
+          </div>
+          <button className="btn-ghost" onClick={handleSplitScene}>Split</button>
+          <button className="btn-ghost" onClick={handleDuplicate}>Duplicate</button>
+          <button className="btn-ghost text-muvi-danger hover:text-muvi-danger" onClick={handleDelete}>Delete</button>
+          <span className="mx-1 h-4 w-px bg-white/10" />
+          <span className="text-[10px] text-muvi-muted">Zoom</span>
+          <input className="w-24 accent-[#ff5c00]" type="range" min="1" max="4" step="0.25" value={timelineZoom} onChange={(event) => setTimelineZoom(Number(event.target.value))} />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto px-2 pb-2 pt-1">
+          <div style={{ width: `${timelineZoom * 100}%`, minWidth: '100%' }}>
+            <div className="flex">
+              <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-end px-2 pb-1">
+                <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/30">Tracks</span>
+              </div>
+              <div
+                className="relative h-7 flex-1 cursor-pointer select-none rounded-t-md bg-black/20"
+                onPointerDown={handleRulerSeek}
+                onPointerMove={handleRulerScrub}
+              >
+                {Array.from({ length: tickCount + 1 }, (_, second) => (
+                  <span
+                    key={second}
+                    className="absolute top-1.5 border-l border-white/15 pl-1 font-mono text-[10px] text-white/40"
+                    style={{ left: `${Math.min(100, (second / sceneDur) * 100)}%` }}
+                  >
+                    {second}s
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative rounded-b-md bg-black/15">
+              {trackRows.map(({ layer, index }) => {
+                const offset = Math.max(0, Number(layer.offset) || 0);
+                const windowDuration = layer.duration != null ? Number(layer.duration) : sceneDur - offset;
+                const color = TRACK_COLORS[layer.type] || '#64748b';
+                const isSelected = state.selectedTarget === 'layer' && index === state.selectedLayerIndex;
+                const showDrop = timelineDropIndex === index;
+                return (
+                  <div
+                    key={layer.id || index}
+                    className={`track-row h-9 border-b border-white/[0.04] ${showDrop ? 'track-row-drop' : ''} ${isSelected ? 'bg-muvi-accent/[0.06]' : 'hover:bg-white/[0.02]'}`}
+                    onDragOver={(event) => {
+                      if (layer.locked) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'move';
+                      setTimelineDropIndex(index);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      completeLayerReorder(index);
+                    }}
+                  >
+                    <div
+                      style={{ width: TRACK_LABEL_WIDTH }}
+                      className={`flex shrink-0 items-center gap-1 border-r border-white/[0.05] px-1.5 ${layer.locked ? '' : 'cursor-grab active:cursor-grabbing'}`}
+                      draggable={!layer.locked}
+                      onDragStart={(event) => beginLayerReorder(index, event)}
+                      onDragEnd={() => { layerDragRef.current = null; setTimelineDropIndex(null); }}
+                      title="Drag to reorder layers"
+                    >
+                      <Icon name="grip" className="h-3.5 w-3.5 shrink-0 text-white/30" />
+                      <button type="button" className="text-white/40 hover:text-white" title={layer.hidden ? 'Show' : 'Hide'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: index, key: 'hidden' })}><Icon name={layer.hidden ? 'eyeOff' : 'eye'} className="h-3.5 w-3.5" /></button>
+                      <button type="button" className="text-white/40 hover:text-white" title={layer.locked ? 'Unlock' : 'Lock'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: index, key: 'locked' })}><Icon name={layer.locked ? 'lock' : 'unlock'} className="h-3.5 w-3.5" /></button>
+                      <button
+                        type="button"
+                        className={`min-w-0 flex-1 truncate text-left text-[11px] font-semibold ${isSelected ? 'text-muvi-accent' : 'text-white/80'}`}
+                        onClick={() => dispatch({ type: 'select-layer', layerIndex: index })}
+                      >
+                        {layerDisplayName(layer)}
+                      </button>
+                    </div>
+                    <div className="relative h-9 flex-1" data-track>
+                      <div
+                        className={`clip-bar ${layer.hidden ? 'opacity-35' : ''} ${isSelected ? 'ring-2 ring-white/80' : 'ring-1 ring-black/20'}`}
+                        style={{
+                          left: `${(offset / sceneDur) * 100}%`,
+                          width: `${Math.max(2.5, (windowDuration / sceneDur) * 100)}%`,
+                          background: `linear-gradient(180deg, ${color}, ${color}cc)`,
+                        }}
+                        onPointerDown={(event) => handleBarPointerDown(event, index, 'move')}
+                        onPointerMove={handleBarPointerMove}
+                        onPointerUp={handleBarPointerUp}
+                      >
+                        <span className="truncate text-[10px] font-bold text-black/75">{layerDisplayName(layer)}</span>
+                        <div
+                          className="absolute right-0 top-0 h-full w-2.5 cursor-ew-resize bg-black/20 hover:bg-black/35"
+                          onPointerDown={(event) => handleBarPointerDown(event, index, 'resize')}
+                          onPointerMove={handleBarPointerMove}
+                          onPointerUp={handleBarPointerUp}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="track-row h-9">
+                <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-2 border-r border-white/[0.05] px-2">
+                  <span className="h-2 w-2 rounded-full bg-sky-500" />
+                  <button
+                    type="button"
+                    className={`min-w-0 flex-1 truncate text-left text-[11px] font-semibold ${state.selectedTarget === 'background' ? 'text-muvi-accent' : 'text-white/70'}`}
+                    onClick={() => dispatch({ type: 'select-background' })}
+                  >
+                    Background
+                  </button>
+                </div>
+                <div className="relative h-9 flex-1" data-track>
+                  <button
+                    type="button"
+                    className={`clip-bar inset-x-1 cursor-pointer ${state.selectedTarget === 'background' ? 'ring-2 ring-white/80' : 'ring-1 ring-black/20'}`}
+                    style={{ background: 'linear-gradient(180deg, #3b82f6, #2563eb)' }}
+                    onClick={() => dispatch({ type: 'select-background' })}
+                  >
+                    <span className="truncate text-[10px] font-bold text-white/90">{bgLabel}</span>
+                  </button>
+                </div>
+              </div>
+
+              {playheadFraction >= 0 && playheadFraction <= 1 && (
+                <div className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: TRACK_LABEL_WIDTH, right: 0 }}>
+                  <div
+                    className="pointer-events-auto absolute bottom-0 top-0 w-5 -translate-x-1/2 cursor-ew-resize"
+                    style={{ left: `${playheadFraction * 100}%` }}
+                    onPointerDown={(event) => {
+                      const track = event.currentTarget.parentElement;
+                      seekFromTimelineClientX(event.clientX, track);
+                      if (event.pointerId != null) {
+                        try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* ignore */ }
+                      }
+                    }}
+                    onPointerMove={(event) => {
+                      if (event.buttons !== 1) return;
+                      seekFromTimelineClientX(event.clientX, event.currentTarget.parentElement);
+                    }}
+                  >
+                    <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-muvi-accent shadow-[0_0_8px_rgba(255,92,0,0.8)]" />
+                    <span className="absolute left-1/2 top-0 h-3.5 w-3.5 -translate-x-1/2 rounded-sm bg-muvi-accent shadow" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%)' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <p className="shrink-0 px-3 pb-1.5 text-[10px] text-white/30">Drag track labels to reorder · drag clips to trim timing · top track is front</p>
+      </div>
+    );
+  }
+
+  function renderEditToolbar() {
+    if (state.selectedTarget !== 'layer' || !selectedLayer) return null;
+    const rotation = Number(selectedLayer.rotation) || 0;
+    return (
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center">
+        <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-white/10 bg-[#16181c]/95 px-1.5 py-1 shadow-soft backdrop-blur">
+          {[
+            ['left', 'L'], ['centerX', 'C'], ['right', 'R'],
+            ['top', 'T'], ['centerY', 'M'], ['bottom', 'B'],
+          ].map(([align, label]) => (
+            <button key={align} type="button" className="btn-ghost min-h-0 px-2 py-1 font-mono text-[11px]" title={`Align ${label}`} onClick={() => dispatch({ type: 'align-layer', align })}>{label}</button>
+          ))}
+          <span className="mx-1 h-4 w-px bg-white/10" />
+          <button type="button" className="btn-ghost min-h-0 px-2 py-1" title="Rotate -15°" onClick={() => dispatch({ type: 'layer', key: 'rotation', value: rotation - 15 })}><Icon name="rotate" className="h-3.5 w-3.5 -scale-x-100" /></button>
+          <button type="button" className="btn-ghost min-h-0 px-2 py-1" title="Rotate +15°" onClick={() => dispatch({ type: 'layer', key: 'rotation', value: rotation + 15 })}><Icon name="rotate" className="h-3.5 w-3.5" /></button>
+          <span className="mx-1 h-4 w-px bg-white/10" />
+          <button type="button" className="btn-ghost min-h-0 px-2 py-1" onClick={() => dispatch({ type: 'duplicate-layer' })}>Copy</button>
+          <button type="button" className="btn-ghost min-h-0 px-2 py-1 text-muvi-danger" onClick={() => dispatch({ type: 'delete-layer' })}><Icon name="trash" className="h-3.5 w-3.5" /></button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen min-h-[680px] flex-col overflow-hidden bg-muvi-bg text-[13px]">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.08] bg-muvi-panel/90 px-3 py-2 backdrop-blur">
+        <div className="flex min-w-0 items-center gap-3">
+          <img src="/assets/images/muvidb-logo.svg" alt="MuviDB" className="h-8 w-8 rounded-lg bg-white/5 p-1" />
+          <div className="min-w-0">
+            <input
+              className="w-full max-w-[280px] truncate border-0 bg-transparent text-sm font-black outline-none placeholder:text-white/30 focus:text-muvi-accent"
+              value={state.config.title || ''}
+              placeholder="Untitled project"
+              onChange={(event) => dispatch({ type: 'project', key: 'title', value: event.target.value })}
+            />
+            <p className="text-[10px] text-muvi-muted">MuviDB Studio · CapCut-style reel editor</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button className="btn-ghost" title="Undo (Ctrl+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}><Icon name="undo" className="h-4 w-4" /></button>
+          <button className="btn-ghost" title="Redo (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" className="h-4 w-4" /></button>
+          <span className="mx-1 h-5 w-px bg-white/10" />
+          <select className="control min-h-0 w-[84px] px-2 py-1 text-xs" value={previewZoom} onChange={(event) => setPreviewZoom(Number(event.target.value))}>
+            {PREVIEW_ZOOMS.map((zoom) => <option key={zoom} value={zoom}>{Math.round(zoom * 100)}%</option>)}
+          </select>
+          <button className="btn-accent px-5" disabled={isRendering} onClick={handleExportVideo}>{isRendering ? 'Exporting…' : 'Export'}</button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1">
+        <nav className="flex w-[64px] shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel py-2">
+          {RAIL_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              className={`studio-rail-btn ${activePanel === item.id ? 'bg-muvi-accent/20 text-white' : 'text-muvi-muted hover:bg-white/[0.06] hover:text-white'}`}
+              onClick={() => setActivePanel(item.id)}
+            >
+              <Icon name={item.id} className="h-5 w-5" />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <aside className="w-[270px] shrink-0 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel/70 p-3">
+          {renderLeftPanel()}
+        </aside>
+
+        <section className="flex min-w-0 flex-1 flex-col bg-[#0c0d10]">
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/[0.06] px-3 py-1.5">
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Frame</span>
+            {FRAME_PRESETS.map((preset) => (
+              <button
+                key={`bar-frame-${preset.id}`}
+                type="button"
+                aria-label={`Frame ${preset.label}`}
+                title={`${preset.ratio} · ${preset.width}×${preset.height}`}
+                className={`chip shrink-0 ${activeFrameId === preset.id ? 'chip-active' : ''}`}
+                onClick={() => dispatch({ type: 'set-frame', id: preset.id, width: preset.width, height: preset.height })}
+              >
+                {preset.label}
+              </button>
+            ))}
+            <span className="ml-auto shrink-0 font-mono text-[10px] text-white/35">{canvasW}×{canvasH}</span>
+          </div>
+
+          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+            {renderEditToolbar()}
+            <div
+              className="max-h-full max-w-full"
+              style={{
+                aspectRatio: `${canvasW} / ${canvasH}`,
+                height: canvasH >= canvasW ? '100%' : 'auto',
+                width: canvasH >= canvasW ? 'auto' : '100%',
+                transform: `scale(${previewZoom})`,
+              }}
+            >
+              <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-phone ring-1 ring-white/5">
+                <canvas
+                  ref={canvasRef}
+                  width={canvasW}
+                  height={canvasH}
+                  className="h-full w-full cursor-move touch-none"
+                  onPointerDown={handleCanvasPointerDown}
+                  onPointerMove={handleCanvasPointerMove}
+                  onPointerUp={handleCanvasPointerUp}
+                  onPointerCancel={handleCanvasPointerUp}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-3 border-t border-white/[0.08] bg-muvi-panel/80 px-4 py-2">
+            <span className="w-[110px] font-mono text-xs tabular-nums text-white/70">{formatTime(state.currentTime)}</span>
+            <div className="flex flex-1 items-center justify-center gap-2">
+              <button className="transport-btn" title="Scene start" onClick={() => seekTo(selectedScene?.start ?? 0)}><Icon name="skipBack" className="h-4 w-4" /></button>
+              <button className="transport-play" title="Play / pause (Space)" onClick={() => dispatch({ type: 'ui', patch: { isPlaying: !state.isPlaying } })}><Icon name={state.isPlaying ? 'pause' : 'play'} className="h-4 w-4" /></button>
+              <button className="transport-btn" title="Next scene" onClick={() => seekTo(selectedScene ? selectedScene.end : 0)}><Icon name="skipFwd" className="h-4 w-4" /></button>
+            </div>
+            <input
+              className="min-w-0 max-w-[420px] flex-1 accent-[#ff5c00]"
+              type="range"
+              min="0"
+              max={Math.max(0.05, totalDuration)}
+              step="0.05"
+              value={Math.min(state.currentTime, Math.max(0.05, totalDuration))}
+              onInput={(event) => seekTo(Number(event.target.value))}
+              onChange={(event) => seekTo(Number(event.target.value))}
+            />
+            <span className="w-[110px] text-right font-mono text-xs tabular-nums text-white/40">{formatTime(totalDuration)}</span>
+            <span className="max-w-[160px] truncate text-[11px] text-white/35">{renderStatus}</span>
+          </div>
+          {renderTimeline()}
+        </section>
+
+        <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/[0.08] bg-muvi-panel/80">
+          <div className="flex shrink-0 border-b border-white/[0.08]">
+            <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'inspector' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('inspector')}>Inspector</button>
+            <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'animation' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('animation')}>Animation</button>
+          </div>
+          <div className="border-b border-white/[0.08] px-4 py-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Selected</p>
+            <p className="truncate text-sm font-black">{selectedName}</p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {inspectorTab === 'inspector' ? renderInspectorTab() : renderAnimationTab()}
+          </div>
+        </aside>
+      </div>
+
+      <audio ref={audioRef} className="hidden" />
+    </div>
+  );
+}
+
+
+createRoot(document.getElementById('root')).render(<App />);

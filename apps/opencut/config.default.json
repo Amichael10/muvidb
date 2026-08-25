@@ -1,0 +1,457 @@
+{
+  "title": "MuviDB Weekly Picks Reel",
+  "duration": 30,
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "outputName": "muvidb-reel.mp4",
+  "coverName": "cover.png",
+  "assets": {
+    "logo": "assets/images/muvidb-logo.svg",
+    "background": ""
+  },
+  "theme": {
+    "backgroundColor": "#0B0D0E",
+    "overlayTop": "rgba(11,13,14,0.56)",
+    "overlayMid": "rgba(11,13,14,0.76)",
+    "overlayBottom": "rgba(11,13,14,0.95)",
+    "accent": "#FF5C00",
+    "text": "#FFFFFF",
+    "muted": "#FFD3B8"
+  },
+  "coverSceneId": "hook",
+  "scenes": [
+    {
+      "id": "hook",
+      "name": "Hook",
+      "start": 0,
+      "end": 7,
+      "background": {
+        "image": "",
+        "zoom": 1,
+        "x": 0,
+        "y": 0,
+        "animation": {
+          "type": "none"
+        }
+      },
+      "layers": [
+        {
+          "id": "brand-logo",
+          "type": "image",
+          "source": "assets/images/muvidb-logo.svg",
+          "x": 72,
+          "y": 72,
+          "width": 92,
+          "height": 92,
+          "opacity": 1
+        },
+        {
+          "id": "brand-text",
+          "type": "text",
+          "text": "MuviDB",
+          "x": 172,
+          "y": 92,
+          "width": 270,
+          "height": 44,
+          "fontSize": 30,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "align": "left",
+          "opacity": 1
+        },
+        {
+          "id": "pill",
+          "type": "pill",
+          "text": "new on muvidb.com",
+          "x": 246,
+          "y": 336,
+          "width": 588,
+          "height": 76,
+          "fontSize": 27,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "fill": "rgba(255,92,0,0.18)",
+          "stroke": "rgba(255,92,0,0.45)",
+          "opacity": 1
+        },
+        {
+          "id": "headline",
+          "type": "text",
+          "text": "3 Nollywood picks you can't miss this week",
+          "x": 84,
+          "y": 470,
+          "width": 912,
+          "height": 380,
+          "fontSize": 84,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "align": "center",
+          "lineHeight": 0.92,
+          "opacity": 1
+        },
+        {
+          "id": "bottom-note",
+          "type": "text",
+          "text": "rated by the MuviDB community",
+          "x": 84,
+          "y": 1330,
+          "width": 912,
+          "height": 70,
+          "fontSize": 38,
+          "weight": "semiBold",
+          "color": "#FFD3B8",
+          "align": "center",
+          "opacity": 1
+        }
+      ],
+      "transition": {
+        "type": "none",
+        "duration": 0
+      }
+    },
+    {
+      "id": "pick-1",
+      "name": "Pick #1",
+      "start": 7,
+      "end": 15,
+      "background": {
+        "image": "",
+        "zoom": 1,
+        "x": 0,
+        "y": 0,
+        "animation": {
+          "type": "none"
+        }
+      },
+      "layers": [
+        {
+          "id": "brand-logo",
+          "type": "image",
+          "source": "assets/images/muvidb-logo.svg",
+          "x": 72,
+          "y": 72,
+          "width": 92,
+          "height": 92,
+          "opacity": 1
+        },
+        {
+          "id": "brand-text",
+          "type": "text",
+          "text": "MuviDB",
+          "x": 172,
+          "y": 92,
+          "width": 270,
+          "height": 44,
+          "fontSize": 30,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "align": "left",
+          "opacity": 1
+        },
+        {
+          "id": "rank-pill",
+          "type": "pill",
+          "text": "PICK #1",
+          "x": 390,
+          "y": 420,
+          "width": 300,
+          "height": 76,
+          "fontSize": 30,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "fill": "rgba(255,92,0,0.9)",
+          "stroke": "rgba(255,255,255,0.2)",
+          "opacity": 1
+        },
+        {
+          "id": "card",
+          "type": "card",
+          "x": 72,
+          "y": 570,
+          "width": 936,
+          "height": 700,
+          "radius": 42,
+          "fill": "rgba(11,13,14,0.72)",
+          "stroke": "rgba(255,92,0,0.35)",
+          "opacity": 1
+        },
+        {
+          "id": "movie-title",
+          "type": "text",
+          "text": "Your Movie Title",
+          "x": 126,
+          "y": 660,
+          "width": 828,
+          "height": 220,
+          "fontSize": 84,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "align": "center",
+          "lineHeight": 0.92,
+          "opacity": 1
+        },
+        {
+          "id": "movie-meta",
+          "type": "text",
+          "text": "Drama  ·  2026  ·  ★ 8.4 on MuviDB",
+          "x": 126,
+          "y": 920,
+          "width": 828,
+          "height": 60,
+          "fontSize": 38,
+          "weight": "bold",
+          "color": "#FF5C00",
+          "align": "center",
+          "opacity": 1
+        },
+        {
+          "id": "movie-blurb",
+          "type": "text",
+          "text": "One sentence on why this film is unmissable goes right here.",
+          "x": 146,
+          "y": 1020,
+          "width": 788,
+          "height": 180,
+          "fontSize": 42,
+          "weight": "medium",
+          "color": "#FFD3B8",
+          "align": "center",
+          "lineHeight": 1.05,
+          "opacity": 1
+        }
+      ],
+      "transition": {
+        "type": "crossfade",
+        "duration": 0.45
+      }
+    },
+    {
+      "id": "pick-2",
+      "name": "Pick #2",
+      "start": 15,
+      "end": 23,
+      "background": {
+        "image": "",
+        "zoom": 1,
+        "x": 0,
+        "y": 0,
+        "animation": {
+          "type": "none"
+        }
+      },
+      "layers": [
+        {
+          "id": "brand-logo",
+          "type": "image",
+          "source": "assets/images/muvidb-logo.svg",
+          "x": 72,
+          "y": 72,
+          "width": 92,
+          "height": 92,
+          "opacity": 1
+        },
+        {
+          "id": "brand-text",
+          "type": "text",
+          "text": "MuviDB",
+          "x": 172,
+          "y": 92,
+          "width": 270,
+          "height": 44,
+          "fontSize": 30,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "align": "left",
+          "opacity": 1
+        },
+        {
+          "id": "rank-pill",
+          "type": "pill",
+          "text": "PICK #2",
+          "x": 390,
+          "y": 420,
+          "width": 300,
+          "height": 76,
+          "fontSize": 30,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "fill": "rgba(255,92,0,0.9)",
+          "stroke": "rgba(255,255,255,0.2)",
+          "opacity": 1
+        },
+        {
+          "id": "card",
+          "type": "card",
+          "x": 72,
+          "y": 570,
+          "width": 936,
+          "height": 700,
+          "radius": 42,
+          "fill": "rgba(11,13,14,0.72)",
+          "stroke": "rgba(255,92,0,0.35)",
+          "opacity": 1
+        },
+        {
+          "id": "movie-title",
+          "type": "text",
+          "text": "Second Movie Title",
+          "x": 126,
+          "y": 660,
+          "width": 828,
+          "height": 220,
+          "fontSize": 84,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "align": "center",
+          "lineHeight": 0.92,
+          "opacity": 1
+        },
+        {
+          "id": "movie-meta",
+          "type": "text",
+          "text": "Thriller  ·  2026  ·  ★ 7.9 on MuviDB",
+          "x": 126,
+          "y": 920,
+          "width": 828,
+          "height": 60,
+          "fontSize": 38,
+          "weight": "bold",
+          "color": "#FF5C00",
+          "align": "center",
+          "opacity": 1
+        },
+        {
+          "id": "movie-blurb",
+          "type": "text",
+          "text": "A short, punchy reason to watch — swap this text for your own.",
+          "x": 146,
+          "y": 1020,
+          "width": 788,
+          "height": 180,
+          "fontSize": 42,
+          "weight": "medium",
+          "color": "#FFD3B8",
+          "align": "center",
+          "lineHeight": 1.05,
+          "opacity": 1
+        }
+      ],
+      "transition": {
+        "type": "crossfade",
+        "duration": 0.45
+      }
+    },
+    {
+      "id": "close",
+      "name": "Close",
+      "start": 23,
+      "end": 30,
+      "background": {
+        "image": "",
+        "zoom": 1,
+        "x": 0,
+        "y": 0,
+        "animation": {
+          "type": "none"
+        }
+      },
+      "layers": [
+        {
+          "id": "brand-logo",
+          "type": "image",
+          "source": "assets/images/muvidb-logo.svg",
+          "x": 412,
+          "y": 620,
+          "width": 256,
+          "height": 256,
+          "opacity": 1
+        },
+        {
+          "id": "brand-text",
+          "type": "text",
+          "text": "MuviDB",
+          "x": 84,
+          "y": 910,
+          "width": 912,
+          "height": 70,
+          "fontSize": 60,
+          "weight": "heavy",
+          "color": "#FFFFFF",
+          "align": "center",
+          "opacity": 1
+        },
+        {
+          "id": "cta",
+          "type": "text",
+          "text": "Rate films, write reviews, build your library",
+          "x": 84,
+          "y": 1020,
+          "width": 912,
+          "height": 110,
+          "fontSize": 38,
+          "weight": "semiBold",
+          "color": "#FF5C00",
+          "align": "center",
+          "opacity": 1
+        },
+        {
+          "id": "handle",
+          "type": "pill",
+          "text": "muvidb.com",
+          "x": 330,
+          "y": 1170,
+          "width": 420,
+          "height": 72,
+          "fontSize": 28,
+          "weight": "bold",
+          "color": "#FFFFFF",
+          "fill": "rgba(255,92,0,0.18)",
+          "stroke": "rgba(255,92,0,0.45)",
+          "opacity": 1
+        }
+      ],
+      "transition": {
+        "type": "crossfade",
+        "duration": 0.45
+      }
+    }
+  ],
+  "fonts": {
+    "defaultFamily": "Manrope",
+    "families": [
+      {
+        "id": "Manrope",
+        "label": "Manrope"
+      },
+      {
+        "id": "Inter",
+        "label": "Inter"
+      },
+      {
+        "id": "InstrumentSans",
+        "label": "Instrument Sans"
+      },
+      {
+        "id": "Georgia",
+        "label": "Georgia"
+      },
+      {
+        "id": "Palatino",
+        "label": "Palatino"
+      },
+      {
+        "id": "Baskerville",
+        "label": "Baskerville"
+      },
+      {
+        "id": "TimesNewRoman",
+        "label": "Times New Roman"
+      },
+      {
+        "id": "NewYork",
+        "label": "New York Serif"
+      }
+    ]
+  }
+}

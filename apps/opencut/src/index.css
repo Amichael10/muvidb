@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: Manrope;
+  src: url('/assets/fonts/Manrope-Regular.ttf') format('truetype');
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: Manrope;
+  src: url('/assets/fonts/Manrope-Bold.ttf') format('truetype');
+  font-weight: 800;
+}
+
+@font-face {
+  font-family: Inter;
+  src: url('/assets/fonts/Inter-Regular.ttf') format('truetype');
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url('/assets/fonts/InstrumentSans-Bold.ttf') format('truetype');
+  font-weight: 800;
+}
+
+@layer base {
+  :root {
+    --studio-bg: #0e0f11;
+    --studio-panel: #16181c;
+    --studio-panel-2: #1c1f24;
+    --studio-line: rgba(255, 255, 255, 0.08);
+    --studio-accent: #ff5c00;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply m-0 min-h-screen font-sans text-white antialiased;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(255, 92, 0, 0.08), transparent 55%),
+      radial-gradient(900px 500px at 90% 0%, rgba(56, 189, 248, 0.05), transparent 50%),
+      var(--studio-bg);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply overflow-auto rounded-xl border border-white/10 bg-muvi-panel/95 p-4;
+  }
+
+  .control {
+    @apply min-h-[34px] w-full rounded-md border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-[13px] text-white outline-none transition placeholder:text-white/30 focus:border-muvi-accent/60 focus:bg-black/40;
+  }
+
+  .label {
+    @apply mb-2.5 grid gap-1 text-[11px] font-medium text-muvi-muted;
+  }
+
+  .btn {
+    @apply min-h-[34px] rounded-md border border-white/[0.08] bg-white/[0.06] px-2.5 py-1.5 text-[13px] text-white transition hover:bg-white/[0.11] disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .btn-accent {
+    @apply min-h-[34px] rounded-md border border-transparent bg-muvi-accent px-3 py-1.5 text-[13px] font-bold text-white transition hover:bg-muvi-brand disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply min-h-[30px] rounded-md border border-transparent bg-transparent px-2 py-1 text-[12px] text-muvi-muted transition hover:bg-white/[0.08] hover:text-white disabled:opacity-40;
+  }
+
+  .section {
+    @apply mt-3 border-t border-white/[0.08] pt-3;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-muvi-muted transition hover:bg-white/[0.1] hover:text-white;
+  }
+
+  .chip-active {
+    @apply border-muvi-accent/50 bg-muvi-accent/20 text-white;
+  }
+
+  .studio-rail-btn {
+    @apply flex w-full flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-[9px] font-semibold tracking-wide transition;
+  }
+
+  .track-row {
+    @apply relative flex items-stretch;
+  }
+
+  .track-row-drop {
+    @apply before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:z-20 before:h-0.5 before:bg-muvi-accent before:content-[''];
+  }
+
+  .clip-bar {
+    @apply absolute top-0.5 bottom-0.5 flex cursor-grab items-center overflow-hidden rounded-md px-2 shadow-sm active:cursor-grabbing;
+  }
+
+  .transport-btn {
+    @apply grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.06] text-white transition hover:bg-white/[0.12];
+  }
+
+  .transport-play {
+    @apply grid h-10 w-10 place-items-center rounded-full bg-muvi-accent text-white shadow-[0_0_0_4px_rgba(255,92,0,0.15)] transition hover:bg-muvi-brand;
+  }
+
+  [draggable="true"] {
+    user-select: none;
+  }
+}
