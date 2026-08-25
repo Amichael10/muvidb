@@ -4,10 +4,10 @@ import { enrichMissingSynopsesConcurrent } from '../api/_lib/cohere_enrichment.j
 export async function runAIMaintenanceDirect() {
   console.log('[AI Maintenance] Running directly in GitHub Actions...');
 
-  const extractCast = await runCastExtraction({ limit: 90 });
-  const cleanupTitles = await runTitleCleanup({ limit: 250 });
+  const extractCast = await runCastExtraction({ limit: 50 });
+  const cleanupTitles = await runTitleCleanup({ limit: 150 });
   const synopsisCandidates = await enrichMissingSynopsesConcurrent(undefined, {
-    batchLimit: 100,
+    batchLimit: 60,
     throwOnFailure: true,
   });
 

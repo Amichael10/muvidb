@@ -297,6 +297,7 @@ jobs:
 
       - name: AI Maintenance (Extract Cast + Title Cleanup)
         if: github.event.schedule == '0 2,14 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'ai_maintenance'))
+        timeout-minutes: 30
         run: |
           echo "Running AI Maintenance directly (Extract Cast → Title Cleanup → Synopses)..."
           npx tsx scripts/run-ai-maintenance.ts
@@ -316,7 +317,7 @@ jobs:
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
 
       - name: Install System and Python Dependencies for Local OCR
-        if: github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'credits_enrichment' || github.event.inputs.task == 'ai_maintenance')
+        if: github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'credits_enrichment')
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg tesseract-ocr libgl1 libglib2.0-0
@@ -325,7 +326,7 @@ jobs:
         continue-on-error: true
 
       - name: Run Hybrid Credit Enrichment (TMDB + Local OCR Fallback)
-        if: github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'credits_enrichment' || github.event.inputs.task == 'ai_maintenance')
+        if: github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'credits_enrichment')
         run: |
           echo "Running local OCR Cast & Crew Extraction on incomplete YouTube videos..."
           npx tsx scripts/batch_enrich_credits.ts

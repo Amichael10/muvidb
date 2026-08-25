@@ -230,25 +230,30 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
   `;
 
   const titleChanges: any[] = [];
+  let titlesApplied = 0;
   for (let offset = 0; offset < messyFilms.length; offset += 25) {
     const batch = messyFilms.slice(offset, offset + 25);
     const { text: titleText } = await generateAIContent(buildTitlePrompt(batch), { preferredProvider: 'cohere' });
     const titleParsed = parseJSON(titleText);
     if (Array.isArray(titleParsed)) {
-      titleChanges.push(...titleParsed.filter((f: any) =>
-        f.old_title && f.new_title && f.old_title.trim() !== f.new_title.trim()
-      ));
+      const batchIds = new Set(batch.map((film) => film.id));
+      const batchChanges = titleParsed.filter((f: any) =>
+        batchIds.has(f.id)
+        && f.old_title
+        && f.new_title
+        && f.old_title.trim() !== f.new_title.trim()
+      );
+      const updateResults = await Promise.all(
+        batchChanges.map((item: any) =>
+          supabase.from('films').update({ title: item.new_title.trim() }).eq('id', item.id)
+        )
+      );
+      titlesApplied += updateResults.filter((res: any) => !res.error).length;
+      titleChanges.push(...batchChanges);
+      console.log(
+        `[AI Maintenance] Title batch ${Math.floor(offset / 25) + 1}/${Math.ceil(messyFilms.length / 25)} committed (${titlesApplied} total updates)`,
+      );
     }
-  }
-
-  let titlesApplied = 0;
-  const titleUpdatePromises = titleChanges.map((item: any) => 
-    supabase.from('films').update({ title: item.new_title }).eq('id', item.id)
-  );
-
-  if (titleUpdatePromises.length > 0) {
-    const updateResults = await Promise.all(titleUpdatePromises);
-    titlesApplied = updateResults.filter((res: any) => !res.error).length;
   }
   
   return {
