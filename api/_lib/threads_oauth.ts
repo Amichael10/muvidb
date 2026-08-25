@@ -563,7 +563,7 @@ export async function createTikTokAuthorizationUrl(req: VercelRequest, actor: So
   });
   if (error) throw error;
 
-  const scopes = String(process.env.TIKTOK_SCOPES || 'user.info.basic').trim();
+  const scopes = String(process.env.TIKTOK_SCOPES || 'user.info.basic,video.publish,video.upload').trim();
   const url = new URL('https://www.tiktok.com/v2/auth/authorize/');
   url.searchParams.set('client_key', clientKey);
   url.searchParams.set('scope', scopes);
@@ -611,6 +611,11 @@ export async function completeTikTokOAuth(req: VercelRequest): Promise<string> {
 
   const accessToken = res.access_token || res.data?.access_token;
   const openId = res.open_id || res.data?.open_id;
+  const grantedScopeValue = String(res.scope || res.data?.scope || '');
+  const grantedScopes = grantedScopeValue
+    .split(/[\s,]+/)
+    .map((scope: string) => scope.trim())
+    .filter(Boolean);
   if (!accessToken) throw httpError(502, 'TikTok did not return an access token');
 
   const userRes = await threadsFetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name', {
@@ -626,7 +631,7 @@ export async function completeTikTokOAuth(req: VercelRequest): Promise<string> {
     accessToken,
     profileImageUrl: userInfo.avatar_url || null,
     actorId: state.actorId,
-    grantedScopes: ['user.info.basic', 'video.publish', 'video.upload'],
+    grantedScopes: grantedScopes.length ? grantedScopes : ['user.info.basic'],
   });
 
   const target = new URL('/admin/social', requestOrigin(req));

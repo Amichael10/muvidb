@@ -186,6 +186,46 @@ export async function uploadAdminSocialImage(file, bucket = 'film-images') {
   return { url: `${base}/storage/v1/object/public/${bucket}/${path}` };
 }
 
+const MAX_SOCIAL_VIDEO_BYTES = 50 * 1024 * 1024;
+
+async function hasMp4MagicBytes(file) {
+  const bytes = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+  // ISO base media files (MP4/MOV) expose an `ftyp` box near the beginning.
+  return bytes.length >= 12
+    && bytes[4] === 0x66
+    && bytes[5] === 0x74
+    && bytes[6] === 0x79
+    && bytes[7] === 0x70;
+}
+
+// Social videos are already compressed media. Upload the original MP4 without
+// canvas processing, while still checking its MIME, size and file signature.
+export async function uploadAdminSocialVideo(file, bucket = 'social-published-assets') {
+  if (!file) return { error: 'No video selected.' };
+  if (file.type !== 'video/mp4') return { error: 'Use an MP4 video for reliable publishing across Meta platforms.' };
+  if (file.size > MAX_SOCIAL_VIDEO_BYTES) return { error: 'Video uploads are limited to 50 MB in Social Studio.' };
+  if (!(await hasMp4MagicBytes(file))) return { error: "That file doesn't look like a valid MP4 video." };
+
+  const path = `social/${crypto.randomUUID()}.mp4`;
+  const { error: upErr } = await supabase.storage
+    .from(bucket)
+    .upload(path, file, {
+      contentType: 'video/mp4',
+      upsert: false,
+      cacheControl: '31536000',
+    });
+  if (upErr) return { error: upErr.message };
+
+  const base = import.meta.env.VITE_SUPABASE_URL || '';
+  return { url: `${base}/storage/v1/object/public/${bucket}/${path}`, mediaType: 'video' };
+}
+
+export async function uploadAdminSocialMedia(file, bucket = 'social-published-assets') {
+  if (file?.type?.startsWith('video/')) return uploadAdminSocialVideo(file, bucket);
+  const result = await uploadAdminSocialImage(file, bucket);
+  return result.error ? result : { ...result, mediaType: 'image' };
+}
+
 // Short-lived signed URL so an admin can preview a quarantined image.
 export async function signedContributionUrl(path) {
   if (!path) return null;

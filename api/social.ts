@@ -117,6 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       attachCarouselAssets,
       reorderCarouselAssets,
       updateSocialVariantCaption,
+      updateSocialVariantOptions,
       prepareSocialContentItemForEdit,
       updateSocialContentItemDraft,
       deleteSocialContentItem,
@@ -353,22 +354,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'attach_carousel_assets') {
         const actor = await requireSocialStudioAdmin(req);
-        const { contentItemId, publicUrls, format, width, height } = req.body || {};
-        if (!contentItemId || !Array.isArray(publicUrls)) {
-          return res.status(400).json({ error: 'contentItemId and publicUrls are required' });
+        const { contentItemId, publicUrls, assets, format, width, height } = req.body || {};
+        if (!contentItemId || (!Array.isArray(publicUrls) && !Array.isArray(assets))) {
+          return res.status(400).json({ error: 'contentItemId and carousel assets are required' });
         }
         return res.status(200).json(
-          await attachCarouselAssets({ contentItemId, publicUrls, format, width, height }, actor),
+          await attachCarouselAssets({ contentItemId, publicUrls, assets, format, width, height }, actor),
         );
       }
 
       if (task === 'reorder_carousel_assets') {
         const actor = await requireSocialStudioAdmin(req);
-        const { contentItemId, publicUrls } = req.body || {};
-        if (!contentItemId || !Array.isArray(publicUrls)) {
-          return res.status(400).json({ error: 'contentItemId and publicUrls are required' });
+        const { contentItemId, publicUrls, assets } = req.body || {};
+        if (!contentItemId || (!Array.isArray(publicUrls) && !Array.isArray(assets))) {
+          return res.status(400).json({ error: 'contentItemId and carousel assets are required' });
         }
-        return res.status(200).json(await reorderCarouselAssets({ contentItemId, publicUrls }, actor));
+        return res.status(200).json(await reorderCarouselAssets({ contentItemId, publicUrls, assets }, actor));
       }
 
       if (task === 'update_variant_caption') {
@@ -381,6 +382,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'caption is required' });
         }
         return res.status(200).json(await updateSocialVariantCaption({ variantId, caption }, actor));
+      }
+
+      if (task === 'update_variant_options') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { variantId, options } = req.body || {};
+        if (typeof variantId !== 'string' || !variantId || !options || typeof options !== 'object') {
+          return res.status(400).json({ error: 'variantId and options are required' });
+        }
+        return res.status(200).json(await updateSocialVariantOptions({ variantId, options }, actor));
       }
 
       if (task === 'prepare_queue_item_edit') {

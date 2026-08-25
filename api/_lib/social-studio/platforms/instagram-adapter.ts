@@ -164,7 +164,10 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
 
     if (mediaUrls.length > 1) {
       const childIds: string[] = [];
-      for (const mediaUrl of mediaUrls) {
+      const carouselAssets = Array.isArray(request.options?.carousel_assets)
+        ? request.options.carousel_assets as Array<{ url?: string; alt_text?: string }>
+        : [];
+      for (const [index, mediaUrl] of mediaUrls.entries()) {
         const childParams = new URLSearchParams({ is_carousel_item: 'true' });
         const childIsVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(mediaUrl);
         if (childIsVideo) {
@@ -173,6 +176,8 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
         } else {
           childParams.set('image_url', mediaUrl);
         }
+        const altText = String(carouselAssets[index]?.alt_text || '').trim();
+        if (altText) childParams.set('alt_text', altText.slice(0, 1000));
         const child = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, childParams);
         if (!child.id) {
           throw new SocialPlatformError({

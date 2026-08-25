@@ -406,7 +406,10 @@ export default function AdminSocialStudio() {
       setScheduleAt(current => ({ ...current, [contentItemId]: '' }));
       refreshAll();
     } catch (err) {
-      toast.error(err.message || 'Scheduling failed');
+      const message = err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String(err?.message || ''))
+        ? 'MuviDB could not reach the scheduling service. Your draft is safe—check your connection and try again.'
+        : err.message || 'This post could not be scheduled. Your draft is still saved.';
+      toast.error(message, { duration: 7000 });
     } finally {
       setReviewingId(null);
     }

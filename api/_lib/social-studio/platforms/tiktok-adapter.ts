@@ -83,64 +83,131 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
+    const mediaUrls = (request.assetUrls?.length ? request.assetUrls : [request.assetUrl]).filter(Boolean) as string[];
+    if (mediaUrls.length > 35) {
+      throw new SocialPlatformError({
+        platform: 'tiktok',
+        code: 'tiktok_photo_carousel_too_large',
+        message: 'TikTok photo carousels can contain no more than 35 images.',
+      });
+    }
+    if (mediaUrls.length > 1 && mediaUrls.some(url => /\.(mp4|mov|webm)(\?.*)?$/i.test(url))) {
+      throw new SocialPlatformError({
+        platform: 'tiktok',
+        code: 'tiktok_photo_carousel_images_only',
+        message: 'TikTok carousel publishing supports images only.',
+      });
+    }
     const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(request.assetUrl);
-    const title = (request.title || request.caption || '').slice(0, 150);
+    const settings = (request.options?.tiktok || {}) as Record<string, any>;
+    const postMode = settings.post_mode === 'MEDIA_UPLOAD' ? 'MEDIA_UPLOAD' : 'DIRECT_POST';
+    let creatorInfo: Record<string, any> = {};
+    if (postMode === 'DIRECT_POST') {
+      const creator = await this.postJson('/post/publish/creator_info/query/', {});
+      creatorInfo = creator.data || {};
+    }
+    const privacyOptions = Array.isArray(creatorInfo.privacy_level_options)
+      ? creatorInfo.privacy_level_options
+      : [];
+    const requestedPrivacy = String(settings.privacy_level || 'PUBLIC_TO_EVERYONE');
+    const privacyLevel = privacyOptions.length && !privacyOptions.includes(requestedPrivacy)
+      ? (privacyOptions.includes('SELF_ONLY') ? 'SELF_ONLY' : privacyOptions[0])
+      : requestedPrivacy;
+    const commonDisclosure = {
+      brand_content_toggle: Boolean(settings.brand_content_toggle),
+      brand_organic_toggle: Boolean(settings.brand_organic_toggle),
+    };
 
     // 1. Direct Video Publish / Upload
     if (isVideo) {
-      const payload = {
-        post_info: {
-          title,
-          privacy_level: 'PUBLIC_TO_EVERYONE',
-          disable_duet: false,
-          disable_stitch: false,
-          disable_comment: false,
-          video_cover_timestamp_ms: 1000,
-        },
-        source_info: {
-          source: 'PULL_FROM_URL',
-          video_url: request.assetUrl,
-        },
+      const sourceInfo = {
+        source: 'PULL_FROM_URL',
+        video_url: request.assetUrl,
       };
+      const payload = postMode === 'MEDIA_UPLOAD'
+        ? { source_info: sourceInfo }
+        : {
+          post_info: {
+            title: String(request.caption || request.title || '').slice(0, 2200),
+            privacy_level: privacyLevel,
+            disable_duet: Boolean(settings.disable_duet || creatorInfo.duet_disabled),
+            disable_stitch: Boolean(settings.disable_stitch || creatorInfo.stitch_disabled),
+            disable_comment: Boolean(settings.disable_comment || creatorInfo.comment_disabled),
+            video_cover_timestamp_ms: Math.max(0, Math.floor(Number(settings.video_cover_timestamp_ms) || 0)),
+            ...commonDisclosure,
+            is_aigc: Boolean(settings.is_aigc),
+          },
+          source_info: sourceInfo,
+        };
 
-      const res = await this.postJson('/post/publish/video/init/', payload);
-      const publishId = res.data?.publish_id || `tiktok_pub_${Date.now()}`;
+      const endpoint = postMode === 'MEDIA_UPLOAD'
+        ? '/post/publish/inbox/video/init/'
+        : '/post/publish/video/init/';
+      const res = await this.postJson(endpoint, payload);
+      const publishId = res.data?.publish_id;
+      if (!publishId) {
+        throw new SocialPlatformError({
+          platform: 'tiktok',
+          code: 'tiktok_publish_id_missing',
+          message: 'TikTok accepted the video request but did not return a publish ID.',
+        });
+      }
 
       return {
         platform: 'tiktok',
         providerPublishId: publishId,
         externalPostId: publishId,
         externalPermalink: null,
-        providerResponse: res,
-        variantStatus: 'published',
+        providerResponse: { ...res, creator_info: creatorInfo, delivery_mode: postMode },
+        variantStatus: postMode === 'MEDIA_UPLOAD' ? 'uploaded_as_draft' : 'published',
       };
     }
 
-    // 2. Direct Photo Carousel Post
+    // 2. Direct Photo / Photo Carousel Post
+    const photoPostInfo: Record<string, unknown> = {
+      title: String(request.title || '').slice(0, 90),
+      description: String(request.caption || '').slice(0, 4000),
+    };
+    if (postMode === 'DIRECT_POST') {
+      Object.assign(photoPostInfo, {
+        privacy_level: privacyLevel,
+        disable_comment: Boolean(settings.disable_comment || creatorInfo.comment_disabled),
+        auto_add_music: Boolean(settings.auto_add_music),
+        ...commonDisclosure,
+      });
+    }
+
     const photoPayload = {
       media_type: 'PHOTO',
-      post_mode: 'DIRECT_POST',
-      post_info: {
-        title,
-        description: request.caption,
-        privacy_level: 'PUBLIC_TO_EVERYONE',
-      },
+      post_mode: postMode,
+      post_info: photoPostInfo,
       source_info: {
         source: 'PULL_FROM_URL',
-        photo_images: [request.assetUrl],
+        photo_images: mediaUrls,
+        photo_cover_index: Math.min(
+          mediaUrls.length - 1,
+          Math.max(0, Math.floor(Number(settings.photo_cover_index) || 0)),
+        ),
       },
     };
 
     const res = await this.postJson('/post/publish/content/init/', photoPayload);
-    const publishId = res.data?.publish_id || `tiktok_photo_${Date.now()}`;
+    const publishId = res.data?.publish_id;
+    if (!publishId) {
+      throw new SocialPlatformError({
+        platform: 'tiktok',
+        code: 'tiktok_publish_id_missing',
+        message: 'TikTok accepted the photo request but did not return a publish ID.',
+      });
+    }
 
     return {
       platform: 'tiktok',
       providerPublishId: publishId,
       externalPostId: publishId,
       externalPermalink: null,
-      providerResponse: res,
-      variantStatus: 'uploaded_as_draft',
+      providerResponse: { ...res, creator_info: creatorInfo, delivery_mode: postMode },
+      variantStatus: postMode === 'MEDIA_UPLOAD' ? 'uploaded_as_draft' : 'published',
     };
   }
 }

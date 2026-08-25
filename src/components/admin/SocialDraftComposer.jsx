@@ -3,7 +3,7 @@ import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
-import { uploadAdminSocialImage } from '../../lib/imageUpload';
+import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 
 export const EDITORIAL_THEMES = [
   {
@@ -134,6 +134,38 @@ const CAPTION_LIMITS = {
   tiktok: 2200,
 };
 
+const DEFAULT_TIKTOK_SETTINGS = {
+  privacy_level: 'PUBLIC_TO_EVERYONE',
+  post_mode: 'DIRECT_POST',
+  disable_comment: false,
+  disable_duet: false,
+  disable_stitch: false,
+  auto_add_music: true,
+  brand_content_toggle: false,
+  brand_organic_toggle: false,
+  is_aigc: false,
+  photo_cover_index: 0,
+  video_cover_timestamp_ms: 1000,
+};
+
+function carouselLimitFor(platforms) {
+  if (platforms.includes('instagram') || platforms.includes('facebook')) return 10;
+  if (platforms.includes('threads')) return 20;
+  if (platforms.includes('tiktok')) return 35;
+  return 10;
+}
+
+function mediaTypeForFile(file) {
+  return file?.type?.startsWith('video/') ? 'video' : 'image';
+}
+
+function readableNetworkError(error, action) {
+  if (error instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String(error?.message || ''))) {
+    return `MuviDB could not reach the server while ${action}. Check your connection, then try again. Your draft is still saved.`;
+  }
+  return error?.message || `Could not finish ${action}. Your draft is still saved.`;
+}
+
 export default function SocialDraftComposer({
   disabled,
   onGenerated,
@@ -156,8 +188,10 @@ export default function SocialDraftComposer({
   const [carouselAssets, setCarouselAssets] = useState([]);
   const [uploadingCustom, setUploadingCustom] = useState(false);
   const [reorderingCarousel, setReorderingCarousel] = useState(false);
+  const [replaceSlideIndex, setReplaceSlideIndex] = useState(null);
   const [scheduling, setScheduling] = useState(false);
   const [customScheduleDate, setCustomScheduleDate] = useState('');
+  const [tiktokSettings, setTikTokSettings] = useState(DEFAULT_TIKTOK_SETTINGS);
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
 
@@ -175,6 +209,7 @@ export default function SocialDraftComposer({
   }, [slotContext]);
 
   const activeTheme = useMemo(() => EDITORIAL_THEMES.find(t => t.id === themeId) || EDITORIAL_THEMES[0], [themeId]);
+  const carouselLimit = carouselLimitFor(platforms);
 
   useEffect(() => {
     setSelected(null);
@@ -262,6 +297,11 @@ export default function SocialDraftComposer({
         })),
       };
       setResult(normalized);
+      const tiktokVariant = normalized.variants.find(variant => variant.platform === 'tiktok');
+      setTikTokSettings({
+        ...DEFAULT_TIKTOK_SETTINGS,
+        ...(tiktokVariant?.platform_options?.tiktok || {}),
+      });
       setCaptionDrafts(Object.fromEntries(normalized.variants.map(variant => [variant.id, variant.caption || ''])));
       setActivePreviewPlatform(normalized.variants?.[0]?.platform || platforms[0] || 'instagram');
       toast.success(`Draft generated with ${normalized.variants?.length || 0} variant(s)!`);
@@ -275,46 +315,81 @@ export default function SocialDraftComposer({
 
   const handleCustomImageUpload = async event => {
     const files = Array.from(event.target.files || []);
-    if (!files.length || !result?.contentItem?.id) return;
+    if (!files.length || !result?.contentItem?.id) {
+      setReplaceSlideIndex(null);
+      return;
+    }
     setUploadingCustom(true);
     try {
       if (postFormat === 'carousel') {
-        if (files.length < 2 || files.length > 10) {
-          throw new Error('Choose between 2 and 10 images for a carousel');
+        if (replaceSlideIndex !== null && files.length !== 1) {
+          throw new Error('Choose one file to replace this carousel item');
         }
-        if (platforms.includes('tiktok')) {
-          throw new Error('Carousel publishing is available for Instagram, Facebook, and Threads. Remove TikTok first.');
+        const projectedCount = replaceSlideIndex === null
+          ? carouselAssets.length + files.length
+          : carouselAssets.length;
+        if (projectedCount < 2 || projectedCount > carouselLimit) {
+          throw new Error(`Choose enough media for 2–${carouselLimit} carousel items on the selected platforms`);
+        }
+        const containsVideo = files.some(file => mediaTypeForFile(file) === 'video')
+          || carouselAssets.some(asset => asset.mediaType === 'video');
+        if (containsVideo && platforms.includes('facebook')) {
+          throw new Error('Facebook Page carousels support images only. Remove Facebook or use only images.');
+        }
+        if (containsVideo && platforms.includes('tiktok')) {
+          throw new Error('TikTok photo carousels support images only. Remove TikTok or use only images.');
         }
 
-        const publicUrls = [];
+        const uploadedAssets = [];
         for (const file of files) {
-          const uploadRes = await uploadAdminSocialImage(file, 'film-images');
+          const uploadRes = await uploadAdminSocialMedia(file, 'social-published-assets');
           if (uploadRes.error) throw new Error(`${file.name}: ${uploadRes.error}`);
-          publicUrls.push(uploadRes.url);
+          uploadedAssets.push({
+            id: uploadRes.url,
+            publicUrl: uploadRes.url,
+            mediaType: uploadRes.mediaType || mediaTypeForFile(file),
+            altText: '',
+          });
         }
+
+        const nextAssets = replaceSlideIndex === null
+          ? [...carouselAssets, ...uploadedAssets]
+          : carouselAssets.map((asset, index) => index === replaceSlideIndex ? uploadedAssets[0] : asset);
 
         const res = await fetch('/api/social?task=attach_carousel_assets', {
           method: 'POST',
           headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contentItemId: result.contentItem.id, publicUrls }),
+          body: JSON.stringify({
+            contentItemId: result.contentItem.id,
+            assets: nextAssets.map(asset => ({
+              url: asset.publicUrl,
+              mediaType: asset.mediaType,
+              altText: asset.altText || '',
+            })),
+          }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
         const attached = (data.assets || []).map((asset, index) => ({
           id: asset.id,
-          publicUrl: asset.public_url,
-          format: 'carousel_image',
+          publicUrl: asset.publicUrl || asset.public_url,
+          mediaType: asset.mediaType || 'image',
+          altText: asset.altText || '',
+          format: asset.mediaType === 'video' ? 'carousel_video' : 'carousel_image',
           width: asset.width || 1080,
           height: asset.height || 1080,
           position: index,
         }));
         setCarouselAssets(attached);
-        toast.success(`${attached.length}-image carousel attached to this draft`);
+        toast.success(replaceSlideIndex === null
+          ? `${attached.length}-item carousel attached to this draft`
+          : `Carousel item ${replaceSlideIndex + 1} replaced`);
+        setReplaceSlideIndex(null);
         return;
       }
 
-      const uploadRes = await uploadAdminSocialImage(files[0], 'social-published-assets');
+      const uploadRes = await uploadAdminSocialMedia(files[0], 'social-published-assets');
       if (uploadRes.error) throw new Error(uploadRes.error);
       const url = uploadRes.url;
 
@@ -324,25 +399,27 @@ export default function SocialDraftComposer({
         body: JSON.stringify({
           contentItemId: result.contentItem.id,
           publicUrl: url,
+          format: uploadRes.mediaType === 'video' ? 'video_vertical_9_16' : 'square_1_1',
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      toast.success('Custom artwork uploaded and attached to this draft!');
+      toast.success(`${uploadRes.mediaType === 'video' ? 'Video' : 'Custom artwork'} uploaded and attached to this draft!`);
       setResult(curr => ({
         ...curr,
         assets: [
-          { id: data.id, publicUrl: url, format: 'custom_design', width: data.width || 1080, height: data.height || 1080 },
+          { id: data.id, publicUrl: url, mediaType: uploadRes.mediaType || 'image', format: uploadRes.mediaType === 'video' ? 'custom_video' : 'custom_design', width: data.width || 1080, height: data.height || 1080 },
           ...(curr?.assets || []),
         ],
         variants: (curr?.variants || []).map(variant => ({ ...variant, selected_asset_id: data.id })),
       }));
-      onGenerated?.({ ...result, assets: [{ id: data.id, publicUrl: url, format: 'custom_design', width: data.width || 1080, height: data.height || 1080 }, ...(result.assets || [])] });
+      onGenerated?.({ ...result, assets: [{ id: data.id, publicUrl: url, mediaType: uploadRes.mediaType || 'image', format: uploadRes.mediaType === 'video' ? 'custom_video' : 'custom_design', width: data.width || 1080, height: data.height || 1080 }, ...(result.assets || [])] });
     } catch (err) {
       toast.error(err.message || 'Failed to upload custom design');
     } finally {
       setUploadingCustom(false);
+      setReplaceSlideIndex(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -389,8 +466,29 @@ export default function SocialDraftComposer({
     }
   };
 
+  const persistTikTokSettings = async () => {
+    const variant = result?.variants?.find(entry => entry.platform === 'tiktok');
+    if (!variant) return;
+    const res = await fetch('/api/social?task=update_variant_options', {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variantId: variant.id, options: { tiktok: tiktokSettings } }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `TikTok settings could not be saved (HTTP ${res.status})`);
+    setResult(current => ({
+      ...current,
+      variants: (current?.variants || []).map(entry => entry.id === variant.id
+        ? { ...entry, platform_options: data.platformOptions }
+        : entry),
+    }));
+  };
+
   const handleSchedule = async (preset, customValue) => {
     if (!result?.contentItem?.id) return;
+    if (postFormat === 'carousel' && carouselAssets.length < 2) {
+      return toast.error('Add at least 2 media items before scheduling this carousel');
+    }
     let targetDate = new Date();
     if (preset === 'today_6pm') {
       targetDate.setHours(18, 0, 0, 0);
@@ -411,6 +509,7 @@ export default function SocialDraftComposer({
     setScheduling(true);
     try {
       await savePendingCaptions();
+      await persistTikTokSettings();
       const res = await fetch('/api/social?task=schedule', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -424,7 +523,7 @@ export default function SocialDraftComposer({
       toast.success(`Post scheduled for ${targetDate.toLocaleString()}!`);
       onGenerated?.(result);
     } catch (err) {
-      toast.error(err.message || 'Scheduling failed');
+      toast.error(readableNetworkError(err, 'scheduling this post'), { duration: 7000 });
     } finally {
       setScheduling(false);
     }
@@ -444,7 +543,11 @@ export default function SocialDraftComposer({
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contentItemId: result.contentItem.id,
-          publicUrls: next.map(asset => asset.publicUrl),
+          assets: next.map(asset => ({
+            url: asset.publicUrl,
+            mediaType: asset.mediaType,
+            altText: asset.altText || '',
+          })),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -454,6 +557,52 @@ export default function SocialDraftComposer({
       toast.error(err.message || 'Could not change the slide order');
     } finally {
       setReorderingCarousel(false);
+    }
+  };
+
+  const persistCarouselAssets = async (next, successMessage) => {
+    const res = await fetch('/api/social?task=attach_carousel_assets', {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contentItemId: result.contentItem.id,
+        assets: next.map(asset => ({
+          url: asset.publicUrl,
+          mediaType: asset.mediaType,
+          altText: asset.altText || '',
+        })),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    setCarouselAssets(next.map((asset, index) => ({ ...asset, position: index })));
+    if (successMessage) toast.success(successMessage);
+  };
+
+  const removeCarouselSlide = async index => {
+    if (carouselAssets.length <= 2) {
+      toast.error('A carousel must keep at least 2 items. Replace this item or switch to a single post.');
+      return;
+    }
+    const removed = carouselAssets[index];
+    const next = carouselAssets.filter((_, itemIndex) => itemIndex !== index);
+    setReorderingCarousel(true);
+    try {
+      await persistCarouselAssets(next, `${removed.mediaType === 'video' ? 'Video' : 'Image'} removed from carousel`);
+    } catch (err) {
+      toast.error(err.message || 'Could not remove this carousel item');
+    } finally {
+      setReorderingCarousel(false);
+    }
+  };
+
+  const saveCarouselAltText = async (index, altText) => {
+    const next = carouselAssets.map((asset, itemIndex) => itemIndex === index ? { ...asset, altText } : asset);
+    setCarouselAssets(next);
+    try {
+      await persistCarouselAssets(next);
+    } catch (err) {
+      toast.error(err.message || 'Could not save the media description');
     }
   };
 
@@ -744,25 +893,28 @@ export default function SocialDraftComposer({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold text-text-primary">
-                      {postFormat === 'carousel' ? 'Upload all carousel slides together' : 'Use your poster as the complete post image'}
+                      {postFormat === 'carousel' ? 'Build an image or video carousel' : 'Use an image or MP4 as the complete post'}
                     </p>
                     <p className="mt-1 text-[10px] text-text-muted">
                       {postFormat === 'carousel'
-                        ? 'Choose 2–10 images. You can reorder them after upload.'
-                        : 'Your upload replaces the entire generated graphic; it will not be placed inside the template.'}
+                        ? `Add up to ${carouselLimit} items for the selected channels. Instagram supports 10; Threads supports 20. Facebook and TikTok carousels are image-only.`
+                        : 'Your upload replaces the entire generated graphic. MP4 videos are supported up to 50 MB.'}
                     </p>
                   </div>
                   <input
                     type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    multiple={postFormat === 'carousel'}
+                    accept="image/png,image/jpeg,image/webp,video/mp4"
+                    multiple={postFormat === 'carousel' && replaceSlideIndex === null}
                     ref={fileInputRef}
                     onChange={handleCustomImageUpload}
                     className="hidden"
                   />
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      setReplaceSlideIndex(null);
+                      setTimeout(() => fileInputRef.current?.click(), 0);
+                    }}
                     disabled={uploadingCustom}
                     className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50"
                   >
@@ -772,8 +924,10 @@ export default function SocialDraftComposer({
                       width="16"
                     />
                     {uploadingCustom
-                      ? postFormat === 'carousel' ? 'Building carousel…' : 'Uploading poster…'
-                      : postFormat === 'carousel' ? 'Choose slides' : 'Upload my poster'}
+                      ? postFormat === 'carousel' ? 'Updating carousel…' : 'Uploading media…'
+                      : postFormat === 'carousel'
+                        ? carouselAssets.length ? 'Add media' : 'Choose 2 or more items'
+                        : 'Upload image or video'}
                   </button>
                 </div>
               </div>
@@ -781,7 +935,8 @@ export default function SocialDraftComposer({
               {postFormat === 'carousel' && carouselAssets.length > 0 && (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs font-bold text-emerald-400">
                   <Icon icon="solar:check-circle-bold" className="mr-1.5 inline" width="15" />
-                  {carouselAssets.length} slides attached as one swipeable post.
+                  {carouselAssets.length}/{carouselLimit} items attached as one swipeable post.
+                  {' '}Instagram and Threads publish one caption for the whole carousel; individual item descriptions are used for accessibility where supported.
                 </div>
               )}
 
@@ -839,11 +994,21 @@ export default function SocialDraftComposer({
 
                     <div className="relative flex min-h-[360px] max-h-[620px] items-center justify-center bg-black">
                       {activeVisualAssets[0] ? (
-                        <img
-                          src={activeVisualAssets[0].publicUrl}
-                          alt={`${activePlatform.label} post preview`}
-                          className="max-h-[620px] w-full object-contain"
-                        />
+                        activeVisualAssets[0].mediaType === 'video' ? (
+                          <video
+                            src={activeVisualAssets[0].publicUrl}
+                            controls
+                            muted
+                            playsInline
+                            className="max-h-[620px] w-full object-contain"
+                          />
+                        ) : (
+                          <img
+                            src={activeVisualAssets[0].publicUrl}
+                            alt={`${activePlatform.label} post preview`}
+                            className="max-h-[620px] w-full object-contain"
+                          />
+                        )
                       ) : (
                         <div className="flex flex-col items-center gap-2 py-20 text-text-muted">
                           <Icon icon="solar:gallery-remove-linear" width="42" />
@@ -870,8 +1035,16 @@ export default function SocialDraftComposer({
                   {postFormat === 'carousel' && carouselAssets.length > 0 && (
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                       {carouselAssets.map((asset, index) => (
-                        <div key={asset.id} className="relative overflow-hidden rounded-lg border border-border bg-black">
-                          <img src={asset.publicUrl} alt={`Slide ${index + 1}`} className="aspect-square w-full object-cover" />
+                        <div key={asset.id} className="overflow-hidden rounded-lg border border-border bg-surface">
+                          <div className="relative bg-black">
+                            {asset.mediaType === 'video' ? (
+                              <video src={asset.publicUrl} muted playsInline className="aspect-square w-full object-cover" />
+                            ) : (
+                              <img src={asset.publicUrl} alt={asset.altText || `Carousel item ${index + 1}`} className="aspect-square w-full object-cover" />
+                            )}
+                            <span className="absolute bottom-1.5 left-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black uppercase text-white">
+                              {asset.mediaType || 'image'}
+                            </span>
                           <div className="absolute inset-x-1.5 top-1.5 flex items-center justify-between">
                             <span className="rounded-full bg-black/80 px-2 py-1 text-[9px] font-black text-white">{index + 1}</span>
                             <div className="flex gap-1">
@@ -881,7 +1054,26 @@ export default function SocialDraftComposer({
                               <button type="button" aria-label={`Move slide ${index + 1} right`} onClick={() => moveCarouselSlide(index, 1)} disabled={index === carouselAssets.length - 1 || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
                                 <Icon icon="solar:arrow-right-linear" width="12" />
                               </button>
+                              <button type="button" aria-label={`Replace carousel item ${index + 1}`} onClick={() => { setReplaceSlideIndex(index); setTimeout(() => fileInputRef.current?.click(), 0); }} disabled={uploadingCustom || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
+                                <Icon icon="solar:refresh-linear" width="12" />
+                              </button>
+                              <button type="button" aria-label={`Remove carousel item ${index + 1}`} onClick={() => removeCarouselSlide(index)} disabled={carouselAssets.length <= 2 || uploadingCustom || reorderingCarousel} className="rounded-full bg-red-600/90 p-1 text-white disabled:opacity-30">
+                                <Icon icon="solar:trash-bin-trash-linear" width="12" />
+                              </button>
                             </div>
+                          </div>
+                          </div>
+                          <div className="p-2">
+                            <label className="text-[9px] font-black uppercase tracking-wider text-text-muted">Media description</label>
+                            <textarea
+                              value={asset.altText || ''}
+                              onChange={event => setCarouselAssets(current => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, altText: event.target.value } : entry))}
+                              onBlur={event => saveCarouselAltText(index, event.target.value)}
+                              maxLength={1000}
+                              rows={2}
+                              placeholder="Describe this item for accessibility"
+                              className="mt-1 w-full resize-y rounded border border-border bg-surface-2 px-2 py-1.5 text-[10px] text-text-primary outline-none focus:border-brand"
+                            />
                           </div>
                         </div>
                       ))}
@@ -955,6 +1147,71 @@ export default function SocialDraftComposer({
                       </p>
                     )}
                   </div>
+
+                  {activeVariant?.platform === 'tiktok' && (
+                    <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wider text-text-primary">TikTok publishing controls</p>
+                          <p className="mt-1 text-[10px] leading-relaxed text-text-muted">
+                            TikTok validates these against the connected creator’s current permissions when publishing.
+                          </p>
+                        </div>
+                        <Icon icon="simple-icons:tiktok" className="text-cyan-300" width="18" />
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                          Delivery mode
+                          <select value={tiktokSettings.post_mode} onChange={event => setTikTokSettings(current => ({ ...current, post_mode: event.target.value }))} className="mt-1 h-9 w-full rounded border border-border bg-surface px-2 text-xs text-text-primary outline-none focus:border-brand">
+                            <option value="DIRECT_POST">Post directly</option>
+                            <option value="MEDIA_UPLOAD">Send to TikTok inbox as draft</option>
+                          </select>
+                        </label>
+                        <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                          Privacy
+                          <select value={tiktokSettings.privacy_level} onChange={event => setTikTokSettings(current => ({ ...current, privacy_level: event.target.value }))} disabled={tiktokSettings.post_mode === 'MEDIA_UPLOAD'} className="mt-1 h-9 w-full rounded border border-border bg-surface px-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-50">
+                            <option value="PUBLIC_TO_EVERYONE">Public</option>
+                            <option value="MUTUAL_FOLLOW_FRIENDS">Mutual followers</option>
+                            <option value="FOLLOWER_OF_CREATOR">Creator’s followers</option>
+                            <option value="SELF_ONLY">Only me</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {[
+                          ['disable_comment', 'Disable comments'],
+                          ['disable_duet', 'Disable Duet'],
+                          ['disable_stitch', 'Disable Stitch'],
+                          ['auto_add_music', 'Auto-add music to photos'],
+                          ['brand_content_toggle', 'Paid partnership'],
+                          ['brand_organic_toggle', 'Promotes our own brand'],
+                          ['is_aigc', 'AI-generated content'],
+                        ].map(([key, label]) => (
+                          <label key={key} className="flex items-center gap-2 rounded border border-border bg-surface px-2.5 py-2 text-[11px] font-bold text-text-primary">
+                            <input type="checkbox" checked={Boolean(tiktokSettings[key])} onChange={event => setTikTokSettings(current => ({ ...current, [key]: event.target.checked }))} className="accent-brand" />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                          Photo cover item
+                          <input type="number" min="1" max={Math.max(1, carouselAssets.length || 1)} value={Number(tiktokSettings.photo_cover_index || 0) + 1} onChange={event => setTikTokSettings(current => ({ ...current, photo_cover_index: Math.max(0, Number(event.target.value || 1) - 1) }))} className="mt-1 h-9 w-full rounded border border-border bg-surface px-2 text-xs text-text-primary outline-none focus:border-brand" />
+                        </label>
+                        <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                          Video cover time (ms)
+                          <input type="number" min="0" step="100" value={tiktokSettings.video_cover_timestamp_ms} onChange={event => setTikTokSettings(current => ({ ...current, video_cover_timestamp_ms: Math.max(0, Number(event.target.value || 0)) }))} className="mt-1 h-9 w-full rounded border border-border bg-surface px-2 text-xs text-text-primary outline-none focus:border-brand" />
+                        </label>
+                      </div>
+
+                      <p className="mt-3 text-[10px] leading-relaxed text-amber-300">
+                        Direct public posting requires TikTok approval/audit and a verified media URL domain. Until TikTok approves the app, it may restrict posts to private visibility.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-3 gap-2">
                     <div className="rounded-lg border border-border bg-surface p-3">

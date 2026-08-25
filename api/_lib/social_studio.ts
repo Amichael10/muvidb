@@ -843,6 +843,58 @@ export async function updateSocialVariantCaption(
   return { success: true, id: variant.id, platform, caption };
 }
 
+export async function updateSocialVariantOptions(
+  input: { variantId: string; options: Record<string, unknown> },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const { data: variant, error } = await supabase
+    .from('social_platform_variants')
+    .select('id,content_item_id,platform,status,platform_options')
+    .eq('id', input.variantId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!variant) throw httpError(404, 'Platform post was not found');
+  if (['publishing', 'published', 'uploaded_as_draft'].includes(variant.status)) {
+    throw httpError(409, 'Publishing has already started, so these settings can no longer be changed');
+  }
+
+  const nextOptions = { ...(variant.platform_options || {}) } as Record<string, unknown>;
+  if (variant.platform === 'tiktok') {
+    const raw = (input.options?.tiktok || input.options || {}) as Record<string, unknown>;
+    const privacyLevels = ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'];
+    const postModes = ['DIRECT_POST', 'MEDIA_UPLOAD'];
+    nextOptions.tiktok = {
+      privacy_level: privacyLevels.includes(String(raw.privacy_level)) ? raw.privacy_level : 'SELF_ONLY',
+      post_mode: postModes.includes(String(raw.post_mode)) ? raw.post_mode : 'DIRECT_POST',
+      disable_comment: Boolean(raw.disable_comment),
+      disable_duet: Boolean(raw.disable_duet),
+      disable_stitch: Boolean(raw.disable_stitch),
+      auto_add_music: Boolean(raw.auto_add_music),
+      brand_content_toggle: Boolean(raw.brand_content_toggle),
+      brand_organic_toggle: Boolean(raw.brand_organic_toggle),
+      is_aigc: Boolean(raw.is_aigc),
+      photo_cover_index: Math.max(0, Math.floor(Number(raw.photo_cover_index) || 0)),
+      video_cover_timestamp_ms: Math.max(0, Math.floor(Number(raw.video_cover_timestamp_ms) || 0)),
+    };
+  } else {
+    throw httpError(400, 'Advanced publishing settings are not available for this platform yet');
+  }
+
+  const { error: updateError } = await supabase
+    .from('social_platform_variants')
+    .update({ platform_options: nextOptions })
+    .eq('id', variant.id);
+  if (updateError) throw updateError;
+  await insertSocialEvent({
+    contentItemId: variant.content_item_id,
+    platformVariantId: variant.id,
+    eventType: 'platform_options_edited',
+    eventData: { actor_id: actor.id, platform: variant.platform },
+  });
+  return { success: true, id: variant.id, platform: variant.platform, platformOptions: nextOptions };
+}
+
 const NON_EDITABLE_CONTENT_STATUSES = ['publishing', 'partially_published', 'published'] as const;
 const NON_EDITABLE_VARIANT_STATUSES = ['publishing', 'published', 'uploaded_as_draft'] as const;
 
@@ -1172,6 +1224,22 @@ export async function scheduleContentItem(
   if (variantError) throw variantError;
   if (!variants?.length) throw httpError(409, 'No approved variants to schedule');
 
+  for (const variant of variants) {
+    const urls = Array.isArray(variant.platform_options?.carousel_asset_urls)
+      ? variant.platform_options.carousel_asset_urls.filter((url: unknown) => typeof url === 'string')
+      : [];
+    if (urls.length > 1) {
+      const limit = variant.platform === 'threads' ? 20 : variant.platform === 'tiktok' ? 35 : 10;
+      if (urls.length > limit) {
+        throw httpError(400, `${variant.platform} allows at most ${limit} carousel items; this draft has ${urls.length}`);
+      }
+      const containsVideo = urls.some((url: string) => /\.mp4(?:$|\?)/i.test(url));
+      if (containsVideo && ['facebook', 'tiktok'].includes(variant.platform)) {
+        throw httpError(400, `${variant.platform} does not support video inside a carousel. Use images only or remove that platform.`);
+      }
+    }
+  }
+
   // Every platform here posts media. Scheduling a variant with no asset would
   // only fail later inside the publisher, so it is caught up front and names
   // the offending platforms.
@@ -1425,10 +1493,12 @@ export async function attachCustomAsset(
   actor: SocialActor,
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  await assertContentItemCanBeChanged(input.contentItemId);
   if (!/^https:\/\//i.test(String(input.publicUrl || ''))) {
     throw httpError(400, 'The custom artwork must have a public HTTPS URL');
   }
-  const format: SocialAssetFormat = input.format || 'square_1_1';
+  const isVideo = /\.mp4(?:$|\?)/i.test(input.publicUrl);
+  const format: SocialAssetFormat = input.format || (isVideo ? 'video_vertical_9_16' as SocialAssetFormat : 'square_1_1');
   const width = input.width || 1080;
   const height = input.height || 1080;
   let storageBucket = 'external';
@@ -1445,7 +1515,9 @@ export async function attachCustomAsset(
   } catch {
     throw httpError(400, 'The custom artwork URL is invalid');
   }
-  const mimeType = /\.jpe?g(?:$|\?)/i.test(input.publicUrl)
+  const mimeType = isVideo
+    ? 'video/mp4'
+    : /\.jpe?g(?:$|\?)/i.test(input.publicUrl)
     ? 'image/jpeg'
     : /\.webp(?:$|\?)/i.test(input.publicUrl)
       ? 'image/webp'
@@ -1490,7 +1562,8 @@ export async function attachCustomAsset(
 export async function attachCarouselAssets(
   input: {
     contentItemId: string;
-    publicUrls: string[];
+    publicUrls?: string[];
+    assets?: Array<{ url: string; mediaType?: 'image' | 'video'; altText?: string }>;
     format?: SocialAssetFormat;
     width?: number;
     height?: number;
@@ -1498,12 +1571,26 @@ export async function attachCarouselAssets(
   actor: SocialActor,
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
-  const publicUrls = [...new Set((input.publicUrls || []).map(url => String(url).trim()).filter(Boolean))];
-  if (publicUrls.length < 2 || publicUrls.length > 10) {
-    throw httpError(400, 'A carousel needs between 2 and 10 images');
+  await assertContentItemCanBeChanged(input.contentItemId);
+
+  const rawAssets = Array.isArray(input.assets) && input.assets.length
+    ? input.assets
+    : (input.publicUrls || []).map(url => ({ url }));
+  const carouselAssets = rawAssets.map(asset => {
+    const url = String(asset?.url || '').trim();
+    const mediaType = asset?.mediaType === 'video' || /\.mp4(?:$|\?)/i.test(url) ? 'video' : 'image';
+    return {
+      url,
+      media_type: mediaType,
+      alt_text: String(asset?.altText || '').trim().slice(0, 1000),
+    };
+  });
+  const publicUrls = carouselAssets.map(asset => asset.url);
+  if (publicUrls.length < 2 || new Set(publicUrls).size !== publicUrls.length) {
+    throw httpError(400, 'A carousel needs at least 2 unique media items');
   }
   if (publicUrls.some(url => !/^https:\/\//i.test(url))) {
-    throw httpError(400, 'Every carousel image must have a public HTTPS URL');
+    throw httpError(400, 'Every carousel item must have a public HTTPS URL');
   }
 
   const format: SocialAssetFormat = input.format || 'square_1_1';
@@ -1517,6 +1604,24 @@ export async function attachCarouselAssets(
   if (variantError) throw variantError;
   if (!variants?.length) throw httpError(404, 'No platform variants were found for this draft');
 
+  const platforms = variants.map(variant => String(variant.platform));
+  const maxItems = platforms.includes('instagram') || platforms.includes('facebook')
+    ? 10
+    : platforms.includes('threads')
+      ? 20
+      : 35;
+  if (carouselAssets.length > maxItems) {
+    throw httpError(400, `${platforms.join(', ')} supports at most ${maxItems} items for this shared carousel`);
+  }
+  if ((platforms.includes('facebook') || platforms.includes('tiktok'))
+      && carouselAssets.some(asset => asset.media_type === 'video')) {
+    throw httpError(400, `${platforms.includes('facebook') ? 'Facebook' : 'TikTok'} carousel publishing supports images only. Remove that platform or the video.`);
+  }
+
+  const previousUrls = Array.isArray(variants[0]?.platform_options?.carousel_asset_urls)
+    ? variants[0].platform_options.carousel_asset_urls.filter((url: unknown) => typeof url === 'string')
+    : [];
+
   for (const variant of variants) {
     const { error: updateError } = await supabase
       .from('social_platform_variants')
@@ -1525,15 +1630,19 @@ export async function attachCarouselAssets(
           ...(variant.platform_options || {}),
           post_format: 'carousel',
           carousel_asset_urls: publicUrls,
+          carousel_assets: carouselAssets,
         },
       })
       .eq('id', variant.id);
     if (updateError) throw updateError;
   }
 
-  const assets = publicUrls.map((publicUrl, position) => ({
-    id: publicUrl,
-    public_url: publicUrl,
+  const assets = carouselAssets.map((asset, position) => ({
+    id: asset.url,
+    public_url: asset.url,
+    publicUrl: asset.url,
+    mediaType: asset.media_type,
+    altText: asset.alt_text,
     format,
     width,
     height,
@@ -1546,51 +1655,53 @@ export async function attachCarouselAssets(
     eventData: {
       actor_id: actor.id,
       public_urls: publicUrls,
-      image_count: assets.length,
+      item_count: assets.length,
       platforms: variants.map(variant => variant.platform),
     },
   });
 
-  return { assets, imageCount: assets.length };
+  // Remove replaced uploads only when they are clearly Social Studio-owned
+  // objects. Generated/source artwork is never deleted by this path.
+  const removedUrls = previousUrls.filter((url: string) => !publicUrls.includes(url));
+  const removals = new Map<string, string[]>();
+  for (const url of removedUrls) {
+    try {
+      const parsed = new URL(url);
+      const marker = '/storage/v1/object/public/';
+      const markerIndex = parsed.pathname.indexOf(marker);
+      if (markerIndex < 0) continue;
+      const parts = parsed.pathname.slice(markerIndex + marker.length).split('/').map(decodeURIComponent);
+      const bucket = parts.shift() || '';
+      const path = parts.join('/');
+      if (!['social-published-assets', 'film-images'].includes(bucket) || !path.startsWith('social/')) continue;
+      const paths = removals.get(bucket) || [];
+      paths.push(path);
+      removals.set(bucket, paths);
+    } catch { /* malformed old URL: leave it alone */ }
+  }
+  for (const [bucket, paths] of removals) {
+    const { error: removeError } = await supabase.storage.from(bucket).remove(paths);
+    if (removeError) console.warn('Social Studio: could not remove replaced carousel media', removeError);
+  }
+
+  return { assets, itemCount: assets.length, maxItems, platforms };
 }
 
 export async function reorderCarouselAssets(
-  input: { contentItemId: string; publicUrls: string[] },
+  input: {
+    contentItemId: string;
+    publicUrls?: string[];
+    assets?: Array<{ url: string; mediaType?: 'image' | 'video'; altText?: string }>;
+  },
   actor: SocialActor,
 ) {
-  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
-  const publicUrls = (input.publicUrls || []).map(url => String(url).trim()).filter(Boolean);
-  if (publicUrls.length < 2 || publicUrls.length > 10 || new Set(publicUrls).size !== publicUrls.length) {
-    throw httpError(400, 'Provide 2–10 unique carousel image URLs in the desired order');
-  }
-  if (publicUrls.some(url => !/^https:\/\//i.test(url))) throw httpError(400, 'Every carousel image must use HTTPS');
-
-  const { data: variants, error: variantError } = await supabase
-    .from('social_platform_variants')
-    .select('id,platform_options')
-    .eq('content_item_id', input.contentItemId);
-  if (variantError) throw variantError;
-  if (!variants?.length) throw httpError(404, 'No platform variants were found for this draft');
-
-  for (const variant of variants) {
-    const { error: updateError } = await supabase
-      .from('social_platform_variants')
-      .update({
-        platform_options: {
-          ...(variant.platform_options || {}),
-          post_format: 'carousel',
-          carousel_asset_urls: publicUrls,
-        },
-      })
-      .eq('id', variant.id);
-    if (updateError) throw updateError;
-  }
+  const result = await attachCarouselAssets(input, actor);
   await insertSocialEvent({
     contentItemId: input.contentItemId,
     eventType: 'carousel_assets_reordered',
-    eventData: { actor_id: actor.id, public_urls: publicUrls },
+    eventData: { actor_id: actor.id, public_urls: result.assets.map(asset => asset.public_url) },
   });
-  return { success: true, publicUrls };
+  return { success: true, ...result };
 }
 
 export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {

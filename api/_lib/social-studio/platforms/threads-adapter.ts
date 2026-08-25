@@ -108,18 +108,21 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
 
     const mediaUrls = (request.assetUrls?.length ? request.assetUrls : request.assetUrl ? [request.assetUrl] : [])
       .filter(Boolean);
-    if (mediaUrls.length > 10) {
+    if (mediaUrls.length > 20) {
       throw new SocialPlatformError({
         platform: 'threads',
         code: 'threads_carousel_too_large',
-        message: 'This carousel contains more than the supported 10 images.',
+        message: 'Threads carousels can contain no more than 20 items.',
       });
     }
 
     let create: URLSearchParams;
     if (mediaUrls.length > 1) {
       const childIds: string[] = [];
-      for (const mediaUrl of mediaUrls) {
+      const carouselAssets = Array.isArray(request.options?.carousel_assets)
+        ? request.options.carousel_assets as Array<{ url?: string; alt_text?: string }>
+        : [];
+      for (const [index, mediaUrl] of mediaUrls.entries()) {
         const childIsVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(mediaUrl);
         const child = new URLSearchParams({
           access_token: this.accessToken,
@@ -127,6 +130,8 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
           is_carousel_item: 'true',
         });
         child.set(childIsVideo ? 'video_url' : 'image_url', mediaUrl);
+        const altText = String(carouselAssets[index]?.alt_text || '').trim();
+        if (altText) child.set('alt_text', altText.slice(0, 1000));
         const childContainer = await this.post(`/${encodeURIComponent(this.userId)}/threads`, child);
         if (!childContainer.id) {
           throw new SocialPlatformError({
@@ -145,12 +150,13 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
         text: request.caption,
       });
     } else {
+      const singleIsVideo = /\.(mp4|mov)(\?.*)?$/i.test(mediaUrls[0] || '');
       create = new URLSearchParams({
         access_token: this.accessToken,
-        media_type: mediaUrls.length ? 'IMAGE' : 'TEXT',
+        media_type: mediaUrls.length ? (singleIsVideo ? 'VIDEO' : 'IMAGE') : 'TEXT',
         text: request.caption,
       });
-      if (mediaUrls[0]) create.set('image_url', mediaUrls[0]);
+      if (mediaUrls[0]) create.set(singleIsVideo ? 'video_url' : 'image_url', mediaUrls[0]);
     }
 
     const container = await this.post(`/${encodeURIComponent(this.userId)}/threads`, create);
