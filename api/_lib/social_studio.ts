@@ -1199,8 +1199,15 @@ export async function scheduleContentItem(
   if (error) throw error;
   if (!item) throw httpError(404, 'Content item not found');
 
-  // If currently in draft or review, automatically approve so scheduling is one-click.
-  if (item.status === 'draft' || item.status === 'ready_for_review') {
+  // Keep one-click scheduling while still honouring the review state machine and
+  // recording both audit events. A draft cannot legally jump straight to
+  // approved; it must first become ready_for_review.
+  if (item.status === 'draft') {
+    await reviewContentItem({ contentItemId: input.contentItemId, action: 'submit' }, actor);
+    item.status = 'ready_for_review';
+  }
+
+  if (item.status === 'ready_for_review') {
     await reviewContentItem({ contentItemId: input.contentItemId, action: 'approve' }, actor);
     item.status = 'approved';
   }
