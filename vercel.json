@@ -243,6 +243,14 @@
       "destination": "/api/seo?type=sitemap&slug=:slug"
     },
     {
+      "source": "/opencut",
+      "destination": "https://opencut.muvidb.com/opencut"
+    },
+    {
+      "source": "/opencut/:path*",
+      "destination": "https://opencut.muvidb.com/opencut/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/api/ssr?__pathname=/$1"
     }

@@ -1,0 +1,17 @@
+# Turborepo
+.turbo
+
+# Env vars
+.env*
+!.env.example
+
+.next/
+
+.font-cache/
+
+next-env.d.ts
+
+*.tsbuildinfo
+
+# MuviDB temporary YouTube clips
+.temp-clips/
