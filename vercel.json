@@ -244,11 +244,11 @@
     },
     {
       "source": "/opencut",
-      "destination": "https://opencut.muvidb.com/opencut"
+      "destination": "https://opencut.muvidb.com"
     },
     {
       "source": "/opencut/:path*",
-      "destination": "https://opencut.muvidb.com/opencut/:path*"
+      "destination": "https://opencut.muvidb.com/:path*"
     },
     {
       "source": "/((?!api/).*)",
