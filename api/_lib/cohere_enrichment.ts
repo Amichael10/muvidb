@@ -10,20 +10,40 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 /**
+ * YouTube descriptions are often promotional copy rather than a synopsis.
+ * Keep this deliberately conservative: a genuine synopsis may mention a cast
+ * member, but it should not contain links, hashtag blocks, or subscribe CTAs.
+ */
+export function synopsisNeedsRewrite(value: string | null | undefined): boolean {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  const hashtags = text.match(/(^|\s)#[\p{L}\p{N}_-]+/gu) || [];
+  if (hashtags.length >= 2) return true;
+  if (/https?:\/\/|www\.|youtu\.be|youtube\.com/i.test(text)) return true;
+  if (/\b(?:subscribe|like and share|follow us|turn on (?:the )?notification|click (?:the )?link|watch (?:the )?full movie)\b/i.test(text)) return true;
+  if (/\b(?:latest|new)\s+(?:nollywood|yoruba|ghanaian|nigerian)?\s*movies?\s*20\d{2}\b/i.test(text)) return true;
+  return false;
+}
+
+/**
  * Concurrently enrich films missing synopses right after a YouTube sync or film insertion.
  * Can take specific filmIds or automatically query recently added films missing synopses.
  */
-export async function enrichMissingSynopsesConcurrent(filmIds?: string[]): Promise<number> {
-  let filmsToEnrich: { id: string; title: string; year?: number | null }[] = [];
+export async function enrichMissingSynopsesConcurrent(
+  filmIds?: string[],
+  options: { replaceNoisy?: boolean } = {},
+): Promise<number> {
+  let filmsToEnrich: { id: string; title: string; year?: number | null; synopsis?: string | null }[] = [];
 
   try {
     if (filmIds && filmIds.length > 0) {
       const { data } = await supabase
         .from('films')
         .select('id, title, year, synopsis')
-        .in('id', filmIds)
-        .or('synopsis.is.null,synopsis.eq.');
-      filmsToEnrich = data || [];
+        .in('id', filmIds);
+      filmsToEnrich = (data || []).filter((film) =>
+        options.replaceNoisy ? synopsisNeedsRewrite(film.synopsis) : !String(film.synopsis || '').trim()
+      );
     } else {
       const { data } = await supabase
         .from('films')
@@ -49,6 +69,8 @@ export async function enrichMissingSynopsesConcurrent(filmIds?: string[]): Promi
     Base the summary ONLY on the title and context. Keep tone cinematic and objective.
 
     Return ONLY JSON array: [{"id": "...", "title": "...", "synopsis": "..."}]
+
+    Do not include hashtags, links, cast lists, calls to subscribe, or marketing language.
 
     Films: ${JSON.stringify(filmsToEnrich.map(f => ({ id: f.id, title: f.title, year: f.year })))}
   `;

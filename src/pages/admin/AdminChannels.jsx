@@ -545,7 +545,13 @@ export default function AdminChannels() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Sync Error');
-      toast.success(`Success: Ingested ${json.videos_upserted || 0} movies.`, { id: tid });
+      const summary = [
+        `${json.videos_upserted || 0} video updates`,
+        `${json.films_created || 0} films created`,
+        `${json.films_repaired || 0} films cleaned`,
+        `${json.credits_added || 0} credits linked`,
+      ];
+      toast.success(`Sync complete: ${summary.join(' · ')}`, { id: tid });
       fetchChannels();
     } catch (err) {
       toast.error(`Failed: ${err.message}`, { id: tid });

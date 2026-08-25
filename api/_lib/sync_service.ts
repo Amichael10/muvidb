@@ -4,7 +4,7 @@ import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
 import { mirrorIfExternal } from './image_mirror.js';
 import { enrichFilmsFromAI, attachCreditsBatch, type EnrichedFilm } from './film_enrichment.js';
-import { enrichMissingSynopsesConcurrent } from './cohere_enrichment.js';
+import { enrichMissingSynopsesConcurrent, synopsisNeedsRewrite } from './cohere_enrichment.js';
 import { pickTmdbMatch } from './tmdb_match.js';
 import {
   curateYouTubeTitle,
@@ -96,6 +96,101 @@ function detectVideoLanguage(title: string, channelName: string, primaryLang?: s
   return 'English';
 }
 
+/**
+ * Repair films created by the retired manual YouTube importer. That path saved
+ * the raw description as synopsis and never extracted title-embedded cast.
+ * `original_title` acts as the durable completion marker, while noisy synopsis
+ * detection allows later promotional descriptions to be repaired once.
+ */
+async function repairLinkedYouTubeFilms(
+  videos: any[],
+  linkedFilmByVideo: Map<string, string>,
+): Promise<{ repaired: number; creditsAdded: number; synopsisGenerated: number }> {
+  const linked = videos.filter((video) => linkedFilmByVideo.get(video.video_id));
+  if (!linked.length) return { repaired: 0, creditsAdded: 0, synopsisGenerated: 0 };
+
+  const filmIds = Array.from(new Set(linked.map((video) => linkedFilmByVideo.get(video.video_id)).filter(Boolean))) as string[];
+  const { data: films, error } = await supabase
+    .from('films')
+    .select('id,title,original_title,synopsis,needs_review')
+    .in('id', filmIds);
+  if (error) throw error;
+
+  const filmById = new Map((films || []).map((film: any) => [film.id, film]));
+  const candidates = linked.filter((video) => {
+    const film: any = filmById.get(linkedFilmByVideo.get(video.video_id));
+    if (!film) return false;
+    const policy = curateYouTubeTitle(video.title);
+    const deterministicTitleChanged = policy.action !== 'skip'
+      && policy.title
+      && cleanTitle(film.title).toLocaleLowerCase() !== cleanTitle(policy.title).toLocaleLowerCase();
+    return !film.original_title || deterministicTitleChanged || synopsisNeedsRewrite(film.synopsis);
+  });
+  if (!candidates.length) return { repaired: 0, creditsAdded: 0, synopsisGenerated: 0 };
+
+  const aiMap = await enrichFilmsFromAI(
+    candidates.map((video) => ({
+      videoId: video.video_id,
+      title: video.title,
+      description: video._description,
+    })),
+  );
+
+  let repaired = 0;
+  const creditEntries: { filmId: string; people: { name: string; role: string }[] }[] = [];
+  const synopsisFallbackIds: string[] = [];
+
+  for (const video of candidates) {
+    const filmId = linkedFilmByVideo.get(video.video_id)!;
+    const film: any = filmById.get(filmId);
+    const policy = curateYouTubeTitle(video.title);
+    const ai = aiMap.get(video.video_id);
+    const aiTitle = ai?.title?.trim();
+    const rawLower = String(video.title || '').toLocaleLowerCase();
+    const usableAiTitle = Boolean(
+      aiTitle
+      && aiTitle.length <= 70
+      && rawLower.includes(aiTitle.toLocaleLowerCase())
+      && !isSensationalizedYouTubeTitle(aiTitle),
+    );
+    const deterministicTitle = policy.action !== 'skip' ? policy.title : null;
+    const cleanedTitle = usableAiTitle ? cleanTitle(aiTitle!) : deterministicTitle;
+    const noisySynopsis = synopsisNeedsRewrite(film.synopsis);
+    const update: Record<string, any> = {
+      original_title: film.original_title || policy.originalTitle || video.title,
+    };
+    if (cleanedTitle && cleanedTitle.length >= 2) update.title = cleanedTitle;
+    if (ai?.synopsis) {
+      update.synopsis = ai.synopsis;
+      update.needs_review = false;
+    } else if (noisySynopsis) {
+      // Remove promotional garbage before Cohere writes the clean fallback.
+      update.synopsis = null;
+      update.needs_review = true;
+      synopsisFallbackIds.push(filmId);
+    }
+
+    const { error: updateError } = await supabase.from('films').update(update).eq('id', filmId);
+    if (updateError) {
+      console.warn(`[runVideosSync] legacy film repair failed for ${filmId}: ${updateError.message}`);
+      continue;
+    }
+    repaired += 1;
+
+    const people = [
+      ...(ai?.cast || []).map((name: string) => ({ name, role: 'actor' })),
+      ...(ai?.director ? [{ name: ai.director, role: 'director' }] : []),
+    ];
+    if (people.length) creditEntries.push({ filmId, people });
+  }
+
+  const creditsAdded = creditEntries.length ? await attachCreditsBatch(creditEntries) : 0;
+  const synopsisGenerated = synopsisFallbackIds.length
+    ? await enrichMissingSynopsesConcurrent(synopsisFallbackIds, { replaceNoisy: true })
+    : 0;
+  return { repaired, creditsAdded, synopsisGenerated };
+}
+
 
 /**
  * Syncs cinema showtimes from various adapters
@@ -144,7 +239,7 @@ export async function runShowtimesSync() {
 /**
  * Syncs latest videos from YouTube channels and auto-promotes long videos to films
  */
-export async function runVideosSync() {
+export async function runVideosSync(options: { channelId?: string; force?: boolean; maxPages?: number } = {}) {
   // Only fetch channels that (a) are enabled for sync and (b) haven't been
   // fetched in the last 3.5 hours. Admins can pause a channel via the
   // sync_enabled toggle to keep the daily sync from pulling its videos.
@@ -156,11 +251,16 @@ export async function runVideosSync() {
   const channels: any[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('channels')
       .select('*')
-      .eq('sync_enabled', true)
-      .or('videos_last_fetched_at.is.null,videos_last_fetched_at.lt.' + staleCutoff)
+      .eq('sync_enabled', true);
+    if (options.channelId) {
+      query = query.eq('id', options.channelId);
+    } else if (!options.force) {
+      query = query.or('videos_last_fetched_at.is.null,videos_last_fetched_at.lt.' + staleCutoff);
+    }
+    const { data, error } = await query
       .order('videos_last_fetched_at', { ascending: true, nullsFirst: true })
       .range(from, from + PAGE - 1);
     if (error || !data?.length) break;
@@ -177,6 +277,9 @@ export async function runVideosSync() {
   let sensationalTitlesSkipped = 0;
   let embeddedTitlesCleaned = 0;
   let shortSkipped = 0;
+  let legacyFilmsRepaired = 0;
+  let repairCreditsAdded = 0;
+  let repairSynopsesGenerated = 0;
 
   for (const ch of channels) {
     try {
@@ -247,7 +350,7 @@ export async function runVideosSync() {
       // so we paginate up to YT_MAX_PAGES pages (50 videos each). This runs in
       // GitHub Actions now (no Vercel 300s limit), so a deeper backfill is just
       // a matter of raising YT_MAX_PAGES — mind the daily API quota though.
-      const maxPages = Math.max(1, parseInt(process.env.YT_MAX_PAGES || '1', 10));
+      const maxPages = Math.max(1, options.maxPages ?? parseInt(process.env.YT_MAX_PAGES || '1', 10));
       const plItems: any[] = [];
       let pageToken: string | undefined;
       for (let page = 0; page < maxPages; page++) {
@@ -367,6 +470,23 @@ export async function runVideosSync() {
             
           const cvMap = new Map();
           if (existingCVs) existingCVs.forEach((cv: any) => cvMap.set(cv.video_id, cv.film_id));
+
+          // The retired manual endpoint created linked films before the shared
+          // cleaner existed. Repair those records during the same channel sync
+          // instead of requiring a separate cron/serverless function.
+          try {
+            const repair = await repairLinkedYouTubeFilms(longVideos, cvMap);
+            legacyFilmsRepaired += repair.repaired;
+            repairCreditsAdded += repair.creditsAdded;
+            repairSynopsesGenerated += repair.synopsisGenerated;
+            if (repair.repaired) {
+              console.log(
+                `[runVideosSync] Repaired ${repair.repaired} linked film(s), added ${repair.creditsAdded} credit(s), generated ${repair.synopsisGenerated} synopsis(es)`,
+              );
+            }
+          } catch (e: any) {
+            console.warn(`[runVideosSync] linked film repair failed for ${ch.name}: ${e.message}`);
+          }
 
           const videosToProcess = longVideos.filter((v: any) => !cvMap.get(v.video_id));
           const titlePolicies = new Map<string, YouTubeTitleDecision>(
@@ -682,6 +802,9 @@ export async function runVideosSync() {
     sensational_titles_skipped: sensationalTitlesSkipped,
     embedded_titles_cleaned: embeddedTitlesCleaned,
     short_skipped: shortSkipped,
+    legacy_films_repaired: legacyFilmsRepaired,
+    repair_credits_added: repairCreditsAdded,
+    repair_synopses_generated: repairSynopsesGenerated,
   };
 }
 
