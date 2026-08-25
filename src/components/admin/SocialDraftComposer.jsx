@@ -121,10 +121,10 @@ export const EDITORIAL_THEMES = [
 ];
 
 const PLATFORMS = [
-  { value: 'instagram', label: 'Instagram', icon: 'mdi:instagram' },
-  { value: 'threads', label: 'Threads', icon: 'simple-icons:threads' },
-  { value: 'facebook', label: 'Facebook', icon: 'mdi:facebook' },
-  { value: 'tiktok', label: 'TikTok', icon: 'simple-icons:tiktok' },
+  { value: 'instagram', label: 'Instagram', icon: 'mdi:instagram', accent: 'from-fuchsia-500 via-red-500 to-amber-400' },
+  { value: 'threads', label: 'Threads', icon: 'simple-icons:threads', accent: 'from-neutral-700 to-black' },
+  { value: 'facebook', label: 'Facebook', icon: 'mdi:facebook', accent: 'from-blue-600 to-blue-800' },
+  { value: 'tiktok', label: 'TikTok', icon: 'simple-icons:tiktok', accent: 'from-cyan-400 via-black to-pink-500' },
 ];
 
 export default function SocialDraftComposer({
@@ -142,6 +142,7 @@ export default function SocialDraftComposer({
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
+  const [activePreviewPlatform, setActivePreviewPlatform] = useState('instagram');
   const [postFormat, setPostFormat] = useState('single');
   const [carouselAssets, setCarouselAssets] = useState([]);
   const [uploadingCustom, setUploadingCustom] = useState(false);
@@ -174,6 +175,12 @@ export default function SocialDraftComposer({
     setPostFormat('single');
     setCarouselAssets([]);
   }, [themeId]);
+
+  useEffect(() => {
+    if (result?.variants?.length && !result.variants.some(variant => variant.platform === activePreviewPlatform)) {
+      setActivePreviewPlatform(result.variants[0].platform);
+    }
+  }, [result, activePreviewPlatform]);
 
   useEffect(() => {
     const term = query.trim();
@@ -238,6 +245,7 @@ export default function SocialDraftComposer({
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
       setResult(data);
+      setActivePreviewPlatform(data.variants?.[0]?.platform || platforms[0] || 'instagram');
       toast.success(`Draft generated with ${data.variants?.length || 0} variant(s)!`);
       onGenerated?.(data);
     } catch (err) {
@@ -310,6 +318,7 @@ export default function SocialDraftComposer({
           { id: data.id, publicUrl: url, format: 'custom_design', width: data.width || 1080, height: data.height || 1080 },
           ...(curr?.assets || []),
         ],
+        variants: (curr?.variants || []).map(variant => ({ ...variant, selected_asset_id: data.id })),
       }));
       onGenerated?.({ ...result, assets: [{ id: data.id, publicUrl: url, format: 'custom_design', width: data.width || 1080, height: data.height || 1080 }, ...(result.assets || [])] });
     } catch (err) {
@@ -388,6 +397,12 @@ export default function SocialDraftComposer({
   };
 
   const label = entry => (activeTheme.entity === 'person' ? entry.name : `${entry.title}${entry.year ? ` (${entry.year})` : ''}`);
+  const activeVariant = result?.variants?.find(variant => variant.platform === activePreviewPlatform) || result?.variants?.[0];
+  const activePlatform = PLATFORMS.find(platform => platform.value === activeVariant?.platform) || PLATFORMS[0];
+  const selectedSingleAsset = result?.assets?.find(asset => asset.id === activeVariant?.selected_asset_id)
+    || result?.assets?.find(asset => asset.format === 'custom_design')
+    || result?.assets?.[0];
+  const activeVisualAssets = postFormat === 'carousel' ? carouselAssets : selectedSingleAsset ? [selectedSingleAsset] : [];
 
   return (
     <div className="space-y-6">
@@ -636,16 +651,9 @@ export default function SocialDraftComposer({
               </span>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-              {/* Left Column: Visual Artwork & Custom Replacement */}
-              <div className="lg:col-span-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
-                    Post Visual & Artwork
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-surface p-1.5">
+            <div className="mt-6 space-y-5">
+              <div className="grid gap-3 rounded-xl border border-border bg-surface p-4 md:grid-cols-[minmax(260px,360px)_1fr] md:items-center">
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-2 p-1.5">
                   {[
                     { value: 'single', label: 'Single image', icon: 'solar:gallery-linear' },
                     { value: 'carousel', label: 'Carousel', icon: 'solar:gallery-wide-linear' },
@@ -657,24 +665,26 @@ export default function SocialDraftComposer({
                         setPostFormat(option.value);
                         if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
-                      className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-bold transition-colors ${
-                        postFormat === option.value
-                          ? 'bg-brand text-white'
-                          : 'text-text-muted hover:bg-surface-2 hover:text-text-primary'
+                      className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2.5 text-xs font-bold transition-colors ${
+                        postFormat === option.value ? 'bg-brand text-white' : 'text-text-muted hover:bg-surface hover:text-text-primary'
                       }`}
                     >
-                      <Icon icon={option.icon} width="16" />
-                      {option.label}
+                      <Icon icon={option.icon} width="16" /> {option.label}
                     </button>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[10px] leading-relaxed text-text-muted">
-                    {postFormat === 'carousel'
-                      ? 'Choose 2–10 images together. Their selected order becomes the swipe order.'
-                      : 'Replace the generated artwork with one custom image.'}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-text-primary">
+                      {postFormat === 'carousel' ? 'Upload all carousel slides together' : 'Use your poster as the complete post image'}
+                    </p>
+                    <p className="mt-1 text-[10px] text-text-muted">
+                      {postFormat === 'carousel'
+                        ? 'Choose 2–10 images. You can reorder them after upload.'
+                        : 'Your upload replaces the entire generated graphic; it will not be placed inside the template.'}
+                    </p>
+                  </div>
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -687,128 +697,185 @@ export default function SocialDraftComposer({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingCustom}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-brand px-2.5 py-1 text-xs font-bold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50"
                   >
                     <Icon
                       icon={uploadingCustom ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'}
                       className={uploadingCustom ? 'animate-spin' : ''}
-                      width="14"
+                      width="16"
                     />
                     {uploadingCustom
-                      ? postFormat === 'carousel' ? 'Building carousel…' : 'Uploading…'
-                      : postFormat === 'carousel' ? 'Choose carousel images' : 'Upload artwork'}
+                      ? postFormat === 'carousel' ? 'Building carousel…' : 'Uploading poster…'
+                      : postFormat === 'carousel' ? 'Choose slides' : 'Upload my poster'}
                   </button>
-                </div>
-
-                {postFormat === 'carousel' && carouselAssets.length > 0 && (
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs font-bold text-emerald-400">
-                    <Icon icon="solar:check-circle-bold" className="mr-1.5 inline" width="15" />
-                    {carouselAssets.length} images attached. Approval will publish them as one swipeable post.
-                  </div>
-                )}
-
-                <div className={postFormat === 'carousel' ? 'grid grid-cols-2 gap-3' : 'flex flex-wrap gap-3'}>
-                  {(postFormat === 'carousel' ? carouselAssets : result.assets || []).map((asset, index) => (
-                    <div
-                      key={asset.id}
-                      className="group relative w-full overflow-hidden rounded-lg border border-border bg-surface"
-                    >
-                      {postFormat === 'carousel' && (
-                        <div className="absolute left-2 top-2 z-10 flex items-center gap-1">
-                          <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-black/80 px-1.5 text-[10px] font-black text-white">
-                            {index + 1}
-                          </span>
-                          <button
-                            type="button"
-                            aria-label={`Move slide ${index + 1} left`}
-                            onClick={() => moveCarouselSlide(index, -1)}
-                            disabled={index === 0 || reorderingCarousel}
-                            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/80 text-white disabled:opacity-30"
-                          >
-                            <Icon icon="solar:arrow-left-linear" width="13" />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`Move slide ${index + 1} right`}
-                            onClick={() => moveCarouselSlide(index, 1)}
-                            disabled={index === carouselAssets.length - 1 || reorderingCarousel}
-                            className="flex h-6 w-6 items-center justify-center rounded-full bg-black/80 text-white disabled:opacity-30"
-                          >
-                            <Icon icon="solar:arrow-right-linear" width="13" />
-                          </button>
-                        </div>
-                      )}
-                      <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="block">
-                        <img
-                          src={asset.publicUrl}
-                          alt={asset.format}
-                          className={`${postFormat === 'carousel' ? 'h-40' : 'h-56'} w-full object-cover transition-opacity group-hover:opacity-90`}
-                        />
-                      </a>
-                      <div className="p-2.5 flex items-center justify-between bg-surface">
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                            asset.format === 'custom_design'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-surface-2 text-text-muted'
-                          }`}
-                        >
-                          {asset.format === 'custom_design'
-                            ? 'Custom Artwork'
-                            : asset.format === 'carousel_image'
-                              ? `Slide ${index + 1}`
-                              : asset.format}
-                        </span>
-                        <span className="text-[10px] font-mono text-text-muted">
-                          {asset.width}×{asset.height}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
 
-              {/* Right Column: Platform Variants & Viral Copy */}
-              <div className="lg:col-span-7 space-y-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
-                  Platform Captions & Tagged Stars
-                </span>
+              {postFormat === 'carousel' && carouselAssets.length > 0 && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs font-bold text-emerald-400">
+                  <Icon icon="solar:check-circle-bold" className="mr-1.5 inline" width="15" />
+                  {carouselAssets.length} slides attached as one swipeable post.
+                </div>
+              )}
 
-                <div className="space-y-3">
-                  {result.variants?.map(variant => (
-                    <div key={variant.id} className="rounded-lg border border-border bg-surface p-4">
-                      <div className="flex items-center justify-between border-b border-border pb-2">
-                        <div className="flex items-center gap-1.5">
-                          <Icon icon={`simple-icons:${variant.platform}`} className="text-brand" width="14" />
-                          <span className="text-xs font-black uppercase tracking-wider text-text-primary">
-                            {variant.platform}
-                          </span>
+              <div>
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-text-muted">
+                  Preview each publishing channel
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {result.variants?.map(variant => {
+                    const platform = PLATFORMS.find(entry => entry.value === variant.platform) || PLATFORMS[0];
+                    const isActive = variant.platform === activeVariant?.platform;
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() => setActivePreviewPlatform(variant.platform)}
+                        className={`inline-flex min-w-fit items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-black transition-all ${
+                          isActive
+                            ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
+                            : 'border-border bg-surface text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        <Icon icon={platform.icon} width="17" /> {platform.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-12">
+                <section className="space-y-3 lg:col-span-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} visual</p>
+                      <p className="text-[10px] text-text-muted">This is the image people will see in their feed.</p>
+                    </div>
+                    <span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted">
+                      {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
+                    </span>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border border-border bg-black shadow-2xl">
+                    <div className={`flex items-center justify-between bg-gradient-to-r ${activePlatform.accent} px-4 py-3 text-white`}>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/30">
+                          <Icon icon={activePlatform.icon} width="17" />
+                        </span>
+                        <div>
+                          <p className="text-xs font-black">MuviDB</p>
+                          <p className="text-[9px] text-white/75">Preview on {activePlatform.label}</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const full = `${variant.caption}\n\n${(variant.hashtags || []).map(t => `#${t}`).join(' ')}`;
-                            navigator.clipboard.writeText(full);
-                            toast.success('Copied caption to clipboard!');
-                          }}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-text-muted hover:text-brand"
-                        >
-                          <Icon icon="solar:copy-linear" width="13" /> Copy Text
-                        </button>
                       </div>
+                      <Icon icon="solar:menu-dots-bold" width="18" />
+                    </div>
 
-                      <p className="mt-3 whitespace-pre-wrap font-sans text-xs text-text-primary leading-relaxed">
-                        {variant.caption}
-                      </p>
-
-                      {variant.hashtags?.length > 0 && (
-                        <p className="mt-3 text-xs font-bold text-brand">
-                          {variant.hashtags.map(tag => `#${tag}`).join(' ')}
-                        </p>
+                    <div className="relative flex min-h-[360px] max-h-[620px] items-center justify-center bg-black">
+                      {activeVisualAssets[0] ? (
+                        <img
+                          src={activeVisualAssets[0].publicUrl}
+                          alt={`${activePlatform.label} post preview`}
+                          className="max-h-[620px] w-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 py-20 text-text-muted">
+                          <Icon icon="solar:gallery-remove-linear" width="42" />
+                          <span className="text-xs">Upload artwork to preview this post</span>
+                        </div>
+                      )}
+                      {postFormat === 'carousel' && activeVisualAssets.length > 1 && (
+                        <span className="absolute right-3 top-3 rounded-full bg-black/75 px-2.5 py-1 text-[10px] font-black text-white">
+                          1/{activeVisualAssets.length}
+                        </span>
                       )}
                     </div>
-                  ))}
-                </div>
+
+                    <div className="flex items-center justify-between border-t border-white/10 bg-[#0f0f0f] px-4 py-3 text-white">
+                      <div className="flex items-center gap-3">
+                        <Icon icon="solar:heart-linear" width="20" />
+                        <Icon icon="solar:chat-round-linear" width="20" />
+                        <Icon icon="solar:plain-linear" width="20" />
+                      </div>
+                      <Icon icon="solar:bookmark-linear" width="20" />
+                    </div>
+                  </div>
+
+                  {postFormat === 'carousel' && carouselAssets.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {carouselAssets.map((asset, index) => (
+                        <div key={asset.id} className="relative overflow-hidden rounded-lg border border-border bg-black">
+                          <img src={asset.publicUrl} alt={`Slide ${index + 1}`} className="aspect-square w-full object-cover" />
+                          <div className="absolute inset-x-1.5 top-1.5 flex items-center justify-between">
+                            <span className="rounded-full bg-black/80 px-2 py-1 text-[9px] font-black text-white">{index + 1}</span>
+                            <div className="flex gap-1">
+                              <button type="button" aria-label={`Move slide ${index + 1} left`} onClick={() => moveCarouselSlide(index, -1)} disabled={index === 0 || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
+                                <Icon icon="solar:arrow-left-linear" width="12" />
+                              </button>
+                              <button type="button" aria-label={`Move slide ${index + 1} right`} onClick={() => moveCarouselSlide(index, 1)} disabled={index === carouselAssets.length - 1 || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
+                                <Icon icon="solar:arrow-right-linear" width="12" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className="space-y-3 lg:col-span-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} caption</p>
+                      <p className="text-[10px] text-text-muted">Copy is shown beside the exact visual selected for this channel.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const full = `${activeVariant?.caption || ''}\n\n${(activeVariant?.hashtags || []).map(tag => `#${tag}`).join(' ')}`;
+                        navigator.clipboard.writeText(full);
+                        toast.success(`${activePlatform.label} caption copied`);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-text-muted hover:border-brand hover:text-brand"
+                    >
+                      <Icon icon="solar:copy-linear" width="14" /> Copy caption
+                    </button>
+                  </div>
+
+                  <div className="min-h-[420px] rounded-2xl border border-border bg-surface p-5">
+                    <div className="flex items-center gap-2 border-b border-border pb-3">
+                      <span className={`flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br ${activePlatform.accent} text-white`}>
+                        <Icon icon={activePlatform.icon} width="18" />
+                      </span>
+                      <div>
+                        <p className="text-xs font-black text-text-primary">MuviDB on {activePlatform.label}</p>
+                        <p className="text-[10px] text-text-muted">{(activeVariant?.caption || '').length} characters</p>
+                      </div>
+                    </div>
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-text-primary">
+                      {activeVariant?.caption || 'No caption generated for this platform.'}
+                    </p>
+                    {activeVariant?.hashtags?.length > 0 && (
+                      <p className="mt-4 text-sm font-bold leading-relaxed text-brand">
+                        {activeVariant.hashtags.map(tag => `#${tag}`).join(' ')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg border border-border bg-surface p-3">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Format</p>
+                      <p className="mt-1 text-xs font-bold text-text-primary">{postFormat === 'carousel' ? 'Carousel' : 'Single image'}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-surface p-3">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Visual</p>
+                      <p className="mt-1 text-xs font-bold text-text-primary">{selectedSingleAsset?.format === 'custom_design' ? 'Custom poster' : 'Generated'}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-surface p-3">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Channel</p>
+                      <p className="mt-1 text-xs font-bold text-text-primary">{activePlatform.label}</p>
+                    </div>
+                  </div>
+                </section>
               </div>
             </div>
 

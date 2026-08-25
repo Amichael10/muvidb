@@ -280,8 +280,22 @@ export default function AutoPilotReviewModal({
 
   const handleDownloadRenderedCard = async () => {
     if (!candidate) return;
-    const toastId = toast.loading('Rendering high-res Figma card (1080×1350)…');
+    const toastId = toast.loading(customImageUrl ? 'Preparing your poster…' : 'Rendering high-res MuviDB card…');
     try {
+      if (customImageUrl) {
+        const posterResponse = await fetch(customImageUrl);
+        if (!posterResponse.ok) throw new Error('Failed to download uploaded poster');
+        const posterBlob = await posterResponse.blob();
+        const posterObjectUrl = URL.createObjectURL(posterBlob);
+        const posterLink = document.createElement('a');
+        posterLink.href = posterObjectUrl;
+        posterLink.download = `${(candidate.name || 'muvidb').replace(/[^a-zA-Z0-9]/g, '_')}_poster.jpg`;
+        posterLink.click();
+        URL.revokeObjectURL(posterObjectUrl);
+        toast.success('Downloaded your original post artwork!', { id: toastId });
+        return;
+      }
+
       const res = await fetch('/api/social?task=render_preview', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -596,10 +610,10 @@ export default function AutoPilotReviewModal({
                   className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
                 >
                   <Icon icon="solar:download-square-linear" width="13" />
-                  Export PNG
+                  {customImageUrl ? 'Download Poster' : 'Export PNG'}
                 </button>
                 <label className="cursor-pointer text-[11px] font-bold text-text-muted hover:text-text-primary hover:underline">
-                  {uploadingImage ? 'Uploading…' : '🖼️ Replace Image'}
+                  {uploadingImage ? 'Uploading…' : customImageUrl ? '🖼️ Change Poster' : '🖼️ Use My Poster'}
                   <input
                     type="file"
                     accept="image/*"
@@ -611,13 +625,31 @@ export default function AutoPilotReviewModal({
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-border shadow-2xl bg-surface-2">
-              <FigmaSocialCardPreview
-                candidate={candidate}
-                series={series}
-                displayImage={displayImage}
-              />
+            <div className="overflow-hidden rounded-2xl border border-border shadow-2xl bg-black">
+              {customImageUrl ? (
+                <div className="relative flex aspect-square w-full items-center justify-center bg-black">
+                  <img
+                    src={customImageUrl}
+                    alt={`${candidate?.name || 'Post'} custom poster`}
+                    className="h-full w-full object-contain"
+                  />
+                  <span className="absolute bottom-3 left-3 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-black shadow-lg">
+                    Your complete post image
+                  </span>
+                </div>
+              ) : (
+                <FigmaSocialCardPreview
+                  candidate={candidate}
+                  series={series}
+                  displayImage={displayImage}
+                />
+              )}
             </div>
+            {customImageUrl && (
+              <p className="text-center text-[11px] text-emerald-400">
+                MuviDB will publish this poster exactly as shown. It is no longer placed inside the graphic template.
+              </p>
+            )}
           </div>
 
           {/* Right: AI Editorial Copywriting & Schedule Controls */}
