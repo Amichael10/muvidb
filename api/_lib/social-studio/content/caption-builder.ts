@@ -12,10 +12,10 @@ export type PlatformCaptionLimits = {
 };
 
 export const PLATFORM_CAPTION_LIMITS: Record<SocialPlatform, PlatformCaptionLimits> = {
-  instagram: { captionLimit: 2200, hashtagLimit: 12, usesTitle: false },
-  facebook: { captionLimit: 2000, hashtagLimit: 4, usesTitle: false },
+  instagram: { captionLimit: 2200, hashtagLimit: 3, usesTitle: false },
+  facebook: { captionLimit: 2000, hashtagLimit: 3, usesTitle: false },
   threads: { captionLimit: 500, hashtagLimit: 3, usesTitle: false },
-  tiktok: { captionLimit: 2200, hashtagLimit: 8, usesTitle: true },
+  tiktok: { captionLimit: 2200, hashtagLimit: 3, usesTitle: true },
 };
 
 export type VariantContent = {
@@ -204,23 +204,25 @@ function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
 }
 
 function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
-  const tags: (string | null)[] = ['Nollywood', 'NollywoodMovies', 'MuviDB'];
-
   if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
-    tags.push(toHashtag(snapshot.name));
-    if (snapshot.nationality) tags.push(toHashtag(snapshot.nationality));
-    tags.push(...snapshot.knownFor.map(film => toHashtag(film.title)));
-    tags.push(snapshot.kind === 'birthday_spotlight' ? 'HappyBirthday' : 'ActorSpotlight');
-    return tags;
+    return [
+      'MuviDB',
+      toHashtag(snapshot.name),
+      snapshot.kind === 'birthday_spotlight' ? 'HappyBirthday' : 'ActorSpotlight',
+      snapshot.nationality ? toHashtag(snapshot.nationality) : null,
+      ...snapshot.knownFor.map(film => toHashtag(film.title)),
+      'Nollywood',
+    ];
   }
 
-  tags.push(toHashtag(snapshot.title));
-  tags.push(...snapshot.genres.map(genre => toHashtag(genre)));
-  tags.push(...snapshot.topCast.map(member => toHashtag(member.name)));
-  if (snapshot.comingSoon) tags.push('ComingSoon');
-  tags.push('NowShowing');
-
-  return tags;
+  return [
+    'MuviDB',
+    toHashtag(snapshot.title),
+    snapshot.comingSoon ? 'ComingSoon' : 'NowShowing',
+    ...snapshot.genres.map(genre => toHashtag(genre)),
+    ...snapshot.topCast.map(member => toHashtag(member.name)),
+    'Nollywood',
+  ];
 }
 
 /**

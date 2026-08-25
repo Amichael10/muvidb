@@ -512,7 +512,7 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   const { data: film, error } = await supabase
     .from('films')
     .select(
-      'id,title,slug,poster_url,backdrop_url,backdrop,release_date,year,synopsis,tagline,genres,countries,languages,liked_percent,coming_soon,is_published,is_in_cinemas,streaming_links,youtube_watch_url',
+      'id,title,slug,poster_url,backdrop_url,backdrop,release_date,year,release_type,source,synopsis,tagline,genres,countries,languages,liked_percent,coming_soon,is_published,is_in_cinemas,streaming_links,youtube_watch_url',
     )
     .eq('id', filmId)
     .maybeSingle();
@@ -798,6 +798,49 @@ export type SocialReviewAction = keyof typeof REVIEW_ACTIONS;
 
 export function isSocialReviewAction(value: unknown): value is SocialReviewAction {
   return typeof value === 'string' && value in REVIEW_ACTIONS;
+}
+
+/** Saves an administrator's final caption without regenerating the draft artwork. */
+export async function updateSocialVariantCaption(
+  input: { variantId: string; caption: string },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+
+  const caption = typeof input.caption === 'string' ? input.caption.trim() : '';
+  if (!caption) throw httpError(400, 'Caption cannot be empty');
+
+  const { data: variant, error } = await supabase
+    .from('social_platform_variants')
+    .select('id,content_item_id,platform,status')
+    .eq('id', input.variantId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!variant) throw httpError(404, 'Platform caption was not found');
+  if (['publishing', 'published'].includes(variant.status)) {
+    throw httpError(409, 'A caption cannot be changed after publishing has started');
+  }
+
+  const platform = variant.platform as SocialPlatform;
+  const limit = PLATFORM_CAPTION_LIMITS[platform]?.captionLimit || 2200;
+  if (caption.length > limit) {
+    throw httpError(400, `Caption exceeds the ${limit}-character limit for ${platform}`);
+  }
+
+  const { error: updateError } = await supabase
+    .from('social_platform_variants')
+    .update({ caption })
+    .eq('id', variant.id);
+  if (updateError) throw updateError;
+
+  await insertSocialEvent({
+    contentItemId: variant.content_item_id,
+    eventType: 'caption_edited',
+    eventData: { actor_id: actor.id, platform, variant_id: variant.id },
+  });
+
+  return { success: true, id: variant.id, platform, caption };
 }
 
 /**

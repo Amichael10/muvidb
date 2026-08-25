@@ -116,6 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       attachCustomAsset,
       attachCarouselAssets,
       reorderCarouselAssets,
+      updateSocialVariantCaption,
       getEditorialCalendar,
       seedEditorialCalendarSlots,
     } = await import('./_lib/social_studio.js');
@@ -365,6 +366,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'contentItemId and publicUrls are required' });
         }
         return res.status(200).json(await reorderCarouselAssets({ contentItemId, publicUrls }, actor));
+      }
+
+      if (task === 'update_variant_caption') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { variantId, caption } = req.body || {};
+        if (typeof variantId !== 'string' || !variantId) {
+          return res.status(400).json({ error: 'variantId is required' });
+        }
+        if (typeof caption !== 'string') {
+          return res.status(400).json({ error: 'caption is required' });
+        }
+        return res.status(200).json(await updateSocialVariantCaption({ variantId, caption }, actor));
       }
 
       if (task === 'threads_oauth_start') {

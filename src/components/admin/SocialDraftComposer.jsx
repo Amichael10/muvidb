@@ -127,6 +127,13 @@ const PLATFORMS = [
   { value: 'tiktok', label: 'TikTok', icon: 'simple-icons:tiktok', accent: 'from-cyan-400 via-black to-pink-500' },
 ];
 
+const CAPTION_LIMITS = {
+  instagram: 2200,
+  threads: 500,
+  facebook: 2000,
+  tiktok: 2200,
+};
+
 export default function SocialDraftComposer({
   disabled,
   onGenerated,
@@ -142,6 +149,8 @@ export default function SocialDraftComposer({
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
+  const [captionDrafts, setCaptionDrafts] = useState({});
+  const [savingCaptionId, setSavingCaptionId] = useState(null);
   const [activePreviewPlatform, setActivePreviewPlatform] = useState('instagram');
   const [postFormat, setPostFormat] = useState('single');
   const [carouselAssets, setCarouselAssets] = useState([]);
@@ -172,6 +181,7 @@ export default function SocialDraftComposer({
     setResults([]);
     setQuery('');
     setResult(null);
+    setCaptionDrafts({});
     setPostFormat('single');
     setCarouselAssets([]);
   }, [themeId]);
@@ -244,10 +254,18 @@ export default function SocialDraftComposer({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      setResult(data);
-      setActivePreviewPlatform(data.variants?.[0]?.platform || platforms[0] || 'instagram');
-      toast.success(`Draft generated with ${data.variants?.length || 0} variant(s)!`);
-      onGenerated?.(data);
+      const normalized = {
+        ...data,
+        variants: (data.variants || []).map(variant => ({
+          ...variant,
+          hashtags: Array.isArray(variant.hashtags) ? variant.hashtags.slice(0, 3) : [],
+        })),
+      };
+      setResult(normalized);
+      setCaptionDrafts(Object.fromEntries(normalized.variants.map(variant => [variant.id, variant.caption || ''])));
+      setActivePreviewPlatform(normalized.variants?.[0]?.platform || platforms[0] || 'instagram');
+      toast.success(`Draft generated with ${normalized.variants?.length || 0} variant(s)!`);
+      onGenerated?.(normalized);
     } catch (err) {
       toast.error(err.message || 'Draft generation failed');
     } finally {
@@ -329,6 +347,48 @@ export default function SocialDraftComposer({
     }
   };
 
+  const persistCaption = async (variant, caption, { notify = true } = {}) => {
+    if (!variant?.id) return;
+    const cleanCaption = String(caption || '').trim();
+    if (!cleanCaption) throw new Error('Caption cannot be empty');
+
+    const limit = CAPTION_LIMITS[variant.platform] || 2200;
+    if (cleanCaption.length > limit) {
+      throw new Error(`${variant.platform} captions cannot exceed ${limit} characters`);
+    }
+
+    setSavingCaptionId(variant.id);
+    try {
+      const res = await fetch('/api/social?task=update_variant_caption', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variantId: variant.id, caption: cleanCaption }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      setResult(current => ({
+        ...current,
+        variants: (current?.variants || []).map(entry => (
+          entry.id === variant.id ? { ...entry, caption: cleanCaption } : entry
+        )),
+      }));
+      setCaptionDrafts(current => ({ ...current, [variant.id]: cleanCaption }));
+      if (notify) toast.success(`${variant.platform} caption saved`);
+    } finally {
+      setSavingCaptionId(null);
+    }
+  };
+
+  const savePendingCaptions = async () => {
+    const changed = (result?.variants || []).filter(variant => (
+      (captionDrafts[variant.id] ?? variant.caption ?? '').trim() !== String(variant.caption || '').trim()
+    ));
+    for (const variant of changed) {
+      await persistCaption(variant, captionDrafts[variant.id], { notify: false });
+    }
+  };
+
   const handleSchedule = async (preset, customValue) => {
     if (!result?.contentItem?.id) return;
     let targetDate = new Date();
@@ -350,6 +410,7 @@ export default function SocialDraftComposer({
 
     setScheduling(true);
     try {
+      await savePendingCaptions();
       const res = await fetch('/api/social?task=schedule', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -399,6 +460,12 @@ export default function SocialDraftComposer({
   const label = entry => (activeTheme.entity === 'person' ? entry.name : `${entry.title}${entry.year ? ` (${entry.year})` : ''}`);
   const activeVariant = result?.variants?.find(variant => variant.platform === activePreviewPlatform) || result?.variants?.[0];
   const activePlatform = PLATFORMS.find(platform => platform.value === activeVariant?.platform) || PLATFORMS[0];
+  const activeCaption = activeVariant
+    ? (captionDrafts[activeVariant.id] ?? activeVariant.caption ?? '')
+    : '';
+  const captionIsDirty = Boolean(activeVariant)
+    && activeCaption.trim() !== String(activeVariant.caption || '').trim();
+  const activeCaptionLimit = CAPTION_LIMITS[activeVariant?.platform] || 2200;
   const selectedSingleAsset = result?.assets?.find(asset => asset.id === activeVariant?.selected_asset_id)
     || result?.assets?.find(asset => asset.format === 'custom_design')
     || result?.assets?.[0];
@@ -823,22 +890,39 @@ export default function SocialDraftComposer({
                 </section>
 
                 <section className="space-y-3 lg:col-span-6">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} caption</p>
-                      <p className="text-[10px] text-text-muted">Copy is shown beside the exact visual selected for this channel.</p>
+                      <p className="text-[10px] text-text-muted">Edit the generated copy here. Each platform keeps its own caption.</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const full = `${activeVariant?.caption || ''}\n\n${(activeVariant?.hashtags || []).map(tag => `#${tag}`).join(' ')}`;
-                        navigator.clipboard.writeText(full);
-                        toast.success(`${activePlatform.label} caption copied`);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-text-muted hover:border-brand hover:text-brand"
-                    >
-                      <Icon icon="solar:copy-linear" width="14" /> Copy caption
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await persistCaption(activeVariant, activeCaption);
+                          } catch (err) {
+                            toast.error(err.message || 'Could not save caption');
+                          }
+                        }}
+                        disabled={!captionIsDirty || savingCaptionId === activeVariant?.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[11px] font-bold text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Icon icon={savingCaptionId === activeVariant?.id ? 'solar:spinner-linear' : 'solar:diskette-linear'} className={savingCaptionId === activeVariant?.id ? 'animate-spin' : ''} width="14" />
+                        {savingCaptionId === activeVariant?.id ? 'Saving…' : 'Save changes'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const full = `${activeCaption}\n\n${(activeVariant?.hashtags || []).slice(0, 3).map(tag => `#${tag}`).join(' ')}`;
+                          navigator.clipboard.writeText(full.trim());
+                          toast.success(`${activePlatform.label} caption copied`);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-text-muted hover:border-brand hover:text-brand"
+                      >
+                        <Icon icon="solar:copy-linear" width="14" /> Copy
+                      </button>
+                    </div>
                   </div>
 
                   <div className="min-h-[420px] rounded-2xl border border-border bg-surface p-5">
@@ -848,15 +932,26 @@ export default function SocialDraftComposer({
                       </span>
                       <div>
                         <p className="text-xs font-black text-text-primary">MuviDB on {activePlatform.label}</p>
-                        <p className="text-[10px] text-text-muted">{(activeVariant?.caption || '').length} characters</p>
+                        <p className={`text-[10px] ${activeCaption.length > activeCaptionLimit ? 'text-red-500' : 'text-text-muted'}`}>
+                          {activeCaption.length}/{activeCaptionLimit} characters
+                        </p>
                       </div>
                     </div>
-                    <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-text-primary">
-                      {activeVariant?.caption || 'No caption generated for this platform.'}
-                    </p>
+                    <textarea
+                      value={activeCaption}
+                      onChange={event => setCaptionDrafts(current => ({
+                        ...current,
+                        [activeVariant.id]: event.target.value,
+                      }))}
+                      maxLength={activeCaptionLimit}
+                      rows={15}
+                      aria-label={`Edit ${activePlatform.label} caption`}
+                      className="mt-4 min-h-[300px] w-full resize-y rounded-xl border border-border bg-surface-2 p-4 text-sm leading-relaxed text-text-primary outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand"
+                      placeholder="Write the caption for this platform…"
+                    />
                     {activeVariant?.hashtags?.length > 0 && (
                       <p className="mt-4 text-sm font-bold leading-relaxed text-brand">
-                        {activeVariant.hashtags.map(tag => `#${tag}`).join(' ')}
+                        {activeVariant.hashtags.slice(0, 3).map(tag => `#${tag}`).join(' ')}
                       </p>
                     )}
                   </div>

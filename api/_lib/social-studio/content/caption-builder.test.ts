@@ -6,7 +6,7 @@ import {
   toHashtag,
   truncateAtWord,
 } from './caption-builder';
-import { buildActorSpotlightSnapshot, buildUpcomingMovieSnapshot } from './snapshots';
+import { buildActorSpotlightSnapshot, buildUpcomingMovieSnapshot, formatWatchAvailability } from './snapshots';
 import { SOCIAL_PLATFORMS } from '../domain/platform-types';
 
 const CAPTURED_AT = '2026-07-30T21:00:00.000Z';
@@ -118,6 +118,20 @@ describe('buildVariantContent', () => {
     expect(content.caption).toContain('Crew:\ndirector — @director.one');
   });
 
+  it('uses the verified streaming destination before a stale YouTube URL', () => {
+    expect(formatWatchAvailability({
+      release_type: 'nollistream',
+      streaming_links: { nollistream: 'https://nollistream.com/watch/downhill' },
+      youtube_watch_url: 'https://youtube.com/watch?v=stale',
+    })).toContain('NolliStream');
+
+    expect(formatWatchAvailability({
+      release_type: 'nollistream',
+      streaming_links: { nollistream: 'https://nollistream.com/watch/downhill' },
+      youtube_watch_url: 'https://youtube.com/watch?v=stale',
+    })).not.toContain('YouTube');
+  });
+
   it('only sets a title for TikTok', () => {
     expect(buildVariantContent({ snapshot: movieSnapshot, platform: 'tiktok' }).title).toBe('Jagun Jagun');
     expect(buildVariantContent({ snapshot: movieSnapshot, platform: 'instagram' }).title).toBeNull();
@@ -160,6 +174,7 @@ describe('buildVariantContent', () => {
     for (const platform of SOCIAL_PLATFORMS) {
       const content = buildVariantContent({ snapshot: movieSnapshot, platform });
       expect(content.hashtags.length).toBeLessThanOrEqual(PLATFORM_CAPTION_LIMITS[platform].hashtagLimit);
+      expect(PLATFORM_CAPTION_LIMITS[platform].hashtagLimit).toBe(3);
     }
   });
 

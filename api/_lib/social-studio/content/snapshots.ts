@@ -275,27 +275,59 @@ export function formatWatchAvailability(film: {
   is_in_cinemas?: boolean | null;
   coming_soon?: boolean | null;
   release_date?: string | null;
-  streaming_links?: Record<string, string> | null;
+  release_type?: string | null;
+  source?: string | null;
+  streaming_links?: Record<string, string> | string | null;
   youtube_watch_url?: string | null;
   youtube_channel_name?: string | null;
 }): string | null {
   if (!film) return null;
-  const links = film.streaming_links || {};
-  const hasPrime = Boolean(links.prime_video || links.prime);
-  const hasNetflix = Boolean(links.netflix);
-  const hasYoutube = Boolean(film.youtube_watch_url || links.youtube);
+  let links: Record<string, string> = {};
+  if (film.streaming_links && typeof film.streaming_links === 'object') {
+    links = film.streaming_links;
+  } else if (typeof film.streaming_links === 'string') {
+    try {
+      const parsed = JSON.parse(film.streaming_links);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) links = parsed;
+    } catch {
+      links = {};
+    }
+  }
+
+  const displayNames: Record<string, string> = {
+    nollistream: 'NolliStream',
+    docuth: 'Docuth',
+    ebonylife: 'EbonyLife ON Plus',
+    kava: 'Kava',
+    circuits: 'Circuits.tv',
+    netflix: 'Netflix',
+    prime_video: 'Prime Video',
+    prime: 'Prime Video',
+    youtube: 'YouTube',
+    apple_tv: 'Apple TV+',
+    disney_plus: 'Disney+',
+    hulu: 'Hulu',
+    irokotv: 'iROKOtv',
+  };
+  const releaseType = String(film.release_type || '').trim().toLowerCase();
+  const linkedPlatform = Object.keys(displayNames).find(key => Boolean(links[key]));
+  const directPlatform = releaseType && !['cinema', 'unreleased'].includes(releaseType)
+    ? releaseType
+    : linkedPlatform;
   const releaseStr = film.release_date ? formatDateNice(film.release_date) : '';
 
-  if (hasPrime) {
-    return releaseStr ? `Only on Prime Video • ${releaseStr} 🍿` : `Streaming on Prime Video 🍿`;
-  }
-  if (hasNetflix) {
-    return releaseStr ? `Only on Netflix • ${releaseStr} 🍿` : `Streaming on Netflix 🍿`;
+  if (directPlatform && displayNames[directPlatform]) {
+    const platformName = displayNames[directPlatform];
+    if (directPlatform === 'youtube') {
+      const channelName = text(film.youtube_channel_name);
+      return channelName ? `Watch on YouTube via ${channelName} 📺` : 'Watch on YouTube 📺';
+    }
+    return releaseStr ? `Streaming on ${platformName} • ${releaseStr} 🍿` : `Streaming on ${platformName} 🍿`;
   }
   if (film.is_in_cinemas) {
     return releaseStr ? `In Cinemas • ${releaseStr} 🎟️` : `In Cinemas Now 🎟️`;
   }
-  if (hasYoutube) {
+  if (film.youtube_watch_url || film.source === 'youtube') {
     const channelName = text(film.youtube_channel_name);
     return channelName ? `Watch on YouTube via ${channelName} 📺` : `Watch on YouTube 📺`;
   }
