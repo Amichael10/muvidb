@@ -15,6 +15,48 @@ import { matchPeopleByNameKey, searchPeopleByName } from '../../lib/peopleSearch
 import { extractCreditsWithLocalOCR } from '../../utils/localCreditOcr';
 
 const PEOPLE_SELECT = 'id, name, photo_url, film_count';
+const FILM_SELECT = 'id, title, poster_url, release_type, series_id, season_number, episode_number, year';
+
+function isActorCredit(role) {
+  return canonicalizeRole(role) === 'actor';
+}
+
+function installmentBaseTitle(title) {
+  return String(title || '')
+    .replace(/\s*[-–—:]?\s*(?:part|pt\.?|episode|ep\.?)\s*\d+\s*$/i, '')
+    .replace(/\s+\d+\s*$/i, '')
+    .trim();
+}
+
+function hasInstallmentMarker(title) {
+  return /(?:\b(?:part|pt\.?|episode|ep\.?)\s*\d+|\s\d+)\s*$/i.test(String(title || '').trim());
+}
+
+async function resolveNamesWithConcurrency(names, { concurrency = 3, onProgress } = {}) {
+  const queue = [...names];
+  const resolved = new Map();
+  let completed = 0;
+
+  const worker = async () => {
+    while (queue.length) {
+      const name = queue.shift();
+      let match = null;
+      try {
+        match = await resolvePersonMatch(name);
+      } catch (err) {
+        console.warn(`Could not match ${name}:`, err);
+      }
+      if (match) resolved.set(name, match);
+      completed += 1;
+      onProgress?.(completed, names.length);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, names.length) }, () => worker())
+  );
+  return resolved;
+}
 
 /**
  * Resolve an OCR/typed credit name to an existing person.
@@ -192,13 +234,19 @@ export default function AdminCreditsExtractor() {
   const [filmSearch, setFilmSearch] = useState('');
   const [isFilmDropdownOpen, setIsFilmDropdownOpen] = useState(false);
   const [isSearchingFilms, setIsSearchingFilms] = useState(false);
+  const [isRematching, setIsRematching] = useState(false);
+  const [rematchProgress, setRematchProgress] = useState({ done: 0, total: 0 });
+  const [relatedFilms, setRelatedFilms] = useState([]);
+  const [relatedFilmId, setRelatedFilmId] = useState('');
+  const [isLoadingRelated, setIsLoadingRelated] = useState(false);
+  const [isImportingCredits, setIsImportingCredits] = useState(false);
 
   // Load 50 recent films on mount (so newly created/updated films appear first)
   async function loadRecentFilms() {
     try {
       const { data, error } = await supabase
         .from('films')
-        .select('id, title, poster_url, release_type')
+        .select(FILM_SELECT)
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -241,7 +289,7 @@ export default function AdminCreditsExtractor() {
       try {
         const { data, error } = await supabase
           .from('films')
-          .select('id, title, poster_url, release_type')
+          .select(FILM_SELECT)
           .ilike('title', `%${cleanSearch}%`)
           .limit(50);
         if (error) throw error;
@@ -267,6 +315,72 @@ export default function AdminCreditsExtractor() {
     };
   }, [filmSearch]);
 
+  // Reuse exact person IDs from connected episodes/installments. Linked series
+  // are authoritative; title-based Part 1/2/3 matches are only offered for
+  // review and never write credits automatically.
+  useEffect(() => {
+    let active = true;
+
+    async function loadRelatedFilms() {
+      if (!selectedFilm?.id) {
+        setRelatedFilms([]);
+        setRelatedFilmId('');
+        return;
+      }
+
+      setIsLoadingRelated(true);
+      try {
+        const found = new Map();
+        const familyRootId = selectedFilm.series_id || selectedFilm.id;
+        const linkedQuery = selectedFilm.series_id
+          ? supabase.from('films').select(FILM_SELECT).or(`id.eq.${familyRootId},series_id.eq.${familyRootId}`).limit(50)
+          : supabase.from('films').select(FILM_SELECT).eq('series_id', selectedFilm.id).limit(50);
+        const { data: linked, error: linkedError } = await linkedQuery;
+        if (linkedError) throw linkedError;
+        (linked || []).forEach((film) => {
+          if (film.id !== selectedFilm.id) found.set(film.id, { ...film, relation: 'linked' });
+        });
+
+        const baseTitle = installmentBaseTitle(selectedFilm.title);
+        if (baseTitle && baseTitle.length >= 3) {
+          const { data: titleMatches, error: titleError } = await supabase
+            .from('films')
+            .select(FILM_SELECT)
+            .ilike('title', `${baseTitle}%`)
+            .limit(30);
+          if (titleError) throw titleError;
+          (titleMatches || []).forEach((film) => {
+            const sameBase = installmentBaseTitle(film.title).toLowerCase() === baseTitle.toLowerCase();
+            const installmentLike = hasInstallmentMarker(selectedFilm.title) || hasInstallmentMarker(film.title);
+            if (film.id !== selectedFilm.id && sameBase && installmentLike) {
+              if (!found.has(film.id)) found.set(film.id, { ...film, relation: 'title_match' });
+            }
+          });
+        }
+
+        if (!active) return;
+        const rows = [...found.values()].sort((a, b) => {
+          const episodeOrder = Number(a.episode_number || a.season_number || 0) - Number(b.episode_number || b.season_number || 0);
+          if (episodeOrder) return episodeOrder;
+          return Number(b.year || 0) - Number(a.year || 0) || a.title.localeCompare(b.title);
+        });
+        setRelatedFilms(rows);
+        setRelatedFilmId((current) => rows.some((film) => film.id === current) ? current : (rows[0]?.id || ''));
+      } catch (err) {
+        console.error('Could not load related film credits:', err);
+        if (active) {
+          setRelatedFilms([]);
+          setRelatedFilmId('');
+        }
+      } finally {
+        if (active) setIsLoadingRelated(false);
+      }
+    }
+
+    loadRelatedFilms();
+    return () => { active = false; };
+  }, [selectedFilm]);
+
 
   // Fetch live matches whenever the name list changes.
   // Uses name_key (order-insensitive) — not case-sensitive exact .in('name').
@@ -277,15 +391,7 @@ export default function AdminCreditsExtractor() {
     if (!nameStrings.length) return;
 
     try {
-      const resolved = new Map(); // queryName → person
-      const BATCH = 8;
-      for (let i = 0; i < nameStrings.length; i += BATCH) {
-        const slice = nameStrings.slice(i, i + BATCH);
-        const found = await Promise.all(slice.map((n) => resolvePersonMatch(n).catch(() => null)));
-        slice.forEach((n, idx) => {
-          if (found[idx]) resolved.set(n, found[idx]);
-        });
-      }
+      const resolved = await resolveNamesWithConcurrency(nameStrings, { concurrency: 3 });
 
       setter((prevRows) =>
         prevRows.map((row) => {
@@ -299,14 +405,9 @@ export default function AdminCreditsExtractor() {
               status: row.forceCreate ? 'new' : 'matched',
             };
           }
-          return {
-            ...row,
-            matchId: null,
-            matchName: null,
-            photoUrl: null,
-            forceCreate: false,
-            status: 'new',
-          };
+          // Preserve an existing/manual link when a transient lookup fails.
+          if (row.matchId) return row;
+          return { ...row, status: 'new' };
         })
       );
     } catch (err) {
@@ -610,6 +711,123 @@ export default function AdminCreditsExtractor() {
     }
   };
 
+  const handleRematchRoster = async () => {
+    const rows = activeTab === 'cast' ? castRows : crewRows;
+    const setter = activeTab === 'cast' ? setCastRows : setCrewRows;
+    const retryRows = rows.filter((row) =>
+      row.name.trim() && !row.matchId && !row.forceCreate && !savedRows.has(row.key) && !savingRows.has(row.key)
+    );
+    if (!retryRows.length) {
+      toast.success('Every available row is already matched.');
+      return;
+    }
+
+    const targetKeys = new Set(retryRows.map((row) => row.key));
+    const names = [...new Set(retryRows.map((row) => row.name.trim()))];
+    setIsRematching(true);
+    setRematchProgress({ done: 0, total: names.length });
+    setter((current) => current.map((row) => targetKeys.has(row.key) ? { ...row, status: 'checking' } : row));
+
+    try {
+      const resolved = await resolveNamesWithConcurrency(names, {
+        concurrency: 3,
+        onProgress: (done, total) => setRematchProgress({ done, total }),
+      });
+      const matchedCount = retryRows.filter((row) => resolved.has(row.name.trim())).length;
+      setter((current) => current.map((row) => {
+        if (!targetKeys.has(row.key)) return row;
+        const match = resolved.get(row.name.trim());
+        if (!match) return { ...row, status: 'new' };
+        return {
+          ...row,
+          matchId: match.id,
+          matchName: match.name,
+          photoUrl: match.photo_url,
+          forceCreate: false,
+          status: 'matched',
+        };
+      }));
+      toast.success(
+        matchedCount
+          ? `Matched ${matchedCount} of ${retryRows.length} previously unmatched rows.`
+          : 'No additional safe matches were found. You can still choose a profile manually.'
+      );
+    } catch (err) {
+      console.error('Roster rematch failed:', err);
+      toast.error(`Could not retry matching: ${getFriendlyErrorMessage(err)}`);
+    } finally {
+      setIsRematching(false);
+    }
+  };
+
+  const handleImportRelatedCredits = async () => {
+    const sourceFilm = relatedFilms.find((film) => film.id === relatedFilmId);
+    if (!sourceFilm) {
+      toast.error('Choose a related film or episode first.');
+      return;
+    }
+
+    setIsImportingCredits(true);
+    try {
+      const { data, error } = await supabase
+        .from('credits')
+        .select('id, role, character_name, billing_order, people:person_id(id,name,photo_url)')
+        .eq('film_id', sourceFilm.id)
+        .order('billing_order', { ascending: true, nullsFirst: false });
+      if (error) throw error;
+
+      const relevant = (data || []).filter((credit) =>
+        activeTab === 'cast' ? isActorCredit(credit.role) : !isActorCredit(credit.role)
+      );
+      const incoming = relevant
+        .filter((credit) => credit.people?.id && credit.people?.name)
+        .map((credit, index) => ({
+          key: `reused-${activeTab}-${sourceFilm.id}-${credit.id}-${Date.now()}-${index}`,
+          name: credit.people.name,
+          roleOrCharacter: activeTab === 'cast' ? (credit.character_name || '') : (credit.role || ''),
+          selected: true,
+          status: 'matched',
+          matchId: credit.people.id,
+          matchName: credit.people.name,
+          photoUrl: credit.people.photo_url,
+          forceCreate: false,
+          reusedFrom: sourceFilm.title,
+        }));
+
+      const setter = activeTab === 'cast' ? setCastRows : setCrewRows;
+      let addedCount = 0;
+      setter((current) => {
+        const seen = new Set(current.map((row) => activeTab === 'cast'
+          ? `person:${row.matchId || foldPersonText(row.name)}`
+          : `person:${row.matchId || foldPersonText(row.name)}|role:${foldPersonText(row.roleOrCharacter)}`
+        ));
+        const additions = incoming.filter((row) => {
+          const key = activeTab === 'cast'
+            ? `person:${row.matchId}`
+            : `person:${row.matchId}|role:${foldPersonText(row.roleOrCharacter)}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        addedCount = additions.length;
+        return [...current, ...additions];
+      });
+
+      if (!incoming.length) {
+        toast.error(`No ${activeTab} credits are attached to ${sourceFilm.title}.`);
+      } else if (!addedCount) {
+        toast.success(`All reusable ${activeTab} credits are already in this roster.`);
+      } else {
+        toast.success(`Added ${addedCount} reusable ${activeTab} suggestion${addedCount === 1 ? '' : 's'} from ${sourceFilm.title}.`);
+      }
+    } catch (err) {
+      console.error('Could not import related credits:', err);
+      toast.error(`Could not reuse credits: ${getFriendlyErrorMessage(err)}`);
+    } finally {
+      setIsImportingCredits(false);
+    }
+  };
+
   // Update specific property on cell edit
   const handleCellChange = (key, field, val, type) => {
     const setter = type === 'cast' ? setCastRows : setCrewRows;
@@ -734,6 +952,9 @@ export default function AdminCreditsExtractor() {
   const filteredFilms = films;
 
   const activeRoster = activeTab === 'cast' ? castRows : crewRows;
+  const unmatchedCount = activeRoster.filter((row) =>
+    row.name.trim() && !row.matchId && !row.forceCreate && !savedRows.has(row.key) && !savingRows.has(row.key)
+  ).length;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto pb-16">
@@ -836,6 +1057,49 @@ export default function AdminCreditsExtractor() {
               )}
             </div>
           </div>
+
+          {selectedFilm && (isLoadingRelated || relatedFilms.length > 0) && (
+            <div className="card-cal p-6 space-y-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-brand">Reuse connected credits</p>
+                <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                  Bring in recurring talent from another installment as editable suggestions. Nothing is saved until you review the roster.
+                </p>
+              </div>
+              {isLoadingRelated ? (
+                <div className="flex items-center gap-2 py-3 text-xs font-bold text-text-muted">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
+                  Finding connected films…
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={relatedFilmId}
+                    onChange={(event) => setRelatedFilmId(event.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm font-bold text-text-primary focus:border-brand focus:outline-none"
+                  >
+                    {relatedFilms.map((film) => (
+                      <option key={film.id} value={film.id}>
+                        {film.title}{film.relation === 'title_match' ? ' · possible installment' : ' · linked'}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleImportRelatedCredits}
+                    disabled={isImportingCredits || !relatedFilmId}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand/30 bg-brand/10 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-brand transition-all hover:bg-brand/15 disabled:opacity-40"
+                  >
+                    {isImportingCredits ? (
+                      <><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/30 border-t-brand" /> Loading credits…</>
+                    ) : (
+                      `Reuse ${activeTab === 'cast' ? 'cast' : 'crew'} suggestions`
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* OCR Engine Selection Card */}
           <div className="card-cal p-6 space-y-4">
@@ -1017,6 +1281,24 @@ export default function AdminCreditsExtractor() {
               <div className="flex items-center gap-3">
                 {activeRoster.length > 0 && (
                   <button
+                    type="button"
+                    onClick={handleRematchRoster}
+                    disabled={isRematching || unmatchedCount === 0}
+                    className="inline-flex items-center gap-2 rounded-lg border border-blue-500/25 bg-blue-500/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-blue-400 transition-all hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Retry database matching for every currently unmatched row"
+                  >
+                    {isRematching ? (
+                      <>
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-400/30 border-t-blue-400" />
+                        Matching {rematchProgress.done}/{rematchProgress.total}
+                      </>
+                    ) : (
+                      <>↻ Auto-match again{unmatchedCount ? ` (${unmatchedCount})` : ''}</>
+                    )}
+                  </button>
+                )}
+                {activeRoster.length > 0 && (
+                  <button
                     onClick={() => {
                       if (activeTab === 'cast') setCastRows([]);
                       else setCrewRows([]);
@@ -1170,6 +1452,11 @@ export default function AdminCreditsExtractor() {
                                 <p className="text-[10px] text-text-muted truncate" title={row.matchName}>
                                   {row.forceCreate ? 'Ignoring match: ' : '→ '}
                                   {row.matchName}
+                                </p>
+                              )}
+                              {row.reusedFrom && (
+                                <p className="truncate text-[9px] font-bold text-amber-500/80" title={`Suggested from ${row.reusedFrom}`}>
+                                  Suggested from {row.reusedFrom}
                                 </p>
                               )}
                             </div>
