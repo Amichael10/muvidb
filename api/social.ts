@@ -94,12 +94,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true, message: 'Threads deauthorized successfully' });
     }
 
-    if (task === 'threads_delete') {
-      const confirmationCode = 'muvidb_del_' + Date.now();
-      return res.status(200).json({
-        url: 'https://muvidb.com/privacy',
-        confirmation_code: confirmationCode,
-      });
+    if (task === 'asset') {
+      const targetUrl = String(req.query.url || '').trim();
+      if (!targetUrl || !targetUrl.startsWith('https://pkenrmorywmuvnzfoylp.supabase.co/')) {
+        return res.status(400).json({ error: 'Invalid or unauthorized asset URL' });
+      }
+      try {
+        const upstream = await fetch(targetUrl);
+        if (!upstream.ok) return res.status(upstream.status).end();
+        const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        return res.status(200).send(buffer);
+      } catch (err: any) {
+        return res.status(502).json({ error: 'Failed to proxy asset', details: err?.message });
+      }
     }
 
     const {

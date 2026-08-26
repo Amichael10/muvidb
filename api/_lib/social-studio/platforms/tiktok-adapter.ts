@@ -118,11 +118,21 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       brand_organic_toggle: Boolean(settings.brand_organic_toggle),
     };
 
+    const proxyUrl = (url: string) => {
+      if (url.startsWith('https://pkenrmorywmuvnzfoylp.supabase.co/')) {
+        return `https://muvidb.com/api/social?task=asset&url=${encodeURIComponent(url)}`;
+      }
+      return url;
+    };
+
+    const targetMediaUrls = mediaUrls.map(proxyUrl);
+    const targetAssetUrl = proxyUrl(request.assetUrl);
+
     // 1. Direct Video Publish / Upload
     if (isVideo) {
       const sourceInfo = {
         source: 'PULL_FROM_URL',
-        video_url: request.assetUrl,
+        video_url: targetAssetUrl,
       };
       const payload = postMode === 'MEDIA_UPLOAD'
         ? { source_info: sourceInfo }
@@ -183,10 +193,10 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       post_info: photoPostInfo,
       source_info: {
         source: 'PULL_FROM_URL',
-        photo_images: mediaUrls,
-        photo_cover_index: Math.min(
-          mediaUrls.length - 1,
-          Math.max(0, Math.floor(Number(settings.photo_cover_index) || 0)),
+        photo_images: targetMediaUrls,
+        photo_cover_index: Math.max(
+          1,
+          Math.min(targetMediaUrls.length, Math.floor(Number(settings.photo_cover_index) || 1)),
         ),
       },
     };
