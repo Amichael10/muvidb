@@ -4,7 +4,7 @@ on:
   schedule:
     # GitHub schedules use UTC. The publisher queries the database for every
     # job whose scheduled_for timestamp is due, so this works across timezones.
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 # Never let two queue drainers publish the same batch concurrently. The

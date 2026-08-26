@@ -36,39 +36,53 @@ function formatDuration(seconds: number) {
   return `${m}m`;
 }
 
-async function alreadyNotified(channelId: string, videoId: string) {
-  const { data } = await supabase
-    .from('youtube_upload_alert_log')
-    .select('video_id')
-    .eq('channel_id', channelId)
-    .eq('video_id', videoId)
-    .maybeSingle();
-  return Boolean(data?.video_id);
+async function claimAlert(channelId: string, video: UploadCandidate, source: string): Promise<boolean> {
+  const { error } = await supabase.from('youtube_upload_alert_log').insert({
+    channel_id: channelId,
+    video_id: video.video_id,
+    title: video.title?.slice(0, 500) || null,
+    notified_at: new Date().toISOString(),
+    status: 'processing',
+    source,
+  });
+  if (!error) return true;
+  if (error.code === '23505') return false;
+  throw error;
 }
 
 async function markNotified(channelId: string, video: UploadCandidate) {
-  const { error } = await supabase.from('youtube_upload_alert_log').upsert(
-    {
-      channel_id: channelId,
-      video_id: video.video_id,
+  const { error } = await supabase
+    .from('youtube_upload_alert_log')
+    .update({
       title: video.title?.slice(0, 500) || null,
       notified_at: new Date().toISOString(),
-    },
-    { onConflict: 'channel_id,video_id' },
-  );
+      status: 'notified',
+      last_error: null,
+    })
+    .eq('channel_id', channelId)
+    .eq('video_id', video.video_id);
   if (error) {
-    console.warn('[youtube_upload_notify] alert log upsert failed:', error.message);
+    console.warn('[youtube_upload_notify] alert log update failed:', error.message);
   }
 }
 
-async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate) {
+async function releaseFailedClaim(channelId: string, videoId: string, message: string) {
+  const { error } = await supabase
+    .from('youtube_upload_alert_log')
+    .delete()
+    .eq('channel_id', channelId)
+    .eq('video_id', videoId)
+    .eq('status', 'processing');
+  if (error) console.warn('[youtube_upload_notify] failed claim cleanup:', message, error.message);
+}
+
+async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, source: string) {
   if (!telegramConfigured()) return { ok: false, skipped: 'telegram not configured' };
+  if (!(await claimAlert(channel.id, video, source))) return { ok: false, skipped: 'already claimed' };
 
   const url = `https://www.youtube.com/watch?v=${video.video_id}`;
   const mins = formatDuration(video.duration_seconds || 0);
-  const published = video.published_at
-    ? new Date(video.published_at).toISOString().slice(0, 16).replace('T', ' ')
-    : '';
+  const published = video.published_at ? new Date(video.published_at).toISOString().slice(0, 16).replace('T', ' ') : '';
 
   const message = [
     '🎬 New YouTube upload',
@@ -87,7 +101,10 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate) {
       inline_keyboard: [
         [
           { text: '▶ Open', url },
-          { text: '🙈 Hide (skip import)', callback_data: `hide_yt:${channel.id}:${video.video_id}` },
+          {
+            text: '🙈 Hide (skip import)',
+            callback_data: `hide_yt:${channel.id}:${video.video_id}`,
+          },
         ],
       ],
     },
@@ -95,6 +112,7 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate) {
 
   if (!sent.ok) {
     console.warn('[youtube_upload_notify] telegram failed:', sent.error);
+    await releaseFailedClaim(channel.id, video.video_id, sent.error || 'Telegram delivery failed');
     return { ok: false, error: sent.error };
   }
 
@@ -106,20 +124,52 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate) {
 export async function notifyYouTubeUploads(
   channel: ChannelRow,
   candidates: UploadCandidate[],
+  options: {
+    baselineAt?: string | null;
+    source?: 'websub' | 'reconciliation' | 'full_sync';
+  } = {},
 ) {
   if (!telegramConfigured() || !candidates.length) {
     return { notified: 0, skipped: candidates.length };
   }
 
-  // STRICT NO-BACKFILL SAFEGUARD: Only alert on uploads published in the last 48 hours.
-  // Anything older was published in the past and should not spam Telegram.
+  let baselineAt = options.baselineAt || null;
+  if (!baselineAt) {
+    const { data: subscription, error: baselineError } = await supabase
+      .from('youtube_websub_subscriptions')
+      .select('baseline_at')
+      .eq('channel_id', channel.id)
+      .maybeSingle();
+    if (baselineError) throw baselineError;
+    baselineAt = subscription?.baseline_at || null;
+  }
+
+  // No state means this is the first observation of the channel. Establishing
+  // a subscription/reconciliation baseline must happen before alerts are sent;
+  // otherwise the first run would announce a backlog as if it were new.
+  if (!baselineAt)
+    return {
+      notified: 0,
+      skipped: candidates.length,
+      reason: 'baseline_missing',
+    };
+
+  // The baseline is the primary no-backfill boundary. The 48-hour ceiling is a
+  // secondary guard against corrupt timestamps or a stale subscription.
   const MAX_UPLOAD_AGE_MS = 48 * 3600 * 1000;
   const now = Date.now();
+  const baselineTime = new Date(baselineAt).getTime();
   const recentFilmLength = candidates.filter((v) => {
     if (!isFilmLengthDuration(v.duration_seconds || 0)) return false;
     if (!v.published_at) return false;
     const pubTime = new Date(v.published_at).getTime();
-    return !isNaN(pubTime) && (now - pubTime) <= MAX_UPLOAD_AGE_MS;
+    return (
+      !isNaN(pubTime) &&
+      !isNaN(baselineTime) &&
+      pubTime > baselineTime &&
+      pubTime <= now + 5 * 60 * 1000 &&
+      now - pubTime <= MAX_UPLOAD_AGE_MS
+    );
   });
 
   if (!recentFilmLength.length) return { notified: 0, skipped: candidates.length };
@@ -138,18 +188,38 @@ export async function notifyYouTubeUploads(
   // Check which candidate videos have already been alerted on
   const { data: alertedRows } = await supabase
     .from('youtube_upload_alert_log')
-    .select('video_id')
+    .select('video_id,status,notified_at')
     .eq('channel_id', channel.id)
     .in('video_id', candidateIds);
 
-  const alertedSet = new Set((alertedRows || []).map((r) => r.video_id));
+  const staleClaimCutoff = now - 15 * 60 * 1000;
+  const staleClaims = (alertedRows || []).filter(
+    (row) => row.status === 'processing' && new Date(row.notified_at || 0).getTime() < staleClaimCutoff,
+  );
+  if (staleClaims.length) {
+    await supabase
+      .from('youtube_upload_alert_log')
+      .delete()
+      .eq('channel_id', channel.id)
+      .eq('status', 'processing')
+      .in(
+        'video_id',
+        staleClaims.map((row) => row.video_id),
+      );
+  }
+  const staleIds = new Set(staleClaims.map((row) => row.video_id));
+  const alertedSet = new Set(
+    (alertedRows || [])
+      .filter((row) => !staleIds.has(row.video_id) && row.status !== 'failed')
+      .map((row) => row.video_id),
+  );
 
   let notified = 0;
   for (const video of recentFilmLength) {
     if (existingSet.has(video.video_id)) continue;
     if (alertedSet.has(video.video_id)) continue;
 
-    const sent = await sendUploadAlert(channel, video);
+    const sent = await sendUploadAlert(channel, video, options.source || 'full_sync');
     if (sent.ok) notified += 1;
   }
   return { notified, skipped: candidates.length - notified };
@@ -208,12 +278,20 @@ export async function pollChannelUploads(channel: ChannelRow): Promise<UploadCan
 
 /** Run from GitHub Actions — alert before the full sync auto-imports. */
 export async function runYouTubeUploadWatch() {
-  if (process.env.ENABLE_YOUTUBE_WATCH !== 'true') {
-    return { ok: true, message: 'YouTube upload watch is currently paused/disabled.', channels: 0, notified: 0 };
+  if (process.env.ENABLE_YOUTUBE_WATCH === 'false') {
+    return {
+      ok: true,
+      message: 'YouTube upload watch is currently paused/disabled.',
+      channels: 0,
+      notified: 0,
+    };
   }
 
   if (!telegramConfigured()) {
-    return { ok: false, message: 'Telegram not configured (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID)' };
+    return {
+      ok: false,
+      message: 'Telegram not configured (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID)',
+    };
   }
 
   const { data: channels, error } = await supabase
@@ -226,13 +304,58 @@ export async function runYouTubeUploadWatch() {
   if (!channels?.length) return { ok: true, channels: 0, notified: 0 };
 
   let totalNotified = 0;
-  const details: { channel: string; notified: number }[] = [];
+  const details: { channel: string; notified: number; status?: string }[] = [];
 
   for (const ch of channels) {
     try {
       const uploads = await pollChannelUploads(ch);
-      const result = await notifyYouTubeUploads(ch, uploads);
+      const { data: existingState, error: stateError } = await supabase
+        .from('youtube_websub_subscriptions')
+        .select('baseline_at')
+        .eq('channel_id', ch.id)
+        .maybeSingle();
+      if (stateError) throw stateError;
+
+      if (!existingState) {
+        const nowIso = new Date().toISOString();
+        const externalId = ch.channel_id || ch.channel_url?.match(/\/channel\/(UC[\w-]+)/)?.[1];
+        if (!externalId) {
+          details.push({
+            channel: ch.name,
+            notified: 0,
+            status: 'awaiting_websub_setup',
+          });
+          continue;
+        }
+        const { error: baselineError } = await supabase.from('youtube_websub_subscriptions').insert({
+          channel_id: ch.id,
+          youtube_channel_id: externalId,
+          topic_url: `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(externalId)}`,
+          status: 'pending',
+          baseline_at: nowIso,
+          last_reconciled_at: nowIso,
+        });
+        if (baselineError) throw baselineError;
+        details.push({
+          channel: ch.name,
+          notified: 0,
+          status: 'baseline_initialized',
+        });
+        continue;
+      }
+
+      const result = await notifyYouTubeUploads(ch, uploads, {
+        baselineAt: existingState.baseline_at,
+        source: 'reconciliation',
+      });
       totalNotified += result.notified;
+      await supabase
+        .from('youtube_websub_subscriptions')
+        .update({
+          last_reconciled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('channel_id', ch.id);
       if (result.notified > 0) {
         details.push({ channel: ch.name, notified: result.notified });
       }
@@ -241,5 +364,10 @@ export async function runYouTubeUploadWatch() {
     }
   }
 
-  return { ok: true, channels: channels.length, notified: totalNotified, details };
+  return {
+    ok: true,
+    channels: channels.length,
+    notified: totalNotified,
+    details,
+  };
 }
