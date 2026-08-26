@@ -251,6 +251,14 @@
       "destination": "https://opencut.muvidb.com/:path*"
     },
     {
+      "source": "/studio",
+      "destination": "https://studio.muvidb.com"
+    },
+    {
+      "source": "/studio/:path*",
+      "destination": "https://studio.muvidb.com/:path*"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/api/ssr?__pathname=/$1"
     }
