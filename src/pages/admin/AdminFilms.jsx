@@ -23,6 +23,7 @@ import { resolveFilmImageFields } from '../../lib/filmImages';
 import { NFVCB_RATING_OPTIONS } from '../../lib/contributions';
 import { getShowName } from '../../utils/series';
 import { deleteFilmsPermanently } from '../../utils/filmDelete';
+import { resolveFilmGenreSelection, visibleFilmGenres } from '../../lib/filmGenres';
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -48,6 +49,7 @@ export default function AdminFilms() {
   const [showtimes, setShowtimes] = useState([]);
   const [cinemas, setCinemas] = useState([]);
   const [allGenres, setAllGenres] = useState([]);
+  const [showAllGenres, setShowAllGenres] = useState(false);
   
   // Search States
   const [peopleSearch, setPeopleSearch] = useState('');
@@ -280,9 +282,24 @@ export default function AdminFilms() {
   }, [films.length > 0]); // Run when films list is populated
 
   const fetchGenres = async () => {
-    const { data } = await supabase.from('genres').select('*').order('name');
+    const { data, error } = await supabase.from('genres').select('id,name').order('name');
+    if (error) {
+      toast.error('Genres could not be loaded. Please try again.');
+      return;
+    }
     setAllGenres(data || []);
   };
+
+  useEffect(() => {
+    if (!isDrawerOpen || allGenres.length === 0) return;
+    setFormData((current) => {
+      const normalized = resolveFilmGenreSelection(current.genres, allGenres).ids;
+      const existing = Array.isArray(current.genres) ? current.genres : [];
+      return existing.length === normalized.length && existing.every((value, index) => value === normalized[index])
+        ? current
+        : { ...current, genres: normalized };
+    });
+  }, [isDrawerOpen, allGenres]);
 
   // Debounced channel search for the "by channel" filter (1.6k+ channels, so a
   // searchable combobox rather than a giant dropdown).
@@ -651,6 +668,7 @@ export default function AdminFilms() {
     setParentSeriesLabel('');
     setSimilarSeries([]);
     setSelectedSimilarIds([]);
+    setShowAllGenres(false);
 
     if (film) {
       setEditingFilm(film);
@@ -1074,7 +1092,16 @@ export default function AdminFilms() {
     setIsSubmitting(true);
 
     try {
-      const selectedGenreIds = formData.genres || [];
+      if (allGenres.length === 0) {
+        toast.error('Genres are still loading. Please wait a moment and try again.');
+        return;
+      }
+      const resolvedGenres = resolveFilmGenreSelection(formData.genres, allGenres);
+      if (resolvedGenres.unresolved.length > 0) {
+        toast.error(`These genres are no longer available: ${resolvedGenres.unresolved.join(', ')}`);
+        return;
+      }
+      const selectedGenreIds = resolvedGenres.ids;
       const channel_video_id = formData.channel_video_id || null;
 
       const cleanFilmPayload = {
@@ -1132,6 +1159,9 @@ export default function AdminFilms() {
             recipients: Array.isArray(a.recipients) ? a.recipients.filter(Boolean) : [],
             won: a.won === true,
           })),
+        // Keep the legacy text array in sync for older public queries while
+        // film_genres remains the canonical relationship table.
+        genres: resolvedGenres.names,
       };
 
       let filmId = editingFilm?.id;
@@ -2587,7 +2617,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase tracking-widest mb-3">Classification Genres</label>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    {allGenres.map(genre => (
+                    {visibleFilmGenres(allGenres, formData.genres, showAllGenres).map(genre => (
                       <label key={genre.id} className="flex items-center gap-3 cursor-pointer group">
                         <div className="relative flex items-center">
                           <input
@@ -2611,6 +2641,17 @@ export default function AdminFilms() {
                       </label>
                     ))}
                   </div>
+
+                  {allGenres.length > visibleFilmGenres(allGenres, formData.genres, false).length && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllGenres((current) => !current)}
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-[10px] font-black uppercase tracking-wider text-brand transition-colors hover:border-brand/50"
+                    >
+                      <Icon icon={showAllGenres ? 'solar:minus-circle-linear' : 'solar:add-circle-linear'} width="15" />
+                      {showAllGenres ? 'Show fewer genres' : `More genres +${allGenres.length - visibleFilmGenres(allGenres, formData.genres, false).length}`}
+                    </button>
+                  )}
 
                   <div className="flex items-center gap-6 pt-4 border-t border-border/50">
                     <label className="flex items-center gap-3 cursor-pointer group">
