@@ -65,6 +65,7 @@ export function Layout({ children }: { children: ReactNode }) {
         />
         <meta name="theme-color" content="#FF5C00" />
         <meta name="p:domain_verify" content="8ad6cd73dc27274ad787bc4a69d26c36" />
+        <meta name="tiktok-developers-site-verification" content="dyOYINHtwrakEU682uyYf9OKbOBSUKSS" />
 
         {/* Speed up the first image/data round-trips (Core Web Vitals) */}
         <link rel="preconnect" href="https://pkenrmorywmuvnzfoylp.supabase.co" crossOrigin="" />
