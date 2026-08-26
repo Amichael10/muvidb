@@ -22,14 +22,24 @@ function required(name: 'THREAD_APP_ID' | 'THREAD_APP_SECRET'): string {
 }
 
 function encryptionKey(): Buffer {
-  const material = String(process.env.SOCIAL_TOKEN_ENCRYPTION_KEY || '').trim();
+  const material = String(
+    process.env.SOCIAL_TOKEN_ENCRYPTION_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.CRON_SECRET ||
+    ''
+  ).trim();
   if (!material) throw httpError(503, 'Social token encryption is not configured');
   return createHash('sha256').update(material).digest();
 }
 
 function stateKey(): string {
-  const value = String(process.env.THREAD_OAUTH_STATE_SECRET || '').trim();
-  if (!value) throw httpError(503, 'Threads OAuth state security is not configured');
+  const value = String(
+    process.env.THREAD_OAUTH_STATE_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.CRON_SECRET ||
+    ''
+  ).trim();
+  if (!value) throw httpError(503, 'OAuth state security is not configured');
   return value;
 }
 
