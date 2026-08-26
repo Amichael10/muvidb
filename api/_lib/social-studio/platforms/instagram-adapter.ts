@@ -56,7 +56,9 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
   constructor(options: InstagramAdapterOptions) {
     this.accessToken = options.accessToken;
     this.instagramAccountId = options.instagramAccountId;
-    this.baseUrl = `https://graph.facebook.com/${cleanVersion(options.apiVersion)}`;
+    const isDirectInstagramToken = options.accessToken.startsWith('IGAG') || options.accessToken.startsWith('IGAA');
+    const domain = isDirectInstagramToken ? 'graph.instagram.com' : 'graph.facebook.com';
+    this.baseUrl = `https://${domain}/${cleanVersion(options.apiVersion)}`;
     this.fetchImpl = options.fetchImpl || fetch;
     this.pollIntervalMs = options.pollIntervalMs || 2000;
     this.maxPollAttempts = options.maxPollAttempts || 15;
