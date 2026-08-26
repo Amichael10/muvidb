@@ -196,6 +196,121 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const connectMeta = async () => {
+    setConnections(prev => ({ ...prev, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=meta_oauth_start', {
+        method: 'POST',
+        headers: await authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      } else {
+        throw new Error('No authorization URL received from Meta');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to initiate Meta connection');
+      setConnections(prev => ({ ...prev, connecting: false }));
+    }
+  };
+
+  const connectThreads = async () => {
+    setConnections(prev => ({ ...prev, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=threads_oauth_start', {
+        method: 'POST',
+        headers: await authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      } else {
+        throw new Error('No authorization URL received from Threads');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to initiate Threads connection');
+      setConnections(prev => ({ ...prev, connecting: false }));
+    }
+  };
+
+  const connectTikTok = async () => {
+    setConnections(prev => ({ ...prev, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=tiktok_oauth_start', {
+        method: 'POST',
+        headers: await authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      } else {
+        throw new Error('No authorization URL received from TikTok');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to initiate TikTok connection');
+      setConnections(prev => ({ ...prev, connecting: false }));
+    }
+  };
+
+  const disconnectAccount = async (platform) => {
+    const confirmed = window.confirm(`Disconnect MuviDB ${platform}? This will stop automated posts to ${platform}.`);
+    if (!confirmed) return;
+
+    setConnections(prev => ({ ...prev, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=disconnect_platform', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`Disconnected ${platform}`);
+      await fetchConnectionsStatus();
+    } catch (err) {
+      toast.error(err.message || `Failed to disconnect ${platform}`);
+    } finally {
+      setConnections(prev => ({ ...prev, connecting: false }));
+    }
+  };
+
+  const saveManualConnection = async (e) => {
+    e.preventDefault();
+    if (!manualConnectPlatform || !manualFormData.accessToken.trim()) {
+      toast.error('Please provide a valid access token');
+      return;
+    }
+
+    setConnections(prev => ({ ...prev, connecting: true }));
+    try {
+      const res = await fetch('/api/social?task=save_connection', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: manualConnectPlatform,
+          username: manualFormData.username.trim(),
+          displayName: manualFormData.displayName.trim() || manualFormData.username.trim(),
+          externalAccountId: manualFormData.externalAccountId.trim() || manualFormData.username.trim(),
+          accessToken: manualFormData.accessToken.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`Successfully saved ${manualConnectPlatform} connection!`);
+      setManualConnectPlatform(null);
+      setManualFormData({ username: '', displayName: '', externalAccountId: '', accessToken: '' });
+      await fetchConnectionsStatus();
+    } catch (err) {
+      toast.error(err.message || `Failed to save ${manualConnectPlatform} token`);
+    } finally {
+      setConnections(prev => ({ ...prev, connecting: false }));
+    }
+  };
+
   const fetchDrafts = async () => {
     setDraftsLoading(true);
     setDraftsError('');
