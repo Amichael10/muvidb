@@ -62,12 +62,6 @@
       "maxDuration": 60
     }
   },
-  "crons": [
-    {
-      "path": "/api/social?task=publish_due",
-      "schedule": "0 0 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/assets/(.*)",
