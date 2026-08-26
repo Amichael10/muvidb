@@ -2,9 +2,10 @@ name: Social Studio Publisher
 
 on:
   schedule:
-    # GitHub schedules use UTC. The publisher queries the database for every
-    # job whose scheduled_for timestamp is due, so this works across timezones.
-    - cron: "*/10 * * * *"
+    # Fixed daily publishing windows in Lagos (WAT / UTC+1):
+    # 09:00, 15:00, and 16:00 WAT = 08:00, 14:00, and 15:00 UTC.
+    # The publisher drains every post due by the time each window runs.
+    - cron: "0 8,14,15 * * *"
   workflow_dispatch:
 
 # Never let two queue drainers publish the same batch concurrently. The
