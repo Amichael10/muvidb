@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
 import { uploadAdminSocialMedia } from '../../lib/imageUpload';
+import SocialCanvasViewport from './SocialCanvasViewport';
+import SocialVideoClipModal from './SocialVideoClipModal';
 
 export const EDITORIAL_THEMES = [
   {
@@ -192,8 +194,69 @@ export default function SocialDraftComposer({
   const [scheduling, setScheduling] = useState(false);
   const [customScheduleDate, setCustomScheduleDate] = useState('');
   const [tiktokSettings, setTikTokSettings] = useState(DEFAULT_TIKTOK_SETTINGS);
+  const [step1Open, setStep1Open] = useState(true);
+  const [step2Open, setStep2Open] = useState(true);
+  const [step3Open, setStep3Open] = useState(true);
+  const [viewLayout, setViewLayout] = useState('split'); // 'split' | 'canvas_focus' | 'caption_focus'
+  const [videoStudioOpen, setVideoStudioOpen] = useState(false);
+  const [canvasAspectRatio, setCanvasAspectRatio] = useState('1:1');
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
+
+  const handleImportVideoToCanvas = async (videoData) => {
+    if (!result?.contentItem?.id) {
+      toast.error('Generate a draft first to attach this video');
+      return;
+    }
+    setUploadingCustom(true);
+    try {
+      const res = await fetch('/api/social?task=attach_custom_asset', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentItemId: result.contentItem.id,
+          publicUrl: videoData.url,
+          format: 'video_vertical_9_16',
+          mediaType: 'video',
+          metadata: {
+            startTime: videoData.startTime,
+            endTime: videoData.endTime,
+            duration: videoData.duration,
+            mode: videoData.mode,
+            title: videoData.title,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      const newAsset = {
+        id: data.id || videoData.url,
+        publicUrl: videoData.url,
+        mediaType: 'video',
+        format: 'custom_video',
+        width: 1080,
+        height: 1920,
+      };
+
+      setResult(curr => ({
+        ...curr,
+        assets: [newAsset, ...(curr?.assets || [])],
+        variants: (curr?.variants || []).map(variant => ({ ...variant, selected_asset_id: newAsset.id })),
+      }));
+      onGenerated?.({ ...result, assets: [newAsset, ...(result.assets || [])] });
+      toast.success(`${videoData.mode === 'clip' ? 'Trimmed clip' : 'Whole video'} downloaded straight into canvas!`);
+    } catch (err) {
+      toast.error(err.message || 'Failed to attach video to canvas');
+    } finally {
+      setUploadingCustom(false);
+    }
+  };
+
+  const handleCanvasCutVideo = async (cutData) => {
+    if (!result?.contentItem?.id) return;
+    toast.success(`Video cut applied: ${cutData.formattedStart} to ${cutData.formattedEnd} (${cutData.duration.toFixed(1)}s duration)`);
+  };
 
   // Sync external theme changes (such as clicking from the 30-Day calendar)
   useEffect(() => {
@@ -657,191 +720,247 @@ export default function SocialDraftComposer({
 
       {/* Main Composer Box */}
       <div className="rounded-lg border border-border bg-surface p-6">
-        {/* Step 1: Select Content Theme */}
+        {/* Step 1: Select Content Theme (Collapsible) */}
         <div>
-          <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setStep1Open(prev => !prev)}
+            className="flex w-full items-center justify-between text-left group"
+          >
             <div className="flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-xs font-black text-brand">
                 1
               </span>
-              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
+              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary group-hover:text-brand transition-colors">
                 Select Content Theme
               </h2>
-            </div>
-            <span className="text-xs text-text-muted">7-Day Rolling Strategy</span>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {EDITORIAL_THEMES.map(t => {
-              const isSelected = themeId === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setThemeId(t.id)}
-                  className={`flex flex-col justify-between rounded-lg border p-4 text-left transition-all ${
-                    isSelected
-                      ? 'border-brand bg-brand/10 shadow-sm ring-1 ring-brand'
-                      : 'border-border bg-surface-2 hover:border-brand/40 hover:bg-surface-2/80'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isSelected ? 'bg-brand text-white' : 'bg-surface text-brand'}`}>
-                        <Icon icon={t.icon} width="18" />
-                      </div>
-                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${isSelected ? 'bg-brand text-white' : 'bg-surface text-text-muted'}`}>
-                        {t.badge}
-                      </span>
-                    </div>
-
-                    <h3 className="mt-3 text-xs font-black text-text-primary">
-                      {t.name}
-                    </h3>
-                    <p className="mt-1 text-[10px] text-text-muted line-clamp-2">
-                      {t.description}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Step 2: Choose Entity / Subject */}
-        <div className="mt-6 border-t border-border pt-6">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-xs font-black text-brand">
-              2
-            </span>
-            <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
-              Choose Subject ({activeTheme.entity === 'person' ? 'Actor / Talent' : 'Movie / Film'})
-            </h2>
-          </div>
-
-          {selected ? (
-            <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-brand/40 bg-brand/5 p-3.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-2 border border-border overflow-hidden">
-                  <Icon icon={activeTheme.entity === 'person' ? 'solar:user-linear' : 'solar:clapperboard-linear'} className="text-text-muted" width="22" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-black text-text-primary">{label(selected)}</h4>
-                  <p className="font-mono text-[10px] text-text-muted">{selected.id}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary"
-              >
-                Change Subject
-              </button>
-            </div>
-          ) : (
-            <div className="mt-3 space-y-2">
-              <div className="relative">
-                <input
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder={activeTheme.placeholder}
-                  className="h-11 w-full rounded-lg border border-border bg-surface-2 pl-4 pr-10 text-sm text-text-primary outline-none focus:border-brand"
-                />
-                {searching && (
-                  <Icon
-                    icon="solar:spinner-linear"
-                    className="absolute right-3.5 top-3.5 animate-spin text-text-muted"
-                    width="18"
-                  />
-                )}
-                {results.length > 0 && (
-                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
-                    {results.map(entry => (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        onClick={() => {
-                          setSelected(entry);
-                          setResults([]);
-                        }}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-text-primary hover:bg-surface-2 border-b border-border/50 last:border-0"
-                      >
-                        <img
-                          src={entry.photo_url || entry.poster_url || ''}
-                          alt=""
-                          className="h-9 w-9 shrink-0 rounded object-cover border border-border bg-surface-2"
-                          onError={e => {
-                            e.currentTarget.style.visibility = 'hidden';
-                          }}
-                        />
-                        <div className="min-w-0">
-                          <span className="font-bold truncate block">{label(entry)}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Suggestion Pills */}
-              {activeTheme.suggestions?.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                    Quick Suggestions:
-                  </span>
-                  {activeTheme.suggestions.map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => handleSuggestionClick(s)}
-                      className="rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-[11px] font-bold text-text-muted hover:border-brand hover:text-brand transition-colors"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+              {!step1Open && (
+                <span className="ml-2 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
+                  {activeTheme.name}
+                </span>
               )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-muted">7-Day Rolling Strategy</span>
+              <Icon
+                icon={step1Open ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+                className="text-text-muted group-hover:text-text-primary transition-transform"
+                width="16"
+              />
+            </div>
+          </button>
+
+          {step1Open && (
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {EDITORIAL_THEMES.map(t => {
+                const isSelected = themeId === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setThemeId(t.id)}
+                    className={`flex flex-col justify-between rounded-lg border p-4 text-left transition-all ${
+                      isSelected
+                        ? 'border-brand bg-brand/10 shadow-sm ring-1 ring-brand'
+                        : 'border-border bg-surface-2 hover:border-brand/40 hover:bg-surface-2/80'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${isSelected ? 'bg-brand text-white' : 'bg-surface text-brand'}`}>
+                          <Icon icon={t.icon} width="18" />
+                        </div>
+                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${isSelected ? 'bg-brand text-white' : 'bg-surface text-text-muted'}`}>
+                          {t.badge}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-3 text-xs font-black text-text-primary">
+                        {t.name}
+                      </h3>
+                      <p className="mt-1 text-[10px] text-text-muted line-clamp-2">
+                        {t.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Step 3: Platform Selection */}
+        {/* Step 2: Choose Entity / Subject (Collapsible) */}
         <div className="mt-6 border-t border-border pt-6">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-xs font-black text-brand">
-              3
-            </span>
-            <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
-              Target Publishing Platforms
-            </h2>
-          </div>
+          <button
+            type="button"
+            onClick={() => setStep2Open(prev => !prev)}
+            className="flex w-full items-center justify-between text-left group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-xs font-black text-brand">
+                2
+              </span>
+              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary group-hover:text-brand transition-colors">
+                Choose Subject ({activeTheme.entity === 'person' ? 'Actor / Talent' : 'Movie / Film'})
+              </h2>
+              {!step2Open && selected && (
+                <span className="ml-2 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
+                  {label(selected)}
+                </span>
+              )}
+            </div>
+            <Icon
+              icon={step2Open ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+              className="text-text-muted group-hover:text-text-primary transition-transform"
+              width="16"
+            />
+          </button>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {PLATFORMS.map(platform => (
-              <button
-                key={platform.value}
-                type="button"
-                onClick={() => togglePlatform(platform.value)}
-                className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all ${
-                  platforms.includes(platform.value)
-                    ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
-                    : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
-                }`}
-              >
-                <Icon icon={platform.icon} width="16" />
-                {platform.label}
-              </button>
-            ))}
-          </div>
+          {step2Open && (
+            <>
+              {selected ? (
+                <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-brand/40 bg-brand/5 p-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-2 border border-border overflow-hidden">
+                      <Icon icon={activeTheme.entity === 'person' ? 'solar:user-linear' : 'solar:clapperboard-linear'} className="text-text-muted" width="22" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-text-primary">{label(selected)}</h4>
+                      <p className="font-mono text-[10px] text-text-muted">{selected.id}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary"
+                  >
+                    Change Subject
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <div className="relative">
+                    <input
+                      value={query}
+                      onChange={e => setQuery(e.target.value)}
+                      placeholder={activeTheme.placeholder}
+                      className="h-11 w-full rounded-lg border border-border bg-surface-2 pl-4 pr-10 text-sm text-text-primary outline-none focus:border-brand"
+                    />
+                    {searching && (
+                      <Icon
+                        icon="solar:spinner-linear"
+                        className="absolute right-3.5 top-3.5 animate-spin text-text-muted"
+                        width="18"
+                      />
+                    )}
+                    {results.length > 0 && (
+                      <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
+                        {results.map(entry => (
+                          <button
+                            key={entry.id}
+                            type="button"
+                            onClick={() => {
+                              setSelected(entry);
+                              setResults([]);
+                            }}
+                            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-text-primary hover:bg-surface-2 border-b border-border/50 last:border-0"
+                          >
+                            <img
+                              src={entry.photo_url || entry.poster_url || ''}
+                              alt=""
+                              className="h-9 w-9 shrink-0 rounded object-cover border border-border bg-surface-2"
+                              onError={e => {
+                                e.currentTarget.style.visibility = 'hidden';
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <span className="font-bold truncate block">{label(entry)}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Suggestion Pills */}
+                  {activeTheme.suggestions?.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                        Quick Suggestions:
+                      </span>
+                      {activeTheme.suggestions.map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => handleSuggestionClick(s)}
+                          className="rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-[11px] font-bold text-text-muted hover:border-brand hover:text-brand transition-colors"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Step 3: Platform Selection (Collapsible) */}
+        <div className="mt-6 border-t border-border pt-6">
+          <button
+            type="button"
+            onClick={() => setStep3Open(prev => !prev)}
+            className="flex w-full items-center justify-between text-left group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-xs font-black text-brand">
+                3
+              </span>
+              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary group-hover:text-brand transition-colors">
+                Target Publishing Platforms
+              </h2>
+              {!step3Open && (
+                <span className="ml-2 text-xs font-bold text-text-muted">
+                  {platforms.join(', ').toUpperCase()}
+                </span>
+              )}
+            </div>
+            <Icon
+              icon={step3Open ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+              className="text-text-muted group-hover:text-text-primary transition-transform"
+              width="16"
+            />
+          </button>
+
+          {step3Open && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {PLATFORMS.map(platform => (
+                <button
+                  key={platform.value}
+                  type="button"
+                  onClick={() => togglePlatform(platform.value)}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all ${
+                    platforms.includes(platform.value)
+                      ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
+                      : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  <Icon icon={platform.icon} width="16" />
+                  {platform.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Generate Action Button */}
-        <div className="mt-6 border-t border-border pt-6">
+        <div className="mt-6 border-t border-border pt-6 flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
             onClick={generate}
             disabled={disabled || generating || !selected || !platforms.length}
-            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-6 text-xs font-black uppercase tracking-wider text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-6 text-xs font-black uppercase tracking-wider text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 shadow-md"
           >
             <Icon
               icon={generating ? 'solar:spinner-linear' : 'solar:magic-stick-3-linear'}
@@ -849,6 +968,16 @@ export default function SocialDraftComposer({
               width="18"
             />
             {generating ? 'Generating High-Impact Copy & Assets…' : 'Generate Social Draft'}
+          </button>
+
+          {/* YouTube / Video Clip Studio Direct Launcher */}
+          <button
+            type="button"
+            onClick={() => setVideoStudioOpen(true)}
+            className="inline-flex h-11 items-center gap-2 rounded-lg border border-red-500/30 bg-red-600/10 px-5 text-xs font-black uppercase tracking-wider text-red-500 hover:bg-red-600/20 transition-all"
+          >
+            <Icon icon="solar:clapperboard-play-bold" width="18" />
+            <span>YouTube / Video Clip Studio</span>
           </button>
         </div>
 
@@ -940,59 +1069,93 @@ export default function SocialDraftComposer({
                 </div>
               )}
 
-              <div>
-                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-text-muted">
-                  Preview each publishing channel
-                </p>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {result.variants?.map(variant => {
-                    const platform = PLATFORMS.find(entry => entry.value === variant.platform) || PLATFORMS[0];
-                    const isActive = variant.platform === activeVariant?.platform;
-                    return (
-                      <button
-                        key={variant.id}
-                        type="button"
-                        onClick={() => setActivePreviewPlatform(variant.platform)}
-                        className={`inline-flex min-w-fit items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-black transition-all ${
-                          isActive
-                            ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
-                            : 'border-border bg-surface text-text-muted hover:text-text-primary'
-                        }`}
-                      >
-                        <Icon icon={platform.icon} width="17" /> {platform.label}
-                      </button>
-                    );
-                  })}
+              {/* Viewport Layout Mode Switcher & Channel Tabs */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-text-muted">
+                    Preview each publishing channel
+                  </p>
+                  <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
+                    {result.variants?.map(variant => {
+                      const platform = PLATFORMS.find(entry => entry.value === variant.platform) || PLATFORMS[0];
+                      const isActive = variant.platform === activeVariant?.platform;
+                      return (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          onClick={() => setActivePreviewPlatform(variant.platform)}
+                          className={`inline-flex min-w-fit items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-black transition-all ${
+                            isActive
+                              ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
+                              : 'border-border bg-surface text-text-muted hover:text-text-primary'
+                          }`}
+                        >
+                          <Icon icon={platform.icon} width="16" /> {platform.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* View Space Layout Switcher (CapCut-Style Workspace Mode) */}
+                <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
+                  {[
+                    { id: 'split', label: 'Split View', icon: 'solar:sidebar-minimalistic-linear' },
+                    { id: 'canvas_focus', label: 'Canvas Focus', icon: 'solar:maximize-square-2-linear' },
+                    { id: 'caption_focus', label: 'Caption Focus', icon: 'solar:document-text-linear' },
+                  ].map(mode => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setViewLayout(mode.id)}
+                      title={mode.label}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold transition-all ${
+                        viewLayout === mode.id
+                          ? 'bg-brand text-white shadow-sm'
+                          : 'text-text-muted hover:bg-surface-2 hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon icon={mode.icon} width="14" />
+                      <span className="hidden sm:inline">{mode.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-12">
-                <section className="space-y-3 lg:col-span-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} visual</p>
-                      <p className="text-[10px] text-text-muted">This is the image people will see in their feed.</p>
-                    </div>
-                    <span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted">
-                      {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
-                    </span>
-                  </div>
-
-                  <div className="overflow-hidden rounded-2xl border border-border bg-black shadow-2xl">
-                    <div className={`flex items-center justify-between bg-gradient-to-r ${activePlatform.accent} px-4 py-3 text-white`}>
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/30">
-                          <Icon icon={activePlatform.icon} width="17" />
-                        </span>
-                        <div>
-                          <p className="text-xs font-black">MuviDB</p>
-                          <p className="text-[9px] text-white/75">Preview on {activePlatform.label}</p>
-                        </div>
+              {/* Dynamic Viewport Grid */}
+              <div className={`grid gap-6 ${
+                viewLayout === 'canvas_focus'
+                  ? 'grid-cols-1'
+                  : viewLayout === 'caption_focus'
+                    ? 'grid-cols-1'
+                    : 'lg:grid-cols-12'
+              }`}>
+                {/* Visual Canvas Column */}
+                {viewLayout !== 'caption_focus' && (
+                  <section className={`space-y-3 ${viewLayout === 'canvas_focus' ? 'w-full' : 'lg:col-span-6'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} Visual Canvas</p>
+                        <p className="text-[10px] text-text-muted">Zoom, pan, cut video, and frame in multi-aspect ratios.</p>
                       </div>
-                      <Icon icon="solar:menu-dots-bold" width="18" />
+                      <span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted">
+                        {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
+                      </span>
                     </div>
 
-                    <div className="relative flex min-h-[360px] max-h-[620px] items-center justify-center bg-black">
+                    {/* CapCut-Style Social Canvas Viewport */}
+                    <SocialCanvasViewport
+                      mediaUrl={activeVisualAssets[0]?.publicUrl}
+                      mediaType={activeVisualAssets[0]?.mediaType || (activeVisualAssets[0]?.format === 'custom_video' ? 'video' : 'image')}
+                      aspectRatio={canvasAspectRatio}
+                      onAspectRatioChange={setCanvasAspectRatio}
+                      platformLabel={activePlatform.label}
+                      platformIcon={activePlatform.icon}
+                      platformAccent={activePlatform.accent}
+                      allowVideoCut={true}
+                      onCutVideo={handleCanvasCutVideo}
+                      onOpenVideoStudio={() => setVideoStudioOpen(true)}
+                    >
                       {activeVisualAssets[0] ? (
                         activeVisualAssets[0].mediaType === 'video' ? (
                           <video
@@ -1000,88 +1163,76 @@ export default function SocialDraftComposer({
                             controls
                             muted
                             playsInline
-                            className="max-h-[620px] w-full object-contain"
+                            className="h-full w-full object-contain"
                           />
                         ) : (
                           <img
                             src={activeVisualAssets[0].publicUrl}
                             alt={`${activePlatform.label} post preview`}
-                            className="max-h-[620px] w-full object-contain"
+                            className="h-full w-full object-contain"
                           />
                         )
                       ) : (
                         <div className="flex flex-col items-center gap-2 py-20 text-text-muted">
                           <Icon icon="solar:gallery-remove-linear" width="42" />
-                          <span className="text-xs">Upload artwork to preview this post</span>
+                          <span className="text-xs">Upload artwork or fetch YouTube video to preview</span>
                         </div>
                       )}
-                      {postFormat === 'carousel' && activeVisualAssets.length > 1 && (
-                        <span className="absolute right-3 top-3 rounded-full bg-black/75 px-2.5 py-1 text-[10px] font-black text-white">
-                          1/{activeVisualAssets.length}
-                        </span>
-                      )}
-                    </div>
+                    </SocialCanvasViewport>
 
-                    <div className="flex items-center justify-between border-t border-white/10 bg-[#0f0f0f] px-4 py-3 text-white">
-                      <div className="flex items-center gap-3">
-                        <Icon icon="solar:heart-linear" width="20" />
-                        <Icon icon="solar:chat-round-linear" width="20" />
-                        <Icon icon="solar:plain-linear" width="20" />
-                      </div>
-                      <Icon icon="solar:bookmark-linear" width="20" />
-                    </div>
-                  </div>
-
-                  {postFormat === 'carousel' && carouselAssets.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {carouselAssets.map((asset, index) => (
-                        <div key={asset.id} className="overflow-hidden rounded-lg border border-border bg-surface">
-                          <div className="relative bg-black">
-                            {asset.mediaType === 'video' ? (
-                              <video src={asset.publicUrl} muted playsInline className="aspect-square w-full object-cover" />
-                            ) : (
-                              <img src={asset.publicUrl} alt={asset.altText || `Carousel item ${index + 1}`} className="aspect-square w-full object-cover" />
-                            )}
-                            <span className="absolute bottom-1.5 left-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black uppercase text-white">
-                              {asset.mediaType || 'image'}
-                            </span>
-                          <div className="absolute inset-x-1.5 top-1.5 flex items-center justify-between">
-                            <span className="rounded-full bg-black/80 px-2 py-1 text-[9px] font-black text-white">{index + 1}</span>
-                            <div className="flex gap-1">
-                              <button type="button" aria-label={`Move slide ${index + 1} left`} onClick={() => moveCarouselSlide(index, -1)} disabled={index === 0 || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
-                                <Icon icon="solar:arrow-left-linear" width="12" />
-                              </button>
-                              <button type="button" aria-label={`Move slide ${index + 1} right`} onClick={() => moveCarouselSlide(index, 1)} disabled={index === carouselAssets.length - 1 || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
-                                <Icon icon="solar:arrow-right-linear" width="12" />
-                              </button>
-                              <button type="button" aria-label={`Replace carousel item ${index + 1}`} onClick={() => { setReplaceSlideIndex(index); setTimeout(() => fileInputRef.current?.click(), 0); }} disabled={uploadingCustom || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
-                                <Icon icon="solar:refresh-linear" width="12" />
-                              </button>
-                              <button type="button" aria-label={`Remove carousel item ${index + 1}`} onClick={() => removeCarouselSlide(index)} disabled={carouselAssets.length <= 2 || uploadingCustom || reorderingCarousel} className="rounded-full bg-red-600/90 p-1 text-white disabled:opacity-30">
-                                <Icon icon="solar:trash-bin-trash-linear" width="12" />
-                              </button>
+                    {postFormat === 'carousel' && carouselAssets.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 pt-2">
+                        {carouselAssets.map((asset, index) => (
+                          <div key={asset.id} className="overflow-hidden rounded-lg border border-border bg-surface">
+                            <div className="relative bg-black">
+                              {asset.mediaType === 'video' ? (
+                                <video src={asset.publicUrl} muted playsInline className="aspect-square w-full object-cover" />
+                              ) : (
+                                <img src={asset.publicUrl} alt={asset.altText || `Carousel item ${index + 1}`} className="aspect-square w-full object-cover" />
+                              )}
+                              <span className="absolute bottom-1.5 left-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black uppercase text-white">
+                                {asset.mediaType || 'image'}
+                              </span>
+                            <div className="absolute inset-x-1.5 top-1.5 flex items-center justify-between">
+                              <span className="rounded-full bg-black/80 px-2 py-1 text-[9px] font-black text-white">{index + 1}</span>
+                              <div className="flex gap-1">
+                                <button type="button" aria-label={`Move slide ${index + 1} left`} onClick={() => moveCarouselSlide(index, -1)} disabled={index === 0 || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
+                                  <Icon icon="solar:arrow-left-linear" width="12" />
+                                </button>
+                                <button type="button" aria-label={`Move slide ${index + 1} right`} onClick={() => moveCarouselSlide(index, 1)} disabled={index === carouselAssets.length - 1 || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
+                                  <Icon icon="solar:arrow-right-linear" width="12" />
+                                </button>
+                                <button type="button" aria-label={`Replace carousel item ${index + 1}`} onClick={() => { setReplaceSlideIndex(index); setTimeout(() => fileInputRef.current?.click(), 0); }} disabled={uploadingCustom || reorderingCarousel} className="rounded-full bg-black/80 p-1 text-white disabled:opacity-30">
+                                  <Icon icon="solar:refresh-linear" width="12" />
+                                </button>
+                                <button type="button" aria-label={`Remove carousel item ${index + 1}`} onClick={() => removeCarouselSlide(index)} disabled={carouselAssets.length <= 2 || uploadingCustom || reorderingCarousel} className="rounded-full bg-red-600/90 p-1 text-white disabled:opacity-30">
+                                  <Icon icon="solar:trash-bin-trash-linear" width="12" />
+                                </button>
+                              </div>
+                            </div>
+                            </div>
+                            <div className="p-2">
+                              <label className="text-[9px] font-black uppercase tracking-wider text-text-muted">Media description</label>
+                              <textarea
+                                value={asset.altText || ''}
+                                onChange={event => setCarouselAssets(current => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, altText: event.target.value } : entry))}
+                                onBlur={event => saveCarouselAltText(index, event.target.value)}
+                                maxLength={1000}
+                                rows={2}
+                                placeholder="Describe this item for accessibility"
+                                className="mt-1 w-full resize-y rounded border border-border bg-surface-2 px-2 py-1.5 text-[10px] text-text-primary outline-none focus:border-brand"
+                              />
                             </div>
                           </div>
-                          </div>
-                          <div className="p-2">
-                            <label className="text-[9px] font-black uppercase tracking-wider text-text-muted">Media description</label>
-                            <textarea
-                              value={asset.altText || ''}
-                              onChange={event => setCarouselAssets(current => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, altText: event.target.value } : entry))}
-                              onBlur={event => saveCarouselAltText(index, event.target.value)}
-                              maxLength={1000}
-                              rows={2}
-                              placeholder="Describe this item for accessibility"
-                              className="mt-1 w-full resize-y rounded border border-border bg-surface-2 px-2 py-1.5 text-[10px] text-text-primary outline-none focus:border-brand"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                )}
 
-                <section className="space-y-3 lg:col-span-6">
+                {/* Caption & Settings Column */}
+                {viewLayout !== 'canvas_focus' && (
+                  <section className={`space-y-3 ${viewLayout === 'caption_focus' ? 'w-full' : 'lg:col-span-6'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} caption</p>
@@ -1228,6 +1379,7 @@ export default function SocialDraftComposer({
                     </div>
                   </div>
                 </section>
+              )}
               </div>
             </div>
 
@@ -1305,6 +1457,15 @@ export default function SocialDraftComposer({
           </div>
         )}
       </div>
+
+      {/* YouTube / Video Clip Studio Modal */}
+      <SocialVideoClipModal
+        isOpen={videoStudioOpen}
+        onClose={() => setVideoStudioOpen(false)}
+        initialVideoUrl={selected?.trailer_youtube_id ? `https://www.youtube.com/watch?v=${selected.trailer_youtube_id}` : (selected?.trailer_external_url || '')}
+        initialTitle={selected?.title || selected?.name || ''}
+        onImportToCanvas={handleImportVideoToCanvas}
+      />
     </div>
   );
 }

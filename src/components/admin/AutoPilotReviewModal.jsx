@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
 import { uploadAdminSocialImage } from '../../lib/imageUpload';
 import FigmaSocialCardPreview from './FigmaSocialCardPreview.jsx';
+import SocialCanvasViewport from './SocialCanvasViewport.jsx';
+import SocialVideoClipModal from './SocialVideoClipModal.jsx';
 
 const PLATFORMS = [
   { value: 'instagram', label: 'Instagram', icon: 'mdi:instagram', color: '#E1306C', maxLen: 2200 },
@@ -44,6 +46,9 @@ export default function AutoPilotReviewModal({
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [videoStudioOpen, setVideoStudioOpen] = useState(false);
+  const [viewLayout, setViewLayout] = useState('split');
+  const [canvasAspectRatio, setCanvasAspectRatio] = useState('1:1');
 
   // Manual Candidate Search & Swap State
   const [manualSearchOpen, setManualSearchOpen] = useState(false);
@@ -597,13 +602,21 @@ export default function AutoPilotReviewModal({
 
         {/* Content Body: 2 Columns */}
         <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 md:grid-cols-12">
-          {/* Left: Graphic Poster Preview */}
+          {/* Left: Graphic Poster Preview with CapCut-style Viewport */}
           <div className="space-y-3 md:col-span-6 flex flex-col justify-center">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-wider text-text-muted">
-                Graphic Card Preview (1:1)
+                Graphic Canvas Preview
               </span>
               <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setVideoStudioOpen(true)}
+                  className="text-[11px] font-bold text-red-400 hover:text-red-300 hover:underline flex items-center gap-1"
+                >
+                  <Icon icon="solar:clapperboard-play-bold" width="13" />
+                  YouTube / Clip Studio
+                </button>
                 <button
                   type="button"
                   onClick={handleDownloadRenderedCard}
@@ -625,29 +638,46 @@ export default function AutoPilotReviewModal({
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-border shadow-2xl bg-black">
+            <SocialCanvasViewport
+              mediaUrl={customImageUrl || displayImage}
+              mediaType={customImageUrl?.endsWith('.mp4') ? 'video' : 'image'}
+              aspectRatio={canvasAspectRatio}
+              onAspectRatioChange={setCanvasAspectRatio}
+              platformLabel={PLATFORMS.find(p => p.value === activePlatformTab)?.label || 'Social'}
+              platformIcon={PLATFORMS.find(p => p.value === activePlatformTab)?.icon || 'solar:gallery-bold'}
+              allowVideoCut={true}
+              onCutVideo={(cut) => toast.success(`Video cut applied: ${cut.formattedStart} to ${cut.formattedEnd}`)}
+              onOpenVideoStudio={() => setVideoStudioOpen(true)}
+            >
               {customImageUrl ? (
-                <div className="relative flex aspect-square w-full items-center justify-center bg-black">
+                customImageUrl.endsWith('.mp4') ? (
+                  <video
+                    src={customImageUrl}
+                    controls
+                    muted
+                    playsInline
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
                   <img
                     src={customImageUrl}
                     alt={`${candidate?.name || 'Post'} custom poster`}
                     className="h-full w-full object-contain"
                   />
-                  <span className="absolute bottom-3 left-3 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-black shadow-lg">
-                    Your complete post image
-                  </span>
-                </div>
+                )
               ) : (
-                <FigmaSocialCardPreview
-                  candidate={candidate}
-                  series={series}
-                  displayImage={displayImage}
-                />
+                <div className="flex h-full w-full items-center justify-center p-4">
+                  <FigmaSocialCardPreview
+                    candidate={candidate}
+                    series={series}
+                    displayImage={displayImage}
+                  />
+                </div>
               )}
-            </div>
+            </SocialCanvasViewport>
             {customImageUrl && (
               <p className="text-center text-[11px] text-emerald-400">
-                MuviDB will publish this poster exactly as shown. It is no longer placed inside the graphic template.
+                MuviDB will publish this media asset exactly as framed.
               </p>
             )}
           </div>
@@ -905,6 +935,18 @@ export default function AutoPilotReviewModal({
           </div>
         </div>
       </div>
+
+      {/* YouTube / Video Clip Studio Modal */}
+      <SocialVideoClipModal
+        isOpen={videoStudioOpen}
+        onClose={() => setVideoStudioOpen(false)}
+        initialVideoUrl={candidate?.trailer_url || (candidate?.trailer_youtube_id ? `https://www.youtube.com/watch?v=${candidate.trailer_youtube_id}` : '')}
+        initialTitle={candidate?.name || ''}
+        onImportToCanvas={(videoData) => {
+          setCustomImageUrl(videoData.url);
+          toast.success(`${videoData.mode === 'clip' ? 'Trimmed clip' : 'Whole video'} imported into review canvas!`);
+        }}
+      />
     </div>
   );
 }
