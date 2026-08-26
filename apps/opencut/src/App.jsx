@@ -1597,7 +1597,7 @@ function formatSecondsToTimecode(sec) {
 }
 
 export default function App() {
-  const [state, dispatch] = useReducer(reducer, null, createInitialState);
+  const [state, dispatch] = useReducer(reducer, initialState);
   const [saveStatus, setSaveStatus] = useState('Not saved yet');
   const [renderStatus, setRenderStatus] = useState('Ready to export');
   const [isRendering, setIsRendering] = useState(false);
