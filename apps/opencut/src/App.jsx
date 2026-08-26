@@ -1574,8 +1574,30 @@ function Icon({ name, className = 'h-5 w-5' }) {
   );
 }
 
-function App() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+function parseTimecodeToSeconds(str) {
+  if (!str) return 0;
+  const clean = String(str).trim();
+  const parts = clean.split(':').map(Number);
+  if (parts.some(isNaN)) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 1) return parts[0];
+  return 0;
+}
+
+function formatSecondsToTimecode(sec) {
+  const safe = Math.max(0, Number(sec) || 0);
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = Math.floor(safe % 60);
+  if (h > 0) {
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+export default function App() {
+  const [state, dispatch] = useReducer(reducer, null, createInitialState);
   const [saveStatus, setSaveStatus] = useState('Not saved yet');
   const [renderStatus, setRenderStatus] = useState('Ready to export');
   const [isRendering, setIsRendering] = useState(false);
@@ -1587,6 +1609,15 @@ function App() {
   const [timelineZoom, setTimelineZoom] = useState(1.25);
   const [timelineDropIndex, setTimelineDropIndex] = useState(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [youtubeFetchMode, setYoutubeFetchMode] = useState('whole'); // 'whole' | 'clip'
+  const [youtubeStartTime, setYoutubeStartTime] = useState('00:00:00');
+  const [youtubeEndTime, setYoutubeEndTime] = useState('00:00:30');
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanMode, setIsPanMode] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
   const [clipDraft, setClipDraft] = useState(null);
   const [clipStatus, setClipStatus] = useState('');
   const [clipBusy, setClipBusy] = useState(false);
@@ -1895,17 +1926,19 @@ function App() {
     });
   }
 
-  async function loadClipSource({ source, title, temporary, duration: knownDuration, autoApply = false }) {
+  async function loadClipSource({ source, title, temporary, duration: knownDuration, clipIn = 0, clipOut = null, autoApply = false }) {
     imageCacheRef.current.clear();
     const meta = await probeVideoMeta(source);
     const duration = knownDuration && knownDuration > 0 ? knownDuration : meta.duration;
+    const safeIn = Math.max(0, Number(clipIn) || 0);
+    const safeOut = Math.max(safeIn + 0.2, clipOut != null ? Number(clipOut) : Number(duration.toFixed(2)));
     const draft = {
       source,
       title: title || 'Clip',
       temporary: Boolean(temporary),
       duration: Number(duration.toFixed(2)),
-      clipIn: 0,
-      clipOut: Number(duration.toFixed(2)),
+      clipIn: safeIn,
+      clipOut: safeOut,
     };
     setClipDraft(draft);
     if (autoApply) {
@@ -1961,11 +1994,18 @@ function App() {
 
       if (!result?.path) throw new Error('Fetch finished without a video file.');
       revokeClipBlob();
+
+      const safeIn = youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
+      const parsedOut = youtubeFetchMode === 'clip' && youtubeEndTime ? parseTimecodeToSeconds(youtubeEndTime) : null;
+      const safeOut = parsedOut != null && parsedOut > safeIn ? parsedOut : (result.duration || safeIn + 30);
+
       await loadClipSource({
         source: result.path,
         title: result.title,
         temporary: true,
         duration: result.duration,
+        clipIn: safeIn,
+        clipOut: safeOut,
         autoApply: true,
       });
       setClipProgress(null);
@@ -2366,14 +2406,102 @@ function App() {
       const hasActiveClip = Boolean(bg.mediaKind === 'video' && bg.clipOut != null);
       return (
         <>
-          <h2 className="mb-1 text-sm font-bold">Clip</h2>
-          <p className="mb-3 text-xs text-muvi-muted">Paste a YouTube link — it loads straight into the editor. Trim In/Out on the timeline, switch social frame sizes, then Export only the cut.</p>
+          <h2 className="mb-1 text-sm font-bold">YouTube / Clip Studio</h2>
+          <p className="mb-3 text-xs text-muvi-muted">Paste a YouTube link to fetch straight into the canvas. Download the whole video or specify start and end time.</p>
 
           <label className="label">YouTube URL
             <input className="control" placeholder="https://www.youtube.com/watch?v=..." value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') handleFetchYoutube(); }} />
           </label>
-          <button className="btn mb-3 w-full bg-muvi-accent/80 hover:bg-muvi-accent disabled:opacity-50" disabled={clipBusy} onClick={handleFetchYoutube}>
-            {clipBusy ? (clipProgress?.message ? 'Fetching…' : 'Working...') : 'Fetch'}
+
+          {/* Dual Option Mode Selector */}
+          <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muvi-muted">Fetch & Import Mode</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setYoutubeFetchMode('whole')}
+                className={`rounded-md px-2.5 py-1.5 text-xs font-bold transition ${
+                  youtubeFetchMode === 'whole'
+                    ? 'bg-muvi-accent text-white shadow-sm'
+                    : 'bg-white/5 text-muvi-muted hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                1. Whole Video
+              </button>
+              <button
+                type="button"
+                onClick={() => setYoutubeFetchMode('clip')}
+                className={`rounded-md px-2.5 py-1.5 text-xs font-bold transition ${
+                  youtubeFetchMode === 'clip'
+                    ? 'bg-muvi-accent text-white shadow-sm'
+                    : 'bg-white/5 text-muvi-muted hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                2. Start & End Time
+              </button>
+            </div>
+
+            {/* Option 2 Timecode Inputs */}
+            {youtubeFetchMode === 'clip' && (
+              <div className="mt-3 space-y-2.5 border-t border-white/10 pt-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muvi-muted">
+                    Start Time
+                    <input
+                      type="text"
+                      placeholder="00:00:00"
+                      value={youtubeStartTime}
+                      onChange={(e) => setYoutubeStartTime(e.target.value)}
+                      className="control mt-1 font-mono text-xs"
+                    />
+                  </label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muvi-muted">
+                    End Time
+                    <input
+                      type="text"
+                      placeholder="00:00:30"
+                      value={youtubeEndTime}
+                      onChange={(e) => setYoutubeEndTime(e.target.value)}
+                      className="control mt-1 font-mono text-xs"
+                    />
+                  </label>
+                </div>
+
+                {/* Duration Readout */}
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muvi-muted">Segment Length:</span>
+                  <span className="font-mono font-bold text-muvi-accent">
+                    {Math.max(0, parseTimecodeToSeconds(youtubeEndTime) - parseTimecodeToSeconds(youtubeStartTime)).toFixed(1)}s
+                  </span>
+                </div>
+
+                {/* Preset Quick Trim Pills */}
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-[9px] uppercase tracking-wider text-muvi-muted">Presets:</span>
+                  {[
+                    { label: '15s Hook', sec: 15 },
+                    { label: '30s Reel', sec: 30 },
+                    { label: '60s TikTok', sec: 60 },
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        const start = parseTimecodeToSeconds(youtubeStartTime);
+                        setYoutubeEndTime(formatSecondsToTimecode(start + preset.sec));
+                      }}
+                      className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-white/20"
+                    >
+                      +{preset.sec}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button className="btn mb-3 w-full bg-muvi-accent/90 hover:bg-muvi-accent disabled:opacity-50 font-bold" disabled={clipBusy} onClick={handleFetchYoutube}>
+            {clipBusy ? (clipProgress?.message ? 'Fetching from YouTube…' : 'Working...') : youtubeFetchMode === 'clip' ? '⚡ Download Clip to Canvas' : '⬇️ Download Whole Video'}
           </button>
 
           {clipProgress && (
@@ -3114,6 +3242,35 @@ function App() {
     );
   }
 
+  const handleViewportWheel = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.08 : -0.08;
+      setPreviewZoom(prev => Math.max(0.3, Math.min(3.0, Number((prev + delta).toFixed(2)))));
+    }
+  };
+
+  const handlePanStart = (e) => {
+    if (isPanMode || e.button === 1) {
+      e.preventDefault();
+      setIsPanning(true);
+      panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+    }
+  };
+
+  const handlePanMove = (e) => {
+    if (isPanning) {
+      setPanOffset({
+        x: e.clientX - panStartRef.current.x,
+        y: e.clientY - panStartRef.current.y,
+      });
+    }
+  };
+
+  const handlePanEnd = () => {
+    setIsPanning(false);
+  };
+
   return (
     <div className="flex h-screen min-h-[680px] flex-col overflow-hidden bg-muvi-bg text-[13px]">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.08] bg-muvi-panel/90 px-3 py-2 backdrop-blur">
@@ -3133,20 +3290,41 @@ function App() {
           <button className="btn-ghost" title="Undo (Ctrl+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}><Icon name="undo" className="h-4 w-4" /></button>
           <button className="btn-ghost" title="Redo (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" className="h-4 w-4" /></button>
           <span className="mx-1 h-5 w-px bg-white/10" />
-          <select className="control min-h-0 w-[84px] px-2 py-1 text-xs" value={previewZoom} onChange={(event) => setPreviewZoom(Number(event.target.value))}>
-            {PREVIEW_ZOOMS.map((zoom) => <option key={zoom} value={zoom}>{Math.round(zoom * 100)}%</option>)}
-          </select>
+          
+          {/* Sidebars Toggle Buttons */}
+          <button
+            type="button"
+            className={`btn-ghost px-2.5 py-1 text-xs font-bold ${leftPanelOpen ? 'text-white' : 'text-muvi-muted'}`}
+            title={leftPanelOpen ? 'Collapse Tools Panel' : 'Expand Tools Panel'}
+            onClick={() => setLeftPanelOpen(prev => !prev)}
+          >
+            Tools {leftPanelOpen ? '◀' : '▶'}
+          </button>
+          <button
+            type="button"
+            className={`btn-ghost px-2.5 py-1 text-xs font-bold ${rightPanelOpen ? 'text-white' : 'text-muvi-muted'}`}
+            title={rightPanelOpen ? 'Collapse Inspector' : 'Expand Inspector'}
+            onClick={() => setRightPanelOpen(prev => !prev)}
+          >
+            Inspector {rightPanelOpen ? '▶' : '◀'}
+          </button>
+
+          <span className="mx-1 h-5 w-px bg-white/10" />
           <button className="btn-accent px-5" disabled={isRendering} onClick={handleExportVideo}>{isRendering ? 'Exporting…' : 'Export'}</button>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <nav className="flex w-[64px] shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel py-2">
+      <div className="flex min-h-0 flex-1 relative">
+        {/* Navigation Rail */}
+        <nav className="flex w-[64px] shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel py-2 z-10">
           {RAIL_ITEMS.map((item) => (
             <button
               key={item.id}
-              className={`studio-rail-btn ${activePanel === item.id ? 'bg-muvi-accent/20 text-white' : 'text-muvi-muted hover:bg-white/[0.06] hover:text-white'}`}
-              onClick={() => setActivePanel(item.id)}
+              className={`studio-rail-btn ${activePanel === item.id && leftPanelOpen ? 'bg-muvi-accent/20 text-white' : 'text-muvi-muted hover:bg-white/[0.06] hover:text-white'}`}
+              onClick={() => {
+                setActivePanel(item.id);
+                if (!leftPanelOpen) setLeftPanelOpen(true);
+              }}
             >
               <Icon name={item.id} className="h-5 w-5" />
               <span>{item.label}</span>
@@ -3154,12 +3332,17 @@ function App() {
           ))}
         </nav>
 
-        <aside className="w-[270px] shrink-0 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel/70 p-3">
-          {renderLeftPanel()}
-        </aside>
+        {/* Collapsible Left Panel */}
+        {leftPanelOpen && (
+          <aside className="w-[290px] shrink-0 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel/70 p-3 transition-all">
+            {renderLeftPanel()}
+          </aside>
+        )}
 
-        <section className="flex min-w-0 flex-1 flex-col bg-[#0c0d10]">
-          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/[0.06] px-3 py-1.5">
+        {/* Main Flexible Canvas Section */}
+        <section className="flex min-w-0 flex-1 flex-col bg-[#0c0d10] relative">
+          {/* Top Bar: Frame Size Presets & Info */}
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/[0.06] px-3 py-1.5 bg-[#121316]">
             <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Frame</span>
             {FRAME_PRESETS.map((preset) => (
               <button
@@ -3176,15 +3359,79 @@ function App() {
             <span className="ml-auto shrink-0 font-mono text-[10px] text-white/35">{canvasW}×{canvasH}</span>
           </div>
 
-          <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
+          {/* Canvas Viewport Area with Zoom & Pan */}
+          <div
+            className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4 select-none ${
+              isPanMode || isPanning ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+            }`}
+            onWheel={handleViewportWheel}
+            onMouseDown={handlePanStart}
+            onMouseMove={handlePanMove}
+            onMouseUp={handlePanEnd}
+            onMouseLeave={handlePanEnd}
+          >
+            {/* CapCut Floating Viewport Toolbar */}
+            <div className="absolute top-4 right-4 z-30 flex items-center gap-1 rounded-lg border border-white/10 bg-[#16181c]/90 px-2 py-1 shadow-2xl backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setPreviewZoom(prev => Math.max(0.3, Number((prev - 0.1).toFixed(2))))}
+                className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                title="Zoom Out (-)"
+              >
+                -
+              </button>
+              <span className="min-w-[44px] text-center font-mono text-[11px] font-bold text-white">
+                {Math.round(previewZoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewZoom(prev => Math.min(3.0, Number((prev + 0.1).toFixed(2))))}
+                className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                title="Zoom In (+)"
+              >
+                +
+              </button>
+              <span className="mx-1 h-3.5 w-px bg-white/15" />
+              <button
+                type="button"
+                onClick={() => { setPreviewZoom(0.85); setPanOffset({ x: 0, y: 0 }); }}
+                className="rounded px-1.5 py-0.5 text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
+                title="Fit Canvas"
+              >
+                Fit
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPreviewZoom(1.0); setPanOffset({ x: 0, y: 0 }); }}
+                className="rounded px-1.5 py-0.5 text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
+                title="Reset Zoom (100%)"
+              >
+                100%
+              </button>
+              <span className="mx-1 h-3.5 w-px bg-white/15" />
+              <button
+                type="button"
+                onClick={() => setIsPanMode(prev => !prev)}
+                className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
+                  isPanMode ? 'bg-muvi-accent text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }`}
+                title="Hand / Pan tool (Drag view space)"
+              >
+                ✋ Pan
+              </button>
+            </div>
+
             {renderEditToolbar()}
+
+            {/* Scaled & Panned Canvas Container */}
             <div
-              className="max-h-full max-w-full"
+              className="max-h-full max-w-full transition-transform duration-75"
               style={{
                 aspectRatio: `${canvasW} / ${canvasH}`,
                 height: canvasH >= canvasW ? '100%' : 'auto',
                 width: canvasH >= canvasW ? 'auto' : '100%',
-                transform: `scale(${previewZoom})`,
+                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${previewZoom})`,
+                transformOrigin: 'center center',
               }}
             >
               <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-phone ring-1 ring-white/5">
@@ -3202,6 +3449,7 @@ function App() {
             </div>
           </div>
 
+          {/* Transport Bar */}
           <div className="flex shrink-0 items-center gap-3 border-t border-white/[0.08] bg-muvi-panel/80 px-4 py-2">
             <span className="w-[110px] font-mono text-xs tabular-nums text-white/70">{formatTime(state.currentTime)}</span>
             <div className="flex flex-1 items-center justify-center gap-2">
@@ -3225,19 +3473,22 @@ function App() {
           {renderTimeline()}
         </section>
 
-        <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/[0.08] bg-muvi-panel/80">
-          <div className="flex shrink-0 border-b border-white/[0.08]">
-            <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'inspector' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('inspector')}>Inspector</button>
-            <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'animation' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('animation')}>Animation</button>
-          </div>
-          <div className="border-b border-white/[0.08] px-4 py-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Selected</p>
-            <p className="truncate text-sm font-black">{selectedName}</p>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {inspectorTab === 'inspector' ? renderInspectorTab() : renderAnimationTab()}
-          </div>
-        </aside>
+        {/* Collapsible Right Inspector */}
+        {rightPanelOpen && (
+          <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/[0.08] bg-muvi-panel/80 transition-all">
+            <div className="flex shrink-0 border-b border-white/[0.08]">
+              <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'inspector' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('inspector')}>Inspector</button>
+              <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'animation' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('animation')}>Animation</button>
+            </div>
+            <div className="border-b border-white/[0.08] px-4 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Selected</p>
+              <p className="truncate text-sm font-black">{selectedName}</p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {inspectorTab === 'inspector' ? renderInspectorTab() : renderAnimationTab()}
+            </div>
+          </aside>
+        )}
       </div>
 
       <audio ref={audioRef} className="hidden" />
