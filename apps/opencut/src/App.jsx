@@ -114,12 +114,9 @@ const initialState = {
 };
 
 function syncTimelineDuration(config) {
-  const requestedDuration = Number(config.duration) || 0;
   const actualEnd = sceneTimelineEnd(config);
-  if (requestedDuration > actualEnd) {
-    setProjectDuration(config, requestedDuration);
-    return;
-  }
+  // Scene timing is the source of truth. Keeping an old project duration here
+  // stretched the final scene straight back after every trim.
   config.duration = Number(actualEnd.toFixed(1));
 }
 
@@ -312,7 +309,8 @@ function reducer(state, action) {
       });
     case 'clip-window':
       return withHistory(state, (config, next) => {
-        const scene = config.scenes[action.sceneIndex ?? state.selectedSceneIndex];
+        const sceneIndex = action.sceneIndex ?? state.selectedSceneIndex;
+        const scene = config.scenes[sceneIndex];
         if (!scene?.background) return;
         const maxOut = Number(scene.background.sourceDuration) || Number(action.clipOut) || 99999;
         const clipIn = action.clipIn != null ? Math.max(0, Number(action.clipIn)) : (scene.background.clipIn ?? 0);
@@ -325,8 +323,9 @@ function reducer(state, action) {
         // A trim changes this clip's length, not its position in the edit.
         // Keep every later scene attached to its new end point.
         scene.end = Number((scene.start + length).toFixed(2));
-        retimeFrom(config, state.selectedSceneIndex + 1);
+        retimeFrom(config, sceneIndex + 1);
         next.currentTime = Math.min(next.currentTime, scene.end);
+        next.isPlaying = false;
       });
     case 'append-clip':
       return withHistory(state, (config, next) => {
@@ -412,9 +411,18 @@ function reducer(state, action) {
         next.selectedTarget = 'scene';
       });
     case 'delete-scene':
-      if (state.config.scenes.length <= 1) return state;
       return withHistory(state, (config, next) => {
         config.scenes.splice(state.selectedSceneIndex, 1);
+        if (!config.scenes.length) {
+          config.coverSceneId = null;
+          config.duration = 1;
+          next.selectedSceneIndex = 0;
+          next.selectedLayerIndex = 0;
+          next.selectedTarget = 'scene';
+          next.currentTime = 0;
+          next.isPlaying = false;
+          return;
+        }
         retimeFrom(config, state.selectedSceneIndex);
         next.selectedSceneIndex = Math.max(0, state.selectedSceneIndex - 1);
         next.selectedLayerIndex = 0;
@@ -1368,12 +1376,11 @@ function isMotionPath(path) {
 function sceneHasMotionBackground(scene) {
   const bg = scene?.background;
   if (!bg) return false;
-  if (bg.mediaKind === 'video') return true;
-  return isMotionPath(bg.image ?? '');
+  return isGifPath(bg.image ?? '');
 }
 
 function sceneHasMotionLayers(scene) {
-  return (scene?.layers || []).some((layer) => layer.type === 'video' || isVideoPath(layer.source));
+  return (scene?.layers || []).some((layer) => isGifPath(layer.source));
 }
 
 const AVAILABLE_VIDEOS = [
@@ -1819,7 +1826,7 @@ export default function App() {
   const [inspectorSubTab, setInspectorSubTab] = useState('basic'); // 'basic' | 'background' | 'audio' | 'speed' | 'animation'
   const [ratioMenuOpen, setRatioMenuOpen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(1);
-  const [timelineZoom, setTimelineZoom] = useState(1.25);
+  const [timelineZoom, setTimelineZoom] = useState(1);
   const [timelineDropIndex, setTimelineDropIndex] = useState(null);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [youtubeFetchMode, setYoutubeFetchMode] = useState('whole'); // 'whole' | 'clip'
@@ -1842,7 +1849,7 @@ export default function App() {
   const [socialPostNow, setSocialPostNow] = useState(false);
   const [socialBusy, setSocialBusy] = useState(false);
   const [socialStatus, setSocialStatus] = useState('');
-  const clipBlobRef = useRef(null);
+  const clipBlobUrlsRef = useRef(new Set());
   const canvasRef = useRef(null);
   const dragRef = useRef(null);
   const barDragRef = useRef(null);
@@ -1859,6 +1866,9 @@ export default function App() {
   const animation = bg.animation || {};
   const fontOptions = state.config.fonts?.families || families;
   const totalDuration = timelineDuration(state.config);
+  // A small editable tail makes a one-clip timeline behave like an editor:
+  // dragging the yellow trim handle visibly exposes empty time after the clip.
+  const timelineViewportDuration = Math.max(totalDuration + 1, totalDuration * 1.12);
   const sceneDur = Math.max(0.2, sceneDuration(selectedScene));
   const audioTrack = state.config.audio;
   const { width: canvasW, height: canvasH } = getCanvasSize(state.config);
@@ -1875,7 +1885,7 @@ export default function App() {
           const restoredBlob = await getMediaBlob('main_video_blob');
           if (restoredBlob) {
             const restoredUrl = URL.createObjectURL(restoredBlob);
-            clipBlobRef.current = restoredUrl;
+            clipBlobUrlsRef.current.add(restoredUrl);
             if (saved.scenes) {
               for (const sc of saved.scenes) {
                 if (sc.background?.image && (sc.background.image.startsWith('blob:') || sc.background.image === 'indexeddb:main_video_blob')) {
@@ -1914,7 +1924,7 @@ export default function App() {
     if (window.confirm('Start a new project? This will clear your current canvas session.')) {
       clearSavedProject();
       await clearMediaBlobs();
-      revokeClipBlob();
+      revokeClipBlobs();
       dispatch({ type: 'replace-config', config: clone(initialConfig) });
       setClipDraft(null);
       setClipStatus('');
@@ -1982,11 +1992,11 @@ export default function App() {
           if (cancelled) return;
           const local = Math.max(0, (video.currentTime || 0) - clipIn);
           if (video.ended || video.currentTime >= clipOut - 0.05) {
-            dispatch({ type: 'ui', patch: { currentTime: Number(span.toFixed(2)), isPlaying: false } });
+            dispatch({ type: 'ui', patch: { currentTime: Number(((scene.start || 0) + span).toFixed(2)), isPlaying: false } });
             video.pause();
             return;
           }
-          dispatch({ type: 'ui', patch: { currentTime: Number(Math.min(span, local).toFixed(2)) } });
+          dispatch({ type: 'ui', patch: { currentTime: Number(((scene.start || 0) + Math.min(span, local)).toFixed(2)) } });
           frame = requestAnimationFrame(tick);
         };
         frame = requestAnimationFrame(tick);
@@ -2148,48 +2158,82 @@ export default function App() {
     refreshUploads();
   }
 
-  function revokeClipBlob() {
-    if (clipBlobRef.current) {
-      URL.revokeObjectURL(clipBlobRef.current);
-      clipBlobRef.current = null;
+  function revokeClipBlobs(source = null) {
+    const urls = clipBlobUrlsRef.current;
+    if (source) {
+      if (urls.has(source)) URL.revokeObjectURL(source);
+      urls.delete(source);
+      return;
     }
+    urls.forEach((url) => URL.revokeObjectURL(url));
+    urls.clear();
   }
 
+  useEffect(() => () => revokeClipBlobs(), []);
+
   function probeVideoMeta(source) {
-    return new Promise((resolveMeta) => {
+    return new Promise((resolveMeta, rejectMeta) => {
       const video = document.createElement('video');
       video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      video.crossOrigin = 'anonymous';
+      let settled = false;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        video.removeAttribute('src');
+        video.load();
+        callback(value);
+      };
+      const timeout = setTimeout(() => finish(rejectMeta, new Error('The video took too long to become playable. Try MP4/WebM or another source.')), 12000);
       video.onloadedmetadata = () => {
-        resolveMeta({
-          duration: Number.isFinite(video.duration) ? video.duration : 10,
+        if (!Number.isFinite(video.duration) || video.duration <= 0 || !video.videoWidth || !video.videoHeight) {
+          finish(rejectMeta, new Error('This source did not provide playable video metadata.'));
+          return;
+        }
+        finish(resolveMeta, {
+          duration: video.duration,
           width: video.videoWidth || 0,
           height: video.videoHeight || 0,
         });
-        video.src = '';
       };
-      video.onerror = () => resolveMeta({ duration: 10, width: 0, height: 0 });
+      video.onerror = () => finish(rejectMeta, new Error('The selected source is not a playable video or blocks canvas playback.'));
       video.src = resolveAssetPath(source);
+      video.load();
     });
   }
 
-  async function warmClipVideo(source) {
+  async function warmClipVideo(source, targetTime = 0) {
     const video = await loadVideo(imageCacheRef.current, source);
-    if (!video) return null;
-    await new Promise((resolve) => {
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      throw new Error('The video could not be decoded for canvas playback.');
+    }
+    video.pause();
+    const safeTarget = Math.max(0, Math.min(Number(targetTime) || 0, Math.max(0, (video.duration || 0) - 0.05)));
+    if (Math.abs((video.currentTime || 0) - safeTarget) <= 0.05) return video;
+    await new Promise((resolve, reject) => {
       let settled = false;
-      const finish = () => {
+      const finish = (error = null) => {
         if (settled) return;
         settled = true;
-        resolve(video);
+        clearTimeout(timeout);
+        video.removeEventListener('seeked', onSeeked);
+        video.removeEventListener('error', onError);
+        if (error) reject(error);
+        else resolve(video);
       };
-      video.addEventListener('seeked', finish, { once: true });
-      video.addEventListener('loadeddata', finish, { once: true });
+      const onSeeked = () => finish();
+      const onError = () => finish(new Error('The video failed while preparing the selected start time.'));
+      const timeout = setTimeout(() => finish(new Error('The selected video position could not be buffered.')), 10000);
+      video.addEventListener('seeked', onSeeked, { once: true });
+      video.addEventListener('error', onError, { once: true });
       try {
-        video.currentTime = Math.min(0.05, Math.max(0, (video.duration || 1) * 0.01));
+        video.currentTime = safeTarget;
       } catch {
-        finish();
+        finish(new Error('The browser could not seek this video.'));
       }
-      setTimeout(finish, 2500);
     });
     return video;
   }
@@ -2197,7 +2241,8 @@ export default function App() {
   async function applyClipToEditor({ source, title, duration, clipIn = 0, clipOut = null, insertion = 'append' }) {
     const safeIn = Math.max(0, Number(clipIn) || 0);
     const safeOut = Math.max(safeIn + 0.2, clipOut != null ? Number(clipOut) : Number(duration) || safeIn + 0.2);
-    // Put the video on the canvas immediately — don't wait for warm/buffer.
+    setClipProgress({ stage: 'loading', percent: 82, message: 'Checking playable frames…' });
+    await warmClipVideo(source, safeIn);
     const hasTimeline = latestStateRef.current.config.scenes.length > 0;
     dispatch({
       type: insertion === 'replace' || !hasTimeline ? 'apply-clip' : 'append-clip',
@@ -2219,23 +2264,25 @@ export default function App() {
     });
     setClipStatus(`${hasTimeline && insertion !== 'replace' ? 'Added as the next clip' : 'On the editor'} · drag clips to reorder, trim their edges, then Export.`);
     setActivePanel('clip');
-    setClipProgress({ stage: 'loading', percent: 92, message: 'Buffering preview…' });
-    warmClipVideo(source).finally(() => {
-      setClipProgress(null);
-    });
+    setClipProgress(null);
   }
 
   async function loadClipSource({ source, title, temporary, duration: knownDuration, clipIn = 0, clipOut = null, autoApply = false, insertion = 'append' }) {
-    imageCacheRef.current.clear();
     const meta = await probeVideoMeta(source);
-    const duration = knownDuration && knownDuration > 0 ? knownDuration : meta.duration;
-    const safeIn = Math.max(0, Number(clipIn) || 0);
-    const safeOut = Math.max(safeIn + 0.2, clipOut != null ? Number(clipOut) : Number(duration.toFixed(2)));
+    const duration = meta.duration || (knownDuration && knownDuration > 0 ? knownDuration : 0);
+    if (!(duration > 0.2)) throw new Error('The selected video is too short or unreadable.');
+    const requestedIn = Math.max(0, Number(clipIn) || 0);
+    if (requestedIn >= duration - 0.2) {
+      throw new Error(`The selected start time (${formatTime(requestedIn)}) is after this video's ${formatTime(duration)} duration.`);
+    }
+    const safeIn = Math.min(requestedIn, duration - 0.2);
+    const requestedOut = clipOut != null ? Number(clipOut) : duration;
+    const safeOut = Math.min(duration, Math.max(safeIn + 0.2, requestedOut));
     const draft = {
       source,
       title: title || 'Clip',
       temporary: Boolean(temporary),
-      duration: Number(duration.toFixed(2)),
+        duration: Number(duration.toFixed(2)),
       clipIn: safeIn,
       clipOut: safeOut,
     };
@@ -2248,7 +2295,10 @@ export default function App() {
   }
 
   async function handleFetchYoutube(urlOverride = '') {
-    const rawUrl = (urlOverride || youtubeUrl).trim();
+    // React passes the click event as the first argument. Only a caller that
+    // deliberately supplies a URL should override the controlled input.
+    const overrideUrl = typeof urlOverride === 'string' ? urlOverride : '';
+    const rawUrl = (overrideUrl || youtubeUrl).trim();
     if (!rawUrl) {
       setClipStatus('Paste a video or YouTube URL first.');
       return;
@@ -2262,7 +2312,6 @@ export default function App() {
     const isDirect = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(rawUrl) || rawUrl.includes('supabase.co') || rawUrl.includes('cloudinary');
     if (isDirect) {
       try {
-        revokeClipBlob();
         const safeIn = youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
         const parsedOut = youtubeFetchMode === 'clip' && youtubeEndTime ? parseTimecodeToSeconds(youtubeEndTime) : null;
 
@@ -2344,8 +2393,9 @@ export default function App() {
         }
       }
 
-      if (!result?.path) throw new Error('Fetch finished without a video stream.');
-      revokeClipBlob();
+      if (!result?.path || !result?.isDirectStream) {
+        throw new Error('YouTube metadata loaded, but Render did not return a playable video stream. Nothing was added to the canvas.');
+      }
 
       const safeIn = youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
       const parsedOut = youtubeFetchMode === 'clip' && youtubeEndTime ? parseTimecodeToSeconds(youtubeEndTime) : null;
@@ -2376,21 +2426,22 @@ export default function App() {
     }
   }
 
-  async function handleOptionalClipUpload(file, insertion = 'append') {
+  async function handleOptionalClipUpload(file, insertion = 'append', applyYoutubeTrim = false) {
     if (!file) return;
+    let pendingBlobUrl = null;
     setClipBusy(true);
     setClipProgress({ stage: 'loading', percent: 20, message: 'Loading local file...' });
     setClipStatus('Loading local file into memory...');
     try {
-      revokeClipBlob();
       // Preview from the device immediately. Persisting a large gallery video
       // must never hold up editing or look like a cloud upload.
       setMediaBlob('main_video_blob', file).catch(() => {});
       const blobUrl = URL.createObjectURL(file);
-      clipBlobRef.current = blobUrl;
+      pendingBlobUrl = blobUrl;
+      clipBlobUrlsRef.current.add(blobUrl);
 
-      const safeIn = youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
-      const parsedOut = youtubeFetchMode === 'clip' && youtubeEndTime ? parseTimecodeToSeconds(youtubeEndTime) : null;
+      const safeIn = applyYoutubeTrim && youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
+      const parsedOut = applyYoutubeTrim && youtubeFetchMode === 'clip' && youtubeEndTime ? parseTimecodeToSeconds(youtubeEndTime) : null;
 
       await loadClipSource({
         source: blobUrl,
@@ -2402,8 +2453,13 @@ export default function App() {
         insertion,
       });
       setClipProgress(null);
-      setClipStatus(`Loaded into canvas with ${youtubeFetchMode === 'clip' ? `trim (${youtubeStartTime} to ${youtubeEndTime}) applied` : 'full duration'}!`);
+      setClipStatus(applyYoutubeTrim && youtubeFetchMode === 'clip'
+        ? `Playable clip loaded with trim ${youtubeStartTime} to ${youtubeEndTime}.`
+        : 'Playable video loaded at its full duration.');
     } catch (error) {
+      if (pendingBlobUrl && !latestStateRef.current.config.scenes.some((scene) => scene.background?.image === pendingBlobUrl)) {
+        revokeClipBlobs(pendingBlobUrl);
+      }
       setClipProgress(null);
       setClipStatus(error.message || 'Could not load that file.');
     } finally {
@@ -2462,7 +2518,9 @@ export default function App() {
 
   async function clearClipDraft() {
     const path = clipDraft?.source;
-    revokeClipBlob();
+    const inUse = latestStateRef.current.config.scenes.some((scene) =>
+      scene.background?.image === path || (scene.layers || []).some((layer) => layer.source === path));
+    if (path && !inUse) revokeClipBlobs(path);
     setClipDraft(null);
     setClipStatus('Cleared temporary clip.');
     if (path && String(path).startsWith('output/temp-clips/')) {
@@ -2800,19 +2858,53 @@ export default function App() {
     if (!track || !scene?.background?.image) return;
     const rect = track.getBoundingClientRect();
     dispatch({ type: 'ui', patch: { selectedSceneIndex: sceneIndex, selectedLayerIndex: 0, selectedTarget: 'background', isPlaying: false } });
-    clipTrimRef.current = {
+    const trim = {
       edge, sceneIndex, startX: event.clientX, width: Math.max(1, rect.width),
       clipIn: Number(scene.background.clipIn) || 0,
       clipOut: Number(scene.background.clipOut) || scene.end - scene.start,
       sourceDuration: Number(scene.background.sourceDuration) || 99999,
+      timelineDuration: Math.max(0.2, timelineViewportDuration),
+      handle: event.currentTarget,
+      pointerId: event.pointerId,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const move = (moveEvent) => {
+      if (clipTrimRef.current !== trim) return;
+      moveEvent.preventDefault();
+      const seconds = ((moveEvent.clientX - trim.startX) / trim.width) * trim.timelineDuration;
+      const minimum = 0.2;
+      const clipIn = trim.edge === 'left'
+        ? Math.max(0, Math.min(trim.clipOut - minimum, trim.clipIn + seconds))
+        : trim.clipIn;
+      const clipOut = trim.edge === 'right'
+        ? Math.min(trim.sourceDuration, Math.max(trim.clipIn + minimum, trim.clipOut + seconds))
+        : trim.clipOut;
+      dispatch({ type: 'clip-window', sceneIndex: trim.sceneIndex, clipIn, clipOut });
+    };
+    const finish = (upEvent) => {
+      if (clipTrimRef.current !== trim) return;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      if (trim.handle?.hasPointerCapture?.(trim.pointerId)) {
+        try { trim.handle.releasePointerCapture(trim.pointerId); } catch { /* ignore */ }
+      }
+      if (clipTrimRef.current === trim) clipTrimRef.current = null;
+    };
+    trim.finish = finish;
+    trim.move = move;
+    clipTrimRef.current?.finish?.();
+    clipTrimRef.current = trim;
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* global listeners remain active */ }
   }
 
   function handleClipTrimPointerMove(event) {
     const trim = clipTrimRef.current;
-    if (!trim || event.buttons !== 1) return;
-    const seconds = ((event.clientX - trim.startX) / trim.width) * totalDuration;
+    if (!trim) return;
+    event.preventDefault();
+    const seconds = ((event.clientX - trim.startX) / trim.width) * trim.timelineDuration;
     const minimum = 0.2;
     const clipIn = trim.edge === 'left'
       ? Math.max(0, Math.min(trim.clipOut - minimum, trim.clipIn + seconds))
@@ -2823,16 +2915,12 @@ export default function App() {
     dispatch({ type: 'clip-window', sceneIndex: trim.sceneIndex, clipIn, clipOut });
   }
 
-  function handleClipTrimPointerUp() {
-    clipTrimRef.current = null;
-  }
-
   function seekFromTimelineClientX(clientX, trackEl) {
     if (!selectedScene || !trackEl) return;
     const rect = trackEl.getBoundingClientRect();
     if (!rect.width) return;
     const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    seekTo(selectedScene.start + fraction * sceneDur);
+    seekTo(Math.min(totalDuration, fraction * timelineViewportDuration));
   }
 
   function handleRulerSeek(event) {
@@ -2898,7 +2986,7 @@ export default function App() {
           <p className="mb-3 text-xs text-muvi-muted">Paste a YouTube link to fetch straight into the canvas. Download the whole video or specify start and end time.</p>
 
           <label className="label">YouTube URL
-            <input className="control" placeholder="https://www.youtube.com/watch?v=..." value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') handleFetchYoutube(); }} />
+            <input data-testid="youtube-url" className="control" placeholder="https://www.youtube.com/watch?v=..." value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') handleFetchYoutube(); }} />
           </label>
 
           {/* Dual Option Mode Selector */}
@@ -2918,6 +3006,7 @@ export default function App() {
               </button>
               <button
                 type="button"
+                data-testid="youtube-mode-clip"
                 onClick={() => setYoutubeFetchMode('clip')}
                 className={`rounded-md px-2.5 py-1.5 text-xs font-bold transition ${
                   youtubeFetchMode === 'clip'
@@ -2936,6 +3025,7 @@ export default function App() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muvi-muted">
                     Start Time
                     <input
+                      data-testid="youtube-start"
                       type="text"
                       placeholder="00:00:00"
                       value={youtubeStartTime}
@@ -2946,6 +3036,7 @@ export default function App() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-muvi-muted">
                     End Time
                     <input
+                      data-testid="youtube-end"
                       type="text"
                       placeholder="00:00:30"
                       value={youtubeEndTime}
@@ -2988,7 +3079,7 @@ export default function App() {
             )}
           </div>
 
-          <button className="btn mb-3 w-full bg-muvi-accent/90 hover:bg-muvi-accent disabled:cursor-wait disabled:opacity-70 font-bold" disabled={clipBusy} onClick={handleFetchYoutube}>
+          <button data-testid="youtube-download" className="btn mb-3 w-full bg-muvi-accent/90 hover:bg-muvi-accent disabled:cursor-wait disabled:opacity-70 font-bold" disabled={clipBusy} onClick={handleFetchYoutube}>
             {clipBusy ? '⏳ Download in progress — please keep this tab open' : youtubeFetchMode === 'clip' ? '⚡ Download Clip to Canvas' : '⬇️ Download Whole Video'}
           </button>
 
@@ -3080,7 +3171,7 @@ export default function App() {
             <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white">📂 Select or Drop Video to Canvas</p>
             <label className="btn block text-center text-xs font-bold bg-muvi-accent hover:bg-muvi-accent/90 text-white cursor-pointer py-2.5 shadow-md">
               ⚡ Choose Video File (MP4, MOV, WebM)
-              <input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { handleOptionalClipUpload(event.target.files?.[0]); event.target.value = ''; }} />
+              <input data-testid="youtube-file-fallback" className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { handleOptionalClipUpload(event.target.files?.[0], 'append', true); event.target.value = ''; }} />
             </label>
             <p className="mt-2 text-[10px] text-white/70">
               {youtubeFetchMode === 'clip'
@@ -3264,7 +3355,7 @@ export default function App() {
           </div>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <label className="btn text-center text-sm">Import image<input className="hidden" type="file" accept="image/*,.gif" onChange={(event) => { const file = event.target.files?.[0]; if (file) importMediaLayer(file, 'image'); event.target.value = ''; }} /></label>
-            <label className="btn text-center text-sm">Import video<input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) handleOptionalClipUpload(file); event.target.value = ''; }} /></label>
+            <label className="btn text-center text-sm">Import video<input data-testid="media-import-video" className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) handleOptionalClipUpload(file); event.target.value = ''; }} /></label>
           </div>
           {uploads.length === 0 ? (
             <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">No uploads yet. Click Upload to add images, videos, or music.</p>
@@ -3780,8 +3871,8 @@ export default function App() {
     const trackRows = layers.map((layer, index) => ({ layer, index })).reverse();
     // The ruler and video rail represent the complete edit. Limit tick density
     // so a long source video does not turn the ruler into an unreadable blur.
-    const playheadFraction = state.currentTime / totalDuration;
-    const tickCount = Math.min(30, Math.max(1, Math.ceil(totalDuration / 5)));
+    const playheadFraction = state.currentTime / timelineViewportDuration;
+    const tickCount = Math.min(30, Math.max(1, Math.ceil(timelineViewportDuration / 5)));
     const bgSource = bg?.image ?? state.config.assets?.background;
     const isVideoBg = Boolean(bg?.mediaKind === 'video' || isVideoPath(bgSource));
     const bgLabel = !bgSource
@@ -3816,6 +3907,7 @@ export default function App() {
             </button>
             <button
               type="button"
+              data-testid="timeline-delete"
               className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-red-400 hover:bg-red-500/20"
               title="Delete Selected"
               onClick={handleDelete}
@@ -3849,6 +3941,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              data-testid="timeline-play"
               className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF5C00] text-black transition hover:scale-105"
               onClick={togglePlay}
               title="Play / Pause (Space)"
@@ -3893,7 +3986,7 @@ export default function App() {
                 onPointerMove={handleRulerScrub}
               >
                 {Array.from({ length: tickCount + 1 }, (_, tick) => {
-                  const second = Math.round((tick / tickCount) * totalDuration);
+                  const second = Math.round((tick / tickCount) * timelineViewportDuration);
                   return (
                   <span
                     key={second}
@@ -3994,6 +4087,7 @@ export default function App() {
                     return (
                       <button
                         key={scene.id || index}
+                        data-testid={`timeline-video-clip-${index}`}
                         type="button"
                         draggable
                         onDragStart={(event) => {
@@ -4011,32 +4105,36 @@ export default function App() {
                         onClick={() => dispatch({ type: 'ui', patch: { selectedSceneIndex: index, selectedLayerIndex: 0, selectedTarget: 'background', isPlaying: false, currentTime: scene.start } })}
                         className={`clip-bar top-1 bottom-1 cursor-grab justify-between rounded-md px-3 text-left active:cursor-grabbing ${active ? 'ring-2 ring-[#FF5C00] shadow-lg z-10' : 'ring-1 ring-black/30 hover:brightness-110'}`}
                         style={{
-                          left: `${(scene.start / totalDuration) * 100}%`,
-                          width: `${Math.max(3, (duration / totalDuration) * 100)}%`,
+                          left: `${(scene.start / timelineViewportDuration) * 100}%`,
+                          width: `${Math.max(3, (duration / timelineViewportDuration) * 100)}%`,
                           background: active ? 'linear-gradient(180deg, #ea580c, #9a3412)' : 'linear-gradient(180deg, #7c2d12, #431407)',
                         }}
                         title="Click to edit · drag a clip onto another clip to reorder"
                       >
                         {scene.background?.mediaKind === 'video' && (
                           <div
+                            data-testid={`trim-left-${index}`}
+                            data-trim-edge="left"
+                            draggable={false}
                             className={`absolute inset-y-0 left-0 z-20 w-2 cursor-ew-resize border-r-2 border-[#fff3a3] bg-[#facc15] shadow-[2px_0_8px_rgba(250,204,21,0.7)] transition-opacity ${active ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
                             title="Yellow handle: drag to crop the beginning"
-                            onPointerDown={(event) => handleClipTrimPointerDown(event, index, 'left')}
+                            onPointerDownCapture={(event) => handleClipTrimPointerDown(event, index, 'left')}
+                            onDragStartCapture={(event) => event.preventDefault()}
                             onPointerMove={handleClipTrimPointerMove}
-                            onPointerUp={handleClipTrimPointerUp}
-                            onPointerCancel={handleClipTrimPointerUp}
                           />
                         )}
                         <span className="truncate text-[10px] font-bold text-white">🎬 {scene.name || (source ? 'Video clip' : 'Scene')}</span>
                         <span className="ml-1 shrink-0 font-mono text-[9px] text-orange-100/80">{duration.toFixed(1)}s</span>
                         {scene.background?.mediaKind === 'video' && (
                           <div
+                            data-testid={`trim-right-${index}`}
+                            data-trim-edge="right"
+                            draggable={false}
                             className={`absolute inset-y-0 right-0 z-20 w-2 cursor-ew-resize border-l-2 border-[#fff3a3] bg-[#facc15] shadow-[-2px_0_8px_rgba(250,204,21,0.7)] transition-opacity ${active ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
                             title="Yellow handle: drag to crop the end"
-                            onPointerDown={(event) => handleClipTrimPointerDown(event, index, 'right')}
+                            onPointerDownCapture={(event) => handleClipTrimPointerDown(event, index, 'right')}
+                            onDragStartCapture={(event) => event.preventDefault()}
                             onPointerMove={handleClipTrimPointerMove}
-                            onPointerUp={handleClipTrimPointerUp}
-                            onPointerCancel={handleClipTrimPointerUp}
                           />
                         )}
                       </button>
@@ -4433,7 +4531,7 @@ export default function App() {
 
             {/* Viewport Center: Empty State or Active Canvas */}
             {isCanvasEmpty ? (
-              <div className="flex w-full max-w-md flex-col items-center justify-center p-4 sm:p-6 text-center select-none z-10">
+              <div data-testid="empty-canvas" className="flex w-full max-w-md flex-col items-center justify-center p-4 sm:p-6 text-center select-none z-10">
                 {/* Glowing MuviDB Orange (+) Button */}
                 <label className="group relative flex h-20 w-20 sm:h-24 sm:w-24 cursor-pointer items-center justify-center rounded-2xl sm:rounded-3xl bg-[#FF5C00] text-black shadow-[0_0_50px_rgba(255,92,0,0.5)] transition-all duration-300 hover:scale-105 hover:bg-[#FF7A30] hover:shadow-[0_0_70px_rgba(255,92,0,0.7)]">
                   <svg className="h-10 w-10 sm:h-12 sm:w-12 transition-transform group-hover:rotate-90 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -4480,6 +4578,7 @@ export default function App() {
               >
                 <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-phone ring-1 ring-white/5 relative">
                   <canvas
+                    data-testid="preview-canvas"
                     ref={canvasRef}
                     width={canvasW}
                     height={canvasH}

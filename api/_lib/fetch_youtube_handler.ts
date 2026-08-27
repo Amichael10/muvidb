@@ -134,9 +134,9 @@ export async function handleFetchYoutube(req: VercelRequest, res: VercelResponse
       }
     }
 
-    let embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
     let directStreamUrl: string | null = null;
     let extractorSource = 'youtube-meta';
+    let extractorError = '';
 
     // Option 4: Query existing Render media-extractor microservice for direct stream extraction
     const extractorBaseUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
@@ -150,20 +150,28 @@ export async function handleFetchYoutube(req: VercelRequest, res: VercelResponse
           ...(extractorSecret ? { Authorization: `Bearer ${extractorSecret}` } : {})
         },
         body: JSON.stringify({ url: trimmedUrl }),
-        signal: AbortSignal.timeout(12000)
+        signal: AbortSignal.timeout(45000)
       });
+      const extData = await extRes.json().catch(() => ({}));
       if (extRes.ok) {
-        const extData = await extRes.json();
         if (extData.success && extData.video_url) {
           directStreamUrl = extData.video_url;
           extractorSource = 'render-extractor';
           if (extData.title) title = extData.title;
           if (extData.duration) duration = Number(extData.duration);
           if (extData.image_url) thumbnail = extData.image_url;
+        } else {
+          extractorError = extData.error || 'The extractor returned no playable video stream.';
         }
+      } else {
+        extractorError = extData.error || extData.detail || `Render extractor returned ${extRes.status}.`;
       }
-    } catch {
-      // ignore timeout or wakeup delay
+    } catch (error) {
+      extractorError = error instanceof Error ? error.message : 'Render extractor request failed.';
+    }
+
+    if (!directStreamUrl) {
+      throw new Error(`YouTube metadata was found, but the video could not be prepared for canvas playback. ${extractorError}`.trim());
     }
 
     const jobId = `yt-${videoId}-${Date.now()}`;
@@ -175,9 +183,9 @@ export async function handleFetchYoutube(req: VercelRequest, res: VercelResponse
       message: directStreamUrl ? 'Direct video stream resolved!' : 'Video metadata ready',
       done: true,
       result: {
-        path: directStreamUrl || trimmedUrl,
-        streamUrl: directStreamUrl || embedUrl,
-        isDirectStream: Boolean(directStreamUrl),
+        path: directStreamUrl,
+        streamUrl: directStreamUrl,
+        isDirectStream: true,
         extractorSource,
         videoId,
         title,

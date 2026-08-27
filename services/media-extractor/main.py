@@ -57,7 +57,10 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'no_warnings': True,
         'skip_download': True,
         'extract_flat': False,
-        'format': 'best',
+        # YouTube increasingly exposes separate video/audio streams and may not
+        # advertise yt-dlp's legacy `best` alias. Prefer a progressive stream
+        # with audio, then fall back to a browser-playable video stream.
+        'format': 'best[ext=mp4][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/bestvideo[ext=mp4]/bestvideo/best',
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
