@@ -3201,12 +3201,12 @@ export default function App() {
     // CapCut: top track = front (last drawn)
     const trackRows = layers.map((layer, index) => ({ layer, index })).reverse();
     const playheadFraction = (state.currentTime - selectedScene.start) / sceneDur;
-    const tickCount = Math.max(1, Math.ceil(sceneDur));
-    const isVideoBg = bg.mediaKind === 'video' || isVideoPath(bgSource);
+    const bgSource = bg?.image ?? state.config.assets?.background;
+    const isVideoBg = Boolean(bg?.mediaKind === 'video' || isVideoPath(bgSource));
     const bgLabel = !bgSource
-      ? `Solid · ${bg.color || state.config.theme?.backgroundColor || '#0B0D0E'}`
+      ? `Solid · ${bg?.color || state.config.theme?.backgroundColor || '#0B0D0E'}`
       : isVideoBg
-        ? (clipDraft?.title || selectedScene.name || 'Video Clip')
+        ? (clipDraft?.title || selectedScene?.name || 'Video Clip')
         : String(bgSource).startsWith('blob:')
           ? 'Image Layer'
           : String(bgSource).split('/').pop();
