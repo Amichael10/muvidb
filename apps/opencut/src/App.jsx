@@ -3202,13 +3202,13 @@ export default function App() {
     const trackRows = layers.map((layer, index) => ({ layer, index })).reverse();
     const playheadFraction = (state.currentTime - selectedScene.start) / sceneDur;
     const tickCount = Math.max(1, Math.ceil(sceneDur));
-    const bgSource = bg.image ?? state.config.assets?.background;
+    const isVideoBg = bg.mediaKind === 'video' || isVideoPath(bgSource);
     const bgLabel = !bgSource
       ? `Solid · ${bg.color || state.config.theme?.backgroundColor || '#0B0D0E'}`
-      : String(bgSource).startsWith('blob:')
-        ? 'Temporary clip'
-        : String(bgSource).includes('temp-clips/')
-          ? `Temp · ${String(bgSource).split('/').pop()}`
+      : isVideoBg
+        ? (clipDraft?.title || selectedScene.name || 'Video Clip')
+        : String(bgSource).startsWith('blob:')
+          ? 'Image Layer'
           : String(bgSource).split('/').pop();
 
     return (
@@ -3324,25 +3324,36 @@ export default function App() {
                 );
               })}
 
-              <div className="track-row h-9">
+              <div className={`track-row h-9 ${state.selectedTarget === 'background' ? 'bg-muvi-accent/[0.08]' : ''}`}>
                 <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-2 border-r border-white/[0.05] px-2">
-                  <span className="h-2 w-2 rounded-full bg-sky-500" />
+                  <span className={`h-2.5 w-2.5 rounded-full ${isVideoBg ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)]' : 'bg-sky-500'}`} />
                   <button
                     type="button"
-                    className={`min-w-0 flex-1 truncate text-left text-[11px] font-semibold ${state.selectedTarget === 'background' ? 'text-muvi-accent' : 'text-white/70'}`}
+                    className={`min-w-0 flex-1 truncate text-left text-[11px] font-bold ${state.selectedTarget === 'background' ? 'text-muvi-accent' : 'text-white/90'}`}
                     onClick={() => dispatch({ type: 'select-background' })}
                   >
-                    Background
+                    {isVideoBg ? '🎬 Video Track' : 'Background'}
                   </button>
                 </div>
                 <div className="relative h-9 flex-1" data-track>
                   <button
                     type="button"
-                    className={`clip-bar inset-x-1 cursor-pointer ${state.selectedTarget === 'background' ? 'ring-2 ring-white/80' : 'ring-1 ring-black/20'}`}
-                    style={{ background: 'linear-gradient(180deg, #3b82f6, #2563eb)' }}
+                    className={`clip-bar inset-x-1 cursor-pointer flex items-center justify-between px-2.5 ${state.selectedTarget === 'background' ? 'ring-2 ring-white/90 shadow-md' : 'ring-1 ring-black/30'}`}
+                    style={{
+                      background: isVideoBg
+                        ? 'linear-gradient(180deg, #f59e0b, #d97706)'
+                        : 'linear-gradient(180deg, #3b82f6, #2563eb)'
+                    }}
                     onClick={() => dispatch({ type: 'select-background' })}
                   >
-                    <span className="truncate text-[10px] font-bold text-white/90">{bgLabel}</span>
+                    <span className="truncate text-[10px] font-bold text-black/90 flex items-center gap-1.5">
+                      {isVideoBg ? '🎬 ' : ''}{bgLabel}
+                    </span>
+                    {isVideoBg && bg.clipOut != null && (
+                      <span className="shrink-0 font-mono text-[9px] font-bold text-black/75 bg-black/15 px-1.5 py-0.5 rounded">
+                        {(Number(bg.clipOut) - (Number(bg.clipIn) || 0)).toFixed(1)}s
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>
