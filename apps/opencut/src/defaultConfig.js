@@ -456,3 +456,30 @@ export const defaultConfig = {
     ]
   }
 };
+
+export const emptyConfig = {
+  title: "Untitled Video Project",
+  duration: 10,
+  fps: 30,
+  width: 1080,
+  height: 1920,
+  framePreset: "ig-reel",
+  outputName: "my-video.mp4",
+  coverName: "cover.png",
+  assets: {
+    logo: "",
+    background: ""
+  },
+  theme: {
+    backgroundColor: "#0B0D0E",
+    overlayTop: "rgba(11,13,14,0)",
+    overlayMid: "rgba(11,13,14,0)",
+    overlayBottom: "rgba(11,13,14,0)",
+    accent: "#00E5FF",
+    text: "#FFFFFF",
+    muted: "#94A3B8"
+  },
+  coverSceneId: "scene-1",
+  scenes: []
+};
+

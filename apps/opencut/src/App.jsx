@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import { defaultConfig } from './defaultConfig.js';
+import { defaultConfig, emptyConfig } from './defaultConfig.js';
 
 const DEFAULT_CANVAS_WIDTH = 1080;
 const DEFAULT_CANVAS_HEIGHT = 1920;
@@ -90,10 +90,10 @@ const selectedLabel = {
 };
 
 const initialConfig = {
-  ...clone(defaultConfig),
+  ...clone(emptyConfig),
   fonts: {
-    defaultFamily: defaultConfig.fonts?.defaultFamily || 'Manrope',
-    families: defaultConfig.fonts?.families || families,
+    defaultFamily: 'Manrope',
+    families: families,
   },
 };
 
@@ -260,10 +260,9 @@ function reducer(state, action) {
         const clipIn = Math.max(0, Number(action.clipIn) || 0);
         const clipOut = Math.max(clipIn + 0.2, Number(action.clipOut) || clipIn + 0.2);
         const length = Number((clipOut - clipIn).toFixed(2));
-        const logo = config.assets?.logo || 'assets/images/muvidb-logo.svg';
         config.scenes = [{
           id: `clip-${Date.now()}`,
-          name: action.title || 'Clip',
+          name: action.title || 'Video Clip',
           start: 0,
           end: length,
           transition: { type: 'none', duration: 0 },
@@ -280,39 +279,14 @@ function reducer(state, action) {
             animation: { type: 'none' },
             color: '#000000',
           },
-          layers: [
-            {
-              id: 'brand-logo',
-              type: 'image',
-              source: logo,
-              x: 72,
-              y: 72,
-              width: 92,
-              height: 92,
-              opacity: 1,
-            },
-            {
-              id: 'clip-title',
-              type: 'text',
-              text: action.title || 'Your title here',
-              x: 84,
-              y: 1480,
-              width: 912,
-              height: 160,
-              fontSize: 52,
-              weight: 'heavy',
-              color: '#FFFFFF',
-              align: 'center',
-              opacity: 1,
-            },
-          ],
+          layers: [],
         }];
         config.duration = length;
         config.coverSceneId = config.scenes[0].id;
         if (action.outputName) config.outputName = action.outputName;
         next.selectedSceneIndex = 0;
-        next.selectedLayerIndex = 1;
-        next.selectedTarget = 'layer';
+        next.selectedLayerIndex = 0;
+        next.selectedTarget = 'background';
         next.currentTime = 0;
         next.isPlaying = false;
       });
@@ -1106,16 +1080,33 @@ function selectedTargetLabel(target, scene) {
 }
 
 function drawSelection(ctx, state, scene, sceneIndex) {
+  if (!scene) return;
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(state.config);
   ctx.save();
-  ctx.lineWidth = 5;
-  ctx.setLineDash([18, 12]);
-  ctx.strokeStyle = '#FF5C00';
-  ctx.fillStyle = 'rgba(255,92,0,0.08)';
+  const cyanStroke = '#00E5FF';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = cyanStroke;
+  ctx.fillStyle = 'rgba(0, 229, 255, 0.05)';
+
   if (state.selectedTarget === 'background' && sceneIndex === state.selectedSceneIndex) {
-    ctx.strokeRect(18, 18, CANVAS_WIDTH - 36, CANVAS_HEIGHT - 36);
-    ctx.fillRect(18, 18, CANVAS_WIDTH - 36, CANVAS_HEIGHT - 36);
+    const bg = scene.background || {};
+    if (bg.image) {
+      ctx.strokeRect(6, 6, CANVAS_WIDTH - 12, CANVAS_HEIGHT - 12);
+      ctx.fillRect(6, 6, CANVAS_WIDTH - 12, CANVAS_HEIGHT - 12);
+      
+      // Draw corner circular nodes
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = cyanStroke;
+      ctx.lineWidth = 3;
+      for (const [cx, cy] of [[6, 6], [CANVAS_WIDTH - 6, 6], [6, CANVAS_HEIGHT - 6], [CANVAS_WIDTH - 6, CANVAS_HEIGHT - 6]]) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
   }
+
   if (state.selectedTarget === 'layer' && sceneIndex === state.selectedSceneIndex) {
     const layer = scene?.layers?.[state.selectedLayerIndex];
     if (layer) {
@@ -1124,25 +1115,28 @@ function drawSelection(ctx, state, scene, sceneIndex) {
       ctx.strokeRect(layer.x, layer.y, layer.width, layer.height);
       ctx.fillRect(layer.x, layer.y, layer.width, layer.height);
       ctx.restore();
-      ctx.setLineDash([]);
+      
       const handles = layerHandlePoints(layer);
-      ctx.strokeStyle = '#FF5C00';
+      ctx.strokeStyle = cyanStroke;
       ctx.fillStyle = '#ffffff';
       ctx.lineWidth = 3;
+      
       // Rotate stem + knob
       ctx.beginPath();
       ctx.moveTo(handles.t.x, handles.t.y);
       ctx.lineTo(handles.rotate.x, handles.rotate.y);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(handles.rotate.x, handles.rotate.y, 10, 0, Math.PI * 2);
+      ctx.arc(handles.rotate.x, handles.rotate.y, 9, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      
       for (const id of ['tl', 'tr', 'bl', 'br', 't', 'b', 'l', 'r']) {
         const handle = handles[id];
-        const size = ['t', 'b', 'l', 'r'].includes(id) ? 14 : 18;
-        ctx.fillRect(handle.x - size / 2, handle.y - size / 2, size, size);
-        ctx.strokeRect(handle.x - size / 2, handle.y - size / 2, size, size);
+        ctx.beginPath();
+        ctx.arc(handle.x, handle.y, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
       }
     }
   }
@@ -1471,7 +1465,13 @@ function loadSavedProject() {
   if (typeof window === 'undefined') return null;
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved ? stripStockBackgrounds(normalizeTimeline(JSON.parse(saved))) : null;
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed?.title === 'MuviDB Weekly Picks Reel') {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return stripStockBackgrounds(normalizeTimeline(parsed));
   } catch {
     return null;
   }
@@ -1627,6 +1627,8 @@ export default function App() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [activePanel, setActivePanel] = useState('media');
   const [inspectorTab, setInspectorTab] = useState('inspector');
+  const [inspectorSubTab, setInspectorSubTab] = useState('basic'); // 'basic' | 'background' | 'audio' | 'speed' | 'animation'
+  const [ratioMenuOpen, setRatioMenuOpen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [timelineZoom, setTimelineZoom] = useState(1.25);
   const [timelineDropIndex, setTimelineDropIndex] = useState(null);
@@ -2975,232 +2977,370 @@ export default function App() {
   }
 
   function renderInspectorTab() {
-    if (state.selectedTarget === 'scene') {
+    const isLayer = state.selectedTarget === 'layer' && Boolean(selectedLayer);
+
+    if (inspectorSubTab === 'background') {
       return (
-        <section className="p-4">
-          <h2 className="mb-3 text-sm font-bold">Scene Timing</h2>
-          <div className="mb-4 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm text-muvi-muted">
-            <span className="font-semibold text-white">{sceneDuration(selectedScene).toFixed(1)} seconds</span>
-            <span> on screen, from {selectedScene?.start ?? 0}s to {selectedScene?.end ?? 0}s.</span>
+        <section className="space-y-4">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Background Settings</h3>
+            <p className="mt-0.5 text-xs text-white/50">Configure canvas background video, image, or backdrop color.</p>
           </div>
-          <label className="label">Scene name<input className="control" value={selectedScene?.name || ''} onChange={(event) => dispatch({ type: 'scene', key: 'name', value: event.target.value })} /></label>
-          <div className="grid grid-cols-3 gap-3">
-            <label className="label">Starts at<input className="control" type="number" step="0.1" value={selectedScene?.start ?? 0} onChange={(event) => dispatch({ type: 'scene', key: 'start', value: event.target.value })} /></label>
-            <label className="label">Ends at<input className="control" type="number" step="0.1" value={selectedScene?.end ?? 0} onChange={(event) => dispatch({ type: 'scene', key: 'end', value: event.target.value })} /></label>
-            <label className="label">Screen time<input className="control" type="number" step="0.1" min="0.2" value={sceneDuration(selectedScene).toFixed(1)} onChange={(event) => dispatch({ type: 'scene', key: 'duration', value: event.target.value })} /></label>
-          </div>
-        </section>
-      );
-    }
-    if (state.selectedTarget === 'background') {
-      return (
-        <section className="p-4">
-          <h2 className="mb-1 text-sm font-bold">Background</h2>
-          <p className="mb-3 text-xs text-muvi-muted">Click empty preview space to select this. Drag the preview to reposition it.</p>
-          <label className="label">Video preset
-            <select className="control" value={AVAILABLE_VIDEOS.some((v) => v.value === (bg.image || '')) ? (bg.image || '') : '__custom__'} onChange={(event) => { if (event.target.value !== '__custom__') { imageCacheRef.current.clear(); dispatch({ type: 'background', key: 'image', value: event.target.value }); } }}>
+
+          <div>
+            <label className="label text-xs font-semibold text-white/80">Video Preset</label>
+            <select
+              className="control mt-1 text-xs"
+              value={AVAILABLE_VIDEOS.some((v) => v.value === (bg.image || '')) ? (bg.image || '') : '__custom__'}
+              onChange={(event) => {
+                if (event.target.value !== '__custom__') {
+                  imageCacheRef.current.clear();
+                  dispatch({ type: 'background', key: 'image', value: event.target.value });
+                }
+              }}
+            >
               {AVAILABLE_VIDEOS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
               {!AVAILABLE_VIDEOS.some((v) => v.value === (bg.image || '')) && <option value="__custom__">Custom ({(bg.image || '').substring(0, 30)}...)</option>}
             </select>
-          </label>
-          <label className="label">Background color
-            <span className="flex items-center gap-2">
-              <input className="control h-[42px] w-[72px] cursor-pointer p-1" type="color" value={bg.color || state.config.theme?.backgroundColor || '#0B0D0E'} onChange={(event) => dispatch({ type: 'background', key: 'color', value: event.target.value })} />
-              {BACKGROUND_SWATCHES.map((swatch) => (
-                <button key={swatch} type="button" title={swatch} className={`h-6 w-6 rounded-md border transition hover:scale-110 ${(bg.color || '').toLowerCase() === swatch.toLowerCase() ? 'border-muvi-accent ring-1 ring-muvi-accent' : 'border-white/25'}`} style={{ background: swatch }} onClick={() => dispatch({ type: 'background', key: 'color', value: swatch })} />
-              ))}
-            </span>
-          </label>
-          <p className="-mt-1 mb-3 text-[11px] text-muvi-muted">The color shows when the preset is "No video (solid color)" and no file is set below.</p>
-          <label className="label">Image, GIF, or video path<input className="control" value={bg.image || ''} onChange={(event) => dispatch({ type: 'background', key: 'image', value: event.target.value })} /></label>
-          <label className="btn mb-3 block text-center">Replace file<input className="hidden" type="file" accept="image/*,video/*,.gif,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAsset(file, (value) => ({ type: 'background', key: 'image', value })); event.target.value = ''; }} /></label>
-          <div className="grid grid-cols-3 gap-3">
-            <label className="label">X<input className="control" type="number" value={bg.x ?? 0} onChange={(event) => dispatch({ type: 'background', key: 'x', value: event.target.value })} /></label>
-            <label className="label">Y<input className="control" type="number" value={bg.y ?? 0} onChange={(event) => dispatch({ type: 'background', key: 'y', value: event.target.value })} /></label>
-            <label className="label">Scale<input className="control" type="number" step="0.01" value={bg.zoom ?? 1} onChange={(event) => dispatch({ type: 'background', key: 'zoom', value: event.target.value })} /></label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <button className="btn" onClick={() => dispatch({ type: 'fit-bg', mode: 'fit' })}>Fit image</button>
-            <button className="btn" onClick={() => dispatch({ type: 'fit-bg', mode: 'fill' })}>Fill frame</button>
-          </div>
-        </section>
-      );
-    }
-    if (state.selectedTarget === 'layer' && selectedLayer) {
-      return (
-        <section className="p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-bold">Layer</h2>
-            <div className="flex gap-1">
-              <button className="btn px-2 py-1" title={selectedLayer.hidden ? 'Show' : 'Hide'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: state.selectedLayerIndex, key: 'hidden' })}><Icon name={selectedLayer.hidden ? 'eyeOff' : 'eye'} className="h-4 w-4" /></button>
-              <button className="btn px-2 py-1" title={selectedLayer.locked ? 'Unlock' : 'Lock'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: state.selectedLayerIndex, key: 'locked' })}><Icon name={selectedLayer.locked ? 'lock' : 'unlock'} className="h-4 w-4" /></button>
-              <button className="btn px-2 py-1 border-muvi-danger/30 text-muvi-danger" title="Delete layer" onClick={() => dispatch({ type: 'delete-layer' })}><Icon name="trash" className="h-4 w-4" /></button>
-            </div>
-          </div>
-          <select className="control mb-3" value={state.selectedLayerIndex} onChange={(event) => dispatch({ type: 'select-layer', layerIndex: Number(event.target.value) })}>
-            {(selectedScene?.layers || []).map((item, index) => <option key={item.id || index} value={index}>{index + 1}. {layerDisplayName(item)}</option>)}
-          </select>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="label">Layer name<input className="control" value={selectedLayerFields.id || ''} onChange={(event) => dispatch({ type: 'layer', key: 'id', value: event.target.value })} /></label>
-            <label className="label">Type<input className="control" value={selectedLayerFields.type === 'shape' ? `shape · ${selectedLayerFields.shapeKind || 'rect'}` : (selectedLayerFields.type || '')} disabled /></label>
-          </div>
-          {['text', 'pill'].includes(selectedLayer.type) && <label className="label">Text<textarea className="control min-h-[96px]" value={selectedLayerFields.text || ''} onChange={(event) => dispatch({ type: 'layer', key: 'text', value: event.target.value })} /></label>}
-          {['image', 'video'].includes(selectedLayer.type) && (
-            <>
-              <label className="label">Media path<input className="control" value={selectedLayerFields.source || ''} onChange={(event) => dispatch({ type: 'layer', key: 'source', value: event.target.value })} /></label>
-              <label className="btn mb-3 block text-center">Replace file<input className="hidden" type="file" accept="image/*,video/*,.gif,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAsset(file, (value) => ({ type: 'layer', key: 'source', value })); event.target.value = ''; }} /></label>
-            </>
-          )}
-          <div className="mb-3 grid grid-cols-3 gap-1.5">
-            {[
-              ['left', 'Left'], ['centerX', 'Center'], ['right', 'Right'],
-              ['top', 'Top'], ['centerY', 'Middle'], ['bottom', 'Bottom'],
-            ].map(([align, label]) => (
-              <button key={align} type="button" className="btn px-1 py-1.5 text-[11px]" onClick={() => dispatch({ type: 'align-layer', align })}>{label}</button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="label">X<input className="control" type="number" value={selectedLayerFields.x ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'x', value: event.target.value })} /></label>
-            <label className="label">Y<input className="control" type="number" value={selectedLayerFields.y ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'y', value: event.target.value })} /></label>
-            <label className="label">Width<input className="control" type="number" value={selectedLayerFields.width ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'width', value: event.target.value })} /></label>
-            <label className="label">Height<input className="control" type="number" value={selectedLayerFields.height ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'height', value: event.target.value })} /></label>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="label">Rotation (°)<input className="control" type="number" step="1" value={selectedLayerFields.rotation ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'rotation', value: event.target.value })} /></label>
-            <label className="label">Opacity<input className="control" type="number" min="0" max="1" step="0.05" value={selectedLayerFields.opacity ?? 1} onChange={(event) => dispatch({ type: 'layer', key: 'opacity', value: event.target.value })} /></label>
-          </div>
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <button type="button" className={`btn text-sm ${selectedLayer.flipX ? 'border-muvi-accent bg-muvi-accent/20' : ''}`} onClick={() => dispatch({ type: 'layer', key: 'flipX', value: !selectedLayer.flipX })}>Flip H</button>
-            <button type="button" className={`btn text-sm ${selectedLayer.flipY ? 'border-muvi-accent bg-muvi-accent/20' : ''}`} onClick={() => dispatch({ type: 'layer', key: 'flipY', value: !selectedLayer.flipY })}>Flip V</button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="label">Shows after (s)<input className="control" type="number" min="0" step="0.1" value={selectedLayerFields.offset ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'offset', value: event.target.value })} /></label>
-            <label className="label">Visible for (s)<input className="control" type="number" min="0.2" step="0.1" placeholder="full scene" value={selectedLayerFields.duration ?? ''} onChange={(event) => dispatch({ type: 'layer', key: 'duration', value: event.target.value })} /></label>
-          </div>
-          {['text', 'pill'].includes(selectedLayer.type) && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="label">Padding X<input className="control" type="number" value={selectedLayerFields.paddingX ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'paddingX', value: event.target.value })} /></label>
-                <label className="label">Padding Y<input className="control" type="number" value={selectedLayerFields.paddingY ?? 0} onChange={(event) => dispatch({ type: 'layer', key: 'paddingY', value: event.target.value })} /></label>
-                <label className="label">Font size<input className="control" type="number" value={selectedLayerFields.fontSize ?? 32} onChange={(event) => dispatch({ type: 'layer', key: 'fontSize', value: event.target.value })} /></label>
-                <label className="label">Line spacing<input className="control" type="number" min="0.6" max="2" step="0.05" value={selectedLayerFields.lineHeight ?? 1.08} onChange={(event) => dispatch({ type: 'layer', key: 'lineHeight', value: event.target.value })} /></label>
-                <label className="label">Weight
-                  <select className="control" value={selectedLayerFields.weight || 'regular'} onChange={(event) => dispatch({ type: 'layer', key: 'weight', value: event.target.value })}>
-                    {['regular', 'medium', 'semiBold', 'bold', 'heavy'].map((value) => <option key={value} value={value}>{value}</option>)}
-                  </select>
-                </label>
-                <label className="label">Alignment
-                  <select className="control" value={selectedLayerFields.align || 'center'} onChange={(event) => dispatch({ type: 'layer', key: 'align', value: event.target.value })}>
-                    {['left', 'center', 'right'].map((value) => <option key={value} value={value}>{value}</option>)}
-                  </select>
-                </label>
-              </div>
-              <label className="label">Font family
-                <select className="control" value={selectedLayerFields.fontFamily || ''} onChange={(event) => dispatch({ type: 'layer', key: 'fontFamily', value: event.target.value })}>
-                  <option value="">Use project font</option>
-                  {fontOptions.map((font) => <option key={font.id} value={font.id}>{font.label}</option>)}
-                </select>
-              </label>
-              <label className="label">Text color<input className="control h-[42px]" type="color" value={selectedLayerFields.color || '#ffffff'} onChange={(event) => dispatch({ type: 'layer', key: 'color', value: event.target.value })} /></label>
-            </>
-          )}
-          {(['pill', 'card', 'shape'].includes(selectedLayer.type)) && (
-            <div className="grid grid-cols-2 gap-3">
-              {selectedLayer.type !== 'shape' || selectedLayer.shapeKind === 'rect' ? (
-                <label className="label">Corners<input className="control" type="number" value={selectedLayerFields.radius ?? 24} onChange={(event) => dispatch({ type: 'layer', key: 'radius', value: event.target.value })} /></label>
-              ) : null}
-              <label className="label">Stroke width<input className="control" type="number" min="0" step="1" value={selectedLayerFields.strokeWidth ?? 2} onChange={(event) => dispatch({ type: 'layer', key: 'strokeWidth', value: event.target.value })} /></label>
-              <label className="label">Fill
-                <span className="flex items-center gap-2">
-                  <input className="control h-[42px] w-[72px] cursor-pointer p-1" type="color" value={/^#([0-9a-f]{6})$/i.test(selectedLayerFields.fill || '') ? selectedLayerFields.fill : '#ff5c00'} onChange={(event) => dispatch({ type: 'layer', key: 'fill', value: event.target.value })} />
-                  <input className="control" value={selectedLayerFields.fill || ''} onChange={(event) => dispatch({ type: 'layer', key: 'fill', value: event.target.value })} />
-                </span>
-              </label>
-              <label className="label">Stroke
-                <span className="flex items-center gap-2">
-                  <input className="control h-[42px] w-[72px] cursor-pointer p-1" type="color" value={/^#([0-9a-f]{6})$/i.test(selectedLayerFields.stroke || '') ? selectedLayerFields.stroke : '#ffffff'} onChange={(event) => dispatch({ type: 'layer', key: 'stroke', value: event.target.value })} />
-                  <input className="control" value={selectedLayerFields.stroke || ''} onChange={(event) => dispatch({ type: 'layer', key: 'stroke', value: event.target.value })} />
-                </span>
-              </label>
-            </div>
-          )}
-          {selectedLayer.type === 'shape' && (
-            <label className="label">Shape
-              <select className="control" value={selectedLayerFields.shapeKind || 'rect'} onChange={(event) => dispatch({ type: 'layer', key: 'shapeKind', value: event.target.value })}>
-                {['rect', 'ellipse', 'triangle', 'diamond', 'hexagon', 'star', 'line', 'arrow'].map((kind) => <option key={kind} value={kind}>{kind}</option>)}
-              </select>
-            </label>
-          )}
-        </section>
-      );
-    }
-    return <p className="p-4 text-xs text-muvi-muted">Select a scene, layer, or the background to edit it.</p>;
-  }
 
-  function renderAnimationTab() {
-    if (state.selectedTarget === 'scene') {
-      return (
-        <section className="p-4">
-          <h2 className="mb-3 text-sm font-bold">Scene Entrance</h2>
-          <label className="label">Entrance style
-            <select className="control" value={selectedScene?.transition?.type || 'none'} onChange={(event) => dispatch({ type: 'transition', key: 'type', value: event.target.value })}>
-              <option value="none">Cut in</option>
-              <option value="crossfade">Crossfade</option>
-              <option value="fade">Fade</option>
-              <option value="slide-up">Slide up</option>
-              <option value="slide-left">Slide left</option>
-            </select>
-          </label>
-          <label className="label">Transition time (s)<input className="control" type="number" min="0" step="0.05" value={selectedScene?.transition?.duration ?? 0} onChange={(event) => dispatch({ type: 'transition', key: 'duration', value: event.target.value })} /></label>
+          <div>
+            <label className="label text-xs font-semibold text-white/80">Background Color</label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                className="control h-8 w-12 cursor-pointer p-0.5 rounded-lg border border-white/10"
+                type="color"
+                value={bg.color || state.config.theme?.backgroundColor || '#0B0D0E'}
+                onChange={(event) => dispatch({ type: 'background', key: 'color', value: event.target.value })}
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {BACKGROUND_SWATCHES.map((swatch) => (
+                  <button
+                    key={swatch}
+                    type="button"
+                    title={swatch}
+                    className={`h-6 w-6 rounded-md border transition hover:scale-110 ${(bg.color || '').toLowerCase() === swatch.toLowerCase() ? 'border-cyan-400 ring-1 ring-cyan-400' : 'border-white/20'}`}
+                    style={{ background: swatch }}
+                    onClick={() => dispatch({ type: 'background', key: 'color', value: swatch })}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="label text-xs font-semibold text-white/80">Media File</label>
+            <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 py-2.5 text-xs font-bold text-cyan-400 hover:bg-white/10">
+              <Icon name="media" className="h-4 w-4" />
+              <span>Replace Media File</span>
+              <input className="hidden" type="file" accept="image/*,video/*,.gif,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAsset(file, (value) => ({ type: 'background', key: 'image', value })); event.target.value = ''; }} />
+            </label>
+          </div>
         </section>
       );
     }
-    if (state.selectedTarget === 'background') {
+
+    if (inspectorSubTab === 'audio') {
       return (
-        <section className="p-4">
-          <h2 className="mb-3 text-sm font-bold">Background Movement</h2>
-          <label className="label">Movement
-            <select className="control" value={animation.type || 'none'} onChange={(event) => dispatch({ type: 'background-animation', key: 'type', value: event.target.value })}>
-              <option value="none">Still</option>
-              <option value="kenBurns">Slow pan and zoom</option>
-            </select>
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            {['startX', 'startY', 'endX', 'endY', 'startZoom', 'endZoom'].map((key) => (
-              <label className="label" key={key}>{animationFieldLabels[key]}<input className="control" type="number" step={key.includes('Zoom') ? '0.01' : '1'} value={animation[key] ?? (key.includes('Zoom') ? bg.zoom ?? 1 : bg[key.replace('start', '').replace('end', '').toLowerCase()] ?? 0)} onChange={(event) => dispatch({ type: 'background-animation', key, value: event.target.value })} /></label>
+        <section className="space-y-4">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Audio Controls</h3>
+            <p className="mt-0.5 text-xs text-white/50">Manage playback volume and soundtrack levels.</p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-white/80">Media Volume</span>
+              <span className="font-mono text-cyan-400 font-bold">100%</span>
+            </div>
+            <input type="range" min="0" max="100" defaultValue="100" className="w-full accent-cyan-400" />
+          </div>
+          <div className="pt-2">
+            <button type="button" className="btn w-full text-xs font-bold">
+              🔊 Mute All Audio
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    if (inspectorSubTab === 'speed') {
+      return (
+        <section className="space-y-4">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Playback Speed</h3>
+            <p className="mt-0.5 text-xs text-white/50">Speed up or slow down the current video segment.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {['0.5x', '0.75x', '1.0x', '1.25x', '1.5x', '2.0x'].map((spd) => (
+              <button
+                key={spd}
+                type="button"
+                className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${spd === '1.0x' ? 'border-cyan-400 bg-cyan-500/20 text-cyan-400' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}
+              >
+                {spd}
+              </button>
             ))}
           </div>
         </section>
       );
     }
-    if (state.selectedTarget === 'layer' && selectedLayer) {
-      const layerAnimation = selectedLayer.animation || {};
+
+    if (inspectorSubTab === 'animation') {
+      const layerAnimation = selectedLayer?.animation || bg?.animation || {};
       return (
-        <section className="p-4">
-          <h2 className="mb-3 text-sm font-bold">Layer Entrance</h2>
-          <label className="label">Animation
-            <select className="control" value={layerAnimation.type || 'none'} onChange={(event) => dispatch({ type: 'layer-animation', key: 'type', value: event.target.value })}>
-              <option value="none">None</option>
-              <option value="fadeIn">Fade in</option>
-              <option value="slideUp">Slide up</option>
-              <option value="slideDown">Slide down</option>
-              <option value="zoomIn">Zoom in</option>
+        <section className="space-y-4">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Entrance Animation</h3>
+            <p className="mt-0.5 text-xs text-white/50">Add dynamic entrance motion when media appears.</p>
+          </div>
+          <div>
+            <label className="label text-xs font-semibold text-white/80">Animation Style</label>
+            <select
+              className="control mt-1 text-xs"
+              value={layerAnimation.type || 'none'}
+              onChange={(event) => {
+                if (isLayer) dispatch({ type: 'layer-animation', key: 'type', value: event.target.value });
+                else dispatch({ type: 'background-animation', key: 'type', value: event.target.value });
+              }}
+            >
+              <option value="none">None (Immediate)</option>
+              <option value="fadeIn">Fade In</option>
+              <option value="slideUp">Slide Up</option>
+              <option value="slideDown">Slide Down</option>
+              <option value="zoomIn">Zoom In</option>
+              <option value="kenBurns">Slow Motion Pan & Zoom</option>
             </select>
-          </label>
-          <label className="label">Duration (s)<input className="control" type="number" min="0.1" max="3" step="0.1" value={layerAnimation.duration ?? 0.5} onChange={(event) => dispatch({ type: 'layer-animation', key: 'duration', value: event.target.value })} /></label>
-          <p className="mt-2 rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">The animation plays when the layer first appears, after its "Shows after" delay.</p>
+          </div>
+          <div>
+            <label className="label text-xs font-semibold text-white/80">Duration (seconds)</label>
+            <input
+              className="control mt-1 text-xs"
+              type="number"
+              min="0.1"
+              max="3"
+              step="0.1"
+              value={layerAnimation.duration ?? 0.5}
+              onChange={(event) => {
+                if (isLayer) dispatch({ type: 'layer-animation', key: 'duration', value: event.target.value });
+              }}
+            />
+          </div>
         </section>
       );
     }
-    return <p className="p-4 text-xs text-muvi-muted">Select a scene, layer, or the background to animate it.</p>;
+
+    // Default: 'basic' (Transform & Layout)
+    return (
+      <section className="space-y-4">
+        {/* Scale Slider */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-white/80">Scale</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs font-bold text-cyan-400">
+                {Math.round((isLayer ? (selectedLayerFields.scale || 1) : (bg.zoom || 1)) * 100)}%
+              </span>
+              <button
+                type="button"
+                title="Reset Scale (100%)"
+                onClick={() => {
+                  if (isLayer) dispatch({ type: 'layer', key: 'scale', value: 1 });
+                  else dispatch({ type: 'background', key: 'zoom', value: 1 });
+                }}
+                className="text-white/40 hover:text-cyan-400 font-bold"
+              >
+                ◇
+              </button>
+            </div>
+          </div>
+          <input
+            type="range"
+            min="0.2"
+            max="3.0"
+            step="0.01"
+            value={isLayer ? (selectedLayerFields.scale || 1) : (bg.zoom || 1)}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (isLayer) dispatch({ type: 'layer', key: 'scale', value: val });
+              else dispatch({ type: 'background', key: 'zoom', value: val });
+            }}
+            className="w-full accent-cyan-400"
+          />
+        </div>
+
+        {/* Position X & Y */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-white/80">Position</span>
+            <button
+              type="button"
+              title="Reset Position (0, 0)"
+              onClick={() => {
+                if (isLayer) {
+                  dispatch({ type: 'layer', key: 'x', value: 0 });
+                  dispatch({ type: 'layer', key: 'y', value: 0 });
+                } else {
+                  dispatch({ type: 'background', key: 'x', value: 0 });
+                  dispatch({ type: 'background', key: 'y', value: 0 });
+                }
+              }}
+              className="text-white/40 hover:text-cyan-400 font-bold"
+            >
+              ◇
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white">
+              <span className="font-mono text-white/40">X</span>
+              <input
+                type="number"
+                value={isLayer ? (selectedLayerFields.x ?? 0) : (bg.x ?? 0)}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (isLayer) dispatch({ type: 'layer', key: 'x', value: val });
+                  else dispatch({ type: 'background', key: 'x', value: val });
+                }}
+                className="w-full bg-transparent text-right font-mono text-xs outline-none"
+              />
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white">
+              <span className="font-mono text-white/40">Y</span>
+              <input
+                type="number"
+                value={isLayer ? (selectedLayerFields.y ?? 0) : (bg.y ?? 0)}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (isLayer) dispatch({ type: 'layer', key: 'y', value: val });
+                  else dispatch({ type: 'background', key: 'y', value: val });
+                }}
+                className="w-full bg-transparent text-right font-mono text-xs outline-none"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Rotate & Flip */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-white/80">Rotate & Flip</span>
+            <span className="font-mono text-xs font-bold text-white/60">
+              {isLayer ? (selectedLayerFields.rotation || 0) : 0}°
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (isLayer) {
+                  const cur = Number(selectedLayerFields.rotation) || 0;
+                  dispatch({ type: 'layer', key: 'rotation', value: (cur + 90) % 360 });
+                }
+              }}
+              className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-xs font-bold text-white hover:bg-white/10"
+            >
+              ⟳ +90° Rotate
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selectedLayer?.flipX ? 'border-cyan-400 bg-cyan-500/20 text-cyan-400' : 'border-white/10 bg-white/5 text-white/80'}`}
+              onClick={() => {
+                if (isLayer) dispatch({ type: 'layer', key: 'flipX', value: !selectedLayer.flipX });
+              }}
+            >
+              ↔ Flip H
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selectedLayer?.flipY ? 'border-cyan-400 bg-cyan-500/20 text-cyan-400' : 'border-white/10 bg-white/5 text-white/80'}`}
+              onClick={() => {
+                if (isLayer) dispatch({ type: 'layer', key: 'flipY', value: !selectedLayer.flipY });
+              }}
+            >
+              ↕ Flip V
+            </button>
+          </div>
+        </div>
+
+        {/* Framing Presets */}
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          <button
+            type="button"
+            className="rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-bold text-white hover:bg-white/10"
+            onClick={() => dispatch({ type: 'fit-bg', mode: 'fit' })}
+          >
+            Fit Frame
+          </button>
+          <button
+            type="button"
+            className="rounded-xl bg-cyan-500/20 border border-cyan-400/40 py-2.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/30"
+            onClick={() => dispatch({ type: 'fit-bg', mode: 'fill' })}
+          >
+            Fill Screen
+          </button>
+        </div>
+
+        {/* Text Layer Settings if applicable */}
+        {isLayer && ['text', 'pill'].includes(selectedLayer.type) && (
+          <div className="space-y-3 border-t border-white/10 pt-3">
+            <div>
+              <label className="label text-xs font-semibold text-white/80">Text Content</label>
+              <textarea
+                className="control mt-1 min-h-[72px] text-xs"
+                value={selectedLayerFields.text || ''}
+                onChange={(event) => dispatch({ type: 'layer', key: 'text', value: event.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="label text-xs font-semibold text-white/80">Font Size</label>
+                <input
+                  className="control mt-1 text-xs"
+                  type="number"
+                  value={selectedLayerFields.fontSize ?? 32}
+                  onChange={(event) => dispatch({ type: 'layer', key: 'fontSize', value: event.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label text-xs font-semibold text-white/80">Color</label>
+                <input
+                  className="control mt-1 h-9 w-full cursor-pointer p-0.5"
+                  type="color"
+                  value={selectedLayerFields.color || '#ffffff'}
+                  onChange={(event) => dispatch({ type: 'layer', key: 'color', value: event.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+    );
   }
 
   function renderTimeline() {
-    if (!selectedScene) return null;
+    if (!selectedScene || state.config.scenes.length === 0) {
+      return (
+        <div className="flex h-[200px] shrink-0 flex-col items-center justify-center border-t border-white/[0.08] bg-[#121417] text-white/40 p-6 text-center">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] px-10 py-6 max-w-lg w-full transition hover:border-cyan-400/40 hover:bg-white/[0.04]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                <line x1="7" y1="2" x2="7" y2="22"></line>
+                <line x1="17" y1="2" x2="17" y2="22"></line>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+              </svg>
+            </div>
+            <p className="mt-2 text-xs font-bold text-white/80">🎬 Drag and drop media here</p>
+            <p className="text-[11px] text-white/35">Or click (+) in the canvas to upload your video</p>
+            <input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+        </div>
+      );
+    }
+
     const layers = selectedScene.layers || [];
-    // CapCut: top track = front (last drawn)
     const trackRows = layers.map((layer, index) => ({ layer, index })).reverse();
     const playheadFraction = (state.currentTime - selectedScene.start) / sceneDur;
+    const tickCount = Math.max(1, Math.ceil(sceneDur));
     const bgSource = bg?.image ?? state.config.assets?.background;
     const isVideoBg = Boolean(bg?.mediaKind === 'video' || isVideoPath(bgSource));
     const bgLabel = !bgSource
@@ -3212,44 +3352,109 @@ export default function App() {
           : String(bgSource).split('/').pop();
 
     return (
-      <div className="flex h-[270px] shrink-0 flex-col border-t border-white/[0.08] bg-[#121417]">
-        <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-1.5">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-            {(state.config.scenes || []).map((scene, index) => (
-              <button
-                key={scene.id || index}
-                type="button"
-                className={`chip shrink-0 ${index === state.selectedSceneIndex ? 'chip-active' : ''}`}
-                onClick={() => dispatch({ type: 'ui', patch: { selectedSceneIndex: index, selectedLayerIndex: 0, selectedTarget: 'scene', isPlaying: false, currentTime: sceneEditTime(scene) } })}
-              >
-                {scene.name || `Scene ${index + 1}`}
-                <span className="ml-1 opacity-60">{sceneDuration(scene).toFixed(0)}s</span>
-              </button>
-            ))}
+      <div className="flex h-[260px] shrink-0 flex-col border-t border-white/[0.08] bg-[#121417]">
+        {/* CapCut Timeline Action Bar */}
+        <div className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-3 py-1.5 bg-[#14161a]">
+          {/* Left Action Buttons */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white"
+              title="Split Video at Playhead"
+              onClick={handleSplitScene}
+            >
+              <span>✂️ Split</span>
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white"
+              title="Duplicate Segment"
+              onClick={handleDuplicate}
+            >
+              <span>📋 Duplicate</span>
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-red-400 hover:bg-red-500/20"
+              title="Delete Selected"
+              onClick={handleDelete}
+            >
+              <Icon name="trash" className="h-3.5 w-3.5" />
+              <span>Delete</span>
+            </button>
+            <span className="mx-1 h-3.5 w-px bg-white/15" />
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => {
+                if (state.selectedTarget === 'layer') {
+                  const rot = Number(selectedLayer?.rotation) || 0;
+                  dispatch({ type: 'layer', key: 'rotation', value: (rot + 90) % 360 });
+                }
+              }}
+            >
+              <span>⟳ Rotate</span>
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => dispatch({ type: 'fit-bg', mode: 'fill' })}
+            >
+              <span>📐 Fill</span>
+            </button>
           </div>
-          <button className="btn-ghost" onClick={handleSplitScene}>Split</button>
-          <button className="btn-ghost" onClick={handleDuplicate}>Duplicate</button>
-          <button className="btn-ghost text-muvi-danger hover:text-muvi-danger" onClick={handleDelete}>Delete</button>
-          <span className="mx-1 h-4 w-px bg-white/10" />
-          <span className="text-[10px] text-muvi-muted">Zoom</span>
-          <input className="w-24 accent-[#ff5c00]" type="range" min="1" max="4" step="0.25" value={timelineZoom} onChange={(event) => setTimelineZoom(Number(event.target.value))} />
+
+          {/* Center Playhead Counter */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-400 text-black transition hover:scale-105"
+              onClick={() => dispatch({ type: 'ui', patch: { isPlaying: !state.isPlaying } })}
+              title="Play / Pause (Space)"
+            >
+              <Icon name={state.isPlaying ? 'pause' : 'play'} className="h-4 w-4 fill-current" />
+            </button>
+            <span className="font-mono text-xs font-bold text-white">
+              {formatSecondsToTimecode(state.currentTime)}
+            </span>
+            <span className="text-xs text-white/30">/</span>
+            <span className="font-mono text-xs font-medium text-white/50">
+              {formatSecondsToTimecode(totalDuration)}
+            </span>
+          </div>
+
+          {/* Right Zoom & Fit Controls */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-white/40">Zoom</span>
+            <input
+              className="w-20 accent-cyan-400"
+              type="range"
+              min="1"
+              max="4"
+              step="0.25"
+              value={timelineZoom}
+              onChange={(event) => setTimelineZoom(Number(event.target.value))}
+            />
+          </div>
         </div>
 
+        {/* Tracks Area */}
         <div className="min-h-0 flex-1 overflow-auto px-2 pb-2 pt-1">
           <div style={{ width: `${timelineZoom * 100}%`, minWidth: '100%' }}>
+            {/* Timeline Ruler */}
             <div className="flex">
               <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-end px-2 pb-1">
                 <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/30">Tracks</span>
               </div>
               <div
-                className="relative h-7 flex-1 cursor-pointer select-none rounded-t-md bg-black/20"
+                className="relative h-6 flex-1 cursor-pointer select-none rounded-t-md bg-black/20"
                 onPointerDown={handleRulerSeek}
                 onPointerMove={handleRulerScrub}
               >
                 {Array.from({ length: tickCount + 1 }, (_, second) => (
                   <span
                     key={second}
-                    className="absolute top-1.5 border-l border-white/15 pl-1 font-mono text-[10px] text-white/40"
+                    className="absolute top-1 border-l border-white/15 pl-1 font-mono text-[9px] text-white/40"
                     style={{ left: `${Math.min(100, (second / sceneDur) * 100)}%` }}
                   >
                     {second}s
@@ -3259,6 +3464,7 @@ export default function App() {
             </div>
 
             <div className="relative rounded-b-md bg-black/15">
+              {/* Layer Tracks */}
               {trackRows.map(({ layer, index }) => {
                 const offset = Math.max(0, Number(layer.offset) || 0);
                 const windowDuration = layer.duration != null ? Number(layer.duration) : sceneDur - offset;
@@ -3268,7 +3474,7 @@ export default function App() {
                 return (
                   <div
                     key={layer.id || index}
-                    className={`track-row h-9 border-b border-white/[0.04] ${showDrop ? 'track-row-drop' : ''} ${isSelected ? 'bg-muvi-accent/[0.06]' : 'hover:bg-white/[0.02]'}`}
+                    className={`track-row h-8 border-b border-white/[0.04] ${showDrop ? 'track-row-drop' : ''} ${isSelected ? 'bg-cyan-500/[0.08]' : 'hover:bg-white/[0.02]'}`}
                     onDragOver={(event) => {
                       if (layer.locked) return;
                       event.preventDefault();
@@ -3293,15 +3499,15 @@ export default function App() {
                       <button type="button" className="text-white/40 hover:text-white" title={layer.locked ? 'Unlock' : 'Lock'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: index, key: 'locked' })}><Icon name={layer.locked ? 'lock' : 'unlock'} className="h-3.5 w-3.5" /></button>
                       <button
                         type="button"
-                        className={`min-w-0 flex-1 truncate text-left text-[11px] font-semibold ${isSelected ? 'text-muvi-accent' : 'text-white/80'}`}
+                        className={`min-w-0 flex-1 truncate text-left text-[11px] font-semibold ${isSelected ? 'text-cyan-400' : 'text-white/80'}`}
                         onClick={() => dispatch({ type: 'select-layer', layerIndex: index })}
                       >
                         {layerDisplayName(layer)}
                       </button>
                     </div>
-                    <div className="relative h-9 flex-1" data-track>
+                    <div className="relative h-8 flex-1" data-track>
                       <div
-                        className={`clip-bar ${layer.hidden ? 'opacity-35' : ''} ${isSelected ? 'ring-2 ring-white/80' : 'ring-1 ring-black/20'}`}
+                        className={`clip-bar ${layer.hidden ? 'opacity-35' : ''} ${isSelected ? 'ring-2 ring-cyan-400' : 'ring-1 ring-black/20'}`}
                         style={{
                           left: `${(offset / sceneDur) * 100}%`,
                           width: `${Math.max(2.5, (windowDuration / sceneDur) * 100)}%`,
@@ -3324,40 +3530,40 @@ export default function App() {
                 );
               })}
 
-              <div className={`track-row h-9 ${state.selectedTarget === 'background' ? 'bg-muvi-accent/[0.08]' : ''}`}>
+              {/* Main Video Track */}
+              <div className={`track-row h-10 ${state.selectedTarget === 'background' ? 'bg-cyan-500/[0.08]' : ''}`}>
                 <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-2 border-r border-white/[0.05] px-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${isVideoBg ? 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)]' : 'bg-sky-500'}`} />
+                  <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
                   <button
                     type="button"
-                    className={`min-w-0 flex-1 truncate text-left text-[11px] font-bold ${state.selectedTarget === 'background' ? 'text-muvi-accent' : 'text-white/90'}`}
+                    className={`min-w-0 flex-1 truncate text-left text-[11px] font-bold ${state.selectedTarget === 'background' ? 'text-cyan-400' : 'text-white/90'}`}
                     onClick={() => dispatch({ type: 'select-background' })}
                   >
-                    {isVideoBg ? '🎬 Video Track' : 'Background'}
+                    🎬 Video Track
                   </button>
                 </div>
-                <div className="relative h-9 flex-1" data-track>
+                <div className="relative h-10 flex-1" data-track>
                   <button
                     type="button"
-                    className={`clip-bar inset-x-1 cursor-pointer flex items-center justify-between px-2.5 ${state.selectedTarget === 'background' ? 'ring-2 ring-white/90 shadow-md' : 'ring-1 ring-black/30'}`}
+                    className={`clip-bar inset-x-1 cursor-pointer flex items-center justify-between px-2.5 rounded-lg ${state.selectedTarget === 'background' ? 'ring-2 ring-cyan-400 shadow-lg' : 'ring-1 ring-black/30'}`}
                     style={{
-                      background: isVideoBg
-                        ? 'linear-gradient(180deg, #f59e0b, #d97706)'
-                        : 'linear-gradient(180deg, #3b82f6, #2563eb)'
+                      background: 'linear-gradient(180deg, #0e7490, #155e75)'
                     }}
                     onClick={() => dispatch({ type: 'select-background' })}
                   >
-                    <span className="truncate text-[10px] font-bold text-black/90 flex items-center gap-1.5">
-                      {isVideoBg ? '🎬 ' : ''}{bgLabel}
+                    <span className="truncate text-[11px] font-bold text-white flex items-center gap-1.5">
+                      🎬 {bgLabel}
                     </span>
                     {isVideoBg && bg.clipOut != null && (
-                      <span className="shrink-0 font-mono text-[9px] font-bold text-black/75 bg-black/15 px-1.5 py-0.5 rounded">
-                        {(Number(bg.clipOut) - (Number(bg.clipIn) || 0)).toFixed(1)}s
+                      <span className="shrink-0 font-mono text-[10px] font-bold text-cyan-200 bg-black/30 px-2 py-0.5 rounded-md">
+                        {formatSecondsToTimecode(Number(bg.clipOut) - (Number(bg.clipIn) || 0))}
                       </span>
                     )}
                   </button>
                 </div>
               </div>
 
+              {/* Playhead Needle */}
               {playheadFraction >= 0 && playheadFraction <= 1 && (
                 <div className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: TRACK_LABEL_WIDTH, right: 0 }}>
                   <div
@@ -3375,37 +3581,60 @@ export default function App() {
                       seekFromTimelineClientX(event.clientX, event.currentTarget.parentElement);
                     }}
                   >
-                    <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-muvi-accent shadow-[0_0_8px_rgba(255,92,0,0.8)]" />
-                    <span className="absolute left-1/2 top-0 h-3.5 w-3.5 -translate-x-1/2 rounded-sm bg-muvi-accent shadow" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%)' }} />
+                    <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.9)]" />
+                    <span className="absolute left-1/2 top-0 h-3.5 w-3.5 -translate-x-1/2 rounded-sm bg-cyan-400 shadow" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%)' }} />
                   </div>
                 </div>
               )}
             </div>
           </div>
         </div>
-        <p className="shrink-0 px-3 pb-1.5 text-[10px] text-white/30">Drag track labels to reorder · drag clips to trim timing · top track is front</p>
       </div>
     );
   }
 
   function renderEditToolbar() {
-    if (state.selectedTarget !== 'layer' || !selectedLayer) return null;
-    const rotation = Number(selectedLayer.rotation) || 0;
+    if (!selectedScene || (!selectedScene.background?.image && !selectedLayer)) return null;
     return (
       <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center">
-        <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-white/10 bg-[#16181c]/95 px-1.5 py-1 shadow-soft backdrop-blur">
-          {[
-            ['left', 'L'], ['centerX', 'C'], ['right', 'R'],
-            ['top', 'T'], ['centerY', 'M'], ['bottom', 'B'],
-          ].map(([align, label]) => (
-            <button key={align} type="button" className="btn-ghost min-h-0 px-2 py-1 font-mono text-[11px]" title={`Align ${label}`} onClick={() => dispatch({ type: 'align-layer', align })}>{label}</button>
-          ))}
-          <span className="mx-1 h-4 w-px bg-white/10" />
-          <button type="button" className="btn-ghost min-h-0 px-2 py-1" title="Rotate -15°" onClick={() => dispatch({ type: 'layer', key: 'rotation', value: rotation - 15 })}><Icon name="rotate" className="h-3.5 w-3.5 -scale-x-100" /></button>
-          <button type="button" className="btn-ghost min-h-0 px-2 py-1" title="Rotate +15°" onClick={() => dispatch({ type: 'layer', key: 'rotation', value: rotation + 15 })}><Icon name="rotate" className="h-3.5 w-3.5" /></button>
-          <span className="mx-1 h-4 w-px bg-white/10" />
-          <button type="button" className="btn-ghost min-h-0 px-2 py-1" onClick={() => dispatch({ type: 'duplicate-layer' })}>Copy</button>
-          <button type="button" className="btn-ghost min-h-0 px-2 py-1 text-muvi-danger" onClick={() => dispatch({ type: 'delete-layer' })}><Icon name="trash" className="h-3.5 w-3.5" /></button>
+        <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-[#16181c]/95 px-2 py-1.5 shadow-2xl backdrop-blur">
+          <label className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white" title="Replace Video/Media">
+            <Icon name="media" className="h-3.5 w-3.5 text-cyan-400" />
+            <span>Replace</span>
+            <input className="hidden" type="file" accept="video/*,image/*,.mp4,.mov,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          <span className="h-3.5 w-px bg-white/15" />
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white"
+            title="Split Video at Playhead"
+            onClick={handleSplitScene}
+          >
+            <span>✂️ Split</span>
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white"
+            title="Rotate"
+            onClick={() => {
+              if (state.selectedTarget === 'layer') {
+                const rot = Number(selectedLayer?.rotation) || 0;
+                dispatch({ type: 'layer', key: 'rotation', value: (rot + 90) % 360 });
+              }
+            }}
+          >
+            <span>⟳ Rotate</span>
+          </button>
+          <span className="h-3.5 w-px bg-white/15" />
+          <button
+            type="button"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/20"
+            title="Delete"
+            onClick={handleDelete}
+          >
+            <Icon name="trash" className="h-3.5 w-3.5" />
+            <span>Delete</span>
+          </button>
         </div>
       </div>
     );
@@ -3440,6 +3669,8 @@ export default function App() {
     setIsPanning(false);
   };
 
+  const isCanvasEmpty = !selectedScene || (!selectedScene.background?.image && (selectedScene.layers || []).length === 0);
+
   return (
     <div className="flex h-screen min-h-[680px] flex-col overflow-hidden bg-muvi-bg text-[13px]">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.08] bg-muvi-panel/90 px-3 py-2 backdrop-blur">
@@ -3447,12 +3678,12 @@ export default function App() {
           <img src="/assets/images/muvidb-logo.svg" alt="MuviDB" className="h-8 w-8 rounded-lg bg-white/5 p-1" />
           <div className="min-w-0">
             <input
-              className="w-full max-w-[280px] truncate border-0 bg-transparent text-sm font-black outline-none placeholder:text-white/30 focus:text-muvi-accent"
+              className="w-full max-w-[280px] truncate border-0 bg-transparent text-sm font-black outline-none placeholder:text-white/30 focus:text-cyan-400"
               value={state.config.title || ''}
               placeholder="Untitled project"
               onChange={(event) => dispatch({ type: 'project', key: 'title', value: event.target.value })}
             />
-            <p className="text-[10px] text-muvi-muted">MuviDB Studio · CapCut-style reel editor</p>
+            <p className="text-[10px] text-muvi-muted">MuviDB Studio · Premium Video Editor</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -3479,7 +3710,9 @@ export default function App() {
           </button>
 
           <span className="mx-1 h-5 w-px bg-white/10" />
-          <button className="btn-accent px-5" disabled={isRendering} onClick={handleExportVideo}>{isRendering ? 'Exporting…' : 'Export'}</button>
+          <button className="rounded-xl bg-cyan-400 px-5 py-1.5 font-bold text-black shadow-[0_0_20px_rgba(6,182,212,0.4)] transition hover:bg-cyan-300 disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
+            {isRendering ? 'Exporting…' : 'Export'}
+          </button>
         </div>
       </header>
 
@@ -3489,7 +3722,7 @@ export default function App() {
           {RAIL_ITEMS.map((item) => (
             <button
               key={item.id}
-              className={`studio-rail-btn ${activePanel === item.id && leftPanelOpen ? 'bg-muvi-accent/20 text-white' : 'text-muvi-muted hover:bg-white/[0.06] hover:text-white'}`}
+              className={`studio-rail-btn ${activePanel === item.id && leftPanelOpen ? 'bg-cyan-500/20 text-cyan-400' : 'text-muvi-muted hover:bg-white/[0.06] hover:text-white'}`}
               onClick={() => {
                 setActivePanel(item.id);
                 if (!leftPanelOpen) setLeftPanelOpen(true);
@@ -3510,24 +3743,6 @@ export default function App() {
 
         {/* Main Flexible Canvas Section */}
         <section className="flex min-w-0 flex-1 flex-col bg-[#0c0d10] relative">
-          {/* Top Bar: Frame Size Presets & Info */}
-          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-white/[0.06] px-3 py-1.5 bg-[#121316]">
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Frame</span>
-            {FRAME_PRESETS.map((preset) => (
-              <button
-                key={`bar-frame-${preset.id}`}
-                type="button"
-                aria-label={`Frame ${preset.label}`}
-                title={`${preset.ratio} · ${preset.width}×${preset.height}`}
-                className={`chip shrink-0 ${activeFrameId === preset.id ? 'chip-active' : ''}`}
-                onClick={() => dispatch({ type: 'set-frame', id: preset.id, width: preset.width, height: preset.height })}
-              >
-                {preset.label}
-              </button>
-            ))}
-            <span className="ml-auto shrink-0 font-mono text-[10px] text-white/35">{canvasW}×{canvasH}</span>
-          </div>
-
           {/* Canvas Viewport Area with Zoom & Pan */}
           <div
             className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4 select-none ${
@@ -3539,8 +3754,45 @@ export default function App() {
             onMouseUp={handlePanEnd}
             onMouseLeave={handlePanEnd}
           >
-            {/* CapCut Floating Viewport Toolbar */}
-            <div className="absolute top-4 right-4 z-30 flex items-center gap-1 rounded-lg border border-white/10 bg-[#16181c]/90 px-2 py-1 shadow-2xl backdrop-blur">
+            {/* Floating Ratio Card (Top Left - Screenshot 1 & 2) */}
+            <div className="absolute top-4 left-4 z-30">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setRatioMenuOpen(prev => !prev)}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#16181c]/90 px-3 py-2 text-xs font-bold text-white shadow-2xl backdrop-blur transition hover:bg-white/15"
+                >
+                  <svg className="h-4 w-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"></rect>
+                  </svg>
+                  <span>Ratio</span>
+                  <span className="text-[10px] text-white/50">{FRAME_PRESETS.find(p => p.id === activeFrameId)?.label || '9:16'}</span>
+                </button>
+                {ratioMenuOpen && (
+                  <div className="absolute left-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-[#16181c]/95 p-1.5 shadow-2xl backdrop-blur z-40">
+                    {FRAME_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          dispatch({ type: 'set-frame', id: preset.id, width: preset.width, height: preset.height });
+                          setRatioMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                          activeFrameId === preset.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <span>{preset.label}</span>
+                        <span className="font-mono text-[10px] text-white/40">{preset.ratio}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* CapCut Floating Viewport Toolbar (Top Right) */}
+            <div className="absolute top-4 right-4 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-[#16181c]/90 px-2 py-1 shadow-2xl backdrop-blur">
               <button
                 type="button"
                 onClick={() => setPreviewZoom(prev => Math.max(0.3, Number((prev - 0.1).toFixed(2))))}
@@ -3582,7 +3834,7 @@ export default function App() {
                 type="button"
                 onClick={() => setIsPanMode(prev => !prev)}
                 className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
-                  isPanMode ? 'bg-muvi-accent text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  isPanMode ? 'bg-cyan-500 text-black' : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`}
                 title="Hand / Pan tool (Drag view space)"
               >
@@ -3594,7 +3846,7 @@ export default function App() {
 
             {/* Scaled & Panned Canvas Container */}
             <div
-              className="max-h-full max-w-full transition-transform duration-75"
+              className="max-h-full max-w-full transition-transform duration-75 relative"
               style={{
                 aspectRatio: `${canvasW} / ${canvasH}`,
                 height: canvasH >= canvasW ? '100%' : 'auto',
@@ -3603,7 +3855,7 @@ export default function App() {
                 transformOrigin: 'center center',
               }}
             >
-              <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-phone ring-1 ring-white/5">
+              <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-phone ring-1 ring-white/5 relative">
                 <canvas
                   ref={canvasRef}
                   width={canvasW}
@@ -3614,47 +3866,96 @@ export default function App() {
                   onPointerUp={handleCanvasPointerUp}
                   onPointerCancel={handleCanvasPointerUp}
                 />
+
+                {/* CapCut Empty Canvas State Overlay (Screenshot 1 & 3) */}
+                {isCanvasEmpty && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 select-none bg-gradient-to-b from-[#111317] to-[#0c0d10]">
+                    {/* Glowing (+) Icon */}
+                    <label className="group relative flex h-20 w-20 cursor-pointer items-center justify-center rounded-2xl bg-cyan-400 text-black shadow-[0_0_40px_rgba(6,182,212,0.45)] transition-all duration-300 hover:scale-105 hover:bg-cyan-300 hover:shadow-[0_0_60px_rgba(6,182,212,0.65)]">
+                      <svg className="h-10 w-10 transition-transform group-hover:rotate-90 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                      <input className="hidden" type="file" accept="video/*,image/*,.mp4,.mov,.m4v,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
+                    </label>
+                    
+                    <h3 className="mt-5 text-lg font-bold text-white tracking-wide">Click to upload</h3>
+                    <p className="mt-1 text-xs text-white/50">Or drag and drop video file here</p>
+
+                    {/* Quick YouTube / URL Input */}
+                    <div className="mt-6 flex w-full max-w-sm items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1.5 focus-within:border-cyan-400">
+                      <input
+                        type="text"
+                        placeholder="Paste YouTube or video link (https://...)"
+                        value={youtubeUrl}
+                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleFetchYoutube(); }}
+                        className="flex-1 bg-transparent px-3 py-1.5 text-xs text-white placeholder-white/40 outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleFetchYoutube}
+                        disabled={clipBusy}
+                        className="rounded-lg bg-cyan-400 px-3.5 py-1.5 text-xs font-bold text-black transition hover:bg-cyan-300 disabled:opacity-50"
+                      >
+                        Import
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Transport Bar */}
-          <div className="flex shrink-0 items-center gap-3 border-t border-white/[0.08] bg-muvi-panel/80 px-4 py-2">
-            <span className="w-[110px] font-mono text-xs tabular-nums text-white/70">{formatTime(state.currentTime)}</span>
-            <div className="flex flex-1 items-center justify-center gap-2">
-              <button className="transport-btn" title="Scene start" onClick={() => seekTo(selectedScene?.start ?? 0)}><Icon name="skipBack" className="h-4 w-4" /></button>
-              <button className="transport-play" title="Play / pause (Space)" onClick={() => dispatch({ type: 'ui', patch: { isPlaying: !state.isPlaying } })}><Icon name={state.isPlaying ? 'pause' : 'play'} className="h-4 w-4" /></button>
-              <button className="transport-btn" title="Next scene" onClick={() => seekTo(selectedScene ? selectedScene.end : 0)}><Icon name="skipFwd" className="h-4 w-4" /></button>
-            </div>
-            <input
-              className="min-w-0 max-w-[420px] flex-1 accent-[#ff5c00]"
-              type="range"
-              min="0"
-              max={Math.max(0.05, totalDuration)}
-              step="0.05"
-              value={Math.min(state.currentTime, Math.max(0.05, totalDuration))}
-              onInput={(event) => seekTo(Number(event.target.value))}
-              onChange={(event) => seekTo(Number(event.target.value))}
-            />
-            <span className="w-[110px] text-right font-mono text-xs tabular-nums text-white/40">{formatTime(totalDuration)}</span>
-            <span className="max-w-[160px] truncate text-[11px] text-white/35">{renderStatus}</span>
-          </div>
           {renderTimeline()}
         </section>
 
         {/* Collapsible Right Inspector */}
         {rightPanelOpen && (
-          <aside className="flex w-[300px] shrink-0 flex-col border-l border-white/[0.08] bg-muvi-panel/80 transition-all">
-            <div className="flex shrink-0 border-b border-white/[0.08]">
-              <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'inspector' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('inspector')}>Inspector</button>
-              <button className={`flex-1 px-4 py-2.5 text-sm font-bold transition ${inspectorTab === 'animation' ? 'border-b-2 border-muvi-accent text-white' : 'text-muvi-muted hover:text-white'}`} onClick={() => setInspectorTab('animation')}>Animation</button>
+          <aside className="flex w-[310px] shrink-0 flex-col border-l border-white/[0.08] bg-[#14161a] transition-all">
+            {/* CapCut Sub-Tabs Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-3 py-2">
+              <div className="flex items-center gap-1 overflow-x-auto">
+                {[
+                  { id: 'basic', label: 'Basic' },
+                  { id: 'background', label: 'Background' },
+                  { id: 'audio', label: 'Audio' },
+                  { id: 'speed', label: 'Speed' },
+                  { id: 'animation', label: 'Animation' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                      inspectorSubTab === tab.id
+                        ? 'bg-cyan-500/20 text-cyan-400'
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                    onClick={() => setInspectorSubTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white text-xs"
+                onClick={() => setRightPanelOpen(false)}
+                title="Close Inspector"
+              >
+                ✕
+              </button>
             </div>
-            <div className="border-b border-white/[0.08] px-4 py-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">Selected</p>
-              <p className="truncate text-sm font-black">{selectedName}</p>
+
+            <div className="border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 flex items-center justify-between">
+              <span className="truncate text-xs font-bold text-white/90">{selectedName || 'Canvas Media'}</span>
+              <span className="font-mono text-[10px] text-white/40">
+                {state.selectedTarget === 'layer' ? 'Layer' : 'Main Video'}
+              </span>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {inspectorTab === 'inspector' ? renderInspectorTab() : renderAnimationTab()}
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {renderInspectorTab()}
             </div>
           </aside>
         )}
@@ -3665,5 +3966,5 @@ export default function App() {
   );
 }
 
-
 createRoot(document.getElementById('root')).render(<App />);
+
