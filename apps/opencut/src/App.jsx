@@ -2081,18 +2081,25 @@ export default function App() {
     if (!file) return;
     setClipBusy(true);
     setClipProgress({ stage: 'loading', percent: 20, message: 'Loading local file...' });
-    setClipStatus('Loading local file into memory (not saved to the media library)...');
+    setClipStatus('Loading local file into memory...');
     try {
       revokeClipBlob();
       const blobUrl = URL.createObjectURL(file);
       clipBlobRef.current = blobUrl;
+
+      const safeIn = youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
+      const parsedOut = youtubeFetchMode === 'clip' && youtubeEndTime ? parseTimecodeToSeconds(youtubeEndTime) : null;
+
       await loadClipSource({
         source: blobUrl,
         title: file.name.replace(/\.[^.]+$/, ''),
         temporary: true,
+        clipIn: safeIn,
+        clipOut: parsedOut,
         autoApply: true,
       });
       setClipProgress(null);
+      setClipStatus(`Loaded into canvas with ${youtubeFetchMode === 'clip' ? `trim (${youtubeStartTime} to ${youtubeEndTime}) applied` : 'full duration'}!`);
     } catch (error) {
       setClipProgress(null);
       setClipStatus(error.message || 'Could not load that file.');
@@ -2605,12 +2612,40 @@ export default function App() {
             </div>
           </div>
 
-          <div className="mb-3 rounded-lg border border-dashed border-white/15 bg-white/[0.03] p-3">
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muvi-muted">Optional</p>
-            <label className="btn block text-center text-sm">Upload a video instead
+          {/* 1-Click SaveFrom HD Helper */}
+          {youtubeUrl.trim() && (
+            <div className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-emerald-400">⚡ SaveFrom HD Helper</span>
+                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">1080p/720p</span>
+              </div>
+              <p className="mb-2 text-[11px] leading-relaxed text-white/75">
+                Download via SaveFrom, then drop the MP4 below — your start ({youtubeStartTime}) and end ({youtubeEndTime}) trim will be automatically applied!
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = youtubeUrl.trim();
+                  if (!url) return;
+                  const target = url.includes('youtube.com')
+                    ? url.replace(/youtube\.com/i, 'ssyoutube.com')
+                    : `https://en1.savefrom.net/#url=${encodeURIComponent(url)}`;
+                  window.open(target, '_blank');
+                }}
+                className="btn w-full bg-emerald-600 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 flex items-center justify-center gap-1.5"
+              >
+                <span>↗️ Open Video in SaveFrom.net</span>
+              </button>
+            </div>
+          )}
+
+          <div className="mb-3 rounded-lg border border-dashed border-white/20 bg-white/[0.04] p-3 text-center">
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white">📂 Select or Drop Video to Canvas</p>
+            <label className="btn block text-center text-xs font-bold bg-white/10 hover:bg-white/20 text-white cursor-pointer py-2">
+              Choose Video File (MP4, MOV, WebM)
               <input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { handleOptionalClipUpload(event.target.files?.[0]); event.target.value = ''; }} />
             </label>
-            <p className="mt-2 text-[11px] text-muvi-muted">Stays in browser memory only — not saved to Uploads.</p>
+            <p className="mt-2 text-[10px] text-muvi-muted">Stays in browser memory · Pre-applies start/end trim automatically.</p>
           </div>
 
           {clipDraft && !hasActiveClip && (
