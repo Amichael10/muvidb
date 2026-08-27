@@ -229,31 +229,46 @@ function reducer(state, action) {
       });
     case 'transition':
       return withHistory(state, (config) => {
-        const item = config.scenes[state.selectedSceneIndex];
+        let item = config.scenes[state.selectedSceneIndex];
+        if (!item) return;
         item.transition = item.transition || {};
         item.transition[action.key] = action.key === 'duration' ? Math.max(0, Number(action.value) || 0) : action.value;
       });
     case 'background':
       return withHistory(state, (config) => {
-        const item = config.scenes[state.selectedSceneIndex];
+        let item = config.scenes[state.selectedSceneIndex];
+        if (!item) {
+          item = {
+            id: `scene-${Date.now()}`,
+            name: 'Scene 1',
+            start: 0,
+            end: 10,
+            background: { color: '#0B0D0E', zoom: 1, x: 0, y: 0 },
+            layers: [],
+          };
+          config.scenes = [item];
+        }
         item.background = item.background || {};
         item.background[action.key] = ['x', 'y', 'zoom'].includes(action.key) ? Number(action.value) || 0 : action.value;
       });
     case 'background-animation':
       return withHistory(state, (config) => {
-        const bg = config.scenes[state.selectedSceneIndex].background || {};
-        bg.animation = bg.animation || {};
-        bg.animation[action.key] = action.key === 'type' ? action.value : Number(action.value) || 0;
-        config.scenes[state.selectedSceneIndex].background = bg;
+        let item = config.scenes[state.selectedSceneIndex];
+        if (!item) return;
+        item.background = item.background || {};
+        item.background.animation = item.background.animation || {};
+        item.background.animation[action.key] = action.key === 'type' ? action.value : Number(action.value) || 0;
       });
     case 'fit-bg':
       return withHistory(state, (config) => {
-        const bg = config.scenes[state.selectedSceneIndex].background || {};
+        let item = config.scenes[state.selectedSceneIndex];
+        if (!item) return;
+        const bg = item.background || {};
         bg.x = 0;
         bg.y = 0;
         bg.zoom = action.mode === 'fill' ? 1.08 : 1;
-        bg.animation = { type: 'kenBurns', startX: 0, startY: 0, endX: -28, endY: -18, startZoom: bg.zoom, endZoom: bg.zoom + 0.04 };
-        config.scenes[state.selectedSceneIndex].background = bg;
+        bg.animation = { type: 'none' };
+        item.background = bg;
       });
     case 'apply-clip':
       return withHistory(state, (config, next) => {
@@ -435,7 +450,19 @@ function reducer(state, action) {
       });
     case 'add-layer':
       return withHistory(state, (config, next) => {
-        const item = config.scenes[state.selectedSceneIndex];
+        let item = config.scenes[state.selectedSceneIndex];
+        if (!item) {
+          item = {
+            id: `scene-${Date.now()}`,
+            name: 'Scene 1',
+            start: 0,
+            end: 10,
+            background: { color: '#0B0D0E', zoom: 1, x: 0, y: 0 },
+            layers: [],
+          };
+          config.scenes = [item];
+          next.selectedSceneIndex = 0;
+        }
         const { width: canvasW, height: canvasH } = getCanvasSize(config);
         let base;
         if (action.layerType === 'shape') {
@@ -455,7 +482,19 @@ function reducer(state, action) {
       });
     case 'add-media-layer':
       return withHistory(state, (config, next) => {
-        const item = config.scenes[state.selectedSceneIndex];
+        let item = config.scenes[state.selectedSceneIndex];
+        if (!item) {
+          item = {
+            id: `scene-${Date.now()}`,
+            name: 'Scene 1',
+            start: 0,
+            end: 10,
+            background: { color: '#0B0D0E', zoom: 1, x: 0, y: 0 },
+            layers: [],
+          };
+          config.scenes = [item];
+          next.selectedSceneIndex = 0;
+        }
         const isVideo = action.layerType === 'video';
         item.layers.push({
           id: `${action.layerType}-${Date.now()}`,
@@ -1083,10 +1122,10 @@ function drawSelection(ctx, state, scene, sceneIndex) {
   if (!scene) return;
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(state.config);
   ctx.save();
-  const cyanStroke = '#00E5FF';
+  const orangeStroke = '#FF5C00';
   ctx.lineWidth = 4;
-  ctx.strokeStyle = cyanStroke;
-  ctx.fillStyle = 'rgba(0, 229, 255, 0.05)';
+  ctx.strokeStyle = orangeStroke;
+  ctx.fillStyle = 'rgba(255, 92, 0, 0.05)';
 
   if (state.selectedTarget === 'background' && sceneIndex === state.selectedSceneIndex) {
     const bg = scene.background || {};
@@ -1096,7 +1135,7 @@ function drawSelection(ctx, state, scene, sceneIndex) {
       
       // Draw corner circular nodes
       ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = cyanStroke;
+      ctx.strokeStyle = orangeStroke;
       ctx.lineWidth = 3;
       for (const [cx, cy] of [[6, 6], [CANVAS_WIDTH - 6, 6], [6, CANVAS_HEIGHT - 6], [CANVAS_WIDTH - 6, CANVAS_HEIGHT - 6]]) {
         ctx.beginPath();
@@ -1117,7 +1156,7 @@ function drawSelection(ctx, state, scene, sceneIndex) {
       ctx.restore();
       
       const handles = layerHandlePoints(layer);
-      ctx.strokeStyle = cyanStroke;
+      ctx.strokeStyle = orangeStroke;
       ctx.fillStyle = '#ffffff';
       ctx.lineWidth = 3;
       
@@ -2979,6 +3018,24 @@ export default function App() {
   function renderInspectorTab() {
     const isLayer = state.selectedTarget === 'layer' && Boolean(selectedLayer);
 
+    if (isCanvasEmpty && !isLayer) {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center text-white/50 space-y-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF5C00]/10 text-[#FF5C00]">
+            <Icon name="media" className="h-6 w-6" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-white">No Video on Canvas</h4>
+            <p className="mt-1 text-xs text-white/40">Upload or import a video to scale, crop, reposition, and transform it.</p>
+          </div>
+          <label className="cursor-pointer rounded-xl bg-[#FF5C00] px-4 py-2 text-xs font-bold text-black transition hover:bg-[#FF7A30] shadow-[0_0_20px_rgba(255,92,0,0.35)]">
+            Upload Video
+            <input className="hidden" type="file" accept="video/*,.mp4,.mov,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+        </div>
+      );
+    }
+
     if (inspectorSubTab === 'background') {
       return (
         <section className="space-y-4">
@@ -3019,7 +3076,7 @@ export default function App() {
                     key={swatch}
                     type="button"
                     title={swatch}
-                    className={`h-6 w-6 rounded-md border transition hover:scale-110 ${(bg.color || '').toLowerCase() === swatch.toLowerCase() ? 'border-cyan-400 ring-1 ring-cyan-400' : 'border-white/20'}`}
+                    className={`h-6 w-6 rounded-md border transition hover:scale-110 ${(bg.color || '').toLowerCase() === swatch.toLowerCase() ? 'border-[#FF5C00] ring-1 ring-[#FF5C00]' : 'border-white/20'}`}
                     style={{ background: swatch }}
                     onClick={() => dispatch({ type: 'background', key: 'color', value: swatch })}
                   />
@@ -3030,7 +3087,7 @@ export default function App() {
 
           <div>
             <label className="label text-xs font-semibold text-white/80">Media File</label>
-            <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 py-2.5 text-xs font-bold text-cyan-400 hover:bg-white/10">
+            <label className="mt-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 py-2.5 text-xs font-bold text-[#FF5C00] hover:bg-white/10">
               <Icon name="media" className="h-4 w-4" />
               <span>Replace Media File</span>
               <input className="hidden" type="file" accept="image/*,video/*,.gif,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAsset(file, (value) => ({ type: 'background', key: 'image', value })); event.target.value = ''; }} />
@@ -3050,9 +3107,9 @@ export default function App() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-white/80">Media Volume</span>
-              <span className="font-mono text-cyan-400 font-bold">100%</span>
+              <span className="font-mono text-[#FF5C00] font-bold">100%</span>
             </div>
-            <input type="range" min="0" max="100" defaultValue="100" className="w-full accent-cyan-400" />
+            <input type="range" min="0" max="100" defaultValue="100" className="w-full accent-[#FF5C00]" />
           </div>
           <div className="pt-2">
             <button type="button" className="btn w-full text-xs font-bold">
@@ -3075,7 +3132,7 @@ export default function App() {
               <button
                 key={spd}
                 type="button"
-                className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${spd === '1.0x' ? 'border-cyan-400 bg-cyan-500/20 text-cyan-400' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}
+                className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${spd === '1.0x' ? 'border-[#FF5C00] bg-[#FF5C00]/20 text-[#FF5C00]' : 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10'}`}
               >
                 {spd}
               </button>
@@ -3137,7 +3194,7 @@ export default function App() {
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-white/80">Scale</span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-cyan-400">
+              <span className="font-mono text-xs font-bold text-[#FF5C00]">
                 {Math.round((isLayer ? (selectedLayerFields.scale || 1) : (bg.zoom || 1)) * 100)}%
               </span>
               <button
@@ -3147,7 +3204,7 @@ export default function App() {
                   if (isLayer) dispatch({ type: 'layer', key: 'scale', value: 1 });
                   else dispatch({ type: 'background', key: 'zoom', value: 1 });
                 }}
-                className="text-white/40 hover:text-cyan-400 font-bold"
+                className="text-white/40 hover:text-[#FF5C00] font-bold"
               >
                 ◇
               </button>
@@ -3164,7 +3221,7 @@ export default function App() {
               if (isLayer) dispatch({ type: 'layer', key: 'scale', value: val });
               else dispatch({ type: 'background', key: 'zoom', value: val });
             }}
-            className="w-full accent-cyan-400"
+            className="w-full accent-[#FF5C00]"
           />
         </div>
 
@@ -3184,7 +3241,7 @@ export default function App() {
                   dispatch({ type: 'background', key: 'y', value: 0 });
                 }
               }}
-              className="text-white/40 hover:text-cyan-400 font-bold"
+              className="text-white/40 hover:text-[#FF5C00] font-bold"
             >
               ◇
             </button>
@@ -3242,7 +3299,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selectedLayer?.flipX ? 'border-cyan-400 bg-cyan-500/20 text-cyan-400' : 'border-white/10 bg-white/5 text-white/80'}`}
+              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selectedLayer?.flipX ? 'border-[#FF5C00] bg-[#FF5C00]/20 text-[#FF5C00]' : 'border-white/10 bg-white/5 text-white/80'}`}
               onClick={() => {
                 if (isLayer) dispatch({ type: 'layer', key: 'flipX', value: !selectedLayer.flipX });
               }}
@@ -3251,7 +3308,7 @@ export default function App() {
             </button>
             <button
               type="button"
-              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selectedLayer?.flipY ? 'border-cyan-400 bg-cyan-500/20 text-cyan-400' : 'border-white/10 bg-white/5 text-white/80'}`}
+              className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${selectedLayer?.flipY ? 'border-[#FF5C00] bg-[#FF5C00]/20 text-[#FF5C00]' : 'border-white/10 bg-white/5 text-white/80'}`}
               onClick={() => {
                 if (isLayer) dispatch({ type: 'layer', key: 'flipY', value: !selectedLayer.flipY });
               }}
@@ -3272,7 +3329,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            className="rounded-xl bg-cyan-500/20 border border-cyan-400/40 py-2.5 text-xs font-bold text-cyan-300 hover:bg-cyan-500/30"
+            className="rounded-xl bg-[#FF5C00]/20 border border-[#FF5C00]/40 py-2.5 text-xs font-bold text-[#FF5C00] hover:bg-[#FF5C00]/30"
             onClick={() => dispatch({ type: 'fit-bg', mode: 'fill' })}
           >
             Fill Screen
@@ -3320,8 +3377,8 @@ export default function App() {
     if (!selectedScene || state.config.scenes.length === 0) {
       return (
         <div className="flex h-[200px] shrink-0 flex-col items-center justify-center border-t border-white/[0.08] bg-[#121417] text-white/40 p-6 text-center">
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] px-10 py-6 max-w-lg w-full transition hover:border-cyan-400/40 hover:bg-white/[0.04]">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] px-10 py-6 max-w-lg w-full transition hover:border-[#FF5C00]/40 hover:bg-white/[0.04]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF5C00]/10 text-[#FF5C00]">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
                 <line x1="7" y1="2" x2="7" y2="22"></line>
@@ -3408,7 +3465,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-400 text-black transition hover:scale-105"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF5C00] text-black transition hover:scale-105"
               onClick={() => dispatch({ type: 'ui', patch: { isPlaying: !state.isPlaying } })}
               title="Play / Pause (Space)"
             >
@@ -3427,7 +3484,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-white/40">Zoom</span>
             <input
-              className="w-20 accent-cyan-400"
+              className="w-20 accent-[#FF5C00]"
               type="range"
               min="1"
               max="4"
@@ -3474,7 +3531,7 @@ export default function App() {
                 return (
                   <div
                     key={layer.id || index}
-                    className={`track-row h-8 border-b border-white/[0.04] ${showDrop ? 'track-row-drop' : ''} ${isSelected ? 'bg-cyan-500/[0.08]' : 'hover:bg-white/[0.02]'}`}
+                    className={`track-row h-8 border-b border-white/[0.04] ${showDrop ? 'track-row-drop' : ''} ${isSelected ? 'bg-[#FF5C00]/[0.08]' : 'hover:bg-white/[0.02]'}`}
                     onDragOver={(event) => {
                       if (layer.locked) return;
                       event.preventDefault();
@@ -3499,7 +3556,7 @@ export default function App() {
                       <button type="button" className="text-white/40 hover:text-white" title={layer.locked ? 'Unlock' : 'Lock'} onClick={() => dispatch({ type: 'toggle-layer-flag', layerIndex: index, key: 'locked' })}><Icon name={layer.locked ? 'lock' : 'unlock'} className="h-3.5 w-3.5" /></button>
                       <button
                         type="button"
-                        className={`min-w-0 flex-1 truncate text-left text-[11px] font-semibold ${isSelected ? 'text-cyan-400' : 'text-white/80'}`}
+                        className={`min-w-0 flex-1 truncate text-left text-[11px] font-semibold ${isSelected ? 'text-[#FF5C00]' : 'text-white/80'}`}
                         onClick={() => dispatch({ type: 'select-layer', layerIndex: index })}
                       >
                         {layerDisplayName(layer)}
@@ -3507,7 +3564,7 @@ export default function App() {
                     </div>
                     <div className="relative h-8 flex-1" data-track>
                       <div
-                        className={`clip-bar ${layer.hidden ? 'opacity-35' : ''} ${isSelected ? 'ring-2 ring-cyan-400' : 'ring-1 ring-black/20'}`}
+                        className={`clip-bar ${layer.hidden ? 'opacity-35' : ''} ${isSelected ? 'ring-2 ring-[#FF5C00]' : 'ring-1 ring-black/20'}`}
                         style={{
                           left: `${(offset / sceneDur) * 100}%`,
                           width: `${Math.max(2.5, (windowDuration / sceneDur) * 100)}%`,
@@ -3531,12 +3588,12 @@ export default function App() {
               })}
 
               {/* Main Video Track */}
-              <div className={`track-row h-10 ${state.selectedTarget === 'background' ? 'bg-cyan-500/[0.08]' : ''}`}>
+              <div className={`track-row h-10 ${state.selectedTarget === 'background' ? 'bg-[#FF5C00]/[0.08]' : ''}`}>
                 <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-2 border-r border-white/[0.05] px-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#FF5C00] shadow-[0_0_6px_rgba(255,92,0,0.6)]" />
                   <button
                     type="button"
-                    className={`min-w-0 flex-1 truncate text-left text-[11px] font-bold ${state.selectedTarget === 'background' ? 'text-cyan-400' : 'text-white/90'}`}
+                    className={`min-w-0 flex-1 truncate text-left text-[11px] font-bold ${state.selectedTarget === 'background' ? 'text-[#FF5C00]' : 'text-white/90'}`}
                     onClick={() => dispatch({ type: 'select-background' })}
                   >
                     🎬 Video Track
@@ -3545,9 +3602,9 @@ export default function App() {
                 <div className="relative h-10 flex-1" data-track>
                   <button
                     type="button"
-                    className={`clip-bar inset-x-1 cursor-pointer flex items-center justify-between px-2.5 rounded-lg ${state.selectedTarget === 'background' ? 'ring-2 ring-cyan-400 shadow-lg' : 'ring-1 ring-black/30'}`}
+                    className={`clip-bar inset-x-1 cursor-pointer flex items-center justify-between px-2.5 rounded-lg ${state.selectedTarget === 'background' ? 'ring-2 ring-[#FF5C00] shadow-lg' : 'ring-1 ring-black/30'}`}
                     style={{
-                      background: 'linear-gradient(180deg, #0e7490, #155e75)'
+                      background: 'linear-gradient(180deg, #c2410c, #9a3412)'
                     }}
                     onClick={() => dispatch({ type: 'select-background' })}
                   >
@@ -3555,7 +3612,7 @@ export default function App() {
                       🎬 {bgLabel}
                     </span>
                     {isVideoBg && bg.clipOut != null && (
-                      <span className="shrink-0 font-mono text-[10px] font-bold text-cyan-200 bg-black/30 px-2 py-0.5 rounded-md">
+                      <span className="shrink-0 font-mono text-[10px] font-bold text-orange-200 bg-black/30 px-2 py-0.5 rounded-md">
                         {formatSecondsToTimecode(Number(bg.clipOut) - (Number(bg.clipIn) || 0))}
                       </span>
                     )}
@@ -3581,8 +3638,8 @@ export default function App() {
                       seekFromTimelineClientX(event.clientX, event.currentTarget.parentElement);
                     }}
                   >
-                    <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.9)]" />
-                    <span className="absolute left-1/2 top-0 h-3.5 w-3.5 -translate-x-1/2 rounded-sm bg-cyan-400 shadow" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%)' }} />
+                    <div className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2 bg-[#FF5C00] shadow-[0_0_10px_rgba(255,92,0,0.9)]" />
+                    <span className="absolute left-1/2 top-0 h-3.5 w-3.5 -translate-x-1/2 rounded-sm bg-[#FF5C00] shadow" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%)' }} />
                   </div>
                 </div>
               )}
@@ -3673,12 +3730,55 @@ export default function App() {
 
   return (
     <div className="flex h-screen min-h-[680px] flex-col overflow-hidden bg-muvi-bg text-[13px]">
+      {/* Global Video Import / Uploading Progress Modal */}
+      {clipBusy && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="flex w-full max-w-sm flex-col items-center rounded-2xl border border-white/10 bg-[#16181c] p-6 text-center shadow-2xl">
+            {/* Animated Glowing Orange Spinner */}
+            <div className="relative flex h-16 w-16 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF5C00] opacity-25"></span>
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#FF5C00] text-black shadow-[0_0_30px_rgba(255,92,0,0.6)]">
+                <svg className="h-7 w-7 animate-spin text-black" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-85" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+              </div>
+            </div>
+
+            <h3 className="mt-4 text-base font-bold text-white">
+              {clipProgress?.stage === 'error' ? 'Import Failed' : (clipProgress?.stage ? `Importing Video (${Math.round(clipProgress.percent || 50)}%)` : 'Importing Video…')}
+            </h3>
+            <p className="mt-1 text-xs text-white/60">
+              {clipProgress?.message || 'Processing video file and preparing canvas...'}
+            </p>
+
+            {/* Live Progress Bar */}
+            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-[#FF5C00] transition-all duration-300 shadow-[0_0_10px_rgba(255,92,0,0.8)]"
+                style={{ width: `${Math.max(5, Math.min(100, clipProgress?.percent || 45))}%` }}
+              />
+            </div>
+
+            {clipProgress?.stage === 'error' && (
+              <button
+                type="button"
+                onClick={() => { setClipBusy(false); setClipProgress(null); }}
+                className="mt-4 rounded-xl bg-white/10 px-5 py-2 text-xs font-bold text-white hover:bg-white/20"
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.08] bg-muvi-panel/90 px-3 py-2 backdrop-blur">
         <div className="flex min-w-0 items-center gap-3">
           <img src="/assets/images/muvidb-logo.svg" alt="MuviDB" className="h-8 w-8 rounded-lg bg-white/5 p-1" />
           <div className="min-w-0">
             <input
-              className="w-full max-w-[280px] truncate border-0 bg-transparent text-sm font-black outline-none placeholder:text-white/30 focus:text-cyan-400"
+              className="w-full max-w-[280px] truncate border-0 bg-transparent text-sm font-black outline-none placeholder:text-white/30 focus:text-[#FF5C00]"
               value={state.config.title || ''}
               placeholder="Untitled project"
               onChange={(event) => dispatch({ type: 'project', key: 'title', value: event.target.value })}
@@ -3710,7 +3810,7 @@ export default function App() {
           </button>
 
           <span className="mx-1 h-5 w-px bg-white/10" />
-          <button className="rounded-xl bg-cyan-400 px-5 py-1.5 font-bold text-black shadow-[0_0_20px_rgba(6,182,212,0.4)] transition hover:bg-cyan-300 disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
+          <button className="rounded-xl bg-[#FF5C00] px-5 py-1.5 font-bold text-black shadow-[0_0_20px_rgba(255,92,0,0.4)] transition hover:bg-[#FF7A30] disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
             {isRendering ? 'Exporting…' : 'Export'}
           </button>
         </div>
@@ -3722,7 +3822,7 @@ export default function App() {
           {RAIL_ITEMS.map((item) => (
             <button
               key={item.id}
-              className={`studio-rail-btn ${activePanel === item.id && leftPanelOpen ? 'bg-cyan-500/20 text-cyan-400' : 'text-muvi-muted hover:bg-white/[0.06] hover:text-white'}`}
+              className={`studio-rail-btn ${activePanel === item.id && leftPanelOpen ? 'bg-[#FF5C00]/20 text-[#FF5C00]' : 'text-muvi-muted hover:bg-white/[0.06] hover:text-white'}`}
               onClick={() => {
                 setActivePanel(item.id);
                 if (!leftPanelOpen) setLeftPanelOpen(true);
@@ -3754,7 +3854,7 @@ export default function App() {
             onMouseUp={handlePanEnd}
             onMouseLeave={handlePanEnd}
           >
-            {/* Floating Ratio Card (Top Left - Screenshot 1 & 2) */}
+            {/* Floating Ratio Card (Top Left) */}
             <div className="absolute top-4 left-4 z-30">
               <div className="relative">
                 <button
@@ -3762,7 +3862,7 @@ export default function App() {
                   onClick={() => setRatioMenuOpen(prev => !prev)}
                   className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#16181c]/90 px-3 py-2 text-xs font-bold text-white shadow-2xl backdrop-blur transition hover:bg-white/15"
                 >
-                  <svg className="h-4 w-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-4 w-4 text-[#FF5C00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"></rect>
                   </svg>
                   <span>Ratio</span>
@@ -3779,7 +3879,7 @@ export default function App() {
                           setRatioMenuOpen(false);
                         }}
                         className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                          activeFrameId === preset.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                          activeFrameId === preset.id ? 'bg-[#FF5C00]/20 text-[#FF5C00]' : 'text-white/80 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         <span>{preset.label}</span>
@@ -3791,7 +3891,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* CapCut Floating Viewport Toolbar (Top Right) */}
+            {/* Floating Viewport Toolbar (Top Right) */}
             <div className="absolute top-4 right-4 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-[#16181c]/90 px-2 py-1 shadow-2xl backdrop-blur">
               <button
                 type="button"
@@ -3834,7 +3934,7 @@ export default function App() {
                 type="button"
                 onClick={() => setIsPanMode(prev => !prev)}
                 className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
-                  isPanMode ? 'bg-cyan-500 text-black' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  isPanMode ? 'bg-[#FF5C00] text-black' : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`}
                 title="Hand / Pan tool (Drag view space)"
               >
@@ -3844,67 +3944,67 @@ export default function App() {
 
             {renderEditToolbar()}
 
-            {/* Scaled & Panned Canvas Container */}
-            <div
-              className="max-h-full max-w-full transition-transform duration-75 relative"
-              style={{
-                aspectRatio: `${canvasW} / ${canvasH}`,
-                height: canvasH >= canvasW ? '100%' : 'auto',
-                width: canvasH >= canvasW ? 'auto' : '100%',
-                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${previewZoom})`,
-                transformOrigin: 'center center',
-              }}
-            >
-              <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-phone ring-1 ring-white/5 relative">
-                <canvas
-                  ref={canvasRef}
-                  width={canvasW}
-                  height={canvasH}
-                  className="h-full w-full cursor-move touch-none"
-                  onPointerDown={handleCanvasPointerDown}
-                  onPointerMove={handleCanvasPointerMove}
-                  onPointerUp={handleCanvasPointerUp}
-                  onPointerCancel={handleCanvasPointerUp}
-                />
+            {/* Viewport Center: Empty State or Active Canvas */}
+            {isCanvasEmpty ? (
+              <div className="flex w-full max-w-md flex-col items-center justify-center p-6 text-center select-none z-10">
+                {/* Glowing MuviDB Orange (+) Button */}
+                <label className="group relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-3xl bg-[#FF5C00] text-black shadow-[0_0_50px_rgba(255,92,0,0.5)] transition-all duration-300 hover:scale-105 hover:bg-[#FF7A30] hover:shadow-[0_0_70px_rgba(255,92,0,0.7)]">
+                  <svg className="h-12 w-12 transition-transform group-hover:rotate-90 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  <input className="hidden" type="file" accept="video/*,image/*,.mp4,.mov,.m4v,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+                
+                <h3 className="mt-5 text-xl font-black text-white tracking-wide">Click to upload</h3>
+                <p className="mt-1 text-xs text-white/50">Or drag and drop your video file here</p>
 
-                {/* CapCut Empty Canvas State Overlay (Screenshot 1 & 3) */}
-                {isCanvasEmpty && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 select-none bg-gradient-to-b from-[#111317] to-[#0c0d10]">
-                    {/* Glowing (+) Icon */}
-                    <label className="group relative flex h-20 w-20 cursor-pointer items-center justify-center rounded-2xl bg-cyan-400 text-black shadow-[0_0_40px_rgba(6,182,212,0.45)] transition-all duration-300 hover:scale-105 hover:bg-cyan-300 hover:shadow-[0_0_60px_rgba(6,182,212,0.65)]">
-                      <svg className="h-10 w-10 transition-transform group-hover:rotate-90 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                      </svg>
-                      <input className="hidden" type="file" accept="video/*,image/*,.mp4,.mov,.m4v,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
-                    </label>
-                    
-                    <h3 className="mt-5 text-lg font-bold text-white tracking-wide">Click to upload</h3>
-                    <p className="mt-1 text-xs text-white/50">Or drag and drop video file here</p>
-
-                    {/* Quick YouTube / URL Input */}
-                    <div className="mt-6 flex w-full max-w-sm items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1.5 focus-within:border-cyan-400">
-                      <input
-                        type="text"
-                        placeholder="Paste YouTube or video link (https://...)"
-                        value={youtubeUrl}
-                        onChange={(e) => setYoutubeUrl(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleFetchYoutube(); }}
-                        className="flex-1 bg-transparent px-3 py-1.5 text-xs text-white placeholder-white/40 outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleFetchYoutube}
-                        disabled={clipBusy}
-                        className="rounded-lg bg-cyan-400 px-3.5 py-1.5 text-xs font-bold text-black transition hover:bg-cyan-300 disabled:opacity-50"
-                      >
-                        Import
-                      </button>
-                    </div>
-                  </div>
-                )}
+                {/* Quick YouTube / URL Input Bar */}
+                <div className="mt-6 flex w-full items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-1.5 shadow-xl backdrop-blur focus-within:border-[#FF5C00]">
+                  <input
+                    type="text"
+                    placeholder="Paste YouTube or video URL (https://...)"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleFetchYoutube(); }}
+                    className="flex-1 bg-transparent px-3 py-2 text-xs text-white placeholder-white/40 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleFetchYoutube}
+                    disabled={clipBusy}
+                    className="rounded-lg bg-[#FF5C00] px-4 py-2 text-xs font-bold text-black transition hover:bg-[#FF7A30] disabled:opacity-50"
+                  >
+                    Import
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Scaled & Panned Canvas Container */
+              <div
+                className="max-h-full max-w-full transition-transform duration-75 relative"
+                style={{
+                  aspectRatio: `${canvasW} / ${canvasH}`,
+                  height: canvasH >= canvasW ? '100%' : 'auto',
+                  width: canvasH >= canvasW ? 'auto' : '100%',
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${previewZoom})`,
+                  transformOrigin: 'center center',
+                }}
+              >
+                <div className="h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-phone ring-1 ring-white/5 relative">
+                  <canvas
+                    ref={canvasRef}
+                    width={canvasW}
+                    height={canvasH}
+                    className="h-full w-full cursor-move touch-none"
+                    onPointerDown={handleCanvasPointerDown}
+                    onPointerMove={handleCanvasPointerMove}
+                    onPointerUp={handleCanvasPointerUp}
+                    onPointerCancel={handleCanvasPointerUp}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {renderTimeline()}
@@ -3913,7 +4013,7 @@ export default function App() {
         {/* Collapsible Right Inspector */}
         {rightPanelOpen && (
           <aside className="flex w-[310px] shrink-0 flex-col border-l border-white/[0.08] bg-[#14161a] transition-all">
-            {/* CapCut Sub-Tabs Header */}
+            {/* Sub-Tabs Header */}
             <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-3 py-2">
               <div className="flex items-center gap-1 overflow-x-auto">
                 {[
@@ -3928,7 +4028,7 @@ export default function App() {
                     type="button"
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
                       inspectorSubTab === tab.id
-                        ? 'bg-cyan-500/20 text-cyan-400'
+                        ? 'bg-[#FF5C00]/20 text-[#FF5C00]'
                         : 'text-white/60 hover:bg-white/5 hover:text-white'
                     }`}
                     onClick={() => setInspectorSubTab(tab.id)}
@@ -3967,4 +4067,5 @@ export default function App() {
 }
 
 createRoot(document.getElementById('root')).render(<App />);
+
 

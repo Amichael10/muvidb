@@ -475,9 +475,9 @@ export const emptyConfig = {
     overlayTop: "rgba(11,13,14,0)",
     overlayMid: "rgba(11,13,14,0)",
     overlayBottom: "rgba(11,13,14,0)",
-    accent: "#00E5FF",
+    accent: "#FF5C00",
     text: "#FFFFFF",
-    muted: "#94A3B8"
+    muted: "#FFD3B8"
   },
   coverSceneId: "scene-1",
   scenes: []
