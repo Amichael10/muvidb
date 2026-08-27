@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleSocial(req, res);
     }
     if (key === 'fetch-youtube') {
-      const { default: handleFetchYoutube } = await import('./fetch-youtube.js');
+      const { handleFetchYoutube } = await import('./_lib/fetch_youtube_handler.js');
       return handleFetchYoutube(req, res);
     }
 
