@@ -131,6 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prepareSocialContentItemForEdit,
       updateSocialContentItemDraft,
       deleteSocialContentItem,
+      createEditorVideoDraft,
       getEditorialCalendar,
       seedEditorialCalendarSlots,
     } = await import('./_lib/social_studio.js');
@@ -495,6 +496,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: (parseErr as Error).message });
         }
         return res.status(201).json(await generateSocialDraft(parsed, actor));
+      }
+
+      if (task === 'create_editor_video_draft') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { title, publicUrl, storagePath, mimeType, fileSizeBytes, width, height, captions, platforms } = req.body || {};
+        return res.status(201).json(await createEditorVideoDraft({
+          title, publicUrl, storagePath, mimeType, fileSizeBytes, width, height,
+          captions: captions && typeof captions === 'object' ? captions : {},
+          platforms: Array.isArray(platforms) ? platforms : [],
+        }, actor));
+      }
+
+      if (task === 'publish_editor_video_now') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId } = req.body || {};
+        if (typeof contentItemId !== 'string' || !contentItemId) return res.status(400).json({ error: 'contentItemId is required' });
+        await scheduleContentItem({ contentItemId, scheduledFor: new Date().toISOString() }, actor);
+        return res.status(200).json(await runSocialPublisher({ limit: 10, lockedBy: `studio:${actor.id}` }));
       }
 
       if (task === 'review') {

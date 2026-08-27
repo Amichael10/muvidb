@@ -184,6 +184,57 @@ async function insertSocialEvent(input: {
   });
 }
 
+/** Create a real Social Studio draft for a video rendered by MuviDB Studio. */
+export async function createEditorVideoDraft(input: {
+  title: string;
+  publicUrl: string;
+  storagePath: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  width: number;
+  height: number;
+  captions: Partial<Record<SocialPlatform, string>>;
+  platforms: SocialPlatform[];
+}, actor: SocialActor) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const title = String(input.title || '').trim().slice(0, 180) || 'MuviDB Studio video';
+  const url = String(input.publicUrl || '').trim();
+  const bucket = getAssetBucket();
+  if (!url.startsWith('https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/')) {
+    throw httpError(400, 'Editor video must be stored in MuviDB media storage');
+  }
+  const platforms = [...new Set(input.platforms)].filter((p): p is SocialPlatform => ['instagram', 'facebook', 'threads', 'tiktok'].includes(p));
+  if (!platforms.length) throw httpError(400, 'Choose at least one social platform');
+
+  const sourceId = crypto.randomUUID();
+  const snapshot = { kind: 'studio_video', capturedAt: new Date().toISOString(), title, publicUrl: url, width: input.width, height: input.height };
+  const { data: contentItem, error: itemError } = await supabase.from('social_content_items').insert({
+    content_type: 'studio_video', title, source_entity_type: 'studio_video', source_entity_id: sourceId,
+    source_snapshot: snapshot, status: 'generating', generation_method: 'studio_export', created_by: actor.id,
+  }).select('id').single();
+  if (itemError) throw itemError;
+
+  const { data: asset, error: assetError } = await supabase.from('social_assets').insert({
+    content_item_id: contentItem.id, format: 'video_vertical_9_16', storage_bucket: bucket,
+    storage_path: input.storagePath, public_url: url, mime_type: input.mimeType || 'video/webm',
+    width: Math.max(1, Math.round(input.width || 1080)), height: Math.max(1, Math.round(input.height || 1920)),
+    file_size_bytes: Math.max(0, Math.round(input.fileSizeBytes || 0)), render_metadata: { source: 'opencut' },
+  }).select('id').single();
+  if (assetError) throw assetError;
+
+  const variants = platforms.map(platform => ({
+    content_item_id: contentItem.id, platform, status: 'draft', title,
+    caption: String(input.captions?.[platform] || '').trim() || title,
+    hashtags: [], mentions: [], selected_asset_id: asset.id,
+    platform_options: { source: 'opencut', media_kind: 'video' },
+  }));
+  const { error: variantsError } = await supabase.from('social_platform_variants').insert(variants);
+  if (variantsError) throw variantsError;
+  await supabase.from('social_content_items').update({ status: 'draft' }).eq('id', contentItem.id);
+  await insertSocialEvent({ contentItemId: contentItem.id, eventType: 'studio_video_exported', eventData: { actor_id: actor.id, platforms } });
+  return { id: contentItem.id, title, status: 'draft', platforms };
+}
+
 async function recalculateContentStatus(contentItemId: string) {
   const { data: variants, error } = await supabase
     .from('social_platform_variants')

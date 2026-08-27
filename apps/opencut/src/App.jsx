@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createClient } from '@supabase/supabase-js';
 import './index.css';
 import { defaultConfig, emptyConfig } from './defaultConfig.js';
 
@@ -30,6 +31,10 @@ function matchFramePreset(config) {
     || 'custom';
 }
 const STORAGE_KEY = 'muvidb-video-studio-project';
+const SOCIAL_BUCKET = 'social-published-assets';
+const SOCIAL_SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://pkenrmorywmuvnzfoylp.supabase.co';
+const SOCIAL_SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_fXxu9pH8yK8s6xEvEJWNgw_T3Nbbvdo';
+const socialStorage = createClient(SOCIAL_SUPABASE_URL, SOCIAL_SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const sceneDuration = (scene) => Math.max(0, Number((scene?.end || 0) - (scene?.start || 0)));
@@ -1830,6 +1835,13 @@ export default function App() {
   const [clipStatus, setClipStatus] = useState('');
   const [clipBusy, setClipBusy] = useState(false);
   const [clipProgress, setClipProgress] = useState(null);
+  const [socialOpen, setSocialOpen] = useState(false);
+  const [socialCaption, setSocialCaption] = useState('');
+  const [socialPlatforms, setSocialPlatforms] = useState(['instagram', 'facebook', 'threads', 'tiktok']);
+  const [socialSchedule, setSocialSchedule] = useState('');
+  const [socialPostNow, setSocialPostNow] = useState(false);
+  const [socialBusy, setSocialBusy] = useState(false);
+  const [socialStatus, setSocialStatus] = useState('');
   const clipBlobRef = useRef(null);
   const canvasRef = useRef(null);
   const dragRef = useRef(null);
@@ -2724,6 +2736,60 @@ export default function App() {
 
   function handleBarPointerUp() {
     barDragRef.current = null;
+  }
+
+  async function handleExportToSocial() {
+    if (!socialPlatforms.length) { setSocialStatus('Choose at least one platform.'); return; }
+    setSocialBusy(true);
+    setSocialStatus('Rendering your edit…');
+    try {
+      const exportConfig = normalizeTimeline(state.config);
+      const result = await recordTimeline(exportConfig, imageCacheRef.current, (elapsed, duration) => {
+        setSocialStatus(`Rendering ${elapsed.toFixed(1)}s of ${duration.toFixed(1)}s…`);
+      });
+      const extension = result.extension || 'webm';
+      const fileName = `studio/${crypto.randomUUID()}.${extension}`;
+      setSocialStatus('Uploading the rendered video to Social Studio…');
+      const { error: uploadError } = await socialStorage.storage.from(SOCIAL_BUCKET).upload(fileName, result.blob, {
+        contentType: result.blob.type || `video/${extension}`, upsert: false, cacheControl: '31536000',
+      });
+      if (uploadError) throw new Error(uploadError.message);
+      const { data: urlData } = socialStorage.storage.from(SOCIAL_BUCKET).getPublicUrl(fileName);
+      const { data: sessionData } = await socialStorage.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error('Sign in to MuviDB as an admin before sending a video to the scheduler.');
+      setSocialStatus('Creating your platform drafts…');
+      const captions = Object.fromEntries(socialPlatforms.map(platform => [platform, socialCaption || exportConfig.title || 'New video from MuviDB Studio']));
+      const response = await fetch('/api/social?task=create_editor_video_draft', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: exportConfig.title, publicUrl: urlData.publicUrl, storagePath: fileName, mimeType: result.blob.type, fileSizeBytes: result.blob.size, width: exportConfig.width, height: exportConfig.height, captions, platforms: socialPlatforms }),
+      });
+      const draft = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(draft.error || `Could not create Social Studio draft (${response.status})`);
+      if (socialPostNow) {
+        setSocialStatus('Sending the video to your connected accounts…');
+        const published = await fetch('/api/social?task=publish_editor_video_now', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ contentItemId: draft.id }),
+        });
+        const publishResult = await published.json().catch(() => ({}));
+        if (!published.ok) throw new Error(publishResult.error || 'Draft created but could not be published immediately. Open Social Studio to retry.');
+        setSocialStatus('Sent to the existing publisher. Check Social Studio for each platform result.');
+      } else if (socialSchedule) {
+        setSocialStatus('Adding the video to the publishing schedule…');
+        const scheduled = await fetch('/api/social?task=schedule', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ contentItemId: draft.id, scheduledFor: new Date(socialSchedule).toISOString() }),
+        });
+        const scheduleResult = await scheduled.json().catch(() => ({}));
+        if (!scheduled.ok) throw new Error(scheduleResult.error || 'Draft created but could not be scheduled. Open Social Studio to schedule it.');
+        setSocialStatus(`Scheduled for ${new Date(socialSchedule).toLocaleString()}. The existing cron publisher will post it.`);
+      } else {
+        setSocialStatus('Draft ready in Social Studio. Review it and choose Post now or a schedule time.');
+      }
+    } catch (error) {
+      setSocialStatus(error.message || 'Could not send the video to Social Studio.');
+    } finally { setSocialBusy(false); }
   }
 
   function handleClipTrimPointerDown(event, sceneIndex, edge) {
@@ -4197,6 +4263,9 @@ export default function App() {
           <button className="rounded-xl bg-[#FF5C00] px-3 sm:px-5 py-1 sm:py-1.5 text-xs sm:text-sm font-bold text-black shadow-[0_0_20px_rgba(255,92,0,0.4)] transition hover:bg-[#FF7A30] disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
             {isRendering ? 'Exporting…' : 'Export'}
           </button>
+          <button className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-100 transition hover:bg-cyan-400/20" onClick={() => setSocialOpen(true)}>
+            Post / Schedule
+          </button>
         </div>
       </header>
 
@@ -4486,6 +4555,36 @@ export default function App() {
       </div>
 
       <audio ref={audioRef} className="hidden" />
+      {socialOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#17191d] p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 className="text-lg font-black text-white">Export to Social Studio</h2><p className="mt-1 text-xs text-white/55">Render this edit, create platform drafts, then post now or let the existing cron scheduler publish it.</p></div>
+              <button className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white" onClick={() => setSocialOpen(false)}>✕</button>
+            </div>
+            <label className="label mt-4">Caption
+              <textarea className="control min-h-24 resize-y" value={socialCaption} onChange={(event) => setSocialCaption(event.target.value)} placeholder="Write one caption for the selected platforms…" />
+            </label>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/45">Publish to</p>
+            <div className="grid grid-cols-2 gap-2">
+              {['instagram', 'facebook', 'threads', 'tiktok'].map(platform => (
+                <label key={platform} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold capitalize ${socialPlatforms.includes(platform) ? 'border-cyan-400/60 bg-cyan-400/10 text-cyan-100' : 'border-white/10 text-white/60'}`}>
+                  <input type="checkbox" checked={socialPlatforms.includes(platform)} onChange={() => setSocialPlatforms(current => current.includes(platform) ? current.filter(item => item !== platform) : [...current, platform])} /> {platform}
+                </label>
+              ))}
+            </div>
+            <label className="label mt-4">Schedule (leave blank to save a reviewable draft)
+              <input className="control" type="datetime-local" disabled={socialPostNow} value={socialSchedule} onChange={(event) => setSocialSchedule(event.target.value)} />
+            </label>
+            <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-bold text-white/80"><input type="checkbox" checked={socialPostNow} onChange={(event) => setSocialPostNow(event.target.checked)} /> Post immediately after exporting</label>
+            {socialStatus && <div className="mt-3 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-3 text-xs text-cyan-50" role="status">{socialBusy && <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-cyan-100/30 border-t-cyan-100" />}{socialStatus}</div>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn" disabled={socialBusy} onClick={() => setSocialOpen(false)}>Cancel</button>
+              <button className="btn-accent" disabled={socialBusy || !socialPlatforms.length} onClick={handleExportToSocial}>{socialBusy ? 'Preparing…' : socialPostNow ? 'Export & post now' : socialSchedule ? 'Export & schedule' : 'Export to drafts'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
