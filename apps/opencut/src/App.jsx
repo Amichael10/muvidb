@@ -1949,23 +1949,54 @@ export default function App() {
   }
 
   async function handleFetchYoutube() {
-    const url = youtubeUrl.trim();
-    if (!url) {
-      setClipStatus('Paste a YouTube URL first.');
+    const rawUrl = youtubeUrl.trim();
+    if (!rawUrl) {
+      setClipStatus('Paste a video or YouTube URL first.');
       return;
     }
+
     setClipBusy(true);
-    setClipProgress({ stage: 'queued', percent: 10, message: 'Contacting YouTube service...' });
-    setClipStatus('Fetching video metadata from YouTube...');
+    setClipProgress({ stage: 'loading', percent: 20, message: 'Loading video...' });
+    setClipStatus('Processing video request...');
+
+    // 1. Direct video URL fast path (.mp4, .webm, .mov, Supabase, Cloudinary)
+    const isDirect = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(rawUrl) || rawUrl.includes('supabase.co') || rawUrl.includes('cloudinary');
+    if (isDirect) {
+      try {
+        revokeClipBlob();
+        const safeIn = youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
+        const parsedOut = youtubeFetchMode === 'clip' && youtubeEndTime ? parseTimecodeToSeconds(youtubeEndTime) : null;
+
+        await loadClipSource({
+          source: rawUrl,
+          title: 'Video Clip',
+          temporary: true,
+          duration: null,
+          clipIn: safeIn,
+          clipOut: parsedOut,
+          autoApply: true,
+        });
+        setClipProgress(null);
+        setClipStatus('Video loaded directly onto canvas!');
+      } catch (err) {
+        setClipProgress({ stage: 'error', percent: 0, message: err.message });
+        setClipStatus(`Could not load video: ${err.message}`);
+      } finally {
+        setClipBusy(false);
+      }
+      return;
+    }
+
+    // 2. YouTube URL fetching via API / Dev server
     try {
       const apiEndpoint = typeof window !== 'undefined' && window.location.hostname.endsWith('muvidb.com')
-        ? 'https://muvidb.com/api/fetch-youtube'
+        ? 'https://muvidb.com/api/data?_r=fetch-youtube'
         : '/api/fetch-youtube';
 
       const start = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: rawUrl }),
       });
       const contentType = start.headers.get('content-type') || '';
       let started;
@@ -1990,7 +2021,7 @@ export default function App() {
 
         for (let i = 0; i < 60; i++) {
           await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
-          const statusResponse = await fetch(`${apiEndpoint}?jobId=${encodeURIComponent(jobId)}`);
+          const statusResponse = await fetch(`${apiEndpoint}&jobId=${encodeURIComponent(jobId)}`);
           const statusContentType = statusResponse.headers.get('content-type') || '';
           let status;
           if (statusContentType.includes('application/json')) {
@@ -2039,9 +2070,7 @@ export default function App() {
         message: error.message || 'Fetch failed',
       });
       setClipStatus(
-        error.message
-          ? `${error.message}. Note: YouTube restricts direct ripping on public web servers. You can use the "Upload a video instead" button below to load an MP4 directly into the canvas.`
-          : 'Could not fetch video. Use the "Upload a video instead" button to load your video into canvas.'
+        'YouTube restricts direct stream ripping on public web servers. You can load any video file instantly by clicking "Upload a video instead" below or dragging an MP4/MOV directly onto the canvas.'
       );
     } finally {
       setClipBusy(false);
