@@ -60,6 +60,9 @@
     },
     "api/external.ts": {
       "maxDuration": 60
+    },
+    "api/fetch-youtube.ts": {
+      "maxDuration": 60
     }
   },
   "headers": [
@@ -143,6 +146,10 @@
     {
       "source": "/api/social",
       "destination": "/api/data?_r=social"
+    },
+    {
+      "source": "/api/fetch-youtube",
+      "destination": "/api/fetch-youtube"
     },
     {
       "source": "/api/youtube",

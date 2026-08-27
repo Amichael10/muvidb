@@ -1963,7 +1963,14 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
-      const started = await start.json();
+      const contentType = start.headers.get('content-type') || '';
+      let started;
+      if (contentType.includes('application/json')) {
+        started = await start.json();
+      } else {
+        const text = await start.text();
+        throw new Error(start.ok ? 'Unexpected response format' : `Server response (${start.status}): ${text.slice(0, 80)}`);
+      }
       if (!start.ok) throw new Error(started.error || 'Fetch failed');
 
       let result = null;
@@ -1980,7 +1987,14 @@ export default function App() {
         for (let i = 0; i < 60; i++) {
           await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
           const statusResponse = await fetch(`/api/fetch-youtube?jobId=${encodeURIComponent(jobId)}`);
-          const status = await statusResponse.json();
+          const statusContentType = statusResponse.headers.get('content-type') || '';
+          let status;
+          if (statusContentType.includes('application/json')) {
+            status = await statusResponse.json();
+          } else {
+            const text = await statusResponse.text();
+            throw new Error(`Server error (${statusResponse.status}): ${text.slice(0, 80)}`);
+          }
           if (!statusResponse.ok) throw new Error(status.error || 'Lost fetch progress.');
           setClipProgress({
             stage: status.stage,

@@ -25,6 +25,16 @@ function extractYouTubeId(urlStr: string): string | null {
   }
 }
 
+function parseIsoDuration(duration: string): number {
+  if (!duration) return 60;
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 60;
+  const hours = parseInt(match[1] || '0', 10);
+  const minutes = parseInt(match[2] || '0', 10);
+  const seconds = parseInt(match[3] || '0', 10);
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
@@ -54,12 +64,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { url } = req.body || {};
-    if (!url) {
+    if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'Provide a valid video URL.' });
     }
 
-    if (!isYouTubeUrl(url)) {
-      const isDirectVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url) || url.includes('supabase.co') || url.includes('cloudinary');
+    const trimmedUrl = url.trim();
+
+    if (!isYouTubeUrl(trimmedUrl)) {
+      const isDirectVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(trimmedUrl) || trimmedUrl.includes('supabase.co') || trimmedUrl.includes('cloudinary');
       if (isDirectVideo) {
         const jobId = `direct-${Date.now()}`;
         return res.status(200).json({
@@ -69,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           message: 'Direct video loaded',
           done: true,
           result: {
-            path: url,
+            path: trimmedUrl,
             title: 'Direct Video',
             duration: null,
             temporary: false,
@@ -78,22 +90,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const videoId = extractYouTubeId(url);
+    const videoId = extractYouTubeId(trimmedUrl);
     if (!videoId) {
       return res.status(400).json({ error: 'Could not extract YouTube video ID from URL.' });
     }
 
-    let title = `YouTube Video (${videoId})`;
+    let title = `YouTube Clip (${videoId})`;
     let duration = 60;
+    let thumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 
-    try {
-      const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-      if (oembedRes.ok) {
-        const oembedData = await oembedRes.json();
-        title = oembedData.title || title;
+    // Try YouTube Data API first if API key is present
+    const apiKey = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
+    if (apiKey) {
+      try {
+        const ytApiRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`
+        );
+        if (ytApiRes.ok) {
+          const ytData = await ytApiRes.json();
+          const item = ytData.items?.[0];
+          if (item) {
+            title = item.snippet?.title || title;
+            duration = parseIsoDuration(item.contentDetails?.duration);
+            thumbnail = item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || thumbnail;
+          }
+        }
+      } catch {
+        // continue
       }
-    } catch {
-      // ignore
+    }
+
+    // Fallback to oEmbed if needed
+    if (title.startsWith('YouTube Clip (')) {
+      try {
+        const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+        if (oembedRes.ok) {
+          const oembedData = await oembedRes.json();
+          title = oembedData.title || title;
+          thumbnail = oembedData.thumbnail_url || thumbnail;
+        }
+      } catch {
+        // continue
+      }
     }
 
     const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
@@ -106,11 +144,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: 'Video metadata ready',
       done: true,
       result: {
-        path: url,
+        path: trimmedUrl,
         streamUrl: embedUrl,
         videoId,
         title,
         duration,
+        thumbnail,
         temporary: true,
       }
     });
