@@ -671,7 +671,8 @@ function loadVideo(cache, path) {
   if (cache.has(key)) return cache.get(key);
   const promise = new Promise((resolve) => {
     const video = document.createElement('video');
-    video.muted = true;
+    video.muted = false;
+    video.volume = 1.0;
     video.loop = false;
     video.playsInline = true;
     video.preload = 'auto';
@@ -689,7 +690,7 @@ function loadVideo(cache, path) {
 }
 
 /** Avoid seeking every paint frame while playing — that stalls long MP4s. Scrubbing always jumps. */
-function syncVideoToTime(video, targetTime, { playing = false, force = false } = {}) {
+function syncVideoToTime(video, targetTime, { playing = false, force = false, volume = 1.0, muted = false } = {}) {
   if (!video || !Number.isFinite(targetTime)) return;
   const drift = Math.abs((video.currentTime || 0) - targetTime);
 
@@ -708,8 +709,14 @@ function syncVideoToTime(video, targetTime, { playing = false, force = false } =
   };
 
   if (playing) {
+    video.muted = muted;
+    video.volume = Math.max(0, Math.min(1, volume));
     if (video.paused) {
-      video.play().catch(() => {});
+      video.play().catch(() => {
+        // Fallback for strict browser autoplay policy
+        video.muted = true;
+        video.play().catch(() => {});
+      });
     }
     // While actively playing, only resync if drift exceeds 1.5 seconds to prevent flicker
     if (force || drift > 1.5) {
@@ -1213,7 +1220,7 @@ async function drawBackground(ctx, item, config, time, cache, playing = false) {
           : (Number.isFinite(video.duration) ? video.duration : clipIn + localTime);
         const span = Math.max(0.1, clipOut - clipIn);
         const targetTime = clipIn + Math.min(localTime, span - 0.01);
-        syncVideoToTime(video, targetTime, { playing, force: !playing });
+        syncVideoToTime(video, targetTime, { playing, force: !playing, volume: bg.volume ?? 1.0, muted: Boolean(bg.muted) });
         drawCoverMedia(ctx, video, video.videoWidth, video.videoHeight, motion, CANVAS_WIDTH, CANVAS_HEIGHT);
         rendered = true;
       }
@@ -1766,8 +1773,13 @@ export default function App() {
         const video = await loadVideo(imageCacheRef.current, bg.image);
         if (!video || cancelled) return;
         video.loop = false;
+        video.muted = false;
+        video.volume = 1.0;
         try { video.currentTime = clipIn + startLocal; } catch { /* ignore */ }
-        await video.play().catch(() => {});
+        await video.play().catch(() => {
+          video.muted = true;
+          return video.play().catch(() => {});
+        });
         const tick = () => {
           if (cancelled) return;
           const local = Math.max(0, (video.currentTime || 0) - clipIn);
@@ -3098,22 +3110,39 @@ export default function App() {
     }
 
     if (inspectorSubTab === 'audio') {
+      const volumeVal = bg?.volume != null ? Math.round(Number(bg.volume) * 100) : 100;
+      const isMuted = Boolean(bg?.muted);
       return (
         <section className="space-y-4">
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Audio Controls</h3>
-            <p className="mt-0.5 text-xs text-white/50">Manage playback volume and soundtrack levels.</p>
+            <p className="mt-0.5 text-xs text-white/50">Manage playback volume and video soundtrack levels.</p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-white/80">Media Volume</span>
-              <span className="font-mono text-[#FF5C00] font-bold">100%</span>
+              <span className="font-mono text-[#FF5C00] font-bold">{isMuted ? 'Muted (0%)' : `${volumeVal}%`}</span>
             </div>
-            <input type="range" min="0" max="100" defaultValue="100" className="w-full accent-[#FF5C00]" />
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={isMuted ? 0 : volumeVal}
+              onChange={(e) => {
+                const vol = Number(e.target.value) / 100;
+                dispatch({ type: 'background', key: 'volume', value: vol });
+                if (isMuted && vol > 0) dispatch({ type: 'background', key: 'muted', value: false });
+              }}
+              className="w-full accent-[#FF5C00]"
+            />
           </div>
           <div className="pt-2">
-            <button type="button" className="btn w-full text-xs font-bold">
-              🔊 Mute All Audio
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'background', key: 'muted', value: !isMuted })}
+              className={`btn w-full text-xs font-bold transition ${isMuted ? 'border-[#FF5C00] text-[#FF5C00] bg-[#FF5C00]/10' : ''}`}
+            >
+              {isMuted ? '🔈 Unmute Audio' : '🔇 Mute Video Audio'}
             </button>
           </div>
         </section>
@@ -3729,7 +3758,7 @@ export default function App() {
   const isCanvasEmpty = !selectedScene || (!selectedScene.background?.image && (selectedScene.layers || []).length === 0);
 
   return (
-    <div className="flex h-screen min-h-[680px] flex-col overflow-hidden bg-muvi-bg text-[13px]">
+    <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-muvi-bg text-[13px]">
       {/* Global Video Import / Uploading Progress Modal */}
       {clipBusy && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
@@ -3773,28 +3802,28 @@ export default function App() {
         </div>
       )}
 
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.08] bg-muvi-panel/90 px-3 py-2 backdrop-blur">
-        <div className="flex min-w-0 items-center gap-3">
-          <img src="/assets/images/muvidb-logo.svg" alt="MuviDB" className="h-8 w-8 rounded-lg bg-white/5 p-1" />
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] bg-muvi-panel/90 px-2 sm:px-3 py-1.5 sm:py-2 backdrop-blur">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <img src="/assets/images/muvidb-logo.svg" alt="MuviDB" className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-white/5 p-1 shrink-0" />
           <div className="min-w-0">
             <input
-              className="w-full max-w-[280px] truncate border-0 bg-transparent text-sm font-black outline-none placeholder:text-white/30 focus:text-[#FF5C00]"
+              className="w-full max-w-[130px] sm:max-w-[240px] truncate border-0 bg-transparent text-xs sm:text-sm font-black outline-none placeholder:text-white/30 focus:text-[#FF5C00]"
               value={state.config.title || ''}
               placeholder="Untitled project"
               onChange={(event) => dispatch({ type: 'project', key: 'title', value: event.target.value })}
             />
-            <p className="text-[10px] text-muvi-muted">MuviDB Studio · Premium Video Editor</p>
+            <p className="hidden sm:block text-[10px] text-muvi-muted">MuviDB Studio · Premium Video Editor</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button className="btn-ghost" title="Undo (Ctrl+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}><Icon name="undo" className="h-4 w-4" /></button>
-          <button className="btn-ghost" title="Redo (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" className="h-4 w-4" /></button>
-          <span className="mx-1 h-5 w-px bg-white/10" />
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <button className="btn-ghost p-1 sm:p-1.5" title="Undo (Ctrl+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}><Icon name="undo" className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
+          <button className="btn-ghost p-1 sm:p-1.5" title="Redo (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
+          <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
           
           {/* Sidebars Toggle Buttons */}
           <button
             type="button"
-            className={`btn-ghost px-2.5 py-1 text-xs font-bold ${leftPanelOpen ? 'text-white' : 'text-muvi-muted'}`}
+            className={`btn-ghost px-2 sm:px-2.5 py-1 text-xs font-bold ${leftPanelOpen ? 'bg-white/10 text-white' : 'text-muvi-muted'}`}
             title={leftPanelOpen ? 'Collapse Tools Panel' : 'Expand Tools Panel'}
             onClick={() => setLeftPanelOpen(prev => !prev)}
           >
@@ -3802,23 +3831,23 @@ export default function App() {
           </button>
           <button
             type="button"
-            className={`btn-ghost px-2.5 py-1 text-xs font-bold ${rightPanelOpen ? 'text-white' : 'text-muvi-muted'}`}
+            className={`btn-ghost px-2 sm:px-2.5 py-1 text-xs font-bold ${rightPanelOpen ? 'bg-white/10 text-white' : 'text-muvi-muted'}`}
             title={rightPanelOpen ? 'Collapse Inspector' : 'Expand Inspector'}
             onClick={() => setRightPanelOpen(prev => !prev)}
           >
             Inspector {rightPanelOpen ? '▶' : '◀'}
           </button>
 
-          <span className="mx-1 h-5 w-px bg-white/10" />
-          <button className="rounded-xl bg-[#FF5C00] px-5 py-1.5 font-bold text-black shadow-[0_0_20px_rgba(255,92,0,0.4)] transition hover:bg-[#FF7A30] disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
+          <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
+          <button className="rounded-xl bg-[#FF5C00] px-3 sm:px-5 py-1 sm:py-1.5 text-xs sm:text-sm font-bold text-black shadow-[0_0_20px_rgba(255,92,0,0.4)] transition hover:bg-[#FF7A30] disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
             {isRendering ? 'Exporting…' : 'Export'}
           </button>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 relative">
-        {/* Navigation Rail */}
-        <nav className="flex w-[64px] shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel py-2 z-10">
+      <div className="flex min-h-0 flex-1 relative overflow-hidden">
+        {/* Navigation Rail (Desktop) */}
+        <nav className="hidden md:flex w-[64px] shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel py-2 z-10">
           {RAIL_ITEMS.map((item) => (
             <button
               key={item.id}
@@ -3834,18 +3863,48 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Collapsible Left Panel */}
+        {/* Collapsible Left Panel (Responsive Drawer) */}
         {leftPanelOpen && (
-          <aside className="w-[290px] shrink-0 overflow-y-auto border-r border-white/[0.08] bg-muvi-panel/70 p-3 transition-all">
-            {renderLeftPanel()}
-          </aside>
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+              onClick={() => setLeftPanelOpen(false)}
+            />
+            <aside className="fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[320px] overflow-y-auto border-r border-white/10 bg-[#14161a] p-3 shadow-2xl transition-all md:relative md:inset-auto md:z-auto md:w-[290px] md:shrink-0 md:bg-muvi-panel/70 md:shadow-none">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 md:hidden">
+                <span className="text-xs font-bold text-white/90">Tools Menu</span>
+                <button
+                  type="button"
+                  onClick={() => setLeftPanelOpen(false)}
+                  className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex gap-1 overflow-x-auto pb-2 mb-2 border-b border-white/10 md:hidden">
+                {RAIL_ITEMS.map((item) => (
+                  <button
+                    key={`mob-${item.id}`}
+                    type="button"
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition shrink-0 ${
+                      activePanel === item.id ? 'bg-[#FF5C00]/20 text-[#FF5C00]' : 'text-white/60 hover:bg-white/5'
+                    }`}
+                    onClick={() => setActivePanel(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {renderLeftPanel()}
+            </aside>
+          </>
         )}
 
         {/* Main Flexible Canvas Section */}
-        <section className="flex min-w-0 flex-1 flex-col bg-[#0c0d10] relative">
+        <section className="flex min-w-0 flex-1 flex-col bg-[#0c0d10] relative overflow-hidden">
           {/* Canvas Viewport Area with Zoom & Pan */}
           <div
-            className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4 select-none ${
+            className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2 sm:p-4 select-none ${
               isPanMode || isPanning ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
             }`}
             onWheel={handleViewportWheel}
@@ -3855,14 +3914,14 @@ export default function App() {
             onMouseLeave={handlePanEnd}
           >
             {/* Floating Ratio Card (Top Left) */}
-            <div className="absolute top-4 left-4 z-30">
+            <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-30">
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setRatioMenuOpen(prev => !prev)}
-                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#16181c]/90 px-3 py-2 text-xs font-bold text-white shadow-2xl backdrop-blur transition hover:bg-white/15"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/10 bg-[#16181c]/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-white shadow-2xl backdrop-blur transition hover:bg-white/15"
                 >
-                  <svg className="h-4 w-4 text-[#FF5C00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#FF5C00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"></rect>
                   </svg>
                   <span>Ratio</span>
@@ -3892,31 +3951,31 @@ export default function App() {
             </div>
 
             {/* Floating Viewport Toolbar (Top Right) */}
-            <div className="absolute top-4 right-4 z-30 flex items-center gap-1 rounded-xl border border-white/10 bg-[#16181c]/90 px-2 py-1 shadow-2xl backdrop-blur">
+            <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-30 flex items-center gap-0.5 sm:gap-1 rounded-xl border border-white/10 bg-[#16181c]/90 px-1.5 sm:px-2 py-1 shadow-2xl backdrop-blur">
               <button
                 type="button"
                 onClick={() => setPreviewZoom(prev => Math.max(0.3, Number((prev - 0.1).toFixed(2))))}
-                className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white text-xs"
                 title="Zoom Out (-)"
               >
                 -
               </button>
-              <span className="min-w-[44px] text-center font-mono text-[11px] font-bold text-white">
+              <span className="min-w-[36px] sm:min-w-[44px] text-center font-mono text-[10px] sm:text-[11px] font-bold text-white">
                 {Math.round(previewZoom * 100)}%
               </span>
               <button
                 type="button"
                 onClick={() => setPreviewZoom(prev => Math.min(3.0, Number((prev + 0.1).toFixed(2))))}
-                className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                className="rounded p-1 text-white/70 hover:bg-white/10 hover:text-white text-xs"
                 title="Zoom In (+)"
               >
                 +
               </button>
-              <span className="mx-1 h-3.5 w-px bg-white/15" />
+              <span className="mx-0.5 sm:mx-1 h-3.5 w-px bg-white/15" />
               <button
                 type="button"
                 onClick={() => { setPreviewZoom(0.85); setPanOffset({ x: 0, y: 0 }); }}
-                className="rounded px-1.5 py-0.5 text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
+                className="rounded px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
                 title="Fit Canvas"
               >
                 Fit
@@ -3924,16 +3983,16 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => { setPreviewZoom(1.0); setPanOffset({ x: 0, y: 0 }); }}
-                className="rounded px-1.5 py-0.5 text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
+                className="hidden sm:inline-block rounded px-1.5 py-0.5 text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
                 title="Reset Zoom (100%)"
               >
                 100%
               </button>
-              <span className="mx-1 h-3.5 w-px bg-white/15" />
+              <span className="mx-0.5 sm:mx-1 h-3.5 w-px bg-white/15" />
               <button
                 type="button"
                 onClick={() => setIsPanMode(prev => !prev)}
-                className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
+                className={`rounded px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold transition ${
                   isPanMode ? 'bg-[#FF5C00] text-black' : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`}
                 title="Hand / Pan tool (Drag view space)"
@@ -3946,34 +4005,34 @@ export default function App() {
 
             {/* Viewport Center: Empty State or Active Canvas */}
             {isCanvasEmpty ? (
-              <div className="flex w-full max-w-md flex-col items-center justify-center p-6 text-center select-none z-10">
+              <div className="flex w-full max-w-md flex-col items-center justify-center p-4 sm:p-6 text-center select-none z-10">
                 {/* Glowing MuviDB Orange (+) Button */}
-                <label className="group relative flex h-24 w-24 cursor-pointer items-center justify-center rounded-3xl bg-[#FF5C00] text-black shadow-[0_0_50px_rgba(255,92,0,0.5)] transition-all duration-300 hover:scale-105 hover:bg-[#FF7A30] hover:shadow-[0_0_70px_rgba(255,92,0,0.7)]">
-                  <svg className="h-12 w-12 transition-transform group-hover:rotate-90 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <label className="group relative flex h-20 w-20 sm:h-24 sm:w-24 cursor-pointer items-center justify-center rounded-2xl sm:rounded-3xl bg-[#FF5C00] text-black shadow-[0_0_50px_rgba(255,92,0,0.5)] transition-all duration-300 hover:scale-105 hover:bg-[#FF7A30] hover:shadow-[0_0_70px_rgba(255,92,0,0.7)]">
+                  <svg className="h-10 w-10 sm:h-12 sm:w-12 transition-transform group-hover:rotate-90 duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
                   <input className="hidden" type="file" accept="video/*,image/*,.mp4,.mov,.m4v,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
                 </label>
                 
-                <h3 className="mt-5 text-xl font-black text-white tracking-wide">Click to upload</h3>
-                <p className="mt-1 text-xs text-white/50">Or drag and drop your video file here</p>
+                <h3 className="mt-4 sm:mt-5 text-lg sm:text-xl font-black text-white tracking-wide">Click to upload</h3>
+                <p className="mt-1 text-[11px] sm:text-xs text-white/50">Or drag and drop your video file here</p>
 
                 {/* Quick YouTube / URL Input Bar */}
-                <div className="mt-6 flex w-full items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-1.5 shadow-xl backdrop-blur focus-within:border-[#FF5C00]">
+                <div className="mt-4 sm:mt-6 flex w-full items-center gap-1.5 sm:gap-2 rounded-xl border border-white/15 bg-white/5 p-1 sm:p-1.5 shadow-xl backdrop-blur focus-within:border-[#FF5C00]">
                   <input
                     type="text"
-                    placeholder="Paste YouTube or video URL (https://...)"
+                    placeholder="Paste video URL (https://...)"
                     value={youtubeUrl}
                     onChange={(e) => setYoutubeUrl(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleFetchYoutube(); }}
-                    className="flex-1 bg-transparent px-3 py-2 text-xs text-white placeholder-white/40 outline-none"
+                    className="flex-1 bg-transparent px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs text-white placeholder-white/40 outline-none"
                   />
                   <button
                     type="button"
                     onClick={handleFetchYoutube}
                     disabled={clipBusy}
-                    className="rounded-lg bg-[#FF5C00] px-4 py-2 text-xs font-bold text-black transition hover:bg-[#FF7A30] disabled:opacity-50"
+                    className="rounded-lg bg-[#FF5C00] px-3 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-black transition hover:bg-[#FF7A30] disabled:opacity-50"
                   >
                     Import
                   </button>
@@ -4010,54 +4069,60 @@ export default function App() {
           {renderTimeline()}
         </section>
 
-        {/* Collapsible Right Inspector */}
+        {/* Collapsible Right Inspector (Responsive Drawer) */}
         {rightPanelOpen && (
-          <aside className="flex w-[310px] shrink-0 flex-col border-l border-white/[0.08] bg-[#14161a] transition-all">
-            {/* Sub-Tabs Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-3 py-2">
-              <div className="flex items-center gap-1 overflow-x-auto">
-                {[
-                  { id: 'basic', label: 'Basic' },
-                  { id: 'background', label: 'Background' },
-                  { id: 'audio', label: 'Audio' },
-                  { id: 'speed', label: 'Speed' },
-                  { id: 'animation', label: 'Animation' },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                      inspectorSubTab === tab.id
-                        ? 'bg-[#FF5C00]/20 text-[#FF5C00]'
-                        : 'text-white/60 hover:bg-white/5 hover:text-white'
-                    }`}
-                    onClick={() => setInspectorSubTab(tab.id)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+              onClick={() => setRightPanelOpen(false)}
+            />
+            <aside className="fixed inset-y-0 right-0 z-50 flex w-[88vw] max-w-[340px] shrink-0 flex-col border-l border-white/10 bg-[#14161a] shadow-2xl transition-all md:relative md:inset-auto md:z-auto md:w-[310px] md:shadow-none">
+              {/* Sub-Tabs Header */}
+              <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] px-3 py-2">
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  {[
+                    { id: 'basic', label: 'Basic' },
+                    { id: 'background', label: 'Background' },
+                    { id: 'audio', label: 'Audio' },
+                    { id: 'speed', label: 'Speed' },
+                    { id: 'animation', label: 'Animation' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                        inspectorSubTab === tab.id
+                          ? 'bg-[#FF5C00]/20 text-[#FF5C00]'
+                          : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      }`}
+                      onClick={() => setInspectorSubTab(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white text-xs"
+                  onClick={() => setRightPanelOpen(false)}
+                  title="Close Inspector"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                type="button"
-                className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white text-xs"
-                onClick={() => setRightPanelOpen(false)}
-                title="Close Inspector"
-              >
-                ✕
-              </button>
-            </div>
 
-            <div className="border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 flex items-center justify-between">
-              <span className="truncate text-xs font-bold text-white/90">{selectedName || 'Canvas Media'}</span>
-              <span className="font-mono text-[10px] text-white/40">
-                {state.selectedTarget === 'layer' ? 'Layer' : 'Main Video'}
-              </span>
-            </div>
+              <div className="border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 flex items-center justify-between">
+                <span className="truncate text-xs font-bold text-white/90">{selectedName || 'Canvas Media'}</span>
+                <span className="font-mono text-[10px] text-white/40">
+                  {state.selectedTarget === 'layer' ? 'Layer' : 'Main Video'}
+                </span>
+              </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {renderInspectorTab()}
-            </div>
-          </aside>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                {renderInspectorTab()}
+              </div>
+            </aside>
+          </>
         )}
       </div>
 
