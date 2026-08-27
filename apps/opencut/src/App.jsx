@@ -307,7 +307,7 @@ function reducer(state, action) {
       });
     case 'clip-window':
       return withHistory(state, (config, next) => {
-        const scene = config.scenes[state.selectedSceneIndex];
+        const scene = config.scenes[action.sceneIndex ?? state.selectedSceneIndex];
         if (!scene?.background) return;
         const maxOut = Number(scene.background.sourceDuration) || Number(action.clipOut) || 99999;
         const clipIn = action.clipIn != null ? Math.max(0, Number(action.clipIn)) : (scene.background.clipIn ?? 0);
@@ -1834,6 +1834,7 @@ export default function App() {
   const canvasRef = useRef(null);
   const dragRef = useRef(null);
   const barDragRef = useRef(null);
+  const clipTrimRef = useRef(null);
   const layerDragRef = useRef(null);
   const sceneDragRef = useRef(null);
   const audioRef = useRef(null);
@@ -2370,7 +2371,9 @@ export default function App() {
     setClipStatus('Loading local file into memory...');
     try {
       revokeClipBlob();
-      await setMediaBlob('main_video_blob', file);
+      // Preview from the device immediately. Persisting a large gallery video
+      // must never hold up editing or look like a cloud upload.
+      setMediaBlob('main_video_blob', file).catch(() => {});
       const blobUrl = URL.createObjectURL(file);
       clipBlobRef.current = blobUrl;
 
@@ -2723,6 +2726,41 @@ export default function App() {
     barDragRef.current = null;
   }
 
+  function handleClipTrimPointerDown(event, sceneIndex, edge) {
+    event.preventDefault();
+    event.stopPropagation();
+    const track = event.currentTarget.closest('[data-video-track]');
+    const scene = state.config.scenes[sceneIndex];
+    if (!track || !scene?.background?.image) return;
+    const rect = track.getBoundingClientRect();
+    dispatch({ type: 'ui', patch: { selectedSceneIndex: sceneIndex, selectedLayerIndex: 0, selectedTarget: 'background', isPlaying: false } });
+    clipTrimRef.current = {
+      edge, sceneIndex, startX: event.clientX, width: Math.max(1, rect.width),
+      clipIn: Number(scene.background.clipIn) || 0,
+      clipOut: Number(scene.background.clipOut) || scene.end - scene.start,
+      sourceDuration: Number(scene.background.sourceDuration) || 99999,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleClipTrimPointerMove(event) {
+    const trim = clipTrimRef.current;
+    if (!trim || event.buttons !== 1) return;
+    const seconds = ((event.clientX - trim.startX) / trim.width) * totalDuration;
+    const minimum = 0.2;
+    const clipIn = trim.edge === 'left'
+      ? Math.max(0, Math.min(trim.clipOut - minimum, trim.clipIn + seconds))
+      : trim.clipIn;
+    const clipOut = trim.edge === 'right'
+      ? Math.min(trim.sourceDuration, Math.max(trim.clipIn + minimum, trim.clipOut + seconds))
+      : trim.clipOut;
+    dispatch({ type: 'clip-window', sceneIndex: trim.sceneIndex, clipIn, clipOut });
+  }
+
+  function handleClipTrimPointerUp() {
+    clipTrimRef.current = null;
+  }
+
   function seekFromTimelineClientX(clientX, trackEl) {
     if (!selectedScene || !trackEl) return;
     const rect = trackEl.getBoundingClientRect();
@@ -2884,20 +2922,23 @@ export default function App() {
             )}
           </div>
 
-          <button className="btn mb-3 w-full bg-muvi-accent/90 hover:bg-muvi-accent disabled:opacity-50 font-bold" disabled={clipBusy} onClick={handleFetchYoutube}>
-            {clipBusy ? (clipProgress?.message ? 'Fetching from YouTube…' : 'Working...') : youtubeFetchMode === 'clip' ? '⚡ Download Clip to Canvas' : '⬇️ Download Whole Video'}
+          <button className="btn mb-3 w-full bg-muvi-accent/90 hover:bg-muvi-accent disabled:cursor-wait disabled:opacity-70 font-bold" disabled={clipBusy} onClick={handleFetchYoutube}>
+            {clipBusy ? '⏳ Download in progress — please keep this tab open' : youtubeFetchMode === 'clip' ? '⚡ Download Clip to Canvas' : '⬇️ Download Whole Video'}
           </button>
 
-          {clipProgress && (
-            <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+          {(clipBusy || clipProgress) && (
+            <div className={`mb-3 rounded-xl border p-3 shadow-[0_8px_24px_rgba(255,92,0,0.12)] ${clipProgress?.stage === 'error' ? 'border-red-500/40 bg-red-500/10' : 'border-muvi-accent/50 bg-muvi-accent/10'}`} role="status" aria-live="polite">
               <div className="mb-2 flex items-center justify-between gap-2 text-xs">
-                <span className="min-w-0 truncate font-semibold text-white">{clipProgress.message}</span>
-                <span className="shrink-0 tabular-nums text-muvi-muted">{Math.round(clipProgress.percent)}%</span>
+                <span className="flex min-w-0 items-center gap-2 font-bold text-white">
+                  {clipProgress?.stage === 'error' ? '⚠️' : <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-muvi-accent" />}
+                  <span className="truncate">{clipProgress?.message || 'Starting your YouTube download…'}</span>
+                </span>
+                <span className="shrink-0 tabular-nums font-bold text-muvi-accent">{Math.round(clipProgress?.percent || 0)}%</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-muvi-accent transition-[width] duration-300 ease-out" style={{ width: `${Math.max(2, Math.min(100, clipProgress.percent))}%` }} />
+                <div className={`h-full rounded-full transition-[width] duration-300 ease-out ${clipProgress?.stage === 'error' ? 'bg-red-400' : 'bg-muvi-accent'}`} style={{ width: `${Math.max(3, Math.min(100, clipProgress?.percent || 3))}%` }} />
               </div>
-              <p className="mt-2 text-[11px] capitalize text-muvi-muted">Stage: {clipProgress.stage}</p>
+              <p className="mt-2 text-[11px] text-white/70">{clipProgress?.stage === 'error' ? 'The reason is shown below. You can correct the link and try again.' : 'Status updates automatically while the clip is prepared for the canvas.'}</p>
             </div>
           )}
 
@@ -2912,7 +2953,7 @@ export default function App() {
           )}
 
           {/* Online Segment Trimmer & Downloader Helpers */}
-          {youtubeUrl.trim() && (
+          {clipProgress?.stage === 'error' && youtubeUrl.trim() && (
             <div className="mb-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] font-bold text-blue-400">✂️ Online Segment Cutters</span>
@@ -3157,7 +3198,7 @@ export default function App() {
           </div>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <label className="btn text-center text-sm">Import image<input className="hidden" type="file" accept="image/*,.gif" onChange={(event) => { const file = event.target.files?.[0]; if (file) importMediaLayer(file, 'image'); event.target.value = ''; }} /></label>
-            <label className="btn text-center text-sm">Import video<input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importMediaLayer(file, 'video'); event.target.value = ''; }} /></label>
+            <label className="btn text-center text-sm">Import video<input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) handleOptionalClipUpload(file); event.target.value = ''; }} /></label>
           </div>
           {uploads.length === 0 ? (
             <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-muvi-muted">No uploads yet. Click Upload to add images, videos, or music.</p>
@@ -3671,8 +3712,10 @@ export default function App() {
 
     const layers = selectedScene.layers || [];
     const trackRows = layers.map((layer, index) => ({ layer, index })).reverse();
-    const playheadFraction = (state.currentTime - selectedScene.start) / sceneDur;
-    const tickCount = Math.max(1, Math.ceil(sceneDur));
+    // The ruler and video rail represent the complete edit. Limit tick density
+    // so a long source video does not turn the ruler into an unreadable blur.
+    const playheadFraction = state.currentTime / totalDuration;
+    const tickCount = Math.min(30, Math.max(1, Math.ceil(totalDuration / 5)));
     const bgSource = bg?.image ?? state.config.assets?.background;
     const isVideoBg = Boolean(bg?.mediaKind === 'video' || isVideoPath(bgSource));
     const bgLabel = !bgSource
@@ -3783,15 +3826,18 @@ export default function App() {
                 onPointerDown={handleRulerSeek}
                 onPointerMove={handleRulerScrub}
               >
-                {Array.from({ length: tickCount + 1 }, (_, second) => (
+                {Array.from({ length: tickCount + 1 }, (_, tick) => {
+                  const second = Math.round((tick / tickCount) * totalDuration);
+                  return (
                   <span
                     key={second}
                     className="absolute top-1 border-l border-white/15 pl-1 font-mono text-[9px] text-white/40"
-                    style={{ left: `${Math.min(100, (second / sceneDur) * 100)}%` }}
+                    style={{ left: `${(tick / tickCount) * 100}%` }}
                   >
-                    {second}s
+                    {formatSecondsToTimecode(second)}
                   </span>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -3863,18 +3909,18 @@ export default function App() {
               })}
 
               {/* Main Video Track */}
-              <div className={`track-row h-10 ${state.selectedTarget === 'background' ? 'bg-[#FF5C00]/[0.08]' : ''}`}>
+              <div className={`track-row h-12 ${state.selectedTarget === 'background' ? 'bg-[#FF5C00]/[0.08]' : ''}`}>
                 <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-2 border-r border-white/[0.05] px-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#FF5C00] shadow-[0_0_6px_rgba(255,92,0,0.6)]" />
+                  <span className="grid h-6 w-6 place-items-center rounded bg-[#FF5C00]/20 text-xs text-[#FF8A45]">▶</span>
                   <button
                     type="button"
                     className={`min-w-0 flex-1 truncate text-left text-[11px] font-bold ${state.selectedTarget === 'background' ? 'text-[#FF5C00]' : 'text-white/90'}`}
                     onClick={() => dispatch({ type: 'select-background' })}
                   >
-                    🎬 Video Track
+                    Video · timeline
                   </button>
                 </div>
-                <div className="relative h-10 flex-1" data-track>
+                <div className="relative h-12 flex-1" data-video-track>
                   {state.config.scenes.map((scene, index) => {
                     const duration = Math.max(0.2, sceneDuration(scene));
                     const source = scene.background?.image;
@@ -3897,7 +3943,7 @@ export default function App() {
                         }}
                         onDragEnd={() => { sceneDragRef.current = null; }}
                         onClick={() => dispatch({ type: 'ui', patch: { selectedSceneIndex: index, selectedLayerIndex: 0, selectedTarget: 'background', isPlaying: false, currentTime: scene.start } })}
-                        className={`clip-bar top-0.5 bottom-0.5 cursor-grab justify-between rounded-md px-2 text-left active:cursor-grabbing ${active ? 'ring-2 ring-[#FF5C00] shadow-lg z-10' : 'ring-1 ring-black/30 hover:brightness-110'}`}
+                        className={`clip-bar top-1 bottom-1 cursor-grab justify-between rounded-md px-3 text-left active:cursor-grabbing ${active ? 'ring-2 ring-[#FF5C00] shadow-lg z-10' : 'ring-1 ring-black/30 hover:brightness-110'}`}
                         style={{
                           left: `${(scene.start / totalDuration) * 100}%`,
                           width: `${Math.max(3, (duration / totalDuration) * 100)}%`,
@@ -3905,13 +3951,49 @@ export default function App() {
                         }}
                         title="Click to edit · drag a clip onto another clip to reorder"
                       >
+                        {scene.background?.mediaKind === 'video' && (
+                          <div
+                            className={`absolute inset-y-0 left-0 z-20 w-2 cursor-ew-resize border-r-2 border-[#fff3a3] bg-[#facc15] shadow-[2px_0_8px_rgba(250,204,21,0.7)] transition-opacity ${active ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+                            title="Yellow handle: drag to crop the beginning"
+                            onPointerDown={(event) => handleClipTrimPointerDown(event, index, 'left')}
+                            onPointerMove={handleClipTrimPointerMove}
+                            onPointerUp={handleClipTrimPointerUp}
+                            onPointerCancel={handleClipTrimPointerUp}
+                          />
+                        )}
                         <span className="truncate text-[10px] font-bold text-white">🎬 {scene.name || (source ? 'Video clip' : 'Scene')}</span>
                         <span className="ml-1 shrink-0 font-mono text-[9px] text-orange-100/80">{duration.toFixed(1)}s</span>
+                        {scene.background?.mediaKind === 'video' && (
+                          <div
+                            className={`absolute inset-y-0 right-0 z-20 w-2 cursor-ew-resize border-l-2 border-[#fff3a3] bg-[#facc15] shadow-[-2px_0_8px_rgba(250,204,21,0.7)] transition-opacity ${active ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+                            title="Yellow handle: drag to crop the end"
+                            onPointerDown={(event) => handleClipTrimPointerDown(event, index, 'right')}
+                            onPointerMove={handleClipTrimPointerMove}
+                            onPointerUp={handleClipTrimPointerUp}
+                            onPointerCancel={handleClipTrimPointerUp}
+                          />
+                        )}
                       </button>
                     );
                   })}
                 </div>
               </div>
+
+              {audioTrack?.source && (
+                <div className="track-row h-9 border-t border-white/[0.05] bg-cyan-500/[0.03]">
+                  <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-2 border-r border-white/[0.05] px-2">
+                    <span className="grid h-5 w-5 place-items-center rounded bg-cyan-400/15 text-[10px] text-cyan-300">♫</span>
+                    <button type="button" className="min-w-0 flex-1 truncate text-left text-[11px] font-bold text-cyan-100" onClick={() => setActivePanel('audio')}>
+                      Audio · {audioTrack.name || 'Soundtrack'}
+                    </button>
+                  </div>
+                  <div className="relative h-9 flex-1">
+                    <div className="absolute inset-x-1 top-1.5 bottom-1.5 flex items-center overflow-hidden rounded bg-gradient-to-r from-cyan-500/70 via-sky-500/55 to-cyan-500/70 px-2">
+                      <span className="truncate text-[10px] font-bold text-cyan-950">♫ {audioTrack.name || 'Audio track'} · {Math.round((audioTrack.volume ?? 1) * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Playhead Needle */}
               {playheadFraction >= 0 && playheadFraction <= 1 && (
