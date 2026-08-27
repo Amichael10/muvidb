@@ -50,6 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: handleSocial } = await import('./social.js');
       return handleSocial(req, res);
     }
+    if (key === 'fetch-youtube') {
+      const { default: handleFetchYoutube } = await import('./fetch-youtube.js');
+      return handleFetchYoutube(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {

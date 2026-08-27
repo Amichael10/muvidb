@@ -1958,7 +1958,11 @@ export default function App() {
     setClipProgress({ stage: 'queued', percent: 10, message: 'Contacting YouTube service...' });
     setClipStatus('Fetching video metadata from YouTube...');
     try {
-      const start = await fetch('/api/fetch-youtube', {
+      const apiEndpoint = typeof window !== 'undefined' && window.location.hostname.endsWith('muvidb.com')
+        ? 'https://muvidb.com/api/fetch-youtube'
+        : '/api/fetch-youtube';
+
+      const start = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -1986,7 +1990,7 @@ export default function App() {
 
         for (let i = 0; i < 60; i++) {
           await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
-          const statusResponse = await fetch(`/api/fetch-youtube?jobId=${encodeURIComponent(jobId)}`);
+          const statusResponse = await fetch(`${apiEndpoint}?jobId=${encodeURIComponent(jobId)}`);
           const statusContentType = statusResponse.headers.get('content-type') || '';
           let status;
           if (statusContentType.includes('application/json')) {

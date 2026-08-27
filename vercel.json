@@ -149,7 +149,7 @@
     },
     {
       "source": "/api/fetch-youtube",
-      "destination": "/api/fetch-youtube"
+      "destination": "/api/data?_r=fetch-youtube"
     },
     {
       "source": "/api/youtube",
