@@ -1497,6 +1497,75 @@ async function saveDataUrlAsset(dataUrl, filename) {
 }
 
 // Store uploads on disk via the dev server so large files (videos) don't
+// Native IndexedDB media storage to persist large video blobs across browser reloads
+const DB_NAME = 'muvidb_studio_store';
+const DB_VERSION = 1;
+const STORE_NAME = 'media_blobs';
+
+function openMediaDB() {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      resolve(null);
+      return;
+    }
+    try {
+      const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function setMediaBlob(key, blob) {
+  try {
+    const db = await openMediaDB();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(blob, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
+async function getMediaBlob(key) {
+  try {
+    const db = await openMediaDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function clearMediaBlobs() {
+  try {
+    const db = await openMediaDB();
+    if (!db) return;
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).clear();
+  } catch {
+    // ignore
+  }
+}
+
+// Store uploads on disk via the dev server so large files (videos) don't
 // blow the localStorage quota; fall back to inline data URLs if it fails.
 async function persistUpload(file) {
   const dataUrl = await readFileAsDataUrl(file);
@@ -1524,10 +1593,14 @@ function loadSavedProject() {
 }
 
 function saveProject(config) {
-  if (typeof window === 'undefined') return null;
-  const saved = normalizeTimeline(config);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-  return saved;
+  if (typeof window === 'undefined' || !config) return null;
+  try {
+    const saved = normalizeTimeline(config);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    return saved;
+  } catch {
+    return null;
+  }
 }
 
 function clearSavedProject() {
@@ -1716,13 +1789,59 @@ export default function App() {
     : selectedTargetLabel(state.selectedTarget, selectedScene);
 
   useEffect(() => {
-    const saved = loadSavedProject();
-    if (saved) {
-      dispatch({ type: 'replace-config', config: saved });
-      setSaveStatus('Loaded saved project');
-    }
-    refreshUploads();
+    (async () => {
+      const saved = loadSavedProject();
+      if (saved && (saved.scenes?.length > 0 || (saved.title && saved.title !== 'Untitled Video Project'))) {
+        try {
+          const restoredBlob = await getMediaBlob('main_video_blob');
+          if (restoredBlob) {
+            const restoredUrl = URL.createObjectURL(restoredBlob);
+            clipBlobRef.current = restoredUrl;
+            if (saved.scenes) {
+              for (const sc of saved.scenes) {
+                if (sc.background?.image && (sc.background.image.startsWith('blob:') || sc.background.image === 'indexeddb:main_video_blob')) {
+                  sc.background.image = restoredUrl;
+                }
+                for (const l of (sc.layers || [])) {
+                  if (l.source && (l.source.startsWith('blob:') || l.source === 'indexeddb:main_video_blob')) {
+                    l.source = restoredUrl;
+                  }
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+        dispatch({ type: 'replace-config', config: saved });
+        setSaveStatus('Restored last session');
+      }
+      refreshUploads();
+    })();
   }, []);
+
+  // Auto-save project changes to browser localStorage
+  useEffect(() => {
+    if (state.config && state.config.scenes) {
+      const timer = setTimeout(() => {
+        saveProject(state.config);
+        setSaveStatus('Saved in browser');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [state.config]);
+
+  async function handleNewProject() {
+    if (window.confirm('Start a new project? This will clear your current canvas session.')) {
+      clearSavedProject();
+      await clearMediaBlobs();
+      revokeClipBlob();
+      dispatch({ type: 'replace-config', config: clone(initialConfig) });
+      setClipDraft(null);
+      setClipStatus('');
+      setSaveStatus('New project started');
+    }
+  }
 
   async function refreshUploads() {
     try {
@@ -2159,6 +2278,7 @@ export default function App() {
     setClipStatus('Loading local file into memory...');
     try {
       revokeClipBlob();
+      await setMediaBlob('main_video_blob', file);
       const blobUrl = URL.createObjectURL(file);
       clipBlobRef.current = blobUrl;
 
@@ -3816,6 +3936,15 @@ export default function App() {
           </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-1.5">
+          <button
+            type="button"
+            className="btn-ghost px-2 sm:px-2.5 py-1 text-xs font-bold text-white/70 hover:text-white"
+            title="Start a new project (clears current canvas session)"
+            onClick={handleNewProject}
+          >
+            + New
+          </button>
+          <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
           <button className="btn-ghost p-1 sm:p-1.5" title="Undo (Ctrl+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}><Icon name="undo" className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
           <button className="btn-ghost p-1 sm:p-1.5" title="Redo (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
           <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
