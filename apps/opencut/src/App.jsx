@@ -1482,13 +1482,13 @@ function downloadJson(config) {
 }
 
 const RAIL_ITEMS = [
+  { id: 'clip', label: 'Clip / Trim' },
   { id: 'media', label: 'Media' },
   { id: 'text', label: 'Text' },
   { id: 'elements', label: 'Elements' },
   { id: 'audio', label: 'Audio' },
   { id: 'layers', label: 'Layers' },
   { id: 'scenes', label: 'Scenes' },
-  { id: 'clip', label: 'Clip' },
   { id: 'project', label: 'Project' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -2594,6 +2594,73 @@ export default function App() {
             </div>
           )}
 
+          {/* Online Segment Trimmer & Downloader Helpers */}
+          {youtubeUrl.trim() && (
+            <div className="mb-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-blue-400">✂️ Online Segment Cutters</span>
+                <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[9px] font-bold text-blue-300">
+                  {youtubeStartTime} → {youtubeEndTime}
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-white/80">
+                Clip just this {Math.max(0, parseTimecodeToSeconds(youtubeEndTime) - parseTimecodeToSeconds(youtubeStartTime)).toFixed(0)}s segment directly online without downloading the entire video:
+              </p>
+              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = youtubeUrl.trim();
+                    if (!url) return;
+                    window.open(`https://www.slicetube.io/`, '_blank');
+                  }}
+                  className="btn w-full bg-blue-600 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-500 flex items-center justify-center gap-1.5"
+                >
+                  <span>✂️ 1. SliceTube.io Trimmer (Fast)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = youtubeUrl.trim();
+                    if (!url) return;
+                    window.open(`https://openreplay.com/tools/youtube-clipper/`, '_blank');
+                  }}
+                  className="btn w-full bg-indigo-600/90 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-600 flex items-center justify-center gap-1.5"
+                >
+                  <span>🎬 2. OpenReplay Clipper (Browser Record)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = youtubeUrl.trim();
+                    if (!url) return;
+                    const target = url.includes('youtube.com')
+                      ? url.replace(/youtube\.com/i, 'ssyoutube.com')
+                      : `https://en1.savefrom.net/#url=${encodeURIComponent(url)}`;
+                    window.open(target, '_blank');
+                  }}
+                  className="btn w-full bg-emerald-700/80 py-1 text-[11px] font-medium text-white/90 shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-1.5"
+                >
+                  <span>⬇️ 3. SaveFrom.net (Full 1080p Video)</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Primary Canvas Ingestion Dropzone */}
+          <div className="mb-3 rounded-lg border-2 border-dashed border-muvi-accent/40 bg-muvi-accent/10 p-3 text-center">
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white">📂 Select or Drop Video to Canvas</p>
+            <label className="btn block text-center text-xs font-bold bg-muvi-accent hover:bg-muvi-accent/90 text-white cursor-pointer py-2.5 shadow-md">
+              ⚡ Choose Video File (MP4, MOV, WebM)
+              <input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { handleOptionalClipUpload(event.target.files?.[0]); event.target.value = ''; }} />
+            </label>
+            <p className="mt-2 text-[10px] text-white/70">
+              {youtubeFetchMode === 'clip'
+                ? `Automatically applies your trim (${youtubeStartTime} to ${youtubeEndTime}) into the canvas!`
+                : 'Loads full video straight into canvas and timeline.'}
+            </p>
+          </div>
+
           <div className="mb-3">
             <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muvi-muted">Frame size</p>
             <div className="grid grid-cols-1 gap-1.5">
@@ -2610,58 +2677,6 @@ export default function App() {
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* 1-Click Online Segment Trimmer & SaveFrom Helpers */}
-          {youtubeUrl.trim() && (
-            <div className="mb-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-blue-400">✂️ Get Trimmed Segment ({youtubeStartTime} → {youtubeEndTime})</span>
-                <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[9px] font-bold text-blue-300">Fast Clip</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-white/75">
-                Download only the {Math.max(0, parseTimecodeToSeconds(youtubeEndTime) - parseTimecodeToSeconds(youtubeStartTime)).toFixed(0)}s segment without downloading the full video:
-              </p>
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const url = youtubeUrl.trim();
-                    if (!url) return;
-                    const startSec = parseTimecodeToSeconds(youtubeStartTime);
-                    const endSec = parseTimecodeToSeconds(youtubeEndTime);
-                    const target = `https://ytcutter.net/?url=${encodeURIComponent(url)}&start=${startSec}&end=${endSec}`;
-                    window.open(target, '_blank');
-                  }}
-                  className="btn w-full bg-blue-600 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-500 flex items-center justify-center gap-1.5"
-                >
-                  <span>✂️ Trim & Download Segment (ytcutter.net)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const url = youtubeUrl.trim();
-                    if (!url) return;
-                    const target = url.includes('youtube.com')
-                      ? url.replace(/youtube\.com/i, 'ssyoutube.com')
-                      : `https://en1.savefrom.net/#url=${encodeURIComponent(url)}`;
-                    window.open(target, '_blank');
-                  }}
-                  className="btn w-full bg-emerald-700/80 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-1.5"
-                >
-                  <span>⬇️ Or Download Whole Video (SaveFrom)</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-3 rounded-lg border border-dashed border-white/20 bg-white/[0.04] p-3 text-center">
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white">📂 Select or Drop Video to Canvas</p>
-            <label className="btn block text-center text-xs font-bold bg-white/10 hover:bg-white/20 text-white cursor-pointer py-2">
-              Choose Video File (MP4, MOV, WebM)
-              <input className="hidden" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" onChange={(event) => { handleOptionalClipUpload(event.target.files?.[0]); event.target.value = ''; }} />
-            </label>
-            <p className="mt-2 text-[10px] text-muvi-muted">Stays in browser memory · Pre-applies start/end trim automatically.</p>
           </div>
 
           {clipDraft && !hasActiveClip && (
