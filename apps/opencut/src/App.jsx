@@ -662,11 +662,35 @@ function loadImage(cache, path) {
   return promise;
 }
 
+function getOrCreateVideoHost() {
+  if (typeof document === 'undefined') return null;
+  let host = document.getElementById('muvidb-video-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'muvidb-video-host';
+    host.style.position = 'fixed';
+    host.style.top = '-9999px';
+    host.style.left = '-9999px';
+    host.style.width = '1px';
+    host.style.height = '1px';
+    host.style.opacity = '0';
+    host.style.pointerEvents = 'none';
+    host.style.zIndex = '-1';
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
 function loadVideo(cache, path) {
   const resolved = resolveAssetPath(path);
   if (!resolved) return Promise.resolve(null);
   const elKey = `video_el:${resolved}`;
-  if (cache.has(elKey)) return Promise.resolve(cache.get(elKey));
+  if (cache.has(elKey)) {
+    const existing = cache.get(elKey);
+    const host = getOrCreateVideoHost();
+    if (host && existing && !existing.parentElement) host.appendChild(existing);
+    return Promise.resolve(existing);
+  }
   const key = `video:${resolved}`;
   if (cache.has(key)) return cache.get(key);
   const promise = new Promise((resolve) => {
@@ -677,6 +701,8 @@ function loadVideo(cache, path) {
     video.playsInline = true;
     video.preload = 'auto';
     video.crossOrigin = 'anonymous';
+    const host = getOrCreateVideoHost();
+    if (host) host.appendChild(video);
     video.onloadeddata = () => {
       cache.set(elKey, video);
       resolve(video);
@@ -1970,6 +1996,31 @@ export default function App() {
     }
   }, [state.isPlaying, audioTrack?.source, audioTrack?.volume]);
 
+  async function togglePlay() {
+    const willPlay = !latestStateRef.current.isPlaying;
+    const currentScene = sceneAtTime(latestStateRef.current.config, latestStateRef.current.currentTime) || selectedScene;
+    const bgImg = currentScene?.background?.image;
+    if (bgImg) {
+      const resolved = resolveAssetPath(bgImg);
+      const video = imageCacheRef.current.get(`video_el:${resolved}`);
+      if (video) {
+        if (willPlay) {
+          video.muted = Boolean(currentScene?.background?.muted);
+          video.volume = Math.max(0, Math.min(1, currentScene?.background?.volume ?? 1.0));
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      }
+    }
+    const audio = audioRef.current;
+    if (audio && audioTrack?.source) {
+      if (willPlay) audio.play().catch(() => {});
+      else audio.pause();
+    }
+    dispatch({ type: 'ui', patch: { isPlaying: willPlay } });
+  }
+
   useEffect(() => {
     function onKeyDown(event) {
       if (event.target.closest('input, textarea, select')) return;
@@ -1986,7 +2037,7 @@ export default function App() {
       }
       if (event.key === ' ') {
         event.preventDefault();
-        dispatch({ type: 'ui', patch: { isPlaying: !latestStateRef.current.isPlaying } });
+        togglePlay();
         return;
       }
       if (key === 's') handleSplitScene();
@@ -3615,7 +3666,7 @@ export default function App() {
             <button
               type="button"
               className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF5C00] text-black transition hover:scale-105"
-              onClick={() => dispatch({ type: 'ui', patch: { isPlaying: !state.isPlaying } })}
+              onClick={togglePlay}
               title="Play / Pause (Space)"
             >
               <Icon name={state.isPlaying ? 'pause' : 'play'} className="h-4 w-4 fill-current" />
