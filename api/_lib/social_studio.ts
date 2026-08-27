@@ -1631,7 +1631,7 @@ export async function attachCarouselAssets(
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   await assertContentItemCanBeChanged(input.contentItemId);
 
-  const rawAssets = Array.isArray(input.assets) && input.assets.length
+  const rawAssets: Array<{ url: string; mediaType?: 'image' | 'video'; altText?: string }> = Array.isArray(input.assets) && input.assets.length
     ? input.assets
     : (input.publicUrls || []).map(url => ({ url }));
   const carouselAssets = rawAssets.map(asset => {
@@ -1796,7 +1796,10 @@ export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
     const slotPriority = (slot: any) => (slot.status === 'planned' ? 0 : 100) + (slot.scheduled_time ? 10 : 0);
     const dedupedByDateAndSeries = new Map<string, any>();
     for (const slot of rawSlots) {
-      const slug = slot.social_content_series?.slug || 'unknown';
+      const series = Array.isArray(slot.social_content_series)
+        ? slot.social_content_series[0]
+        : slot.social_content_series;
+      const slug = series?.slug || 'unknown';
       const key = `${slot.scheduled_date}:${slug}`;
       const existing = dedupedByDateAndSeries.get(key);
       if (!existing || slotPriority(slot) > slotPriority(existing)) dedupedByDateAndSeries.set(key, slot);
@@ -1995,7 +1998,7 @@ export async function approveEditorialSlot(
   input: {
     slotId: string;
     candidateId: string;
-    candidateType: 'person' | 'movie';
+    candidateType: 'person' | 'movie' | 'play';
     contentType?: SocialContentType;
     templateSlug?: string;
     scheduledDate: string;
@@ -2064,11 +2067,7 @@ export async function approveEditorialSlot(
 
   // 4. Schedule the draft
   const scheduledItem = await scheduleContentItem(
-    draft.contentItem.id,
-    {
-      scheduledFor,
-      platformSettings: platforms.map(p => ({ platform: p, scheduledFor })),
-    },
+    { contentItemId: draft.contentItem.id, scheduledFor },
     actor,
   );
 

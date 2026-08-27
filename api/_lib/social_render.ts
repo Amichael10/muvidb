@@ -302,25 +302,25 @@ function icon(name: SocialIconName, size: number, s: number, color = BRAND.orang
 }
 
 /** Circled icon used by the footer call to action. */
-function circledIcon(name: SocialIconName, size: number, s: number): SatoriNode {
+function circledIcon(name: SocialIconName, size: number, s: number, color = BRAND.orange): SatoriNode {
   return h(
     'div',
     {
       width: `${size * s}px`,
       height: `${size * s}px`,
       borderRadius: `${size * s}px`,
-      border: `${Math.max(2, 2.5 * s)}px solid ${BRAND.orange}`,
+      border: `${Math.max(2, 2.5 * s)}px solid ${color}`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
     },
-    icon(name, size * 0.52, s),
+    icon(name, size * 0.52, s, color),
   );
 }
 
 /** Fading dot matrix in the top-right corner of every mockup. */
-function dotGrid(x: number, y: number, s: number): SatoriNode {
+function dotGrid(x: number, y: number, s: number, color = BRAND.orange): SatoriNode {
   const cols = 8;
   const rows = 11;
   const gap = 11 * s;
@@ -336,7 +336,7 @@ function dotGrid(x: number, y: number, s: number): SatoriNode {
           width: `${3.5 * s}px`,
           height: `${3.5 * s}px`,
           borderRadius: `${4 * s}px`,
-          backgroundColor: BRAND.orange,
+          backgroundColor: color,
           opacity: Math.max(0.12, 0.85 - r * 0.07),
           display: 'flex',
         }),
@@ -915,13 +915,13 @@ function buildMovieSpotlightCard(
 
   children.push(dotGrid(width - pad - 78 * s, gridY + 34 * s, s, theme.accent));
 
-  if (decor.filmStrip) {
+  if (decor.reel) {
     const stripW = Math.round(380 * s);
     children.push(
       h(
         'div',
         { position: 'absolute', right: `${-40 * s}px`, bottom: `${-40 * s}px`, display: 'flex', opacity: 0.09 },
-        { type: 'img', props: { src: decor.filmStrip, width: stripW, height: stripW, style: { width: `${stripW}px`, height: `${stripW}px` } } },
+        { type: 'img', props: { src: decor.reel, width: stripW, height: stripW, style: { width: `${stripW}px`, height: `${stripW}px` } } },
       ),
     );
   }

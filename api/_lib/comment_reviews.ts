@@ -251,7 +251,7 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
   // network blip ("fetch failed" / socket hang up) — so one hiccup doesn't
   // abort the whole run.
   const withRetry = async <T>(
-    run: () => Promise<{ data: T | null; error: any }>,
+    run: () => PromiseLike<{ data: T | null; error: any }>,
     label: string,
     attempt = 0,
   ): Promise<T | null> => {

@@ -62,7 +62,7 @@ let activeCinemaCatalogPromise: Promise<MatchedFilm[]> | null = null;
 
 async function getActiveCinemaCatalog(): Promise<MatchedFilm[]> {
   if (!activeCinemaCatalogPromise) {
-    activeCinemaCatalogPromise = supabase
+    activeCinemaCatalogPromise = Promise.resolve(supabase
       .from('films')
       .select('id,title,poster_url,backdrop_url,is_in_cinemas,synopsis,runtime_minutes,genres,year,nfvcb_rating,trailer_external_url')
       .eq('is_nollywood', true)
@@ -72,7 +72,7 @@ async function getActiveCinemaCatalog(): Promise<MatchedFilm[]> {
         return ((data || []) as MatchedFilm[]).sort(
           (a, b) => Number(isOwnUrl(b.poster_url)) - Number(isOwnUrl(a.poster_url)),
         );
-      });
+      }));
   }
   return activeCinemaCatalogPromise;
 }

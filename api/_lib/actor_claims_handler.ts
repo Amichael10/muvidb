@@ -67,7 +67,10 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
         person,
         email: profile?.email || user.email,
         professionalRoles: profile?.professional_roles || [],
-        credits: credits || [],
+        credits: (credits || []).map(credit => ({
+          ...credit,
+          films: Array.isArray(credit.films) ? (credit.films[0] || null) : credit.films,
+        })),
       });
       const filename = `${String(person.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'professional'}-${format}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
