@@ -1955,8 +1955,8 @@ export default function App() {
       return;
     }
     setClipBusy(true);
-    setClipProgress({ stage: 'queued', percent: 0, message: 'Starting...' });
-    setClipStatus('Fetching from YouTube (temporary file, not your media library)...');
+    setClipProgress({ stage: 'queued', percent: 10, message: 'Contacting YouTube service...' });
+    setClipStatus('Fetching video metadata from YouTube...');
     try {
       const start = await fetch('/api/fetch-youtube', {
         method: 'POST',
@@ -1966,33 +1966,37 @@ export default function App() {
       const started = await start.json();
       if (!start.ok) throw new Error(started.error || 'Fetch failed');
 
-      const jobId = started.jobId;
-      setClipProgress({
-        stage: started.stage || 'queued',
-        percent: started.percent || 0,
-        message: started.message || 'Queued...',
-      });
-
       let result = null;
-      for (;;) {
-        await new Promise((resolveWait) => setTimeout(resolveWait, 500));
-        const statusResponse = await fetch(`/api/fetch-youtube?jobId=${encodeURIComponent(jobId)}`);
-        const status = await statusResponse.json();
-        if (!statusResponse.ok) throw new Error(status.error || 'Lost fetch progress.');
+      if (started.done && started.result) {
+        result = started.result;
+      } else {
+        const jobId = started.jobId;
         setClipProgress({
-          stage: status.stage,
-          percent: Number(status.percent) || 0,
-          message: status.message || 'Working...',
+          stage: started.stage || 'queued',
+          percent: started.percent || 25,
+          message: started.message || 'Queued...',
         });
-        setClipStatus(status.message || 'Fetching...');
-        if (status.done) {
-          if (status.error) throw new Error(status.error);
-          result = status.result;
-          break;
+
+        for (let i = 0; i < 60; i++) {
+          await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
+          const statusResponse = await fetch(`/api/fetch-youtube?jobId=${encodeURIComponent(jobId)}`);
+          const status = await statusResponse.json();
+          if (!statusResponse.ok) throw new Error(status.error || 'Lost fetch progress.');
+          setClipProgress({
+            stage: status.stage,
+            percent: Number(status.percent) || 50,
+            message: status.message || 'Working...',
+          });
+          setClipStatus(status.message || 'Fetching...');
+          if (status.done) {
+            if (status.error) throw new Error(status.error);
+            result = status.result;
+            break;
+          }
         }
       }
 
-      if (!result?.path) throw new Error('Fetch finished without a video file.');
+      if (!result?.path) throw new Error('Fetch finished without a video stream.');
       revokeClipBlob();
 
       const safeIn = youtubeFetchMode === 'clip' ? parseTimecodeToSeconds(youtubeStartTime) : 0;
@@ -2009,9 +2013,18 @@ export default function App() {
         autoApply: true,
       });
       setClipProgress(null);
+      setClipStatus('Video attached to canvas and ready for trimming!');
     } catch (error) {
-      setClipProgress(null);
-      setClipStatus(error.message || 'Could not fetch that video. You can use optional upload instead.');
+      setClipProgress({
+        stage: 'error',
+        percent: 0,
+        message: error.message || 'Fetch failed',
+      });
+      setClipStatus(
+        error.message
+          ? `${error.message}. Note: YouTube restricts direct ripping on public web servers. You can use the "Upload a video instead" button below to load an MP4 directly into the canvas.`
+          : 'Could not fetch video. Use the "Upload a video instead" button to load your video into canvas.'
+      );
     } finally {
       setClipBusy(false);
     }
@@ -2514,6 +2527,16 @@ export default function App() {
                 <div className="h-full rounded-full bg-muvi-accent transition-[width] duration-300 ease-out" style={{ width: `${Math.max(2, Math.min(100, clipProgress.percent))}%` }} />
               </div>
               <p className="mt-2 text-[11px] capitalize text-muvi-muted">Stage: {clipProgress.stage}</p>
+            </div>
+          )}
+
+          {clipStatus && (
+            <div className={`mb-3 rounded-lg border p-3 text-xs leading-relaxed ${
+              clipProgress?.stage === 'error'
+                ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                : 'border-white/10 bg-white/[0.04] text-white/80'
+            }`}>
+              <p>{clipStatus}</p>
             </div>
           )}
 
