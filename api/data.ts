@@ -1,10 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { handleCors } from './_lib/cors.js';
 
 /**
  * Temporary hardened router — catch all failures so we stop returning
  * opaque FUNCTION_INVOCATION_FAILED and can restore catalogue APIs.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (handleCors(req, res)) return;
+
   try {
     const raw = req.query._r;
     const key = Array.isArray(raw) ? raw[0] : raw;

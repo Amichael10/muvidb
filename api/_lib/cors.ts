@@ -15,6 +15,8 @@ export function getCorsHeaders(req: VercelRequest) {
       origin === 'https://muvidb.com' ||
       origin === 'https://www.muvidb.com' ||
       origin === 'https://lumi.muvidb.com' ||
+      origin === 'https://studio.muvidb.com' ||
+      origin.endsWith('.muvidb.com') ||
       origin.endsWith('.vercel.app') ||
       /^http:\/\/localhost(:\d+)?$/.test(origin) ||
       /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
@@ -26,9 +28,9 @@ export function getCorsHeaders(req: VercelRequest) {
 
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Vary': 'Origin', // Tell caches that the response varies depending on the Origin header
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Vary': 'Origin',
   };
 }
 

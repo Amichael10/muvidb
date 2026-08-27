@@ -2612,30 +2612,46 @@ export default function App() {
             </div>
           </div>
 
-          {/* 1-Click SaveFrom HD Helper */}
+          {/* 1-Click Online Segment Trimmer & SaveFrom Helpers */}
           {youtubeUrl.trim() && (
-            <div className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-emerald-400">⚡ SaveFrom HD Helper</span>
-                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">1080p/720p</span>
+            <div className="mb-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-blue-400">✂️ Get Trimmed Segment ({youtubeStartTime} → {youtubeEndTime})</span>
+                <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-[9px] font-bold text-blue-300">Fast Clip</span>
               </div>
-              <p className="mb-2 text-[11px] leading-relaxed text-white/75">
-                Download via SaveFrom, then drop the MP4 below — your start ({youtubeStartTime}) and end ({youtubeEndTime}) trim will be automatically applied!
+              <p className="text-[11px] leading-relaxed text-white/75">
+                Download only the {Math.max(0, parseTimecodeToSeconds(youtubeEndTime) - parseTimecodeToSeconds(youtubeStartTime)).toFixed(0)}s segment without downloading the full video:
               </p>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = youtubeUrl.trim();
-                  if (!url) return;
-                  const target = url.includes('youtube.com')
-                    ? url.replace(/youtube\.com/i, 'ssyoutube.com')
-                    : `https://en1.savefrom.net/#url=${encodeURIComponent(url)}`;
-                  window.open(target, '_blank');
-                }}
-                className="btn w-full bg-emerald-600 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 flex items-center justify-center gap-1.5"
-              >
-                <span>↗️ Open Video in SaveFrom.net</span>
-              </button>
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = youtubeUrl.trim();
+                    if (!url) return;
+                    const startSec = parseTimecodeToSeconds(youtubeStartTime);
+                    const endSec = parseTimecodeToSeconds(youtubeEndTime);
+                    const target = `https://ytcutter.net/?url=${encodeURIComponent(url)}&start=${startSec}&end=${endSec}`;
+                    window.open(target, '_blank');
+                  }}
+                  className="btn w-full bg-blue-600 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-500 flex items-center justify-center gap-1.5"
+                >
+                  <span>✂️ Trim & Download Segment (ytcutter.net)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = youtubeUrl.trim();
+                    if (!url) return;
+                    const target = url.includes('youtube.com')
+                      ? url.replace(/youtube\.com/i, 'ssyoutube.com')
+                      : `https://en1.savefrom.net/#url=${encodeURIComponent(url)}`;
+                    window.open(target, '_blank');
+                  }}
+                  className="btn w-full bg-emerald-700/80 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-1.5"
+                >
+                  <span>⬇️ Or Download Whole Video (SaveFrom)</span>
+                </button>
+              </div>
             </div>
           )}
 
