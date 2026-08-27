@@ -631,11 +631,17 @@ function resolveAssetPath(path) {
 function loadImage(cache, path) {
   const resolved = resolveAssetPath(path);
   if (!resolved) return Promise.resolve(null);
+  const elKey = `image_el:${resolved}`;
+  if (cache.has(elKey)) return Promise.resolve(cache.get(elKey));
   const key = `image:${resolved}`;
   if (cache.has(key)) return cache.get(key);
   const promise = new Promise((resolve) => {
     const image = new Image();
-    image.onload = () => resolve(image);
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      cache.set(elKey, image);
+      resolve(image);
+    };
     image.onerror = () => resolve(null);
     image.src = resolved;
   });
@@ -646,6 +652,8 @@ function loadImage(cache, path) {
 function loadVideo(cache, path) {
   const resolved = resolveAssetPath(path);
   if (!resolved) return Promise.resolve(null);
+  const elKey = `video_el:${resolved}`;
+  if (cache.has(elKey)) return Promise.resolve(cache.get(elKey));
   const key = `video:${resolved}`;
   if (cache.has(key)) return cache.get(key);
   const promise = new Promise((resolve) => {
@@ -654,7 +662,11 @@ function loadVideo(cache, path) {
     video.loop = false;
     video.playsInline = true;
     video.preload = 'auto';
-    video.onloadeddata = () => resolve(video);
+    video.crossOrigin = 'anonymous';
+    video.onloadeddata = () => {
+      cache.set(elKey, video);
+      resolve(video);
+    };
     video.onerror = () => resolve(null);
     video.src = resolved;
     video.load();
@@ -667,10 +679,8 @@ function loadVideo(cache, path) {
 function syncVideoToTime(video, targetTime, { playing = false, force = false } = {}) {
   if (!video || !Number.isFinite(targetTime)) return;
   const drift = Math.abs((video.currentTime || 0) - targetTime);
-  const seekThreshold = playing ? 0.85 : 0.05;
 
   const applySeek = (time) => {
-    // Always push the latest time so scrubbing isn't stuck behind an in-flight seek.
     video.__seekTarget = time;
     try { video.currentTime = time; } catch { video.__seekLock = false; return; }
     if (video.__seekLock) return;
@@ -681,25 +691,23 @@ function syncVideoToTime(video, targetTime, { playing = false, force = false } =
       video.__seekLock = false;
     };
     video.addEventListener('seeked', unlock, { once: true });
-    setTimeout(unlock, 1500);
+    setTimeout(unlock, 1000);
   };
 
   if (playing) {
     if (video.paused) {
-      if (drift > 0.04) applySeek(targetTime);
       video.play().catch(() => {});
-      return;
     }
-    if (force || drift > seekThreshold) {
-      if (video.__seekLock && Math.abs((video.__seekTarget ?? video.currentTime) - targetTime) <= seekThreshold) return;
+    // While actively playing, only resync if drift exceeds 1.5 seconds to prevent flicker
+    if (force || drift > 1.5) {
       applySeek(targetTime);
     }
     return;
   }
 
-  // Paused / scrubbing: always honor the latest playhead.
+  // Paused / scrubbing:
   if (!video.paused) video.pause();
-  if (!force && drift <= seekThreshold) return;
+  if (!force && drift <= 0.05) return;
   applySeek(targetTime);
 }
 
@@ -1154,30 +1162,44 @@ function drawCoverMedia(ctx, media, mediaWidth, mediaHeight, motion, canvasW = D
 async function drawBackground(ctx, item, config, time, cache, playing = false) {
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(config);
   const bg = item?.background || {};
-  ctx.fillStyle = bg.color || config.theme?.backgroundColor || '#0B0D0E';
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-  // An empty string means "solid color": don't fall back to the project default
   const source = bg.image ?? config.assets?.background;
-  if (!source) return;
   const motion = backgroundMotion(item, time);
   const treatAsVideo = bg.mediaKind === 'video' || isVideoPath(source);
-  if (treatAsVideo) {
-    const video = await loadVideo(cache, source);
-    if (video) {
-      const localTime = Math.max(0, (time || 0) - (item?.start || 0));
-      const clipIn = Number(bg.clipIn) || 0;
-      const clipOut = bg.clipOut != null && bg.clipOut !== ''
-        ? Number(bg.clipOut)
-        : (Number.isFinite(video.duration) ? video.duration : clipIn + localTime);
-      const span = Math.max(0.1, clipOut - clipIn);
-      const targetTime = clipIn + Math.min(localTime, span - 0.01);
-      syncVideoToTime(video, targetTime, { playing, force: !playing });
-      drawCoverMedia(ctx, video, video.videoWidth, video.videoHeight, motion, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  let rendered = false;
+  if (source) {
+    if (treatAsVideo) {
+      const resolved = resolveAssetPath(source);
+      let video = resolved ? cache.get(`video_el:${resolved}`) : null;
+      if (!video) video = await loadVideo(cache, source);
+      if (video && (video.readyState >= 2 || video.videoWidth > 0)) {
+        const localTime = Math.max(0, (time || 0) - (item?.start || 0));
+        const clipIn = Number(bg.clipIn) || 0;
+        const clipOut = bg.clipOut != null && bg.clipOut !== ''
+          ? Number(bg.clipOut)
+          : (Number.isFinite(video.duration) ? video.duration : clipIn + localTime);
+        const span = Math.max(0.1, clipOut - clipIn);
+        const targetTime = clipIn + Math.min(localTime, span - 0.01);
+        syncVideoToTime(video, targetTime, { playing, force: !playing });
+        drawCoverMedia(ctx, video, video.videoWidth, video.videoHeight, motion, CANVAS_WIDTH, CANVAS_HEIGHT);
+        rendered = true;
+      }
+    } else {
+      const resolved = resolveAssetPath(source);
+      let image = resolved ? cache.get(`image_el:${resolved}`) : null;
+      if (!image) image = await loadImage(cache, source);
+      if (image && (image.naturalWidth || image.width)) {
+        drawCoverMedia(ctx, image, image.naturalWidth || image.width, image.naturalHeight || image.height, motion, CANVAS_WIDTH, CANVAS_HEIGHT);
+        rendered = true;
+      }
     }
-  } else {
-    const image = await loadImage(cache, source);
-    if (image) drawCoverMedia(ctx, image, image.naturalWidth || image.width, image.naturalHeight || image.height, motion, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
+
+  if (!rendered) {
+    ctx.fillStyle = bg.color || config.theme?.backgroundColor || '#0B0D0E';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  }
+
   if (bg.noOverlay) return;
   const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   gradient.addColorStop(0, config.theme?.overlayTop || 'rgba(11,13,14,0.56)');
