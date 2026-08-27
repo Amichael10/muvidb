@@ -240,11 +240,12 @@ export async function mineFilmComments(
  * film it checks so 0-comment films get retried later (once they've grown) but
  * not every run.
  */
-export async function runCommentMining(opts: { scan?: number; aiCap?: number; minComments?: number } = {}) {
+export async function runCommentMining(opts: { scan?: number; aiCap?: number; minComments?: number; staleDays?: number } = {}) {
   const scan = opts.scan ?? Number(process.env.COMMENT_MINE_SCAN || 300);
   const aiCap = opts.aiCap ?? Number(process.env.COMMENT_MINE_AICAP || 150);
   const minComments = opts.minComments ?? Number(process.env.COMMENT_MINE_MINCOMMENTS || 20);
-  const staleBefore = new Date(Date.now() - 21 * 86400_000).toISOString();
+  const staleDays = opts.staleDays ?? Number(process.env.COMMENT_MINE_STALE_DAYS || 5);
+  const staleBefore = new Date(Date.now() - staleDays * 86400_000).toISOString();
 
   // Retry any selection on a transient failure — statement timeout (57014) or a
   // network blip ("fetch failed" / socket hang up) — so one hiccup doesn't
@@ -269,7 +270,7 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
   };
 
   const COLS = 'id, source_video_id, comments_synced_at';
-  // Needs a (re)check: never mined, or mined > 21 days ago.
+  // Needs a (re)check: never mined, or mined > 5 days ago.
   const needsMining = (q: any) =>
     q.not('source_video_id', 'is', null)
       .or(`comments_synced_at.is.null,comments_synced_at.lt.${staleBefore}`);
@@ -375,7 +376,7 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
         if (res.reason === 'quota') { console.warn('[comment-mining] quota hit during mine, stopping.'); return { checked: i, mined, skipped, aiUsed, viewsBackfilled }; }
       }
       // Checked but nothing to mine (or AI cap reached): stamp so we don't
-      // recheck every run, but it'll be revisited after the 21-day window.
+      // recheck every run, but it'll be revisited after the 5-day window.
       skipped++;
       await supabase.from('films').update(patch).eq('id', f.id);
     }
