@@ -317,14 +317,53 @@ function reducer(state, action) {
         scene.background.clipIn = Number(safeIn.toFixed(2));
         scene.background.clipOut = Number(clipOut.toFixed(2));
         const length = Number((clipOut - safeIn).toFixed(2));
-        scene.start = 0;
-        scene.end = length;
-        if (config.scenes.length === 1) {
-          config.duration = length;
-          next.currentTime = Math.min(next.currentTime, length);
-        } else {
-          retimeFrom(config, state.selectedSceneIndex + 1);
-        }
+        // A trim changes this clip's length, not its position in the edit.
+        // Keep every later scene attached to its new end point.
+        scene.end = Number((scene.start + length).toFixed(2));
+        retimeFrom(config, state.selectedSceneIndex + 1);
+        next.currentTime = Math.min(next.currentTime, scene.end);
+      });
+    case 'append-clip':
+      return withHistory(state, (config, next) => {
+        const clipIn = Math.max(0, Number(action.clipIn) || 0);
+        const clipOut = Math.max(clipIn + 0.2, Number(action.clipOut) || clipIn + 0.2);
+        const start = timelineDuration(config);
+        const scene = {
+          id: `clip-${Date.now()}`,
+          name: action.title || `Clip ${config.scenes.length + 1}`,
+          start,
+          end: Number((start + clipOut - clipIn).toFixed(2)),
+          transition: { type: 'crossfade', duration: 0.2 },
+          background: {
+            image: action.source, mediaKind: 'video', clipIn, clipOut,
+            sourceDuration: Number(action.sourceDuration) || clipOut,
+            noOverlay: true, zoom: 1, x: 0, y: 0, color: '#000000', animation: { type: 'none' },
+          },
+          layers: [],
+        };
+        config.scenes.push(scene);
+        syncTimelineDuration(config);
+        next.selectedSceneIndex = config.scenes.length - 1;
+        next.selectedLayerIndex = 0;
+        next.selectedTarget = 'background';
+        next.currentTime = scene.start;
+        next.isPlaying = false;
+      });
+    case 'reorder-scene':
+      return withHistory(state, (config, next) => {
+        const from = Number(action.fromIndex);
+        const to = Number(action.toIndex);
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from === to) return;
+        const [scene] = config.scenes.splice(from, 1);
+        config.scenes.splice(to, 0, scene);
+        const firstDuration = Math.max(0.2, sceneDuration(config.scenes[0]));
+        config.scenes[0].start = 0;
+        config.scenes[0].end = Number(firstDuration.toFixed(2));
+        retimeFrom(config, 1);
+        next.selectedSceneIndex = to;
+        next.selectedLayerIndex = 0;
+        next.selectedTarget = 'scene';
+        next.currentTime = sceneEditTime(config.scenes[to]);
       });
     case 'set-frame':
       return withHistory(state, (config) => {
@@ -1796,6 +1835,7 @@ export default function App() {
   const dragRef = useRef(null);
   const barDragRef = useRef(null);
   const layerDragRef = useRef(null);
+  const sceneDragRef = useRef(null);
   const audioRef = useRef(null);
   const imageCacheRef = useRef(new Map());
   const latestStateRef = useRef(state);
@@ -2141,12 +2181,13 @@ export default function App() {
     return video;
   }
 
-  async function applyClipToEditor({ source, title, duration, clipIn = 0, clipOut = null }) {
+  async function applyClipToEditor({ source, title, duration, clipIn = 0, clipOut = null, insertion = 'append' }) {
     const safeIn = Math.max(0, Number(clipIn) || 0);
     const safeOut = Math.max(safeIn + 0.2, clipOut != null ? Number(clipOut) : Number(duration) || safeIn + 0.2);
     // Put the video on the canvas immediately — don't wait for warm/buffer.
+    const hasTimeline = latestStateRef.current.config.scenes.length > 0;
     dispatch({
-      type: 'apply-clip',
+      type: insertion === 'replace' || !hasTimeline ? 'apply-clip' : 'append-clip',
       source,
       title: title || 'Clip',
       clipIn: safeIn,
@@ -2163,7 +2204,7 @@ export default function App() {
       clipOut: safeOut,
       applied: true,
     });
-    setClipStatus(`On the editor · scrub, Set In/Out, switch frame size, then Export.`);
+    setClipStatus(`${hasTimeline && insertion !== 'replace' ? 'Added as the next clip' : 'On the editor'} · drag clips to reorder, trim their edges, then Export.`);
     setActivePanel('clip');
     setClipProgress({ stage: 'loading', percent: 92, message: 'Buffering preview…' });
     warmClipVideo(source).finally(() => {
@@ -2171,7 +2212,7 @@ export default function App() {
     });
   }
 
-  async function loadClipSource({ source, title, temporary, duration: knownDuration, clipIn = 0, clipOut = null, autoApply = false }) {
+  async function loadClipSource({ source, title, temporary, duration: knownDuration, clipIn = 0, clipOut = null, autoApply = false, insertion = 'append' }) {
     imageCacheRef.current.clear();
     const meta = await probeVideoMeta(source);
     const duration = knownDuration && knownDuration > 0 ? knownDuration : meta.duration;
@@ -2187,14 +2228,14 @@ export default function App() {
     };
     setClipDraft(draft);
     if (autoApply) {
-      await applyClipToEditor(draft);
+      await applyClipToEditor({ ...draft, insertion });
     } else {
       setClipStatus(`Loaded · ${formatTime(duration)} total. Open in editor to trim.`);
     }
   }
 
-  async function handleFetchYoutube() {
-    const rawUrl = youtubeUrl.trim();
+  async function handleFetchYoutube(urlOverride = '') {
+    const rawUrl = (urlOverride || youtubeUrl).trim();
     if (!rawUrl) {
       setClipStatus('Paste a video or YouTube URL first.');
       return;
@@ -2322,7 +2363,7 @@ export default function App() {
     }
   }
 
-  async function handleOptionalClipUpload(file) {
+  async function handleOptionalClipUpload(file, insertion = 'append') {
     if (!file) return;
     setClipBusy(true);
     setClipProgress({ stage: 'loading', percent: 20, message: 'Loading local file...' });
@@ -2343,6 +2384,7 @@ export default function App() {
         clipIn: safeIn,
         clipOut: parsedOut,
         autoApply: true,
+        insertion,
       });
       setClipProgress(null);
       setClipStatus(`Loaded into canvas with ${youtubeFetchMode === 'clip' ? `trim (${youtubeStartTime} to ${youtubeEndTime}) applied` : 'full duration'}!`);
@@ -2351,6 +2393,35 @@ export default function App() {
       setClipStatus(error.message || 'Could not load that file.');
     } finally {
       setClipBusy(false);
+    }
+  }
+
+  function handleCanvasDrop(event) {
+    event.preventDefault();
+    const file = event.dataTransfer?.files?.[0];
+    if (file) {
+      handleOptionalClipUpload(file);
+      return;
+    }
+    const url = event.dataTransfer?.getData('text/uri-list') || event.dataTransfer?.getData('text/plain');
+    if (url && /^https?:\/\//i.test(url.trim())) {
+      setYoutubeUrl(url.trim());
+      handleFetchYoutube(url.trim());
+    }
+  }
+
+  function handleCanvasPaste(event) {
+    const file = event.clipboardData?.files?.[0];
+    if (file) {
+      event.preventDefault();
+      handleOptionalClipUpload(file);
+      return;
+    }
+    const text = event.clipboardData?.getData('text/plain')?.trim();
+    if (text && /^https?:\/\//i.test(text)) {
+      event.preventDefault();
+      setYoutubeUrl(text);
+      handleFetchYoutube(text);
     }
   }
 
@@ -3804,23 +3875,41 @@ export default function App() {
                   </button>
                 </div>
                 <div className="relative h-10 flex-1" data-track>
-                  <button
-                    type="button"
-                    className={`clip-bar inset-x-1 cursor-pointer flex items-center justify-between px-2.5 rounded-lg ${state.selectedTarget === 'background' ? 'ring-2 ring-[#FF5C00] shadow-lg' : 'ring-1 ring-black/30'}`}
-                    style={{
-                      background: 'linear-gradient(180deg, #c2410c, #9a3412)'
-                    }}
-                    onClick={() => dispatch({ type: 'select-background' })}
-                  >
-                    <span className="truncate text-[11px] font-bold text-white flex items-center gap-1.5">
-                      🎬 {bgLabel}
-                    </span>
-                    {isVideoBg && bg.clipOut != null && (
-                      <span className="shrink-0 font-mono text-[10px] font-bold text-orange-200 bg-black/30 px-2 py-0.5 rounded-md">
-                        {formatSecondsToTimecode(Number(bg.clipOut) - (Number(bg.clipIn) || 0))}
-                      </span>
-                    )}
-                  </button>
+                  {state.config.scenes.map((scene, index) => {
+                    const duration = Math.max(0.2, sceneDuration(scene));
+                    const source = scene.background?.image;
+                    const active = index === state.selectedSceneIndex;
+                    return (
+                      <button
+                        key={scene.id || index}
+                        type="button"
+                        draggable
+                        onDragStart={(event) => {
+                          sceneDragRef.current = index;
+                          event.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const fromIndex = sceneDragRef.current;
+                          sceneDragRef.current = null;
+                          if (Number.isInteger(fromIndex)) dispatch({ type: 'reorder-scene', fromIndex, toIndex: index });
+                        }}
+                        onDragEnd={() => { sceneDragRef.current = null; }}
+                        onClick={() => dispatch({ type: 'ui', patch: { selectedSceneIndex: index, selectedLayerIndex: 0, selectedTarget: 'background', isPlaying: false, currentTime: scene.start } })}
+                        className={`clip-bar top-0.5 bottom-0.5 cursor-grab justify-between rounded-md px-2 text-left active:cursor-grabbing ${active ? 'ring-2 ring-[#FF5C00] shadow-lg z-10' : 'ring-1 ring-black/30 hover:brightness-110'}`}
+                        style={{
+                          left: `${(scene.start / totalDuration) * 100}%`,
+                          width: `${Math.max(3, (duration / totalDuration) * 100)}%`,
+                          background: active ? 'linear-gradient(180deg, #ea580c, #9a3412)' : 'linear-gradient(180deg, #7c2d12, #431407)',
+                        }}
+                        title="Click to edit · drag a clip onto another clip to reorder"
+                      >
+                        <span className="truncate text-[10px] font-bold text-white">🎬 {scene.name || (source ? 'Video clip' : 'Scene')}</span>
+                        <span className="ml-1 shrink-0 font-mono text-[9px] text-orange-100/80">{duration.toFixed(1)}s</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -3862,7 +3951,7 @@ export default function App() {
           <label className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white" title="Replace Video/Media">
             <Icon name="media" className="h-3.5 w-3.5 text-cyan-400" />
             <span>Replace</span>
-            <input className="hidden" type="file" accept="video/*,image/*,.mp4,.mov,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0]); e.target.value = ''; }} />
+            <input className="hidden" type="file" accept="video/*,image/*,.mp4,.mov,.webm" onChange={(e) => { handleOptionalClipUpload(e.target.files?.[0], 'replace'); e.target.value = ''; }} />
           </label>
           <span className="h-3.5 w-px bg-white/15" />
           <button
@@ -4096,6 +4185,10 @@ export default function App() {
             onMouseMove={handlePanMove}
             onMouseUp={handlePanEnd}
             onMouseLeave={handlePanEnd}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleCanvasDrop}
+            onPaste={handleCanvasPaste}
+            tabIndex={0}
           >
             {/* Floating Ratio Card (Top Left) */}
             <div className="absolute top-2 sm:top-4 left-2 sm:left-4 z-30">
