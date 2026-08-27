@@ -134,18 +134,51 @@ export async function handleFetchYoutube(req: VercelRequest, res: VercelResponse
       }
     }
 
-    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+    let embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+    let directStreamUrl: string | null = null;
+    let extractorSource = 'youtube-meta';
+
+    // Option 4: Query existing Render media-extractor microservice for direct stream extraction
+    const extractorBaseUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
+    const extractorSecret = process.env.EXTRACTOR_SECRET || '';
+
+    try {
+      const extRes = await fetch(`${extractorBaseUrl}/extract`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(extractorSecret ? { Authorization: `Bearer ${extractorSecret}` } : {})
+        },
+        body: JSON.stringify({ url: trimmedUrl }),
+        signal: AbortSignal.timeout(12000)
+      });
+      if (extRes.ok) {
+        const extData = await extRes.json();
+        if (extData.success && extData.video_url) {
+          directStreamUrl = extData.video_url;
+          extractorSource = 'render-extractor';
+          if (extData.title) title = extData.title;
+          if (extData.duration) duration = Number(extData.duration);
+          if (extData.image_url) thumbnail = extData.image_url;
+        }
+      }
+    } catch {
+      // ignore timeout or wakeup delay
+    }
+
     const jobId = `yt-${videoId}-${Date.now()}`;
 
     return res.status(200).json({
       jobId,
       stage: 'ready',
       percent: 100,
-      message: 'Video metadata ready',
+      message: directStreamUrl ? 'Direct video stream resolved!' : 'Video metadata ready',
       done: true,
       result: {
-        path: trimmedUrl,
-        streamUrl: embedUrl,
+        path: directStreamUrl || trimmedUrl,
+        streamUrl: directStreamUrl || embedUrl,
+        isDirectStream: Boolean(directStreamUrl),
+        extractorSource,
         videoId,
         title,
         duration,

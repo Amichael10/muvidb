@@ -2858,22 +2858,26 @@ export default function App() {
                   onClick={() => {
                     const url = youtubeUrl.trim();
                     if (!url) return;
-                    window.open(`https://www.slicetube.io/`, '_blank');
+                    const startSec = parseTimecodeToSeconds(youtubeStartTime) || 0;
+                    const endSec = parseTimecodeToSeconds(youtubeEndTime) || startSec + 30;
+                    window.open(`https://www.slicetube.io/?url=${encodeURIComponent(url)}&start=${startSec}&end=${endSec}`, '_blank');
                   }}
                   className="btn w-full bg-blue-600 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-500 flex items-center justify-center gap-1.5"
                 >
-                  <span>✂️ 1. SliceTube.io Trimmer (Fast)</span>
+                  <span>✂️ 1. SliceTube.io Trimmer ({youtubeStartTime} → {youtubeEndTime})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     const url = youtubeUrl.trim();
                     if (!url) return;
-                    window.open(`https://openreplay.com/tools/youtube-clipper/`, '_blank');
+                    const startSec = parseTimecodeToSeconds(youtubeStartTime) || 0;
+                    const endSec = parseTimecodeToSeconds(youtubeEndTime) || startSec + 30;
+                    window.open(`https://openreplay.com/tools/youtube-clipper/?url=${encodeURIComponent(url)}&start=${startSec}&end=${endSec}`, '_blank');
                   }}
                   className="btn w-full bg-indigo-600/90 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-600 flex items-center justify-center gap-1.5"
                 >
-                  <span>🎬 2. OpenReplay Clipper (Browser Record)</span>
+                  <span>🎬 2. OpenReplay Clipper ({youtubeStartTime} → {youtubeEndTime})</span>
                 </button>
                 <button
                   type="button"
@@ -2882,12 +2886,12 @@ export default function App() {
                     if (!url) return;
                     const target = url.includes('youtube.com')
                       ? url.replace(/youtube\.com/i, 'ssyoutube.com')
-                      : `https://en1.savefrom.net/#url=${encodeURIComponent(url)}`;
+                      : `https://en1.savefrom.net/1-youtube-video-downloader-4vA/?url=${encodeURIComponent(url)}`;
                     window.open(target, '_blank');
                   }}
                   className="btn w-full bg-emerald-700/80 py-1 text-[11px] font-medium text-white/90 shadow-sm hover:bg-emerald-600 flex items-center justify-center gap-1.5"
                 >
-                  <span>⬇️ 3. SaveFrom.net (Full 1080p Video)</span>
+                  <span>⬇️ 3. SaveFrom.net (Full High-Res Video)</span>
                 </button>
               </div>
             </div>
