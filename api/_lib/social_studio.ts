@@ -1825,6 +1825,7 @@ export async function attachCarouselAssets(
 export async function reorderCarouselAssets(
   input: {
     contentItemId: string;
+    variantId?: string;
     publicUrls?: string[];
     assets?: Array<{ url: string; mediaType?: 'image' | 'video'; altText?: string }>;
   },
