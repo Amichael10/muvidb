@@ -675,6 +675,32 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const runPublishNow = async contentItemId => {
+    setReviewingId(contentItemId);
+    try {
+      const schedRes = await fetch('/api/social?task=schedule', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId, scheduledFor: new Date().toISOString() }),
+      });
+      const schedData = await schedRes.json().catch(() => ({}));
+      if (!schedRes.ok) throw new Error(schedData.error || `HTTP ${schedRes.status}`);
+
+      const pubRes = await fetch('/api/social?task=publish_due', {
+        headers: await authHeaders(),
+      });
+      const pubData = await pubRes.json().catch(() => ({}));
+      if (!pubRes.ok) throw new Error(pubData.error || `HTTP ${pubRes.status}`);
+
+      toast.success('Publishing triggered!');
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to trigger publishing');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
   const openFullStudioEditor = async item => {
     setReviewingId(item.id);
     try {
@@ -1398,6 +1424,16 @@ export default function AdminSocialStudio() {
                           className="rounded border border-border bg-surface-2 px-2.5 py-1 text-xs font-bold text-text-primary hover:border-brand hover:text-brand disabled:opacity-50"
                         >
                           🕒 Tomorrow 6 PM
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => runPublishNow(item.id)}
+                          disabled={reviewingId === item.id}
+                          className="rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50 inline-flex items-center gap-1 shadow-xs"
+                          title="Trigger immediate publish for this post"
+                        >
+                          <Icon icon="solar:bolt-bold" width="13" />
+                          <span>Publish Now</span>
                         </button>
 
                         <div className="flex items-center gap-2 ml-auto">
