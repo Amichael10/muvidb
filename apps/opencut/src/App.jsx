@@ -1465,55 +1465,131 @@ function pickRecorderMimeType(withAudio = false) {
 }
 
 async function recordTimeline(config, cache, onProgress) {
-  const hasAudio = Boolean(config.audio?.source);
+  const scenes = config.scenes || [];
+  const duration = timelineDuration(config);
+  const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(config);
+
+  // Check if any scene has a video background or audio track
+  const hasVideoScenes = scenes.some((s) => isVideoPath(s.background?.image) || s.background?.mediaKind === 'video');
+  const hasAudioSource = Boolean(config.audio?.source);
+  const hasAudio = hasVideoScenes || hasAudioSource;
   const mimeType = pickRecorderMimeType(hasAudio);
   if (!mimeType) throw new Error('This browser does not support video recording. Try Chrome or Edge.');
 
-  const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(config);
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
-  const fps = Math.min(60, Math.max(10, Number(config.fps) || 30));
-  const duration = timelineDuration(config);
-  const frameState = {
-    config,
-    currentTime: 0,
-    selectedTarget: 'none',
-    selectedSceneIndex: -1,
-    selectedLayerIndex: -1,
-  };
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
-  // Warm caches so the recording does not open on a black frame
-  await paintPreview(canvas, frameState, cache);
+  const is4K = CANVAS_WIDTH >= 2160 || CANVAS_HEIGHT >= 2160;
+  const videoBitrate = is4K ? 28_000_000 : 12_000_000;
+  const fps = Math.min(60, Math.max(24, Number(config.fps) || 30));
 
+  // Initialize canvas stream
   const stream = canvas.captureStream(fps);
 
-  let audioElement = null;
+  // Set up Web Audio Context for mixing video sound and background music
   let audioContext = null;
-  if (hasAudio) {
-    audioElement = document.createElement('audio');
-    audioElement.src = resolveAssetPath(config.audio.source);
-    audioElement.loop = true;
-    await new Promise((resolve) => {
-      audioElement.oncanplaythrough = resolve;
-      audioElement.onerror = resolve;
-      audioElement.load();
-    });
-    try {
-      audioContext = new AudioContext();
-      const sourceNode = audioContext.createMediaElementSource(audioElement);
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = Math.min(1, Math.max(0, config.audio.volume ?? 1));
-      const destination = audioContext.createMediaStreamDestination();
-      sourceNode.connect(gainNode);
-      gainNode.connect(destination);
-      destination.stream.getAudioTracks().forEach((track) => stream.addTrack(track));
-    } catch {
-      audioElement = null;
+  let masterDestination = null;
+  const cleanupAudio = [];
+
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx && hasAudio) {
+      audioContext = new AudioCtx();
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      masterDestination = audioContext.createMediaStreamDestination();
+    }
+  } catch (err) {
+    console.warn('AudioContext init error:', err);
+  }
+
+  // Preload and connect video elements
+  const sceneVideoMap = new Map();
+  for (let i = 0; i < scenes.length; i += 1) {
+    const scene = scenes[i];
+    const source = scene.background?.image;
+    if (source && (isVideoPath(source) || scene.background?.mediaKind === 'video')) {
+      try {
+        const video = await loadVideo(cache, source);
+        if (video) {
+          sceneVideoMap.set(i, video);
+          const clipIn = Number(scene.background?.clipIn) || 0;
+          try { video.currentTime = clipIn; } catch { /* ignore */ }
+          video.muted = false;
+          video.volume = Math.max(0, Math.min(1, scene.background?.volume ?? 1.0));
+
+          if (audioContext && masterDestination && !scene.background?.muted) {
+            try {
+              let sourceNode = video.__studioSourceNode;
+              if (!sourceNode) {
+                sourceNode = audioContext.createMediaElementSource(video);
+                video.__studioSourceNode = sourceNode;
+              }
+              const gainNode = audioContext.createGain();
+              gainNode.gain.value = Math.max(0, Math.min(1, scene.background?.volume ?? 1.0));
+              sourceNode.connect(gainNode);
+              gainNode.connect(masterDestination);
+              cleanupAudio.push(() => {
+                try { gainNode.disconnect(); } catch { /* ignore */ }
+              });
+            } catch (audioErr) {
+              console.warn('Video audio routing notice:', audioErr);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to preload scene video:', err);
+      }
     }
   }
 
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 12_000_000 });
+  // Optional background audio track
+  let bgAudioElement = null;
+  if (hasAudioSource && audioContext && masterDestination) {
+    try {
+      bgAudioElement = document.createElement('audio');
+      bgAudioElement.src = resolveAssetPath(config.audio.source);
+      bgAudioElement.loop = true;
+      await new Promise((resolve) => {
+        bgAudioElement.oncanplaythrough = resolve;
+        bgAudioElement.onerror = resolve;
+        bgAudioElement.load();
+      });
+      const bgSourceNode = audioContext.createMediaElementSource(bgAudioElement);
+      const bgGain = audioContext.createGain();
+      bgGain.gain.value = Math.min(1, Math.max(0, config.audio.volume ?? 1));
+      bgSourceNode.connect(bgGain);
+      bgGain.connect(masterDestination);
+      cleanupAudio.push(() => {
+        try { bgGain.disconnect(); } catch { /* ignore */ }
+      });
+    } catch {
+      bgAudioElement = null;
+    }
+  }
+
+  // Add recorded audio tracks to the stream
+  if (masterDestination && masterDestination.stream.getAudioTracks().length > 0) {
+    masterDestination.stream.getAudioTracks().forEach((track) => {
+      stream.addTrack(track);
+    });
+  }
+
+  // Create MediaRecorder with both video and audio
+  const recorderOptions = {
+    mimeType,
+    videoBitsPerSecond: videoBitrate,
+  };
+  if (hasAudio) {
+    recorderOptions.audioBitsPerSecond = 192_000;
+  }
+
+  const recorder = new MediaRecorder(stream, recorderOptions);
   const chunks = [];
   recorder.ondataavailable = (event) => {
     if (event.data?.size) chunks.push(event.data);
@@ -1523,13 +1599,37 @@ async function recordTimeline(config, cache, onProgress) {
     recorder.onerror = (event) => reject(event.error || new Error('Recording failed.'));
   });
 
+  // Start recorder
   recorder.start(250);
-  if (audioElement) {
-    audioElement.currentTime = 0;
-    audioElement.play().catch(() => {});
+  if (bgAudioElement) {
+    bgAudioElement.currentTime = 0;
+    bgAudioElement.play().catch(() => {});
   }
+
+  // Start smooth real-time video playback and frame drawing
+  let activeSceneIdx = -1;
   const startedAt = performance.now();
-  let painting = false;
+
+  const playSceneVideo = (idx, localTime = 0) => {
+    if (activeSceneIdx === idx) return;
+    if (activeSceneIdx >= 0) {
+      const prevVideo = sceneVideoMap.get(activeSceneIdx);
+      if (prevVideo && !prevVideo.paused) prevVideo.pause();
+    }
+    activeSceneIdx = idx;
+    const nextVideo = sceneVideoMap.get(idx);
+    const nextScene = scenes[idx];
+    if (nextVideo && nextScene) {
+      const clipIn = Number(nextScene.background?.clipIn) || 0;
+      const target = clipIn + localTime;
+      try { nextVideo.currentTime = target; } catch { /* ignore */ }
+      nextVideo.muted = false;
+      nextVideo.volume = Math.max(0, Math.min(1, nextScene.background?.volume ?? 1.0));
+      nextVideo.play().catch(() => {});
+    }
+  };
+
+  // Render loop
   await new Promise((resolve) => {
     const tick = (now) => {
       const elapsed = (now - startedAt) / 1000;
@@ -1537,24 +1637,45 @@ async function recordTimeline(config, cache, onProgress) {
         resolve();
         return;
       }
-      if (!painting) {
-        painting = true;
-        frameState.currentTime = elapsed;
-        paintPreview(canvas, frameState, cache).finally(() => {
-          painting = false;
-        });
-        onProgress?.(elapsed, duration);
+
+      const currentScene = sceneAtTime(config, elapsed);
+      const sceneIndex = scenes.indexOf(currentScene);
+      if (sceneIndex >= 0) {
+        const localTime = Math.max(0, elapsed - (currentScene.start || 0));
+        playSceneVideo(sceneIndex, localTime);
       }
+
+      const stateObj = {
+        config,
+        currentTime: elapsed,
+        selectedTarget: 'none',
+        selectedSceneIndex: -1,
+        selectedLayerIndex: -1,
+        isPlaying: true,
+      };
+
+      paintPreview(canvas, stateObj, cache);
+      onProgress?.(elapsed, duration);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
 
+  // Stop all playback
+  sceneVideoMap.forEach((video) => {
+    if (!video.paused) video.pause();
+  });
+  if (bgAudioElement) bgAudioElement.pause();
+
   recorder.stop();
   await stopped;
-  if (audioElement) audioElement.pause();
-  if (audioContext) audioContext.close().catch(() => {});
+
+  cleanupAudio.forEach((fn) => fn());
+  if (audioContext && audioContext.state !== 'closed') {
+    audioContext.close().catch(() => {});
+  }
   stream.getTracks().forEach((track) => track.stop());
+
   return {
     blob: new Blob(chunks, { type: mimeType.split(';')[0] }),
     extension: mimeType.startsWith('video/mp4') ? 'mp4' : 'webm',
