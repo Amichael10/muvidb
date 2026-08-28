@@ -1456,15 +1456,23 @@ function activeBackgroundPath(state) {
   return scene?.background?.image ?? state.config.assets?.background ?? '';
 }
 
-function pickRecorderMimeType(withAudio = false) {
+function pickRecorderMimeType(withAudio = false, preferredFormat = 'webm') {
   if (typeof MediaRecorder === 'undefined') return '';
-  const candidates = withAudio
-    ? ['video/mp4;codecs=avc1.64002A,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm']
-    : ['video/mp4;codecs=avc1.64002A', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+  const webmCandidates = withAudio
+    ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+    : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const mp4Candidates = withAudio
+    ? ['video/mp4;codecs=avc1.64002A,mp4a.40.2', 'video/mp4']
+    : ['video/mp4;codecs=avc1.64002A', 'video/mp4'];
+
+  const candidateList = preferredFormat === 'mp4'
+    ? [...mp4Candidates, ...webmCandidates]
+    : [...webmCandidates, ...mp4Candidates];
+
+  return candidateList.find((type) => MediaRecorder.isTypeSupported(type)) || '';
 }
 
-async function recordTimeline(config, cache, onProgress) {
+async function recordTimeline(config, cache, onProgress, preferredFormat = 'webm') {
   const scenes = config.scenes || [];
   const duration = timelineDuration(config);
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = getCanvasSize(config);
@@ -1473,7 +1481,7 @@ async function recordTimeline(config, cache, onProgress) {
   const hasVideoScenes = scenes.some((s) => isVideoPath(s.background?.image) || s.background?.mediaKind === 'video');
   const hasAudioSource = Boolean(config.audio?.source);
   const hasAudio = hasVideoScenes || hasAudioSource;
-  const mimeType = pickRecorderMimeType(hasAudio);
+  const mimeType = pickRecorderMimeType(hasAudio, preferredFormat);
   if (!mimeType) throw new Error('This browser does not support video recording. Try Chrome or Edge.');
 
   const canvas = document.createElement('canvas');
