@@ -1083,6 +1083,10 @@ export default function AdminSocialStudio() {
                 const previewAsset = carouselPreviewUrl
                   ? { public_url: carouselPreviewUrl, format: 'carousel' }
                   : assets.find(asset => asset.id === selectedAssetId) || assets[0];
+                const isVideoAsset = previewAsset && (
+                  Boolean(previewAsset.format?.toLowerCase().includes('video')) ||
+                  /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(previewAsset.public_url || '')
+                );
                 const canChangeQueueItem = !['publishing', 'partially_published', 'published'].includes(item.status);
                 return (
                 <div
@@ -1093,11 +1097,30 @@ export default function AdminSocialStudio() {
                     <div className="flex shrink-0 items-start gap-4">
                       {previewAsset ? (
                         <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
-                          <img
-                            src={previewAsset.public_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
+                          {isVideoAsset ? (
+                            <>
+                              <video
+                                src={previewAsset.public_url}
+                                className="h-full w-full object-cover"
+                                muted
+                                playsInline
+                                preload="metadata"
+                                onMouseEnter={(e) => { try { e.target.play(); } catch {} }}
+                                onMouseLeave={(e) => { try { e.target.pause(); e.target.currentTime = 0; } catch {} }}
+                              />
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 group-hover:opacity-0 transition-opacity">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-[10px] text-white shadow">
+                                  ▶
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <img
+                              src={previewAsset.public_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          )}
                           <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
                             {previewAsset.format === 'custom_design' ? 'Custom Design' : previewAsset.format}
                           </span>
@@ -1124,7 +1147,7 @@ export default function AdminSocialStudio() {
                         <div className="mt-3 flex items-center gap-2">
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,video/*,.mp4,.webm,.mov"
                             ref={el => (fileInputRefs.current[item.id] = el)}
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
