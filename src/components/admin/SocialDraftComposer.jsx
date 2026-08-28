@@ -898,6 +898,43 @@ export default function SocialDraftComposer({
     }
   };
 
+  const handleSelectAssetForActivePlatform = async (asset) => {
+    if (!activeVariant?.id) return;
+    const targetVariantId = uploadScope === 'active' ? activeVariant.id : undefined;
+
+    setResult(curr => ({
+      ...curr,
+      variants: (curr?.variants || []).map(v => (!targetVariantId || v.id === targetVariantId)
+        ? {
+            ...v,
+            selected_asset_id: asset.id,
+            platform_options: {
+              ...(v.platform_options || {}),
+              asset_format: asset.format || 'square_1_1',
+              post_format: 'single',
+              carousel_assets: [],
+              carousel_asset_urls: [],
+            },
+          }
+        : v),
+    }));
+
+    try {
+      await fetch('/api/social?task=update_variant_asset', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variantId: activeVariant.id,
+          selectedAssetId: asset.id,
+          format: asset.format || 'square_1_1',
+        }),
+      });
+      toast.success(`Assigned ${asset.mediaType === 'video' ? 'video' : 'artwork'} to ${uploadScope === 'active' ? activePlatform.label : 'all channels'}`);
+    } catch (err) {
+      console.warn('Failed to assign asset:', err.message);
+    }
+  };
+
   const activeMentions = activeVariant?.mentions || activeVariant?.platform_options?.mentions || [];
 
   const handleAddTag = async (tagText) => {
@@ -1490,6 +1527,63 @@ export default function SocialDraftComposer({
                         {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
                       </span>
                     </div>
+
+                    {/* Media Library Selector Strip for Active Platform */}
+                    {result.assets?.length > 1 && (
+                      <div className="rounded-xl border border-border bg-surface p-3 space-y-2 shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Icon icon="solar:gallery-favourite-bold" className="text-brand" width="16" />
+                            <span className="text-[11px] font-black uppercase tracking-wider text-text-primary">
+                              Available Media for this Draft ({result.assets.length} items)
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-text-muted">
+                            Click any item to assign to <strong className="text-brand">{activePlatform.label}</strong>
+                          </span>
+                        </div>
+
+                        <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
+                          {result.assets.map((asset, idx) => {
+                            const isSelected = activeVariant?.selected_asset_id === asset.id || (!activeVariant?.selected_asset_id && idx === 0);
+                            const isVid = asset.mediaType === 'video' || asset.format === 'custom_video' || asset.format === 'video_vertical_9_16';
+                            return (
+                              <button
+                                key={asset.id || idx}
+                                type="button"
+                                onClick={() => handleSelectAssetForActivePlatform(asset)}
+                                title={`Use this ${isVid ? 'video' : 'image'} for ${activePlatform.label}`}
+                                className={`relative group shrink-0 rounded-lg overflow-hidden border-2 transition-all text-left ${
+                                  isSelected && activeVariantPostFormat !== 'carousel'
+                                    ? 'border-brand ring-2 ring-brand/30 shadow-md scale-[1.02]'
+                                    : 'border-border bg-black hover:border-brand/50 opacity-70 hover:opacity-100'
+                                }`}
+                                style={{ width: '88px', height: '88px' }}
+                              >
+                                {isVid ? (
+                                  <video src={asset.publicUrl} muted className="h-full w-full object-cover" />
+                                ) : (
+                                  <img src={asset.publicUrl} alt="Asset thumbnail" className="h-full w-full object-cover" />
+                                )}
+
+                                {/* Asset Format Badge */}
+                                <span className="absolute top-1 left-1 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+                                  {isVid ? 'Video' : asset.format?.replace(/_/g, ' ') || 'Image'}
+                                </span>
+
+                                {/* Active Selection Checkmark Overlay */}
+                                {isSelected && activeVariantPostFormat !== 'carousel' && (
+                                  <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5">
+                                    <Icon icon="solar:check-circle-bold" width="10" />
+                                    <span>Active for {activePlatform.label}</span>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     {/* CapCut-Style Social Canvas Viewport */}
                     <SocialCanvasViewport
