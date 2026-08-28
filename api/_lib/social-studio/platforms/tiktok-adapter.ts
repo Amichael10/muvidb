@@ -118,15 +118,8 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       brand_organic_toggle: Boolean(settings.brand_organic_toggle),
     };
 
-    const proxyUrl = (url: string) => {
-      if (url.startsWith('https://pkenrmorywmuvnzfoylp.supabase.co/')) {
-        return `https://muvidb.com/api/social?task=asset&url=${encodeURIComponent(url)}`;
-      }
-      return url;
-    };
-
-    const targetMediaUrls = mediaUrls.map(proxyUrl);
-    const targetAssetUrl = proxyUrl(request.assetUrl);
+    const targetMediaUrls = mediaUrls;
+    const targetAssetUrl = request.assetUrl;
 
     // 1. Direct Video Publish / Upload
     if (isVideo) {
