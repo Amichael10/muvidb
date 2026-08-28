@@ -236,6 +236,7 @@ export default function SocialDraftComposer({
   const [viewLayout, setViewLayout] = useState('split'); // 'split' | 'canvas_focus' | 'caption_focus'
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
   const [canvasAspectRatio, setCanvasAspectRatio] = useState('1:1');
+  const [newTagInput, setNewTagInput] = useState('');
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
 
@@ -803,6 +804,81 @@ export default function SocialDraftComposer({
     } catch (err) {
       console.warn('Failed to update aspect ratio on variant:', err.message);
     }
+  };
+
+  const activeMentions = activeVariant?.mentions || activeVariant?.platform_options?.mentions || [];
+
+  const handleAddTag = async (tagText) => {
+    let clean = String(tagText || newTagInput || '').trim();
+    if (!clean) return;
+    if (!clean.startsWith('@')) clean = '@' + clean;
+    clean = clean.replace(/[^a-zA-Z0-9_@.]/g, '');
+    if (!clean || clean === '@') return;
+    if (activeMentions.includes(clean)) {
+      setNewTagInput('');
+      return;
+    }
+    const nextMentions = [...activeMentions, clean];
+    setNewTagInput('');
+
+    setResult(curr => ({
+      ...curr,
+      variants: (curr?.variants || []).map(v => v.id === activeVariant.id
+        ? {
+            ...v,
+            mentions: nextMentions,
+            platform_options: { ...(v.platform_options || {}), mentions: nextMentions },
+          }
+        : v),
+    }));
+
+    try {
+      await fetch('/api/social?task=update_variant_options', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variantId: activeVariant.id,
+          options: { ...(activeVariant.platform_options || {}), mentions: nextMentions },
+        }),
+      });
+      toast.success(`Tagged ${clean}`);
+    } catch (err) {
+      console.warn('Could not save tags:', err.message);
+    }
+  };
+
+  const handleRemoveTag = async (tagToRemove) => {
+    const nextMentions = activeMentions.filter(t => t !== tagToRemove);
+    setResult(curr => ({
+      ...curr,
+      variants: (curr?.variants || []).map(v => v.id === activeVariant.id
+        ? {
+            ...v,
+            mentions: nextMentions,
+            platform_options: { ...(v.platform_options || {}), mentions: nextMentions },
+          }
+        : v),
+    }));
+
+    try {
+      await fetch('/api/social?task=update_variant_options', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variantId: activeVariant.id,
+          options: { ...(activeVariant.platform_options || {}), mentions: nextMentions },
+        }),
+      });
+    } catch (err) {
+      console.warn('Could not remove tag:', err.message);
+    }
+  };
+
+  const handleInsertTagToCaption = (tag) => {
+    const current = activeCaption;
+    const updated = current.includes(tag) ? current : `${current} ${tag}`.trim();
+    setCaptionDrafts(curr => ({ ...curr, [activeVariant.id]: updated }));
+    toast.success(`Added ${tag} to caption`);
   };
 
   return (
@@ -1500,6 +1576,110 @@ export default function SocialDraftComposer({
                         {activeVariant.hashtags.slice(0, 3).map(tag => `#${tag}`).join(' ')}
                       </p>
                     )}
+                  </div>
+
+                  {/* Tagged Accounts & Collaborators (@mentions) */}
+                  <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                          <Icon icon="solar:user-speak-bold" width="16" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wider text-text-primary">
+                            Tagged Accounts & Collaborators
+                          </p>
+                          <p className="text-[10px] text-text-muted">
+                            Tag profiles, actors, or brand partners on {activePlatform.label}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-mono font-bold text-text-muted">
+                        {activeMentions.length} tagged
+                      </span>
+                    </div>
+
+                    {/* Tag Pills */}
+                    {activeMentions.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {activeMentions.map(tag => (
+                          <div
+                            key={tag}
+                            className="group flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 pl-2.5 pr-1 py-1 text-xs font-bold text-brand shadow-xs"
+                          >
+                            <span>{tag}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleInsertTagToCaption(tag)}
+                              title="Add to caption"
+                              className="rounded-full p-0.5 hover:bg-brand/20 text-brand text-[10px]"
+                            >
+                              <Icon icon="solar:add-circle-linear" width="13" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTag(tag)}
+                              title="Remove tag"
+                              className="rounded-full p-0.5 hover:bg-red-500/20 text-text-muted hover:text-red-400"
+                            >
+                              <Icon icon="solar:close-circle-bold" width="13" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add Tag Input */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={newTagInput}
+                          onChange={e => setNewTagInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                          }}
+                          placeholder={`Add account handle, e.g. @frameshot, @muvidb_`}
+                          className="h-9 w-full rounded-lg border border-border bg-surface-2 pl-3 pr-8 text-xs text-text-primary outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                        />
+                        {newTagInput && (
+                          <button
+                            type="button"
+                            onClick={() => setNewTagInput('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                          >
+                            <Icon icon="solar:close-circle-bold" width="14" />
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddTag()}
+                        disabled={!newTagInput.trim()}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-surface-2 px-3 text-xs font-bold text-text-primary hover:bg-brand hover:text-white border border-border hover:border-brand transition-all disabled:opacity-40 disabled:pointer-events-none"
+                      >
+                        <Icon icon="solar:add-square-linear" width="15" />
+                        <span>Tag</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Suggestion Pills */}
+                    <div className="flex items-center gap-1.5 pt-0.5 overflow-x-auto text-[10px] text-text-muted">
+                      <span className="shrink-0 font-semibold">Quick tag:</span>
+                      {['@muvidb_', '@frameshot', selected?.name ? `@${selected.name.toLowerCase().replace(/[^a-z0-9]/g, '')}` : null].filter(Boolean).map(sug => (
+                        <button
+                          key={sug}
+                          type="button"
+                          onClick={() => handleAddTag(sug)}
+                          className="shrink-0 rounded-md border border-border bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-text-primary hover:border-brand hover:text-brand transition-colors"
+                        >
+                          +{sug}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {activeVariant?.platform === 'tiktok' && (
