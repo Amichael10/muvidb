@@ -206,6 +206,8 @@ function readableNetworkError(error, action) {
 export default function SocialDraftComposer({
   disabled,
   onGenerated,
+  initialDraft = null,
+  onClearDraft = null,
   selectedThemeId = 'actor_spotlight',
   slotContext = null,
   onClearSlot = null,
@@ -317,7 +319,67 @@ export default function SocialDraftComposer({
   const activeTheme = useMemo(() => EDITORIAL_THEMES.find(t => t.id === themeId) || EDITORIAL_THEMES[0], [themeId]);
   const carouselLimit = carouselLimitFor(platforms);
 
+  // Load draft when opened for editing from the Queue / Calendar
   useEffect(() => {
+    if (!initialDraft) return;
+    const variants = initialDraft.social_platform_variants || initialDraft.variants || [];
+    const rawAssets = initialDraft.social_assets || initialDraft.assets || [];
+    const normalizedAssets = rawAssets.map(a => ({
+      id: a.id,
+      publicUrl: a.public_url || a.publicUrl,
+      format: a.format,
+      mediaType: a.format?.includes('video') || a.media_type === 'video' ? 'video' : 'image',
+      width: a.width || 1080,
+      height: a.height || 1080,
+    }));
+
+    const activeVariantsList = variants.map(v => ({
+      ...v,
+      platform_options: v.platform_options || {},
+      hashtags: v.hashtags || [],
+    }));
+
+    const composerResult = {
+      contentItem: initialDraft,
+      variants: activeVariantsList,
+      assets: normalizedAssets,
+    };
+
+    setResult(composerResult);
+    setCaptionDrafts(Object.fromEntries(activeVariantsList.map(v => [v.id, v.caption || ''])));
+
+    const firstVariant = activeVariantsList[0];
+    if (firstVariant) {
+      setActivePreviewPlatform(firstVariant.platform);
+      const format = firstVariant.platform_options?.post_format || 'single';
+      setPostFormat(format);
+      setCarouselAssets(firstVariant.platform_options?.carousel_assets || []);
+    }
+
+    setPlatforms(activeVariantsList.map(v => v.platform));
+    setStep1Open(false);
+    setStep2Open(false);
+    setStep3Open(true);
+  }, [initialDraft]);
+
+  const handleResetComposer = () => {
+    setResult(null);
+    setSelected(null);
+    setResults([]);
+    setQuery('');
+    setCaptionDrafts({});
+    setPostFormat('single');
+    setCarouselAssets([]);
+    setStep1Open(true);
+    setStep2Open(true);
+    setStep3Open(true);
+    onClearDraft?.();
+    onClearSlot?.();
+    toast.success('Composer reset. Ready for a new post.');
+  };
+
+  useEffect(() => {
+    if (initialDraft) return; // preserve draft if editing
     setSelected(null);
     setResults([]);
     setQuery('');
@@ -665,7 +727,7 @@ export default function SocialDraftComposer({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       toast.success(`Post scheduled for ${targetDate.toLocaleString()}!`);
-      onGenerated?.(result);
+      onGenerated?.(result, { action: 'scheduled' });
     } catch (err) {
       toast.error(readableNetworkError(err, 'scheduling this post'), { duration: 7000 });
     } finally {
@@ -735,7 +797,7 @@ export default function SocialDraftComposer({
   const removeCarouselSlide = async index => {
     const list = activeVariantCarouselAssets.length > 0 ? activeVariantCarouselAssets : carouselAssets;
     if (list.length <= 2) {
-      toast.error('A carousel must keep at least 2 items. Replace this item or switch to a single post.');
+      toast.error('A carousel must keep at least 2 items. Switch to Single post or add another item first.');
       return;
     }
     const removed = list[index];
@@ -1404,16 +1466,55 @@ export default function SocialDraftComposer({
         {/* GENERATED DRAFT WORKSPACE */}
         {result && (
           <div className="mt-8 rounded-lg border border-brand/30 bg-surface-2 p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icon icon="solar:check-circle-bold" className="text-emerald-400" width="20" />
-                <h3 className="text-sm font-black uppercase tracking-widest text-text-primary">
-                  Draft Created: {result.contentItem?.title}
-                </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${initialDraft ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                  <Icon icon={initialDraft ? 'solar:pen-new-square-bold' : 'solar:check-circle-bold'} width="18" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-text-primary">
+                      {initialDraft ? 'Editing Scheduled Post' : 'Draft Created'}: {result.contentItem?.title}
+                    </h3>
+                    <span className={`rounded px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                      initialDraft ? 'bg-amber-500/15 text-amber-400' : 'bg-brand/15 text-brand'
+                    }`}>
+                      {initialDraft ? (result.contentItem?.status || 'Draft') : 'Ready for Scheduling'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-muted">
+                    {initialDraft
+                      ? 'Full Studio editing mode: change visuals, format ratios, video clips, and copy.'
+                      : 'Polish your visual canvas and edit platform copy before scheduling.'}
+                  </p>
+                </div>
               </div>
-              <span className="rounded bg-brand/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
-                Ready For Review & Scheduling
-              </span>
+
+              {/* Action buttons: Reset or Return to Queue */}
+              <div className="flex items-center gap-2">
+                {initialDraft && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClearDraft?.();
+                      onGenerated?.(result, { action: 'scheduled' });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary hover:border-brand transition-all"
+                  >
+                    <Icon icon="solar:arrow-left-linear" width="14" />
+                    <span>Back to Queue</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleResetComposer}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-brand hover:border-brand/50 transition-all shadow-2xs"
+                  title="Clear composer and start a fresh post"
+                >
+                  <Icon icon="solar:restart-linear" width="14" />
+                  <span>+ Create Fresh Post</span>
+                </button>
+              </div>
             </div>
 
             <div className="mt-6 space-y-5">

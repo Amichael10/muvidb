@@ -237,6 +237,7 @@ export default function AdminSocialStudio() {
   const [draftsError, setDraftsError] = useState('');
   const [reviewingId, setReviewingId] = useState(null);
   const [scheduleAt, setScheduleAt] = useState({});
+  const [editingDraft, setEditingDraft] = useState(null);
   const [editingQueueItem, setEditingQueueItem] = useState(null);
   const [queueEditTitle, setQueueEditTitle] = useState('');
   const [queueEditCaptions, setQueueEditCaptions] = useState({});
@@ -674,6 +675,28 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const openFullStudioEditor = async item => {
+    setReviewingId(item.id);
+    try {
+      if (item.status === 'scheduled') {
+        const res = await fetch('/api/social?task=prepare_queue_item_edit', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentItemId: item.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setEditingDraft(item);
+      setActiveTab('composer');
+      toast.success(`Opening "${item.title || 'Post'}" in Full Studio`);
+    } catch (err) {
+      toast.error(err.message || 'Could not open post in Studio');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
   const openQueueEditor = async item => {
     setReviewingId(item.id);
     try {
@@ -911,10 +934,18 @@ export default function AdminSocialStudio() {
       {activeTab === 'composer' && (
         <SocialDraftComposer
           disabled={!summary.enabled}
+          initialDraft={editingDraft}
+          onClearDraft={() => setEditingDraft(null)}
           selectedThemeId={selectedThemeId}
           slotContext={slotContext}
           onClearSlot={() => setSlotContext(null)}
-          onGenerated={refreshAll}
+          onGenerated={async (res, meta) => {
+            await refreshAll();
+            if (meta?.action === 'scheduled' || meta?.action === 'published') {
+              setActiveTab('drafts');
+              setEditingDraft(null);
+            }
+          }}
         />
       )}
 
@@ -1285,12 +1316,12 @@ export default function AdminSocialStudio() {
                         <>
                           <button
                             type="button"
-                            onClick={() => openQueueEditor(item)}
+                            onClick={() => openFullStudioEditor(item)}
                             disabled={reviewingId === item.id}
                             className="inline-flex items-center gap-1.5 rounded-md border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-bold text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
                           >
                             <Icon icon="solar:pen-new-square-linear" width="14" />
-                            Edit
+                            Studio Edit
                           </button>
                           <button
                             type="button"
