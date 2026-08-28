@@ -1753,6 +1753,10 @@ export async function attachCarouselAssets(
     throw httpError(400, `${platforms.join(', ')} supports at most ${maxItems} items for this carousel`);
   }
 
+  const previousUrls = Array.isArray(variants[0]?.platform_options?.carousel_asset_urls)
+    ? variants[0].platform_options.carousel_asset_urls.filter((url: unknown) => typeof url === 'string')
+    : [];
+
   for (const variant of variants) {
     const { error: updateError } = await supabase
       .from('social_platform_variants')
