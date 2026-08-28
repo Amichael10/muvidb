@@ -82,6 +82,54 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
     return payload;
   }
 
+  private async get(path: string, params: Record<string, string>): Promise<Record<string, any>> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    url.searchParams.set('access_token', this.accessToken);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url.toString(), { signal: AbortSignal.timeout(15_000) });
+    } catch (error: any) {
+      throw new SocialPlatformError({
+        platform: 'threads',
+        code: 'threads_network_error',
+        message: 'Threads Graph API could not be reached.',
+        retryable: true,
+        details: { cause: error?.message || 'network_error' },
+      });
+    }
+
+    const payload = (await response.json().catch(() => ({}))) as ThreadsApiError & Record<string, any>;
+    if (!response.ok || payload.error) {
+      throw errorFromResponse(response.status, payload, 'Threads request failed.');
+    }
+    return payload;
+  }
+
+  private async waitForContainer(containerId: string): Promise<void> {
+    const maxAttempts = 30; // up to 60 seconds for video container processing
+    const pollIntervalMs = 2000;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const statusData = await this.get(`/${encodeURIComponent(containerId)}`, {
+        fields: 'status_code,error_message',
+      });
+      const statusCode = statusData.status_code;
+
+      if (statusCode === 'FINISHED') return;
+      if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
+        throw new SocialPlatformError({
+          platform: 'threads',
+          code: `threads_media_${String(statusCode).toLowerCase()}`,
+          message: statusData.error_message || `Threads media container failed with status: ${statusCode}`,
+          details: { statusCode, error_message: statusData.error_message },
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+  }
+
   private async permalink(postId: string): Promise<string | null> {
     const url = new URL(`${this.baseUrl}/${encodeURIComponent(postId)}`);
     url.searchParams.set('fields', 'id,permalink');
@@ -117,13 +165,15 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
     }
 
     let create: URLSearchParams;
+    let isVideoPublish = false;
+
     if (mediaUrls.length > 1) {
       const childIds: string[] = [];
       const carouselAssets = Array.isArray(request.options?.carousel_assets)
         ? request.options.carousel_assets as Array<{ url?: string; alt_text?: string }>
         : [];
       for (const [index, mediaUrl] of mediaUrls.entries()) {
-        const childIsVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(mediaUrl);
+        const childIsVideo = /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(mediaUrl);
         const child = new URLSearchParams({
           access_token: this.accessToken,
           media_type: childIsVideo ? 'VIDEO' : 'IMAGE',
@@ -141,6 +191,9 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
             retryable: true,
           });
         }
+        if (childIsVideo) {
+          await this.waitForContainer(String(childContainer.id));
+        }
         childIds.push(String(childContainer.id));
       }
       create = new URLSearchParams({
@@ -149,8 +202,10 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
         children: childIds.join(','),
         text: request.caption,
       });
+      isVideoPublish = true;
     } else {
-      const singleIsVideo = /\.(mp4|mov)(\?.*)?$/i.test(mediaUrls[0] || '');
+      const singleIsVideo = /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(mediaUrls[0] || '');
+      isVideoPublish = singleIsVideo;
       create = new URLSearchParams({
         access_token: this.accessToken,
         media_type: mediaUrls.length ? (singleIsVideo ? 'VIDEO' : 'IMAGE') : 'TEXT',
@@ -167,6 +222,11 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
         message: 'Threads accepted the media but did not return a container ID.',
         retryable: true,
       });
+    }
+
+    // Wait for the container to finish processing before publishing (essential for videos and carousels)
+    if (isVideoPublish) {
+      await this.waitForContainer(String(container.id));
     }
 
     let published: Record<string, any>;
