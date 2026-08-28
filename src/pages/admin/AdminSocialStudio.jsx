@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
 import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
-import { uploadAdminSocialImage } from '../../lib/imageUpload';
+import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
 import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
 import SocialIntakeInbox from '../../components/admin/SocialIntakeInbox';
@@ -429,7 +429,7 @@ export default function AdminSocialStudio() {
           content_type,
           created_at,
           rejection_reason,
-          social_platform_variants(id,platform,status,caption,title,hashtags,selected_asset_id,platform_options,scheduled_for,published_at),
+          social_platform_variants(id,platform,status,caption,title,hashtags,selected_asset_id,platform_options,scheduled_for,published_at,last_error_code,last_error_message),
           social_assets(id,public_url,format,width,height)
         `)
         .order('created_at', { ascending: false })
@@ -1221,8 +1221,8 @@ export default function AdminSocialStudio() {
                               if (!file) return;
                               setUploadingAssetId(item.id);
                               try {
-                                const upload = await uploadAdminSocialImage(file, 'social-published-assets');
-                                if (upload.error || !upload.url) throw new Error(upload.error || 'The uploaded image has no public URL');
+                                const upload = await uploadAdminSocialMedia(file, 'social-published-assets');
+                                if (upload.error || !upload.url) throw new Error(upload.error || 'The uploaded media has no public URL');
                                 const publicUrl = upload.url;
                                 const res = await fetch('/api/social?task=attach_custom_asset', {
                                   method: 'POST',
@@ -1386,6 +1386,21 @@ export default function AdminSocialStudio() {
                           </button>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Error details if failed */}
+                  {variants.some(v => v.last_error_message) && (
+                    <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Icon icon="solar:danger-triangle-bold" width="14" className="text-red-400" />
+                        <span>Publishing Error Details:</span>
+                      </div>
+                      {variants.filter(v => v.last_error_message).map(v => (
+                        <div key={v.id} className="text-[11px] font-mono pl-5">
+                          <strong className="uppercase text-red-300">[{v.platform}]:</strong> {v.last_error_message}
+                        </div>
+                      ))}
                     </div>
                   )}
 

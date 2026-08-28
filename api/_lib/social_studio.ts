@@ -97,8 +97,14 @@ export async function requireSocialStudioAdmin(req: VercelRequest): Promise<Soci
 }
 
 export async function requireSocialPublisherAuth(req: VercelRequest): Promise<void> {
-  const auth = await isValidAuth(req);
-  if (!auth.valid) throw httpError(401, auth.reason || 'Unauthorized');
+  const cronAuth = await isValidAuth(req);
+  if (cronAuth.valid) return;
+  try {
+    await requireSocialStudioAdmin(req);
+    return;
+  } catch {
+    throw httpError(401, cronAuth.reason || 'Unauthorized');
+  }
 }
 
 async function countRows(table: string, filters?: (query: any) => any): Promise<number> {
