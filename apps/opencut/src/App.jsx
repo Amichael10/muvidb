@@ -130,7 +130,7 @@ const initialState = {
   config: initialConfig,
   selectedSceneIndex: 0,
   selectedLayerIndex: 0,
-  selectedTarget: 'scene',
+  selectedTarget: 'none',
   currentTime: 0,
   isPlaying: false,
   past: [],
@@ -2010,6 +2010,22 @@ export default function App() {
   const [isPanMode, setIsPanMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0 });
+  const [studioTheme, setStudioTheme] = useState(() => {
+    try {
+      return localStorage.getItem('muvidb_studio_theme') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('muvidb_studio_theme', studioTheme);
+      document.documentElement.classList.toggle('light-theme', studioTheme === 'light');
+    } catch {
+      // ignore
+    }
+  }, [studioTheme]);
   const [clipDraft, setClipDraft] = useState(null);
   const [clipStatus, setClipStatus] = useState('');
   const [clipBusy, setClipBusy] = useState(false);
@@ -2297,6 +2313,10 @@ export default function App() {
       if (key === 's') handleSplitScene();
       if (key === 'd') handleDuplicate();
       if (key === 'delete' || key === 'backspace') handleDelete();
+      if (event.key === 'Escape') {
+        dispatch({ type: 'ui', patch: { selectedTarget: 'none' } });
+        setRatioMenuOpen(false);
+      }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -4746,9 +4766,12 @@ export default function App() {
   }
 
   function renderEditToolbar() {
-    if (!selectedScene || (!selectedScene.background?.image && !selectedLayer)) return null;
+    if (state.selectedTarget === 'none' || !selectedScene) return null;
+    const isLayer = state.selectedTarget === 'layer' && Boolean(selectedLayer);
+    const isBg = state.selectedTarget === 'background' && Boolean(selectedScene.background?.image || selectedScene.background?.color);
+    if (!isLayer && !isBg) return null;
     return (
-      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center">
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center animate-in fade-in slide-in-from-top-2 duration-150">
         <div className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/10 bg-[#16181c]/95 px-2 py-1.5 shadow-2xl backdrop-blur">
           <label className="flex cursor-pointer items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white" title="Replace Video/Media">
             <Icon name="media" className="h-3.5 w-3.5 text-cyan-400" />
@@ -4824,7 +4847,7 @@ export default function App() {
   const isCanvasEmpty = !selectedScene || (!selectedScene.background?.image && (selectedScene.layers || []).length === 0);
 
   return (
-    <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-muvi-bg text-[13px]">
+    <div className={`flex h-[100dvh] min-h-0 flex-col overflow-hidden text-[13px] transition-colors duration-200 ${studioTheme === 'light' ? 'light-mode bg-[#f3f4f6] text-[#0f172a]' : 'bg-muvi-bg text-white'}`}>
       {/* Global Video Import / Uploading Progress Modal */}
       {clipBusy && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
@@ -4893,6 +4916,17 @@ export default function App() {
           <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
           <button className="btn-ghost p-1 sm:p-1.5" title="Undo (Ctrl+Z)" disabled={!state.past.length} onClick={() => dispatch({ type: 'undo' })}><Icon name="undo" className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
           <button className="btn-ghost p-1 sm:p-1.5" title="Redo (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
+          <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
+          
+          {/* Light / Dark Mode Toggle Button */}
+          <button
+            type="button"
+            className="btn-ghost p-1 sm:p-1.5 flex items-center justify-center text-sm"
+            title={studioTheme === 'light' ? 'Switch to Dark theme' : 'Switch to Light theme'}
+            onClick={() => setStudioTheme(prev => prev === 'light' ? 'dark' : 'light')}
+          >
+            <span>{studioTheme === 'light' ? '🌙' : '☀️'}</span>
+          </button>
           <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
           
           {/* Sidebars Toggle Buttons */}
@@ -4990,6 +5024,12 @@ export default function App() {
             onMouseMove={handlePanMove}
             onMouseUp={handlePanEnd}
             onMouseLeave={handlePanEnd}
+            onPointerDown={(event) => {
+              if (event.target === event.currentTarget) {
+                dispatch({ type: 'ui', patch: { selectedTarget: 'none' } });
+                setRatioMenuOpen(false);
+              }
+            }}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleCanvasDrop}
             onPaste={handleCanvasPaste}
