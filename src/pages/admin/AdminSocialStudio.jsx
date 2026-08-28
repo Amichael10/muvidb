@@ -97,6 +97,111 @@ function asRelationArray(value) {
   return [];
 }
 
+function extractYouTubeId(url) {
+  if (!url || typeof url !== 'string') return null;
+  if (url.includes('youtube.com/embed/')) {
+    return url.split('youtube.com/embed/')[1]?.split('?')[0];
+  }
+  if (url.includes('youtube.com/watch')) {
+    try {
+      return new URL(url).searchParams.get('v');
+    } catch {
+      return null;
+    }
+  }
+  if (url.includes('youtu.be/')) {
+    return url.split('youtu.be/')[1]?.split('?')[0];
+  }
+  return null;
+}
+
+function SocialAssetThumbnail({ asset }) {
+  const [loadFailed, setLoadFailed] = useState(false);
+  if (!asset?.public_url || loadFailed) {
+    return (
+      <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-surface-2 text-text-muted">
+        <Icon icon="solar:gallery-linear" width="28" />
+      </div>
+    );
+  }
+
+  const publicUrl = asset.public_url;
+  const ytId = extractYouTubeId(publicUrl);
+  const isDirectVideo = !ytId && (
+    Boolean(asset.format?.toLowerCase().includes('video')) ||
+    /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(publicUrl)
+  );
+
+  const formatLabel = {
+    video_vertical_9_16: 'Vertical Video',
+    custom_video: 'Video',
+    custom_design: 'Custom',
+    square_1_1: 'Square 1:1',
+    portrait_4_5: 'Portrait 4:5',
+    carousel: 'Carousel',
+  }[asset.format] || (asset.format ? asset.format.replace(/_/g, ' ') : 'Media');
+
+  if (ytId) {
+    return (
+      <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
+        <img
+          src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setLoadFailed(true)}
+        />
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 group-hover:bg-black/20 transition-all">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-[10px] text-white shadow">
+            ▶
+          </span>
+        </div>
+        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+          YouTube
+        </span>
+      </div>
+    );
+  }
+
+  if (isDirectVideo) {
+    return (
+      <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
+        <video
+          src={publicUrl}
+          className="h-full w-full object-cover"
+          muted
+          playsInline
+          preload="metadata"
+          onError={() => setLoadFailed(true)}
+          onMouseEnter={(e) => { try { e.target.play(); } catch {} }}
+          onMouseLeave={(e) => { try { e.target.pause(); e.target.currentTime = 0; } catch {} }}
+        />
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 group-hover:opacity-0 transition-opacity">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-[10px] text-white shadow">
+            ▶
+          </span>
+        </div>
+        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+          {formatLabel}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
+      <img
+        src={publicUrl}
+        alt=""
+        className="h-full w-full object-cover"
+        onError={() => setLoadFailed(true)}
+      />
+      <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+        {formatLabel}
+      </span>
+    </div>
+  );
+}
+
 function getPlatformOptions(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return value;
   if (typeof value !== 'string') return {};
@@ -1083,10 +1188,6 @@ export default function AdminSocialStudio() {
                 const previewAsset = carouselPreviewUrl
                   ? { public_url: carouselPreviewUrl, format: 'carousel' }
                   : assets.find(asset => asset.id === selectedAssetId) || assets[0];
-                const isVideoAsset = previewAsset && (
-                  Boolean(previewAsset.format?.toLowerCase().includes('video')) ||
-                  /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(previewAsset.public_url || '')
-                );
                 const canChangeQueueItem = !['publishing', 'partially_published', 'published'].includes(item.status);
                 return (
                 <div
@@ -1095,41 +1196,7 @@ export default function AdminSocialStudio() {
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex shrink-0 items-start gap-4">
-                      {previewAsset ? (
-                        <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
-                          {isVideoAsset ? (
-                            <>
-                              <video
-                                src={previewAsset.public_url}
-                                className="h-full w-full object-cover"
-                                muted
-                                playsInline
-                                preload="metadata"
-                                onMouseEnter={(e) => { try { e.target.play(); } catch {} }}
-                                onMouseLeave={(e) => { try { e.target.pause(); e.target.currentTime = 0; } catch {} }}
-                              />
-                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 group-hover:opacity-0 transition-opacity">
-                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-[10px] text-white shadow">
-                                  ▶
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <img
-                              src={previewAsset.public_url}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          )}
-                          <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
-                            {previewAsset.format === 'custom_design' ? 'Custom Design' : previewAsset.format}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-surface-2 text-text-muted">
-                          <Icon icon="solar:gallery-linear" width="28" />
-                        </div>
-                      )}
+                      <SocialAssetThumbnail asset={previewAsset} />
 
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
