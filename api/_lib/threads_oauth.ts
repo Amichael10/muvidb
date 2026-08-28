@@ -326,7 +326,7 @@ export async function disconnectThreads() {
 export async function getPlatformPublishingCredentials(platform: string) {
   const { data: connection, error } = await supabase
     .from('social_connections')
-    .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,token_ciphertext,token_iv,token_auth_tag')
+    .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,connection_metadata,token_ciphertext,token_iv,token_auth_tag')
     .eq('platform', platform)
     .eq('status', 'connected')
     .order('updated_at', { ascending: false })
@@ -336,8 +336,53 @@ export async function getPlatformPublishingCredentials(platform: string) {
   if (error) throw error;
   if (!connection) throw httpError(409, `Connect the MuviDB ${platform} account before publishing`);
 
-  const { accessToken } = decryptThreadsToken(connection);
+  let { accessToken } = decryptThreadsToken(connection);
   const expiresAt = connection.token_expires_at ? new Date(connection.token_expires_at).getTime() : null;
+
+  // Auto-refresh TikTok access token seamlessly if refresh_token is present
+  if (platform === 'tiktok') {
+    const meta = (connection.connection_metadata && typeof connection.connection_metadata === 'object') ? connection.connection_metadata : {};
+    const refreshToken = meta.refresh_token;
+    const clientKey = process.env.TIKTOK_CLIENT_KEY;
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET;
+
+    if (refreshToken && clientKey && clientSecret && (expiresAt === null || expiresAt - Date.now() < 3600 * 1000)) {
+      try {
+        const refreshRes = await threadsFetch('https://open.tiktokapis.com/v2/oauth/token/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_key: clientKey,
+            client_secret: clientSecret,
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+          }),
+        });
+
+        const newAccessToken = refreshRes.access_token || refreshRes.data?.access_token;
+        const newRefreshToken = refreshRes.refresh_token || refreshRes.data?.refresh_token || refreshToken;
+        const expiresIn = Number(refreshRes.expires_in || refreshRes.data?.expires_in || 86400);
+
+        if (newAccessToken) {
+          accessToken = newAccessToken;
+          const encrypted = encryptThreadsToken({ accessToken: newAccessToken });
+          await supabase
+            .from('social_connections')
+            .update({
+              ...encrypted,
+              token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+              connection_metadata: { ...meta, refresh_token: newRefreshToken },
+              status: 'connected',
+              last_verified_at: new Date().toISOString(),
+            })
+            .eq('id', connection.id);
+        }
+      } catch (refreshErr: any) {
+        console.warn('Failed to auto-refresh TikTok token:', refreshErr?.message);
+      }
+    }
+  }
+
   if (expiresAt && expiresAt <= Date.now()) {
     await supabase.from('social_connections').update({ status: 'expired' }).eq('id', connection.id);
     throw httpError(409, `The ${platform} connection has expired. Reconnect it before publishing`);
@@ -397,22 +442,76 @@ export async function savePlatformConnection(input: {
   username: string;
   externalAccountId: string;
   accessToken: string;
+  refreshToken?: string;
   profileImageUrl?: string;
   tokenExpiresAt?: string;
   grantedScopes?: string[];
   actorId?: string;
+  connectionMetadata?: any;
 }) {
-  const encrypted = encryptThreadsToken({ accessToken: input.accessToken });
+  let finalToken = input.accessToken;
+  let finalExpiresAt = input.tokenExpiresAt || null;
+  let finalAccountId = input.externalAccountId;
+  let finalDisplayName = input.displayName;
+
+  const appId = process.env.META_APP_ID || process.env.THREAD_APP_ID;
+  const appSecret = process.env.META_APP_SECRET || process.env.THREAD_APP_SECRET;
+
+  // Auto-upgrade Meta short-lived user tokens to Permanent Page Access Tokens
+  if ((input.platform === 'facebook' || input.platform === 'instagram') && appId && appSecret && finalToken) {
+    try {
+      const longUrl = new URL('https://graph.facebook.com/v19.0/oauth/access_token');
+      longUrl.searchParams.set('grant_type', 'fb_exchange_token');
+      longUrl.searchParams.set('client_id', appId);
+      longUrl.searchParams.set('client_secret', appSecret);
+      longUrl.searchParams.set('fb_exchange_token', finalToken);
+      const longRes = await threadsFetch(longUrl.toString()).catch(() => null);
+      const userLongToken = longRes?.access_token || finalToken;
+
+      const accountsUrl = new URL('https://graph.facebook.com/v19.0/me/accounts');
+      accountsUrl.searchParams.set('fields', 'id,name,access_token,instagram_business_account{id,username,name,profile_picture_url}');
+      accountsUrl.searchParams.set('access_token', userLongToken);
+      const accountsRes = await threadsFetch(accountsUrl.toString()).catch(() => null);
+
+      const pages = accountsRes?.data || [];
+      if (pages.length > 0) {
+        const matchedPage = pages.find((p: any) => String(p.id) === String(finalAccountId)) || pages[0];
+        if (input.platform === 'facebook' && matchedPage.access_token) {
+          finalToken = matchedPage.access_token;
+          finalAccountId = String(matchedPage.id);
+          finalDisplayName = matchedPage.name || finalDisplayName;
+          finalExpiresAt = null; // Permanent Page token never expires
+        } else if (input.platform === 'instagram') {
+          const matchedIg = pages.find((p: any) => p.instagram_business_account?.id)?.instagram_business_account;
+          if (matchedIg && matchedPage.access_token) {
+            finalToken = matchedPage.access_token;
+            finalAccountId = String(matchedIg.id);
+            finalExpiresAt = null; // Page token used for Instagram publishing never expires
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('Could not auto-exchange Meta token:', e?.message);
+    }
+  }
+
+  const encrypted = encryptThreadsToken({ accessToken: finalToken });
+  const metaObj = {
+    ...(input.connectionMetadata || {}),
+    ...(input.refreshToken ? { refresh_token: input.refreshToken } : {}),
+  };
+
   const record = {
     platform: input.platform,
-    display_name: input.displayName,
+    display_name: finalDisplayName,
     username: input.username,
-    external_account_id: input.externalAccountId,
+    external_account_id: finalAccountId,
     profile_image_url: input.profileImageUrl || null,
     status: 'connected',
     granted_scopes: input.grantedScopes || [],
-    token_expires_at: input.tokenExpiresAt || null,
+    token_expires_at: finalExpiresAt,
     last_verified_at: new Date().toISOString(),
+    connection_metadata: metaObj,
     created_by: input.actorId || null,
     ...encrypted,
   };
@@ -620,6 +719,8 @@ export async function completeTikTokOAuth(req: VercelRequest): Promise<string> {
   });
 
   const accessToken = res.access_token || res.data?.access_token;
+  const refreshToken = res.refresh_token || res.data?.refresh_token;
+  const expiresIn = Number(res.expires_in || res.data?.expires_in || 86400);
   const openId = res.open_id || res.data?.open_id;
   const grantedScopeValue = String(res.scope || res.data?.scope || '');
   const grantedScopes = grantedScopeValue
@@ -639,6 +740,8 @@ export async function completeTikTokOAuth(req: VercelRequest): Promise<string> {
     username: userInfo.display_name ? String(userInfo.display_name).replace(/^@/, '') : 'muvidb',
     externalAccountId: String(openId || userInfo.open_id || 'tiktok_account'),
     accessToken,
+    refreshToken,
+    tokenExpiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
     profileImageUrl: userInfo.avatar_url || null,
     actorId: state.actorId,
     grantedScopes: grantedScopes.length ? grantedScopes : ['user.info.basic'],
