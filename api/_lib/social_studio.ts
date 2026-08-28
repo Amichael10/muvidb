@@ -259,6 +259,38 @@ async function recalculateContentStatus(contentItemId: string) {
     .from('social_content_items')
     .update({ status: nextStatus })
     .eq('id', contentItemId);
+
+  // If published successfully across all scheduled targets, delete the media files from Supabase Storage immediately
+  if (nextStatus === 'published') {
+    await cleanupContentItemAssets(contentItemId).catch(err => {
+      console.warn(`[Social Studio] Immediate asset cleanup notice for ${contentItemId}:`, err?.message);
+    });
+  }
+}
+
+export async function cleanupContentItemAssets(contentItemId: string) {
+  const { data: assets, error: assetError } = await supabase
+    .from('social_assets')
+    .select('id,storage_bucket,storage_path')
+    .eq('content_item_id', contentItemId);
+
+  if (assetError) throw assetError;
+  if (!assets?.length) return;
+
+  const byBucket = new Map<string, string[]>();
+  for (const asset of assets) {
+    if (asset.storage_bucket && asset.storage_path && asset.storage_bucket !== 'external') {
+      const paths = byBucket.get(asset.storage_bucket) || [];
+      paths.push(asset.storage_path);
+      byBucket.set(asset.storage_bucket, paths);
+    }
+  }
+
+  for (const [bucket, paths] of byBucket) {
+    if (paths.length) {
+      await supabase.storage.from(bucket).remove(paths);
+    }
+  }
 }
 
 async function processJob(job: any, lockedBy: string, now: Date) {
@@ -1555,7 +1587,7 @@ export async function attachCustomAsset(
   if (!/^https:\/\//i.test(String(input.publicUrl || ''))) {
     throw httpError(400, 'The custom artwork must have a public HTTPS URL');
   }
-  const isVideo = /\.mp4(?:$|\?)/i.test(input.publicUrl);
+  const isVideo = /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(input.publicUrl) || Boolean(input.format?.includes('video'));
   const format: SocialAssetFormat = input.format || (isVideo ? 'video_vertical_9_16' as SocialAssetFormat : 'square_1_1');
   const width = input.width || 1080;
   const height = input.height || 1080;
@@ -1574,7 +1606,11 @@ export async function attachCustomAsset(
     throw httpError(400, 'The custom artwork URL is invalid');
   }
   const mimeType = isVideo
-    ? 'video/mp4'
+    ? (/\.webm(?:$|\?)/i.test(input.publicUrl)
+        ? 'video/webm'
+        : /\.mov(?:$|\?)/i.test(input.publicUrl)
+        ? 'video/quicktime'
+        : 'video/mp4')
     : /\.jpe?g(?:$|\?)/i.test(input.publicUrl)
     ? 'image/jpeg'
     : /\.webp(?:$|\?)/i.test(input.publicUrl)
@@ -1636,7 +1672,7 @@ export async function attachCarouselAssets(
     : (input.publicUrls || []).map(url => ({ url }));
   const carouselAssets = rawAssets.map(asset => {
     const url = String(asset?.url || '').trim();
-    const mediaType = asset?.mediaType === 'video' || /\.mp4(?:$|\?)/i.test(url) ? 'video' : 'image';
+    const mediaType = asset?.mediaType === 'video' || /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url) ? 'video' : 'image';
     return {
       url,
       media_type: mediaType,

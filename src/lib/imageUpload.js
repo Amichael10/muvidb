@@ -188,29 +188,45 @@ export async function uploadAdminSocialImage(file, bucket = 'film-images') {
 
 const MAX_SOCIAL_VIDEO_BYTES = 50 * 1024 * 1024;
 
-async function hasMp4MagicBytes(file) {
+async function validateVideoSignature(file) {
   const bytes = new Uint8Array(await file.slice(0, 32).arrayBuffer());
-  // ISO base media files (MP4/MOV) expose an `ftyp` box near the beginning.
-  return bytes.length >= 12
-    && bytes[4] === 0x66
-    && bytes[5] === 0x74
-    && bytes[6] === 0x79
-    && bytes[7] === 0x70;
+  // WebM / EBML header (0x1A 0x45 0xDF 0xA3)
+  const isWebM = bytes.length >= 4
+    && bytes[0] === 0x1A
+    && bytes[1] === 0x45
+    && bytes[2] === 0xDF
+    && bytes[3] === 0xA3;
+
+  // ISO base media files (MP4/MOV) expose an `ftyp` or `moov` box near the beginning
+  const isMp4OrMov = bytes.length >= 12
+    && ((bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) ||
+        (bytes[4] === 0x6D && bytes[5] === 0x6F && bytes[6] === 0x6F && bytes[7] === 0x76));
+
+  return isWebM || isMp4OrMov;
 }
 
-// Social videos are already compressed media. Upload the original MP4 without
-// canvas processing, while still checking its MIME, size and file signature.
+// Social videos are already compressed media. Upload the video without canvas processing,
+// while checking MIME, size and file signature. Supports MP4, WebM, and MOV.
 export async function uploadAdminSocialVideo(file, bucket = 'social-published-assets') {
   if (!file) return { error: 'No video selected.' };
-  if (file.type !== 'video/mp4') return { error: 'Use an MP4 video for reliable publishing across Meta platforms.' };
-  if (file.size > MAX_SOCIAL_VIDEO_BYTES) return { error: 'Video uploads are limited to 50 MB in Social Studio.' };
-  if (!(await hasMp4MagicBytes(file))) return { error: "That file doesn't look like a valid MP4 video." };
+  const type = file.type || '';
+  const isWebM = type === 'video/webm' || file.name?.toLowerCase().endsWith('.webm');
+  const isMp4 = type === 'video/mp4' || file.name?.toLowerCase().endsWith('.mp4');
+  const isMov = type === 'video/quicktime' || file.name?.toLowerCase().endsWith('.mov');
 
-  const path = `social/${crypto.randomUUID()}.mp4`;
+  if (!isWebM && !isMp4 && !isMov && !type.startsWith('video/')) {
+    return { error: 'Please select a supported video format (.mp4, .webm, or .mov).' };
+  }
+  if (file.size > MAX_SOCIAL_VIDEO_BYTES) return { error: 'Video uploads are limited to 50 MB in Social Studio.' };
+  if (!(await validateVideoSignature(file))) return { error: "That file doesn't look like a valid video (.mp4, .webm, or .mov)." };
+
+  const ext = isWebM ? 'webm' : (isMov ? 'mov' : 'mp4');
+  const contentType = isWebM ? 'video/webm' : (isMov ? 'video/quicktime' : 'video/mp4');
+  const path = `social/${crypto.randomUUID()}.${ext}`;
   const { error: upErr } = await supabase.storage
     .from(bucket)
     .upload(path, file, {
-      contentType: 'video/mp4',
+      contentType,
       upsert: false,
       cacheControl: '31536000',
     });

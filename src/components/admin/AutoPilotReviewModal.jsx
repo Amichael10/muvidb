@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
-import { uploadAdminSocialImage } from '../../lib/imageUpload';
+import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 import FigmaSocialCardPreview from './FigmaSocialCardPreview.jsx';
 import SocialCanvasViewport from './SocialCanvasViewport.jsx';
 import SocialVideoClipModal from './SocialVideoClipModal.jsx';
@@ -272,12 +272,12 @@ export default function AutoPilotReviewModal({
     if (!file) return;
     setUploadingImage(true);
     try {
-      const upload = await uploadAdminSocialImage(file, 'social-published-assets');
-      if (upload.error || !upload.url) throw new Error(upload.error || 'The uploaded image has no public URL');
+      const upload = await uploadAdminSocialMedia(file, 'social-published-assets');
+      if (upload.error || !upload.url) throw new Error(upload.error || 'The uploaded media has no public URL');
       setCustomImageUrl(upload.url);
-      toast.success('Custom graphic artwork uploaded!');
+      toast.success(`${upload.mediaType === 'video' ? 'Custom video' : 'Custom graphic artwork'} uploaded!`);
     } catch (err) {
-      toast.error(err.message || 'Image upload failed');
+      toast.error(err.message || 'Media upload failed');
     } finally {
       setUploadingImage(false);
     }
@@ -626,10 +626,10 @@ export default function AutoPilotReviewModal({
                   {customImageUrl ? 'Download Poster' : 'Export PNG'}
                 </button>
                 <label className="cursor-pointer text-[11px] font-bold text-text-muted hover:text-text-primary hover:underline">
-                  {uploadingImage ? 'Uploading…' : customImageUrl ? '🖼️ Change Poster' : '🖼️ Use My Poster'}
+                  {uploadingImage ? 'Uploading…' : customImageUrl ? '🖼️ Change Media' : '🖼️ Use My Media / Poster'}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*,.mp4,.webm,.mov"
                     onChange={handleImageUpload}
                     disabled={uploadingImage}
                     className="hidden"
@@ -640,7 +640,7 @@ export default function AutoPilotReviewModal({
 
             <SocialCanvasViewport
               mediaUrl={customImageUrl || displayImage}
-              mediaType={customImageUrl?.endsWith('.mp4') ? 'video' : 'image'}
+              mediaType={/\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(customImageUrl || '') ? 'video' : 'image'}
               aspectRatio={canvasAspectRatio}
               onAspectRatioChange={setCanvasAspectRatio}
               platformLabel={PLATFORMS.find(p => p.value === activePlatformTab)?.label || 'Social'}

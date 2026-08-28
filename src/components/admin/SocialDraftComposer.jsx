@@ -158,7 +158,7 @@ function carouselLimitFor(platforms) {
 }
 
 function mediaTypeForFile(file) {
-  return file?.type?.startsWith('video/') ? 'video' : 'image';
+  return file?.type?.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file?.name || '') ? 'video' : 'image';
 }
 
 function readableNetworkError(error, action) {
@@ -1022,17 +1022,17 @@ export default function SocialDraftComposer({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold text-text-primary">
-                      {postFormat === 'carousel' ? 'Build an image or video carousel' : 'Use an image or MP4 as the complete post'}
+                      {postFormat === 'carousel' ? 'Build an image or video carousel' : 'Use an image or video (MP4/WebM) as the complete post'}
                     </p>
                     <p className="mt-1 text-[10px] text-text-muted">
                       {postFormat === 'carousel'
                         ? `Add up to ${carouselLimit} items for the selected channels. Instagram supports 10; Threads supports 20. Facebook and TikTok carousels are image-only.`
-                        : 'Your upload replaces the entire generated graphic. MP4 videos are supported up to 50 MB.'}
+                        : 'Your upload replaces the entire generated graphic. MP4 and WebM videos are supported up to 50 MB.'}
                     </p>
                   </div>
                   <input
                     type="file"
-                    accept="image/png,image/jpeg,image/webp,video/mp4"
+                    accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
                     multiple={postFormat === 'carousel' && replaceSlideIndex === null}
                     ref={fileInputRef}
                     onChange={handleCustomImageUpload}
