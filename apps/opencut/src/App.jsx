@@ -2092,8 +2092,82 @@ export default function App() {
     ? layerDisplayName(selectedLayer)
     : selectedTargetLabel(state.selectedTarget, selectedScene);
 
+  const [returnContext, setReturnContext] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const sourceUrl = params.get('source_url');
+      const draftId = params.get('draft_id');
+      const variantId = params.get('variant_id');
+      const aspectRatio = params.get('aspect_ratio');
+      const mediaType = params.get('media_type') || 'video';
+      const title = params.get('title') || 'Social Media Edit';
+      const returnTo = params.get('return_to');
+      if (sourceUrl || draftId) {
+        return { sourceUrl, draftId, variantId, aspectRatio, mediaType, title, returnTo };
+      }
+    } catch {}
+    return null;
+  });
+
+  const [returningToSocial, setReturningToSocial] = useState(false);
+  const [returnProgress, setReturnProgress] = useState(null);
+
   useEffect(() => {
     (async () => {
+      // 1. If loaded with source_url from Social Studio, initialize directly
+      if (returnContext?.sourceUrl) {
+        let presetId = 'ig-reel';
+        let targetW = 1080;
+        let targetH = 1920;
+        if (returnContext.aspectRatio === '1:1') {
+          presetId = 'ig-post'; targetW = 1080; targetH = 1080;
+        } else if (returnContext.aspectRatio === '4:5') {
+          presetId = 'ig-portrait'; targetW = 1080; targetH = 1350;
+        } else if (returnContext.aspectRatio === '16:9') {
+          presetId = 'youtube'; targetW = 1920; targetH = 1080;
+        }
+
+        const isImg = returnContext.mediaType === 'image';
+        const sceneDurationSec = isImg ? 5 : 30;
+
+        const newConfig = {
+          ...clone(emptyConfig),
+          title: returnContext.title || 'Social Edit',
+          width: targetW,
+          height: targetH,
+          duration: sceneDurationSec,
+          framePreset: presetId,
+          scenes: [
+            {
+              id: `scene-${Date.now()}`,
+              name: 'Scene 1',
+              start: 0,
+              end: sceneDurationSec,
+              transition: { type: 'none', duration: 0 },
+              background: {
+                image: returnContext.sourceUrl,
+                mediaKind: isImg ? 'image' : 'video',
+                clipIn: 0,
+                clipOut: sceneDurationSec,
+                sourceDuration: sceneDurationSec,
+                noOverlay: true,
+                zoom: 1,
+                x: 0,
+                y: 0,
+                animation: { type: 'none' },
+              },
+              layers: [],
+            },
+          ],
+        };
+
+        dispatch({ type: 'replace-config', config: newConfig });
+        setSaveStatus(`Loaded from Social Studio (${returnContext.aspectRatio || '9:16'})`);
+        refreshUploads();
+        return;
+      }
+
+      // 2. Otherwise load existing saved project session
       const saved = loadSavedProject();
       if (saved && (saved.scenes?.length > 0 || (saved.title && saved.title !== 'Untitled Video Project'))) {
         try {
@@ -2123,6 +2197,97 @@ export default function App() {
       refreshUploads();
     })();
   }, []);
+
+  async function handleSaveAndReturnToSocialStudio() {
+    if (!returnContext) return;
+    setReturningToSocial(true);
+    setReturnProgress('Preparing high-quality render…');
+    try {
+      const exportConfig = normalizeTimeline(state.config);
+      const isImg = returnContext.mediaType === 'image';
+      
+      let finalBlob;
+      let extension = 'mp4';
+
+      if (isImg) {
+        setReturnProgress('Rendering high-res image…');
+        const canvas = canvasRef.current;
+        if (!canvas) throw new Error('Canvas not found');
+        finalBlob = await new Promise((res) => canvas.toBlob(res, 'image/png', 0.95));
+        extension = 'png';
+      } else {
+        setReturnProgress('Rendering video in selected aspect ratio…');
+        const result = await recordTimeline(exportConfig, imageCacheRef.current, (elapsed, duration) => {
+          const pct = Math.min(99, Math.round((elapsed / Math.max(1, duration)) * 100));
+          setReturnProgress(`Rendering video: ${pct}% (${elapsed.toFixed(1)}s / ${duration.toFixed(1)}s)…`);
+        });
+        finalBlob = result.blob;
+        extension = result.extension || 'mp4';
+      }
+
+      setReturnProgress('Uploading to MuviDB cloud storage…');
+      const fileName = `studio/${crypto.randomUUID()}.${extension}`;
+      const { error: uploadError } = await socialStorage.storage.from(SOCIAL_BUCKET).upload(fileName, finalBlob, {
+        contentType: finalBlob.type || (isImg ? 'image/png' : `video/${extension}`),
+        upsert: false,
+        cacheControl: '31536000',
+      });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: urlData } = socialStorage.storage.from(SOCIAL_BUCKET).getPublicUrl(fileName);
+      const publicUrl = urlData.publicUrl;
+
+      setReturnProgress('Updating Social Studio draft…');
+      const { data: sessionData } = await socialStorage.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      let assetId = null;
+      if (token && returnContext.draftId) {
+        const attachRes = await fetch('/api/social?task=attach_custom_asset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            contentItemId: returnContext.draftId,
+            variantId: returnContext.variantId,
+            publicUrl,
+            format: activeFrameId,
+            width: exportConfig.width,
+            height: exportConfig.height,
+          }),
+        });
+        const attachData = await attachRes.json().catch(() => ({}));
+        assetId = attachData?.id;
+      }
+
+      setReturnProgress('✅ Done! Returning to Social Studio…');
+
+      // Notify parent/opener window if opened in a popup/tab
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({
+          type: 'OPEN_CUT_RENDER_COMPLETE',
+          draftId: returnContext.draftId,
+          variantId: returnContext.variantId,
+          publicUrl,
+          assetId,
+          width: exportConfig.width,
+          height: exportConfig.height,
+          format: activeFrameId,
+        }, '*');
+        setTimeout(() => window.close(), 800);
+      } else {
+        // Fallback navigation
+        const returnUrl = new URL(returnContext.returnTo || '/admin/social', window.location.origin);
+        returnUrl.searchParams.set('tab', 'composer');
+        if (returnContext.draftId) returnUrl.searchParams.set('draft_id', returnContext.draftId);
+        returnUrl.searchParams.set('rendered_url', publicUrl);
+        setTimeout(() => { window.location.href = returnUrl.toString(); }, 800);
+      }
+    } catch (err) {
+      alert('Error rendering media: ' + (err.message || 'Unknown error'));
+      setReturningToSocial(false);
+      setReturnProgress(null);
+    }
+  }
 
   // Auto-save project changes to browser localStorage
   useEffect(() => {
@@ -4851,11 +5016,42 @@ export default function App() {
   const handlePanEnd = () => {
     setIsPanning(false);
   };
-
   const isCanvasEmpty = !selectedScene || (!selectedScene.background?.image && (selectedScene.layers || []).length === 0);
 
   return (
     <div className={`flex h-[100dvh] min-h-0 flex-col overflow-hidden text-[13px] transition-colors duration-200 ${studioTheme === 'light' ? 'light-mode bg-[#f3f4f6] text-[#0f172a]' : 'bg-muvi-bg text-white'}`}>
+      {/* Social Studio Return Progress Modal */}
+      {returningToSocial && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="flex w-full max-w-md flex-col items-center rounded-3xl border border-emerald-500/30 bg-[#121417] p-8 text-center shadow-2xl">
+            <div className="relative flex h-20 w-20 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-25"></span>
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-black shadow-[0_0_40px_rgba(16,185,129,0.5)]">
+                <svg className="h-8 w-8 animate-spin text-black" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-85" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+              </div>
+            </div>
+
+            <h3 className="mt-5 text-lg font-black text-white">
+              Rendering for Social Studio
+            </h3>
+            <p className="mt-2 text-xs font-semibold text-emerald-400">
+              {returnProgress || 'Processing visual layout and canvas layers…'}
+            </p>
+
+            <div className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 animate-pulse transition-all duration-300" style={{ width: '100%' }} />
+            </div>
+            
+            <p className="mt-4 text-[11px] text-white/40">
+              Your draft in Social Studio will be updated automatically with this cropped and branded asset.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Global Video Import / Uploading Progress Modal */}
       {clipBusy && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
@@ -4909,7 +5105,9 @@ export default function App() {
               placeholder="Untitled project"
               onChange={(event) => dispatch({ type: 'project', key: 'title', value: event.target.value })}
             />
-            <p className="hidden sm:block text-[10px] text-muvi-muted">MuviDB Studio · Premium Video Editor</p>
+            <p className="hidden sm:block text-[10px] text-muvi-muted">
+              {returnContext ? `Editing for Social Studio (${returnContext.aspectRatio || '9:16'})` : 'MuviDB Studio · Premium Video Editor'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-1.5">
@@ -4926,42 +5124,25 @@ export default function App() {
           <button className="btn-ghost p-1 sm:p-1.5" title="Redo (Ctrl+Shift+Z)" disabled={!state.future.length} onClick={() => dispatch({ type: 'redo' })}><Icon name="redo" className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></button>
           <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
           
-          {/* Light / Dark Mode Toggle Button */}
-          <button
-            type="button"
-            className="btn-ghost p-1 sm:p-1.5 flex items-center justify-center text-sm"
-            title={studioTheme === 'light' ? 'Switch to Dark theme' : 'Switch to Light theme'}
-            onClick={() => setStudioTheme(prev => prev === 'light' ? 'dark' : 'light')}
-          >
-            <span>{studioTheme === 'light' ? '🌙' : '☀️'}</span>
-          </button>
-          <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
-          
-          {/* Sidebars Toggle Buttons */}
-          <button
-            type="button"
-            className={`btn-ghost px-2 sm:px-2.5 py-1 text-xs font-bold ${leftPanelOpen ? 'bg-white/10 text-white' : 'text-muvi-muted'}`}
-            title={leftPanelOpen ? 'Collapse Tools Panel' : 'Expand Tools Panel'}
-            onClick={() => setLeftPanelOpen(prev => !prev)}
-          >
-            Tools {leftPanelOpen ? '◀' : '▶'}
-          </button>
-          <button
-            type="button"
-            className={`btn-ghost px-2 sm:px-2.5 py-1 text-xs font-bold ${rightPanelOpen ? 'bg-white/10 text-white' : 'text-muvi-muted'}`}
-            title={rightPanelOpen ? 'Collapse Inspector' : 'Expand Inspector'}
-            onClick={() => setRightPanelOpen(prev => !prev)}
-          >
-            Inspector {rightPanelOpen ? '▶' : '◀'}
-          </button>
-
-          <span className="mx-0.5 sm:mx-1 h-4 sm:h-5 w-px bg-white/10" />
-          <button className="rounded-xl bg-[#FF5C00] px-3 sm:px-5 py-1 sm:py-1.5 text-xs sm:text-sm font-bold text-black shadow-[0_0_20px_rgba(255,92,0,0.4)] transition hover:bg-[#FF7A30] disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
-            {isRendering ? 'Exporting…' : 'Export'}
-          </button>
-          <button className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-100 transition hover:bg-cyan-400/20" onClick={() => setSocialOpen(true)}>
-            Post / Schedule
-          </button>
+          {returnContext ? (
+            <button
+              type="button"
+              disabled={returningToSocial}
+              onClick={handleSaveAndReturnToSocialStudio}
+              className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 sm:px-5 py-1.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-emerald-500/30 transition hover:scale-105 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>💾 Save & Return</span>
+            </button>
+          ) : (
+            <>
+              <button className="rounded-xl bg-[#FF5C00] px-3 sm:px-5 py-1 sm:py-1.5 text-xs sm:text-sm font-bold text-black shadow-[0_0_20px_rgba(255,92,0,0.4)] transition hover:bg-[#FF7A30] disabled:opacity-50" disabled={isRendering} onClick={handleExportVideo}>
+                {isRendering ? 'Exporting…' : 'Export'}
+              </button>
+              <button className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-3 py-1 text-xs font-bold text-cyan-100 transition hover:bg-cyan-400/20" onClick={() => setSocialOpen(true)}>
+                Post / Schedule
+              </button>
+            </>
+          )}
         </div>
       </header>
 

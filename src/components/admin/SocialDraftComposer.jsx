@@ -362,7 +362,140 @@ export default function SocialDraftComposer({
     setStep3Open(true);
   }, [initialDraft]);
 
+  // 1. Cross-tab real-time listener from OpenCut Studio
+  useEffect(() => {
+    const handleStudioMessage = (event) => {
+      if (event.data?.type === 'OPEN_CUT_RENDER_COMPLETE') {
+        const { draftId, variantId, publicUrl, assetId, width, height, format } = event.data;
+
+        const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(publicUrl);
+        const newAsset = {
+          id: assetId || publicUrl,
+          publicUrl,
+          mediaType: isVideo ? 'video' : 'image',
+          format: format || 'custom_render',
+          width: width || 1080,
+          height: height || 1080,
+        };
+
+        setResult(curr => {
+          if (!curr) return curr;
+          const updatedAssets = [newAsset, ...(curr.assets || []).filter(a => a.id !== newAsset.id && a.publicUrl !== publicUrl)];
+          const updatedVariants = (curr.variants || []).map(v => {
+            if (!variantId || v.id === variantId) {
+              return {
+                ...v,
+                selected_asset_id: newAsset.id,
+                selected_asset: newAsset,
+              };
+            }
+            return v;
+          });
+          return { ...curr, assets: updatedAssets, variants: updatedVariants };
+        });
+
+        toast.success('✨ Rendered asset from Studio attached to draft!');
+      }
+    };
+
+    window.addEventListener('message', handleStudioMessage);
+    return () => window.removeEventListener('message', handleStudioMessage);
+  }, []);
+
+  // 2. Persist working state into sessionStorage so returning via URL or tab refresh restores everything
+  useEffect(() => {
+    if (result && result.contentItem) {
+      try {
+        const stateToSave = {
+          result,
+          captionDrafts,
+          platforms,
+          activePreviewPlatform,
+          postFormat,
+          carouselAssets,
+          tiktokSettings,
+          customScheduleDate,
+          selected,
+          themeId,
+        };
+        sessionStorage.setItem('muvidb_social_composer_cache', JSON.stringify(stateToSave));
+      } catch {
+        // quota or privacy mode
+      }
+    }
+  }, [result, captionDrafts, platforms, activePreviewPlatform, postFormat, carouselAssets, tiktokSettings, customScheduleDate, selected, themeId]);
+
+  // 3. Restore cached working draft if available on initial mount without initialDraft prop
+  useEffect(() => {
+    if (!initialDraft) {
+      try {
+        const cached = sessionStorage.getItem('muvidb_social_composer_cache');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.result?.contentItem) {
+            setResult(parsed.result);
+            if (parsed.captionDrafts) setCaptionDrafts(parsed.captionDrafts);
+            if (parsed.platforms) setPlatforms(parsed.platforms);
+            if (parsed.activePreviewPlatform) setActivePreviewPlatform(parsed.activePreviewPlatform);
+            if (parsed.postFormat) setPostFormat(parsed.postFormat);
+            if (parsed.carouselAssets) setCarouselAssets(parsed.carouselAssets);
+            if (parsed.tiktokSettings) setTikTokSettings(parsed.tiktokSettings);
+            if (parsed.customScheduleDate) setCustomScheduleDate(parsed.customScheduleDate);
+            if (parsed.selected) setSelected(parsed.selected);
+            if (parsed.themeId) setThemeId(parsed.themeId);
+            setStep1Open(false);
+            setStep2Open(false);
+            setStep3Open(true);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const handleOpenInStudio = (mediaUrl = null, customRatio = null) => {
+    const targetUrl = mediaUrl || selectedSingleAsset?.publicUrl || activeAsset?.publicUrl;
+    if (!targetUrl) {
+      toast.error('Select or upload a media file first');
+      return;
+    }
+    const ratio = customRatio || canvasAspectRatio || (postFormat === 'carousel' ? '1:1' : '9:16');
+    const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(targetUrl) || activeAsset?.mediaType === 'video';
+
+    // Store state before navigating
+    try {
+      sessionStorage.setItem('muvidb_social_composer_cache', JSON.stringify({
+        result,
+        captionDrafts,
+        platforms,
+        activePreviewPlatform,
+        postFormat,
+        carouselAssets,
+        tiktokSettings,
+        customScheduleDate,
+        selected,
+        themeId,
+      }));
+    } catch {}
+
+    const studioUrl = new URL('/opencut/', window.location.origin);
+    studioUrl.searchParams.set('source_url', targetUrl);
+    studioUrl.searchParams.set('media_type', isVideo ? 'video' : 'image');
+    studioUrl.searchParams.set('aspect_ratio', ratio);
+    if (result?.contentItem?.id) studioUrl.searchParams.set('draft_id', result.contentItem.id);
+    if (activeVariant?.id) studioUrl.searchParams.set('variant_id', activeVariant.id);
+    studioUrl.searchParams.set('title', result?.contentItem?.title || selected?.title || 'Social Video');
+    studioUrl.searchParams.set('return_to', window.location.pathname);
+
+    window.open(studioUrl.toString(), '_blank');
+    toast.info('🎨 Opening in MuviDB Studio! Frame your shot, brand it, and click Save & Return.');
+  };
+
   const handleResetComposer = () => {
+    try {
+      sessionStorage.removeItem('muvidb_social_composer_cache');
+    } catch {}
     setResult(null);
     setSelected(null);
     setResults([]);
@@ -1676,7 +1809,7 @@ export default function SocialDraftComposer({
                 </div>
 
                 {/* Per-Platform Aspect Ratio Selector */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[10px] font-black uppercase tracking-wider text-text-muted mr-1">Aspect Ratio:</span>
                   {[
                     { id: '1:1', label: '1:1', desc: 'Square' },
@@ -1698,8 +1831,44 @@ export default function SocialDraftComposer({
                       {ratio.label}
                     </button>
                   ))}
+
+                  <span className="h-4 w-px bg-border mx-1 hidden sm:block" />
+
+                  {/* 1-Click Round-Trip Open in Studio Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenInStudio()}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1 text-xs font-black text-white shadow-xs transition-all hover:scale-105 hover:from-emerald-500 hover:to-teal-500"
+                    title="Open in OpenCut Studio to crop, resize, and add watermark with instant round-trip save"
+                  >
+                    <Icon icon="solar:magic-stick-3-bold" width="14" />
+                    <span>🎨 Open in Studio</span>
+                  </button>
                 </div>
               </div>
+
+              {/* Instagram Carousel Aspect Ratio Compatibility Helper Banner */}
+              {activePlatform.id === 'instagram' && activeVariantPostFormat === 'carousel' && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">⚠️</span>
+                    <div>
+                      <p className="font-bold text-amber-100">Instagram Carousel Aspect Ratio Rule</p>
+                      <p className="text-[11px] text-amber-200/80">
+                        Instagram requires all carousel items to share identical aspect ratios (e.g. 1:1 Square or 4:5 Portrait). Mixed landscape + portrait files will be rejected by Meta.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenInStudio(null, '1:1')}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1 text-xs font-black text-black shadow-xs hover:bg-amber-400 transition"
+                  >
+                    <Icon icon="solar:crop-minimalistic-bold" width="14" />
+                    <span>Crop to 1:1 in Studio</span>
+                  </button>
+                </div>
+              )}
 
               {/* Dynamic Viewport Grid */}
               <div className={`grid gap-6 ${
