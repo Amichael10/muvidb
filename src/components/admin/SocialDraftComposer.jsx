@@ -760,9 +760,19 @@ export default function SocialDraftComposer({
     };
     const targetFormat = formatMap[ratioId];
 
-    // Find matching rendered asset
-    const matchingAsset = (result?.assets || []).find(a => a.format === targetFormat);
-    const selectedAssetId = matchingAsset ? matchingAsset.id : activeVariant.selected_asset_id;
+    // Check if the current variant or draft is using a custom uploaded video or image
+    const currentAsset = (result?.assets || []).find(a => a.id === activeVariant.selected_asset_id);
+    const isCustomUpload = currentAsset?.format === 'custom_video'
+      || currentAsset?.format === 'custom_design'
+      || currentAsset?.format === 'video_vertical_9_16'
+      || currentAsset?.mediaType === 'video';
+
+    // If custom media, preserve the uploaded asset; otherwise use matching template format
+    let selectedAssetId = activeVariant.selected_asset_id;
+    if (!isCustomUpload) {
+      const matchingAsset = (result?.assets || []).find(a => a.format === targetFormat);
+      if (matchingAsset) selectedAssetId = matchingAsset.id;
+    }
 
     setResult(curr => ({
       ...curr,
@@ -770,7 +780,11 @@ export default function SocialDraftComposer({
         ? {
             ...v,
             selected_asset_id: selectedAssetId,
-            platform_options: { ...(v.platform_options || {}), asset_format: targetFormat },
+            platform_options: {
+              ...(v.platform_options || {}),
+              asset_format: targetFormat,
+              canvas_ratio: ratioId,
+            },
           }
         : v),
     }));
@@ -1391,6 +1405,29 @@ export default function SocialDraftComposer({
                             </div>
                           </div>
                         ))}
+
+                        {/* Prominent "+" Add More Media Card */}
+                        {carouselAssets.length < carouselLimit && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplaceSlideIndex(null);
+                              setTimeout(() => fileInputRef.current?.click(), 0);
+                            }}
+                            disabled={uploadingCustom || reorderingCarousel}
+                            className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-surface-2/70 p-4 text-text-muted hover:border-brand hover:bg-brand/5 hover:text-brand transition-all aspect-square min-h-[160px] group shadow-xs"
+                          >
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-surface group-hover:bg-brand group-hover:text-white border border-border transition-all shadow-sm">
+                              <Icon icon={uploadingCustom ? 'solar:spinner-linear' : 'solar:add-circle-bold'} className={uploadingCustom ? 'animate-spin' : ''} width="24" />
+                            </div>
+                            <span className="text-[11px] font-black uppercase tracking-wider">
+                              {uploadingCustom ? 'Adding…' : 'Add Media'}
+                            </span>
+                            <span className="text-[9px] text-text-muted">
+                              Image or Video ({carouselAssets.length}/{carouselLimit})
+                            </span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </section>

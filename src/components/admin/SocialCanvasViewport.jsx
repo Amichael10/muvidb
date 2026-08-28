@@ -50,6 +50,7 @@ export default function SocialCanvasViewport({
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeAspect, setActiveAspect] = useState(aspectRatio);
+  const [fitMode, setFitMode] = useState('contain'); // 'contain' (Fit) | 'cover' (Fill)
 
   // In-Canvas Video Trimmer / Cut State
   const videoRef = useRef(null);
@@ -308,15 +309,30 @@ export default function SocialCanvasViewport({
             <Icon icon="solar:magnifer-zoom-in-linear" width="14" />
           </button>
 
-          {/* Fit Viewport */}
+          {/* Fit / Fill Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => setFitMode(m => m === 'contain' ? 'cover' : 'contain')}
+            title={fitMode === 'contain' ? 'Switch to Fill Mode (Scale to fill entire frame)' : 'Switch to Fit Mode (Contain with original aspect)'}
+            className={`flex h-7 items-center gap-1.5 rounded-lg px-2 text-[10px] font-bold transition-all ${
+              fitMode === 'cover'
+                ? 'bg-brand text-white shadow-sm'
+                : 'bg-black/40 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <Icon icon={fitMode === 'cover' ? 'solar:maximize-square-minimalistic-bold' : 'solar:minimize-square-minimalistic-bold'} width="12" />
+            <span>{fitMode === 'cover' ? 'Fill Frame' : 'Fit Frame'}</span>
+          </button>
+
+          {/* Reset Zoom */}
           <button
             type="button"
             onClick={fitToScreen}
-            title="Fit to Canvas"
+            title="Reset Canvas View"
             className="flex h-7 items-center gap-1 rounded-lg bg-black/40 px-2 text-[10px] font-bold text-white/70 hover:bg-white/10 hover:text-white"
           >
             <Icon icon="solar:maximize-square-2-linear" width="12" />
-            <span>Fit</span>
+            <span>Reset View</span>
           </button>
 
           <div className="h-4 w-px bg-white/10" />
@@ -382,7 +398,7 @@ export default function SocialCanvasViewport({
                   playsInline
                   onLoadedMetadata={handleLoadedMetadata}
                   onTimeUpdate={handleTimeUpdate}
-                  className="h-full w-full object-contain"
+                  className={`h-full w-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
                 />
                 {/* Play/Pause Overlay on Click */}
                 <button
@@ -396,7 +412,9 @@ export default function SocialCanvasViewport({
                 </button>
               </div>
             ) : (
-              children
+              <div className={`h-full w-full flex items-center justify-center [&>img]:${fitMode === 'cover' ? 'object-cover' : 'object-contain'} [&>video]:${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}>
+                {children}
+              </div>
             )}
 
             {/* Canvas Corner Dimension Badge */}
