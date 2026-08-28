@@ -1,21 +1,34 @@
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config();
+import { getSupabase } from '../api/_lib/supabase.js';
 
-import { createClient } from '@supabase/supabase-js'
-import * as dotenv from 'dotenv'
+const supabase = getSupabase();
 
-dotenv.config({ path: '.env.local' })
+async function checkFilmsSchema() {
+  const { data: film } = await supabase
+    .from('films')
+    .select('*')
+    .ilike('title', '%Saamu Alajo%')
+    .limit(1);
+  console.log('Saamu Alajo film keys:', film ? Object.keys(film[0]) : 'none');
+  console.log('Saamu Alajo film sample data:', film ? film[0] : null);
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // Check if Tosin Olaniyan has actor claims or credits
+  const { data: claims } = await supabase
+    .from('actor_claims')
+    .select('*')
+    .ilike('actor_name', '%Tosin%');
+  console.log('Actor claims for Tosin:', claims);
 
-const supabase = createClient(supabaseUrl, supabaseKey)
-
-async function checkFilms() {
-  const { data, error } = await supabase.from('films').select('*').limit(1)
-  if (error) console.error(error)
-  else {
-    console.log('Film keys:', Object.keys(data[0]).sort())
-    console.log('First film:', JSON.stringify(data[0], null, 2))
-  }
+  // Check all cast in film_cast for Tosin Olaniyan (id: 364457c8-e535-43d7-aa5a-0d59055c2bbb)
+  const { data: tosinCast } = await supabase
+    .from('film_cast')
+    .select('id, film_id, role, character_name, films(id, title)')
+    .eq('person_id', '364457c8-e535-43d7-aa5a-0d59055c2bbb');
+  console.log('Tosin Olaniyan all cast:', tosinCast);
 }
 
-checkFilms()
+checkFilmsSchema().catch(console.error);

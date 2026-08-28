@@ -48,6 +48,14 @@ async function resumeSync() {
   }
 
   console.log(`✅ Successfully restored sync_enabled = true for exactly ${updatedCount} active channels.`);
+
+  await supabase.from('automation_jobs').upsert({
+    id: 'youtube_sync_paused_channels',
+    status: 'active',
+    last_message: `Sync resumed for ${updatedCount} active channels.`,
+    last_run: new Date().toISOString()
+  });
 }
 
 resumeSync();
+

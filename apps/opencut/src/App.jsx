@@ -15,20 +15,44 @@ function getCanvasSize(config) {
 }
 
 const FRAME_PRESETS = [
-  { id: 'ig-reel', label: 'Instagram Reel', width: 1080, height: 1920, ratio: '9:16' },
+  { id: 'ig-reel', label: 'Instagram Reel / Shorts', width: 1080, height: 1920, ratio: '9:16' },
   { id: 'tiktok', label: 'TikTok', width: 1080, height: 1920, ratio: '9:16' },
-  { id: 'ig-post', label: 'Instagram Post', width: 1080, height: 1080, ratio: '1:1' },
-  { id: 'ig-portrait', label: 'Instagram 4:5', width: 1080, height: 1350, ratio: '4:5' },
+  { id: 'youtube', label: 'YouTube / Landscape', width: 1920, height: 1080, ratio: '16:9' },
+  { id: 'ig-post', label: 'Instagram Square', width: 1080, height: 1080, ratio: '1:1' },
+  { id: 'ig-portrait', label: 'Instagram Portrait', width: 1080, height: 1350, ratio: '4:5' },
+  { id: 'vertical-4k', label: '4K Vertical Ultra HD', width: 2160, height: 3840, ratio: '9:16' },
+  { id: 'landscape-4k', label: '4K Landscape Ultra HD', width: 3840, height: 2160, ratio: '16:9' },
+  { id: 'cinema-ultrawide', label: 'Cinematic 2.39:1', width: 2560, height: 1080, ratio: '21:9' },
+  { id: 'classic-tv', label: 'Classic 4:3', width: 1440, height: 1080, ratio: '4:3' },
   { id: 'twitter', label: 'Twitter / X', width: 1600, height: 900, ratio: '16:9' },
 ];
+
+function getAspectRatioLabel(width, height) {
+  if (!width || !height) return 'Custom';
+  const ratio = width / height;
+  if (Math.abs(ratio - 9 / 16) < 0.02) return '9:16';
+  if (Math.abs(ratio - 16 / 9) < 0.02) return '16:9';
+  if (Math.abs(ratio - 1) < 0.02) return '1:1';
+  if (Math.abs(ratio - 4 / 5) < 0.02) return '4:5';
+  if (Math.abs(ratio - 5 / 4) < 0.02) return '5:4';
+  if (Math.abs(ratio - 4 / 3) < 0.02) return '4:3';
+  if (Math.abs(ratio - 3 / 4) < 0.02) return '3:4';
+  if (Math.abs(ratio - 21 / 9) < 0.05 || Math.abs(ratio - 2.39) < 0.05) return '21:9';
+  const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+  const d = gcd(Math.round(width), Math.round(height));
+  const rw = Math.round(width) / d;
+  const rh = Math.round(height) / d;
+  if (rw <= 20 && rh <= 20) return `${rw}:${rh}`;
+  return `${ratio.toFixed(2)}:1`;
+}
 
 function matchFramePreset(config) {
   const { width, height } = getCanvasSize(config);
   const preferred = FRAME_PRESETS.find((preset) => preset.id === config?.framePreset);
   if (preferred && preferred.width === width && preferred.height === height) return preferred.id;
-  return FRAME_PRESETS.find((preset) => preset.width === width && preset.height === height)?.id
-    || config?.framePreset
-    || 'custom';
+  const matched = FRAME_PRESETS.find((preset) => preset.width === width && preset.height === height);
+  if (matched) return matched.id;
+  return 'custom';
 }
 const STORAGE_KEY = 'muvidb-video-studio-project';
 const SOCIAL_BUCKET = 'social-published-assets';
@@ -391,6 +415,18 @@ function reducer(state, action) {
             layer.height = Math.round((Number(layer.height) || 0) * sy);
           });
         });
+      });
+    case 'set-cover':
+      return withHistory(state, (config) => {
+        config.coverImage = action.coverImage;
+        config.coverTime = action.coverTime ?? 0;
+        config.coverMode = action.coverMode || 'video';
+      });
+    case 'clear-cover':
+      return withHistory(state, (config) => {
+        config.coverImage = '';
+        config.coverTime = null;
+        config.coverMode = 'video';
       });
     case 'add-scene':
       return withHistory(state, (config, next) => {
@@ -1115,11 +1151,17 @@ async function drawLayer(ctx, item, config, cache, layerTime = 0, playing = fals
         const targetTime = localTime % video.duration;
         syncVideoToTime(video, targetTime, { playing, force: !playing });
       }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(video, item.x, item.y, item.width, item.height);
     }
   } else if (item.type === 'image') {
     const image = await loadImage(cache, item.source);
-    if (image) ctx.drawImage(image, item.x, item.y, item.width, item.height);
+    if (image) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(image, item.x, item.y, item.width, item.height);
+    }
   }
   if (item.type === 'shape') {
     paintShape(ctx, item);
@@ -1269,6 +1311,8 @@ function drawSelection(ctx, state, scene, sceneIndex) {
 
 function drawCoverMedia(ctx, media, mediaWidth, mediaHeight, motion, canvasW = DEFAULT_CANVAS_WIDTH, canvasH = DEFAULT_CANVAS_HEIGHT) {
   if (!mediaWidth || !mediaHeight) return;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   const scale = Math.max(canvasW / mediaWidth, canvasH / mediaHeight) * (motion.zoom || 1);
   const drawWidth = mediaWidth * scale;
   const drawHeight = mediaHeight * scale;
@@ -1523,6 +1567,8 @@ async function paintPreview(canvas, state, cache) {
   if (canvas.width !== CANVAS_WIDTH) canvas.width = CANVAS_WIDTH;
   if (canvas.height !== CANVAS_HEIGHT) canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   const item = sceneAtTime(state.config, state.currentTime);
   if (!item) return;
@@ -1825,6 +1871,11 @@ export default function App() {
   const [inspectorTab, setInspectorTab] = useState('inspector');
   const [inspectorSubTab, setInspectorSubTab] = useState('basic'); // 'basic' | 'background' | 'audio' | 'speed' | 'animation'
   const [ratioMenuOpen, setRatioMenuOpen] = useState(false);
+  const [customFrameWidth, setCustomFrameWidth] = useState('1080');
+  const [customFrameHeight, setCustomFrameHeight] = useState('1920');
+  const [customFrameError, setCustomFrameError] = useState('');
+  const [lockAspectRatio, setLockAspectRatio] = useState(false);
+  const [sourceVideoRes, setSourceVideoRes] = useState(null);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [timelineDropIndex, setTimelineDropIndex] = useState(null);
@@ -1842,6 +1893,14 @@ export default function App() {
   const [clipStatus, setClipStatus] = useState('');
   const [clipBusy, setClipBusy] = useState(false);
   const [clipProgress, setClipProgress] = useState(null);
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [coverTab, setCoverTab] = useState('video'); // 'video' | 'upload'
+  const [coverTime, setCoverTime] = useState(0);
+  const [coverUploadPreview, setCoverUploadPreview] = useState(null);
+  const [filmstripThumbnails, setFilmstripThumbnails] = useState([]);
+  const [isGeneratingFilmstrip, setIsGeneratingFilmstrip] = useState(false);
+  const [coverToast, setCoverToast] = useState('');
+  const coverCanvasRef = useRef(null);
   const [socialOpen, setSocialOpen] = useState(false);
   const [socialCaption, setSocialCaption] = useState('');
   const [socialPlatforms, setSocialPlatforms] = useState(['instagram', 'facebook', 'threads', 'tiktok']);
@@ -1873,6 +1932,17 @@ export default function App() {
   const audioTrack = state.config.audio;
   const { width: canvasW, height: canvasH } = getCanvasSize(state.config);
   const activeFrameId = matchFramePreset(state.config);
+  const activePreset = FRAME_PRESETS.find((preset) => preset.id === activeFrameId);
+  const activeFrameRatio = getAspectRatioLabel(canvasW, canvasH);
+  const activeFrameLabel = activePreset
+    ? `${activePreset.label} (${activePreset.ratio})`
+    : `${activeFrameRatio} · ${canvasW}×${canvasH}`;
+
+  useEffect(() => {
+    setCustomFrameWidth(String(canvasW));
+    setCustomFrameHeight(String(canvasH));
+  }, [canvasW, canvasH]);
+
   const selectedName = state.selectedTarget === 'layer'
     ? layerDisplayName(selectedLayer)
     : selectedTargetLabel(state.selectedTarget, selectedScene);
@@ -2193,11 +2263,13 @@ export default function App() {
           finish(rejectMeta, new Error('This source did not provide playable video metadata.'));
           return;
         }
-        finish(resolveMeta, {
+        const meta = {
           duration: video.duration,
           width: video.videoWidth || 0,
           height: video.videoHeight || 0,
-        });
+        };
+        setSourceVideoRes(meta);
+        finish(resolveMeta, meta);
       };
       video.onerror = () => finish(rejectMeta, new Error('The selected source is not a playable video or blocks canvas playback.'));
       video.src = resolveAssetPath(source);
@@ -2796,6 +2868,203 @@ export default function App() {
     barDragRef.current = null;
   }
 
+  function applyCustomFrame(overrideWidth = null, overrideHeight = null) {
+    const width = Math.round(Number(overrideWidth ?? customFrameWidth));
+    const height = Math.round(Number(overrideHeight ?? customFrameHeight));
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 16 || height < 16 || width > 7680 || height > 7680) {
+      setCustomFrameError('Use whole-number dimensions from 16 to 7680 pixels.');
+      return;
+    }
+    dispatch({ type: 'set-frame', id: 'custom', width, height });
+    setCustomFrameWidth(String(width));
+    setCustomFrameHeight(String(height));
+    setCustomFrameError('');
+    setRatioMenuOpen(false);
+  }
+
+  function handleCustomWidthChange(val) {
+    setCustomFrameWidth(val);
+    setCustomFrameError('');
+    const numW = Number(val);
+    if (lockAspectRatio && Number.isFinite(numW) && numW > 0 && canvasW > 0 && canvasH > 0) {
+      const currentRatio = canvasW / canvasH;
+      const computedH = Math.round(numW / currentRatio);
+      if (computedH >= 16 && computedH <= 7680) {
+        setCustomFrameHeight(String(computedH));
+      }
+    }
+  }
+
+  function handleCustomHeightChange(val) {
+    setCustomFrameHeight(val);
+    setCustomFrameError('');
+    const numH = Number(val);
+    if (lockAspectRatio && Number.isFinite(numH) && numH > 0 && canvasW > 0 && canvasH > 0) {
+      const currentRatio = canvasW / canvasH;
+      const computedW = Math.round(numH * currentRatio);
+      if (computedW >= 16 && computedW <= 7680) {
+        setCustomFrameWidth(String(computedW));
+      }
+    }
+  }
+
+  function applyQuickAspectPreset(ratioW, ratioH) {
+    const currentW = Math.round(Number(customFrameWidth)) || canvasW || 1080;
+    const computedH = Math.round((currentW * ratioH) / ratioW);
+    setCustomFrameWidth(String(currentW));
+    setCustomFrameHeight(String(computedH));
+    applyCustomFrame(currentW, computedH);
+  }
+
+  function toggle4KResolution() {
+    const currentW = Math.round(Number(customFrameWidth)) || canvasW || 1080;
+    const currentH = Math.round(Number(customFrameHeight)) || canvasH || 1920;
+    const is4K = currentW >= 2160 || currentH >= 2160;
+    const scaleFactor = is4K ? 0.5 : 2;
+    const newW = Math.round(currentW * scaleFactor);
+    const newH = Math.round(currentH * scaleFactor);
+    setCustomFrameWidth(String(newW));
+    setCustomFrameHeight(String(newH));
+    applyCustomFrame(newW, newH);
+  }
+
+  function matchSourceResolution() {
+    if (!sourceVideoRes?.width || !sourceVideoRes?.height) return;
+    setCustomFrameWidth(String(sourceVideoRes.width));
+    setCustomFrameHeight(String(sourceVideoRes.height));
+    applyCustomFrame(sourceVideoRes.width, sourceVideoRes.height);
+  }
+
+  async function generateFilmstrip() {
+    setIsGeneratingFilmstrip(true);
+    try {
+      const dur = Math.max(0.5, timelineDuration(state.config));
+      const sampleCount = 10;
+      const thumbs = [];
+      const offscreen = document.createElement('canvas');
+      offscreen.width = 160;
+      offscreen.height = 90;
+      for (let i = 0; i < sampleCount; i += 1) {
+        const t = (i / (sampleCount - 1)) * dur;
+        const tempState = {
+          config: state.config,
+          currentTime: t,
+          selectedTarget: 'none',
+          selectedSceneIndex: -1,
+          selectedLayerIndex: -1,
+          isPlaying: false,
+        };
+        await paintPreview(offscreen, tempState, imageCacheRef.current);
+        thumbs.push({ time: t, url: offscreen.toDataURL('image/jpeg', 0.8) });
+      }
+      setFilmstripThumbnails(thumbs);
+    } catch {
+      // Fallback silently
+    } finally {
+      setIsGeneratingFilmstrip(false);
+    }
+  }
+
+  function openCoverModal() {
+    setCoverModalOpen(true);
+    setCoverTime(state.config.coverTime != null ? state.config.coverTime : state.currentTime || 0);
+    if (state.config.coverMode === 'upload' && state.config.coverImage) {
+      setCoverTab('upload');
+      setCoverUploadPreview(state.config.coverImage);
+    } else {
+      setCoverTab('video');
+      setCoverUploadPreview(null);
+    }
+    generateFilmstrip();
+  }
+
+  useEffect(() => {
+    if (!coverModalOpen || !coverCanvasRef.current) return;
+    const canvas = coverCanvasRef.current;
+    if (coverTab === 'upload' && coverUploadPreview) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.clearRect(0, 0, canvasW, canvasH);
+        drawCoverMedia(ctx, img, img.naturalWidth || img.width, img.naturalHeight || img.height, { zoom: 1, x: 0, y: 0 }, canvasW, canvasH);
+      };
+      img.src = coverUploadPreview;
+    } else {
+      const tempState = {
+        config: state.config,
+        currentTime: coverTime,
+        selectedTarget: 'none',
+        selectedSceneIndex: -1,
+        selectedLayerIndex: -1,
+        isPlaying: false,
+      };
+      paintPreview(canvas, tempState, imageCacheRef.current);
+    }
+  }, [coverModalOpen, coverTab, coverTime, coverUploadPreview, canvasW, canvasH, state.config]);
+
+  function handleCoverImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setCoverUploadPreview(e.target.result);
+      setCoverTab('upload');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function applyCoverSelection() {
+    if (!coverCanvasRef.current) return;
+    try {
+      const dataUrl = coverCanvasRef.current.toDataURL('image/jpeg', 0.95);
+      dispatch({
+        type: 'set-cover',
+        coverImage: dataUrl,
+        coverTime: coverTab === 'video' ? coverTime : null,
+        coverMode: coverTab,
+      });
+      setCoverToast('Cover saved!');
+      setTimeout(() => setCoverToast(''), 3000);
+    } catch {
+      if (coverTab === 'upload' && coverUploadPreview) {
+        dispatch({
+          type: 'set-cover',
+          coverImage: coverUploadPreview,
+          coverTime: null,
+          coverMode: 'upload',
+        });
+      }
+    }
+    setCoverModalOpen(false);
+  }
+
+  function downloadCoverImage() {
+    if (!coverCanvasRef.current) return;
+    try {
+      const dataUrl = coverCanvasRef.current.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${(state.config.title || 'video').toLowerCase().replace(/\s+/g, '-')}-cover.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      // ignore
+    }
+  }
+
+  function clearCoverSelection() {
+    dispatch({ type: 'clear-cover' });
+    setCoverUploadPreview(null);
+    setCoverModalOpen(false);
+    setCoverToast('Cover reset to default.');
+    setTimeout(() => setCoverToast(''), 3000);
+  }
+
   async function handleExportToSocial() {
     if (!socialPlatforms.length) { setSocialStatus('Choose at least one platform.'); return; }
     setSocialBusy(true);
@@ -3181,20 +3450,118 @@ export default function App() {
           </div>
 
           <div className="mb-3">
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muvi-muted">Frame size</p>
-            <div className="grid grid-cols-1 gap-1.5">
-              {FRAME_PRESETS.map((preset) => (
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muvi-muted">Frame size & Ratio</p>
+              <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#FF5C00]">{activeFrameRatio}</span>
+            </div>
+
+            {/* Source Match (if available) */}
+            {sourceVideoRes?.width && sourceVideoRes?.height && (
+              <button
+                type="button"
+                onClick={matchSourceResolution}
+                className="mb-2 group flex w-full items-center justify-between rounded-xl border border-[#FF5C00]/40 bg-[#FF5C00]/15 p-2 text-left transition hover:bg-[#FF5C00]/25"
+              >
+                <div>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-white">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#FF5C00] animate-pulse" />
+                    Match Source Video
+                  </div>
+                  <div className="text-[10px] text-white/60">
+                    {sourceVideoRes.width} × {sourceVideoRes.height} px
+                  </div>
+                </div>
+                <span className="rounded bg-[#FF5C00] px-1.5 py-0.5 text-[10px] font-bold text-black">Apply</span>
+              </button>
+            )}
+
+            {/* Quick Ratios */}
+            <div className="mb-2 grid grid-cols-4 gap-1">
+              {[
+                { label: '9:16', w: 9, h: 16 },
+                { label: '16:9', w: 16, h: 9 },
+                { label: '1:1', w: 1, h: 1 },
+                { label: '4:5', w: 4, h: 5 },
+                { label: '21:9', w: 21, h: 9 },
+                { label: '4:3', w: 4, h: 3 },
+              ].map(r => (
                 <button
-                  key={`clip-frame-${preset.id}`}
+                  key={`sb-ratio-${r.label}`}
                   type="button"
-                  aria-label={`Frame ${preset.label}`}
-                  className={`rounded-lg border px-3 py-2 text-left text-xs transition ${activeFrameId === preset.id ? 'border-muvi-accent bg-muvi-accent/15 text-white' : 'border-white/10 bg-white/5 text-muvi-muted hover:bg-white/10 hover:text-white'}`}
-                  onClick={() => dispatch({ type: 'set-frame', id: preset.id, width: preset.width, height: preset.height })}
+                  onClick={() => applyQuickAspectPreset(r.w, r.h)}
+                  className={`rounded-lg border px-1.5 py-1 text-center text-[11px] font-bold transition ${
+                    activeFrameRatio === r.label
+                      ? 'border-[#FF5C00] bg-[#FF5C00]/20 text-[#FF5C00]'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                  }`}
                 >
-                  <span className="font-bold text-white">{preset.label}</span>
-                  <span className="mt-0.5 block text-[10px]">{preset.ratio} · {preset.width}×{preset.height}</span>
+                  {r.label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={toggle4KResolution}
+                className={`col-span-2 rounded-lg border px-1.5 py-1 text-center text-[10px] font-extrabold transition ${
+                  (canvasW >= 2160 || canvasH >= 2160)
+                    ? 'border-[#FF5C00] bg-[#FF5C00] text-black shadow-md shadow-[#FF5C00]/30'
+                    : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {(canvasW >= 2160 || canvasH >= 2160) ? '✨ 4K Active' : '🚀 Switch to 4K'}
+              </button>
+            </div>
+
+            {/* Custom Pixel Inputs */}
+            <div className={`rounded-xl border p-2.5 ${activeFrameId === 'custom' ? 'border-[#FF5C00]/40 bg-[#FF5C00]/10' : 'border-white/10 bg-white/5'}`}>
+              <div className="mb-1.5 flex items-center justify-between gap-1">
+                <span className="text-xs font-bold text-white">Custom Dimensions</span>
+                <label className="flex items-center gap-1 text-[10px] text-white/60 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={lockAspectRatio}
+                    onChange={(e) => setLockAspectRatio(e.target.checked)}
+                    className="rounded border-white/20 bg-black/40 accent-[#FF5C00]"
+                  />
+                  <span>Lock aspect</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+                <div>
+                  <span className="mb-0.5 block text-[9px] text-white/40">Width</span>
+                  <input
+                    aria-label="Custom frame width"
+                    className="control min-w-0 px-2 py-1 text-xs font-mono"
+                    type="number"
+                    min="16"
+                    max="7680"
+                    step="10"
+                    value={customFrameWidth}
+                    onChange={(e) => handleCustomWidthChange(e.target.value)}
+                  />
+                </div>
+                <span className="self-end pb-2 text-xs text-white/40">×</span>
+                <div>
+                  <span className="mb-0.5 block text-[9px] text-white/40">Height</span>
+                  <input
+                    aria-label="Custom frame height"
+                    className="control min-w-0 px-2 py-1 text-xs font-mono"
+                    type="number"
+                    min="16"
+                    max="7680"
+                    step="10"
+                    value={customFrameHeight}
+                    onChange={(e) => handleCustomHeightChange(e.target.value)}
+                  />
+                </div>
+              </div>
+              {customFrameError && <p className="mt-1 text-[10px] text-red-300">{customFrameError}</p>}
+              <button
+                type="button"
+                className="btn mt-2 w-full py-1.5 text-xs font-bold bg-[#FF5C00] text-black hover:bg-[#FF7A30]"
+                onClick={() => applyCustomFrame()}
+              >
+                Apply Custom Size ({getAspectRatioLabel(Number(customFrameWidth), Number(customFrameHeight))})
+              </button>
             </div>
           </div>
 
@@ -3548,6 +3915,36 @@ export default function App() {
               <span>Replace Media File</span>
               <input className="hidden" type="file" accept="image/*,video/*,.gif,.mp4,.mov,.m4v,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) importAsset(file, (value) => ({ type: 'background', key: 'image', value })); event.target.value = ''; }} />
             </label>
+          </div>
+
+          <div className="pt-2 border-t border-white/10">
+            <label className="label text-xs font-semibold text-white/80">Video Cover / Thumbnail</label>
+            <div className="mt-2 flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-12 w-12 shrink-0 rounded-lg border border-white/15 bg-black/40 overflow-hidden flex items-center justify-center">
+                  {state.config.coverImage ? (
+                    <img src={state.config.coverImage} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-white/40">Auto</span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-white">
+                    {state.config.coverImage ? 'Custom Cover' : 'Default Frame'}
+                  </p>
+                  <p className="truncate text-[11px] text-white/40">
+                    {state.config.coverMode === 'upload' ? 'Uploaded Image' : state.config.coverTime != null ? `Frame at ${formatSecondsToTimecode(state.config.coverTime)}` : 'First Frame'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={openCoverModal}
+                className="shrink-0 rounded-lg bg-cyan-400 px-3 py-1.5 text-xs font-bold text-black hover:bg-cyan-300 transition shadow-sm"
+              >
+                {state.config.coverImage ? 'Edit' : 'Add'}
+              </button>
+            </div>
           </div>
         </section>
       );
@@ -3935,6 +4332,23 @@ export default function App() {
             >
               <span>📐 Fill</span>
             </button>
+            <span className="mx-1 h-3.5 w-px bg-white/15" />
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-xs font-bold text-cyan-100 hover:bg-cyan-400/20"
+              title="Set or customize video cover thumbnail"
+              onClick={openCoverModal}
+            >
+              <svg className="h-3.5 w-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <path d="M21 15l-5-5L5 21"></path>
+              </svg>
+              <span>Cover</span>
+              {state.config.coverImage && (
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              )}
+            </button>
           </div>
 
           {/* Center Playhead Counter */}
@@ -4069,8 +4483,29 @@ export default function App() {
 
               {/* Main Video Track */}
               <div className={`track-row h-12 ${state.selectedTarget === 'background' ? 'bg-[#FF5C00]/[0.08]' : ''}`}>
-                <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-2 border-r border-white/[0.05] px-2">
-                  <span className="grid h-6 w-6 place-items-center rounded bg-[#FF5C00]/20 text-xs text-[#FF8A45]">▶</span>
+                <div style={{ width: TRACK_LABEL_WIDTH }} className="flex shrink-0 items-center gap-1.5 border-r border-white/[0.05] px-1.5">
+                  {/* CapCut Add Cover Button */}
+                  <button
+                    type="button"
+                    onClick={openCoverModal}
+                    className="group relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/20 bg-white/5 transition hover:border-cyan-400 hover:bg-cyan-500/10 shadow-sm"
+                    title={state.config.coverImage ? "Edit video cover thumbnail" : "Add video cover thumbnail"}
+                  >
+                    {state.config.coverImage ? (
+                      <img src={state.config.coverImage} alt="Cover" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-white/70 group-hover:text-cyan-400">
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 20h9"></path>
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-[7px] font-extrabold text-cyan-300 uppercase tracking-tighter">
+                      Cover
+                    </div>
+                  </button>
+
                   <button
                     type="button"
                     className={`min-w-0 flex-1 truncate text-left text-[11px] font-bold ${state.selectedTarget === 'background' ? 'text-[#FF5C00]' : 'text-white/90'}`}
@@ -4445,32 +4880,165 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setRatioMenuOpen(prev => !prev)}
-                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/10 bg-[#16181c]/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-white shadow-2xl backdrop-blur transition hover:bg-white/15"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/15 bg-[#16181c]/95 px-3 py-2 text-xs font-bold text-white shadow-2xl backdrop-blur transition hover:border-[#FF5C00]/50 hover:bg-[#1f2227]"
                 >
-                  <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#FF5C00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-4 w-4 text-[#FF5C00]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"></rect>
                   </svg>
                   <span>Ratio</span>
-                  <span className="text-[10px] text-white/50">{FRAME_PRESETS.find(p => p.id === activeFrameId)?.label || '9:16'}</span>
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-[#FF5C00]">{activeFrameRatio}</span>
+                  <span className="text-[10px] text-white/50">{canvasW}×{canvasH}</span>
                 </button>
                 {ratioMenuOpen && (
-                  <div className="absolute left-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-[#16181c]/95 p-1.5 shadow-2xl backdrop-blur z-40">
-                    {FRAME_PRESETS.map((preset) => (
+                  <div className="absolute left-0 top-full mt-2 w-72 sm:w-80 rounded-2xl border border-white/15 bg-[#16181c]/98 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl z-50">
+                    
+                    {/* Source Video Match (If Detected) */}
+                    {sourceVideoRes?.width && sourceVideoRes?.height && (
+                      <div className="mb-2.5">
+                        <button
+                          type="button"
+                          onClick={matchSourceResolution}
+                          className="group flex w-full items-center justify-between rounded-xl border border-[#FF5C00]/40 bg-[#FF5C00]/15 p-2.5 text-left transition hover:bg-[#FF5C00]/25 hover:border-[#FF5C00]"
+                        >
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                              <span className="inline-block h-2 w-2 rounded-full bg-[#FF5C00] animate-pulse" />
+                              Match Source Video
+                              {(sourceVideoRes.width >= 3840 || sourceVideoRes.height >= 3840) && (
+                                <span className="rounded bg-[#FF5C00] px-1 py-0.2 text-[9px] font-extrabold text-black uppercase">4K UHD</span>
+                              )}
+                            </div>
+                            <div className="mt-0.5 text-[11px] text-white/60">
+                              {sourceVideoRes.width} × {sourceVideoRes.height} px · {getAspectRatioLabel(sourceVideoRes.width, sourceVideoRes.height)}
+                            </div>
+                          </div>
+                          <span className="rounded-lg bg-[#FF5C00] px-2 py-1 text-[11px] font-bold text-black transition group-hover:scale-105">
+                            Apply
+                          </span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Quick Aspect Ratio Selector Tabs */}
+                    <div className="mb-2">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">Quick Ratios</p>
+                      <div className="grid grid-cols-4 gap-1">
+                        {[
+                          { label: '9:16', w: 9, h: 16 },
+                          { label: '16:9', w: 16, h: 9 },
+                          { label: '1:1', w: 1, h: 1 },
+                          { label: '4:5', w: 4, h: 5 },
+                          { label: '21:9', w: 21, h: 9 },
+                          { label: '4:3', w: 4, h: 3 },
+                        ].map(r => (
+                          <button
+                            key={`top-ratio-${r.label}`}
+                            type="button"
+                            onClick={() => applyQuickAspectPreset(r.w, r.h)}
+                            className={`rounded-lg border px-2 py-1.5 text-center text-xs font-bold transition ${
+                              activeFrameRatio === r.label
+                                ? 'border-[#FF5C00] bg-[#FF5C00]/20 text-[#FF5C00]'
+                                : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            {r.label}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={toggle4KResolution}
+                          className={`col-span-2 flex items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-center text-[11px] font-extrabold transition ${
+                            (canvasW >= 2160 || canvasH >= 2160)
+                              ? 'border-[#FF5C00] bg-[#FF5C00] text-black shadow-lg shadow-[#FF5C00]/30'
+                              : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+                          }`}
+                          title="Toggle between 1080p Standard HD and 4K Ultra HD"
+                        >
+                          <span>{(canvasW >= 2160 || canvasH >= 2160) ? '✨ 4K Active' : '🚀 Switch to 4K'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Presets List */}
+                    <div className="mb-2 max-h-36 overflow-y-auto pr-1 space-y-1">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">Presets</p>
+                      {FRAME_PRESETS.map((preset) => (
+                        <button
+                          key={`floating-preset-${preset.id}`}
+                          type="button"
+                          onClick={() => {
+                            dispatch({ type: 'set-frame', id: preset.id, width: preset.width, height: preset.height });
+                            setRatioMenuOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                            activeFrameId === preset.id
+                              ? 'bg-[#FF5C00]/20 text-[#FF5C00] font-bold'
+                              : 'text-white/80 hover:bg-white/10 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span>{preset.label}</span>
+                            {preset.width >= 2160 && (
+                              <span className="rounded bg-white/15 px-1 py-0.2 text-[9px] font-mono text-white/70">4K</span>
+                            )}
+                          </div>
+                          <span className="font-mono text-[10px] text-white/40">{preset.ratio} · {preset.width}×{preset.height}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Custom Manual Adjustment */}
+                    <div className="border-t border-white/10 pt-2">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Custom Dimensions</span>
+                        <label className="flex items-center gap-1 text-[11px] font-medium text-white/70 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={lockAspectRatio}
+                            onChange={(e) => setLockAspectRatio(e.target.checked)}
+                            className="rounded border-white/20 bg-black/40 accent-[#FF5C00]"
+                          />
+                          <span>Lock aspect</span>
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+                        <div>
+                          <span className="mb-0.5 block text-[9px] text-white/40">Width</span>
+                          <input
+                            aria-label="Custom width"
+                            className="control min-w-0 px-2 py-1 text-xs font-mono"
+                            type="number"
+                            min="16"
+                            max="7680"
+                            step="10"
+                            value={customFrameWidth}
+                            onChange={(e) => handleCustomWidthChange(e.target.value)}
+                          />
+                        </div>
+                        <span className="self-end pb-2 text-xs font-bold text-white/40">×</span>
+                        <div>
+                          <span className="mb-0.5 block text-[9px] text-white/40">Height</span>
+                          <input
+                            aria-label="Custom height"
+                            className="control min-w-0 px-2 py-1 text-xs font-mono"
+                            type="number"
+                            min="16"
+                            max="7680"
+                            step="10"
+                            value={customFrameHeight}
+                            onChange={(e) => handleCustomHeightChange(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      {customFrameError && <p className="mt-1 text-[10px] text-red-300">{customFrameError}</p>}
                       <button
-                        key={preset.id}
                         type="button"
-                        onClick={() => {
-                          dispatch({ type: 'set-frame', id: preset.id, width: preset.width, height: preset.height });
-                          setRatioMenuOpen(false);
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                          activeFrameId === preset.id ? 'bg-[#FF5C00]/20 text-[#FF5C00]' : 'text-white/80 hover:bg-white/10 hover:text-white'
-                        }`}
+                        className="mt-2 w-full rounded-xl bg-[#FF5C00] py-2 text-xs font-bold text-black shadow-lg shadow-[#FF5C00]/25 transition hover:bg-[#FF7A30] hover:scale-[1.01]"
+                        onClick={() => applyCustomFrame()}
                       >
-                        <span>{preset.label}</span>
-                        <span className="font-mono text-[10px] text-white/40">{preset.ratio}</span>
+                        Apply Custom Frame ({getAspectRatioLabel(Number(customFrameWidth), Number(customFrameHeight))})
                       </button>
-                    ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -4682,6 +5250,261 @@ export default function App() {
               <button className="btn-accent" disabled={socialBusy || !socialPlatforms.length} onClick={handleExportToSocial}>{socialBusy ? 'Preparing…' : socialPostNow ? 'Export & post now' : socialSchedule ? 'Export & schedule' : 'Export to drafts'}</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* CapCut Add Cover Modal */}
+      {coverModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex w-full max-w-2xl flex-col rounded-2xl border border-white/15 bg-[#17191d] shadow-[0_25px_60px_rgba(0,0,0,0.85)] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4">
+              <h2 className="text-base font-black text-white flex items-center gap-2">
+                <span>Add cover</span>
+                {state.config.coverImage && (
+                  <span className="rounded-full bg-cyan-400/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300">Custom Active</span>
+                )}
+              </h2>
+              <button
+                type="button"
+                className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white transition"
+                onClick={() => setCoverModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Segmented Tab Selector (From video / Upload) */}
+            <div className="flex justify-center border-b border-white/[0.04] bg-black/20 py-3">
+              <div className="inline-flex rounded-xl bg-white/5 p-1 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setCoverTab('video')}
+                  className={`rounded-lg px-6 py-1.5 text-xs font-bold transition ${
+                    coverTab === 'video'
+                      ? 'bg-white text-black shadow-md'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  From video
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverTab('upload')}
+                  className={`rounded-lg px-6 py-1.5 text-xs font-bold transition ${
+                    coverTab === 'upload'
+                      ? 'bg-white text-black shadow-md'
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  Upload
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col items-center">
+              {coverTab === 'video' ? (
+                <div className="w-full flex flex-col items-center">
+                  {/* Aspect Ratio Canvas Preview Frame */}
+                  <div className="relative flex items-center justify-center rounded-2xl bg-black/60 p-3 border border-white/10 shadow-inner max-h-[300px] min-h-[220px] w-full">
+                    <canvas
+                      ref={coverCanvasRef}
+                      className="max-h-[280px] max-w-full rounded-xl object-contain shadow-2xl border border-white/10"
+                    />
+                    <div className="absolute top-4 left-4 rounded-lg bg-black/60 px-2 py-1 text-[10px] font-mono text-white/80 backdrop-blur">
+                      {activeFrameRatio} · {canvasW}×{canvasH}
+                    </div>
+                  </div>
+
+                  {/* Playhead Sync Action */}
+                  <div className="mt-3 flex w-full items-center justify-between text-xs text-white/70 px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-cyan-400">
+                        {formatSecondsToTimecode(coverTime)}
+                      </span>
+                      <span className="text-white/30">/</span>
+                      <span className="font-mono text-xs text-white/50">
+                        {formatSecondsToTimecode(totalDuration)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCoverTime(state.currentTime)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-cyan-400 hover:text-cyan-300 hover:underline"
+                    >
+                      <span>⏱ Snap to current player frame ({formatSecondsToTimecode(state.currentTime)})</span>
+                    </button>
+                  </div>
+
+                  {/* Filmstrip Scrubber Ribbon */}
+                  <div className="mt-3 w-full">
+                    <div
+                      className="relative h-16 w-full cursor-pointer select-none overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-inner"
+                      onPointerDown={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                        setCoverTime(fraction * totalDuration);
+                      }}
+                      onPointerMove={(e) => {
+                        if (e.buttons === 1) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                          setCoverTime(fraction * totalDuration);
+                        }
+                      }}
+                    >
+                      {/* Filmstrip thumbnails */}
+                      <div className="flex h-full w-full pointer-events-none">
+                        {filmstripThumbnails.length > 0 ? (
+                          filmstripThumbnails.map((thumb, idx) => (
+                            <img
+                              key={idx}
+                              src={thumb.url}
+                              alt=""
+                              className="h-full flex-1 object-cover border-r border-black/30 last:border-r-0 opacity-80 hover:opacity-100"
+                            />
+                          ))
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-white/5 text-[11px] text-white/40">
+                            {isGeneratingFilmstrip ? 'Generating video filmstrip…' : 'Drag scrubber to select cover frame'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Scrubber Needle Handle */}
+                      <div
+                        className="pointer-events-none absolute top-0 bottom-0 z-20 flex flex-col items-center"
+                        style={{
+                          left: `${totalDuration > 0 ? (coverTime / totalDuration) * 100 : 0}%`,
+                          transform: 'translateX(-50%)',
+                        }}
+                      >
+                        <div className="h-2.5 w-3 rounded-b bg-cyan-400 shadow-md flex items-center justify-center">
+                          <span className="text-[6px] text-black">▼</span>
+                        </div>
+                        <div className="w-0.5 flex-1 bg-cyan-400 shadow-[0_0_8px_#00c5d7]" />
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-center text-[10px] text-white/40">
+                      Click or drag across the filmstrip to select your ideal video cover frame
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Upload Tab */
+                <div className="w-full flex flex-col items-center">
+                  {coverUploadPreview ? (
+                    <div className="w-full flex flex-col items-center">
+                      <div className="relative flex items-center justify-center rounded-2xl bg-black/60 p-3 border border-white/10 shadow-inner max-h-[300px] min-h-[220px] w-full">
+                        <canvas
+                          ref={coverCanvasRef}
+                          className="max-h-[280px] max-w-full rounded-xl object-contain shadow-2xl border border-white/10"
+                        />
+                        <div className="absolute top-4 left-4 rounded-lg bg-black/60 px-2 py-1 text-[10px] font-mono text-white/80 backdrop-blur">
+                          Custom Upload · {activeFrameRatio}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <label className="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-bold text-white hover:bg-white/10 transition">
+                          Change image
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              handleCoverImageFile(e.target.files?.[0]);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setCoverUploadPreview(null)}
+                          className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-300 hover:bg-red-500/20"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="group flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-cyan-400/40 bg-cyan-400/[0.03] p-10 transition hover:border-cyan-400 hover:bg-cyan-400/[0.08] min-h-[260px]">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-cyan-400/15 text-cyan-400 transition group-hover:scale-110 shadow-lg shadow-cyan-400/20">
+                        <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="12" y1="8" x2="12" y2="16"></line>
+                          <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                      </div>
+                      <p className="mt-4 text-sm font-bold text-white">Click to upload or drop an image here</p>
+                      <p className="mt-1 text-xs text-white/50">Recommended ratio: {activeFrameRatio} (PNG, JPG, WebP)</p>
+                      <input
+                        type="file"
+                        accept="image/*,.png,.jpg,.jpeg,.webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          handleCoverImageFile(e.target.files?.[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-between border-t border-white/[0.08] bg-[#14161a] px-6 py-4">
+              <div className="flex items-center gap-2">
+                {state.config.coverImage && (
+                  <button
+                    type="button"
+                    onClick={clearCoverSelection}
+                    className="rounded-lg px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/15 transition"
+                  >
+                    Reset Cover
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={downloadCoverImage}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white transition"
+                  title="Download this cover frame to your device"
+                >
+                  <span>⬇ Download</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white transition"
+                  onClick={() => setCoverModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={applyCoverSelection}
+                  className="flex items-center gap-1.5 rounded-xl bg-[#00c5d7] px-5 py-2 text-xs font-bold text-black shadow-lg shadow-[#00c5d7]/25 transition hover:bg-[#00d8eb] hover:scale-[1.02]"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                  <span>Apply cover</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast feedback */}
+      {coverToast && (
+        <div className="fixed bottom-6 right-6 z-[90] flex items-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-950/90 px-4 py-2.5 text-xs font-bold text-cyan-100 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+          <span>✨</span>
+          <span>{coverToast}</span>
         </div>
       )}
     </div>
