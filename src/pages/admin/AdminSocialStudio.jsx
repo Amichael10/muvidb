@@ -512,6 +512,19 @@ export default function AdminSocialStudio() {
     fetchCalendar();
   }, []);
 
+  // Real-time polling while any post is actively publishing or scheduled
+  useEffect(() => {
+    const hasActivePublishing = drafts.some(d => d.status === 'publishing' || d.status === 'processing');
+    if (!hasActivePublishing) return;
+
+    const interval = setInterval(() => {
+      fetchSummary();
+      fetchDrafts();
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [drafts]);
+
   useEffect(() => {
     const threadsRes = searchParams.get('threads');
     const metaRes = searchParams.get('meta');
@@ -677,6 +690,7 @@ export default function AdminSocialStudio() {
 
   const runPublishNow = async contentItemId => {
     setReviewingId(contentItemId);
+    const toastId = toast.loading('Initiating instant publish for selected channels...');
     try {
       const schedRes = await fetch('/api/social?task=schedule', {
         method: 'POST',
@@ -692,10 +706,10 @@ export default function AdminSocialStudio() {
       const pubData = await pubRes.json().catch(() => ({}));
       if (!pubRes.ok) throw new Error(pubData.error || `HTTP ${pubRes.status}`);
 
-      toast.success('Publishing triggered!');
+      toast.success('Publishing in progress! Uploading & publishing to selected channels.', { id: toastId });
       refreshAll();
     } catch (err) {
-      toast.error(err.message || 'Failed to trigger publishing');
+      toast.error(err.message || 'Failed to trigger publishing', { id: toastId });
     } finally {
       setReviewingId(null);
     }
@@ -1328,15 +1342,42 @@ export default function AdminSocialStudio() {
 
                     {/* Actions & Status Controls */}
                     <div className="flex flex-wrap items-center gap-2">
-                      {variants.map(variant => (
-                        <span
-                          key={variant.id}
-                          className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1 text-[10px] font-bold text-text-muted"
-                        >
-                          <Icon icon={`simple-icons:${variant.platform}`} width="12" />
-                          {variant.platform}
-                        </span>
-                      ))}
+                      {variants.map(variant => {
+                        const isPublished = variant.status === 'published';
+                        const isPublishing = variant.status === 'publishing' || variant.status === 'processing';
+                        const isFailed = variant.status === 'failed';
+                        return (
+                          <span
+                            key={variant.id}
+                            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-bold ${
+                              isPublished
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                : isPublishing
+                                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 animate-pulse'
+                                  : isFailed
+                                    ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                                    : 'border-border bg-surface-2 text-text-muted'
+                            }`}
+                            title={variant.last_error_message || variant.status}
+                          >
+                            <Icon icon={`simple-icons:${variant.platform}`} width="12" />
+                            <span className="capitalize">{variant.platform}</span>
+                            {isPublished && <Icon icon="solar:check-circle-bold" width="12" className="text-emerald-400" />}
+                            {isPublishing && <Icon icon="solar:spinner-linear" width="12" className="animate-spin text-amber-400" />}
+                            {isFailed && <Icon icon="solar:close-circle-bold" width="12" className="text-red-400" />}
+                            {variant.external_permalink && (
+                              <a
+                                href={variant.external_permalink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-1 text-emerald-400 underline hover:text-emerald-300"
+                              >
+                                View
+                              </a>
+                            )}
+                          </span>
+                        );
+                      })}
 
                       {canChangeQueueItem && (
                         <>
@@ -1428,12 +1469,18 @@ export default function AdminSocialStudio() {
                         <button
                           type="button"
                           onClick={() => runPublishNow(item.id)}
-                          disabled={reviewingId === item.id}
-                          className="rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50 inline-flex items-center gap-1 shadow-xs"
+                          disabled={reviewingId === item.id || item.status === 'publishing'}
+                          className="rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50 inline-flex items-center gap-1.5 shadow-xs transition-colors"
                           title="Trigger immediate publish for this post"
                         >
-                          <Icon icon="solar:bolt-bold" width="13" />
-                          <span>Publish Now</span>
+                          <Icon
+                            icon={reviewingId === item.id || item.status === 'publishing' ? 'solar:spinner-linear' : 'solar:bolt-bold'}
+                            className={reviewingId === item.id || item.status === 'publishing' ? 'animate-spin' : ''}
+                            width="13"
+                          />
+                          <span>
+                            {reviewingId === item.id || item.status === 'publishing' ? 'Publishing...' : 'Publish Now'}
+                          </span>
                         </button>
 
                         <div className="flex items-center gap-2 ml-auto">
