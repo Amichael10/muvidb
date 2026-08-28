@@ -427,18 +427,18 @@ export default function SocialDraftComposer({
     }
     setUploadingCustom(true);
     try {
-      if (postFormat === 'carousel') {
+      const isCarouselMode = activeVariantPostFormat === 'carousel';
+      const currentList = activeVariantCarouselAssets;
+      if (isCarouselMode) {
         if (replaceSlideIndex !== null && files.length !== 1) {
           throw new Error('Choose one file to replace this carousel item');
         }
         const projectedCount = replaceSlideIndex === null
-          ? carouselAssets.length + files.length
-          : carouselAssets.length;
-        if (projectedCount < 2 || projectedCount > carouselLimit) {
-          throw new Error(`Choose enough media for 2–${carouselLimit} carousel items on the selected platforms`);
+          ? currentList.length + files.length
+          : currentList.length;
+        if (projectedCount > carouselLimit) {
+          throw new Error(`Platform limit reached (max ${carouselLimit} items)`);
         }
-        const containsVideo = files.some(file => mediaTypeForFile(file) === 'video')
-          || carouselAssets.some(asset => asset.mediaType === 'video');
 
         const uploadedAssets = [];
         for (const file of files) {
@@ -453,8 +453,8 @@ export default function SocialDraftComposer({
         }
 
         const nextAssets = replaceSlideIndex === null
-          ? [...carouselAssets, ...uploadedAssets]
-          : carouselAssets.map((asset, index) => index === replaceSlideIndex ? uploadedAssets[0] : asset);
+          ? [...currentList, ...uploadedAssets]
+          : currentList.map((asset, index) => index === replaceSlideIndex ? uploadedAssets[0] : asset);
 
         const targetVariantId = uploadScope === 'active' ? activeVariant?.id : undefined;
         const res = await fetch('/api/social?task=attach_carousel_assets', {
@@ -485,8 +485,16 @@ export default function SocialDraftComposer({
         }));
         setCarouselAssets(attached);
 
+        const newMediaAssets = uploadedAssets.map(u => ({
+          id: u.publicUrl,
+          publicUrl: u.publicUrl,
+          mediaType: u.mediaType,
+          format: u.mediaType === 'video' ? 'custom_video' : 'custom_design',
+        }));
+
         setResult(curr => ({
           ...curr,
+          assets: [...newMediaAssets, ...(curr?.assets || [])],
           variants: (curr?.variants || []).map(variant => (
             (!targetVariantId || variant.id === targetVariantId)
               ? {
@@ -503,7 +511,7 @@ export default function SocialDraftComposer({
         }));
 
         toast.success(replaceSlideIndex === null
-          ? `${attached.length}-item carousel attached to ${targetVariantId ? activePlatform.label : 'all channels'}`
+          ? `${attached.length}-item carousel updated for ${targetVariantId ? activePlatform.label : 'all channels'}`
           : `Carousel item ${replaceSlideIndex + 1} replaced`);
         setReplaceSlideIndex(null);
         return;
@@ -810,14 +818,53 @@ export default function SocialDraftComposer({
     if (!activeVariant?.id) return;
     const targetVariantId = uploadScope === 'active' ? activeVariant.id : undefined;
 
+    let initialCarousel = activeVariantCarouselAssets;
+    let selectedAssetId = activeVariant.selected_asset_id;
+
+    if (targetFormat === 'carousel') {
+      if (initialCarousel.length < 2) {
+        const available = result?.assets || [];
+        if (available.length >= 2) {
+          initialCarousel = available.slice(0, 2).map((a, i) => ({
+            id: a.id || a.publicUrl,
+            publicUrl: a.publicUrl,
+            mediaType: a.mediaType || (a.format === 'custom_video' || a.format === 'video_vertical_9_16' ? 'video' : 'image'),
+            altText: '',
+            position: i,
+          }));
+        } else if (available.length === 1) {
+          initialCarousel = [{
+            id: available[0].id || available[0].publicUrl,
+            publicUrl: available[0].publicUrl,
+            mediaType: available[0].mediaType || (available[0].format === 'custom_video' || available[0].format === 'video_vertical_9_16' ? 'video' : 'image'),
+            altText: '',
+            position: 0,
+          }];
+        }
+      }
+      setCarouselAssets(initialCarousel);
+    } else {
+      // Switching to single: pick first slide as the single asset
+      const firstSlide = activeVariantCarouselAssets[0];
+      const match = (result?.assets || []).find(a => a.publicUrl === firstSlide?.publicUrl || a.id === firstSlide?.id) || result?.assets?.[0];
+      if (match) selectedAssetId = match.id;
+    }
+
     setResult(curr => ({
       ...curr,
       variants: (curr?.variants || []).map(v => (!targetVariantId || v.id === targetVariantId)
         ? {
             ...v,
+            selected_asset_id: selectedAssetId,
             platform_options: {
               ...(v.platform_options || {}),
               post_format: targetFormat,
+              ...(targetFormat === 'carousel'
+                ? {
+                    carousel_assets: initialCarousel,
+                    carousel_asset_urls: initialCarousel.map(a => a.publicUrl),
+                  }
+                : {}),
             },
           }
         : v),
@@ -832,9 +879,29 @@ export default function SocialDraftComposer({
           options: {
             ...(activeVariant.platform_options || {}),
             post_format: targetFormat,
+            ...(targetFormat === 'carousel'
+              ? {
+                  carousel_assets: initialCarousel,
+                  carousel_asset_urls: initialCarousel.map(a => a.publicUrl),
+                }
+              : {}),
           },
         }),
       });
+
+      if (targetFormat === 'carousel' && initialCarousel.length >= 2) {
+        await persistCarouselAssets(initialCarousel);
+      } else if (targetFormat === 'single') {
+        await fetch('/api/social?task=update_variant_asset', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            variantId: activeVariant.id,
+            selectedAssetId,
+          }),
+        });
+      }
+
       toast.success(`${uploadScope === 'active' ? activePlatform.label : 'All channels'} format set to ${targetFormat === 'carousel' ? 'Carousel' : 'Single post'}`);
     } catch (err) {
       console.warn('Failed to update variant post format:', err.message);
@@ -902,6 +969,34 @@ export default function SocialDraftComposer({
     if (!activeVariant?.id) return;
     const targetVariantId = uploadScope === 'active' ? activeVariant.id : undefined;
 
+    if (activeVariantPostFormat === 'carousel') {
+      const currentList = activeVariantCarouselAssets;
+      const existingIndex = currentList.findIndex(a => a.id === asset.id || a.publicUrl === asset.publicUrl);
+      if (existingIndex >= 0) {
+        if (currentList.length <= 2) {
+          toast.error('A carousel needs at least 2 items. Switch to Single post or add another item first.');
+          return;
+        }
+        await removeCarouselSlide(existingIndex);
+      } else {
+        if (currentList.length >= carouselLimit) {
+          toast.error(`Platform limit reached (max ${carouselLimit} items)`);
+          return;
+        }
+        const newSlide = {
+          id: asset.id || asset.publicUrl,
+          publicUrl: asset.publicUrl,
+          mediaType: asset.mediaType || (asset.format === 'custom_video' || asset.format === 'video_vertical_9_16' ? 'video' : 'image'),
+          altText: '',
+          position: currentList.length,
+        };
+        const nextList = [...currentList, newSlide];
+        await persistCarouselAssets(nextList, `Added to ${activePlatform.label} carousel (Slide ${nextList.length})`);
+      }
+      return;
+    }
+
+    // Single post mode:
     setResult(curr => ({
       ...curr,
       variants: (curr?.variants || []).map(v => (!targetVariantId || v.id === targetVariantId)
@@ -912,8 +1007,6 @@ export default function SocialDraftComposer({
               ...(v.platform_options || {}),
               asset_format: asset.format || 'square_1_1',
               post_format: 'single',
-              carousel_assets: [],
-              carousel_asset_urls: [],
             },
           }
         : v),
@@ -1531,7 +1624,7 @@ export default function SocialDraftComposer({
                     {/* Media Library Selector Strip for Active Platform */}
                     {result.assets?.length > 1 && (
                       <div className="rounded-xl border border-border bg-surface p-3 space-y-2 shadow-xs">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-1">
                           <div className="flex items-center gap-1.5">
                             <Icon icon="solar:gallery-favourite-bold" className="text-brand" width="16" />
                             <span className="text-[11px] font-black uppercase tracking-wider text-text-primary">
@@ -1539,24 +1632,35 @@ export default function SocialDraftComposer({
                             </span>
                           </div>
                           <span className="text-[10px] text-text-muted">
-                            Click any item to assign to <strong className="text-brand">{activePlatform.label}</strong>
+                            {activeVariantPostFormat === 'carousel'
+                              ? <span>Click items to <strong className="text-brand">add/remove slides</strong> for {activePlatform.label}</span>
+                              : <span>Click an item to <strong className="text-brand">use as active post</strong> for {activePlatform.label}</span>}
                           </span>
                         </div>
 
                         <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
                           {result.assets.map((asset, idx) => {
-                            const isSelected = activeVariant?.selected_asset_id === asset.id || (!activeVariant?.selected_asset_id && idx === 0);
+                            const isSingleSelected = activeVariant?.selected_asset_id === asset.id || (!activeVariant?.selected_asset_id && idx === 0);
+                            const carouselIndex = activeVariantCarouselAssets.findIndex(
+                              a => a.id === asset.id || a.publicUrl === asset.publicUrl
+                            );
+                            const isInCarousel = carouselIndex >= 0;
                             const isVid = asset.mediaType === 'video' || asset.format === 'custom_video' || asset.format === 'video_vertical_9_16';
+
+                            const isHighlighted = activeVariantPostFormat === 'carousel' ? isInCarousel : isSingleSelected;
+
                             return (
                               <button
                                 key={asset.id || idx}
                                 type="button"
                                 onClick={() => handleSelectAssetForActivePlatform(asset)}
-                                title={`Use this ${isVid ? 'video' : 'image'} for ${activePlatform.label}`}
+                                title={activeVariantPostFormat === 'carousel'
+                                  ? (isInCarousel ? `Remove Slide ${carouselIndex + 1} from ${activePlatform.label} carousel` : `Add to ${activePlatform.label} carousel`)
+                                  : `Use this ${isVid ? 'video' : 'image'} for ${activePlatform.label}`}
                                 className={`relative group shrink-0 rounded-lg overflow-hidden border-2 transition-all text-left ${
-                                  isSelected && activeVariantPostFormat !== 'carousel'
+                                  isHighlighted
                                     ? 'border-brand ring-2 ring-brand/30 shadow-md scale-[1.02]'
-                                    : 'border-border bg-black hover:border-brand/50 opacity-70 hover:opacity-100'
+                                    : 'border-border bg-black hover:border-brand/50 opacity-60 hover:opacity-100'
                                 }`}
                                 style={{ width: '88px', height: '88px' }}
                               >
@@ -1571,12 +1675,26 @@ export default function SocialDraftComposer({
                                   {isVid ? 'Video' : asset.format?.replace(/_/g, ' ') || 'Image'}
                                 </span>
 
-                                {/* Active Selection Checkmark Overlay */}
-                                {isSelected && activeVariantPostFormat !== 'carousel' && (
-                                  <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5">
-                                    <Icon icon="solar:check-circle-bold" width="10" />
-                                    <span>Active for {activePlatform.label}</span>
-                                  </div>
+                                {/* Selection Badge */}
+                                {activeVariantPostFormat === 'carousel' ? (
+                                  isInCarousel ? (
+                                    <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5">
+                                      <Icon icon="solar:check-circle-bold" width="10" />
+                                      <span>Slide {carouselIndex + 1}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 text-text-muted group-hover:text-white group-hover:bg-brand/90 text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5 transition-colors">
+                                      <Icon icon="solar:add-circle-linear" width="10" />
+                                      <span>+ Add Slide</span>
+                                    </div>
+                                  )
+                                ) : (
+                                  isSingleSelected && (
+                                    <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5">
+                                      <Icon icon="solar:check-circle-bold" width="10" />
+                                      <span>Active</span>
+                                    </div>
+                                  )
                                 )}
                               </button>
                             );
