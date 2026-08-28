@@ -108,25 +108,24 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
   }
 
   private async waitForContainer(containerId: string): Promise<void> {
-    const maxAttempts = 30; // up to 60 seconds for video container processing
-    const pollIntervalMs = 2000;
+    const maxAttempts = 30; // up to 90 seconds for video container processing
+    const pollIntervalMs = 3000;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
       const statusData = await this.get(`/${encodeURIComponent(containerId)}`, {
-        fields: 'status_code,error_message',
+        fields: 'id,status,error_message',
       });
-      const statusCode = statusData.status_code;
+      const status = statusData.status;
 
-      if (statusCode === 'FINISHED') return;
-      if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
+      if (status === 'FINISHED') return;
+      if (status === 'ERROR' || status === 'EXPIRED') {
         throw new SocialPlatformError({
           platform: 'threads',
-          code: `threads_media_${String(statusCode).toLowerCase()}`,
-          message: statusData.error_message || `Threads media container failed with status: ${statusCode}`,
-          details: { statusCode, error_message: statusData.error_message },
+          code: `threads_media_${String(status).toLowerCase()}`,
+          message: statusData.error_message || `Threads media container failed with status: ${status}`,
+          details: { status, error_message: statusData.error_message },
         });
       }
-
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
   }
 
