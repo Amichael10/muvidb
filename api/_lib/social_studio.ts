@@ -1632,23 +1632,69 @@ export async function attachCustomAsset(
 
   if (assetError) throw assetError;
 
-  await supabase
-    .from('social_platform_variants')
-    .update({ selected_asset_id: assetRow.id })
-    .eq('content_item_id', input.contentItemId);
+  if (input.variantId) {
+    await supabase
+      .from('social_platform_variants')
+      .update({ selected_asset_id: assetRow.id })
+      .eq('id', input.variantId);
+  } else {
+    await supabase
+      .from('social_platform_variants')
+      .update({ selected_asset_id: assetRow.id })
+      .eq('content_item_id', input.contentItemId);
+  }
 
   await insertSocialEvent({
     contentItemId: input.contentItemId,
     eventType: 'custom_asset_uploaded',
-    eventData: { actor_id: actor.id, asset_id: assetRow.id, public_url: input.publicUrl },
+    eventData: { actor_id: actor.id, asset_id: assetRow.id, public_url: input.publicUrl, variant_id: input.variantId || null },
   });
 
   return assetRow;
 }
 
+export async function updateSocialVariantAsset(
+  input: {
+    variantId: string;
+    selectedAssetId?: string | null;
+    format?: SocialAssetFormat;
+  },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  if (!input.variantId) throw httpError(400, 'variantId is required');
+
+  const { data: variant, error: findError } = await supabase
+    .from('social_platform_variants')
+    .select('id,content_item_id,platform_options')
+    .eq('id', input.variantId)
+    .single();
+  if (findError || !variant) throw httpError(404, 'Platform variant not found');
+
+  await assertContentItemCanBeChanged(variant.content_item_id);
+
+  const platformOptions = {
+    ...(variant.platform_options || {}),
+    ...(input.format ? { asset_format: input.format } : {}),
+  };
+
+  const { error: updateError } = await supabase
+    .from('social_platform_variants')
+    .update({
+      selected_asset_id: input.selectedAssetId || null,
+      platform_options: platformOptions,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.variantId);
+  if (updateError) throw updateError;
+
+  return { ok: true, variantId: input.variantId, selectedAssetId: input.selectedAssetId, format: input.format };
+}
+
 export async function attachCarouselAssets(
   input: {
     contentItemId: string;
+    variantId?: string;
     publicUrls?: string[];
     assets?: Array<{ url: string; mediaType?: 'image' | 'video'; altText?: string }>;
     format?: SocialAssetFormat;
@@ -1684,10 +1730,16 @@ export async function attachCarouselAssets(
   const width = input.width || 1080;
   const height = input.height || 1080;
 
-  const { data: variants, error: variantError } = await supabase
+  let query = supabase
     .from('social_platform_variants')
     .select('id,platform,platform_options')
     .eq('content_item_id', input.contentItemId);
+
+  if (input.variantId) {
+    query = query.eq('id', input.variantId);
+  }
+
+  const { data: variants, error: variantError } = await query;
   if (variantError) throw variantError;
   if (!variants?.length) throw httpError(404, 'No platform variants were found for this draft');
 
@@ -1698,16 +1750,8 @@ export async function attachCarouselAssets(
       ? 20
       : 35;
   if (carouselAssets.length > maxItems) {
-    throw httpError(400, `${platforms.join(', ')} supports at most ${maxItems} items for this shared carousel`);
+    throw httpError(400, `${platforms.join(', ')} supports at most ${maxItems} items for this carousel`);
   }
-  if ((platforms.includes('facebook') || platforms.includes('tiktok'))
-      && carouselAssets.some(asset => asset.media_type === 'video')) {
-    throw httpError(400, `${platforms.includes('facebook') ? 'Facebook' : 'TikTok'} carousel publishing supports images only. Remove that platform or the video.`);
-  }
-
-  const previousUrls = Array.isArray(variants[0]?.platform_options?.carousel_asset_urls)
-    ? variants[0].platform_options.carousel_asset_urls.filter((url: unknown) => typeof url === 'string')
-    : [];
 
   for (const variant of variants) {
     const { error: updateError } = await supabase

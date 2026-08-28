@@ -129,6 +129,41 @@ const PLATFORMS = [
   { value: 'tiktok', label: 'TikTok', icon: 'simple-icons:tiktok', accent: 'from-cyan-400 via-black to-pink-500' },
 ];
 
+export const PLATFORM_SPECS = {
+  instagram: {
+    label: 'Instagram',
+    optimalRatio: '4:5 (Feed) or 9:16 (Reels)',
+    carouselSupport: 'Up to 10 items (Mixed images & videos)',
+    videoSupport: 'Reels (9:16) up to 90s, Feed video up to 15 min',
+    tips: 'Use 4:5 for standard feed posts, 9:16 for Reels.',
+    icon: 'mdi:instagram',
+  },
+  threads: {
+    label: 'Threads',
+    optimalRatio: '1:1, 4:5, 9:16 (Any ratio)',
+    carouselSupport: 'Up to 20 items (Mixed images & videos)',
+    videoSupport: 'MP4 / WebM / MOV up to 5 min',
+    tips: 'Supports up to 20 items in a single swipeable carousel.',
+    icon: 'simple-icons:threads',
+  },
+  facebook: {
+    label: 'Facebook',
+    optimalRatio: '1:1 (Square) or 16:9 (Landscape)',
+    carouselSupport: 'Up to 10 images (Photo-only carousels)',
+    videoSupport: 'Single video post (MP4/WebM)',
+    tips: 'Facebook carousels support photos only. Video posts are single video.',
+    icon: 'mdi:facebook',
+  },
+  tiktok: {
+    label: 'TikTok',
+    optimalRatio: '9:16 (Vertical Video recommended)',
+    carouselSupport: 'Up to 35 photos (Image-only photo mode)',
+    videoSupport: 'Single 9:16 vertical video up to 10 min',
+    tips: '9:16 vertical video performs best. Music can be auto-added.',
+    icon: 'simple-icons:tiktok',
+  },
+};
+
 const CAPTION_LIMITS = {
   instagram: 2200,
   threads: 500,
@@ -189,6 +224,7 @@ export default function SocialDraftComposer({
   const [postFormat, setPostFormat] = useState('single');
   const [carouselAssets, setCarouselAssets] = useState([]);
   const [uploadingCustom, setUploadingCustom] = useState(false);
+  const [uploadScope, setUploadScope] = useState('active'); // 'active' (target current channel) | 'all' (all selected channels)
   const [reorderingCarousel, setReorderingCarousel] = useState(false);
   const [replaceSlideIndex, setReplaceSlideIndex] = useState(null);
   const [scheduling, setScheduling] = useState(false);
@@ -215,6 +251,7 @@ export default function SocialDraftComposer({
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contentItemId: result.contentItem.id,
+          variantId: uploadScope === 'active' ? activeVariant?.id : undefined,
           publicUrl: videoData.url,
           format: 'video_vertical_9_16',
           mediaType: 'video',
@@ -239,13 +276,18 @@ export default function SocialDraftComposer({
         height: 1920,
       };
 
+      const targetVariantId = uploadScope === 'active' ? activeVariant?.id : undefined;
       setResult(curr => ({
         ...curr,
         assets: [newAsset, ...(curr?.assets || [])],
-        variants: (curr?.variants || []).map(variant => ({ ...variant, selected_asset_id: newAsset.id })),
+        variants: (curr?.variants || []).map(variant => (
+          (!targetVariantId || variant.id === targetVariantId)
+            ? { ...variant, selected_asset_id: newAsset.id }
+            : variant
+        )),
       }));
       onGenerated?.({ ...result, assets: [newAsset, ...(result.assets || [])] });
-      toast.success(`${videoData.mode === 'clip' ? 'Trimmed clip' : 'Whole video'} downloaded straight into canvas!`);
+      toast.success(`${videoData.mode === 'clip' ? 'Trimmed clip' : 'Whole video'} attached to ${uploadScope === 'active' ? activePlatform.label : 'all channels'}!`);
     } catch (err) {
       toast.error(err.message || 'Failed to attach video to canvas');
     } finally {
@@ -413,11 +455,13 @@ export default function SocialDraftComposer({
           ? [...carouselAssets, ...uploadedAssets]
           : carouselAssets.map((asset, index) => index === replaceSlideIndex ? uploadedAssets[0] : asset);
 
+        const targetVariantId = uploadScope === 'active' ? activeVariant?.id : undefined;
         const res = await fetch('/api/social?task=attach_carousel_assets', {
           method: 'POST',
           headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contentItemId: result.contentItem.id,
+            variantId: targetVariantId,
             assets: nextAssets.map(asset => ({
               url: asset.publicUrl,
               mediaType: asset.mediaType,
@@ -440,7 +484,7 @@ export default function SocialDraftComposer({
         }));
         setCarouselAssets(attached);
         toast.success(replaceSlideIndex === null
-          ? `${attached.length}-item carousel attached to this draft`
+          ? `${attached.length}-item carousel attached to ${targetVariantId ? activePlatform.label : 'all channels'}`
           : `Carousel item ${replaceSlideIndex + 1} replaced`);
         setReplaceSlideIndex(null);
         return;
@@ -450,11 +494,13 @@ export default function SocialDraftComposer({
       if (uploadRes.error) throw new Error(uploadRes.error);
       const url = uploadRes.url;
 
+      const targetVariantId = uploadScope === 'active' ? activeVariant?.id : undefined;
       const res = await fetch('/api/social?task=attach_custom_asset', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contentItemId: result.contentItem.id,
+          variantId: targetVariantId,
           publicUrl: url,
           format: uploadRes.mediaType === 'video' ? 'video_vertical_9_16' : 'square_1_1',
         }),
@@ -462,18 +508,22 @@ export default function SocialDraftComposer({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      toast.success(`${uploadRes.mediaType === 'video' ? 'Video' : 'Custom artwork'} uploaded and attached to this draft!`);
+      toast.success(`${uploadRes.mediaType === 'video' ? 'Video' : 'Custom artwork'} uploaded for ${targetVariantId ? activePlatform.label : 'all channels'}!`);
       setResult(curr => ({
         ...curr,
         assets: [
           { id: data.id, publicUrl: url, mediaType: uploadRes.mediaType || 'image', format: uploadRes.mediaType === 'video' ? 'custom_video' : 'custom_design', width: data.width || 1080, height: data.height || 1080 },
           ...(curr?.assets || []),
         ],
-        variants: (curr?.variants || []).map(variant => ({ ...variant, selected_asset_id: data.id })),
+        variants: (curr?.variants || []).map(variant => (
+          (!targetVariantId || variant.id === targetVariantId)
+            ? { ...variant, selected_asset_id: data.id }
+            : variant
+        )),
       }));
       onGenerated?.({ ...result, assets: [{ id: data.id, publicUrl: url, mediaType: uploadRes.mediaType || 'image', format: uploadRes.mediaType === 'video' ? 'custom_video' : 'custom_design', width: data.width || 1080, height: data.height || 1080 }, ...(result.assets || [])] });
     } catch (err) {
-      toast.error(err.message || 'Failed to upload custom design');
+      toast.error(err.message || 'Failed to upload custom media');
     } finally {
       setUploadingCustom(false);
       setReplaceSlideIndex(null);
@@ -666,6 +716,7 @@ export default function SocialDraftComposer({
   const label = entry => (activeTheme.entity === 'person' ? entry.name : `${entry.title}${entry.year ? ` (${entry.year})` : ''}`);
   const activeVariant = result?.variants?.find(variant => variant.platform === activePreviewPlatform) || result?.variants?.[0];
   const activePlatform = PLATFORMS.find(platform => platform.value === activeVariant?.platform) || PLATFORMS[0];
+  const activeSpec = PLATFORM_SPECS[activeVariant?.platform] || PLATFORM_SPECS.instagram;
   const activeCaption = activeVariant
     ? (captionDrafts[activeVariant.id] ?? activeVariant.caption ?? '')
     : '';
@@ -676,6 +727,69 @@ export default function SocialDraftComposer({
     || result?.assets?.find(asset => asset.format === 'custom_design')
     || result?.assets?.[0];
   const activeVisualAssets = postFormat === 'carousel' ? carouselAssets : selectedSingleAsset ? [selectedSingleAsset] : [];
+
+  // Automatically sync aspect ratio with active platform variant's settings
+  useEffect(() => {
+    if (!activeVariant) return;
+    const currentAsset = result?.assets?.find(a => a.id === activeVariant.selected_asset_id);
+    const format = activeVariant.platform_options?.asset_format || currentAsset?.format;
+    if (format === 'portrait_4_5') {
+      setCanvasAspectRatio('4:5');
+    } else if (format === 'vertical_9_16' || format === 'video_vertical_9_16' || format === 'custom_video') {
+      setCanvasAspectRatio('9:16');
+    } else if (format === 'landscape_16_9') {
+      setCanvasAspectRatio('16:9');
+    } else if (format === 'square_1_1') {
+      setCanvasAspectRatio('1:1');
+    } else {
+      if (activeVariant.platform === 'tiktok') setCanvasAspectRatio('9:16');
+      else if (activeVariant.platform === 'instagram') setCanvasAspectRatio('4:5');
+      else setCanvasAspectRatio('1:1');
+    }
+  }, [activeVariant?.id, activeVariant?.platform, activeVariant?.selected_asset_id]);
+
+  const handleAspectRatioSelect = async (ratioId) => {
+    setCanvasAspectRatio(ratioId);
+    if (!activeVariant?.id) return;
+
+    const formatMap = {
+      '1:1': 'square_1_1',
+      '4:5': 'portrait_4_5',
+      '9:16': 'vertical_9_16',
+      '16:9': 'landscape_16_9',
+    };
+    const targetFormat = formatMap[ratioId];
+
+    // Find matching rendered asset
+    const matchingAsset = (result?.assets || []).find(a => a.format === targetFormat);
+    const selectedAssetId = matchingAsset ? matchingAsset.id : activeVariant.selected_asset_id;
+
+    setResult(curr => ({
+      ...curr,
+      variants: (curr?.variants || []).map(v => v.id === activeVariant.id
+        ? {
+            ...v,
+            selected_asset_id: selectedAssetId,
+            platform_options: { ...(v.platform_options || {}), asset_format: targetFormat },
+          }
+        : v),
+    }));
+
+    try {
+      await fetch('/api/social?task=update_variant_asset', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variantId: activeVariant.id,
+          selectedAssetId,
+          format: targetFormat,
+        }),
+      });
+      toast.success(`${activePlatform.label} format set to ${ratioId}`);
+    } catch (err) {
+      console.warn('Failed to update aspect ratio on variant:', err.message);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1024,34 +1138,47 @@ export default function SocialDraftComposer({
                         : 'Your upload replaces the entire generated graphic. MP4 and WebM videos are supported up to 50 MB.'}
                     </p>
                   </div>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-                    multiple={postFormat === 'carousel' && replaceSlideIndex === null}
-                    ref={fileInputRef}
-                    onChange={handleCustomImageUpload}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReplaceSlideIndex(null);
-                      setTimeout(() => fileInputRef.current?.click(), 0);
-                    }}
-                    disabled={uploadingCustom}
-                    className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50"
-                  >
-                    <Icon
-                      icon={uploadingCustom ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'}
-                      className={uploadingCustom ? 'animate-spin' : ''}
-                      width="16"
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">Target:</span>
+                      <select
+                        value={uploadScope}
+                        onChange={e => setUploadScope(e.target.value)}
+                        className="bg-transparent text-xs font-bold text-text-primary outline-none cursor-pointer"
+                      >
+                        <option value="active">Only {activePlatform.label}</option>
+                        <option value="all">All Selected Channels</option>
+                      </select>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                      multiple={postFormat === 'carousel' && replaceSlideIndex === null}
+                      ref={fileInputRef}
+                      onChange={handleCustomImageUpload}
+                      className="hidden"
                     />
-                    {uploadingCustom
-                      ? postFormat === 'carousel' ? 'Updating carousel…' : 'Uploading media…'
-                      : postFormat === 'carousel'
-                        ? carouselAssets.length ? 'Add media' : 'Choose 2 or more items'
-                        : 'Upload image or video'}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplaceSlideIndex(null);
+                        setTimeout(() => fileInputRef.current?.click(), 0);
+                      }}
+                      disabled={uploadingCustom}
+                      className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50 shadow-sm"
+                    >
+                      <Icon
+                        icon={uploadingCustom ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'}
+                        className={uploadingCustom ? 'animate-spin' : ''}
+                        width="16"
+                      />
+                      {uploadingCustom
+                        ? postFormat === 'carousel' ? 'Updating carousel…' : 'Uploading media…'
+                        : postFormat === 'carousel'
+                          ? carouselAssets.length ? 'Add media' : 'Choose 2 or more items'
+                          : 'Upload image or video'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1116,6 +1243,51 @@ export default function SocialDraftComposer({
                 </div>
               </div>
 
+              {/* Platform Guidelines & Aspect Ratio Assistant */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-brand">
+                    <Icon icon={activeSpec.icon} width="22" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-text-primary">{activeSpec.label} Specifics</span>
+                      <span className="rounded bg-brand/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
+                        Optimal: {activeSpec.optimalRatio}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-text-muted">
+                      {postFormat === 'carousel' ? activeSpec.carouselSupport : activeSpec.videoSupport} · <span className="text-text-secondary">{activeSpec.tips}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Per-Platform Aspect Ratio Selector */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-text-muted mr-1">Aspect Ratio:</span>
+                  {[
+                    { id: '1:1', label: '1:1', desc: 'Square' },
+                    { id: '4:5', label: '4:5', desc: 'Portrait' },
+                    { id: '9:16', label: '9:16', desc: 'Vertical' },
+                    { id: '16:9', label: '16:9', desc: 'Landscape' },
+                  ].map(ratio => (
+                    <button
+                      key={ratio.id}
+                      type="button"
+                      onClick={() => handleAspectRatioSelect(ratio.id)}
+                      title={ratio.desc}
+                      className={`rounded-md px-2.5 py-1 text-xs font-black transition-all ${
+                        canvasAspectRatio === ratio.id
+                          ? 'bg-brand text-white shadow-sm ring-1 ring-brand'
+                          : 'border border-border bg-surface-2 text-text-muted hover:border-brand/40 hover:text-text-primary'
+                      }`}
+                    >
+                      {ratio.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Dynamic Viewport Grid */}
               <div className={`grid gap-6 ${
                 viewLayout === 'canvas_focus'
@@ -1130,7 +1302,7 @@ export default function SocialDraftComposer({
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} Visual Canvas</p>
-                        <p className="text-[10px] text-text-muted">Zoom, pan, cut video, and frame in multi-aspect ratios.</p>
+                        <p className="text-[10px] text-text-muted">Framed in {canvasAspectRatio} ratio for {activePlatform.label}.</p>
                       </div>
                       <span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted">
                         {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
@@ -1142,7 +1314,7 @@ export default function SocialDraftComposer({
                       mediaUrl={activeVisualAssets[0]?.publicUrl}
                       mediaType={activeVisualAssets[0]?.mediaType || (activeVisualAssets[0]?.format === 'custom_video' ? 'video' : 'image')}
                       aspectRatio={canvasAspectRatio}
-                      onAspectRatioChange={setCanvasAspectRatio}
+                      onAspectRatioChange={handleAspectRatioSelect}
                       platformLabel={activePlatform.label}
                       platformIcon={activePlatform.icon}
                       platformAccent={activePlatform.accent}
@@ -1329,7 +1501,7 @@ export default function SocialDraftComposer({
                           ['disable_comment', 'Disable comments'],
                           ['disable_duet', 'Disable Duet'],
                           ['disable_stitch', 'Disable Stitch'],
-                          ['auto_add_music', 'Auto-add music to photos'],
+                          ['auto_add_music', 'Auto-add trending music'],
                           ['brand_content_toggle', 'Paid partnership'],
                           ['brand_organic_toggle', 'Promotes our own brand'],
                           ['is_aigc', 'AI-generated content'],
@@ -1339,6 +1511,11 @@ export default function SocialDraftComposer({
                             {label}
                           </label>
                         ))}
+                      </div>
+
+                      <div className="mt-2.5 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-[10px] text-cyan-200">
+                        <span className="font-black uppercase tracking-wider text-cyan-300 mr-1">🎵 Auto-Add Music Note:</span>
+                        When enabled, TikTok automatically selects and overlays a copyright-cleared trending commercial sound suited for your post category. (The official TikTok API does not provide third-party apps with a song search picker due to music licensing).
                       </div>
 
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">

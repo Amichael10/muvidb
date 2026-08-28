@@ -48,7 +48,11 @@ export default function AutoPilotReviewModal({
   const [approving, setApproving] = useState(false);
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
   const [viewLayout, setViewLayout] = useState('split');
-  const [canvasAspectRatio, setCanvasAspectRatio] = useState('1:1');
+  const [platformRatios, setPlatformRatios] = useState({ instagram: '4:5', tiktok: '9:16', facebook: '1:1', threads: '1:1' });
+  const canvasAspectRatio = platformRatios[activePlatformTab] || '1:1';
+  const handleAspectRatioChange = (ratio) => {
+    setPlatformRatios(prev => ({ ...prev, [activePlatformTab]: ratio }));
+  };
 
   // Manual Candidate Search & Swap State
   const [manualSearchOpen, setManualSearchOpen] = useState(false);
@@ -642,7 +646,7 @@ export default function AutoPilotReviewModal({
               mediaUrl={customImageUrl || displayImage}
               mediaType={/\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(customImageUrl || '') ? 'video' : 'image'}
               aspectRatio={canvasAspectRatio}
-              onAspectRatioChange={setCanvasAspectRatio}
+              onAspectRatioChange={handleAspectRatioChange}
               platformLabel={PLATFORMS.find(p => p.value === activePlatformTab)?.label || 'Social'}
               platformIcon={PLATFORMS.find(p => p.value === activePlatformTab)?.icon || 'solar:gallery-bold'}
               allowVideoCut={true}

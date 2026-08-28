@@ -440,6 +440,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await updateSocialVariantOptions({ variantId, options }, actor));
       }
 
+      if (task === 'update_variant_asset') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { variantId, selectedAssetId, format } = req.body || {};
+        if (typeof variantId !== 'string' || !variantId) {
+          return res.status(400).json({ error: 'variantId is required' });
+        }
+        const { updateSocialVariantAsset } = await import('./_lib/social_studio.js');
+        return res.status(200).json(await updateSocialVariantAsset({ variantId, selectedAssetId, format }, actor));
+      }
+
       if (task === 'prepare_queue_item_edit') {
         const actor = await requireSocialStudioAdmin(req);
         const { contentItemId } = req.body || {};
