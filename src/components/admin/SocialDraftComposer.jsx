@@ -396,12 +396,6 @@ export default function SocialDraftComposer({
         }
         const containsVideo = files.some(file => mediaTypeForFile(file) === 'video')
           || carouselAssets.some(asset => asset.mediaType === 'video');
-        if (containsVideo && platforms.includes('facebook')) {
-          throw new Error('Facebook Page carousels support images only. Remove Facebook or use only images.');
-        }
-        if (containsVideo && platforms.includes('tiktok')) {
-          throw new Error('TikTok photo carousels support images only. Remove TikTok or use only images.');
-        }
 
         const uploadedAssets = [];
         for (const file of files) {
@@ -1000,8 +994,8 @@ export default function SocialDraftComposer({
               <div className="grid gap-3 rounded-xl border border-border bg-surface p-4 md:grid-cols-[minmax(260px,360px)_1fr] md:items-center">
                 <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-2 p-1.5">
                   {[
-                    { value: 'single', label: 'Single image', icon: 'solar:gallery-linear' },
-                    { value: 'carousel', label: 'Carousel', icon: 'solar:gallery-wide-linear' },
+                    { value: 'single', label: 'Single post (image / video)', icon: 'solar:gallery-linear' },
+                    { value: 'carousel', label: 'Carousel (images + videos)', icon: 'solar:gallery-wide-linear' },
                   ].map(option => (
                     <button
                       key={option.value}
@@ -1022,11 +1016,11 @@ export default function SocialDraftComposer({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold text-text-primary">
-                      {postFormat === 'carousel' ? 'Build an image or video carousel' : 'Use an image or video (MP4/WebM) as the complete post'}
+                      {postFormat === 'carousel' ? 'Build a carousel of images, video + images, or multiple videos' : 'Use an image or video (MP4/WebM) as the complete post'}
                     </p>
                     <p className="mt-1 text-[10px] text-text-muted">
                       {postFormat === 'carousel'
-                        ? `Add up to ${carouselLimit} items for the selected channels. Instagram supports 10; Threads supports 20. Facebook and TikTok carousels are image-only.`
+                        ? `Add up to ${carouselLimit} items (mix videos and images freely). Instagram supports 10 items; Threads supports 20 items.`
                         : 'Your upload replaces the entire generated graphic. MP4 and WebM videos are supported up to 50 MB.'}
                     </p>
                   </div>

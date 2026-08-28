@@ -757,19 +757,6 @@ export async function generateSocialDraft(
   if (!template) throw httpError(404, `Template ${input.templateSlug} not found`);
   if (!template.is_active) throw httpError(409, `Template ${input.templateSlug} is not active`);
 
-  const { data: existing, error: existingError } = await supabase
-    .from('social_content_items')
-    .select('id,status')
-    .eq('content_type', input.contentType)
-    .eq('source_entity_id', input.sourceEntityId)
-    .in('status', ACTIVE_CONTENT_STATUSES)
-    .limit(1);
-
-  if (existingError) throw existingError;
-  if (existing?.length) {
-    throw httpError(409, `An active ${input.contentType} already exists for this source (${existing[0].id})`);
-  }
-
   const snapshot =
     sourceEntityType === 'person'
       ? await loadPersonSource(input.sourceEntityId, capturedAt, input.contentType)
