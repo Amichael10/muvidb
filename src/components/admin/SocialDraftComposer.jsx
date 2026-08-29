@@ -468,6 +468,50 @@ export default function SocialDraftComposer({
     toast('🎬 YouTube & Video Clip Studio ready! Set timecodes, preview loop, and import directly to canvas.', { icon: '🎬' });
   };
 
+  const handleImportVideoToCanvas = (clipData) => {
+    if (!clipData || !clipData.url) return;
+    const newAsset = {
+      id: `clip-${Date.now()}`,
+      publicUrl: clipData.url,
+      mediaType: 'video',
+      format: clipData.mode === 'clip' ? 'video_clip' : 'full_video',
+      title: clipData.title || 'Video Clip',
+      startTime: clipData.startTime || 0,
+      endTime: clipData.endTime || clipData.duration || 0,
+      duration: clipData.duration || 0,
+      width: 1080,
+      height: 1920,
+    };
+
+    setResult(curr => {
+      if (!curr) {
+        return {
+          assets: [newAsset],
+          variants: (platforms || ['tiktok', 'instagram']).map(p => ({
+            platform: p,
+            selected_asset_id: newAsset.id,
+            selected_asset: newAsset,
+          })),
+        };
+      }
+      const updatedAssets = [newAsset, ...(curr.assets || []).filter(a => a.id !== newAsset.id)];
+      const updatedVariants = (curr.variants || []).map(v => {
+        if (!activePreviewPlatform || v.platform === activePreviewPlatform) {
+          return {
+            ...v,
+            selected_asset_id: newAsset.id,
+            selected_asset: newAsset,
+          };
+        }
+        return v;
+      });
+      return { ...curr, assets: updatedAssets, variants: updatedVariants };
+    });
+
+    setPostFormat('single');
+    toast.success(`🎬 Attached video clip (${clipData.formattedStart || '00:00'} - ${clipData.formattedEnd || ''}) to draft!`);
+  };
+
   const handleResetComposer = () => {
     try {
       sessionStorage.removeItem('muvidb_social_composer_cache');
