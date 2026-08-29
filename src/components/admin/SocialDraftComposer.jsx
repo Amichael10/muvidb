@@ -465,7 +465,7 @@ export default function SocialDraftComposer({
   const handleOpenInStudio = (mediaUrl = null, customRatio = null) => {
     if (customRatio) setCanvasAspectRatio(customRatio);
     setVideoStudioOpen(true);
-    toast.info('🎬 YouTube & Video Clip Studio ready! Set timecodes, preview loop, and import directly to canvas.');
+    toast('🎬 YouTube & Video Clip Studio ready! Set timecodes, preview loop, and import directly to canvas.', { icon: '🎬' });
   };
 
   const handleResetComposer = () => {
