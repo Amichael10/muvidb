@@ -80,6 +80,7 @@ export function Layout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
 
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="icon" type="image/png" href="/favicon.png" />

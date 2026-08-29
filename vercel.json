@@ -253,7 +253,7 @@
       "destination": "/api/seo?type=sitemap&slug=:slug"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/|assets/|favicon|site\\.webmanifest|apple-touch-icon|images/|robots\\.txt|sitemap|.*\\.(?:ico|png|svg|jpg|jpeg|webp|js|css|woff2|woff|ttf|txt|xml|json)).*)",
       "destination": "/api/ssr?__pathname=/$1"
     }
   ]
