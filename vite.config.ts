@@ -471,5 +471,13 @@ export default defineConfig(({ mode, isSsrBuild }) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        external: ['tesseract.js'],
+      },
+    },
+    ssr: {
+      external: ['tesseract.js'],
+    },
   };
 });
