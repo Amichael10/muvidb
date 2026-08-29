@@ -463,41 +463,9 @@ export default function SocialDraftComposer({
   }, []);
 
   const handleOpenInStudio = (mediaUrl = null, customRatio = null) => {
-    const targetUrl = mediaUrl || selectedSingleAsset?.publicUrl || activeAsset?.publicUrl;
-    if (!targetUrl) {
-      toast.error('Select or upload a media file first');
-      return;
-    }
-    const ratio = customRatio || canvasAspectRatio || (postFormat === 'carousel' ? '1:1' : '9:16');
-    const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(targetUrl) || activeAsset?.mediaType === 'video';
-
-    // Store state before navigating
-    try {
-      sessionStorage.setItem('muvidb_social_composer_cache', JSON.stringify({
-        result,
-        captionDrafts,
-        platforms,
-        activePreviewPlatform,
-        postFormat,
-        carouselAssets,
-        tiktokSettings,
-        customScheduleDate,
-        selected,
-        themeId,
-      }));
-    } catch {}
-
-    const studioUrl = new URL('/opencut/', window.location.origin);
-    studioUrl.searchParams.set('source_url', targetUrl);
-    studioUrl.searchParams.set('media_type', isVideo ? 'video' : 'image');
-    studioUrl.searchParams.set('aspect_ratio', ratio);
-    if (result?.contentItem?.id) studioUrl.searchParams.set('draft_id', result.contentItem.id);
-    if (activeVariant?.id) studioUrl.searchParams.set('variant_id', activeVariant.id);
-    studioUrl.searchParams.set('title', result?.contentItem?.title || selected?.title || 'Social Video');
-    studioUrl.searchParams.set('return_to', window.location.pathname);
-
-    window.open(studioUrl.toString(), '_blank');
-    toast.info('🎨 Opening in MuviDB Studio! Frame your shot, brand it, and click Save & Return.');
+    if (customRatio) setCanvasAspectRatio(customRatio);
+    setVideoStudioOpen(true);
+    toast.info('🎬 YouTube & Video Clip Studio ready! Set timecodes, preview loop, and import directly to canvas.');
   };
 
   const handleResetComposer = () => {
