@@ -213,7 +213,6 @@ export default function SocialCanvasViewport({
   };
 
   const selectedRatioConfig = ASPECT_RATIOS.find(r => r.id === activeAspect) || ASPECT_RATIOS[0];
-  const isVideo = mediaType === 'video' || (typeof mediaUrl === 'string' && (mediaUrl.includes('.mp4') || mediaUrl.includes('video')));
 
   return (
     <div
