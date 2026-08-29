@@ -142,6 +142,28 @@ export default function SocialVideoClipModal({
     if (videoRef.current) videoRef.current.currentTime = valid;
   };
 
+  const [isPreviewingClip, setIsPreviewingClip] = useState(false);
+
+  const handlePreviewClip = () => {
+    if (!videoUrl) return toast.error('Please load a video first');
+    if (endTime <= startTime) return toast.error('End time must be after start time');
+    
+    setIsPreviewingClip(true);
+    if (videoRef.current) {
+      videoRef.current.currentTime = startTime;
+      const p = videoRef.current.play();
+      if (p && typeof p.then === 'function') {
+        p.then(() => setIsPlaying(true)).catch((err) => {
+          console.warn('Preview playback interrupted:', err);
+          setIsPlaying(false);
+        });
+      } else {
+        setIsPlaying(true);
+      }
+    }
+    toast.success(`Playing preview clip: ${formatSecondsToTimecode(startTime)} to ${formatSecondsToTimecode(endTime)}`);
+  };
+
   const handleApplyToCanvas = (mode) => {
     if (!videoUrl) {
       return toast.error('Please load a video first');
@@ -376,6 +398,19 @@ export default function SocialVideoClipModal({
                   </span>
                   <button
                     type="button"
+                    onClick={handlePreviewClip}
+                    disabled={!videoUrl || clipDuration <= 0}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
+                      isPreviewingClip
+                        ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                        : 'border-white/20 bg-black/40 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Icon icon={isPlaying && isPreviewingClip ? 'solar:pause-bold' : 'solar:play-bold'} width="14" />
+                    <span>{isPreviewingClip ? 'Pause Preview' : 'Preview Clip Loop'}</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleApplyToCanvas('clip')}
                     disabled={!videoUrl || clipDuration <= 0}
                     className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:bg-brand-hover disabled:opacity-50 shadow-lg"
@@ -385,6 +420,18 @@ export default function SocialVideoClipModal({
                   </button>
                 </div>
               </div>
+
+              {isPreviewingClip && (
+                <div className="flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-3.5 py-2 text-xs text-amber-300 animate-pulse">
+                  <div className="flex items-center gap-2 font-bold">
+                    <Icon icon="solar:videocamera-record-bold" className="text-amber-400" width="14" />
+                    <span>Live Previewing Trimmed Loop ({formatSecondsToTimecode(startTime)} → {formatSecondsToTimecode(endTime)})</span>
+                  </div>
+                  <span className="font-mono text-[11px] font-black text-amber-400">
+                    Playhead: {formatSecondsToTimecode(currentTime)}
+                  </span>
+                </div>
+              )}
 
               {/* Timecode Inputs Grid */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

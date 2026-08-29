@@ -561,6 +561,29 @@ export default function SocialCanvasViewport({
                 Clip: {formatTime(Math.max(0, trimEnd - trimStart))}
               </div>
 
+              {/* Preview Cut Loop Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!videoRef.current) return;
+                  videoRef.current.currentTime = trimStart;
+                  const p = videoRef.current.play();
+                  if (p && typeof p.then === 'function') {
+                    p.then(() => setIsPlaying(true)).catch((err) => {
+                      console.warn('Playback prevented:', err);
+                      setIsPlaying(false);
+                    });
+                  } else {
+                    setIsPlaying(true);
+                  }
+                  toast.success(`Playing cut preview: ${formatTime(trimStart)} to ${formatTime(trimEnd)}`);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-[11px] font-black uppercase text-amber-300 hover:bg-amber-500/20 transition-all"
+              >
+                <Icon icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'} width="12" />
+                <span>{isPlaying ? 'Pause Loop' : 'Preview Loop'}</span>
+              </button>
+
               {/* Apply Cut Button */}
               <button
                 type="button"
