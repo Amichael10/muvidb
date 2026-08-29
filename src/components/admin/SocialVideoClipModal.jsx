@@ -47,6 +47,7 @@ export default function SocialVideoClipModal({
   const [endTime, setEndTime] = useState(0);
   const [startTimeInput, setStartTimeInput] = useState('00:00');
   const [endTimeInput, setEndTimeInput] = useState('00:30');
+  const [isPreviewingClip, setIsPreviewingClip] = useState(false);
 
   useEffect(() => {
     if (initialVideoUrl) {
@@ -64,14 +65,24 @@ export default function SocialVideoClipModal({
   const extractVideoUrl = (input) => {
     const raw = String(input || '').trim();
     if (!raw) return '';
-    // If YouTube ID or URL
-    if (raw.includes('youtube.com/watch?v=')) {
-      const vid = new URL(raw).searchParams.get('v');
-      return vid ? `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1` : raw;
+    if (raw.includes('youtube.com/watch')) {
+      try {
+        const vid = new URL(raw).searchParams.get('v');
+        if (vid) return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+      } catch {
+        const m = raw.match(/v=([a-zA-Z0-9_-]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1`;
+      }
     }
     if (raw.includes('youtu.be/')) {
       const vid = raw.split('youtu.be/')[1]?.split('?')[0];
-      return vid ? `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1` : raw;
+      if (vid) return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+    }
+    if (raw.includes('youtube.com/embed/')) {
+      return raw.includes('enablejsapi=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}autoplay=1&enablejsapi=1`;
+    }
+    if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) {
+      return `https://www.youtube.com/embed/${raw}?autoplay=1&enablejsapi=1`;
     }
     return raw;
   };
@@ -83,6 +94,7 @@ export default function SocialVideoClipModal({
     setLoading(true);
     const resolved = extractVideoUrl(videoInput);
     setVideoUrl(resolved);
+    setIsPreviewingClip(false);
     toast.success('Video loaded ready for clipping!');
     setLoading(false);
   };
@@ -128,7 +140,7 @@ export default function SocialVideoClipModal({
     setStartTime(valid);
     setStartTimeInput(formatSecondsToTimecode(valid));
     if (valid >= endTime) {
-      const nextEnd = Math.min(duration, valid + 30);
+      const nextEnd = Math.min(duration || (valid + 30), valid + 30);
       setEndTime(nextEnd);
       setEndTimeInput(formatSecondsToTimecode(nextEnd));
     }
@@ -142,14 +154,20 @@ export default function SocialVideoClipModal({
     if (videoRef.current) videoRef.current.currentTime = valid;
   };
 
-  const [isPreviewingClip, setIsPreviewingClip] = useState(false);
-
   const handlePreviewClip = () => {
     if (!videoUrl) return toast.error('Please load a video first');
     if (endTime <= startTime) return toast.error('End time must be after start time');
     
     setIsPreviewingClip(true);
-    if (videoRef.current) {
+    if (videoUrl.includes('youtube.com/embed')) {
+      let vid = '';
+      if (videoUrl.includes('embed/')) {
+        vid = videoUrl.split('embed/')[1]?.split('?')[0];
+      }
+      if (vid) {
+        setVideoUrl(`https://www.youtube.com/embed/${vid}?autoplay=1&start=${Math.max(0, Math.floor(startTime))}&end=${Math.max(1, Math.floor(endTime))}&enablejsapi=1`);
+      }
+    } else if (videoRef.current) {
       videoRef.current.currentTime = startTime;
       const p = videoRef.current.play();
       if (p && typeof p.then === 'function') {
