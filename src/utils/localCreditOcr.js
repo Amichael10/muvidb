@@ -1,5 +1,3 @@
-import { createWorker } from 'tesseract.js';
-
 // Common role labels in credit rolls
 const ROLE_PATTERNS = [
   { pattern: /^(?:STORY)(?: BY)?$/i, label: 'Story' },
@@ -55,6 +53,7 @@ function cleanPersonName(raw) {
  * Returns array of extracted items: [{ name: string, role_or_character: string }]
  */
 export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast') {
+  const { createWorker } = await import('tesseract.js');
   const worker = await createWorker('eng');
   
   try {
