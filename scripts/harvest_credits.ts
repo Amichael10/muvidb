@@ -56,7 +56,7 @@ function numberSetting(name: string, envName: string, fallback: number) {
 // Credit rolls sit in the final minutes. Use explicit positive timestamps for
 // --download-sections; the negative form (`*-300-inf`) produced empty stubs on
 // this source even though yt-dlp exited successfully.
-const TAIL_SECONDS = Number(arg('tail')) || 300; // last 5 min (override: --tail=420)
+const TAIL_SECONDS = Number(arg('tail')) || 180; // last 3 min default (override: --tail=180)
 const MIN_ENTRIES = 4;          // structural gate: fewer than this isn't a roll
 const FRAME_EVERY_SEC = Number(arg('frame-every')) || 1; // sample cadence inside the tail
 const SINGLE_FRAME_MIN_OCR_CONFIDENCE = Number(arg('single-frame-min-ocr')) || 0.65;
@@ -125,6 +125,7 @@ type WorkerStatus =
   | 'idle'
   | 'running'
   | 'paused'
+  | 'cooling_down'
   | 'stopping'
   | 'stopped'
   | 'failed';
@@ -167,13 +168,14 @@ function monitorWarning(label: string, error: unknown) {
 }
 
 async function writeWorkerRow() {
+  const dbStatus = (workerStatus as string) === 'cooling_down' ? 'idle' : workerStatus;
   const { error } = await supabase
     .from('credit_harvest_workers')
     .upsert({
       worker_id: WORKER_ID,
       machine_name: WORKER_MACHINE,
       process_id: process.pid,
-      status: workerStatus,
+      status: dbStatus,
       current_job_id: activeJobId,
       current_film_id: activeFilmId,
       processed_count: workerProcessed,
@@ -568,6 +570,29 @@ async function requeueLowCoverage(maxCandidates: number) {
 
   console.log(`Requeued ${rows.length} low-coverage jobs.`);
   console.log('   Start workers with --reharvest-existing so existing pending candidates are kept and only new rows are appended.');
+}
+
+async function requeueFailed() {
+  console.log('🔄 Requeueing all failed jobs back to pending status...');
+  const { data, error } = await supabase
+    .from('credit_harvest_jobs')
+    .update({
+      status: 'pending',
+      outcome: null,
+      error: null,
+      started_at: null,
+      processed_at: null,
+      attempts: 0
+    })
+    .eq('status', 'failed')
+    .select('id');
+
+  if (error) {
+    console.error('❌ Failed to requeue failed jobs:', error.message);
+    return;
+  }
+
+  console.log(`✅ Requeued ${(data || []).length} failed jobs back to pending queue.`);
 }
 
 function normalizeCandidateValue(value: string | null | undefined): string {
@@ -1187,13 +1212,17 @@ async function finish(
 ) {
   // --film debug mode has no queue row to update.
   if (!job.id) { console.log(`   [debug] outcome=${outcome} candidates=${candidates}${error ? ` error=${error}` : ''}`); return; }
-  const { error: finishError } = await supabase.from('credit_harvest_jobs').update({
-    status: outcome === 'error' ? 'failed' : 'done',
-    outcome, candidates_found: candidates, error: error ?? null,
-    processed_at: new Date().toISOString(),
-    heartbeat_at: new Date().toISOString(),
-  }).eq('id', job.id);
-  if (finishError) throw new Error(`finish job: ${finishError.message}`);
+  try {
+    const { error: finishError } = await supabase.from('credit_harvest_jobs').update({
+      status: outcome === 'error' ? 'failed' : 'done',
+      outcome, candidates_found: candidates, error: error ?? null,
+      processed_at: new Date().toISOString(),
+      heartbeat_at: new Date().toISOString(),
+    }).eq('id', job.id);
+    if (finishError) console.warn(`   ⚠️  finish job DB notice: ${finishError.message}`);
+  } catch (err) {
+    console.warn(`   ⚠️  finish job network error ignored: ${String(err)}`);
+  }
 
   workerProcessed++;
   if (outcome === 'error') workerFailures++;
@@ -1220,12 +1249,37 @@ async function finish(
     job,
     error ? { error } : undefined,
   );
-  await setWorkerActivity(
-    stopRequested ? 'stopping' : 'idle',
-    resultMessage,
-    null,
+
+  const isTimeoutError = outcome === 'error' && (
+    String(error || '').toLowerCase().includes('timeout') ||
+    String(error || '').toLowerCase().includes('killed')
   );
+
+  if (isTimeoutError) {
+    consecutiveTimeouts++;
+    const cooldownSecs = Math.min(300, Math.floor(60 * Math.pow(1.5, Math.min(consecutiveTimeouts - 1, 5))));
+    const coolMsg = `🧊 YouTube throttling detected (${consecutiveTimeouts} streak). Cooling down for ${cooldownSecs}s before refiring...`;
+    console.log(`   ${coolMsg}`);
+    await writeWorkerLog('warning', 'worker_cooldown', coolMsg, job, { consecutiveTimeouts, cooldownSecs });
+    await setWorkerActivity('cooling_down', coolMsg, null);
+    await waitInterruptibly(cooldownSecs * 1000);
+  } else if (outcome === 'credits_found' || outcome === 'no_credits') {
+    consecutiveTimeouts = 0;
+    await setWorkerActivity(
+      stopRequested ? 'stopping' : 'idle',
+      resultMessage,
+      null,
+    );
+  } else {
+    await setWorkerActivity(
+      stopRequested ? 'stopping' : 'idle',
+      resultMessage,
+      null,
+    );
+  }
 }
+
+let consecutiveTimeouts = 0;
 
 /** Claim the next pending job (newest created YouTube film first). */
 async function claim(): Promise<Job | null> {
@@ -1240,8 +1294,9 @@ async function main() {
   if (arg('enqueue-recon') !== undefined) { await enqueueRecon(Number(arg('enqueue-recon')) || 3); return; }
   if (arg('enqueue-popular') !== undefined) { await enqueuePopular(Number(arg('enqueue-popular')) || 2000); return; }
   if (arg('enqueue-latest-sparse') !== undefined) { await enqueueLatestSparse(Number(arg('enqueue-latest-sparse')) || AUTO_ENQUEUE_LATEST_LIMIT, AUTO_ENQUEUE_MIN_CREDITS); return; }
-  if (arg('enqueue-sparse') !== undefined) { await enqueueSparse(Number(arg('enqueue-sparse')) || 4); return; }
+  if (arg('requeue-sparse') !== undefined) { await enqueueSparse(Number(arg('enqueue-sparse')) || 4); return; }
   if (arg('requeue-low-coverage') !== undefined) { await requeueLowCoverage(Number(arg('requeue-low-coverage')) || 12); return; }
+  if (arg('requeue-failed') !== undefined) { await requeueFailed(); return; }
 
   await checkPrereqs();
 

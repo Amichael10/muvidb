@@ -63,7 +63,6 @@ export function CanvasVideoPlayer({
           controls
           playsInline
           preload="auto"
-          crossOrigin="anonymous"
           autoPlay={autoPlay}
           loop={loop}
           muted={muted}
@@ -73,11 +72,7 @@ export function CanvasVideoPlayer({
             setHasError(true);
             setErrorMessage('HTML5 video decoding failed. Ensure source is an MP4/WebM blob or stream.');
           }}
-        >
-          <source src={mediaUrl} type="video/webm" />
-          <source src={mediaUrl} type="video/mp4" />
-          Your browser does not support HTML5 video playback.
-        </video>
+        />
       )}
     </div>
   );

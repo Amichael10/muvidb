@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { CohereClientV2 } from 'cohere-ai';
 import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
@@ -138,7 +137,14 @@ const COHERE_CHAT_MODEL = process.env.COHERE_CHAT_MODEL || 'command-r-08-2024';
 const COHERE_EMBED_MODEL = process.env.COHERE_EMBED_MODEL || 'embed-v4.0';
 const COHERE_RERANK_MODEL = process.env.COHERE_RERANK_MODEL || 'rerank-v4.0-pro';
 
-const cohereClientFor = () => new CohereClientV2({ token: COHERE_KEYS[cohereKeyIdx] || '' });
+let _CohereClient: any = null;
+async function cohereClientFor() {
+  if (!_CohereClient) {
+    const mod = await import('cohere-ai');
+    _CohereClient = (mod as any).CohereClient || (mod as any).CohereClientV2 || (mod as any).default;
+  }
+  return new _CohereClient({ token: COHERE_KEYS[cohereKeyIdx] || '' });
+}
 
 /** Cohere SDK uses statusCode; some paths surface status. */
 function cohereErrStatus(err: any): number | undefined {
@@ -159,7 +165,7 @@ function isCohereDeadKeyError(err: any): boolean {
 const deadCohereKeys = new Set<string>();
 
 /** Run a Cohere call, rotating on quota AND skipping keys that are simply dead. */
-async function withCohereRotation(fn: (client: CohereClientV2) => Promise<any>): Promise<any> {
+async function withCohereRotation(fn: (client: any) => Promise<any>): Promise<any> {
   let lastErr: any;
   for (let attempt = 0; attempt < Math.max(1, COHERE_KEYS.length); attempt++) {
     // Skip keys already proven dead this process.
@@ -168,7 +174,8 @@ async function withCohereRotation(fn: (client: CohereClientV2) => Promise<any>):
       continue;
     }
     try {
-      return await fn(cohereClientFor());
+      const client = await cohereClientFor();
+      return await fn(client);
     } catch (err: any) {
       lastErr = err;
       if (isCohereDeadKeyError(err) && COHERE_KEYS.length > 1) {

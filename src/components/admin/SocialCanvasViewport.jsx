@@ -147,10 +147,18 @@ export default function SocialCanvasViewport({
 
     if (showTrimmer && trimEnd > trimStart) {
       if (t >= trimEnd) {
-        videoRef.current.currentTime = trimStart;
-      }
+  // Reset playback state when mediaUrl changes
+  useEffect(() => {
+    setIsPlaying(false);
+    setVideoDuration(0);
+    setTrimStart(0);
+    setTrimEnd(0);
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch {}
     }
-  };
+  }, [mediaUrl]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -158,8 +166,17 @@ export default function SocialCanvasViewport({
       if (showTrimmer && (currentTime < trimStart || currentTime >= trimEnd)) {
         videoRef.current.currentTime = trimStart;
       }
-      videoRef.current.play();
-      setIsPlaying(true);
+      const playPromise = videoRef.current.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.then(() => {
+          setIsPlaying(true);
+        }).catch((err) => {
+          console.warn('Canvas video playback prevented or failed:', err);
+          setIsPlaying(false);
+        });
+      } else {
+        setIsPlaying(true);
+      }
     } else {
       videoRef.current.pause();
       setIsPlaying(false);
@@ -440,16 +457,11 @@ export default function SocialCanvasViewport({
                     src={mediaUrl}
                     playsInline
                     preload="auto"
-                    crossOrigin="anonymous"
                     onLoadedMetadata={handleLoadedMetadata}
                     onTimeUpdate={handleTimeUpdate}
                     onError={(e) => console.error('Canvas video playback error:', e)}
                     className={`h-full w-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
-                  >
-                    <source src={mediaUrl} type="video/webm" />
-                    <source src={mediaUrl} type="video/mp4" />
-                    Your browser does not support HTML5 video playback.
-                  </video>
+                  />
                   {/* Play/Pause Overlay on Click */}
                   <button
                     type="button"

@@ -368,7 +368,15 @@ export default function SocialDraftComposer({
       if (event.data?.type === 'OPEN_CUT_RENDER_COMPLETE') {
         const { draftId, variantId, publicUrl, assetId, width, height, format } = event.data;
 
-        const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(publicUrl);
+        const isVideo = Boolean(publicUrl && (
+          /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(publicUrl) ||
+          publicUrl.startsWith('blob:') ||
+          format?.includes('video') ||
+          format?.includes('render') ||
+          format?.includes('custom') ||
+          format?.includes('9:16') ||
+          format?.includes('1:1')
+        ));
         const newAsset = {
           id: assetId || publicUrl,
           publicUrl,
@@ -2030,10 +2038,7 @@ export default function SocialDraftComposer({
                               playsInline
                               preload="auto"
                               className="h-full w-full object-contain"
-                            >
-                              <source src={activeVisualAssets[0].publicUrl} type="video/webm" />
-                              <source src={activeVisualAssets[0].publicUrl} type="video/mp4" />
-                            </video>
+                            />
                           )
                         ) : (
                           <img
