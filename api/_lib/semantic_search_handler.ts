@@ -92,7 +92,7 @@ async function rerankSearch(
   const results = ranked
     .map((r) => {
       const orig = byIndex.get(r.index);
-      return orig ? { ...orig, score: r.relevance_score } : null;
+      return orig ? { ...orig, score: (r as any).relevanceScore ?? (r as any).relevance_score } : null;
     })
     .filter(Boolean);
 
@@ -108,7 +108,8 @@ async function rerankSearch(
 }
 
 async function vectorSearch(q: string, body: any, res: VercelResponse) {
-  const embedding = await embedWithCohere(q.slice(0, 500), 'search_query');
+  const embeddings = await embedWithCohere([q.slice(0, 500)], { inputType: 'search_query' });
+  const embedding = embeddings[0];
   if (!embedding || !embedding.length) {
     return res.status(502).json({ error: 'Failed to embed query', films: [] });
   }
