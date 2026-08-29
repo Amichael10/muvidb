@@ -53,7 +53,8 @@ function cleanPersonName(raw) {
  * Returns array of extracted items: [{ name: string, role_or_character: string }]
  */
 export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast') {
-  const { createWorker } = await import('tesseract.js');
+  const modName = 'tesseract.js';
+  const { createWorker } = await import(/* @vite-ignore */ modName);
   const worker = await createWorker('eng');
   
   try {
