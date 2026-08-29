@@ -147,6 +147,11 @@ export default function SocialCanvasViewport({
 
     if (showTrimmer && trimEnd > trimStart) {
       if (t >= trimEnd) {
+        videoRef.current.currentTime = trimStart;
+      }
+    }
+  };
+
   // Reset playback state when mediaUrl changes
   useEffect(() => {
     setIsPlaying(false);
