@@ -33,12 +33,6 @@
     "api/data.ts": {
       "maxDuration": 60
     },
-    "api/telegram.ts": {
-      "maxDuration": 30
-    },
-    "api/auth-email.ts": {
-      "maxDuration": 30
-    },
     "api/automation.ts": {
       "maxDuration": 60
     },
@@ -52,16 +46,7 @@
     "api/ai.ts": {
       "maxDuration": 60
     },
-    "api/semantic-search.ts": {
-      "maxDuration": 30
-    },
     "api/media.ts": {
-      "maxDuration": 60
-    },
-    "api/drive.ts": {
-      "maxDuration": 60
-    },
-    "api/external.ts": {
       "maxDuration": 60
     }
   },
@@ -105,7 +90,27 @@
     },
     {
       "source": "/api/drive/create-upload-session",
-      "destination": "/api/drive"
+      "destination": "/api/social?task=create_upload_session"
+    },
+    {
+      "source": "/api/drive",
+      "destination": "/api/social?task=create_upload_session"
+    },
+    {
+      "source": "/api/telegram",
+      "destination": "/api/automation?action=telegram"
+    },
+    {
+      "source": "/api/auth-email",
+      "destination": "/api/automation?action=auth-email"
+    },
+    {
+      "source": "/api/semantic-search",
+      "destination": "/api/ai?op=semantic-search"
+    },
+    {
+      "source": "/api/external",
+      "destination": "/api/media?op=external"
     },
     {
       "source": "/api/film/:id",

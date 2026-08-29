@@ -12,6 +12,27 @@ export const maxDuration = 60;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
+  const pathname = (req.url || '').split('?')[0];
+
+  // Telegram webhook endpoint
+  if (action === 'telegram' || pathname.includes('/api/telegram')) {
+    const { handleTelegramOps } = await import('./_lib/telegram_ops_handler.js');
+    return handleTelegramOps(req, res);
+  }
+
+  // Supabase Auth Email hook
+  if (action === 'auth-email' || pathname.includes('/api/auth-email')) {
+    try {
+      const { handleAuthEmailHook } = await import('./_lib/auth_email_handler.js');
+      return await handleAuthEmailHook(req, res);
+    } catch (err: any) {
+      console.error('[auth-email] handler failed:', err?.message || err);
+      return res.status(500).json({
+        error: 'auth-email failed',
+        message: err?.message || String(err),
+      });
+    }
+  }
 
   // Read-only job status — no privileged side effects.
   if (action === 'status') {

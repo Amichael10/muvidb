@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkRateLimit } from './_lib/rateLimit.js';
-import { handleCors } from './_lib/cors.js';
+import { checkRateLimit } from './rateLimit.js';
+import { handleCors } from './cors.js';
 
 const YOUTUBE_BASE = 'https://www.googleapis.com/youtube/v3';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -14,11 +14,9 @@ const TMDB_ALLOWED = [
   /^\/person\/\d+$/,
 ];
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleExternalProvider(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-
-  console.log(`[API] ${req.method} ${req.url}`);
 
   if (checkRateLimit(req as any)) {
     console.log(`[API] Rate limit hit for ${req.url}`);

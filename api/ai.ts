@@ -8,6 +8,15 @@ export const maxDuration = 60;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
+
+  const op = (req.query?.op || req.body?.op || req.query?.task || req.body?.task || '').toString();
+  const pathname = (req.url || '').split('?')[0];
+
+  if (op === 'semantic-search' || op === 'semantic_search' || pathname.includes('/semantic-search')) {
+    const { handleSemanticSearch } = await import('./_lib/semantic_search_handler.js');
+    return handleSemanticSearch(req, res);
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   // This endpoint performs privileged, service-role DB writes (renaming

@@ -36,6 +36,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const op = req.query.op;
   if (op === 'health') return handleHealth(req, res);
   if (op === 'mirror') return handleMirrorImages(req, res);
+  if (op === 'external' || req.query.provider) {
+    const { handleExternalProvider } = await import('./_lib/external_provider_handler.js');
+    return handleExternalProvider(req, res);
+  }
 
   const raw = req.query.url;
   const url = Array.isArray(raw) ? raw[0] : raw;

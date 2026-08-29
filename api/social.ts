@@ -26,6 +26,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const scope = (req.query?.scope || req.body?.scope || '').toString();
 
   try {
+    if (task === 'create_upload_session' || task === 'drive_upload_session' || pathname.includes('/drive/create-upload-session')) {
+      const { createDriveUploadSession } = await import('./_lib/google_drive.js');
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const { fileName, mimeType, fileSize } = body;
+      if (!fileName || !fileSize) {
+        return res.status(400).json({ error: 'Missing fileName or fileSize' });
+      }
+      const uploadUrl = await createDriveUploadSession(
+        fileName,
+        mimeType || 'video/webm',
+        Number(fileSize)
+      );
+      return res.status(200).json({ uploadUrl });
+    }
+
     if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
       const { handleEditorialTask } = await import('./_lib/editorial_handler.js');
       return handleEditorialTask(req, res);

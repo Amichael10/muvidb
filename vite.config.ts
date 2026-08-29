@@ -93,8 +93,9 @@ export default defineConfig(({ mode, isSsrBuild }) => {
           bypass: async (req, res) => {
             try {
               const url = new URL(req.url, 'http://localhost:3001');
-              const { default: handler } = await import('./api/external.js');
-              await handler(
+              const extMod = './api/_lib/external_provider_handler.js';
+              const { handleExternalProvider } = await import(/* @vite-ignore */ extMod);
+              await handleExternalProvider(
                 { query: Object.fromEntries(url.searchParams), method: req.method },
                 {
                   status: (code) => ({
@@ -152,10 +153,11 @@ export default defineConfig(({ mode, isSsrBuild }) => {
                 body += chunk;
               }
               const parsed = JSON.parse(body || '{}');
-              const { createDriveUploadSession } = await import('./src/lib/googleDrive.js');
+              const driveMod = './api/_lib/google_drive.js';
+              const { createDriveUploadSession } = await import(/* @vite-ignore */ driveMod);
               const uploadUrl = await createDriveUploadSession(
                 parsed.fileName,
-                parsed.mimeType || 'video/mp4',
+                parsed.mimeType || 'video/webm',
                 Number(parsed.fileSize)
               );
               res.statusCode = 200;

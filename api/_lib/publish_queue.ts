@@ -1,5 +1,5 @@
-import { getVideoStreamFromDrive, deleteVideoFromDrive } from '@/lib/googleDrive';
-import { supabase } from '@/lib/supabaseClient';
+import { getVideoStreamFromDrive, deleteVideoFromDrive } from './google_drive.js';
+import { supabase } from './supabase.js';
 
 export interface PublishResult {
   success: boolean;
@@ -58,27 +58,18 @@ export async function processScheduledPosts() {
           .update({ status: 'published', published_at: new Date().toISOString() })
           .eq('id', post.id);
 
-        // 4. CLEANUP: Delete from Google Drive to free up space immediately
+        // 4. Cleanup Google Drive file immediately
         await deleteVideoFromDrive(post.drive_file_id);
-
-        results.push({ id: post.id, status: 'published', cleanedUp: true });
-      } else {
-        await publishToSocialPlatform(post.platform, null, post.caption);
-        await supabase
-          .from('scheduled_posts')
-          .update({ status: 'published', published_at: new Date().toISOString() })
-          .eq('id', post.id);
 
         results.push({ id: post.id, status: 'published' });
       }
     } catch (err: any) {
-      console.error(`Failed to publish post ${post.id}:`, err);
+      console.error(`[Publish Queue] Failed to process post ${post.id}:`, err);
       await supabase
         .from('scheduled_posts')
-        .update({ status: 'failed', error_log: String(err?.message || err) })
+        .update({ status: 'failed', error: err?.message || 'Unknown error' })
         .eq('id', post.id);
-
-      results.push({ id: post.id, status: 'failed', error: String(err?.message || err) });
+      results.push({ id: post.id, status: 'failed', error: err?.message });
     }
   }
 
