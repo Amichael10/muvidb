@@ -1,4 +1,3 @@
-import QRCode from 'qrcode';
 import { professionalRoleLabel } from './professionalRoles';
 
 export const CAREER_PASSPORT_WIDTH = 1080;
@@ -213,6 +212,8 @@ export async function generateCareerPassportJpeg(input) {
   ctx.fillStyle = ORANGE;
   for (let row = 0; row < 3; row += 1) for (let col = 0; col < 3; col += 1) ctx.beginPath(), ctx.arc(1000 + col * 14, 44 + row * 14, 3, 0, Math.PI * 2), ctx.fill();
 
+  const qrcodeModName = 'qrcode';
+  const { default: QRCode } = await import(/* @vite-ignore */ qrcodeModName);
   const [logo, portrait, qr, cinemaIcon, streamingIcon, youtubeIcon, theatreIcon, tvIcon, clapperIcon, starIcon, usersIcon, actorIcon, ...posters] = await Promise.all([
     safeImage('/images/MuviDB%20Brand/MuviDB%20Icon.png', '/images/logo.png'),
     safeImage(model.photoUrl, '/images/person-placeholder.png'),
