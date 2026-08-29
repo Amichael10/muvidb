@@ -52,6 +52,15 @@ export default function SocialCanvasViewport({
   const [activeAspect, setActiveAspect] = useState(aspectRatio);
   const [fitMode, setFitMode] = useState('contain'); // 'contain' (Fit) | 'cover' (Fill)
 
+  // Video / Image detection
+  const isVideo = mediaType === 'video' ||
+    Boolean(mediaUrl && (
+      /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(mediaUrl) ||
+      mediaUrl.startsWith('blob:') ||
+      mediaUrl.includes('youtube.com') ||
+      mediaUrl.includes('youtu.be')
+    ));
+
   // In-Canvas Video Trimmer / Cut State
   const videoRef = useRef(null);
   const containerRef = useRef(null);
@@ -391,10 +400,33 @@ export default function SocialCanvasViewport({
           >
             {/* Custom Content or Injected Video */}
             {isVideo && typeof mediaUrl === 'string' ? (
-              mediaUrl.includes('youtube.com/embed') || mediaUrl.includes('youtube.com/watch') || mediaUrl.includes('youtu.be') ? (
+              mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be') ? (
                 <div className="relative h-full w-full bg-black flex items-center justify-center">
                   <iframe
-                    src={mediaUrl.includes('watch?v=') ? `https://www.youtube.com/embed/${mediaUrl.split('watch?v=')[1]?.split('&')[0]}?autoplay=1&enablejsapi=1` : mediaUrl}
+                    key={mediaUrl}
+                    src={(() => {
+                      if (mediaUrl.includes('youtube.com/embed/')) return mediaUrl;
+                      try {
+                        const parsed = new URL(mediaUrl);
+                        let vid = '';
+                        if (mediaUrl.includes('youtu.be/')) {
+                          vid = parsed.pathname.slice(1).split('?')[0];
+                        } else if (mediaUrl.includes('shorts/')) {
+                          vid = parsed.pathname.split('shorts/')[1]?.split('?')[0];
+                        } else {
+                          vid = parsed.searchParams.get('v') || '';
+                        }
+                        if (vid) {
+                          const start = parsed.searchParams.get('start');
+                          const end = parsed.searchParams.get('end');
+                          let embed = `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+                          if (start) embed += `&start=${start}`;
+                          if (end) embed += `&end=${end}`;
+                          return embed;
+                        }
+                      } catch {}
+                      return mediaUrl;
+                    })()}
                     title="Video Canvas Preview"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen

@@ -148,23 +148,53 @@ export default function SocialVideoClipModal({
     }
 
     if (mode === 'whole') {
+      let fullUrl = videoUrl;
+      if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+        let vid = '';
+        if (videoUrl.includes('embed/')) {
+          vid = videoUrl.split('embed/')[1]?.split('?')[0];
+        } else if (videoUrl.includes('youtu.be/')) {
+          vid = videoUrl.split('youtu.be/')[1]?.split('?')[0];
+        } else if (videoUrl.includes('watch?v=')) {
+          vid = videoUrl.split('watch?v=')[1]?.split('&')[0];
+        }
+        if (vid) {
+          fullUrl = `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+        }
+      }
+
       onImportToCanvas?.({
-        url: videoUrl,
+        url: fullUrl,
         mode: 'whole',
         startTime: 0,
         endTime: duration,
         duration: duration,
         title: videoTitle || 'Source Video',
       });
-      toast.success('Whole video downloaded straight into the canvas!');
+      toast.success('Whole video imported straight into the canvas!');
       onClose();
     } else {
       if (endTime <= startTime) {
         return toast.error('End time must be greater than start time');
       }
       const clipDuration = endTime - startTime;
+      let clippedUrl = videoUrl;
+      if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+        let vid = '';
+        if (videoUrl.includes('embed/')) {
+          vid = videoUrl.split('embed/')[1]?.split('?')[0];
+        } else if (videoUrl.includes('youtu.be/')) {
+          vid = videoUrl.split('youtu.be/')[1]?.split('?')[0];
+        } else if (videoUrl.includes('watch?v=')) {
+          vid = videoUrl.split('watch?v=')[1]?.split('&')[0];
+        }
+        if (vid) {
+          clippedUrl = `https://www.youtube.com/embed/${vid}?autoplay=1&start=${Math.max(0, Math.floor(startTime))}&end=${Math.max(1, Math.floor(endTime))}&enablejsapi=1`;
+        }
+      }
+
       onImportToCanvas?.({
-        url: videoUrl,
+        url: clippedUrl,
         mode: 'clip',
         startTime,
         endTime,

@@ -1988,13 +1988,53 @@ export default function SocialDraftComposer({
                     >
                       {activeVisualAssets[0] ? (
                         activeVisualAssets[0].mediaType === 'video' ? (
-                          <video
-                            src={activeVisualAssets[0].publicUrl}
-                            controls
-                            muted
-                            playsInline
-                            className="h-full w-full object-contain"
-                          />
+                          activeVisualAssets[0].publicUrl?.includes('youtube.com') || activeVisualAssets[0].publicUrl?.includes('youtu.be') ? (
+                            <iframe
+                              key={activeVisualAssets[0].publicUrl}
+                              src={
+                                activeVisualAssets[0].publicUrl.includes('youtube.com/embed/')
+                                  ? activeVisualAssets[0].publicUrl
+                                  : (() => {
+                                      try {
+                                        const parsed = new URL(activeVisualAssets[0].publicUrl);
+                                        let vid = '';
+                                        if (activeVisualAssets[0].publicUrl.includes('youtu.be/')) {
+                                          vid = parsed.pathname.slice(1).split('?')[0];
+                                        } else if (activeVisualAssets[0].publicUrl.includes('shorts/')) {
+                                          vid = parsed.pathname.split('shorts/')[1]?.split('?')[0];
+                                        } else {
+                                          vid = parsed.searchParams.get('v') || '';
+                                        }
+                                        if (vid) {
+                                          const start = parsed.searchParams.get('start');
+                                          const end = parsed.searchParams.get('end');
+                                          let embed = `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+                                          if (start) embed += `&start=${start}`;
+                                          if (end) embed += `&end=${end}`;
+                                          return embed;
+                                        }
+                                      } catch {}
+                                      return activeVisualAssets[0].publicUrl;
+                                    })()
+                              }
+                              title="Video Canvas Preview"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              className="h-full w-full border-0 object-cover"
+                            />
+                          ) : (
+                            <video
+                              key={activeVisualAssets[0].publicUrl}
+                              src={activeVisualAssets[0].publicUrl}
+                              controls
+                              playsInline
+                              preload="auto"
+                              className="h-full w-full object-contain"
+                            >
+                              <source src={activeVisualAssets[0].publicUrl} type="video/webm" />
+                              <source src={activeVisualAssets[0].publicUrl} type="video/mp4" />
+                            </video>
+                          )
                         ) : (
                           <img
                             src={activeVisualAssets[0].publicUrl}
