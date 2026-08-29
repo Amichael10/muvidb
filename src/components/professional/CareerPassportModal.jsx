@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import '@fontsource/bebas-neue/400.css';
-import '@fontsource/barlow/500.css';
 import { supabase } from '../../lib/supabase';
 import {
   buildCareerPassportModel,
