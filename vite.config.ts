@@ -133,6 +133,42 @@ export default defineConfig(({ mode, isSsrBuild }) => {
             return false;
           }
         },
+        '/api/drive': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 204;
+              res.end();
+              return false;
+            }
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.end(JSON.stringify({ error: 'Method not allowed' }));
+              return false;
+            }
+            try {
+              let body = '';
+              for await (const chunk of req) {
+                body += chunk;
+              }
+              const parsed = JSON.parse(body || '{}');
+              const { createDriveUploadSession } = await import('./src/lib/googleDrive.js');
+              const uploadUrl = await createDriveUploadSession(
+                parsed.fileName,
+                parsed.mimeType || 'video/mp4',
+                Number(parsed.fileSize)
+              );
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ uploadUrl }));
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          }
+        },
         '/api/cron/refresh-videos': {
           target: 'http://localhost:3001',
           bypass: async (req, res) => {

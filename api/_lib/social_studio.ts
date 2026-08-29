@@ -1572,6 +1572,7 @@ export async function attachCustomAsset(
     format?: SocialAssetFormat;
     width?: number;
     height?: number;
+    variantId?: string;
   },
   actor: SocialActor,
 ) {

@@ -186,7 +186,7 @@ export async function uploadAdminSocialImage(file, bucket = 'film-images') {
   return { url: `${base}/storage/v1/object/public/${bucket}/${path}` };
 }
 
-const MAX_SOCIAL_VIDEO_BYTES = 50 * 1024 * 1024;
+const MAX_SOCIAL_VIDEO_BYTES = 500 * 1024 * 1024; // 500 MB (HD Video Support)
 
 async function validateVideoSignature(file) {
   const bytes = new Uint8Array(await file.slice(0, 32).arrayBuffer());
@@ -206,7 +206,7 @@ async function validateVideoSignature(file) {
 }
 
 // Social videos are already compressed media. Upload the video without canvas processing,
-// while checking MIME, size and file signature. Supports MP4, WebM, and MOV.
+// while checking MIME, size and file signature. Supports MP4, WebM, and MOV up to 500MB.
 export async function uploadAdminSocialVideo(file, bucket = 'social-published-assets') {
   if (!file) return { error: 'No video selected.' };
   const type = file.type || '';
@@ -217,7 +217,7 @@ export async function uploadAdminSocialVideo(file, bucket = 'social-published-as
   if (!isWebM && !isMp4 && !isMov && !type.startsWith('video/')) {
     return { error: 'Please select a supported video format (.mp4, .webm, or .mov).' };
   }
-  if (file.size > MAX_SOCIAL_VIDEO_BYTES) return { error: 'Video uploads are limited to 50 MB in Social Studio.' };
+  if (file.size > MAX_SOCIAL_VIDEO_BYTES) return { error: 'Video uploads are limited to 500 MB in Social Studio.' };
   if (!(await validateVideoSignature(file))) return { error: "That file doesn't look like a valid video (.mp4, .webm, or .mov)." };
 
   const ext = isWebM ? 'webm' : (isMov ? 'mov' : 'mp4');

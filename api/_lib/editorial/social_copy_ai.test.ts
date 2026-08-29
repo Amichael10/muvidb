@@ -7,6 +7,11 @@ import {
   type AICopyVariation,
 } from './social_copy_ai.js';
 
+vi.mock('../ai_service.js', () => ({
+  generateAIContent: vi.fn().mockRejectedValue(new Error('AI simulated failure')),
+  parseJSON: (x: string) => { try { return JSON.parse(x); } catch { return null; } },
+}));
+
 function variations(text: string): AICopyVariation[] {
   return ['A', 'B', 'C'].map((key, index) => ({
     key: key as 'A' | 'B' | 'C',

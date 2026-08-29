@@ -49,6 +49,7 @@ describe('ThreadsPlatformAdapter', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child-1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child-2' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'carousel-1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'FINISHED' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'post-1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ permalink: 'https://threads.net/@muvidb/post/carousel' }), { status: 200 }));
     const adapter = new ThreadsPlatformAdapter({ accessToken: 'token', userId: 'user-1', fetchImpl });

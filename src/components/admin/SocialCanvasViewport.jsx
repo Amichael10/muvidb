@@ -391,26 +391,46 @@ export default function SocialCanvasViewport({
           >
             {/* Custom Content or Injected Video */}
             {isVideo && typeof mediaUrl === 'string' ? (
-              <div className="relative h-full w-full bg-black flex items-center justify-center">
-                <video
-                  ref={videoRef}
-                  src={mediaUrl}
-                  playsInline
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onTimeUpdate={handleTimeUpdate}
-                  className={`h-full w-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
-                />
-                {/* Play/Pause Overlay on Click */}
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur-sm">
-                    <Icon icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'} width="22" />
-                  </div>
-                </button>
-              </div>
+              mediaUrl.includes('youtube.com/embed') || mediaUrl.includes('youtube.com/watch') || mediaUrl.includes('youtu.be') ? (
+                <div className="relative h-full w-full bg-black flex items-center justify-center">
+                  <iframe
+                    src={mediaUrl.includes('watch?v=') ? `https://www.youtube.com/embed/${mediaUrl.split('watch?v=')[1]?.split('&')[0]}?autoplay=1&enablejsapi=1` : mediaUrl}
+                    title="Video Canvas Preview"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="h-full w-full border-0 object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="relative h-full w-full bg-black flex items-center justify-center">
+                  <video
+                    ref={videoRef}
+                    key={mediaUrl}
+                    src={mediaUrl}
+                    playsInline
+                    preload="auto"
+                    crossOrigin="anonymous"
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onTimeUpdate={handleTimeUpdate}
+                    onError={(e) => console.error('Canvas video playback error:', e)}
+                    className={`h-full w-full ${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}
+                  >
+                    <source src={mediaUrl} type="video/webm" />
+                    <source src={mediaUrl} type="video/mp4" />
+                    Your browser does not support HTML5 video playback.
+                  </video>
+                  {/* Play/Pause Overlay on Click */}
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur-sm">
+                      <Icon icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'} width="22" />
+                    </div>
+                  </button>
+                </div>
+              )
             ) : (
               <div className={`h-full w-full flex items-center justify-center [&>img]:${fitMode === 'cover' ? 'object-cover' : 'object-contain'} [&>video]:${fitMode === 'cover' ? 'object-cover' : 'object-contain'}`}>
                 {children}

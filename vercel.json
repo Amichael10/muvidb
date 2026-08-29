@@ -58,6 +58,9 @@
     "api/media.ts": {
       "maxDuration": 60
     },
+    "api/drive.ts": {
+      "maxDuration": 60
+    },
     "api/external.ts": {
       "maxDuration": 60
     }
@@ -99,6 +102,10 @@
     {
       "source": "/storage/v1/object/public/:path*",
       "destination": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/:path*"
+    },
+    {
+      "source": "/api/drive/create-upload-session",
+      "destination": "/api/drive"
     },
     {
       "source": "/api/film/:id",
