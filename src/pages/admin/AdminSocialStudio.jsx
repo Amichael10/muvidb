@@ -237,6 +237,7 @@ export default function AdminSocialStudio() {
   const [draftsError, setDraftsError] = useState('');
   const [reviewingId, setReviewingId] = useState(null);
   const [scheduleAt, setScheduleAt] = useState({});
+  const [expandedCaptions, setExpandedCaptions] = useState({});
   const [editingDraft, setEditingDraft] = useState(null);
   const [editingQueueItem, setEditingQueueItem] = useState(null);
   const [queueEditTitle, setQueueEditTitle] = useState('');
@@ -1260,29 +1261,23 @@ export default function AdminSocialStudio() {
                   ? { public_url: carouselPreviewUrl, format: 'carousel' }
                   : assets.find(asset => asset.id === selectedAssetId) || assets[0];
                 const canChangeQueueItem = !['publishing', 'partially_published', 'published'].includes(item.status);
+                const isExpanded = Boolean(expandedCaptions[item.id]);
+
+                // Find schedule timestamp
+                const scheduledTime = item.scheduled_for || variants.find(v => v.scheduled_for)?.scheduled_for;
+                const publishedTime = item.published_at || (item.status === 'published' ? item.updated_at : null);
+
                 return (
-                <div
-                  key={item.id}
-                  className="rounded-lg border border-border bg-surface p-5 transition-shadow hover:shadow-sm"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="flex shrink-0 items-start gap-4">
-                      <SocialAssetThumbnail asset={previewAsset} />
-
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-bold text-text-primary">{item.title}</h3>
-                          <Pill tone={STATUS_TONES[item.status] || 'blue'}>{item.status}</Pill>
-                          <span className="text-xs text-text-muted">
-                            Type: <strong className="text-text-primary">{item.content_type}</strong>
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-text-muted">
-                          Created {new Date(item.created_at).toLocaleString()}
-                        </p>
-
-                        {/* Replace Graphic Asset Button */}
-                        <div className="mt-3 flex items-center gap-2">
+                  <div
+                    key={item.id}
+                    className="group relative rounded-2xl border border-white/10 bg-[#141419] p-5 shadow-xl transition-all hover:border-white/20 hover:bg-[#16161f] space-y-4"
+                  >
+                    {/* Top Main Row */}
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      {/* Left: Thumbnail & Replace Media Button */}
+                      <div className="flex items-start gap-4 shrink-0">
+                        <div className="relative">
+                          <SocialAssetThumbnail asset={previewAsset} />
                           <input
                             type="file"
                             accept="image/*,video/*,.mp4,.webm,.mov"
@@ -1331,200 +1326,274 @@ export default function AdminSocialStudio() {
                             type="button"
                             onClick={() => fileInputRefs.current[item.id]?.click()}
                             disabled={uploadingAssetId === item.id}
-                            className="inline-flex items-center gap-1.5 rounded border border-border bg-surface px-2.5 py-1 text-xs font-bold text-text-primary hover:border-brand hover:text-brand disabled:opacity-50"
+                            className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded bg-black/60 border border-white/10 px-2 py-1 text-[10px] font-bold text-white hover:bg-white/10 hover:text-brand disabled:opacity-50 transition-colors"
                           >
-                            <Icon icon={uploadingAssetId === item.id ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'} className={uploadingAssetId === item.id ? 'animate-spin' : ''} width="13" />
-                            {uploadingAssetId === item.id ? 'Uploading…' : '🖼️ Replace Graphic'}
+                            <Icon icon={uploadingAssetId === item.id ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'} className={uploadingAssetId === item.id ? 'animate-spin' : ''} width="11" />
+                            {uploadingAssetId === item.id ? 'Uploading…' : '🖼️ Replace'}
                           </button>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Actions & Status Controls */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {variants.map(variant => {
-                        const isPublished = variant.status === 'published';
-                        const isPublishing = variant.status === 'publishing' || variant.status === 'processing';
-                        const isFailed = variant.status === 'failed';
-                        return (
-                          <span
-                            key={variant.id}
-                            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-bold ${
-                              isPublished
-                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                                : isPublishing
-                                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-300 animate-pulse'
-                                  : isFailed
-                                    ? 'border-red-500/30 bg-red-500/10 text-red-400'
-                                    : 'border-border bg-surface-2 text-text-muted'
-                            }`}
-                            title={variant.last_error_message || variant.status}
-                          >
-                            <Icon icon={`simple-icons:${variant.platform}`} width="12" />
-                            <span className="capitalize">{variant.platform}</span>
-                            {isPublished && <Icon icon="solar:check-circle-bold" width="12" className="text-emerald-400" />}
-                            {isPublishing && <Icon icon="solar:spinner-linear" width="12" className="animate-spin text-amber-400" />}
-                            {isFailed && <Icon icon="solar:close-circle-bold" width="12" className="text-red-400" />}
-                            {variant.external_permalink && (
-                              <a
-                                href={variant.external_permalink}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="ml-1 text-emerald-400 underline hover:text-emerald-300"
-                              >
-                                View
-                              </a>
+                        {/* Middle: Title, Badges, Schedule Timing & Platform Delivery Grid */}
+                        <div className="flex-1 min-w-0 space-y-3">
+                          {/* Title & Status Pills */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-black text-white tracking-tight">{item.title}</h3>
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                              item.status === 'published'
+                                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
+                                : item.status === 'scheduled'
+                                  ? 'border-blue-500/40 bg-blue-500/15 text-blue-300'
+                                  : item.status === 'partially_published'
+                                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+                                    : item.status === 'failed'
+                                      ? 'border-red-500/40 bg-red-500/15 text-red-400'
+                                      : 'border-white/10 bg-white/5 text-white/60'
+                            }`}>
+                              {item.status === 'published' && <Icon icon="solar:check-circle-bold" width="12" />}
+                              {item.status === 'scheduled' && <Icon icon="solar:calendar-bold" width="12" />}
+                              {item.status === 'publishing' && <Icon icon="solar:spinner-linear" className="animate-spin" width="12" />}
+                              {item.status === 'failed' && <Icon icon="solar:close-circle-bold" width="12" />}
+                              {item.status}
+                            </span>
+                            <span className="rounded bg-black/40 border border-white/5 px-2 py-0.5 text-[10px] font-bold text-white/50">
+                              {item.content_type?.replace(/_/g, ' ')}
+                            </span>
+                          </div>
+
+                          {/* Timing Banner */}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/60 font-mono">
+                            {item.status === 'scheduled' && scheduledTime ? (
+                              <span className="inline-flex items-center gap-1.5 font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
+                                <Icon icon="solar:clock-circle-bold" width="14" />
+                                Scheduled: {new Date(scheduledTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                              </span>
+                            ) : item.status === 'published' && publishedTime ? (
+                              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                                <Icon icon="solar:check-circle-bold" width="14" />
+                                Published on {new Date(publishedTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                              </span>
+                            ) : (
+                              <span>Created {new Date(item.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
                             )}
-                          </span>
-                        );
-                      })}
+                          </div>
 
-                      {canChangeQueueItem && (
-                        <>
+                          {/* Platform Delivery Rectangular Grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                            {variants.map(variant => {
+                              const isPublished = variant.status === 'published';
+                              const isPublishing = variant.status === 'publishing' || variant.status === 'processing';
+                              const isFailed = variant.status === 'failed';
+                              const isScheduled = variant.status === 'scheduled' || (item.status === 'scheduled' && !isPublished && !isFailed);
+                              const permalink = variant.external_permalink || variant.platform_options?.post_url || variant.platform_options?.permalink;
+
+                              const platformIcons = {
+                                tiktok: 'simple-icons:tiktok',
+                                instagram: 'simple-icons:instagram',
+                                facebook: 'simple-icons:facebook',
+                                threads: 'simple-icons:threads',
+                                youtube: 'simple-icons:youtube',
+                              };
+
+                              return (
+                                <div
+                                  key={variant.id}
+                                  className={`flex flex-col justify-between rounded-xl border p-3 transition-all ${
+                                    isPublished
+                                      ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400'
+                                      : isPublishing
+                                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 animate-pulse'
+                                        : isFailed
+                                          ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                                          : isScheduled
+                                            ? 'border-blue-500/30 bg-blue-500/5 text-blue-300'
+                                            : 'border-white/10 bg-black/40 text-white/60'
+                                  }`}
+                                >
+                                  {/* Platform Header */}
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                      <Icon icon={platformIcons[variant.platform] || 'solar:share-circle-bold'} width="14" />
+                                      <span className="text-xs font-black capitalize text-white">{variant.platform}</span>
+                                    </div>
+                                    {isPublished && <Icon icon="solar:check-circle-bold" width="14" className="text-emerald-400" />}
+                                    {isPublishing && <Icon icon="solar:spinner-linear" width="14" className="animate-spin text-amber-400" />}
+                                    {isFailed && <Icon icon="solar:close-circle-bold" width="14" className="text-red-400" />}
+                                  </div>
+
+                                  {/* Status Text / Live View Post Link */}
+                                  <div className="mt-2.5">
+                                    {isPublished ? (
+                                      permalink ? (
+                                        <a
+                                          href={permalink}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-1 text-[11px] font-black text-emerald-300 hover:bg-emerald-500/30 hover:text-emerald-200 transition-colors shadow-xs"
+                                        >
+                                          <span>View Post</span>
+                                          <Icon icon="solar:arrow-right-up-linear" width="12" />
+                                        </a>
+                                      ) : (
+                                        <span className="text-[11px] font-bold text-emerald-400">Published</span>
+                                      )
+                                    ) : isPublishing ? (
+                                      <span className="text-[11px] font-bold text-amber-300">Publishing…</span>
+                                    ) : isFailed ? (
+                                      <span className="text-[11px] font-bold text-red-400">Failed</span>
+                                    ) : isScheduled ? (
+                                      <span className="text-[11px] font-bold text-blue-300">Scheduled</span>
+                                    ) : (
+                                      <span className="text-[11px] font-bold text-white/50">Draft</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Actions Column */}
+                      <div className="flex flex-wrap items-center gap-2 lg:flex-col lg:items-end shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openFullStudioEditor(item)}
+                          disabled={reviewingId === item.id}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-brand hover:bg-brand/20 transition-all disabled:opacity-50 shadow-xs"
+                        >
+                          <Icon icon="solar:pen-new-square-bold" width="14" />
+                          Studio Edit
+                        </button>
+
+                        {item.status !== 'published' && (
                           <button
                             type="button"
-                            onClick={() => openFullStudioEditor(item)}
-                            disabled={reviewingId === item.id}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-bold text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
+                            onClick={() => runPublishNow(item.id)}
+                            disabled={reviewingId === item.id || item.status === 'publishing'}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:opacity-50 shadow-md transition-all"
                           >
-                            <Icon icon="solar:pen-new-square-linear" width="14" />
-                            Studio Edit
+                            <Icon
+                              icon={reviewingId === item.id || item.status === 'publishing' ? 'solar:spinner-linear' : 'solar:bolt-bold'}
+                              className={reviewingId === item.id || item.status === 'publishing' ? 'animate-spin' : ''}
+                              width="14"
+                            />
+                            <span>{reviewingId === item.id || item.status === 'publishing' ? 'Publishing…' : 'Publish Now'}</span>
                           </button>
+                        )}
+
+                        {item.status === 'scheduled' && (
+                          <button
+                            type="button"
+                            onClick={() => runCancelSchedule(item.id)}
+                            disabled={reviewingId === item.id}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-3 py-1.5 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                          >
+                            <Icon icon="solar:calendar-minimalistic-linear" width="14" />
+                            Cancel Schedule
+                          </button>
+                        )}
+
+                        {canChangeQueueItem && (
                           <button
                             type="button"
                             onClick={() => deleteQueueItem(item)}
                             disabled={reviewingId === item.id}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-lg p-1.5 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                            title="Delete post from queue"
                           >
-                            <Icon icon="solar:trash-bin-trash-linear" width="14" />
-                            Delete
+                            <Icon icon="solar:trash-bin-trash-linear" width="15" />
+                            <span>Delete</span>
                           </button>
-                        </>
-                      )}
-
-                      {reviewActions(item.status).map(({ action, label, tone }) => (
-                        <button
-                          key={action}
-                          type="button"
-                          onClick={() => runReview(item.id, action)}
-                          disabled={reviewingId === item.id}
-                          className={`rounded-md border px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${
-                            tone === 'green'
-                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
-                              : tone === 'red'
-                                ? 'border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                                : tone === 'brand'
-                                  ? 'border-brand/30 bg-brand/10 text-brand hover:bg-brand/20'
-                                  : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-
-                      {item.status === 'scheduled' && (
-                        <button
-                          type="button"
-                          onClick={() => runCancelSchedule(item.id)}
-                          disabled={reviewingId === item.id}
-                          className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs font-bold text-text-muted transition-colors hover:text-text-primary disabled:opacity-50"
-                        >
-                          Cancel Schedule
-                        </button>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Schedule Controls */}
-                  {item.status !== 'published' && item.status !== 'scheduled' && (
-                    <div className="mt-4 border-t border-border pt-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">
-                          Quick Schedule:
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => runQuickSchedulePreset(item.id, 'today_6pm')}
-                          disabled={reviewingId === item.id}
-                          className="rounded border border-border bg-surface-2 px-2.5 py-1 text-xs font-bold text-text-primary hover:border-brand hover:text-brand disabled:opacity-50"
-                        >
-                          🕒 Today 6 PM
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => runQuickSchedulePreset(item.id, 'tomorrow_10am')}
-                          disabled={reviewingId === item.id}
-                          className="rounded border border-border bg-surface-2 px-2.5 py-1 text-xs font-bold text-text-primary hover:border-brand hover:text-brand disabled:opacity-50"
-                        >
-                          🕒 Tomorrow 10 AM
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => runQuickSchedulePreset(item.id, 'tomorrow_6pm')}
-                          disabled={reviewingId === item.id}
-                          className="rounded border border-border bg-surface-2 px-2.5 py-1 text-xs font-bold text-text-primary hover:border-brand hover:text-brand disabled:opacity-50"
-                        >
-                          🕒 Tomorrow 6 PM
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => runPublishNow(item.id)}
-                          disabled={reviewingId === item.id || item.status === 'publishing'}
-                          className="rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50 inline-flex items-center gap-1.5 shadow-xs transition-colors"
-                          title="Trigger immediate publish for this post"
-                        >
-                          <Icon
-                            icon={reviewingId === item.id || item.status === 'publishing' ? 'solar:spinner-linear' : 'solar:bolt-bold'}
-                            className={reviewingId === item.id || item.status === 'publishing' ? 'animate-spin' : ''}
-                            width="13"
-                          />
-                          <span>
-                            {reviewingId === item.id || item.status === 'publishing' ? 'Publishing...' : 'Publish Now'}
+                    {/* Schedule Bar for Drafts */}
+                    {item.status !== 'published' && (
+                      <div className="border-t border-white/10 pt-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
+                            Quick Reschedule:
                           </span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => runQuickSchedulePreset(item.id, 'today_6pm')}
+                            disabled={reviewingId === item.id}
+                            className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold text-white hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
+                          >
+                            🕒 Today 6 PM
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => runQuickSchedulePreset(item.id, 'tomorrow_10am')}
+                            disabled={reviewingId === item.id}
+                            className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold text-white hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
+                          >
+                            🕒 Tomorrow 10 AM
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => runQuickSchedulePreset(item.id, 'tomorrow_6pm')}
+                            disabled={reviewingId === item.id}
+                            className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold text-white hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
+                          >
+                            🕒 Tomorrow 6 PM
+                          </button>
+                        </div>
 
-                        <div className="flex items-center gap-2 ml-auto">
+                        <div className="flex items-center gap-2">
                           <input
                             type="datetime-local"
                             value={scheduleAt[item.id] || ''}
                             onChange={e => setScheduleAt(curr => ({ ...curr, [item.id]: e.target.value }))}
-                            className="h-8 rounded border border-border bg-surface-2 px-2 text-xs text-text-primary outline-none focus:border-brand"
+                            className="h-8 rounded-lg border border-white/10 bg-black/50 px-2 text-xs text-white outline-none focus:border-brand"
                           />
                           <button
                             type="button"
                             onClick={() => runSchedule(item.id)}
                             disabled={reviewingId === item.id || !scheduleAt[item.id]}
-                            className="rounded bg-brand px-3 py-1 text-xs font-bold text-white hover:bg-brand-hover disabled:opacity-50"
+                            className="rounded-lg bg-brand px-3 py-1 text-xs font-black uppercase text-white hover:bg-brand-hover disabled:opacity-50 shadow-xs"
                           >
                             Schedule
                           </button>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Error details if failed */}
-                  {variants.some(v => v.last_error_message) && (
-                    <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400 space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <Icon icon="solar:danger-triangle-bold" width="14" className="text-red-400" />
-                        <span>Publishing Error Details:</span>
-                      </div>
-                      {variants.filter(v => v.last_error_message).map(v => (
-                        <div key={v.id} className="text-[11px] font-mono pl-5">
-                          <strong className="uppercase text-red-300">[{v.platform}]:</strong> {v.last_error_message}
+                    {/* Errors Banner if any */}
+                    {variants.some(v => v.last_error_message) && (
+                      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-300 space-y-1.5">
+                        <div className="flex items-center gap-2 font-bold text-red-400">
+                          <Icon icon="solar:danger-triangle-bold" width="16" />
+                          <span>Delivery Issues on Platform(s):</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        {variants.filter(v => v.last_error_message).map(v => (
+                          <div key={v.id} className="pl-6 font-mono text-[11px]">
+                            <strong className="uppercase text-red-400">[{v.platform}]:</strong> {v.last_error_message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-                  {/* Caption preview snippet */}
-                  {variants[0]?.caption && (
-                    <div className="mt-3 rounded-md bg-surface-2 p-3 text-xs text-text-muted whitespace-pre-wrap max-h-28 overflow-y-auto font-mono">
-                      {variants[0].caption}
-                    </div>
-                  )}
-                </div>
+                    {/* Caption Preview Accordion */}
+                    {variants[0]?.caption && (
+                      <div className="border-t border-white/5 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedCaptions(curr => ({ ...curr, [item.id]: !curr[item.id] }))}
+                          className="flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white transition-colors"
+                        >
+                          <Icon icon={isExpanded ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'} width="14" />
+                          <span>{isExpanded ? 'Hide Captions' : 'View Captions & Hashtags'}</span>
+                        </button>
+                        {isExpanded && (
+                          <div className="mt-2.5 rounded-xl border border-white/5 bg-black/60 p-3.5 text-xs text-white/80 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
+                            {variants[0].caption}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

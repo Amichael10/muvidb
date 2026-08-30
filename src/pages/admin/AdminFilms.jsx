@@ -192,6 +192,7 @@ export default function AdminFilms() {
   const [similarSeries, setSimilarSeries] = useState([]);
   const [selectedSimilarIds, setSelectedSimilarIds] = useState([]);
   const [linkingSimilar, setLinkingSimilar] = useState(false);
+  const [episodeSearchQuery, setEpisodeSearchQuery] = useState('');
 
   const draftKey = isDrawerOpen ? (editingFilm ? `MuviDB_draft_film_${editingFilm.id}` : 'MuviDB_draft_film_new') : null;
   const draftData = useMemo(() => ({ formData, credits, showtimes, selectedCompany }), [formData, credits, showtimes, selectedCompany]);
@@ -763,14 +764,14 @@ export default function AdminFilms() {
       setParentSeriesResults([]);
       return;
     }
+    const cleanQ = q.trim();
     const { data } = await supabase
       .from('films')
-      .select('id, title, year, poster_url')
-      .eq('content_type', 'series')
+      .select('id, title, year, poster_url, content_type')
       .is('series_id', null)
-      .ilike('title', `%${q.trim()}%`)
+      .ilike('title', `%${cleanQ}%`)
       .order('title')
-      .limit(12);
+      .limit(15);
     setParentSeriesResults((data || []).filter((f) => f.id !== editingFilm?.id));
   };
 
@@ -790,27 +791,54 @@ export default function AdminFilms() {
     setParentSeriesLabel('');
   };
 
-  const findSimilarSeriesToLink = async () => {
-    if (!editingFilm?.id || !formData.title) {
+  const findSimilarSeriesToLink = async (customQuery = null) => {
+    if (!editingFilm?.id) {
       toast.error('Save/open a series first');
       return;
     }
-    const stem = getShowName(formData.title) || formData.title;
-    const { data, error } = await supabase
-      .from('films')
-      .select('id, title, year, poster_url, series_id')
-      .eq('content_type', 'series')
-      .ilike('title', `${stem}%`)
-      .neq('id', editingFilm.id)
-      .limit(60);
-    if (error) {
-      toast.error('Could not find similar titles');
+
+    const query = (typeof customQuery === 'string' && customQuery.trim())
+      ? customQuery.trim()
+      : (getShowName(formData.title) || formData.title || '').trim();
+
+    if (!query) {
+      toast.error('Please enter a title or keyword to search');
       return;
     }
-    const rows = (data || []).filter((f) => f.series_id !== editingFilm.id);
+
+    const cleanQuery = query
+      .replace(/[^\w\s]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const words = cleanQuery.split(' ').filter(w => w.length >= 3);
+    const mainStem = words.slice(0, 3).join(' ') || cleanQuery;
+
+    let queryBuilder = supabase
+      .from('films')
+      .select('id, title, year, poster_url, series_id, content_type, episode_number')
+      .neq('id', editingFilm.id);
+
+    if (words.length > 1) {
+      queryBuilder = queryBuilder.ilike('title', `%${mainStem}%`);
+    } else {
+      queryBuilder = queryBuilder.ilike('title', `%${cleanQuery}%`);
+    }
+
+    const { data, error } = await queryBuilder.limit(80);
+    if (error) {
+      toast.error('Could not find matching titles');
+      return;
+    }
+
+    const rows = (data || []).filter((f) => f.id !== editingFilm.id);
     setSimilarSeries(rows);
-    setSelectedSimilarIds(rows.filter((f) => !f.series_id).map((f) => f.id));
-    if (!rows.length) toast('No similar titles found');
+    setSelectedSimilarIds(rows.filter((f) => !f.series_id || f.series_id === editingFilm.id).map((f) => f.id));
+    if (!rows.length) {
+      toast('No matching titles found. Try typing in the search box.');
+    } else {
+      toast.success(`Found ${rows.length} candidate episodes / titles`);
+    }
   };
 
   const linkSelectedAsEpisodes = async () => {
@@ -2456,48 +2484,103 @@ export default function AdminFilms() {
                       )}
                     </div>
 
-                    {similarSeries.length > 0 && (
+                    {editingFilm?.id && !formData.series_id && (
                       <div className="space-y-3 border-t border-border pt-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-[11px] text-text-muted">
-                            Select titles to nest under <span className="font-bold text-text-primary">{formData.title}</span>
-                          </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-text-muted">
+                            Search & Nest Episodes / Variants
+                          </label>
+                          <span className="text-[11px] text-text-muted">
+                            Nest under <strong className="text-text-primary">{formData.title}</strong>
+                          </span>
+                        </div>
+
+                        {/* Search Bar for Episodes */}
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted opacity-60" width="14" />
+                            <input
+                              type="text"
+                              value={episodeSearchQuery}
+                              onChange={(e) => {
+                                setEpisodeSearchQuery(e.target.value);
+                                if (e.target.value.trim().length >= 2) {
+                                  findSimilarSeriesToLink(e.target.value);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  findSimilarSeriesToLink(episodeSearchQuery || formData.title);
+                                }
+                              }}
+                              placeholder="Type title or keyword to find episodes (e.g. 'Episode', 'Part 2')…"
+                              className="w-full bg-surface border border-border rounded-lg pl-9 pr-3 py-2 text-xs text-text-primary outline-none focus:border-brand"
+                            />
+                          </div>
                           <button
                             type="button"
-                            disabled={linkingSimilar || selectedSimilarIds.length === 0}
-                            onClick={linkSelectedAsEpisodes}
-                            className="text-[10px] font-bold uppercase tracking-widest px-3 py-2 rounded-lg bg-brand text-white disabled:opacity-40"
+                            onClick={() => findSimilarSeriesToLink(episodeSearchQuery || formData.title)}
+                            className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3.5 py-2 rounded-lg bg-brand/10 border border-brand/40 text-brand hover:bg-brand/20 transition-all inline-flex items-center gap-1"
                           >
-                            {linkingSimilar ? 'Linking…' : `Link ${selectedSimilarIds.length} selected`}
+                            <Icon icon="solar:magnifer-bold" width="12" />
+                            Search
                           </button>
                         </div>
-                        <div className="max-h-56 overflow-y-auto space-y-1.5">
-                          {similarSeries.map((row) => {
-                            const already = row.series_id === editingFilm?.id;
-                            const checked = selectedSimilarIds.includes(row.id);
-                            return (
-                              <label
-                                key={row.id}
-                                className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer ${
-                                  already ? 'border-brand/40 bg-brand/5 opacity-70' : 'border-border bg-surface hover:border-brand/40'
-                                }`}
+
+                        {similarSeries.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-[11px] text-text-muted">
+                                Found {similarSeries.length} matching candidate(s):
+                              </p>
+                              <button
+                                type="button"
+                                disabled={linkingSimilar || selectedSimilarIds.length === 0}
+                                onClick={linkSelectedAsEpisodes}
+                                className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-brand text-white disabled:opacity-40 shadow-xs hover:bg-brand-hover"
                               >
-                                <input
-                                  type="checkbox"
-                                  disabled={already}
-                                  checked={already || checked}
-                                  onChange={() => {
-                                    setSelectedSimilarIds((prev) =>
-                                      prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]
-                                    );
-                                  }}
-                                />
-                                <span className="text-sm text-text-primary flex-1 truncate">{row.title}</span>
-                                {already && <span className="text-[9px] font-bold uppercase text-brand">Linked</span>}
-                              </label>
-                            );
-                          })}
-                        </div>
+                                {linkingSimilar ? 'Linking…' : `Link ${selectedSimilarIds.length} selected`}
+                              </button>
+                            </div>
+                            <div className="max-h-56 overflow-y-auto space-y-1.5 rounded-lg border border-border bg-surface/50 p-2">
+                              {similarSeries.map((row) => {
+                                const already = row.series_id === editingFilm?.id;
+                                const checked = selectedSimilarIds.includes(row.id);
+                                return (
+                                  <label
+                                    key={row.id}
+                                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+                                      already ? 'border-brand/40 bg-brand/5 opacity-75' : checked ? 'border-brand bg-brand/10' : 'border-border bg-surface hover:border-brand/40'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      disabled={already}
+                                      checked={already || checked}
+                                      onChange={() => {
+                                        setSelectedSimilarIds((prev) =>
+                                          prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]
+                                        );
+                                      }}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-bold text-text-primary truncate">{row.title}</p>
+                                      <p className="text-[10px] text-text-muted font-mono">
+                                        {row.year ? `${row.year} • ` : ''}Type: {row.content_type || 'unclassified'}
+                                      </p>
+                                    </div>
+                                    {already && (
+                                      <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                        Linked
+                                      </span>
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
