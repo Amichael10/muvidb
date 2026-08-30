@@ -8,7 +8,9 @@ interface ServiceAccountToken {
 let cachedToken: ServiceAccountToken | null = null;
 
 /**
- * Creates a signed Google OAuth2 JWT and exchanges it for a Bearer Access Token.
+ * Obtains a Google Drive Bearer Access Token.
+ * Prioritizes GOOGLE_REFRESH_TOKEN (User OAuth with paid Google One storage).
+ * Falls back to Service Account JWT if refresh token is not configured.
  * Uses 100% native Node.js crypto and fetch — ZERO external dependencies.
  */
 async function getGoogleDriveAccessToken(): Promise<string> {
@@ -17,12 +19,44 @@ async function getGoogleDriveAccessToken(): Promise<string> {
     return cachedToken.token;
   }
 
+  // 1. Prioritize User OAuth Refresh Token (uses personal/paid Google One storage)
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (refreshToken && clientId && clientSecret) {
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+      }).toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      throw new Error(`Failed to refresh Google Drive access token: ${tokenResponse.status} ${errorText}`);
+    }
+
+    const tokenData = (await tokenResponse.json()) as { access_token: string; expires_in: number };
+    cachedToken = {
+      token: tokenData.access_token,
+      expiresAt: now + (tokenData.expires_in || 3600),
+    };
+
+    return cachedToken.token;
+  }
+
+  // 2. Fallback to Service Account JWT
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   let privateKey = process.env.GOOGLE_PRIVATE_KEY || '';
   privateKey = privateKey.replace(/\\n/g, '\n');
 
   if (!clientEmail || !privateKey) {
-    throw new Error('Google Drive service account credentials not configured in environment variables');
+    throw new Error('Google Drive credentials not configured in environment variables (missing GOOGLE_REFRESH_TOKEN or GOOGLE_SERVICE_ACCOUNT_EMAIL)');
   }
 
   const header = {
@@ -70,7 +104,7 @@ async function getGoogleDriveAccessToken(): Promise<string> {
 
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
-    throw new Error(`Failed to obtain Google Drive access token: ${tokenResponse.status} ${errorText}`);
+    throw new Error(`Failed to obtain Google Drive service account token: ${tokenResponse.status} ${errorText}`);
   }
 
   const tokenData = (await tokenResponse.json()) as { access_token: string; expires_in: number };

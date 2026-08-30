@@ -24,6 +24,8 @@ import { recentHitsForIp, topHitters } from './scrape_guard.js';
 import { supabase } from './supabase.js';
 import { generateAIContent } from './ai_service.js';
 import { extractInstagramMedia } from './instagram_downloader.js';
+import { extractFacebookMedia } from './facebook_downloader.js';
+import { extractThreadsMedia } from './threads_downloader.js';
 import { createSocialDraftFromIntake } from './social_intake.js';
 
 const IP_RE = /^(?:\d{1,3}\.){3}\d{1,3}$|^(?:[a-fA-F0-9:]+)$/;
@@ -662,6 +664,56 @@ async function prepareStructuredIntake(eventId: string, kind: 'film' | 'critic_r
   }
 }
 
+function cleanExtractedUrl(rawUrl: string | null): string | null {
+  if (!rawUrl) return null;
+  let cleaned = rawUrl.trim();
+  // Strip surrounding punctuation e.g. (https://...), <https://...>, [https://...], "https://..."
+  cleaned = cleaned.replace(/^[<(\["']+|[>)\]"',;.]*$/g, '');
+  if (/^https?:\/\//i.test(cleaned)) {
+    return cleaned;
+  }
+  return null;
+}
+
+function extractUrlFromMessage(message: any): string | null {
+  const text = String(message.text || message.caption || '').trim();
+
+  // 1. Check message entities (text_link or url)
+  const entities = Array.isArray(message.entities)
+    ? message.entities
+    : Array.isArray(message.caption_entities)
+      ? message.caption_entities
+      : [];
+
+  for (const ent of entities) {
+    if (ent.type === 'text_link' && ent.url) {
+      const cleaned = cleanExtractedUrl(ent.url);
+      if (cleaned) return cleaned;
+    }
+    if (ent.type === 'url' && typeof ent.offset === 'number' && typeof ent.length === 'number') {
+      const raw = text.slice(ent.offset, ent.offset + ent.length);
+      const cleaned = cleanExtractedUrl(raw);
+      if (cleaned) return cleaned;
+    }
+  }
+
+  // 2. Check link preview options / web_page
+  const previewUrl = message.link_preview_options?.url || message.web_page?.url;
+  if (previewUrl) {
+    const cleaned = cleanExtractedUrl(previewUrl);
+    if (cleaned) return cleaned;
+  }
+
+  // 3. Fallback regex in text/caption
+  const match = text.match(/https?:\/\/[^\s]+/i);
+  if (match) {
+    const cleaned = cleanExtractedUrl(match[0]);
+    if (cleaned) return cleaned;
+  }
+
+  return null;
+}
+
 async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) {
   let title = '';
   let description = rawText || '';
@@ -688,48 +740,46 @@ async function resolveIntakeMetadata(sourceUrl: string | null, rawText: string) 
         platformLabel = 'Instagram';
         title = 'Instagram Post';
       }
-    } else if (/threads\.net/i.test(sourceUrl)) {
-      eventType = 'threads_post';
-      platformLabel = 'Threads';
+    } else if (/facebook\.com|fb\.watch|fb\.me/i.test(sourceUrl)) {
       try {
-        const res = await fetch(sourceUrl, {
-          headers: {
-            'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-            'Accept': 'text/html,application/xhtml+xml',
-            'Accept-Language': 'en-US,en;q=0.9',
-          },
-          signal: AbortSignal.timeout(5000),
-        });
-        if (res.ok) {
-          const html = await res.text();
-          const ogTitle =
-            html.match(/<meta property="og:title" content="([^"]*)"/i)?.[1] ||
-            html.match(/<title>([^<]*)<\/title>/i)?.[1];
-          const ogDesc =
-            html.match(/<meta property="og:description" content="([^"]*)"/i)?.[1] ||
-            html.match(/<meta name="description" content="([^"]*)"/i)?.[1];
-          const ogImg = html.match(/<meta property="og:image" content="([^"]*)"/i)?.[1];
-
-          if (ogTitle) {
-            const decoded = decodeHtmlEntities(ogTitle);
-            const author = decoded.match(/^([^:]+?)\s+on\s+Threads/i) || decoded.match(/^([^(]+)\s*\(@/);
-            if (author) authorName = author[1].trim();
-            title = decoded;
-          }
-          if (ogDesc) {
-            const decodedDesc = decodeHtmlEntities(ogDesc);
-            if (decodedDesc.length > 10 && !decodedDesc.includes('Join Threads to share')) {
-              description = decodedDesc;
-            }
-          }
-          if (ogImg && !ogImg.includes('static.cdninstagram.com')) {
-            imageUrl = ogImg.replace(/&amp;/g, '&');
-          }
-        }
+        const fbMedia = await extractFacebookMedia(sourceUrl);
+        eventType = fbMedia.isReel
+          ? 'facebook_reel'
+          : fbMedia.isVideo
+            ? 'facebook_video'
+            : 'facebook_post';
+        platformLabel = fbMedia.isReel
+          ? 'Facebook Reel'
+          : fbMedia.isVideo
+            ? 'Facebook Video'
+            : 'Facebook Post';
+        title = fbMedia.title;
+        if (fbMedia.caption) description = fbMedia.caption;
+        if (fbMedia.authorName) authorName = fbMedia.authorName;
+        if (fbMedia.imageUrl) imageUrl = fbMedia.imageUrl;
+        if (fbMedia.videoUrl) videoUrl = fbMedia.videoUrl;
+      } catch (err: any) {
+        console.warn('[resolveIntakeMetadata] Facebook scrape warning:', err.message);
+        eventType = 'facebook_post';
+        platformLabel = 'Facebook';
+        title = 'Facebook Post';
+      }
+    } else if (/threads\.(?:net|com)/i.test(sourceUrl)) {
+      try {
+        const threadsMedia = await extractThreadsMedia(sourceUrl);
+        eventType = threadsMedia.isReel ? 'threads_reel' : 'threads_post';
+        platformLabel = threadsMedia.isReel ? 'Threads Reel' : 'Threads';
+        title = threadsMedia.title;
+        if (threadsMedia.caption) description = threadsMedia.caption;
+        if (threadsMedia.authorName) authorName = threadsMedia.authorName;
+        if (threadsMedia.imageUrl) imageUrl = threadsMedia.imageUrl;
+        if (threadsMedia.videoUrl) videoUrl = threadsMedia.videoUrl;
       } catch (err: any) {
         console.warn('[resolveIntakeMetadata] Threads scrape warning:', err.message);
+        eventType = 'threads_post';
+        platformLabel = 'Threads';
+        title = 'Threads Post';
       }
-      if (!title) title = authorName ? `${authorName} on Threads` : 'Threads Post';
     } else if (/youtube\.com|youtu\.be/i.test(sourceUrl)) {
       eventType = 'youtube_video';
       platformLabel = 'YouTube';
@@ -806,9 +856,8 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     : null;
   const directVideo = message.video || null;
 
-  // Extract URLs if present
-  const urlMatch = text.match(/https?:\/\/[^\s]+/i);
-  const sourceUrl = urlMatch ? urlMatch[0] : null;
+  // Extract URLs safely from text, caption, or message entities
+  const sourceUrl = extractUrlFromMessage(message);
 
   const meta = await resolveIntakeMetadata(sourceUrl, text);
 
@@ -882,8 +931,14 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     .filter(Boolean)
     .join('\n');
 
+  const canDownloadVideo =
+    Boolean(meta.videoUrl) ||
+    /(?:youtube\.com|youtu\.be|facebook\.com|fb\.watch|fb\.me|instagram\.com|threads\.(?:net|com)|tiktok\.com)/i.test(
+      sourceUrl || '',
+    );
+
   const inlineKeyboard = [
-    ...(/(?:youtube\.com|youtu\.be)/i.test(sourceUrl || '')
+    ...(canDownloadVideo
       ? [[{ text: '▶️ Get Playable Video', callback_data: `intake_download:${newEvent.id}` }]]
       : []),
     [{ text: '🎨 Create Editable Social Draft', callback_data: `intake_draft:${newEvent.id}` }],

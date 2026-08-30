@@ -123,30 +123,102 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
 
     // 1. Direct Video Publish / Upload
     if (isVideo) {
-      const sourceInfo = {
-        source: 'PULL_FROM_URL',
-        video_url: targetAssetUrl,
-      };
-      const payload = postMode === 'MEDIA_UPLOAD'
-        ? { source_info: sourceInfo }
-        : {
-          post_info: {
-            title: String(request.caption || request.title || '').slice(0, 2200),
-            privacy_level: privacyLevel,
-            disable_duet: Boolean(settings.disable_duet || creatorInfo.duet_disabled),
-            disable_stitch: Boolean(settings.disable_stitch || creatorInfo.stitch_disabled),
-            disable_comment: Boolean(settings.disable_comment || creatorInfo.comment_disabled),
-            video_cover_timestamp_ms: Math.max(0, Math.floor(Number(settings.video_cover_timestamp_ms) || 0)),
-            ...commonDisclosure,
-            is_aigc: Boolean(settings.is_aigc),
-          },
-          source_info: sourceInfo,
-        };
+      const isDirectFileUpload = Boolean(settings.force_file_upload);
 
-      const endpoint = postMode === 'MEDIA_UPLOAD'
-        ? '/post/publish/inbox/video/init/'
-        : '/post/publish/video/init/';
-      const res = await this.postJson(endpoint, payload);
+      const initVideoPublish = async (useFileUpload: boolean, videoBytes?: Buffer) => {
+        const sourceInfo = useFileUpload && videoBytes
+          ? {
+              source: 'FILE_UPLOAD',
+              video_size: videoBytes.length,
+              chunk_size: videoBytes.length,
+              total_chunk_count: 1,
+            }
+          : {
+              source: 'PULL_FROM_URL',
+              video_url: targetAssetUrl,
+            };
+
+        const payload = postMode === 'MEDIA_UPLOAD'
+          ? { source_info: sourceInfo }
+          : {
+              post_info: {
+                title: String(request.caption || request.title || '').slice(0, 2200),
+                privacy_level: privacyLevel,
+                disable_duet: Boolean(settings.disable_duet || creatorInfo.duet_disabled),
+                disable_stitch: Boolean(settings.disable_stitch || creatorInfo.stitch_disabled),
+                disable_comment: Boolean(settings.disable_comment || creatorInfo.comment_disabled),
+                video_cover_timestamp_ms: Math.max(0, Math.floor(Number(settings.video_cover_timestamp_ms) || 0)),
+                ...commonDisclosure,
+                is_aigc: Boolean(settings.is_aigc),
+              },
+              source_info: sourceInfo,
+            };
+
+        const endpoint = postMode === 'MEDIA_UPLOAD'
+          ? '/post/publish/inbox/video/init/'
+          : '/post/publish/video/init/';
+
+        return this.postJson(endpoint, payload);
+      };
+
+      let res: Record<string, any>;
+      try {
+        if (isDirectFileUpload) {
+          const videoRes = await this.fetchImpl(targetAssetUrl);
+          if (!videoRes.ok) throw new Error(`Failed to fetch video asset (${videoRes.status})`);
+          const videoBytes = Buffer.from(await videoRes.arrayBuffer());
+          res = await initVideoPublish(true, videoBytes);
+          const uploadUrl = res.data?.upload_url;
+          if (uploadUrl) {
+            const putRes = await this.fetchImpl(uploadUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'video/mp4',
+                'Content-Range': `bytes 0-${videoBytes.length - 1}/${videoBytes.length}`,
+              },
+              body: videoBytes,
+            });
+            if (!putRes.ok) {
+              throw new Error(`TikTok video file binary upload failed (${putRes.status})`);
+            }
+          }
+        } else {
+          res = await initVideoPublish(false);
+        }
+      } catch (err: any) {
+        // If TikTok rejects domain verification on PULL_FROM_URL, fallback to direct FILE_UPLOAD automatically!
+        if (err?.details?.provider_code === 'url_ownership_unverified' || err?.message?.includes('ownership')) {
+          console.log('[TikTok Adapter] PULL_FROM_URL domain unverified. Streaming binary bytes via FILE_UPLOAD...');
+          const videoRes = await this.fetchImpl(targetAssetUrl);
+          if (!videoRes.ok) throw new Error(`Failed to fetch video asset (${videoRes.status})`);
+          const videoBytes = Buffer.from(await videoRes.arrayBuffer());
+          res = await initVideoPublish(true, videoBytes);
+          const uploadUrl = res.data?.upload_url;
+          if (uploadUrl) {
+            console.log(`[TikTok Adapter] Uploading ${videoBytes.length} bytes to TikTok upload URL...`);
+            const putRes = await fetch(uploadUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'video/mp4',
+                'Content-Range': `bytes 0-${videoBytes.length - 1}/${videoBytes.length}`,
+                'Content-Length': String(videoBytes.length),
+              },
+              body: videoBytes,
+              // @ts-ignore
+              duplex: 'half',
+              signal: AbortSignal.timeout(180_000),
+            });
+            if (!putRes.ok) {
+              const errBody = await putRes.text().catch(() => '');
+              throw new Error(`TikTok video file binary upload failed (${putRes.status}): ${errBody}`);
+            }
+            console.log('[TikTok Adapter] Binary bytes uploaded to TikTok successfully!');
+          }
+        } else {
+          throw err;
+        }
+      }
+
       const publishId = res.data?.publish_id;
       if (!publishId) {
         throw new SocialPlatformError({

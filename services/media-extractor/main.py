@@ -12,7 +12,7 @@ class ExtractRequest(BaseModel):
     url: str
 
 def get_cookie_file():
-    cookies_raw = os.getenv("INSTAGRAM_COOKIES", "").strip()
+    cookies_raw = os.getenv("COOKIES_TXT", "").strip() or os.getenv("INSTAGRAM_COOKIES", "").strip() or os.getenv("FACEBOOK_COOKIES", "").strip() or os.getenv("FB_COOKIES", "").strip()
     session_id = os.getenv("INSTAGRAM_SESSION_ID", "").strip()
 
     if cookies_raw:
@@ -37,8 +37,14 @@ def health_check():
     return {
         "status": "ok",
         "service": "media-extractor",
-        "version": "1.1.0",
-        "has_cookies": bool(os.getenv("INSTAGRAM_COOKIES") or os.getenv("INSTAGRAM_SESSION_ID"))
+        "version": "1.2.0",
+        "has_cookies": bool(
+            os.getenv("COOKIES_TXT") or 
+            os.getenv("INSTAGRAM_COOKIES") or 
+            os.getenv("FACEBOOK_COOKIES") or 
+            os.getenv("FB_COOKIES") or 
+            os.getenv("INSTAGRAM_SESSION_ID")
+        )
     }
 
 @app.post("/extract")
@@ -75,14 +81,29 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
+            # If multiple entries (playlist or carousel), pick the first valid entry
+            if info.get('entries'):
+                entries = [e for e in info['entries'] if e]
+                if entries:
+                    info = entries[0]
+
             # Find best video URL
             video_url = None
-            if info.get('url'):
+            if info.get('url') and (info.get('vcodec') != 'none' or info.get('ext') == 'mp4'):
                 video_url = info.get('url')
             elif info.get('formats'):
-                formats = [f for f in info.get('formats', []) if f.get('url') and f.get('vcodec') != 'none']
-                if formats:
-                    video_url = formats[-1].get('url')
+                # Prefer progressive MP4 with both audio and video, else any valid video
+                prog = [f for f in info.get('formats', []) if f.get('url') and f.get('vcodec') != 'none' and f.get('acodec') != 'none' and f.get('ext') == 'mp4']
+                if prog:
+                    video_url = prog[-1].get('url')
+                else:
+                    formats = [f for f in info.get('formats', []) if f.get('url') and f.get('vcodec') != 'none']
+                    if formats:
+                        video_url = formats[-1].get('url')
+
+            image_url = info.get('thumbnail')
+            if not image_url and info.get('thumbnails'):
+                image_url = info['thumbnails'][-1].get('url')
 
             return {
                 "success": True,
@@ -90,7 +111,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
                 "caption": info.get("description") or info.get("title") or "",
                 "author": info.get("uploader") or info.get("uploader_id") or info.get("channel") or None,
                 "video_url": video_url,
-                "image_url": info.get("thumbnail"),
+                "image_url": image_url,
                 "duration": info.get("duration"),
                 "extractor": info.get("extractor"),
             }
