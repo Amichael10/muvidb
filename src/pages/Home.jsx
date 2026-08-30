@@ -42,6 +42,20 @@ const cinemaFilmKey = (title = '') => title
   .trim()
   .replace(/\s+/g, ' ');
 
+function formatStudioBoxOffice(amount) {
+  if (!amount || amount <= 0) return null;
+  if (amount >= 1_000_000_000) {
+    return `₦${(amount / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`;
+  }
+  if (amount >= 1_000_000) {
+    return `₦${(amount / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  }
+  if (amount >= 1_000) {
+    return `₦${(amount / 1_000).toFixed(0)}K`;
+  }
+  return `₦${amount.toLocaleString()}`;
+}
+
 export default function Home() {
   const { isAuthenticated } = useAuth();
   // Hero rail is server-rendered and edge-cached by the route loader in
@@ -657,16 +671,107 @@ export default function Home() {
   };
 
   const fetchCompanies = async () => {
-    const { data, error } = await supabase
-      .from('companies')
-      .select(`
-        *,
-        film_companies(film_id)
-      `)
-      .limit(12);
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select(`
+          id, name, logo_url, founded_year, description, website, company_type,
+          film_companies(
+            film:films(
+              id, title, poster_url, backdrop_url, view_count, average_rating, 
+              liked_percent, box_office_domestic, release_type, year
+            )
+          )
+        `);
 
-    if (!error && data) {
-      setProductionCompanies(data);
+      if (!error && data && data.length > 0) {
+        const scored = data.map((c) => {
+          const films = (c.film_companies || []).map((fc) => fc.film).filter(Boolean);
+          const filmCount = films.length;
+          
+          const isRealLogo = Boolean(
+            c.logo_url && 
+            !c.logo_url.includes('ui-avatars.com') && 
+            !c.logo_url.includes('placeholder') &&
+            !c.logo_url.includes('default')
+          );
+
+          let totalBoxOffice = 0;
+          let maxBoxOffice = 0;
+          let totalLikes = 0;
+          let ratedCount = 0;
+          let totalViews = 0;
+          let highestLiked = 0;
+          let topFilm = null;
+          let topFilmScore = -1;
+
+          for (const f of films) {
+            const bo = Number(f.box_office_domestic) || 0;
+            totalBoxOffice += bo;
+            if (bo > maxBoxOffice) maxBoxOffice = bo;
+
+            if (f.liked_percent) {
+              totalLikes += Number(f.liked_percent);
+              if (Number(f.liked_percent) > highestLiked) highestLiked = Number(f.liked_percent);
+              ratedCount++;
+            }
+            totalViews += Number(f.view_count) || 0;
+
+            const fScore = (bo > 0 ? bo / 100_000 : 0) + (f.liked_percent ? f.liked_percent * 10 : 0) + (f.view_count ? Math.log10(f.view_count) * 100 : 0) + (f.poster_url ? 500 : 0);
+            if (fScore > topFilmScore) {
+              topFilmScore = fScore;
+              topFilm = f;
+            }
+          }
+
+          const avgLike = ratedCount > 0 ? Math.round(totalLikes / ratedCount) : null;
+
+          let score = 0;
+          if (isRealLogo) score += 6000;
+          if (filmCount > 0) score += Math.min(filmCount * 150, 4000);
+          
+          if (totalBoxOffice >= 1_000_000_000) score += 8000;
+          else if (totalBoxOffice >= 500_000_000) score += 6000;
+          else if (totalBoxOffice >= 100_000_000) score += 4500;
+          else if (totalBoxOffice > 0) score += 3000;
+
+          if (highestLiked >= 85) score += 2000;
+          else if (highestLiked >= 70) score += 1000;
+
+          if (totalViews >= 5_000_000) score += 3000;
+          else if (totalViews >= 1_000_000) score += 2000;
+          else if (totalViews >= 100_000) score += 1000;
+
+          return {
+            ...c,
+            filmCount,
+            totalBoxOffice,
+            maxBoxOffice,
+            highestLiked,
+            avgLike,
+            totalViews,
+            topFilm,
+            score,
+          };
+        });
+
+        // Filter and sort by prestige & popularity score
+        scored.sort((a, b) => b.score - a.score);
+
+        // Top pool of powerhouse studios
+        const topPool = scored.slice(0, 30);
+
+        // Weighted random rotation: top studios have strong chance while rotating dynamically
+        const shuffled = [...topPool]
+          .map((item) => ({ item, sortKey: Math.random() * 0.35 + (item.score / 25000) * 0.65 }))
+          .sort((a, b) => b.sortKey - a.sortKey)
+          .map((wrap) => wrap.item)
+          .slice(0, 12);
+
+        setProductionCompanies(shuffled);
+      }
+    } catch (e) {
+      console.error('Error fetching companies:', e);
     }
   };
 
@@ -1347,7 +1452,7 @@ export default function Home() {
         {(isSecondaryLoading || productionCompanies.length > 0) && (
           <div className="relative z-10 border-b border-hairline py-14 md:py-16 bg-surface/30">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-end justify-between mb-12">
+              <div className="flex items-end justify-between mb-8">
                 <div className="space-y-1">
                   <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
                     Nollywood Studios
@@ -1356,65 +1461,130 @@ export default function Home() {
                     The creative production powerhouses
                   </p>
                 </div>
-                <Link to="/companies" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline">
-                  View all
+                <Link to="/companies" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline flex items-center gap-1">
+                  <span>View all</span>
+                  <Icon icon="solar:arrow-right-linear" className="text-xs" />
                 </Link>
               </div>
 
-              <div data-lenis-prevent className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide overscroll-x-contain">
+              <div data-lenis-prevent className="flex overflow-x-auto gap-5 pb-6 pt-2 scrollbar-hide overscroll-x-contain">
                 {isSecondaryLoading ? (
                   [...Array(4)].map((_, i) => (
-                    <div key={i} className="shrink-0 w-64 bg-surface border border-hairline rounded-2xl p-6 flex flex-col gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-surface-2 animate-pulse shrink-0" />
+                    <div key={i} className="shrink-0 w-72 sm:w-80 bg-surface border border-hairline rounded-2xl p-5 flex flex-col justify-between animate-pulse">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-14 h-14 rounded-xl bg-surface-2 shrink-0" />
                         <div className="space-y-2 flex-1">
-                          <div className="h-4 w-2/3 bg-surface-2 animate-pulse rounded" />
-                          <div className="h-3 w-1/3 bg-surface-2 animate-pulse rounded" />
+                          <div className="h-4 w-3/4 bg-surface-2 rounded" />
+                          <div className="h-3 w-1/2 bg-surface-2 rounded" />
                         </div>
                       </div>
-                      <div className="h-3 w-1/2 bg-surface-2 animate-pulse rounded pt-2" />
+                      <div className="h-12 w-full bg-surface-2/60 rounded-xl my-3" />
+                      <div className="h-3 w-1/3 bg-surface-2 rounded pt-2" />
                     </div>
                   ))
                 ) : (
                   productionCompanies.map((company) => {
-                    const filmCount = company.film_companies?.length || 0;
+                    const filmCount = company.filmCount || company.film_companies?.length || 0;
                     return (
-                      <div 
+                      <Link 
                         key={company.id}
-
-                        className="shrink-0 w-64 bg-surface border border-hairline hover:border-brand rounded-2xl p-6 transition-all group shadow-sm flex flex-col gap-4"
+                        to={`/companies/${company.id}`}
+                        className="shrink-0 w-72 sm:w-80 group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-hairline/80 bg-surface/90 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-xl hover:shadow-brand/5"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-xl border border-hairline flex items-center justify-center overflow-hidden shrink-0 ${company.logo_url ? 'bg-white p-1' : 'bg-surface-2'}`}>
-                            <ImageWithFallback
-                              src={company.logo_url}
-                              alt={company.name}
-                              fallbackType="company"
-                              name={company.name}
-                              className={`w-full h-full group-hover:scale-110 transition-transform duration-500 ${company.logo_url ? 'object-contain' : 'object-cover'}`}
-                              width={96}
-                              sizes="48px"
+                        {/* Ambient Backdrop Banner */}
+                        <div className="relative h-24 w-full overflow-hidden bg-surface-2">
+                          {company.topFilm?.backdrop_url || company.topFilm?.poster_url ? (
+                            <img
+                              src={company.topFilm.backdrop_url || company.topFilm.poster_url}
+                              alt=""
+                              className="h-full w-full object-cover opacity-20 filter blur-[1px] group-hover:scale-105 group-hover:opacity-35 transition-all duration-700"
                               loading="lazy"
                             />
+                          ) : (
+                            <div className="h-full w-full bg-gradient-to-tr from-brand/10 via-surface-2 to-surface-3" />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/60 to-surface" />
+
+                          {/* Top Right Highlight Badges */}
+                          <div className="absolute top-2.5 right-3 flex items-center gap-1.5 flex-wrap justify-end">
+                            {company.totalBoxOffice > 0 ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 backdrop-blur-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-300 border border-amber-500/30 shadow-xs">
+                                <Icon icon="solar:cup-star-bold" className="text-[11px] text-amber-400" />
+                                {formatStudioBoxOffice(company.totalBoxOffice)} BO
+                              </span>
+                            ) : company.avgLike ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 backdrop-blur-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-300 border border-emerald-500/30">
+                                <Icon icon="solar:like-bold" className="text-[11px] text-emerald-400" />
+                                {company.avgLike}% Liked
+                              </span>
+                            ) : company.founded_year ? (
+                              <span className="inline-flex items-center rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-text-muted border border-white/10">
+                                Est. {company.founded_year}
+                              </span>
+                            ) : null}
                           </div>
-                          <div className="min-w-0">
-                            <h3 className="font-bold text-text-primary text-xs tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-tight">
-                              {toTitleCase(company.name)}
-                            </h3>
-                            {company.founded_year && (
-                              <p className="text-text-muted text-[8px] font-black uppercase tracking-widest mt-0.5 opacity-60">
-                                EST. {company.founded_year}
+                        </div>
+
+                        {/* Card Body & Studio Branding */}
+                        <div className="relative px-5 pb-4 pt-0 flex flex-col gap-3 -mt-8">
+                          <div className="flex items-end gap-3.5">
+                            {/* Studio Logo */}
+                            <div className="relative h-13 w-13 shrink-0 overflow-hidden rounded-xl border border-hairline bg-surface-2 p-1.5 shadow-md group-hover:border-brand/40 group-hover:shadow-brand/20 transition-all duration-300 flex items-center justify-center">
+                              <ImageWithFallback
+                                src={company.logo_url}
+                                alt={toTitleCase(company.name)}
+                                fallbackType="company"
+                                name={toTitleCase(company.name)}
+                                className={`h-full w-full transition-transform duration-500 group-hover:scale-110 ${company.logo_url && !company.logo_url.includes('placeholder') ? 'object-contain' : 'object-cover'}`}
+                                width={104}
+                                sizes="52px"
+                                loading="lazy"
+                              />
+                            </div>
+
+                            <div className="min-w-0 flex-1 pb-0.5">
+                              <h3 className="font-bold text-text-primary text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-snug">
+                                {toTitleCase(company.name)}
+                              </h3>
+                              <p className="text-[9px] font-extrabold uppercase tracking-widest text-text-muted opacity-70 truncate mt-0.5">
+                                {company.company_type ? company.company_type.replace(/_/g, ' ') : 'Production Studio'}
                               </p>
-                            )}
+                            </div>
+                          </div>
+
+                          {/* Top Production Release Preview (if any) */}
+                          {company.topFilm && (
+                            <div className="rounded-xl bg-surface-2/60 border border-hairline/60 px-3 py-2 flex items-center gap-2.5 transition-colors group-hover:bg-surface-2/80">
+                              {company.topFilm.poster_url && (
+                                <img
+                                  src={company.topFilm.poster_url}
+                                  alt=""
+                                  className="w-5 h-7 rounded object-cover shrink-0 border border-hairline/40 shadow-xs"
+                                  loading="lazy"
+                                />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[8px] font-black uppercase tracking-wider text-text-muted opacity-60">Featured Hit</p>
+                                <p className="text-xs font-semibold text-text-primary truncate">{company.topFilm.title}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Card Footer: Metrics & Navigation CTA */}
+                          <div className="pt-2.5 border-t border-hairline/70 flex items-center justify-between mt-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Icon icon="solar:clapperboard-play-linear" className="text-text-muted text-xs" />
+                              <span className="text-text-muted text-[9px] font-black uppercase tracking-widest">
+                                {filmCount} {filmCount === 1 ? 'Film' : 'Films'} Produced
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-brand text-[9px] font-black uppercase tracking-wider group-hover:translate-x-0.5 transition-transform">
+                              <span>Explore</span>
+                              <Icon icon="solar:arrow-right-linear" className="text-xs" />
+                            </div>
                           </div>
                         </div>
-                        <div className="pt-2 border-t border-hairline flex items-center gap-1.5">
-                          <Icon icon="solar:clapperboard-play-linear" className="text-text-muted text-xs" />
-                          <span className="text-text-muted text-[8px] font-black uppercase tracking-widest">
-                            {filmCount} {filmCount === 1 ? 'Film' : 'Films'} Produced
-                          </span>
-                        </div>
-                      </div>
+                      </Link>
                     );
                   })
                 )}

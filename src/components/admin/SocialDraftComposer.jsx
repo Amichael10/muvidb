@@ -242,62 +242,6 @@ export default function SocialDraftComposer({
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
 
-  const handleImportVideoToCanvas = async (videoData) => {
-    if (!result?.contentItem?.id) {
-      toast.error('Generate a draft first to attach this video');
-      return;
-    }
-    setUploadingCustom(true);
-    try {
-      const res = await fetch('/api/social?task=attach_custom_asset', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentItemId: result.contentItem.id,
-          variantId: uploadScope === 'active' ? activeVariant?.id : undefined,
-          publicUrl: videoData.url,
-          format: 'video_vertical_9_16',
-          mediaType: 'video',
-          metadata: {
-            startTime: videoData.startTime,
-            endTime: videoData.endTime,
-            duration: videoData.duration,
-            mode: videoData.mode,
-            title: videoData.title,
-          },
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-
-      const newAsset = {
-        id: data.id || videoData.url,
-        publicUrl: videoData.url,
-        mediaType: 'video',
-        format: 'custom_video',
-        width: 1080,
-        height: 1920,
-      };
-
-      const targetVariantId = uploadScope === 'active' ? activeVariant?.id : undefined;
-      setResult(curr => ({
-        ...curr,
-        assets: [newAsset, ...(curr?.assets || [])],
-        variants: (curr?.variants || []).map(variant => (
-          (!targetVariantId || variant.id === targetVariantId)
-            ? { ...variant, selected_asset_id: newAsset.id }
-            : variant
-        )),
-      }));
-      onGenerated?.({ ...result, assets: [newAsset, ...(result.assets || [])] });
-      toast.success(`${videoData.mode === 'clip' ? 'Trimmed clip' : 'Whole video'} attached to ${uploadScope === 'active' ? activePlatform.label : 'all channels'}!`);
-    } catch (err) {
-      toast.error(err.message || 'Failed to attach video to canvas');
-    } finally {
-      setUploadingCustom(false);
-    }
-  };
-
   const handleCanvasCutVideo = async (cutData) => {
     if (!result?.contentItem?.id) return;
     toast.success(`Video cut applied: ${cutData.formattedStart} to ${cutData.formattedEnd} (${cutData.duration.toFixed(1)}s duration)`);
