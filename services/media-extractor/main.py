@@ -202,14 +202,14 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['mweb', 'web', 'android', 'ios'],
+                    'player_client': ['visionos', 'mweb', 'android', 'web'],
                 }
             },
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
             },
-            'format': 'best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best',
+            'format': 'bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best[height<=1080]/best',
             'download_ranges': yt_dlp.utils.download_range_func(None, [(start_sec, end_sec)]),
             'force_keyframes_at_cuts': True,
             'outtmpl': raw_output,
