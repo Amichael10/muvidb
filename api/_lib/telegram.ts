@@ -255,9 +255,12 @@ export function telegramConfigured() {
 
 /** Only this chat may run ops commands (private chat with you). */
 export function isAllowedOpsChat(chatId: string | number | undefined | null): boolean {
-  const allowed = (process.env.TELEGRAM_CHAT_ID || '').trim();
-  if (!allowed || chatId == null) return false;
-  return String(chatId).trim() === allowed;
+  const allowed = (process.env.TELEGRAM_CHAT_ID || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!allowed.length || chatId == null) return false;
+  return allowed.includes(String(chatId).trim());
 }
 
 export async function getTelegramFileUrl(fileId: string): Promise<string | null> {

@@ -53,6 +53,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { default: handleSocial } = await import('./social.js');
       return handleSocial(req, res);
     }
+    if (key === 'telegram') {
+      const { handleTelegramOps } = await import('./_lib/telegram_ops_handler.js');
+      return handleTelegramOps(req, res);
+    }
     if (key === 'fetch-youtube') {
       const { handleFetchYoutube } = await import('./_lib/fetch_youtube_handler.js');
       return handleFetchYoutube(req, res);

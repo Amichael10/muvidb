@@ -106,6 +106,10 @@
       "destination": "/api/social?task=create_upload_session"
     },
     {
+      "source": "/api/telegram",
+      "destination": "/api/data?_r=telegram"
+    },
+    {
       "source": "/api/auth-email",
       "destination": "/api/automation?action=auth-email"
     },
