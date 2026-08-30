@@ -12,8 +12,31 @@ class ExtractRequest(BaseModel):
     url: str
 
 def get_cookie_file():
-    cookies_raw = os.getenv("COOKIES_TXT", "").strip() or os.getenv("INSTAGRAM_COOKIES", "").strip() or os.getenv("FACEBOOK_COOKIES", "").strip() or os.getenv("FB_COOKIES", "").strip()
+    cookies_raw = (
+        os.getenv("COOKIES_TXT", "").strip() or
+        os.getenv("YOUTUBE_COOKIES", "").strip() or
+        os.getenv("INSTAGRAM_COOKIES", "").strip() or
+        os.getenv("FACEBOOK_COOKIES", "").strip() or
+        os.getenv("FB_COOKIES", "").strip()
+    )
     session_id = os.getenv("INSTAGRAM_SESSION_ID", "").strip()
+
+    if not cookies_raw:
+        possible_paths = [
+            "cookies.txt",
+            "/app/cookies.txt",
+            os.path.join(os.path.dirname(__file__), "cookies.txt"),
+            os.path.join(os.path.dirname(__file__), "..", "..", "cookies.txt"),
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        cookies_raw = f.read().strip()
+                    if cookies_raw:
+                        break
+                except Exception:
+                    pass
 
     if cookies_raw:
         tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt")
@@ -37,13 +60,16 @@ def health_check():
     return {
         "status": "ok",
         "service": "media-extractor",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "has_cookies": bool(
             os.getenv("COOKIES_TXT") or 
+            os.getenv("YOUTUBE_COOKIES") or
             os.getenv("INSTAGRAM_COOKIES") or 
             os.getenv("FACEBOOK_COOKIES") or 
             os.getenv("FB_COOKIES") or 
-            os.getenv("INSTAGRAM_SESSION_ID")
+            os.getenv("INSTAGRAM_SESSION_ID") or
+            os.path.exists("cookies.txt") or
+            os.path.exists("/app/cookies.txt")
         )
     }
 
@@ -63,9 +89,12 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'no_warnings': True,
         'skip_download': True,
         'extract_flat': False,
-        # YouTube increasingly exposes separate video/audio streams and may not
-        # advertise yt-dlp's legacy `best` alias. Prefer a progressive stream
-        # with audio, then fall back to a browser-playable video stream.
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web'],
+                'player_skip': ['webpage', 'configs', 'js'],
+            }
+        },
         'format': 'best[ext=mp4][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/bestvideo[ext=mp4]/bestvideo/best',
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -173,6 +202,16 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'android', 'web'],
+                    'player_skip': ['webpage', 'configs', 'js'],
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'download_ranges': yt_dlp.utils.download_range_func(None, [(start_sec, end_sec)]),
             'force_keyframes_at_cuts': True,

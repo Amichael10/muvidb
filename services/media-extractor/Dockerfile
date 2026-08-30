@@ -9,8 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -r
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
+# Copy application files and cookies
 COPY main.py .
+COPY cookies.txt* .
 
 EXPOSE 8000
 
