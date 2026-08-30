@@ -191,6 +191,14 @@ const DEFAULT_CINEMAS: Partial<CinemaRow>[] = [
     scrape_adapter: 'reach_cinema',
     scrape_config: { externalCinemaId: 'nov-f76e616e', bookingBaseUrl: 'https://novacinemang.com' },
   },
+
+  // ── EBONYLIFE CINEMAS ──
+  {
+    name: 'EbonyLife Cinemas, Victoria Island',
+    chain: 'EbonyLife',
+    scrape_adapter: 'reach_cinema',
+    scrape_config: { externalCinemaId: 'ebo-5157e512', bookingBaseUrl: 'https://ebonylifecinemas.com' },
+  },
 ];
 
 async function sync() {

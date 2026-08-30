@@ -545,18 +545,111 @@ const PersonDetail = () => {
     awardWins ? `${awardWins} ${awardWins === 1 ? 'award' : 'awards'}` : '',
     awardNominations ? `${awardNominations} ${awardNominations === 1 ? 'nomination' : 'nominations'}` : '',
   ].filter(Boolean).join(' & ')
-  const knownFor = [...new Map(
-    (person.credits || [])
-      .filter((credit) => credit.films?.id)
-      .map((credit) => [credit.films.id, credit])
-  ).values()]
-    .sort((a, b) => {
-      const views = (b.films?.view_count || 0) - (a.films?.view_count || 0)
-      if (views !== 0) return views
-      const ratings = (b.films?.liked_percent || 0) - (a.films?.liked_percent || 0)
-      if (ratings !== 0) return ratings
-      return (b.films?.year || 0) - (a.films?.year || 0)
-    })
+
+  // ── Known For Calculation ──────────────────────────────────────────────
+  const awardFilmIds = new Set(awardEntries.map((a) => a?.film_id).filter(Boolean))
+  const awardFilmTitles = new Set(
+    awardEntries.map((a) => (a?.film_title || a?.title || '').trim().toLowerCase()).filter(Boolean)
+  )
+
+  const getCreditBoxOffice = (credit) => {
+    const film = credit.films || {}
+    const source = film.streaming_links?.box_office?.source || film.box_office_source
+    if (!source && !film.box_office_domestic) return 0
+    const dom = film.streaming_links?.box_office?.domestic || film.box_office_domestic || 0
+    return typeof dom === 'number' ? dom : parseFloat(dom) || 0
+  }
+
+  const scoreCreditForKnownFor = (credit) => {
+    const film = credit.films || {}
+    let score = 0
+
+    // 1. Poster presence (titles with posters always lead)
+    const hasPoster = Boolean(film.poster_url && !film.poster_url.includes('placeholder'))
+    if (hasPoster) score += 10000
+
+    // 2. Box Office Gross
+    const boxOffice = getCreditBoxOffice(credit)
+    if (boxOffice >= 1_000_000_000) {
+      score += 8000 // ₦1B+ blockbuster
+    } else if (boxOffice >= 500_000_000) {
+      score += 6000 // ₦500M+
+    } else if (boxOffice >= 100_000_000) {
+      score += 4500 // ₦100M+
+    } else if (boxOffice > 0) {
+      score += 3000 // Reported box office
+    }
+
+    // 3. Cinema / Theatrical release
+    const relType = String(film.release_type || '').toLowerCase()
+    if (relType === 'cinema' || relType === 'theatrical') {
+      score += 2000
+    } else if (['netflix', 'prime', 'amazon_prime', 'showmax'].includes(relType)) {
+      score += 1500
+    }
+
+    // 4. Awards for this film (won or nominated)
+    const hasAward =
+      awardFilmIds.has(film.id) ||
+      (film.title && awardFilmTitles.has(film.title.trim().toLowerCase()))
+    if (hasAward) {
+      score += 3500
+    }
+
+    // 5. Role prominence (lead roles rank much higher than cameos)
+    const role = (credit.role || '').toLowerCase()
+    const order = credit.billing_order ?? 99
+    if (role === 'actor') {
+      if (order === 1) score += 2000 // Top lead
+      else if (order <= 3) score += 1500 // Primary lead
+      else if (order <= 6) score += 900 // Major supporting
+      else if (order <= 12) score += 400
+    } else if (['director', 'creator'].includes(role)) {
+      score += 1800
+    } else if (['producer', 'executive producer', 'writer', 'screenplay'].includes(role)) {
+      score += 1200
+    }
+
+    // 6. YouTube / Streaming View Count (scaled logarithmically)
+    const views = typeof film.view_count === 'number' ? film.view_count : parseInt(film.view_count, 10) || 0
+    if (views > 0) {
+      score += Math.min(2500, Math.floor(Math.log10(views + 1) * 250))
+    }
+
+    // 7. Audience Liked % / Ratings
+    const liked = Number(film.liked_percent) || 0
+    if (liked > 0) {
+      score += Math.floor((liked / 100) * 400)
+    }
+
+    // 8. Recency tiebreaker
+    const year = Number(film.year) || 0
+    if (year >= 1990) {
+      score += Math.min(200, (year - 1990) * 5)
+    }
+
+    return score
+  }
+
+  // Deduplicate by film, keeping the credit with the highest individual prominence (e.g. Lead role over Producer)
+  const filmCreditMap = new Map()
+  for (const credit of (person.credits || [])) {
+    const filmId = credit.films?.id
+    if (!filmId) continue
+    const existing = filmCreditMap.get(filmId)
+    if (!existing) {
+      filmCreditMap.set(filmId, credit)
+    } else {
+      const existingScore = scoreCreditForKnownFor(existing)
+      const newScore = scoreCreditForKnownFor(credit)
+      if (newScore > existingScore) {
+        filmCreditMap.set(filmId, credit)
+      }
+    }
+  }
+
+  const knownFor = [...filmCreditMap.values()]
+    .sort((a, b) => scoreCreditForKnownFor(b) - scoreCreditForKnownFor(a))
     .slice(0, 6)
 
   // ── Career Impact Stats ────────────────────────────────────────────────
