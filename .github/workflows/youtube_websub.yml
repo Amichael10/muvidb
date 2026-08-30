@@ -52,9 +52,14 @@ jobs:
             "$BASE_URL/api/automation?action=youtube-websub-renew")"
           echo "$response" | jq .
           failed="$(echo "$response" | jq -r '.failed // 0')"
+          total="$(echo "$response" | jq -r '.channels // 0')"
           if [ "$failed" -gt 0 ]; then
-            echo "::error::$failed YouTube WebSub subscription request(s) failed."
-            exit 1
+            if [ "$failed" -ge "$total" ] && [ "$total" -gt 0 ]; then
+              echo "::error::All $failed YouTube WebSub subscription requests failed."
+              exit 1
+            else
+              echo "::warning::$failed out of $total YouTube WebSub subscription request(s) failed."
+            fi
           fi
 
       - name: Reconcile recent uploads

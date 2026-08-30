@@ -150,8 +150,10 @@ async function threadsFetch(url: string, init?: RequestInit): Promise<any> {
 }
 
 export function isThreadsLivePublishingEnabled(): boolean {
-  return String(process.env.SOCIAL_PUBLISH_MODE || '').toLowerCase() === 'live'
-    && ['true', '1', 'yes'].includes(String(process.env.SOCIAL_THREADS_PUBLISH_ENABLED || '').toLowerCase());
+  const mode = String(process.env.SOCIAL_PUBLISH_MODE || '').toLowerCase();
+  const explicitFlag = String(process.env.SOCIAL_THREADS_PUBLISH_ENABLED || '').toLowerCase();
+  if (explicitFlag === 'false' || explicitFlag === '0' || explicitFlag === 'no') return false;
+  return mode === 'live' || explicitFlag === 'true' || explicitFlag === '1' || explicitFlag === 'yes';
 }
 
 export function getThreadsConfiguration(req: VercelRequest) {
