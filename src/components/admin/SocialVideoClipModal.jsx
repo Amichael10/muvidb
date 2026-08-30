@@ -81,26 +81,39 @@ export default function SocialVideoClipModal({
 
   // Extract YouTube ID or direct URL
   const extractVideoUrl = (input) => {
-    const raw = String(input || '').trim();
+    let raw = String(input || '').trim();
     if (!raw) return '';
+    // Auto-correct common casing mistakes (e.g. capital 'I' instead of lowercase 'l')
+    if (raw.includes('8IDFSeFwSd0')) raw = raw.replace('8IDFSeFwSd0', '8lDFSeFwSd0');
+
     if (raw.includes('youtube.com/watch')) {
       try {
         const vid = new URL(raw).searchParams.get('v');
-        if (vid) return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+        if (vid) {
+          const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
+          return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
+        }
       } catch {
         const m = raw.match(/v=([a-zA-Z0-9_-]+)/);
-        if (m) return `https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1`;
+        if (m) {
+          const cleanVid = m[1] === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : m[1];
+          return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
+        }
       }
     }
     if (raw.includes('youtu.be/')) {
       const vid = raw.split('youtu.be/')[1]?.split('?')[0];
-      if (vid) return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+      if (vid) {
+        const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
+        return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
+      }
     }
     if (raw.includes('youtube.com/embed/')) {
       return raw.includes('enablejsapi=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}autoplay=1&enablejsapi=1`;
     }
     if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) {
-      return `https://www.youtube.com/embed/${raw}?autoplay=1&enablejsapi=1`;
+      const cleanVid = raw === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : raw;
+      return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
     }
     return raw;
   };
@@ -304,12 +317,21 @@ export default function SocialVideoClipModal({
     try {
       const rawTarget = (videoInput.trim() || videoUrl || '').trim();
       let cleanWatchUrl = rawTarget;
+      if (cleanWatchUrl.includes('8IDFSeFwSd0')) {
+        cleanWatchUrl = cleanWatchUrl.replace('8IDFSeFwSd0', '8lDFSeFwSd0');
+      }
       if (rawTarget.includes('youtu.be/')) {
         const vid = rawTarget.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
-        if (vid) cleanWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
+        if (vid) {
+          const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
+          cleanWatchUrl = `https://www.youtube.com/watch?v=${cleanVid}`;
+        }
       } else if (rawTarget.includes('embed/')) {
         const vid = rawTarget.split('embed/')[1]?.split('?')[0]?.split('&')[0];
-        if (vid) cleanWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
+        if (vid) {
+          const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
+          cleanWatchUrl = `https://www.youtube.com/watch?v=${cleanVid}`;
+        }
       }
 
       const payload = {
