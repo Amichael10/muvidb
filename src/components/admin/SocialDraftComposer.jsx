@@ -836,6 +836,8 @@ export default function SocialDraftComposer({
         ? { ...entry, platform_options: data.platformOptions }
         : entry),
     }));
+  };
+
   const handleAttachRenderedVideo = async (clipAsset) => {
     if (!clipAsset || !clipAsset.publicUrl) return;
     const isSquare = clipAsset.aspectRatio === '1:1';
