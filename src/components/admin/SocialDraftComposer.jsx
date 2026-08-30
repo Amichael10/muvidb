@@ -2276,20 +2276,25 @@ export default function SocialDraftComposer({
                         <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
                           Delivery mode
                           <select value={tiktokSettings.post_mode} onChange={event => setTikTokSettings(current => ({ ...current, post_mode: event.target.value }))} className="mt-1 h-9 w-full rounded border border-border bg-surface px-2 text-xs text-text-primary outline-none focus:border-brand">
-                            <option value="DIRECT_POST">Post directly</option>
-                            <option value="MEDIA_UPLOAD">Send to TikTok inbox as draft</option>
+                            <option value="DIRECT_POST">Post directly (with full caption & tags)</option>
+                            <option value="MEDIA_UPLOAD">Send to TikTok inbox as draft (video only, no caption)</option>
                           </select>
                         </label>
                         <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
                           Privacy
                           <select value={tiktokSettings.privacy_level} onChange={event => setTikTokSettings(current => ({ ...current, privacy_level: event.target.value }))} disabled={tiktokSettings.post_mode === 'MEDIA_UPLOAD'} className="mt-1 h-9 w-full rounded border border-border bg-surface px-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-50">
-                            <option value="PUBLIC_TO_EVERYONE">Public</option>
+                            <option value="PUBLIC_TO_EVERYONE">Public (Visible to everyone)</option>
+                            <option value="SELF_ONLY">Only me (Private on profile with full caption)</option>
                             <option value="MUTUAL_FOLLOW_FRIENDS">Mutual followers</option>
                             <option value="FOLLOWER_OF_CREATOR">Creator’s followers</option>
-                            <option value="SELF_ONLY">Only me</option>
                           </select>
                         </label>
                       </div>
+                      {tiktokSettings.post_mode === 'MEDIA_UPLOAD' && (
+                        <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-[10px] text-amber-200">
+                          ⚠️ <span className="font-bold text-amber-300">TikTok Inbox Limitation:</span> TikTok’s Inbox API only transfers raw video files without captions. To have your full caption and tags automatically attached, select <strong>Post directly</strong> (select <em>Only me</em> if you wish to review before making it public).
+                        </p>
+                      )}
 
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {[
