@@ -422,9 +422,9 @@ export default function SocialCanvasViewport({
             {/* Custom Content or Injected Video */}
             {isVideo && typeof mediaUrl === 'string' ? (
               mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be') ? (
-                <div className="relative h-full w-full bg-black flex items-center justify-center">
+                <div className="relative h-full w-full bg-black flex items-center justify-center overflow-hidden">
                   <iframe
-                    key={mediaUrl}
+                    key={`${mediaUrl}_${fitMode}_${activeAspect}`}
                     src={(() => {
                       if (mediaUrl.includes('youtube.com/embed/')) return mediaUrl;
                       try {
@@ -451,7 +451,22 @@ export default function SocialCanvasViewport({
                     title="Video Canvas Preview"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    className="h-full w-full border-0 object-cover"
+                    style={
+                      fitMode === 'cover'
+                        ? activeAspect === '9:16'
+                          ? { width: '316.05%', height: '100%', maxWidth: 'none', maxHeight: 'none' }
+                          : activeAspect === '4:5'
+                            ? { width: '222.22%', height: '100%', maxWidth: 'none', maxHeight: 'none' }
+                            : activeAspect === '1:1'
+                              ? { width: '177.78%', height: '100%', maxWidth: 'none', maxHeight: 'none' }
+                              : { width: '100%', height: '100%' }
+                        : { width: '100%', height: '100%' }
+                    }
+                    className={
+                      fitMode === 'cover' && activeAspect !== '16:9'
+                        ? 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border-0 pointer-events-auto'
+                        : 'h-full w-full border-0'
+                    }
                   />
                 </div>
               ) : (
