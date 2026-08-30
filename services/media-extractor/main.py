@@ -91,7 +91,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'web'],
+                'player_client': ['visionos', 'android', 'mweb'],
                 'player_skip': ['webpage', 'configs', 'js'],
             }
         },
@@ -204,7 +204,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['mweb', 'web', 'android', 'ios'],
+                    'player_client': ['visionos', 'android', 'mweb'],
                     'player_skip': ['webpage', 'configs', 'js'],
                 }
             },
