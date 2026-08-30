@@ -4,10 +4,6 @@
   "outputDirectory": "build/client",
   "crons": [
     {
-      "path": "/api/social?task=publish_due",
-      "schedule": "0 */2 * * *"
-    },
-    {
       "path": "/api/cron/sync",
       "schedule": "0 0 * * *"
     }

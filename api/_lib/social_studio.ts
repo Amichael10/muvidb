@@ -350,6 +350,13 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     if (assetError) throw assetError;
     assetUrl = asset?.public_url || null;
   }
+  if (!assetUrl) {
+    assetUrl = variant.platform_options?.asset_url ||
+      variant.platform_options?.video_url ||
+      variant.platform_options?.media_url ||
+      variant.platform_options?.custom_asset_url ||
+      null;
+  }
   if (assetUrls.length) assetUrl = assetUrls[0];
   else if (assetUrl) assetUrls = [assetUrl];
 
@@ -526,6 +533,60 @@ export async function runSocialPublisher(input: {
   const now = input.now || new Date();
   const nowIso = now.toISOString();
   const limit = Math.min(Math.max(input.limit || 10, 1), 25);
+
+  // 1. Recover stale processing locks (e.g. jobs stuck in processing for > 10 mins from crashed runs)
+  const staleThreshold = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
+  await supabase
+    .from('social_publish_jobs')
+    .update({ status: 'retrying', locked_at: null, locked_by: null })
+    .eq('status', 'processing')
+    .lt('locked_at', staleThreshold);
+
+  // 2. Auto-heal: ensure any scheduled variants with scheduled_for <= now have a queued publish job
+  const { data: scheduledVariants } = await supabase
+    .from('social_platform_variants')
+    .select('id, content_item_id, platform, scheduled_for, status')
+    .eq('status', 'scheduled')
+    .lte('scheduled_for', nowIso);
+
+  for (const variant of scheduledVariants || []) {
+    const scheduledIso = variant.scheduled_for || nowIso;
+    const idempotencyKey = createPublishJobIdempotencyKey({
+      contentItemId: variant.content_item_id,
+      platform: variant.platform as SocialPlatform,
+      scheduledFor: scheduledIso,
+    });
+    
+    const { data: existingJob } = await supabase
+      .from('social_publish_jobs')
+      .select('id, status')
+      .eq('platform_variant_id', variant.id)
+      .maybeSingle();
+
+    if (!existingJob) {
+      await supabase
+        .from('social_publish_jobs')
+        .insert({
+          platform_variant_id: variant.id,
+          status: 'queued',
+          scheduled_for: scheduledIso,
+          available_at: scheduledIso,
+          idempotency_key: idempotencyKey,
+        });
+    } else if (existingJob.status === 'cancelled') {
+      await supabase
+        .from('social_publish_jobs')
+        .update({
+          status: 'queued',
+          available_at: scheduledIso,
+          scheduled_for: scheduledIso,
+          completed_at: null,
+          locked_at: null,
+          locked_by: null,
+        })
+        .eq('id', existingJob.id);
+    }
+  }
 
   const { data: jobs, error } = await supabase
     .from('social_publish_jobs')

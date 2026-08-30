@@ -2,10 +2,8 @@ name: Social Studio Publisher
 
 on:
   schedule:
-    # Fixed daily publishing windows in Lagos (WAT / UTC+1):
-    # 09:00, 15:00, and 16:00 WAT = 08:00, 14:00, and 15:00 UTC.
-    # The publisher drains every post due by the time each window runs.
-    - cron: "0 8,14,15 * * *"
+    # Runs every 15 minutes to promptly drain and publish any posts scheduled for release
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 # Never let two queue drainers publish the same batch concurrently. The
