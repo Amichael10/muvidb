@@ -243,30 +243,45 @@ export default function SocialDraftComposer({
   const searchToken = useRef(0);
 
   const handleAttachRenderedVideo = (renderedAsset) => {
-    if (!renderedAsset?.public_url && !renderedAsset?.url) return;
-    const videoUrl = renderedAsset.public_url || renderedAsset.url;
+    if (!renderedAsset?.public_url && !renderedAsset?.url && !renderedAsset?.publicUrl) return;
+    const videoUrl = renderedAsset.public_url || renderedAsset.url || renderedAsset.publicUrl;
+    const isSquare = renderedAsset.aspectRatio === '1:1';
+    const targetPlatforms = isSquare ? ['facebook', 'threads'] : ['tiktok', 'instagram'];
+
     const newAsset = {
       id: `rendered_video_${Date.now()}`,
       publicUrl: videoUrl,
       public_url: videoUrl,
       mediaType: 'video',
       format: 'custom_video',
-      width: renderedAsset.aspectRatio === '9:16' ? 1080 : 1920,
-      height: renderedAsset.aspectRatio === '9:16' ? 1920 : 1080,
+      width: isSquare ? 1080 : (renderedAsset.aspectRatio === '9:16' ? 1080 : 1920),
+      height: isSquare ? 1080 : (renderedAsset.aspectRatio === '9:16' ? 1920 : 1080),
+      aspectRatio: renderedAsset.aspectRatio || (isSquare ? '1:1' : '9:16'),
+      driveFileId: renderedAsset.driveFileId || renderedAsset.drive_file_id,
+      drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
     };
 
     setResult(prev => {
       if (!prev) return prev;
       const updatedAssets = [newAsset, ...(prev.assets || []).filter(a => a.mediaType !== 'video')];
-      const updatedVariants = (prev.variants || []).map(v => ({
-        ...v,
-        platform_options: {
-          ...(v.platform_options || {}),
-          video_url: videoUrl,
-          asset_url: videoUrl,
-          post_format: 'single',
-        },
-      }));
+      const updatedVariants = (prev.variants || []).map(v => {
+        const match = targetPlatforms.includes(v.platform) || !isSquare;
+        if (!match) return v;
+
+        return {
+          ...v,
+          media_urls: [videoUrl],
+          drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id || v.drive_file_id,
+          platform_options: {
+            ...(v.platform_options || {}),
+            video_url: videoUrl,
+            asset_url: videoUrl,
+            drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
+            aspect_ratio: renderedAsset.aspectRatio,
+            post_format: 'single',
+          },
+        };
+      });
       return {
         ...prev,
         assets: updatedAssets,
@@ -277,6 +292,7 @@ export default function SocialDraftComposer({
     if (renderedAsset.aspectRatio) {
       setCanvasAspectRatio(renderedAsset.aspectRatio);
     }
+    toast.success(`🎬 ${renderedAsset.aspectRatio || 'Video'} clip attached to ${isSquare ? 'Facebook & Threads' : 'TikTok & Instagram'}!`);
   };
 
   const handleCanvasCutVideo = async (cutData) => {
@@ -836,47 +852,6 @@ export default function SocialDraftComposer({
         ? { ...entry, platform_options: data.platformOptions }
         : entry),
     }));
-  };
-
-  const handleAttachRenderedVideo = async (clipAsset) => {
-    if (!clipAsset || !clipAsset.publicUrl) return;
-    const isSquare = clipAsset.aspectRatio === '1:1';
-    const targetPlatforms = isSquare ? ['facebook', 'threads'] : ['tiktok', 'instagram'];
-
-    setResult(curr => {
-      if (!curr) return curr;
-      const updatedVariants = (curr.variants || []).map(variant => {
-        const match = targetPlatforms.includes(variant.platform) || !isSquare;
-        if (!match) return variant;
-
-        return {
-          ...variant,
-          media_urls: [clipAsset.publicUrl],
-          drive_file_id: clipAsset.driveFileId || clipAsset.drive_file_id || variant.drive_file_id,
-          platform_options: {
-            ...(variant.platform_options || {}),
-            post_format: 'video',
-            video_url: clipAsset.publicUrl,
-            drive_file_id: clipAsset.driveFileId || clipAsset.drive_file_id,
-            aspect_ratio: clipAsset.aspectRatio,
-          }
-        };
-      });
-
-      return {
-        ...curr,
-        assets: [clipAsset, ...(curr.assets || [])],
-        variants: updatedVariants,
-      };
-    });
-
-    toast.success(`🎬 ${clipAsset.aspectRatio || 'Video'} clip attached to ${isSquare ? 'Facebook & Threads' : 'TikTok & Instagram'}!`);
-  };
-
-  const handleImportVideoToCanvas = (clipAsset) => {
-    if (!clipAsset) return;
-    setCustomMedia(prev => [clipAsset, ...prev]);
-    toast.success('Video imported to canvas!');
   };
 
   const handleSchedule = async (preset, customValue) => {
