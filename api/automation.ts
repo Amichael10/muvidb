@@ -7,6 +7,8 @@ import scrapeImdbActorHandler from './_lib/scrape_imdb_actor_handler';
 import deduplicatorHandler from './_lib/deduplicator_handler';
 import peopleEnrichmentHandler from './_lib/people_enrichment_handler';
 import { renewYouTubeWebSubSubscriptions, youtubeWebSubHandler } from './_lib/youtube_websub';
+import { handleTelegramOps } from './_lib/telegram_ops_handler';
+import { handleAuthEmailHook } from './_lib/auth_email_handler';
 
 export const maxDuration = 60;
 
@@ -16,14 +18,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Telegram webhook endpoint
   if (action === 'telegram' || pathname.includes('/api/telegram')) {
-    const { handleTelegramOps } = await import('./_lib/telegram_ops_handler.js');
     return handleTelegramOps(req, res);
   }
 
   // Supabase Auth Email hook
   if (action === 'auth-email' || pathname.includes('/api/auth-email')) {
     try {
-      const { handleAuthEmailHook } = await import('./_lib/auth_email_handler.js');
       return await handleAuthEmailHook(req, res);
     } catch (err: any) {
       console.error('[auth-email] handler failed:', err?.message || err);
