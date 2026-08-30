@@ -126,3 +126,122 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
                 os.remove(cookie_path)
             except Exception:
                 pass
+
+
+class ClipRequest(BaseModel):
+    url: str
+    start_time: float
+    end_time: float
+    aspect_ratio: str = "9:16"  # "9:16", "1:1", "16:9", "4:5"
+    fit_mode: str = "cover"     # "cover", "contain"
+    title: str = "clip"
+
+
+@app.post("/clip")
+def process_clip(req: ClipRequest, authorization: str = Header(None)):
+    import time
+    import subprocess
+    import requests
+
+    if AUTH_SECRET:
+        token = authorization.replace("Bearer ", "").strip() if authorization else ""
+        if token != AUTH_SECRET:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Missing URL")
+
+    start_sec = max(0.0, float(req.start_time))
+    end_sec = max(start_sec + 1.0, float(req.end_time))
+    duration = end_sec - start_sec
+
+    if req.aspect_ratio == "9:16":
+        vf = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920" if req.fit_mode == "cover" else "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
+    elif req.aspect_ratio == "1:1":
+        vf = "scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080" if req.fit_mode == "cover" else "scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2"
+    elif req.aspect_ratio == "4:5":
+        vf = "scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350" if req.fit_mode == "cover" else "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2"
+    else:
+        vf = "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080"
+
+    cookie_path = get_cookie_file()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw_output = os.path.join(tmpdir, "raw.mp4")
+        processed_output = os.path.join(tmpdir, "processed.mp4")
+
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'download_ranges': yt_dlp.utils.download_range_func(None, [(start_sec, end_sec)]),
+            'force_keyframes_at_cuts': True,
+            'outtmpl': raw_output,
+        }
+        if cookie_path:
+            ydl_opts['cookiefile'] = cookie_path
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except Exception as e:
+            return {"success": False, "error": f"Download failed: {str(e)}"}
+        finally:
+            if cookie_path and os.path.exists(cookie_path):
+                try:
+                    os.remove(cookie_path)
+                except Exception:
+                    pass
+
+        if not os.path.exists(raw_output):
+            candidates = [f for f in os.listdir(tmpdir) if f.startswith("raw")]
+            if candidates:
+                raw_output = os.path.join(tmpdir, candidates[0])
+            else:
+                return {"success": False, "error": "Failed to slice video segment"}
+
+        cmd = [
+            "ffmpeg", "-y", "-i", raw_output,
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            processed_output
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0 or not os.path.exists(processed_output):
+            return {"success": False, "error": f"FFmpeg processing failed: {res.stderr[:300]}"}
+
+        supabase_url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+
+        file_size = os.path.getsize(processed_output)
+        safe_title = "".join(c for c in req.title if c.isalnum() or c in "-_").strip() or "clip"
+        file_name = f"clip_{safe_title}_{int(start_sec)}_{int(end_sec)}_{req.aspect_ratio.replace(':', 'x')}_{int(time.time())}.mp4"
+
+        if supabase_url and supabase_key:
+            upload_url = f"{supabase_url.rstrip('/')}/storage/v1/object/social-published-assets/test-scenario/{file_name}"
+            headers = {
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "video/mp4",
+                "x-upsert": "true"
+            }
+            with open(processed_output, "rb") as f:
+                up_res = requests.post(upload_url, headers=headers, data=f, timeout=120)
+            if up_res.status_code not in [200, 201]:
+                return {"success": False, "error": f"Cloud storage upload failed ({up_res.status_code}): {up_res.text[:200]}"}
+
+            public_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/social-published-assets/test-scenario/{file_name}"
+            return {
+                "success": True,
+                "public_url": public_url,
+                "file_name": file_name,
+                "duration": duration,
+                "size_mb": round(file_size / (1024 * 1024), 2),
+                "aspect_ratio": req.aspect_ratio,
+                "fit_mode": req.fit_mode,
+            }
+        else:
+            return {"success": False, "error": "Supabase storage credentials not configured on extractor"}
+

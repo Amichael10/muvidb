@@ -41,6 +41,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ uploadUrl });
     }
 
+    if (task === 'clip_video' || task === 'render_clip') {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const { url, startTime, endTime, aspectRatio, fitMode, title } = body;
+      if (!url) return res.status(400).json({ error: 'Missing video url' });
+
+      const extractorBaseUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
+      const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (extractorSecret) headers.Authorization = `Bearer ${extractorSecret}`;
+
+      const extRes = await fetch(`${extractorBaseUrl}/clip`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          url,
+          start_time: Number(startTime) || 0,
+          end_time: Number(endTime) || (Number(startTime) + 60),
+          aspect_ratio: aspectRatio || '9:16',
+          fit_mode: fitMode || 'cover',
+          title: title || 'clip',
+        }),
+        signal: AbortSignal.timeout(180_000),
+      });
+
+      const data = await extRes.json().catch(() => ({}));
+      if (!extRes.ok || !data.success) {
+        return res.status(500).json({ error: data.error || 'Video rendering failed on extractor' });
+      }
+      return res.status(200).json(data);
+    }
+
     if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
       const { handleEditorialTask } = await import('./_lib/editorial_handler.js');
       return handleEditorialTask(req, res);

@@ -31,6 +31,7 @@ export default function SocialVideoClipModal({
   initialVideoUrl = '',
   initialTitle = '',
   onImportToCanvas,
+  onAttachRenderedVideo,
 }) {
   const [activeTab, setActiveTab] = useState('clip_range'); // 'whole_video' | 'clip_range'
   const [videoInput, setVideoInput] = useState(initialVideoUrl || '');
@@ -44,10 +45,21 @@ export default function SocialVideoClipModal({
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [startTime, setStartTime] = useState(0);
-  const [endTime, setEndTime] = useState(0);
+  const [endTime, setEndTime] = useState(30);
   const [startTimeInput, setStartTimeInput] = useState('00:00');
   const [endTimeInput, setEndTimeInput] = useState('00:30');
   const [isPreviewingClip, setIsPreviewingClip] = useState(false);
+
+  // Crop Aspect Ratio & Framing Mode
+  const [cropAspectRatio, setCropAspectRatio] = useState('9:16'); // '9:16' | '1:1' | '16:9' | '4:5'
+  const [cropFitMode, setCropFitMode] = useState('cover'); // 'cover' (fill/crop) | 'contain' (fit/letterbox)
+
+  // Multi-Stage Progress State for True Video Cut & Upload
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [renderStage, setRenderStage] = useState(1);
+  const [renderStatusText, setRenderStatusText] = useState('');
+  const progressTimerRef = useRef(null);
 
   useEffect(() => {
     if (initialVideoUrl) {
@@ -58,6 +70,12 @@ export default function SocialVideoClipModal({
       setVideoTitle(initialTitle);
     }
   }, [initialVideoUrl, initialTitle]);
+
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -104,7 +122,7 @@ export default function SocialVideoClipModal({
     const dur = videoRef.current.duration || 0;
     setDuration(dur);
     setStartTime(0);
-    setEndTime(Math.min(dur, 60)); // Default to 60s max for TikTok/Reels
+    setEndTime(Math.min(dur, 60));
     setStartTimeInput('00:00');
     setEndTimeInput(formatSecondsToTimecode(Math.min(dur, 60)));
   };
@@ -157,7 +175,7 @@ export default function SocialVideoClipModal({
   const handlePreviewClip = () => {
     if (!videoUrl) return toast.error('Please load a video first');
     if (endTime <= startTime) return toast.error('End time must be after start time');
-    
+
     setIsPreviewingClip(true);
     if (videoUrl.includes('youtube.com/embed')) {
       let vid = '';
@@ -182,7 +200,8 @@ export default function SocialVideoClipModal({
     toast.success(`Playing preview clip: ${formatSecondsToTimecode(startTime)} to ${formatSecondsToTimecode(endTime)}`);
   };
 
-  const handleApplyToCanvas = (mode) => {
+  // Preview embed in canvas
+  const handleApplyPreviewToCanvas = (mode) => {
     if (!videoUrl) {
       return toast.error('Please load a video first');
     }
@@ -211,7 +230,7 @@ export default function SocialVideoClipModal({
         duration: duration,
         title: videoTitle || 'Source Video',
       });
-      toast.success('Whole video imported straight into the canvas!');
+      toast.success('Whole video imported into canvas preview!');
       onClose();
     } else {
       if (endTime <= startTime) {
@@ -243,8 +262,99 @@ export default function SocialVideoClipModal({
         formattedEnd: formatSecondsToTimecode(endTime),
         title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startTime)} - ${formatSecondsToTimecode(endTime)})`,
       });
-      toast.success(`Trimmed clip (${formatSecondsToTimecode(startTime)} to ${formatSecondsToTimecode(endTime)}) sent to canvas!`);
+      toast.success(`Trimmed loop preview sent to canvas!`);
       onClose();
+    }
+  };
+
+  // True Server-Side Render, 9:16 Crop & Cloudinary/Supabase Storage Attachment
+  const handleRenderAndAttachClip = async () => {
+    if (!videoInput.trim() && !videoUrl) {
+      return toast.error('Please enter a video URL or YouTube link');
+    }
+    if (activeTab === 'clip_range' && endTime <= startTime) {
+      return toast.error('End time must be greater than start time');
+    }
+
+    const startSec = activeTab === 'clip_range' ? startTime : 0;
+    const endSec = activeTab === 'clip_range' ? endTime : (duration || 60);
+    const sliceLen = Math.max(1, endSec - startSec);
+
+    setIsRendering(true);
+    setRenderProgress(10);
+    setRenderStage(1);
+    setRenderStatusText(`[1/3] Downloading & Slicing (${formatSecondsToTimecode(startSec)} → ${formatSecondsToTimecode(endSec)})...`);
+
+    // Dynamic progress bar ticker
+    let currentP = 10;
+    progressTimerRef.current = setInterval(() => {
+      currentP += Math.floor(Math.random() * 6) + 2;
+      if (currentP > 92) currentP = 92;
+      setRenderProgress(currentP);
+
+      if (currentP > 40 && currentP <= 75) {
+        setRenderStage(2);
+        setRenderStatusText(`[2/3] Applying ${cropAspectRatio} ${cropFitMode === 'cover' ? 'Vertical Fill Crop' : 'Letterbox Fit'} & Encoding 1080x1920 MP4...`);
+      } else if (currentP > 75) {
+        setRenderStage(3);
+        setRenderStatusText(`[3/3] Uploading rendered MP4 to Cloud Storage & attaching to variants...`);
+      }
+    }, 900);
+
+    try {
+      const payload = {
+        url: videoInput.trim() || videoUrl,
+        startTime: startSec,
+        endTime: endSec,
+        aspectRatio: cropAspectRatio,
+        fitMode: cropFitMode,
+        title: videoTitle || 'social_clip',
+      };
+
+      const res = await fetch('/api/social?task=clip_video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Video rendering failed');
+      }
+
+      setRenderProgress(100);
+      setRenderStatusText('[Done] Video rendered, cropped & attached to draft!');
+
+      // Notify parent composer and attach MP4 video
+      const clipAsset = {
+        url: data.public_url,
+        public_url: data.public_url,
+        publicUrl: data.public_url,
+        format: 'custom_video',
+        mediaType: 'video',
+        duration: sliceLen,
+        aspectRatio: cropAspectRatio,
+        fileName: data.file_name,
+        sizeMb: data.size_mb,
+        title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startSec)} - ${formatSecondsToTimecode(endSec)})`,
+        isRenderedMp4: true,
+      };
+
+      onImportToCanvas?.(clipAsset);
+      onAttachRenderedVideo?.(clipAsset);
+
+      toast.success(`🎉 ${cropAspectRatio} Video Clip rendered & attached to draft!`);
+      setTimeout(() => {
+        setIsRendering(false);
+        onClose();
+      }, 1000);
+    } catch (err) {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      setIsRendering(false);
+      console.error('Render clip error:', err);
+      toast.error(err.message || 'Could not render video clip. Please check the video link.');
     }
   };
 
@@ -254,6 +364,61 @@ export default function SocialVideoClipModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
       <div className="relative flex max-h-[95vh] w-full max-w-4xl flex-col rounded-2xl border border-border bg-[#0f0f13] shadow-2xl overflow-hidden text-white">
+        
+        {/* Render Progress Overlay Modal */}
+        {isRendering && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-6 backdrop-blur-lg">
+            <div className="w-full max-w-md space-y-5 rounded-2xl border border-white/10 bg-[#16161c] p-6 shadow-2xl text-center">
+              <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand/20 text-brand border border-brand/40">
+                <Icon icon="solar:clapperboard-edit-bold" className="animate-bounce" width="32" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="text-base font-black uppercase tracking-wider text-white">
+                  Rendering & Attaching Video Clip
+                </h3>
+                <p className="font-mono text-xs text-brand font-bold">
+                  {renderStatusText}
+                </p>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono font-bold text-white/70">
+                  <span>Progress Stage {renderStage}/3</span>
+                  <span className="text-brand">{renderProgress}%</span>
+                </div>
+                <div className="h-3 w-full overflow-hidden rounded-full bg-black/60 border border-white/10">
+                  <div
+                    className="h-full bg-gradient-to-r from-brand via-amber-400 to-emerald-400 transition-all duration-300"
+                    style={{ width: `${renderProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Multi-step Status Items */}
+              <div className="space-y-2 rounded-xl bg-black/40 p-3 text-left font-mono text-[11px]">
+                <div className={`flex items-center gap-2 ${renderStage >= 1 ? 'text-emerald-400 font-bold' : 'text-white/40'}`}>
+                  <Icon icon={renderStage > 1 ? 'solar:check-circle-bold' : 'solar:spinner-linear'} className={renderStage === 1 ? 'animate-spin' : ''} width="14" />
+                  <span>1. Slicing source segment ({formatSecondsToTimecode(startTime)} → {formatSecondsToTimecode(endTime)})</span>
+                </div>
+                <div className={`flex items-center gap-2 ${renderStage >= 2 ? 'text-emerald-400 font-bold' : 'text-white/40'}`}>
+                  <Icon icon={renderStage > 2 ? 'solar:check-circle-bold' : 'solar:spinner-linear'} className={renderStage === 2 ? 'animate-spin' : ''} width="14" />
+                  <span>2. Applying {cropAspectRatio} {cropFitMode === 'cover' ? 'Vertical Fill' : 'Fit'} 1080x1920 Crop</span>
+                </div>
+                <div className={`flex items-center gap-2 ${renderStage >= 3 ? 'text-emerald-400 font-bold' : 'text-white/40'}`}>
+                  <Icon icon={renderProgress === 100 ? 'solar:check-circle-bold' : 'solar:spinner-linear'} className={renderStage === 3 && renderProgress < 100 ? 'animate-spin' : ''} width="14" />
+                  <span>3. Uploading MP4 to Cloud Storage & attaching to variants</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-white/50">
+                Please wait a moment while the video is processed with FFmpeg & stored for social publishing.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-white/10 bg-[#16161c] px-6 py-4">
           <div className="flex items-center gap-3">
@@ -265,7 +430,7 @@ export default function SocialVideoClipModal({
                 YouTube & Video Clip Studio
               </h3>
               <p className="text-xs text-white/60">
-                Download whole videos or enter exact start/end timecodes directly into the canvas
+                Cut, 9:16 vertical crop, and attach MP4 video clips directly into your drafts
               </p>
             </div>
           </div>
@@ -310,19 +475,6 @@ export default function SocialVideoClipModal({
         <div className="flex border-b border-white/10 bg-[#16161c]">
           <button
             type="button"
-            onClick={() => setActiveTab('whole_video')}
-            className={`flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-xs font-black uppercase tracking-wider transition-all ${
-              activeTab === 'whole_video'
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-transparent text-white/60 hover:text-white'
-            }`}
-          >
-            <Icon icon="solar:file-download-bold" width="16" />
-            <span>Option 1: Download Whole Video</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('clip_range')}
             className={`flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-xs font-black uppercase tracking-wider transition-all ${
               activeTab === 'clip_range'
@@ -331,79 +483,118 @@ export default function SocialVideoClipModal({
             }`}
           >
             <Icon icon="solar:scissors-bold" width="16" />
-            <span>Option 2: Enter Start & End Time (Custom Clip)</span>
+            <span>Option 1: Clip Video by Start & End Time (TikTok / Reels)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('whole_video')}
+            className={`flex flex-1 items-center justify-center gap-2 border-b-2 py-3 text-xs font-black uppercase tracking-wider transition-all ${
+              activeTab === 'whole_video'
+                ? 'border-brand bg-brand/10 text-brand'
+                : 'border-transparent text-white/60 hover:text-white'
+            }`}
+          >
+            <Icon icon="solar:file-download-bold" width="16" />
+            <span>Option 2: Use Whole Video</span>
           </button>
         </div>
 
-        {/* Content Body */}
+        {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Video Player Box */}
-          <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-xl">
+          {/* Video Preview Player */}
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-inner">
             {videoUrl ? (
               isEmbed ? (
                 <iframe
                   src={videoUrl}
-                  title="YouTube Player"
+                  title="Source Video"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                   className="h-full w-full border-0"
                 />
               ) : (
-                <div className="relative h-full w-full flex items-center justify-center">
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    playsInline
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onTimeUpdate={handleTimeUpdate}
-                    className="h-full w-full object-contain"
-                  />
-                  <button
-                    type="button"
-                    onClick={togglePlay}
-                    className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity"
-                  >
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/80 text-white shadow-2xl backdrop-blur-md">
-                      <Icon icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'} width="26" />
-                    </div>
-                  </button>
-                </div>
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onTimeUpdate={handleTimeUpdate}
+                  className="h-full w-full object-contain"
+                  controls
+                  playsInline
+                />
               )
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-white/40">
-                <Icon icon="solar:play-stream-linear" width="48" />
-                <span className="text-xs">Paste a video or trailer URL above to preview & clip</span>
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-white/40">
+                <Icon icon="solar:videocamera-record-linear" width="48" />
+                <p className="text-xs">Paste video link above and click &quot;Fetch Video&quot; to preview</p>
               </div>
             )}
           </div>
 
-          {/* OPTION 1: Whole Video Controls */}
-          {activeTab === 'whole_video' && (
-            <div className="rounded-xl border border-white/10 bg-[#16161c] p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-black text-white">Full Video Download & Canvas Import</h4>
-                  <p className="text-xs text-white/60 mt-0.5">
-                    Transfers the entire video directly into your Social Studio draft without any cutting.
-                  </p>
-                </div>
+          {/* Aspect Ratio & Framing Controls */}
+          <div className="rounded-xl border border-white/10 bg-[#16161c] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">Target Framing & Aspect Ratio</h4>
+                <p className="text-[10px] text-white/60">Choose the canvas layout for TikTok, Reels, or Instagram</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {[
+                  { id: '9:16', label: '9:16 Vertical (TikTok/Reels)' },
+                  { id: '1:1', label: '1:1 Square (Feed)' },
+                  { id: '4:5', label: '4:5 Portrait' },
+                  { id: '16:9', label: '16:9 Landscape' },
+                ].map(r => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setCropAspectRatio(r.id)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-black transition-all ${
+                      cropAspectRatio === r.id
+                        ? 'bg-brand text-white shadow-md'
+                        : 'bg-black/40 text-white/70 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Fit Mode Toggle */}
+            <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
+              <span className="text-[11px] text-white/70 font-semibold">Scaling Mode:</span>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleApplyToCanvas('whole')}
-                  disabled={!videoUrl}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3 text-xs font-black uppercase tracking-wider text-white hover:bg-brand-hover disabled:opacity-50 shadow-lg"
+                  onClick={() => setCropFitMode('cover')}
+                  className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                    cropFitMode === 'cover'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-black/30 text-white/60 hover:text-white'
+                  }`}
                 >
-                  <Icon icon="solar:download-square-bold" width="18" />
-                  <span>Download Whole Video to Canvas</span>
+                  Fill Frame (Zoom Crop - Fills Full Screen)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCropFitMode('contain')}
+                  className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                    cropFitMode === 'contain'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-black/30 text-white/60 hover:text-white'
+                  }`}
+                >
+                  Fit Frame (Letterbox)
                 </button>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* OPTION 2: Enter Start & End Time Controls */}
+          {/* Timecode & Action Controls */}
           {activeTab === 'clip_range' && (
             <div className="rounded-xl border border-white/10 bg-[#16161c] p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex flex-wrap items-center justify-between border-b border-white/10 pb-3 gap-3">
                 <div>
                   <h4 className="text-sm font-black text-white">Trim Segment by Start & End Time</h4>
                   <p className="text-xs text-white/60">
@@ -414,27 +605,42 @@ export default function SocialVideoClipModal({
                   <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-xs font-black text-emerald-400">
                     Duration: {formatSecondsToTimecode(clipDuration)}
                   </span>
+                  
+                  {/* Preview Loop Button */}
                   <button
                     type="button"
                     onClick={handlePreviewClip}
                     disabled={!videoUrl || clipDuration <= 0}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-black uppercase tracking-wider transition-all ${
                       isPreviewingClip
                         ? 'border-amber-500/50 bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
                         : 'border-white/20 bg-black/40 text-white hover:bg-white/10'
                     }`}
                   >
                     <Icon icon={isPlaying && isPreviewingClip ? 'solar:pause-bold' : 'solar:play-bold'} width="14" />
-                    <span>{isPreviewingClip ? 'Pause Preview' : 'Preview Clip Loop'}</span>
+                    <span>{isPreviewingClip ? 'Pause Loop' : 'Preview Loop'}</span>
                   </button>
+
+                  {/* Canvas Preview Button */}
                   <button
                     type="button"
-                    onClick={() => handleApplyToCanvas('clip')}
+                    onClick={() => handleApplyPreviewToCanvas('clip')}
                     disabled={!videoUrl || clipDuration <= 0}
-                    className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:bg-brand-hover disabled:opacity-50 shadow-lg"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/40 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-white/10 disabled:opacity-50"
                   >
-                    <Icon icon="solar:cut-bold" width="16" />
-                    <span>Send Clip to Canvas</span>
+                    <Icon icon="solar:eye-bold" width="14" />
+                    <span>Canvas Preview</span>
+                  </button>
+
+                  {/* Primary: Cut, Crop & Attach MP4 */}
+                  <button
+                    type="button"
+                    onClick={handleRenderAndAttachClip}
+                    disabled={!videoUrl || clipDuration <= 0 || isRendering}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-amber-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 disabled:opacity-50 shadow-lg"
+                  >
+                    <Icon icon="solar:clapperboard-edit-bold" width="16" />
+                    <span>🎬 Cut, Crop & Attach MP4 Video</span>
                   </button>
                 </div>
               </div>
@@ -541,13 +747,34 @@ export default function SocialVideoClipModal({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Social Platform Recommendations */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 text-[11px] text-white/70">
-                <span className="font-bold text-white">Platform Recommendations:</span>
-                <span className="rounded bg-black/60 px-2 py-0.5 border border-white/10">🎵 TikTok: 15s - 60s</span>
-                <span className="rounded bg-black/60 px-2 py-0.5 border border-white/10">📸 Reels: up to 90s</span>
-                <span className="rounded bg-black/60 px-2 py-0.5 border border-white/10">🧵 Threads: up to 5 min</span>
+          {activeTab === 'whole_video' && (
+            <div className="rounded-xl border border-white/10 bg-[#16161c] p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-black text-white">Full Video Importer</h4>
+                  <p className="text-xs text-white/60">Import whole video directly into draft without trimming</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreviewToCanvas('whole')}
+                    className="rounded-xl border border-white/20 bg-black/40 px-4 py-2.5 text-xs font-black uppercase text-white hover:bg-white/10"
+                  >
+                    Canvas Preview
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRenderAndAttachClip}
+                    disabled={!videoUrl || isRendering}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-amber-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 shadow-lg"
+                  >
+                    <Icon icon="solar:clapperboard-edit-bold" width="16" />
+                    <span>🎬 Render & Attach Full Video</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -237,14 +237,86 @@ export default function SocialDraftComposer({
   const [step3Open, setStep3Open] = useState(true);
   const [viewLayout, setViewLayout] = useState('split'); // 'split' | 'canvas_focus' | 'caption_focus'
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
-  const [canvasAspectRatio, setCanvasAspectRatio] = useState('1:1');
+  const [canvasAspectRatio, setCanvasAspectRatio] = useState('9:16');
   const [newTagInput, setNewTagInput] = useState('');
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
 
+  const handleAspectRatioSelect = (ratio) => {
+    setCanvasAspectRatio(ratio);
+  };
+
+  const handleImportVideoToCanvas = (videoData) => {
+    if (!videoData?.url) return;
+    const newAsset = {
+      id: `imported_video_${Date.now()}`,
+      publicUrl: videoData.url,
+      public_url: videoData.url,
+      mediaType: 'video',
+      format: videoData.isRenderedMp4 ? 'custom_video' : 'youtube_embed',
+      width: videoData.aspectRatio === '9:16' ? 1080 : 1920,
+      height: videoData.aspectRatio === '9:16' ? 1920 : 1080,
+    };
+
+    setResult(prev => {
+      if (!prev) return prev;
+      const updatedAssets = [newAsset, ...(prev.assets || []).filter(a => a.id !== newAsset.id)];
+      const updatedVariants = (prev.variants || []).map(v => ({
+        ...v,
+        platform_options: {
+          ...(v.platform_options || {}),
+          video_url: videoData.url,
+          asset_url: videoData.url,
+          post_format: 'single',
+        },
+      }));
+      return {
+        ...prev,
+        assets: updatedAssets,
+        variants: updatedVariants,
+      };
+    });
+  };
+
+  const handleAttachRenderedVideo = (renderedAsset) => {
+    if (!renderedAsset?.public_url && !renderedAsset?.url) return;
+    const videoUrl = renderedAsset.public_url || renderedAsset.url;
+    const newAsset = {
+      id: `rendered_video_${Date.now()}`,
+      publicUrl: videoUrl,
+      public_url: videoUrl,
+      mediaType: 'video',
+      format: 'custom_video',
+      width: renderedAsset.aspectRatio === '9:16' ? 1080 : 1920,
+      height: renderedAsset.aspectRatio === '9:16' ? 1920 : 1080,
+    };
+
+    setResult(prev => {
+      if (!prev) return prev;
+      const updatedAssets = [newAsset, ...(prev.assets || []).filter(a => a.mediaType !== 'video')];
+      const updatedVariants = (prev.variants || []).map(v => ({
+        ...v,
+        platform_options: {
+          ...(v.platform_options || {}),
+          video_url: videoUrl,
+          asset_url: videoUrl,
+          post_format: 'single',
+        },
+      }));
+      return {
+        ...prev,
+        assets: updatedAssets,
+        variants: updatedVariants,
+      };
+    });
+
+    if (renderedAsset.aspectRatio) {
+      setCanvasAspectRatio(renderedAsset.aspectRatio);
+    }
+  };
+
   const handleCanvasCutVideo = async (cutData) => {
-    if (!result?.contentItem?.id) return;
-    toast.success(`Video cut applied: ${cutData.formattedStart} to ${cutData.formattedEnd} (${cutData.duration.toFixed(1)}s duration)`);
+    setVideoStudioOpen(true);
   };
 
   // Sync external theme changes (such as clicking from the 30-Day calendar)
@@ -2433,9 +2505,10 @@ export default function SocialDraftComposer({
       <SocialVideoClipModal
         isOpen={videoStudioOpen}
         onClose={() => setVideoStudioOpen(false)}
-        initialVideoUrl={selected?.trailer_youtube_id ? `https://www.youtube.com/watch?v=${selected.trailer_youtube_id}` : (selected?.trailer_external_url || '')}
+        initialVideoUrl={activeVisualAssets[0]?.publicUrl || (selected?.trailer_youtube_id ? `https://www.youtube.com/watch?v=${selected.trailer_youtube_id}` : (selected?.trailer_external_url || ''))}
         initialTitle={selected?.title || selected?.name || ''}
         onImportToCanvas={handleImportVideoToCanvas}
+        onAttachRenderedVideo={handleAttachRenderedVideo}
       />
     </div>
   );

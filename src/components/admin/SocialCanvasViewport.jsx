@@ -599,15 +599,27 @@ export default function SocialCanvasViewport({
                 <span>{isPlaying ? 'Pause Loop' : 'Preview Loop'}</span>
               </button>
 
-              {/* Apply Cut Button */}
+              {/* Apply Preview Cut Button */}
               <button
                 type="button"
                 onClick={handleApplyCut}
                 disabled={isTrimming || trimEnd <= trimStart}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-white hover:bg-brand-hover transition-all disabled:opacity-50 shadow-md"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/40 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white hover:bg-white/10 transition-all disabled:opacity-50"
               >
-                <Icon icon={isTrimming ? 'solar:spinner-linear' : 'solar:cut-bold'} className={isTrimming ? 'animate-spin' : ''} width="14" />
-                <span>{isTrimming ? 'Cutting…' : 'Apply Cut to Canvas'}</span>
+                <Icon icon={isTrimming ? 'solar:spinner-linear' : 'solar:eye-bold'} className={isTrimming ? 'animate-spin' : ''} width="14" />
+                <span>{isTrimming ? 'Applying…' : 'Canvas Preview'}</span>
+              </button>
+
+              {/* Render & Attach Video Clip Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenVideoStudio?.();
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand to-amber-500 px-4 py-1.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 transition-all shadow-lg"
+              >
+                <Icon icon="solar:clapperboard-edit-bold" width="14" />
+                <span>🎬 Cut, Crop & Attach MP4</span>
               </button>
             </div>
           </div>

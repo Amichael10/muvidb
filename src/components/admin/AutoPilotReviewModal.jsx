@@ -950,6 +950,9 @@ export default function AutoPilotReviewModal({
           setCustomImageUrl(videoData.url);
           toast.success(`${videoData.mode === 'clip' ? 'Trimmed clip' : 'Whole video'} imported into review canvas!`);
         }}
+        onAttachRenderedVideo={(clipAsset) => {
+          setCustomImageUrl(clipAsset.public_url || clipAsset.url);
+        }}
       />
     </div>
   );

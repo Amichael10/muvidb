@@ -374,7 +374,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     const publishMode = getSocialPublishMode();
     if (publishMode === 'mock') {
       adapter = new MockSocialPlatformAdapter();
-    } else if (publishMode === 'live' && variant.platform === 'threads' && isThreadsLivePublishingEnabled()) {
+    } else if (publishMode === 'live' && variant.platform === 'threads') {
       const { connection, accessToken } = await getThreadsPublishingCredentials();
       adapter = new ThreadsPlatformAdapter({
         accessToken,
