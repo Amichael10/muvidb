@@ -59,7 +59,7 @@ def health_check():
     return {
         "status": "ok",
         "service": "media-extractor",
-        "version": "1.4.0",
+        "version": "1.4.1",
         "has_cookies": bool(
             os.getenv("COOKIES_TXT") or 
             os.getenv("YOUTUBE_COOKIES") or
@@ -90,8 +90,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['visionos', 'android', 'mweb'],
-                'player_skip': ['webpage', 'configs', 'js'],
+                'player_client': ['mweb', 'web', 'android', 'ios'],
             }
         },
         'format': 'best[ext=mp4][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/bestvideo[ext=mp4]/bestvideo/best',
@@ -203,8 +202,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['visionos', 'android', 'mweb'],
-                    'player_skip': ['webpage', 'configs', 'js'],
+                    'player_client': ['mweb', 'web', 'android', 'ios'],
                 }
             },
             'http_headers': {
