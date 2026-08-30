@@ -41,6 +41,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ uploadUrl });
     }
 
+    if (task === 'make_drive_file_public') {
+      const { makeFilePublic } = await import('./_lib/google_drive.js');
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const { fileId } = body;
+      if (!fileId) return res.status(400).json({ error: 'Missing fileId' });
+      const publicUrl = await makeFilePublic(fileId);
+      return res.status(200).json({ success: true, publicUrl });
+    }
+
     if (task === 'clip_video' || task === 'render_clip') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const { url, startTime, endTime, aspectRatio, fitMode, title } = body;

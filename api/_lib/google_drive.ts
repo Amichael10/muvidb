@@ -192,3 +192,26 @@ export async function deleteVideoFromDrive(fileId: string): Promise<void> {
     console.error(`[GoogleDrive] Failed to delete file ${fileId}:`, error);
   }
 }
+
+/**
+ * Sets file permission to public reader and returns direct download link
+ */
+export async function makeFilePublic(fileId: string): Promise<string> {
+  try {
+    const token = await getGoogleDriveAccessToken();
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'reader',
+        type: 'anyone',
+      }),
+    });
+  } catch (err) {
+    console.warn('[GoogleDrive] Failed to set public permission:', err);
+  }
+  return `https://drive.google.com/uc?export=download&id=${fileId}`;
+}
