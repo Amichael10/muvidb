@@ -42,6 +42,9 @@
     "api/automation.ts": {
       "maxDuration": 60
     },
+    "api/telegram.ts": {
+      "maxDuration": 60
+    },
     "api/social.ts": {
       "includeFiles": "{api/_lib/{fonts,decor}/**,src/features/social-studio/**}",
       "maxDuration": 60
@@ -101,10 +104,6 @@
     {
       "source": "/api/drive",
       "destination": "/api/social?task=create_upload_session"
-    },
-    {
-      "source": "/api/telegram",
-      "destination": "/api/automation?action=telegram"
     },
     {
       "source": "/api/auth-email",
