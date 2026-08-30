@@ -59,7 +59,7 @@ def health_check():
     return {
         "status": "ok",
         "service": "media-extractor",
-        "version": "1.4.1",
+        "version": "1.5.0",
         "has_cookies": bool(
             os.getenv("COOKIES_TXT") or 
             os.getenv("YOUTUBE_COOKIES") or
@@ -83,6 +83,8 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
     if not url:
         raise HTTPException(status_code=400, detail="Missing URL")
 
+    is_youtube = "youtube.com" in url or "youtu.be" in url
+
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
@@ -90,7 +92,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['mweb', 'web', 'android', 'ios'],
+                'player_client': ['web_embedded', 'android_vr', 'mweb', 'ios'],
             }
         },
         'format': 'best[ext=mp4][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/bestvideo[ext=mp4]/bestvideo/best',
@@ -101,7 +103,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
     }
 
     cookie_path = get_cookie_file()
-    if cookie_path:
+    if cookie_path and not is_youtube:
         ydl_opts['cookiefile'] = cookie_path
 
     try:
@@ -193,6 +195,8 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
         vf = "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080"
 
     cookie_path = get_cookie_file()
+    is_youtube = "youtube.com" in url or "youtu.be" in url
+
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_output = os.path.join(tmpdir, "raw.mp4")
         processed_output = os.path.join(tmpdir, "processed.mp4")
@@ -202,7 +206,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['visionos', 'mweb', 'android', 'web'],
+                    'player_client': ['web_embedded', 'android_vr', 'mweb', 'ios'],
                 }
             },
             'http_headers': {
@@ -214,7 +218,8 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'force_keyframes_at_cuts': True,
             'outtmpl': raw_output,
         }
-        if cookie_path:
+        # Only attach cookiefile for non-YouTube platforms (Instagram/FB) to avoid datacenter IP session conflict
+        if cookie_path and not is_youtube:
             ydl_opts['cookiefile'] = cookie_path
 
         try:
