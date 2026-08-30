@@ -1,13 +1,10 @@
 services:
   - type: web
     name: muvidb-media-extractor
-    env: python
+    env: docker
     rootDir: services/media-extractor
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: Dockerfile
     plan: free
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.8
       - key: EXTRACTOR_SECRET
         generateValue: true

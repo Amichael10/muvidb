@@ -12,6 +12,22 @@ class ExtractRequest(BaseModel):
     url: str
 
 def get_cookie_file():
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "cookies.txt"),
+        "cookies.txt",
+        "/app/cookies.txt",
+        os.path.join(os.path.dirname(__file__), "..", "..", "cookies.txt"),
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                if content and ("youtube.com" in content or "instagram.com" in content or "Netscape" in content):
+                    return os.path.abspath(p)
+            except Exception:
+                pass
+
     cookies_raw = (
         os.getenv("COOKIES_TXT", "").strip() or
         os.getenv("YOUTUBE_COOKIES", "").strip() or
@@ -20,23 +36,6 @@ def get_cookie_file():
         os.getenv("FB_COOKIES", "").strip()
     )
     session_id = os.getenv("INSTAGRAM_SESSION_ID", "").strip()
-
-    if not cookies_raw:
-        possible_paths = [
-            "cookies.txt",
-            "/app/cookies.txt",
-            os.path.join(os.path.dirname(__file__), "cookies.txt"),
-            os.path.join(os.path.dirname(__file__), "..", "..", "cookies.txt"),
-        ]
-        for p in possible_paths:
-            if os.path.exists(p):
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        cookies_raw = f.read().strip()
-                    if cookies_raw:
-                        break
-                except Exception:
-                    pass
 
     if cookies_raw:
         tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt")
@@ -60,7 +59,7 @@ def health_check():
     return {
         "status": "ok",
         "service": "media-extractor",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "has_cookies": bool(
             os.getenv("COOKIES_TXT") or 
             os.getenv("YOUTUBE_COOKIES") or
@@ -226,7 +225,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
         except Exception as e:
             return {"success": False, "error": f"Download failed: {str(e)}"}
         finally:
-            if cookie_path and os.path.exists(cookie_path):
+            if cookie_path and os.path.exists(cookie_path) and tempfile.gettempdir() in cookie_path:
                 try:
                     os.remove(cookie_path)
                 except Exception:
