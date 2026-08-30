@@ -302,8 +302,18 @@ export default function SocialVideoClipModal({
     }, 900);
 
     try {
+      const rawTarget = (videoInput.trim() || videoUrl || '').trim();
+      let cleanWatchUrl = rawTarget;
+      if (rawTarget.includes('youtu.be/')) {
+        const vid = rawTarget.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
+        if (vid) cleanWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
+      } else if (rawTarget.includes('embed/')) {
+        const vid = rawTarget.split('embed/')[1]?.split('?')[0]?.split('&')[0];
+        if (vid) cleanWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
+      }
+
       const payload = {
-        url: videoInput.trim() || videoUrl,
+        url: cleanWatchUrl,
         startTime: startSec,
         endTime: endSec,
         aspectRatio: cropAspectRatio,

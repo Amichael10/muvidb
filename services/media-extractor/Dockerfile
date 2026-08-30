@@ -2,8 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies including ffmpeg
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+# Install system dependencies including ffmpeg and nodejs (for yt-dlp JS challenges)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg nodejs curl && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY requirements.txt .
