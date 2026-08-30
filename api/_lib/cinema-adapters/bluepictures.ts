@@ -22,6 +22,7 @@
  *   { "ticketUrl": "https://bluepicturesng.com/value/blockbuster-ticket/" }
  */
 
+import * as cheerio from 'cheerio';
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { todayLagos } from './types.js';
 import { cinemaFetch } from './cinema-fetch.js';
@@ -58,65 +59,62 @@ function extractTimes(text: string): string[] {
   TIME_PATTERN.lastIndex = 0;
   while ((m = TIME_PATTERN.exec(text)) !== null) {
     const parsed = parseTime12h(m[0]);
-    if (parsed) matches.push(parsed);
+    if (parsed && !matches.includes(parsed)) matches.push(parsed);
   }
   return matches;
 }
 
 /**
- * Strip HTML tags and decode basic HTML entities.
- */
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
  * Parse the /now-showing/ HTML.
- * Returns a flat list of { filmTitle, posterUrl, showTimes[] }.
+ * Returns a flat list of { filmTitle, posterUrl, showTimes[], ticketUrl }.
  */
 interface ParsedFilm {
   title: string;
   slug: string;
   posterUrl: string | null;
   times: string[];       // HH:MM:SS 24h
+  ticketUrl?: string | null;
 }
 
 function parseNowShowingHtml(html: string): ParsedFilm[] {
+  const $ = cheerio.load(html);
   const films: ParsedFilm[] = [];
 
-  // Each film is inside <a href="/movie/[slug]/">...</a>
-  // We split by this pattern to get per-film blocks
-  const cardRe = /<a\s+href="([^"]*\/movie\/([^"\/]+)\/?)"[^>]*>([\s\S]*?)<\/a>/gi;
-  let cardMatch: RegExpExecArray | null;
+  $('.mb-movie-item').each((_, el) => {
+    const item = $(el);
+    const titleEl = item.find('.movie-title, h3');
+    const title = titleEl.text().trim();
+    if (!title) return;
 
-  while ((cardMatch = cardRe.exec(html)) !== null) {
-    const _href = cardMatch[1];
-    const slug  = cardMatch[2];
-    const body  = cardMatch[3];
+    const movieLink = item.find('a[href*="/movie/"]').first().attr('href') || '';
+    const slugMatch = movieLink.match(/\/movie\/([^/]+)/);
+    const slug = slugMatch ? slugMatch[1] : title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    // Title from <h3>...</h3>
-    const titleMatch = body.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i);
-    if (!titleMatch) continue;
-    const title = stripHtml(titleMatch[1]);
-    if (!title) continue;
+    const posterUrl = item.find('.movie-image img, img').first().attr('src') || null;
 
-    // Poster from first <img src="...">
-    let posterUrl: string | null = null;
-    const imgMatch = body.match(/<img[^>]+src="([^"]+)"/i);
-    if (imgMatch) posterUrl = imgMatch[1];
+    const timeText = item.find('.running-time').text().trim() || item.text();
+    const times = extractTimes(timeText);
 
-    // Extract all time strings from the entire card body (text nodes)
-    const plainText = stripHtml(body);
-    const times = extractTimes(plainText);
+    const ticketUrl = item.find('a[href*="/value/"], a.btn-custom-link').attr('href') || null;
 
-    films.push({ title, slug, posterUrl, times });
+    films.push({ title, slug, posterUrl, times, ticketUrl });
+  });
+
+  // Fallback if class names changed
+  if (films.length === 0) {
+    $('div:has(h3):has(img)').each((_, el) => {
+      const item = $(el);
+      const title = item.find('h3').first().text().trim();
+      if (!title) return;
+      const movieLink = item.find('a[href*="/movie/"]').first().attr('href') || '';
+      const slugMatch = movieLink.match(/\/movie\/([^/]+)/);
+      const slug = slugMatch ? slugMatch[1] : title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const posterUrl = item.find('img').first().attr('src') || null;
+      const times = extractTimes(item.text());
+      if (times.length > 0) {
+        films.push({ title, slug, posterUrl, times });
+      }
+    });
   }
 
   return films;
@@ -124,7 +122,7 @@ function parseNowShowingHtml(html: string): ParsedFilm[] {
 
 export const bluepicturesAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<AdapterResult> => {
   const cfg = cinema.scrape_config || {};
-  const nowShowingUrl: string = cfg.nowShowingUrl || DEFAULT_NOW_SHOWING;
+  const nowShowingUrl: string = cfg.nowShowingUrl || cfg.url || DEFAULT_NOW_SHOWING;
   const ticketUrl: string     = cfg.ticketUrl     || DEFAULT_TICKET_URL;
 
   let html: string;
@@ -164,8 +162,6 @@ export const bluepicturesAdapter: CinemaAdapter = async (cinema: CinemaRow): Pro
 
   for (const film of films) {
     if (!film.times.length) {
-      // Film listed but no parseable times — include with a default time of 00:00:00
-      // so it still passes through the Nollywood matcher (no DB write without a valid time)
       continue;
     }
     for (const showTime of film.times) {
@@ -177,8 +173,8 @@ export const bluepicturesAdapter: CinemaAdapter = async (cinema: CinemaRow): Pro
         },
         showDate: today,
         showTime,
-        format: 'Standard',  // Blue Pictures is a single-screen standard cinema
-        ticketUrl,
+        format: 'Standard',
+        ticketUrl: film.ticketUrl || ticketUrl,
       });
     }
   }

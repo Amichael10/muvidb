@@ -24,7 +24,6 @@ export async function cinemaFetch(url: string, options: CinemaFetchOptions = {})
   const zenrowsApiKey = process.env.ZENROWS_API_KEY?.trim();
   const proxyUrl = (process.env.CINEMA_PROXY_URL || process.env.HTTP_PROXY || process.env.HTTPS_PROXY)?.trim();
 
-  let targetUrl = url;
   const headers = new Headers(options.headers || {});
 
   // Set standard browser headers if not already set
@@ -40,42 +39,49 @@ export async function cinemaFetch(url: string, options: CinemaFetchOptions = {})
   if (!headers.has('Accept-Language')) {
     headers.set('Accept-Language', 'en-US,en;q=0.9');
   }
-
-  // Emulate Nigerian residential client IP headers for CDN geo-filters
   if (!headers.has('X-Forwarded-For')) {
-    // 102.89.x.x is MTN Nigeria / Lagos IP range
     headers.set('X-Forwarded-For', '102.89.23.142');
   }
   if (!headers.has('CF-IPCountry')) {
     headers.set('CF-IPCountry', 'NG');
   }
 
-  // Pure JSON REST APIs (like Fusion Intel / Reach Cinema) should NOT be proxied via ZenRows HTML scraper
-  const isDirectApi = url.includes('fusionintel.io') || url.includes('veezi.com') || url.includes('/api/');
+  // 1. Try Direct Fetch first with a snappy timeout (8s)
+  try {
+    const directRes = await fetch(url, {
+      ...options,
+      headers,
+      signal: AbortSignal.timeout(Math.min(timeoutMs, 8000)),
+    });
 
-  if (!isDirectApi) {
-    // 1. Route through ScraperAPI if key is available
-    if (scraperApiKey) {
-      const scraperUrl = new URL('http://api.scraperapi.com');
-      scraperUrl.searchParams.set('api_key', scraperApiKey);
-      scraperUrl.searchParams.set('url', url);
-      scraperUrl.searchParams.set('country_code', 'ng');
-      scraperUrl.searchParams.set('keep_headers', 'true');
-      targetUrl = scraperUrl.toString();
+    if (directRes.ok) {
+      return directRes;
     }
-    // 2. Route through ZenRows if key is available
-    else if (zenrowsApiKey) {
-      const zenrowsUrl = new URL('https://api.zenrows.com/v1/');
-      zenrowsUrl.searchParams.set('apikey', zenrowsApiKey);
-      zenrowsUrl.searchParams.set('url', url);
-      zenrowsUrl.searchParams.set('js_render', 'true');
-      zenrowsUrl.searchParams.set('premium_proxy', 'true');
-      zenrowsUrl.searchParams.set('proxy_country', 'ng');
-      targetUrl = zenrowsUrl.toString();
-    }
+  } catch (_e) {
+    // Direct fetch failed or timed out — fallback to proxy/scraper gateway below
   }
 
-  // 3. Custom Proxy Agent via undici (if set)
+  // 2. Route through ScraperAPI if key is available
+  let targetUrl = url;
+  if (scraperApiKey) {
+    const scraperUrl = new URL('http://api.scraperapi.com');
+    scraperUrl.searchParams.set('api_key', scraperApiKey);
+    scraperUrl.searchParams.set('url', url);
+    scraperUrl.searchParams.set('country_code', 'ng');
+    scraperUrl.searchParams.set('keep_headers', 'true');
+    targetUrl = scraperUrl.toString();
+  }
+  // 3. Route through ZenRows if key is available
+  else if (zenrowsApiKey) {
+    const zenrowsUrl = new URL('https://api.zenrows.com/v1/');
+    zenrowsUrl.searchParams.set('apikey', zenrowsApiKey);
+    zenrowsUrl.searchParams.set('url', url);
+    zenrowsUrl.searchParams.set('js_render', 'true');
+    zenrowsUrl.searchParams.set('premium_proxy', 'true');
+    zenrowsUrl.searchParams.set('proxy_country', 'ng');
+    targetUrl = zenrowsUrl.toString();
+  }
+
   const fetchOptions: any = {
     ...options,
     headers,
