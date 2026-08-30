@@ -59,7 +59,7 @@ def health_check():
     return {
         "status": "ok",
         "service": "media-extractor",
-        "version": "1.5.1",
+        "version": "1.5.2",
         "has_cookies": bool(
             os.getenv("COOKIES_TXT") or 
             os.getenv("YOUTUBE_COOKIES") or
@@ -92,7 +92,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios', 'web_embedded'],
+                'player_client': ['web', 'mweb', 'android', 'ios'],
             }
         },
         'format': 'best[ext=mp4][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/bestvideo[ext=mp4]/bestvideo/best',
@@ -103,7 +103,7 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
     }
 
     cookie_path = get_cookie_file()
-    if cookie_path and not is_youtube:
+    if cookie_path:
         ydl_opts['cookiefile'] = cookie_path
 
     try:
@@ -206,7 +206,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'ios', 'web_embedded'],
+                    'player_client': ['web', 'mweb', 'android', 'ios'],
                 }
             },
             'http_headers': {
@@ -218,8 +218,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'force_keyframes_at_cuts': True,
             'outtmpl': raw_output,
         }
-        # Only attach cookiefile for non-YouTube platforms (Instagram/FB) to avoid datacenter IP session conflict
-        if cookie_path and not is_youtube:
+        if cookie_path:
             ydl_opts['cookiefile'] = cookie_path
 
         try:
