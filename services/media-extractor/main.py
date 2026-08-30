@@ -204,7 +204,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'android', 'web'],
+                    'player_client': ['mweb', 'web', 'android', 'ios'],
                     'player_skip': ['webpage', 'configs', 'js'],
                 }
             },
@@ -212,7 +212,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
             },
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best',
             'download_ranges': yt_dlp.utils.download_range_func(None, [(start_sec, end_sec)]),
             'force_keyframes_at_cuts': True,
             'outtmpl': raw_output,
@@ -242,12 +242,12 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
         cmd = [
             "ffmpeg", "-y", "-i", raw_output,
             "-vf", vf,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "22",
-            "-c:a", "aac", "-b:a", "192k",
+            "-c:v", "libx264", "-preset", "ultrafast", "-threads", "2", "-crf", "23",
+            "-c:a", "aac", "-b:a", "128k",
             "-movflags", "+faststart",
             processed_output
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
         if res.returncode != 0 or not os.path.exists(processed_output):
             return {"success": False, "error": f"FFmpeg processing failed: {res.stderr[:300]}"}
 
