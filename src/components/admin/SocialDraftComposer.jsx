@@ -242,42 +242,6 @@ export default function SocialDraftComposer({
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
 
-  const handleAspectRatioSelect = (ratio) => {
-    setCanvasAspectRatio(ratio);
-  };
-
-  const handleImportVideoToCanvas = (videoData) => {
-    if (!videoData?.url) return;
-    const newAsset = {
-      id: `imported_video_${Date.now()}`,
-      publicUrl: videoData.url,
-      public_url: videoData.url,
-      mediaType: 'video',
-      format: videoData.isRenderedMp4 ? 'custom_video' : 'youtube_embed',
-      width: videoData.aspectRatio === '9:16' ? 1080 : 1920,
-      height: videoData.aspectRatio === '9:16' ? 1920 : 1080,
-    };
-
-    setResult(prev => {
-      if (!prev) return prev;
-      const updatedAssets = [newAsset, ...(prev.assets || []).filter(a => a.id !== newAsset.id)];
-      const updatedVariants = (prev.variants || []).map(v => ({
-        ...v,
-        platform_options: {
-          ...(v.platform_options || {}),
-          video_url: videoData.url,
-          asset_url: videoData.url,
-          post_format: 'single',
-        },
-      }));
-      return {
-        ...prev,
-        assets: updatedAssets,
-        variants: updatedVariants,
-      };
-    });
-  };
-
   const handleAttachRenderedVideo = (renderedAsset) => {
     if (!renderedAsset?.public_url && !renderedAsset?.url) return;
     const videoUrl = renderedAsset.public_url || renderedAsset.url;
@@ -489,14 +453,15 @@ export default function SocialDraftComposer({
     const newAsset = {
       id: `clip-${Date.now()}`,
       publicUrl: clipData.url,
+      public_url: clipData.url,
       mediaType: 'video',
-      format: clipData.mode === 'clip' ? 'video_clip' : 'full_video',
+      format: clipData.isRenderedMp4 ? 'custom_video' : (clipData.mode === 'clip' ? 'video_clip' : 'full_video'),
       title: clipData.title || 'Video Clip',
       startTime: clipData.startTime || 0,
       endTime: clipData.endTime || clipData.duration || 0,
       duration: clipData.duration || 0,
-      width: 1080,
-      height: 1920,
+      width: clipData.aspectRatio === '9:16' ? 1080 : 1920,
+      height: clipData.aspectRatio === '9:16' ? 1920 : 1080,
     };
 
     setResult(curr => {
@@ -507,6 +472,11 @@ export default function SocialDraftComposer({
             platform: p,
             selected_asset_id: newAsset.id,
             selected_asset: newAsset,
+            platform_options: {
+              video_url: clipData.url,
+              asset_url: clipData.url,
+              post_format: 'single',
+            },
           })),
         };
       }
@@ -517,6 +487,12 @@ export default function SocialDraftComposer({
             ...v,
             selected_asset_id: newAsset.id,
             selected_asset: newAsset,
+            platform_options: {
+              ...(v.platform_options || {}),
+              video_url: clipData.url,
+              asset_url: clipData.url,
+              post_format: 'single',
+            },
           };
         }
         return v;
@@ -524,6 +500,9 @@ export default function SocialDraftComposer({
       return { ...curr, assets: updatedAssets, variants: updatedVariants };
     });
 
+    if (clipData.aspectRatio) {
+      setCanvasAspectRatio(clipData.aspectRatio);
+    }
     setPostFormat('single');
     toast.success(`🎬 Attached video clip (${clipData.formattedStart || '00:00'} - ${clipData.formattedEnd || ''}) to draft!`);
   };
