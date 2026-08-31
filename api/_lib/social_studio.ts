@@ -275,13 +275,19 @@ async function recalculateContentStatus(contentItemId: string) {
 }
 
 export async function cleanupContentItemAssets(contentItemId: string) {
-  const { data: assets, error: assetError } = await supabase
-    .from('social_assets')
-    .select('id,storage_bucket,storage_path')
-    .eq('content_item_id', contentItemId);
+  const [{ data: assets, error: assetError }, { data: variants, error: variantError }] = await Promise.all([
+    supabase
+      .from('social_assets')
+      .select('id,storage_bucket,storage_path')
+      .eq('content_item_id', contentItemId),
+    supabase
+      .from('social_platform_variants')
+      .select('platform_options')
+      .eq('content_item_id', contentItemId),
+  ]);
 
   if (assetError) throw assetError;
-  if (!assets?.length) return;
+  if (variantError) throw variantError;
 
   const byBucket = new Map<string, string[]>();
   for (const asset of assets) {
@@ -296,6 +302,24 @@ export async function cleanupContentItemAssets(contentItemId: string) {
     if (paths.length) {
       await supabase.storage.from(bucket).remove(paths);
     }
+  }
+
+  // Drive is used as temporary staging for large videos. It is not represented
+  // by a Supabase storage path, so clean those files explicitly once every
+  // selected platform has accepted the post.
+  const driveFileIds = new Set<string>();
+  for (const variant of variants || []) {
+    const options = variant?.platform_options || {};
+    const directId = options.drive_file_id || options.driveFileId;
+    if (typeof directId === 'string' && directId) driveFileIds.add(directId);
+    for (const asset of Array.isArray(options.carousel_assets) ? options.carousel_assets : []) {
+      const assetId = asset?.drive_file_id || asset?.driveFileId;
+      if (typeof assetId === 'string' && assetId) driveFileIds.add(assetId);
+    }
+  }
+  if (driveFileIds.size) {
+    const { deleteVideoFromDrive } = await import('./google_drive.js');
+    await Promise.allSettled([...driveFileIds].map(fileId => deleteVideoFromDrive(fileId)));
   }
 }
 
@@ -333,6 +357,25 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     .eq('id', variant.content_item_id)
     .single();
   if (contentError) throw contentError;
+
+  // A queued row can outlive a cancelled or reopened schedule. Never let that
+  // stale job publish merely because it was claimed a few milliseconds before
+  // the cancellation request updated the queue.
+  if (!['scheduled', 'publishing'].includes(variant.status) || !['scheduled', 'publishing', 'partially_published'].includes(contentItem.status)) {
+    await supabase
+      .from('social_publish_jobs')
+      .update({
+        status: 'cancelled',
+        completed_at: nowIso,
+        locked_at: null,
+        locked_by: null,
+        last_error_code: 'schedule_no_longer_active',
+        last_error_message: 'The schedule was cancelled before publishing began.',
+      })
+      .eq('id', job.id)
+      .eq('status', 'processing');
+    return { jobId: job.id, status: 'skipped', reason: 'schedule_no_longer_active' };
+  }
 
   let assetUrl: string | null = null;
   let assetUrls: string[] = Array.isArray(variant.platform_options?.carousel_asset_urls)
@@ -409,18 +452,66 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       });
     }
 
-    const result = await adapter.publish({
-      jobId: job.id,
-      variantId: variant.id,
-      platform: variant.platform,
-      caption: variant.caption || '',
-      title: variant.title,
-      assetUrl,
-      assetUrls,
-      scheduledFor: job.scheduled_for,
-      options: variant.platform_options,
-      sourceSnapshot: contentItem.source_snapshot,
-    });
+    const result = adapter instanceof TikTokPlatformAdapter && job.provider_publish_id
+      ? await adapter.checkPublishStatus(
+          String(job.provider_publish_id),
+          variant.platform_options?.tiktok?.post_mode === 'MEDIA_UPLOAD' ? 'MEDIA_UPLOAD' : 'DIRECT_POST',
+        )
+      : await adapter.publish({
+          jobId: job.id,
+          variantId: variant.id,
+          platform: variant.platform,
+          caption: variant.caption || '',
+          title: variant.title,
+          assetUrl,
+          assetUrls,
+          scheduledFor: job.scheduled_for,
+          options: variant.platform_options,
+          sourceSnapshot: contentItem.source_snapshot,
+        });
+
+    if (result.variantStatus === 'publishing') {
+      const nextCheck = new Date(Date.now() + 60_000).toISOString();
+      await Promise.all([
+        supabase
+          .from('social_platform_variants')
+          .update({
+            status: 'publishing',
+            external_post_id: result.externalPostId,
+            last_error_code: null,
+            last_error_message: null,
+          })
+          .eq('id', variant.id),
+        supabase
+          .from('social_publish_jobs')
+          .update({
+            status: 'retrying',
+            provider_publish_id: result.providerPublishId,
+            provider_response: result.providerResponse,
+            available_at: nextCheck,
+            locked_at: null,
+            locked_by: null,
+            completed_at: null,
+            last_error_code: null,
+            last_error_message: null,
+            last_error_details: null,
+          })
+          .eq('id', job.id),
+      ]);
+      await insertSocialEvent({
+        contentItemId: contentItem.id,
+        platformVariantId: variant.id,
+        eventType: 'platform_processing',
+        eventData: {
+          job_id: job.id,
+          platform: variant.platform,
+          provider_publish_id: result.providerPublishId,
+          next_status_check: nextCheck,
+        },
+      });
+      await recalculateContentStatus(contentItem.id);
+      return { jobId: job.id, status: 'platform_processing', platform: variant.platform };
+    }
 
     const completedAt = new Date().toISOString();
     await supabase
@@ -590,7 +681,7 @@ export async function runSocialPublisher(input: {
 
   const { data: jobs, error } = await supabase
     .from('social_publish_jobs')
-    .select('id,platform_variant_id,status,scheduled_for,available_at,attempt_count,max_attempts')
+    .select('id,platform_variant_id,status,scheduled_for,available_at,attempt_count,max_attempts,provider_publish_id,provider_response')
     .in('status', ['queued', 'retrying'])
     .lte('available_at', nowIso)
     .lte('scheduled_for', nowIso)
@@ -1180,29 +1271,15 @@ export async function deleteSocialContentItem(
     if (jobError) throw jobError;
   }
 
-  const { data: assets, error: assetError } = await supabase
-    .from('social_assets')
-    .select('storage_bucket,storage_path')
-    .eq('content_item_id', input.contentItemId);
-  if (assetError) throw assetError;
+  await cleanupContentItemAssets(input.contentItemId).catch(error => {
+    console.warn(`Social Studio: queue item ${item.id} cleanup was incomplete`, error);
+  });
 
   const { error: deleteError } = await supabase
     .from('social_content_items')
     .delete()
     .eq('id', input.contentItemId);
   if (deleteError) throw deleteError;
-
-  const byBucket = new Map<string, string[]>();
-  for (const asset of assets || []) {
-    if (!asset.storage_bucket || asset.storage_bucket === 'external' || !asset.storage_path) continue;
-    const paths = byBucket.get(asset.storage_bucket) || [];
-    paths.push(asset.storage_path);
-    byBucket.set(asset.storage_bucket, paths);
-  }
-  for (const [bucket, paths] of byBucket) {
-    const { error: removeError } = await supabase.storage.from(bucket).remove(paths);
-    if (removeError) console.warn(`Social Studio: queue item ${item.id} deleted, but asset cleanup failed`, removeError);
-  }
 
   return { success: true, id: item.id, title: item.title, deletedBy: actor.id };
 }
@@ -1403,6 +1480,12 @@ export async function scheduleContentItem(
     status: 'queued',
     scheduled_for: scheduledForIso,
     available_at: scheduledForIso,
+    completed_at: null,
+    locked_at: null,
+    locked_by: null,
+    last_error_code: null,
+    last_error_message: null,
+    last_error_details: null,
     idempotency_key: createPublishJobIdempotencyKey({
       contentItemId: input.contentItemId,
       platform: variant.platform as SocialPlatform,
@@ -1410,23 +1493,57 @@ export async function scheduleContentItem(
     }),
   }));
 
+  const { data: scheduledVariants, error: scheduleVariantError } = await supabase
+    .from('social_platform_variants')
+    .update({ status: 'scheduled', scheduled_for: scheduledForIso })
+    .eq('content_item_id', input.contentItemId)
+    .eq('status', 'approved')
+    .select('id');
+  if (scheduleVariantError) throw scheduleVariantError;
+  if ((scheduledVariants || []).length !== variants.length) {
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'approved', scheduled_for: null })
+      .in('id', (scheduledVariants || []).map(row => row.id));
+    throw httpError(409, 'The draft changed while it was being scheduled. Review it and try again.');
+  }
+
+  const { data: scheduledItem, error: scheduleItemError } = await supabase
+    .from('social_content_items')
+    .update({ status: 'scheduled' })
+    .eq('id', input.contentItemId)
+    .eq('status', 'approved')
+    .select('id')
+    .maybeSingle();
+
+  if (scheduleItemError || !scheduledItem) {
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'approved', scheduled_for: null })
+      .in('id', variants.map(variant => variant.id));
+    if (scheduleItemError) throw scheduleItemError;
+    throw httpError(409, 'The draft changed while it was being scheduled. Review it and try again.');
+  }
+
   const { data: jobs, error: jobError } = await supabase
     .from('social_publish_jobs')
     .upsert(jobRows, { onConflict: 'idempotency_key' })
     .select('id,platform_variant_id');
 
-  if (jobError) throw jobError;
-
-  await supabase
-    .from('social_platform_variants')
-    .update({ status: 'scheduled', scheduled_for: scheduledForIso })
-    .eq('content_item_id', input.contentItemId)
-    .eq('status', 'approved');
-
-  await supabase
-    .from('social_content_items')
-    .update({ status: 'scheduled' })
-    .eq('id', input.contentItemId);
+  if (jobError) {
+    await Promise.all([
+      supabase
+        .from('social_platform_variants')
+        .update({ status: 'approved', scheduled_for: null })
+        .in('id', variants.map(variant => variant.id)),
+      supabase
+        .from('social_content_items')
+        .update({ status: 'approved' })
+        .eq('id', input.contentItemId)
+        .eq('status', 'scheduled'),
+    ]);
+    throw jobError;
+  }
 
   await insertSocialEvent({
     contentItemId: input.contentItemId,
@@ -1503,6 +1620,18 @@ export async function cancelContentSchedule(input: { contentItemId: string }, ac
       .in('platform_variant_id', variantIds)
       .eq('status', 'processing');
     inFlight = count || 0;
+
+    if (inFlight > 0) {
+      const cancelledIds = (cancelled || []).map(row => row.id);
+      if (cancelledIds.length) {
+        await supabase
+          .from('social_publish_jobs')
+          .update({ status: 'queued', completed_at: null })
+          .in('id', cancelledIds)
+          .eq('status', 'cancelled');
+      }
+      throw httpError(409, 'This post has already started publishing. Wait for the platform result before editing it.');
+    }
 
     await supabase
       .from('social_platform_variants')
@@ -1634,6 +1763,8 @@ export async function attachCustomAsset(
     width?: number;
     height?: number;
     variantId?: string;
+    driveFileId?: string;
+    aspectRatio?: string;
   },
   actor: SocialActor,
 ) {
@@ -1642,7 +1773,7 @@ export async function attachCustomAsset(
   if (!/^https:\/\//i.test(String(input.publicUrl || ''))) {
     throw httpError(400, 'The custom artwork must have a public HTTPS URL');
   }
-  const isVideo = /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(input.publicUrl) || Boolean(input.format?.includes('video'));
+  const isVideo = Boolean(input.driveFileId) || /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(input.publicUrl) || Boolean(input.format?.includes('video'));
   const format: SocialAssetFormat = input.format || (isVideo ? 'video_vertical_9_16' as SocialAssetFormat : 'square_1_1');
   const width = input.width || 1080;
   const height = input.height || 1080;
@@ -1685,7 +1816,12 @@ export async function attachCustomAsset(
         width,
         height,
         file_size_bytes: 0,
-        render_metadata: { source: 'custom_upload', uploaded_by: actor.id },
+        render_metadata: {
+          source: input.driveFileId ? 'desktop_clipper' : 'custom_upload',
+          uploaded_by: actor.id,
+          drive_file_id: input.driveFileId || null,
+          aspect_ratio: input.aspectRatio || null,
+        },
       },
       { onConflict: 'content_item_id,format' },
     )
@@ -1695,9 +1831,28 @@ export async function attachCustomAsset(
   if (assetError) throw assetError;
 
   if (input.variantId) {
+    const { data: selectedVariant, error: selectedVariantError } = await supabase
+      .from('social_platform_variants')
+      .select('platform_options')
+      .eq('id', input.variantId)
+      .eq('content_item_id', input.contentItemId)
+      .maybeSingle();
+    if (selectedVariantError) throw selectedVariantError;
+    if (!selectedVariant) throw httpError(404, 'Platform variant not found for this draft');
     await supabase
       .from('social_platform_variants')
-      .update({ selected_asset_id: assetRow.id })
+      .update({
+        selected_asset_id: assetRow.id,
+        platform_options: {
+          ...(selectedVariant.platform_options || {}),
+          post_format: 'single',
+          asset_url: input.publicUrl,
+          video_url: isVideo ? input.publicUrl : null,
+          drive_file_id: input.driveFileId || null,
+          aspect_ratio: input.aspectRatio || null,
+          asset_format: format,
+        },
+      })
       .eq('id', input.variantId);
   } else {
     await supabase

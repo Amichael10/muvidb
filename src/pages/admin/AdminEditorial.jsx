@@ -43,7 +43,7 @@ export default function AdminEditorial() {
   // Load Overview Data
   const fetchOverview = async () => {
     try {
-      const res = await fetch('/api/social?task=overview');
+      const res = await fetch('/api/social?task=overview', { headers: await authHeaders() });
       if (!res.ok) throw new Error('Failed to fetch overview');
       const data = await res.json();
       setOverviewData(data);
@@ -55,7 +55,7 @@ export default function AdminEditorial() {
   // Load Calendar Slots
   const fetchCalendar = async () => {
     try {
-      const res = await fetch('/api/social?task=calendar');
+      const res = await fetch('/api/social?task=calendar', { headers: await authHeaders() });
       if (!res.ok) throw new Error('Failed to fetch calendar');
       const data = await res.json();
       setCalendarSlots(data.slots || []);
@@ -67,7 +67,7 @@ export default function AdminEditorial() {
   // Load Series Registry
   const fetchSeries = async () => {
     try {
-      const res = await fetch('/api/social?task=series');
+      const res = await fetch('/api/social?task=series', { headers: await authHeaders() });
       if (!res.ok) throw new Error('Failed to fetch series');
       const data = await res.json();
       setSeriesList(data.series || []);
@@ -90,7 +90,7 @@ export default function AdminEditorial() {
     const slug = slot.social_content_series?.slug || 'filmography';
 
     try {
-      const res = await fetch(`/api/social?task=candidates&seriesSlug=${slug}`);
+      const res = await fetch(`/api/social?task=candidates&seriesSlug=${slug}`, { headers: await authHeaders() });
       if (!res.ok) throw new Error('Failed to fetch candidates');
       const data = await res.json();
       setCandidates(data.candidates || []);

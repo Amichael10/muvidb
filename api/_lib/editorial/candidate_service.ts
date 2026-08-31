@@ -592,7 +592,7 @@ export async function searchCandidates(
   if (type === 'all' || type === 'movie') {
     const { data: films } = await supabase
       .from('films')
-      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, youtube_watch_url, is_in_cinemas, synopsis, tagline, genres, liked_percent, imdb_rating, view_count')
+      .select('id, title, slug, poster_url, backdrop_url, release_date, year, release_type, streaming_links, youtube_watch_url, is_in_cinemas, coming_soon, synopsis, tagline, genres, liked_percent, imdb_rating, view_count')
       .ilike('title', `%${trimmed}%`)
       .order('year', { ascending: false })
       .limit(limit);
@@ -600,9 +600,15 @@ export async function searchCandidates(
     if (films && films.length > 0) {
       const enrichedFilms = await enrichFilmCandidates(films);
       enrichedFilms.forEach((f) => {
-        const platformName = f.youtube_watch_url
-          ? 'YouTube'
-          : PLATFORM_DISPLAY_NAMES[f.release_type || ''] || (f.is_in_cinemas ? 'In Cinemas' : 'Streaming');
+        const platform = resolveFilmPlatform(f);
+        const lifecycle = classifyFilmLifecycle(f);
+        const platformName = platform
+          ? (PLATFORM_DISPLAY_NAMES[platform] || platform)
+          : lifecycle === 'now_in_cinemas'
+            ? 'In Cinemas'
+            : lifecycle === 'upcoming'
+              ? 'Coming Soon'
+              : 'MuviDB Catalogue';
         results.push({
           id: f.id,
           type: 'movie',
@@ -613,8 +619,16 @@ export async function searchCandidates(
           category: platformName,
           data: {
             ...f,
-            platform: f.youtube_watch_url ? 'youtube' : f.release_type,
+            lifecycle,
+            platform,
             platformDisplayName: platformName,
+            watchAvailability: lifecycle === 'now_streaming'
+              ? `Now Streaming on ${platformName}`
+              : lifecycle === 'now_in_cinemas'
+                ? 'In Cinemas Now'
+                : lifecycle === 'upcoming'
+                  ? 'Coming Soon'
+                  : 'MuviDB Catalogue',
           },
         });
       });

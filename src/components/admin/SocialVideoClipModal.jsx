@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
+import { authHeaders } from '../../lib/apiAuth';
+import { supabase } from '../../lib/supabase';
+
+const LOCAL_CLIPPER_URL = 'http://127.0.0.1:4317';
 
 function formatSecondsToTimecode(totalSeconds) {
   if (isNaN(totalSeconds) || totalSeconds < 0) return '00:00:00';
@@ -53,6 +57,7 @@ export default function SocialVideoClipModal({
 
   // Crop Aspect Ratio & Framing Mode
   const [cropAspectRatio, setCropAspectRatio] = useState('9:16'); // '9:16' | '1:1' | '16:9' | '4:5'
+  const [selectedAspectRatios, setSelectedAspectRatios] = useState(['9:16']);
   const [cropFitMode, setCropFitMode] = useState('cover'); // 'cover' (fill/crop) | 'contain' (fit/letterbox)
 
   // Multi-Stage Progress State for True Video Cut & Upload
@@ -61,6 +66,7 @@ export default function SocialVideoClipModal({
   const [renderStage, setRenderStage] = useState(1);
   const [renderStatusText, setRenderStatusText] = useState('');
   const progressTimerRef = useRef(null);
+  const renderAbortRef = useRef(null);
 
   useEffect(() => {
     if (initialVideoUrl) {
@@ -84,37 +90,30 @@ export default function SocialVideoClipModal({
   const extractVideoUrl = (input) => {
     let raw = String(input || '').trim();
     if (!raw) return '';
-    // Auto-correct common casing mistakes (e.g. capital 'I' instead of lowercase 'l')
-    if (raw.includes('8IDFSeFwSd0')) raw = raw.replace('8IDFSeFwSd0', '8lDFSeFwSd0');
-
     if (raw.includes('youtube.com/watch')) {
       try {
         const vid = new URL(raw).searchParams.get('v');
         if (vid) {
-          const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
-          return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
+          return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
         }
       } catch {
         const m = raw.match(/v=([a-zA-Z0-9_-]+)/);
         if (m) {
-          const cleanVid = m[1] === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : m[1];
-          return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
+          return `https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1`;
         }
       }
     }
     if (raw.includes('youtu.be/')) {
       const vid = raw.split('youtu.be/')[1]?.split('?')[0];
       if (vid) {
-        const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
-        return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
+        return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
       }
     }
     if (raw.includes('youtube.com/embed/')) {
       return raw.includes('enablejsapi=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}autoplay=1&enablejsapi=1`;
     }
     if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) {
-      const cleanVid = raw === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : raw;
-      return `https://www.youtube.com/embed/${cleanVid}?autoplay=1&enablejsapi=1`;
+      return `https://www.youtube.com/embed/${raw}?autoplay=1&enablejsapi=1`;
     }
     return raw;
   };
@@ -281,7 +280,148 @@ export default function SocialVideoClipModal({
     }
   };
 
-  // Native Residential Stream Slicing & Direct Google Drive Upload
+  const uploadLocalClipToStorage = async (localClip, signal) => {
+    const clipResponse = await fetch(localClip.download_url, { signal });
+    if (!clipResponse.ok) throw new Error('The desktop clipper finished, but the rendered file could not be read.');
+    const clipBlob = await clipResponse.blob();
+    if (!clipBlob.size) throw new Error('The desktop clipper returned an empty video.');
+
+    const cleanFileName = (localClip.file_name || `muvidb_clip_${Date.now()}.mp4`).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `clips/${Date.now()}_${cleanFileName}`;
+
+    // 1. Direct High-Speed Supabase CDN Upload
+    if (supabase) {
+      try {
+        const { error: uploadErr } = await supabase.storage
+          .from('social-published-assets')
+          .upload(storagePath, clipBlob, { contentType: 'video/mp4', upsert: true });
+
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage
+            .from('social-published-assets')
+            .getPublicUrl(storagePath);
+
+          if (urlData?.publicUrl) {
+            if (localClip.cleanup_url) {
+              fetch(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
+            }
+            return {
+              ...localClip,
+              public_url: urlData.publicUrl,
+              size_mb: Number((clipBlob.size / (1024 * 1024)).toFixed(2)),
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase storage direct upload failed, trying drive fallback...', err);
+      }
+    }
+
+    // 2. Google Drive Fallback
+    const sessionResponse = await fetch('/api/social?task=create_upload_session', {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({
+        fileName: cleanFileName,
+        mimeType: 'video/mp4',
+        fileSize: clipBlob.size,
+      }),
+    });
+    const session = await sessionResponse.json().catch(() => ({}));
+    if (!sessionResponse.ok || !session.uploadUrl) {
+      throw new Error(session.error || 'MuviDB could not prepare the temporary video upload.');
+    }
+
+    const driveResponse = await fetch(session.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'video/mp4' },
+      signal,
+      body: clipBlob,
+    });
+    const driveFile = await driveResponse.json().catch(() => ({}));
+    if (!driveResponse.ok || !driveFile.id) {
+      throw new Error('Google Drive could not store the rendered clip.');
+    }
+
+    const publicResponse = await fetch('/api/social?task=make_drive_file_public', {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({ fileId: driveFile.id }),
+    });
+    const publicData = await publicResponse.json().catch(() => ({}));
+    if (!publicResponse.ok || !publicData.publicUrl) {
+      throw new Error(publicData.error || 'The temporary video could not be made available to the selected platforms.');
+    }
+
+    if (localClip.cleanup_url) {
+      fetch(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
+    }
+
+    return {
+      ...localClip,
+      public_url: publicData.publicUrl,
+      drive_file_id: driveFile.id,
+      size_mb: Number((clipBlob.size / (1024 * 1024)).toFixed(2)),
+    };
+  };
+
+  // Fetch and render locally only. Drive upload is deliberately kept as a
+  // separate step so an upload/attach failure can never be mistaken for a
+  // failed YouTube extraction and retried through the cloud fallback.
+  const renderWithDesktopClipper = async (payload, signal) => {
+    const response = await fetch(`${LOCAL_CLIPPER_URL}/clip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({
+        url: payload.url,
+        start_time: payload.startTime,
+        end_time: payload.endTime,
+        aspect_ratio: payload.aspectRatio,
+        fit_mode: payload.fitMode === 'contain' ? 'contain' : 'cover',
+        title: payload.title,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 202 && data.job_id) {
+      // The desktop service renders in the background so a slow YouTube
+      // download cannot make the browser report a generic "Failed to fetch".
+      for (;;) {
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(resolve, 1000);
+          if (signal) {
+            const abort = () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); };
+            if (signal.aborted) abort();
+            else signal.addEventListener('abort', abort, { once: true });
+          }
+        });
+        const statusResponse = await fetch(data.status_url, { signal });
+        const status = await statusResponse.json().catch(() => ({}));
+        if (statusResponse.ok && status.success) return status;
+        if (!statusResponse.ok) throw new Error(status.detail || status.error || 'The desktop clipper could not finish this video.');
+        if (Number.isFinite(status.progress)) setRenderProgress(Math.max(10, Math.min(85, status.progress)));
+        setRenderStatusText(`[2/3] ${status.message || 'Processing the clip…'}`);
+      }
+    }
+    if (!response.ok || !data.success) {
+      throw new Error(data.detail || data.error || 'The desktop clipper could not render this video.');
+    }
+    return data;
+  };
+
+  const cancelRender = () => {
+    renderAbortRef.current?.abort();
+    renderAbortRef.current = null;
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    setIsRendering(false);
+    setRenderStatusText('Render cancelled.');
+    toast('Video render cancelled');
+  };
+
+  // Free local residential slicing first; the existing cloud extractor remains
+  // a fallback for direct MP4s and periods when YouTube is not blocking it.
   const handleRenderAndAttachClip = async () => {
     if (!videoInput.trim() && !videoUrl) {
       return toast.error('Please enter a video URL or YouTube link');
@@ -295,99 +435,79 @@ export default function SocialVideoClipModal({
     const sliceLen = Math.max(1, endSec - startSec);
 
     setIsRendering(true);
-    setRenderProgress(10);
+    const abortController = new AbortController();
+    renderAbortRef.current = abortController;
+    setRenderProgress(5);
     setRenderStage(1);
-    setRenderStatusText(`[1/3] Slicing source segment (${formatSecondsToTimecode(startSec)} → ${formatSecondsToTimecode(endSec)})...`);
-
-    // Dynamic progress bar ticker
-    let currentP = 10;
-    progressTimerRef.current = setInterval(() => {
-      currentP += Math.floor(Math.random() * 6) + 2;
-      if (currentP > 92) currentP = 92;
-      setRenderProgress(currentP);
-
-      if (currentP > 35 && currentP <= 75) {
-        setRenderStage(2);
-        setRenderStatusText(`[2/3] Applying ${cropAspectRatio} ${cropFitMode === 'cover' ? 'Fill Crop' : 'Letterbox Fit'} & Encoding 1080p MP4...`);
-      } else if (currentP > 75) {
-        setRenderStage(3);
-        setRenderStatusText(`[3/3] Uploading MP4 to Google Drive & attaching to variants...`);
-      }
-    }, 800);
+    setRenderStatusText(`[1/3] Preparing ${selectedAspectRatios.length} aspect ratio${selectedAspectRatios.length === 1 ? '' : 's'} (${formatSecondsToTimecode(startSec)} → ${formatSecondsToTimecode(endSec)})...`);
 
     try {
       const rawTarget = (videoInput.trim() || videoUrl || '').trim();
       let cleanWatchUrl = rawTarget;
-      if (cleanWatchUrl.includes('8IDFSeFwSd0')) {
-        cleanWatchUrl = cleanWatchUrl.replace('8IDFSeFwSd0', '8lDFSeFwSd0');
-      }
       if (rawTarget.includes('youtu.be/')) {
         const vid = rawTarget.split('youtu.be/')[1]?.split('?')[0]?.split('&')[0];
         if (vid) {
-          const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
-          cleanWatchUrl = `https://www.youtube.com/watch?v=${cleanVid}`;
+          cleanWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
         }
       } else if (rawTarget.includes('embed/')) {
         const vid = rawTarget.split('embed/')[1]?.split('?')[0]?.split('&')[0];
         if (vid) {
-          const cleanVid = vid === '8IDFSeFwSd0' ? '8lDFSeFwSd0' : vid;
-          cleanWatchUrl = `https://www.youtube.com/watch?v=${cleanVid}`;
+          cleanWatchUrl = `https://www.youtube.com/watch?v=${vid}`;
         }
       }
 
-      const payload = {
-        url: cleanWatchUrl,
-        startTime: startSec,
-        endTime: endSec,
-        aspectRatio: cropAspectRatio,
-        fitMode: cropFitMode,
-        title: videoTitle || 'social_clip',
-      };
-
-      const res = await fetch('/api/social?task=clip_video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Video rendering failed');
+      const ratios = selectedAspectRatios.length ? selectedAspectRatios : [cropAspectRatio];
+      for (let index = 0; index < ratios.length; index += 1) {
+        const ratio = ratios[index];
+        const payload = { url: cleanWatchUrl, startTime: startSec, endTime: endSec, aspectRatio: ratio, fitMode: cropFitMode, title: videoTitle || 'social_clip' };
+        setRenderStage(2);
+        setRenderProgress(Math.round(10 + (index / ratios.length) * 45));
+        setRenderStatusText(`[2/3] Downloading source & rendering ${ratio} crop (${index + 1}/${ratios.length})…`);
+        let data;
+        let localClip;
+        try {
+          localClip = await renderWithDesktopClipper(payload, abortController.signal);
+        } catch (error) {
+          const authFailure = /cookie|sign in|not a bot|youtube needs/i.test(String(error?.message || ''));
+          if (authFailure) {
+            throw new Error('YouTube authentication failed. Export a fresh cookies.txt while signed in to YouTube, place it in the MuviDB project folder, restart the clipper, and try again.');
+          }
+          if (/ffmpeg|render the selected crop|requested format is not available/i.test(String(error?.message || ''))) {
+            throw new Error(`The desktop clipper could not render this crop. ${error?.message || 'Check that FFmpeg is installed and try again.'}`);
+          }
+          setRenderStatusText(`[2/3] Desktop clipper unavailable for ${ratio}. Trying cloud fallback…`);
+          const res = await fetch('/api/social?task=clip_video', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, signal: abortController.signal, body: JSON.stringify(payload) });
+          data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) throw new Error(error?.message || data.error || 'The video could not be rendered.');
+        }
+        if (localClip) {
+          // A rendered local file is uploaded directly to CDN storage
+          data = await uploadLocalClipToStorage(localClip, abortController.signal);
+        }
+        setRenderStage(3);
+        setRenderProgress(Math.round(55 + ((index + 0.5) / ratios.length) * 40));
+        setRenderStatusText(`[3/3] Uploading ${ratio} MP4 to Google Drive and attaching it…`);
+        const clipAsset = { url: data.public_url, public_url: data.public_url, publicUrl: data.public_url, driveFileId: data.drive_file_id, drive_file_id: data.drive_file_id, format: 'custom_video', mediaType: 'video', duration: sliceLen, aspectRatio: ratio, fileName: data.file_name, sizeMb: data.size_mb, title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startSec)} - ${formatSecondsToTimecode(endSec)})`, isRenderedMp4: true };
+        if (onAttachRenderedVideo) {
+          const attached = await onAttachRenderedVideo(clipAsset);
+          if (attached === false) throw new Error(`The ${ratio} video was rendered but could not be attached to this draft.`);
+        } else onImportToCanvas?.(clipAsset);
+        setRenderProgress(Math.round(55 + ((index + 1) / ratios.length) * 40));
       }
-
       setRenderProgress(100);
-      setRenderStatusText('[Done] Video rendered, cropped & attached to draft!');
-
-      // Notify parent composer and attach MP4 video with drive_file_id
-      const clipAsset = {
-        url: data.public_url,
-        public_url: data.public_url,
-        publicUrl: data.public_url,
-        driveFileId: data.drive_file_id,
-        drive_file_id: data.drive_file_id,
-        format: 'custom_video',
-        mediaType: 'video',
-        duration: sliceLen,
-        aspectRatio: cropAspectRatio,
-        fileName: data.file_name,
-        sizeMb: data.size_mb,
-        title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startSec)} - ${formatSecondsToTimecode(endSec)})`,
-        isRenderedMp4: true,
-      };
-
-      onImportToCanvas?.(clipAsset);
-      onAttachRenderedVideo?.(clipAsset);
+      setRenderStatusText(`[Done] ${ratios.length} rendered video${ratios.length === 1 ? '' : 's'} attached to the draft.`);
 
       toast.success(`🎉 ${cropAspectRatio} Video Clip attached to draft!`);
+      renderAbortRef.current = null;
       setTimeout(() => {
         setIsRendering(false);
         onClose();
       }, 1000);
     } catch (err) {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      renderAbortRef.current = null;
       setIsRendering(false);
+      if (err?.name === 'AbortError') return;
       console.error('Render clip error:', err);
       toast.error(err.message || 'Could not render video clip. Please check the video link.');
     }
@@ -450,6 +570,13 @@ export default function SocialVideoClipModal({
               <p className="text-[11px] text-white/50">
                 Please wait a moment while the video is processed with FFmpeg & stored for social publishing.
               </p>
+              <button
+                type="button"
+                onClick={cancelRender}
+                className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white"
+              >
+                Cancel render
+              </button>
             </div>
           </div>
         )}
@@ -583,17 +710,23 @@ export default function SocialVideoClipModal({
                   <button
                     key={r.id}
                     type="button"
-                    onClick={() => setCropAspectRatio(r.id)}
+                    onClick={() => {
+                      setCropAspectRatio(r.id);
+                      setSelectedAspectRatios(current => current.includes(r.id)
+                        ? (current.length > 1 ? current.filter(value => value !== r.id) : current)
+                        : [...current, r.id]);
+                    }}
                     className={`rounded-lg px-3 py-1.5 text-xs font-black transition-all ${
-                      cropAspectRatio === r.id
+                      selectedAspectRatios.includes(r.id)
                         ? 'bg-brand text-white shadow-md'
                         : 'bg-black/40 text-white/70 hover:bg-white/10 hover:text-white'
                     }`}
                   >
-                    {r.label}
+                    {selectedAspectRatios.includes(r.id) ? '✓ ' : ''}{r.label}
                   </button>
                 ))}
               </div>
+              <p className="mt-2 text-[10px] text-white/50">Select every format you need. They will be rendered and uploaded in one run.</p>
             </div>
 
             {/* Fit Mode Toggle */}
@@ -623,6 +756,16 @@ export default function SocialVideoClipModal({
                   Fit Frame (Letterbox)
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+            <Icon icon="solar:laptop-minimalistic-check-linear" width="20" className="mt-0.5 shrink-0 text-emerald-300" />
+            <div>
+              <p className="font-black">Free desktop processing</p>
+              <p className="mt-0.5 text-[11px] leading-5 text-emerald-100/70">
+                For reliable YouTube clips, keep <span className="font-mono text-emerald-200">scripts/start-local-social-clipper.ps1</span> running on this computer. The final MP4 goes directly to temporary Google Drive storage—never through Vercel or Supabase.
+              </p>
             </div>
           </div>
 

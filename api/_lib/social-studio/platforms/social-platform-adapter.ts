@@ -20,7 +20,7 @@ export type SocialPublishResult = {
   externalPostId: string;
   externalPermalink: string | null;
   providerResponse: Record<string, unknown>;
-  variantStatus: Extract<SocialVariantStatus, 'published' | 'uploaded_as_draft'>;
+  variantStatus: Extract<SocialVariantStatus, 'publishing' | 'published' | 'uploaded_as_draft'>;
 };
 
 export interface SocialPlatformAdapter {

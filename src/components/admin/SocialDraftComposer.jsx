@@ -242,11 +242,58 @@ export default function SocialDraftComposer({
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
 
-  const handleAttachRenderedVideo = (renderedAsset) => {
-    if (!renderedAsset?.public_url && !renderedAsset?.url && !renderedAsset?.publicUrl) return;
+  const handleAttachRenderedVideo = async (renderedAsset) => {
+    if (!renderedAsset?.public_url && !renderedAsset?.url && !renderedAsset?.publicUrl) return false;
     const videoUrl = renderedAsset.public_url || renderedAsset.url || renderedAsset.publicUrl;
-    const isSquare = renderedAsset.aspectRatio === '1:1';
-    const targetPlatforms = isSquare ? ['facebook', 'threads'] : ['tiktok', 'instagram'];
+    const ratio = renderedAsset.aspectRatio || '9:16';
+    const platformTargets = {
+      '1:1': ['instagram', 'facebook', 'threads'],
+      '4:5': ['instagram', 'facebook'],
+      '9:16': ['instagram', 'facebook', 'tiktok'],
+      '16:9': ['facebook', 'threads'],
+    };
+    const targetPlatforms = platformTargets[ratio] || ['instagram', 'tiktok'];
+    const dimensions = {
+      '1:1': { width: 1080, height: 1080, format: 'square_1_1' },
+      '4:5': { width: 1080, height: 1350, format: 'portrait_4_5' },
+      '9:16': { width: 1080, height: 1920, format: 'video_vertical_9_16' },
+      '16:9': { width: 1920, height: 1080, format: 'landscape_16_9' },
+    };
+    const targetDimensions = dimensions[ratio] || dimensions['9:16'];
+    const contentItemId = result?.contentItem?.id;
+    const matchingVariants = (result?.variants || []).filter(variant => targetPlatforms.includes(variant.platform));
+
+    if (!contentItemId || !matchingVariants.length) {
+      toast.error('Generate the social draft and select a compatible platform before attaching the clip.');
+      return false;
+    }
+
+    let attachments = [];
+    try {
+      attachments = await Promise.all(matchingVariants.map(async variant => {
+        const response = await fetch('/api/social?task=attach_custom_asset', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentItemId,
+            variantId: variant.id,
+            publicUrl: videoUrl,
+            format: targetDimensions.format,
+            width: targetDimensions.width,
+            height: targetDimensions.height,
+            driveFileId: renderedAsset.driveFileId || renderedAsset.drive_file_id,
+            aspectRatio: ratio,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Could not attach the clip to ${variant.platform}`);
+        return { variantId: variant.id, assetId: data.id };
+      }));
+    } catch (error) {
+      toast.error(error.message || 'The clip was rendered but could not be attached to the draft.');
+      return false;
+    }
+    const attachedAssetIds = new Map(attachments.map(entry => [entry.variantId, entry.assetId]));
 
     const newAsset = {
       id: `rendered_video_${Date.now()}`,
@@ -254,9 +301,9 @@ export default function SocialDraftComposer({
       public_url: videoUrl,
       mediaType: 'video',
       format: 'custom_video',
-      width: isSquare ? 1080 : (renderedAsset.aspectRatio === '9:16' ? 1080 : 1920),
-      height: isSquare ? 1080 : (renderedAsset.aspectRatio === '9:16' ? 1920 : 1080),
-      aspectRatio: renderedAsset.aspectRatio || (isSquare ? '1:1' : '9:16'),
+      width: targetDimensions.width,
+      height: targetDimensions.height,
+      aspectRatio: ratio,
       driveFileId: renderedAsset.driveFileId || renderedAsset.drive_file_id,
       drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
     };
@@ -265,11 +312,11 @@ export default function SocialDraftComposer({
       if (!prev) return prev;
       const updatedAssets = [newAsset, ...(prev.assets || []).filter(a => a.mediaType !== 'video')];
       const updatedVariants = (prev.variants || []).map(v => {
-        const match = targetPlatforms.includes(v.platform) || !isSquare;
-        if (!match) return v;
+        if (!targetPlatforms.includes(v.platform)) return v;
 
         return {
           ...v,
+          selected_asset_id: attachedAssetIds.get(v.id) || v.selected_asset_id,
           media_urls: [videoUrl],
           drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id || v.drive_file_id,
           platform_options: {
@@ -277,7 +324,8 @@ export default function SocialDraftComposer({
             video_url: videoUrl,
             asset_url: videoUrl,
             drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
-            aspect_ratio: renderedAsset.aspectRatio,
+            aspect_ratio: ratio,
+            asset_format: targetDimensions.format,
             post_format: 'single',
           },
         };
@@ -289,10 +337,10 @@ export default function SocialDraftComposer({
       };
     });
 
-    if (renderedAsset.aspectRatio) {
-      setCanvasAspectRatio(renderedAsset.aspectRatio);
-    }
-    toast.success(`🎬 ${renderedAsset.aspectRatio || 'Video'} clip attached to ${isSquare ? 'Facebook & Threads' : 'TikTok & Instagram'}!`);
+    setCanvasAspectRatio(ratio);
+    const platformNames = matchingVariants.map(variant => variant.platform).join(', ');
+    toast.success(`🎬 ${ratio} clip attached to ${platformNames}!`);
+    return true;
   };
 
   const handleCanvasCutVideo = async (cutData) => {
@@ -1620,7 +1668,9 @@ export default function SocialDraftComposer({
           <button
             type="button"
             onClick={() => setVideoStudioOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-red-500/30 bg-red-600/10 px-5 text-xs font-black uppercase tracking-wider text-red-500 hover:bg-red-600/20 transition-all"
+            disabled={!result}
+            title={!result ? 'Generate the social draft first so the rendered clip has somewhere to attach' : 'Open the YouTube and video clip studio'}
+            className="inline-flex h-11 items-center gap-2 rounded-lg border border-red-500/30 bg-red-600/10 px-5 text-xs font-black uppercase tracking-wider text-red-500 hover:bg-red-600/20 transition-all disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Icon icon="solar:clapperboard-play-bold" width="18" />
             <span>YouTube / Video Clip Studio</span>

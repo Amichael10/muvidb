@@ -2,6 +2,47 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export const maxDuration = 60;
 
+const SOCIAL_ALLOWED_ORIGINS = new Set([
+  'https://muvidb.com',
+  'https://www.muvidb.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+]);
+
+function applyCors(req: VercelRequest, res: VercelResponse) {
+  const origin = String(req.headers.origin || '');
+  const configuredOrigins = [process.env.SITE_URL, process.env.VITE_SITE_URL]
+    .filter(Boolean)
+    .map(value => String(value).replace(/\/$/, ''));
+  if (origin && (SOCIAL_ALLOWED_ORIGINS.has(origin) || configuredOrigins.includes(origin))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
+function parseBody(req: VercelRequest): Record<string, any> {
+  if (typeof req.body !== 'string') return req.body || {};
+  try {
+    return JSON.parse(req.body);
+  } catch {
+    return {};
+  }
+}
+
+function isSafeRemoteVideoUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 const EDITORIAL_TASKS = new Set([
   'candidates',
   'calendar',
@@ -12,9 +53,7 @@ const EDITORIAL_TASKS = new Set([
 ]);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  applyCors(req, res);
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
@@ -27,77 +66,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (task === 'create_upload_session' || task === 'drive_upload_session' || pathname.includes('/drive/create-upload-session')) {
+      const { requireSocialStudioAdmin } = await import('./_lib/social_studio.js');
+      await requireSocialStudioAdmin(req);
       const { createDriveUploadSession } = await import('./_lib/google_drive.js');
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const body = parseBody(req);
       const { fileName, mimeType, fileSize } = body;
       if (!fileName || !fileSize) {
         return res.status(400).json({ error: 'Missing fileName or fileSize' });
       }
+      const numericSize = Number(fileSize);
+      if (!Number.isFinite(numericSize) || numericSize <= 0 || numericSize > 2 * 1024 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Video size must be between 1 byte and 2 GB' });
+      }
+      if (!/^video\/(mp4|webm|quicktime)$/i.test(String(mimeType || 'video/webm'))) {
+        return res.status(400).json({ error: 'Only MP4, WebM, or MOV videos can be uploaded' });
+      }
       const uploadUrl = await createDriveUploadSession(
-        fileName,
+        String(fileName).replace(/[^a-z0-9._-]+/gi, '_').slice(0, 140),
         mimeType || 'video/webm',
-        Number(fileSize)
+        numericSize
       );
       return res.status(200).json({ uploadUrl });
     }
 
     if (task === 'make_drive_file_public') {
+      const { requireSocialStudioAdmin } = await import('./_lib/social_studio.js');
+      await requireSocialStudioAdmin(req);
       const { makeFilePublic } = await import('./_lib/google_drive.js');
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const body = parseBody(req);
       const { fileId } = body;
-      if (!fileId) return res.status(400).json({ error: 'Missing fileId' });
+      if (!fileId || !/^[a-zA-Z0-9_-]{10,200}$/.test(String(fileId))) {
+        return res.status(400).json({ error: 'A valid Drive file ID is required' });
+      }
       const publicUrl = await makeFilePublic(fileId);
       return res.status(200).json({ success: true, publicUrl });
     }
 
     if (task === 'clip_video' || task === 'render_clip') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const { requireSocialStudioAdmin } = await import('./_lib/social_studio.js');
+      await requireSocialStudioAdmin(req);
+      const body = parseBody(req);
       const { url, startTime, endTime, aspectRatio, fitMode, title } = body;
-      if (!url) return res.status(400).json({ error: 'Missing video url' });
-
-      // 1. Try local residential processor first (Solution 1: Fastest & Zero Bot Wall)
-      try {
-        const { spawnSync } = await import('child_process');
-        const fs = await import('fs');
-        const path = await import('path');
-        const scriptPath = path.resolve(process.cwd(), 'scripts', 'local_clip_processor.py');
-
-        if (fs.existsSync(scriptPath)) {
-          const payloadB64 = Buffer.from(JSON.stringify({
-            url,
-            startTime: Number(startTime) || 0,
-            endTime: Number(endTime) || (Number(startTime) + 60),
-            aspectRatio: aspectRatio || '9:16',
-            fitMode: fitMode || 'cover',
-            title: title || 'clip',
-          })).toString('base64');
-
-          const proc = spawnSync('python', [scriptPath, payloadB64], {
-            timeout: 180_000,
-            encoding: 'utf-8',
-          });
-
-          if (proc.stdout) {
-            const lines = proc.stdout.trim().split('\n');
-            for (let i = lines.length - 1; i >= 0; i--) {
-              try {
-                const parsed = JSON.parse(lines[i]);
-                if (parsed && typeof parsed.success === 'boolean') {
-                  if (parsed.success) {
-                    return res.status(200).json(parsed);
-                  } else {
-                    console.warn('[LocalClipper] Local processor reported error:', parsed.error);
-                  }
-                }
-              } catch {}
-            }
-          }
-        }
-      } catch (localErr) {
-        console.warn('[LocalClipper] Local execution bypassed:', localErr);
+      if (!isSafeRemoteVideoUrl(url)) return res.status(400).json({ error: 'Enter a valid HTTPS video URL' });
+      const start = Math.max(0, Number(startTime) || 0);
+      const end = Number(endTime) || start + 60;
+      if (end <= start || end - start > 600) {
+        return res.status(400).json({ error: 'Choose a clip between 1 second and 10 minutes' });
+      }
+      if (!['1:1', '4:5', '9:16', '16:9'].includes(String(aspectRatio || '9:16'))) {
+        return res.status(400).json({ error: 'Choose a supported video aspect ratio' });
       }
 
-      // 2. Cloud Extractor Fallback
+      // The free desktop companion is called directly by the admin browser so
+      // yt-dlp uses the administrator's residential connection. This server
+      // route is deliberately cloud-only; pretending Vercel is "local" simply
+      // recreates YouTube's datacenter bot wall.
       const extractorBaseUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
       const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -108,8 +131,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers,
         body: JSON.stringify({
           url,
-          start_time: Number(startTime) || 0,
-          end_time: Number(endTime) || (Number(startTime) + 60),
+          start_time: start,
+          end_time: end,
           aspect_ratio: aspectRatio || '9:16',
           fit_mode: fitMode || 'cover',
           title: title || 'clip',
@@ -119,12 +142,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const data = await extRes.json().catch(() => ({}));
       if (!extRes.ok || !data.success) {
-        return res.status(500).json({ error: data.error || 'Video rendering failed on extractor' });
+        console.error('[Social clipper] Extractor failed:', data.error || extRes.status);
+        return res.status(502).json({
+          error: 'The video could not be prepared automatically. Start the free MuviDB desktop clipper and try again.',
+          code: 'clipper_cloud_unavailable',
+        });
       }
       return res.status(200).json(data);
     }
 
     if (scope === 'editorial' || EDITORIAL_TASKS.has(task)) {
+      const { requireSocialStudioAdmin } = await import('./_lib/social_studio.js');
+      await requireSocialStudioAdmin(req);
       const { handleEditorialTask } = await import('./_lib/editorial_handler.js');
       return handleEditorialTask(req, res);
     }
@@ -248,6 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } = await import('./_lib/threads_oauth.js');
 
     if (task === 'render_preview') {
+      await requireSocialStudioAdmin(req);
       const { candidate, format = 'portrait_4_5' } = (req.method === 'POST' ? req.body : req.query) || {};
       if (!candidate) {
         return res.status(400).json({ error: 'Candidate data is required for preview rendering' });
@@ -424,6 +454,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (task === 'search_candidates') {
+        await requireSocialStudioAdmin(req);
         const { q, type = 'all', limit = 20 } = req.body || {};
         const { searchCandidates } = await import('./_lib/editorial/candidate_service.js');
         return res.status(200).json(await searchCandidates(String(q || ''), type, Number(limit)));
@@ -490,11 +521,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'attach_custom_asset') {
         const actor = await requireSocialStudioAdmin(req);
-        const { contentItemId, publicUrl, format, width, height } = req.body || {};
+        const { contentItemId, variantId, publicUrl, format, width, height, driveFileId, aspectRatio } = req.body || {};
         if (!contentItemId || !publicUrl) {
           return res.status(400).json({ error: 'contentItemId and publicUrl are required' });
         }
-        return res.status(200).json(await attachCustomAsset({ contentItemId, publicUrl, format, width, height }, actor));
+        return res.status(200).json(await attachCustomAsset({
+          contentItemId, variantId, publicUrl, format, width, height, driveFileId, aspectRatio,
+        }, actor));
       }
 
       if (task === 'attach_carousel_assets') {
@@ -677,9 +710,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err: any) {
-    console.error('[api/social]', err);
-    return res.status(err?.status || 500).json({
-      error: err?.message || 'Social Studio request failed',
+    const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    console.error(`[api/social:${requestId}]`, err);
+    const status = Number(err?.status || 500);
+    return res.status(status).json({
+      error: status < 500
+        ? (err?.message || 'The request could not be completed')
+        : 'Social Studio could not complete that request. Please try again.',
+      requestId,
     });
   }
 }

@@ -5,6 +5,7 @@ import { scoreCandidate } from './editorial/scoring_service.js';
 import { buildFactPack } from './editorial/fact_pack_service.js';
 import { generateEditorialAngles, generateEditorialCopy } from './editorial/copy_service.js';
 import { seedRollingCalendar } from './editorial/calendar_service.js';
+import { requireSocialStudioAdmin } from './social_studio.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
@@ -13,6 +14,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 export async function handleEditorialTask(req: VercelRequest, res: VercelResponse) {
   try {
+    await requireSocialStudioAdmin(req);
     const task = (req.query.task || req.body?.task || '').toString();
 
     // 1. GET candidates

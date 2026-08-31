@@ -22,7 +22,8 @@ describe('TikTokPlatformAdapter', () => {
         duet_disabled: false,
         stitch_disabled: false,
       } }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { publish_id: 'tt_pub_123' } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { publish_id: 'tt_pub_123' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { status: 'PUBLISH_COMPLETE', publicly_available_post_id: ['tt_post_123'] } }), { status: 200 }));
 
     const adapter = new TikTokPlatformAdapter({
       accessToken: 'tt-token',
@@ -31,7 +32,7 @@ describe('TikTokPlatformAdapter', () => {
 
     const result = await adapter.publish(request());
 
-    expect(result.externalPostId).toBe('tt_pub_123');
+    expect(result.externalPostId).toBe('tt_post_123');
     expect(result.platform).toBe('tiktok');
     expect(result.variantStatus).toBe('published');
 
@@ -42,9 +43,9 @@ describe('TikTokPlatformAdapter', () => {
   });
 
   it('uploads photo post as draft', async () => {
-    const fetchImpl = vi.fn().mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: { publish_id: 'tt_photo_456' } }), { status: 200 })
-    );
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { publish_id: 'tt_photo_456' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { status: 'SEND_TO_USER_INBOX' } }), { status: 200 }));
 
     const adapter = new TikTokPlatformAdapter({
       accessToken: 'tt-token',
@@ -68,7 +69,8 @@ describe('TikTokPlatformAdapter', () => {
         privacy_level_options: ['SELF_ONLY'],
         comment_disabled: true,
       } }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { publish_id: 'tt_carousel_1' } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { publish_id: 'tt_carousel_1' } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { status: 'PUBLISH_COMPLETE' } }), { status: 200 }));
     const adapter = new TikTokPlatformAdapter({ accessToken: 'tt-token', fetchImpl });
 
     await adapter.publish(request({

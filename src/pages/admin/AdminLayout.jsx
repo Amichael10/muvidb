@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, Link, useLocation, Navigate } from 'react-router-dom';
+import { Outlet, NavLink, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Icon } from '@iconify/react';
 import { useAdminNotifications } from '../../hooks/useAdminNotifications';
@@ -7,6 +7,8 @@ import { useAdminNotifications } from '../../hooks/useAdminNotifications';
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [globalSearch, setGlobalSearch] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const isSuperAdmin = user?.role === 'admin';
   const { totalCount, cinemaCount, claimCount, notifications, loading: notificationsLoading } = useAdminNotifications(isSuperAdmin);
@@ -207,14 +209,37 @@ export default function AdminLayout() {
             <h1 className="hidden sm:block text-lg font-bold text-text-primary tracking-tight">
               {currentPage?.label || 'Dashboard'}
             </h1>
-            <div className="hidden md:flex ml-8 items-center bg-surface-2 rounded-lg px-3 py-1.5 border border-border group">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const q = globalSearch.trim();
+                if (!q) return;
+                if (location.pathname.startsWith('/admin/films')) {
+                  navigate(`/admin/films?search=${encodeURIComponent(q)}`);
+                } else {
+                  navigate(`/admin/people?search=${encodeURIComponent(q)}`);
+                }
+              }}
+              className="hidden md:flex ml-8 items-center bg-surface-2 rounded-lg px-3 py-1.5 border border-border group focus-within:border-brand transition-colors"
+            >
               <Icon icon="solar:magnifer-linear" className="text-text-muted transition-colors group-focus-within:text-brand" />
               <input 
                 type="text" 
-                placeholder="Search resources..." 
+                placeholder="Search people or films..." 
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
                 className="bg-transparent border-none focus:ring-0 text-sm w-64 placeholder:text-text-muted ml-2 text-text-primary outline-none"
               />
-            </div>
+              {globalSearch && (
+                <button
+                  type="button"
+                  onClick={() => setGlobalSearch('')}
+                  className="text-text-muted hover:text-text-primary text-xs ml-1"
+                >
+                  ✕
+                </button>
+              )}
+            </form>
           </div>
 
           <div className="ml-auto flex items-center gap-2 md:gap-4">

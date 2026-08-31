@@ -1,0 +1,5 @@
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+# Keep a broadly available floor; pip will install the newest compatible yt-dlp.
+yt-dlp>=2025.1.15
+pydantic==2.11.7

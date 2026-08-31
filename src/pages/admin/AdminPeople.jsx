@@ -40,6 +40,14 @@ export default function AdminPeople() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    const urlQ = searchParams.get('search') || '';
+    if (urlQ && urlQ !== search) {
+      setSearch(urlQ);
+      setDebouncedSearch(urlQ);
+    }
+  }, [searchParams]);
+
   const [verifiedFilter, setVerifiedFilter] = useState('All'); 
   const [spotlightFilter, setSpotlightFilter] = useState('All'); 
   const [profileStatus, setProfileStatus] = useState('All'); 
@@ -182,13 +190,15 @@ export default function AdminPeople() {
   const fetchPeople = async () => {
     setIsLoading(true);
     try {
+      const cleanSearch = (debouncedSearch || '').trim();
+
       // 1. Get exact total count for the current filters
       let countQuery = supabase
         .from('people')
         .select('*', { count: 'exact', head: true });
 
-      if (debouncedSearch.trim()) {
-        countQuery = countQuery.ilike('name', `%${debouncedSearch}%`);
+      if (cleanSearch) {
+        countQuery = countQuery.ilike('name', `%${cleanSearch}%`);
       }
       if (profileStatus === 'Incomplete') {
         // OR logic for incomplete profiles (missing bio OR missing photo)
@@ -200,6 +210,18 @@ export default function AdminPeople() {
           .not('photo_url', 'is', null)
           .neq('bio', '')
           .neq('photo_url', '');
+      }
+
+      if (verifiedFilter === 'Verified') {
+        countQuery = countQuery.eq('is_verified', true);
+      } else if (verifiedFilter === 'Member') {
+        countQuery = countQuery.eq('is_verified', false);
+      }
+
+      if (spotlightFilter === 'Spotlight') {
+        countQuery = countQuery.eq('is_spotlight', true);
+      } else if (spotlightFilter === 'Regular') {
+        countQuery = countQuery.eq('is_spotlight', false);
       }
 
       const { count, error: countError } = await countQuery;
@@ -219,7 +241,7 @@ export default function AdminPeople() {
       const sort = sortConfigs[sortBy] || sortConfigs['Most Popular'];
       
       const { data, error } = await supabase.rpc('get_people_with_counts', {
-        p_search: debouncedSearch,
+        p_search: cleanSearch,
         p_verified: verifiedFilter.toLowerCase(),
         p_spotlight: spotlightFilter.toLowerCase(),
         p_sort_col: sort.col,
@@ -229,8 +251,48 @@ export default function AdminPeople() {
         p_status: profileStatus.toLowerCase()
       });
 
-      if (error) throw error;
-      setPeople(data || []);
+      if (error) {
+        console.warn('RPC get_people_with_counts error, falling back to direct table query:', error);
+        let fallbackQuery = supabase
+          .from('people')
+          .select(`
+            id, name, photo_url, is_verified, is_spotlight, popularity_score,
+            known_for_department, created_at
+          `);
+
+        if (cleanSearch) {
+          fallbackQuery = fallbackQuery.ilike('name', `%${cleanSearch}%`);
+        }
+        if (profileStatus === 'Incomplete') {
+          fallbackQuery = fallbackQuery.or('bio.is.null,photo_url.is.null,bio.eq.,photo_url.eq.');
+        } else if (profileStatus === 'Complete') {
+          fallbackQuery = fallbackQuery
+            .not('bio', 'is', null)
+            .not('photo_url', 'is', null)
+            .neq('bio', '')
+            .neq('photo_url', '');
+        }
+        if (verifiedFilter === 'Verified') {
+          fallbackQuery = fallbackQuery.eq('is_verified', true);
+        } else if (verifiedFilter === 'Member') {
+          fallbackQuery = fallbackQuery.eq('is_verified', false);
+        }
+        if (spotlightFilter === 'Spotlight') {
+          fallbackQuery = fallbackQuery.eq('is_spotlight', true);
+        } else if (spotlightFilter === 'Regular') {
+          fallbackQuery = fallbackQuery.eq('is_spotlight', false);
+        }
+
+        fallbackQuery = fallbackQuery
+          .order(sort.col, { ascending: sort.asc })
+          .range((page - 1) * pageSize, page * pageSize - 1);
+
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        if (fallbackError) throw fallbackError;
+        setPeople(fallbackData || []);
+      } else {
+        setPeople(data || []);
+      }
     } catch (error) {
       console.error('Error fetching people:', error);
       // Fixed id so a flurry of failed searches/filters shows ONE snackbar, not a stack.
@@ -696,8 +758,18 @@ export default function AdminPeople() {
               placeholder="Search records..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-2 border border-border rounded-md pl-10 pr-4 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
+              className="w-full bg-surface-2 border border-border rounded-md pl-10 pr-9 py-2 text-sm text-text-primary outline-none focus:border-brand transition-colors"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors text-xs p-1"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </div>
           <select value={profileStatus} onChange={(e) => setProfileStatus(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
             <option value="All">All Status</option>

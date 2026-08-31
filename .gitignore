@@ -90,6 +90,98 @@ scratch/
 
 # React Router framework-mode generated typegen + build output
 .react-router/
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.vercel
+.env*.local
+
+# .claude: ignore local settings and downloaded skill packs, but commit our own project skills
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/db-check/
+!.claude/skills/db-migration/
+!.claude/skills/scraper-recon/
+!.claude/skills/db-fix/
+!.claude/skills/new-adapter/
+
+# Temporary task/run directories
+temp_lumi_*/
+.tmp-npm-cache/
+
+# Scratch and output directories
+scratch/
+output/
+
+# Root-level test, fix, and debug scripts
+check_constraints.js
+check_triggers.js
+crew_extractor.py
+db_debug.json
+find_cinemas.cjs
+fix_db.js
+fix_db_more.js
+retry_config.cjs
+sanitize_and_configure_cinemas.cjs
+test_merge.js
+test_merge_dummy.js
+test_merge_invalid.js
+test_merge_same.js
+test_sync.cjs
+test_sync.ts
+test_update.js
+update_cinemas.cjs
+update_cinemas2.cjs
+update_cinemas3.cjs
+
+# Untracked scripts in scripts/
+scripts/clean_hallucinated.cjs
+scripts/inspect.ts
+scripts/inspect_rpcs.ts
+scripts/seed-cinemas.ts
+scripts/sniff_ojaja.ts
+scripts/sniff_pepperoni.ts
+scripts/temp.ts
+scripts/test-api.ts
+scripts/test-films-query.ts
+scripts/test-get-people.ts
+scripts/test-scraper.ts
+
+# Archive and backup files
+project.tar.gz
+*.tar.gz
+*.zip
+*.mp4
+*.png
+*.jpg
+*.jpeg
+# Keep shipped site assets (homepage intro cards, attribution logos, etc.)
+!public/images/**/*.png
+!public/images/**/*.jpg
+!public/images/**/*.jpeg
+!public/images/**/*.webp
+!public/images/**/*.svg
+*.bak
+
+# Playwright storageState — holds live login cookies (NetflixId/SecureNetflixId
+# are a full Netflix session). Never commit these.
+netflix_playwright_state.json
+.netflix-chrome-profile/
+*_playwright_state.json
+.playwright-cli/
+
+# Local agent tooling + throwaway repair/inspection scripts.
+.agents/
+scratch/
+
+# React Router framework-mode generated typegen + build output
+.react-router/
 build/
 
 # Social Studio design mockups (large PNG references, kept local)
@@ -97,3 +189,10 @@ docs/social-templates/*.png
 
 # Local credit-roll frame dumps from harvest_credits.ts --frames-only
 harvest_frames/
+.local-clipper-venv/
+.vercel_python_packages/
+test_artifacts/
+scratch*
+*.part
+cookies.txt
+cookies.txt.txt

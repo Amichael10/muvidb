@@ -177,9 +177,9 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
           childParams.set('video_url', mediaUrl);
         } else {
           childParams.set('image_url', mediaUrl);
+          const altText = String(carouselAssets[index]?.alt_text || '').trim();
+          if (altText) childParams.set('alt_text', altText.slice(0, 1000));
         }
-        const altText = String(carouselAssets[index]?.alt_text || '').trim();
-        if (altText) childParams.set('alt_text', altText.slice(0, 1000));
         const child = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, childParams);
         if (!child.id) {
           throw new SocialPlatformError({

@@ -74,6 +74,49 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
     return payload;
   }
 
+  async checkPublishStatus(
+    publishId: string,
+    deliveryMode: 'DIRECT_POST' | 'MEDIA_UPLOAD' = 'DIRECT_POST',
+  ): Promise<SocialPublishResult> {
+    const response = await this.postJson('/post/publish/status/fetch/', { publish_id: publishId });
+    const data = response.data || {};
+    const status = String(data.status || 'PROCESSING_UPLOAD');
+    const availablePostIds = data.publicly_available_post_id ?? data.publicaly_available_post_id;
+    const publicIds = Array.isArray(availablePostIds)
+      ? availablePostIds.map(String).filter(Boolean)
+      : [];
+
+    if (status === 'FAILED') {
+      throw new SocialPlatformError({
+        platform: 'tiktok',
+        code: `tiktok_publish_${String(data.fail_reason || 'failed').toLowerCase()}`,
+        message: `TikTok could not publish this post: ${String(data.fail_reason || 'media processing failed').replace(/_/g, ' ')}.`,
+        retryable: false,
+        details: { publish_id: publishId, status, fail_reason: data.fail_reason || null },
+      });
+    }
+
+    const complete = status === 'PUBLISH_COMPLETE';
+    const deliveredToInbox = status === 'SEND_TO_USER_INBOX';
+    return {
+      platform: 'tiktok',
+      providerPublishId: publishId,
+      externalPostId: publicIds[0] || publishId,
+      externalPermalink: null,
+      providerResponse: {
+        ...response,
+        delivery_mode: deliveryMode,
+        publish_status: status,
+        publicly_available_post_ids: publicIds,
+      },
+      variantStatus: complete
+        ? 'published'
+        : deliveredToInbox && deliveryMode === 'MEDIA_UPLOAD'
+          ? 'uploaded_as_draft'
+          : 'publishing',
+    };
+  }
+
   async publish(request: SocialPublishRequest): Promise<SocialPublishResult> {
     if (!request.assetUrl) {
       throw new SocialPlatformError({
@@ -228,14 +271,9 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
         });
       }
 
-      return {
-        platform: 'tiktok',
-        providerPublishId: publishId,
-        externalPostId: publishId,
-        externalPermalink: null,
-        providerResponse: { ...res, creator_info: creatorInfo, delivery_mode: postMode },
-        variantStatus: postMode === 'MEDIA_UPLOAD' ? 'uploaded_as_draft' : 'published',
-      };
+      const statusResult = await this.checkPublishStatus(publishId, postMode);
+      statusResult.providerResponse = { ...statusResult.providerResponse, creator_info: creatorInfo };
+      return statusResult;
     }
 
     // 2. Direct Photo / Photo Carousel Post
@@ -276,13 +314,8 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
-    return {
-      platform: 'tiktok',
-      providerPublishId: publishId,
-      externalPostId: publishId,
-      externalPermalink: null,
-      providerResponse: { ...res, creator_info: creatorInfo, delivery_mode: postMode },
-      variantStatus: postMode === 'MEDIA_UPLOAD' ? 'uploaded_as_draft' : 'published',
-    };
+    const statusResult = await this.checkPublishStatus(publishId, postMode);
+    statusResult.providerResponse = { ...statusResult.providerResponse, creator_info: creatorInfo };
+    return statusResult;
   }
 }
