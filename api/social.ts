@@ -55,6 +55,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { url, startTime, endTime, aspectRatio, fitMode, title } = body;
       if (!url) return res.status(400).json({ error: 'Missing video url' });
 
+      // 1. Try local residential processor first (Solution 1: Fastest & Zero Bot Wall)
+      try {
+        const { spawnSync } = await import('child_process');
+        const fs = await import('fs');
+        const path = await import('path');
+        const scriptPath = path.resolve(process.cwd(), 'scripts', 'local_clip_processor.py');
+
+        if (fs.existsSync(scriptPath)) {
+          const payloadB64 = Buffer.from(JSON.stringify({
+            url,
+            startTime: Number(startTime) || 0,
+            endTime: Number(endTime) || (Number(startTime) + 60),
+            aspectRatio: aspectRatio || '9:16',
+            fitMode: fitMode || 'cover',
+            title: title || 'clip',
+          })).toString('base64');
+
+          const proc = spawnSync('python', [scriptPath, payloadB64], {
+            timeout: 180_000,
+            encoding: 'utf-8',
+          });
+
+          if (proc.stdout) {
+            const lines = proc.stdout.trim().split('\n');
+            for (let i = lines.length - 1; i >= 0; i--) {
+              try {
+                const parsed = JSON.parse(lines[i]);
+                if (parsed && typeof parsed.success === 'boolean') {
+                  if (parsed.success) {
+                    return res.status(200).json(parsed);
+                  } else {
+                    console.warn('[LocalClipper] Local processor reported error:', parsed.error);
+                  }
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch (localErr) {
+        console.warn('[LocalClipper] Local execution bypassed:', localErr);
+      }
+
+      // 2. Cloud Extractor Fallback
       const extractorBaseUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
       const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };

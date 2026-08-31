@@ -281,193 +281,7 @@ export default function SocialVideoClipModal({
     }
   };
 
-  // In-Browser MediaRecorder -> Direct Google Drive Upload (Zero Bot Wall)
-  const handleRecordInBrowserAndUploadToDrive = async () => {
-    if (!videoInput.trim() && !videoUrl) {
-      return toast.error('Please enter a video URL or YouTube link');
-    }
-    if (activeTab === 'clip_range' && endTime <= startTime) {
-      return toast.error('End time must be greater than start time');
-    }
-
-    const startSec = activeTab === 'clip_range' ? startTime : 0;
-    const endSec = activeTab === 'clip_range' ? endTime : (duration || 60);
-    const sliceLen = Math.max(1, endSec - startSec);
-
-    setIsRendering(true);
-    setRenderProgress(10);
-    setRenderStage(1);
-    setRenderStatusText(`[1/3] Preparing In-Browser Capture (${formatSecondsToTimecode(startSec)} → ${formatSecondsToTimecode(endSec)})...`);
-
-    try {
-      // 1. Check if direct video element is available
-      let stream = null;
-      if (videoRef.current && typeof videoRef.current.captureStream === 'function') {
-        try {
-          stream = videoRef.current.captureStream();
-        } catch {
-          stream = null;
-        }
-      }
-
-      // If iframe or captureStream not accessible directly, prompt user for high-def tab capture with 1 click
-      if (!stream && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-        toast('Confirm window/tab capture to record audio & video stream directly without server blocks', { icon: '🎬', duration: 4000 });
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 30 },
-          audio: true,
-          preferCurrentTab: true,
-        });
-      }
-
-      if (!stream) {
-        // Fallback to server-side render if browser screen capture was cancelled
-        toast('Falling back to cloud render...', { icon: '☁️' });
-        return handleRenderAndAttachClip();
-      }
-
-      setRenderStage(2);
-      setRenderStatusText(`[2/3] Live Recording ${cropAspectRatio} segment (${sliceLen}s)...`);
-
-      // Seek & Play
-      if (videoRef.current) {
-        videoRef.current.currentTime = startSec;
-        videoRef.current.play().catch(() => {});
-      } else if (iframeRef.current) {
-        iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [startSec, true] }), '*');
-        iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), '*');
-      }
-
-      const mimeType = MediaRecorder.isTypeSupported('video/mp4;codecs=avc1,mp4a.40.2')
-        ? 'video/mp4;codecs=avc1,mp4a.40.2'
-        : (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm');
-
-      const recordedChunks = [];
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          recordedChunks.push(e.data);
-        }
-      };
-
-      const recordPromise = new Promise((resolve) => {
-        recorder.onstop = () => resolve();
-      });
-
-      recorder.start(500);
-
-      // Countdown ticker
-      let elapsed = 0;
-      const interval = setInterval(() => {
-        elapsed += 1;
-        const progressPct = Math.min(80, Math.round(10 + (elapsed / sliceLen) * 70));
-        setRenderProgress(progressPct);
-        setRenderStatusText(`[2/3] Recording live: ${Math.max(0, sliceLen - elapsed)}s remaining (${cropAspectRatio})...`);
-
-        if (elapsed >= sliceLen) {
-          clearInterval(interval);
-          if (recorder.state === 'recording') {
-            recorder.stop();
-          }
-          stream.getTracks().forEach(t => t.stop());
-          if (videoRef.current) videoRef.current.pause();
-        }
-      }, 1000);
-
-      await recordPromise;
-      clearInterval(interval);
-
-      setRenderStage(3);
-      setRenderProgress(85);
-      setRenderStatusText(`[3/3] Uploading directly to Google Drive...`);
-
-      const cleanMime = mimeType.split(';')[0];
-      const recordedBlob = new Blob(recordedChunks, { type: cleanMime });
-      const safeTitle = (videoTitle || 'clip').replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-      const ext = cleanMime.includes('mp4') ? 'mp4' : 'webm';
-      const fileName = `clip_${safeTitle}_${Math.floor(startSec)}_${Math.floor(endSec)}_${cropAspectRatio.replace(':', 'x')}_${Date.now()}.${ext}`;
-
-      // 1. Create Google Drive upload session
-      const sessionRes = await fetch('/api/social?task=create_upload_session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName,
-          mimeType: cleanMime,
-          fileSize: recordedBlob.size,
-        }),
-      });
-
-      const sessionData = await sessionRes.json().catch(() => ({}));
-      if (!sessionRes.ok || !sessionData.uploadUrl) {
-        throw new Error(sessionData.error || 'Failed to create Google Drive upload session');
-      }
-
-      // 2. Stream blob directly to Google Drive
-      const driveUploadRes = await fetch(sessionData.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': cleanMime,
-        },
-        body: recordedBlob,
-      });
-
-      if (!driveUploadRes.ok) {
-        throw new Error(`Google Drive upload failed (${driveUploadRes.status})`);
-      }
-
-      const driveData = await driveUploadRes.json().catch(() => ({}));
-      const driveFileId = driveData.id;
-
-      // 3. Make Drive file publicly readable
-      let publicUrl = `https://drive.google.com/uc?export=download&id=${driveFileId}`;
-      if (driveFileId) {
-        const pubRes = await fetch('/api/social?task=make_drive_file_public', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileId: driveFileId }),
-        });
-        const pubData = await pubRes.json().catch(() => ({}));
-        if (pubData.publicUrl) publicUrl = pubData.publicUrl;
-      }
-
-      setRenderProgress(100);
-      setRenderStatusText('[Done] Uploaded to Google Drive & attached to draft!');
-
-      const clipAsset = {
-        url: publicUrl,
-        public_url: publicUrl,
-        publicUrl: publicUrl,
-        driveFileId,
-        drive_file_id: driveFileId,
-        format: 'custom_video',
-        mediaType: 'video',
-        duration: sliceLen,
-        aspectRatio: cropAspectRatio,
-        fileName,
-        sizeMb: Math.round((recordedBlob.size / (1024 * 1024)) * 100) / 100,
-        title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startSec)} - ${formatSecondsToTimecode(endSec)})`,
-        isRenderedMp4: true,
-      };
-
-      onImportToCanvas?.(clipAsset);
-      onAttachRenderedVideo?.(clipAsset);
-
-      toast.success(`🎉 ${cropAspectRatio} Clip uploaded to Google Drive & attached!`);
-      setTimeout(() => {
-        setIsRendering(false);
-        onClose();
-      }, 1000);
-
-    } catch (err) {
-      setIsRendering(false);
-      console.error('In-browser recording failed:', err);
-      toast.error(err.message || 'Recording cancelled. You can also try Server Render.');
-    }
-  };
-
-  // True Server-Side Render, 9:16 Crop & Cloudinary/Supabase Storage Attachment
+  // Native Residential Stream Slicing & Direct Google Drive Upload
   const handleRenderAndAttachClip = async () => {
     if (!videoInput.trim() && !videoUrl) {
       return toast.error('Please enter a video URL or YouTube link');
@@ -483,7 +297,7 @@ export default function SocialVideoClipModal({
     setIsRendering(true);
     setRenderProgress(10);
     setRenderStage(1);
-    setRenderStatusText(`[1/3] Downloading & Slicing (${formatSecondsToTimecode(startSec)} → ${formatSecondsToTimecode(endSec)})...`);
+    setRenderStatusText(`[1/3] Slicing source segment (${formatSecondsToTimecode(startSec)} → ${formatSecondsToTimecode(endSec)})...`);
 
     // Dynamic progress bar ticker
     let currentP = 10;
@@ -492,14 +306,14 @@ export default function SocialVideoClipModal({
       if (currentP > 92) currentP = 92;
       setRenderProgress(currentP);
 
-      if (currentP > 40 && currentP <= 75) {
+      if (currentP > 35 && currentP <= 75) {
         setRenderStage(2);
-        setRenderStatusText(`[2/3] Applying ${cropAspectRatio} ${cropFitMode === 'cover' ? 'Vertical Fill Crop' : 'Letterbox Fit'} & Encoding 1080x1920 MP4...`);
+        setRenderStatusText(`[2/3] Applying ${cropAspectRatio} ${cropFitMode === 'cover' ? 'Fill Crop' : 'Letterbox Fit'} & Encoding 1080p MP4...`);
       } else if (currentP > 75) {
         setRenderStage(3);
-        setRenderStatusText(`[3/3] Uploading rendered MP4 to Cloud Storage & attaching to variants...`);
+        setRenderStatusText(`[3/3] Uploading MP4 to Google Drive & attaching to variants...`);
       }
-    }, 900);
+    }, 800);
 
     try {
       const rawTarget = (videoInput.trim() || videoUrl || '').trim();
@@ -546,11 +360,13 @@ export default function SocialVideoClipModal({
       setRenderProgress(100);
       setRenderStatusText('[Done] Video rendered, cropped & attached to draft!');
 
-      // Notify parent composer and attach MP4 video
+      // Notify parent composer and attach MP4 video with drive_file_id
       const clipAsset = {
         url: data.public_url,
         public_url: data.public_url,
         publicUrl: data.public_url,
+        driveFileId: data.drive_file_id,
+        drive_file_id: data.drive_file_id,
         format: 'custom_video',
         mediaType: 'video',
         duration: sliceLen,
@@ -564,7 +380,7 @@ export default function SocialVideoClipModal({
       onImportToCanvas?.(clipAsset);
       onAttachRenderedVideo?.(clipAsset);
 
-      toast.success(`🎉 ${cropAspectRatio} Video Clip rendered & attached to draft!`);
+      toast.success(`🎉 ${cropAspectRatio} Video Clip attached to draft!`);
       setTimeout(() => {
         setIsRendering(false);
         onClose();
@@ -851,28 +667,16 @@ export default function SocialVideoClipModal({
                     <span>Canvas Preview</span>
                   </button>
 
-                  {/* In-Browser Capture & Direct Google Drive Upload (Zero Bot Wall) */}
-                  <button
-                    type="button"
-                    onClick={handleRecordInBrowserAndUploadToDrive}
-                    disabled={!videoUrl || clipDuration <= 0 || isRendering}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 disabled:opacity-50 shadow-lg"
-                    title="Records directly in your browser and streams straight to Google Drive without datacenter bot walls"
-                  >
-                    <Icon icon="solar:cloud-upload-bold" width="16" />
-                    <span>🚀 Record & Upload to Google Drive</span>
-                  </button>
-
-                  {/* Fallback Server Cloud Render */}
+                  {/* Primary Cut, Crop & Attach MP4 Video Button */}
                   <button
                     type="button"
                     onClick={handleRenderAndAttachClip}
                     disabled={!videoUrl || clipDuration <= 0 || isRendering}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-xs font-black uppercase tracking-wider text-white/80 hover:bg-white/10 hover:text-white disabled:opacity-50"
-                    title="Render on cloud microservice with FFmpeg"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-amber-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 disabled:opacity-50 shadow-lg"
+                    title="Cuts precise segment, crops to 1:1 or 9:16, and attaches MP4 video to draft"
                   >
-                    <Icon icon="solar:clapperboard-edit-bold" width="14" />
-                    <span>☁️ Cloud Render</span>
+                    <Icon icon="solar:clapperboard-edit-bold" width="16" />
+                    <span>🎬 Cut, Crop & Attach MP4 Video</span>
                   </button>
                 </div>
               </div>
