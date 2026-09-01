@@ -286,7 +286,8 @@ export default function AutoPilotReviewModal({
         });
         if (!res.ok) {
           const payload = await res.json().catch(() => ({}));
-          throw new Error(payload.error || `Graphic renderer returned HTTP ${res.status}`);
+          const reference = payload.requestId ? ` (reference: ${payload.requestId})` : '';
+          throw new Error(`${payload.error || `Graphic renderer returned HTTP ${res.status}`}${reference}`);
         }
         const blob = await res.blob();
         objectUrl = URL.createObjectURL(blob);

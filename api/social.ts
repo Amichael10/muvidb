@@ -742,7 +742,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(status).json({
       error: status < 500
         ? (err?.message || 'The request could not be completed')
-        : 'Social Studio could not complete that request. Please try again.',
+        : task === 'render_preview'
+          ? 'The deployed graphic renderer could not complete this preview. Please retry after the deployment finishes.'
+          : 'Social Studio could not complete that request. Please try again.',
       requestId,
     });
   }

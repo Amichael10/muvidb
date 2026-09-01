@@ -62,6 +62,7 @@
     "@react-router/node": "^7.18.1",
     "@react-router/serve": "^7.18.1",
     "@resvg/resvg-js": "^2.6.2",
+    "@sparticuz/chromium": "^149.0.0",
     "@supabase/supabase-js": "^2.101.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",

@@ -176,7 +176,20 @@ async function renderHtmlTemplate(input: {
   if (ratio) url.searchParams.set('ratio', ratio);
   url.searchParams.set('render', '1');
 
-  const browser = await chromium.launch({ headless: true });
+  // Vercel functions do not include Playwright's downloaded desktop browser.
+  // Use the Lambda-compatible Chromium binary there; retain Playwright's own
+  // browser locally so development continues to work on Windows and macOS.
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_EXECUTION_ENV);
+  const browser = isServerless
+    ? await (async () => {
+        const { default: serverlessChromium } = await import('@sparticuz/chromium');
+        return chromium.launch({
+          args: serverlessChromium.args,
+          executablePath: await serverlessChromium.executablePath(),
+          headless: true,
+        });
+      })()
+    : await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     await page.addInitScript(data => {
