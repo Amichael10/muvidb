@@ -638,11 +638,26 @@ export async function runSocialPublisher(input: {
 
   // 1. Recover stale processing locks (e.g. jobs stuck in processing for > 10 mins from crashed runs)
   const staleThreshold = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
-  await supabase
+  const { data: staleJobs } = await supabase
     .from('social_publish_jobs')
-    .update({ status: 'retrying', locked_at: null, locked_by: null })
+    .select('id,platform_variant_id')
     .eq('status', 'processing')
     .lt('locked_at', staleThreshold);
+
+  if (staleJobs?.length) {
+    const staleIds = staleJobs.map(job => job.id);
+    await supabase
+      .from('social_publish_jobs')
+      .update({ status: 'retrying', locked_at: null, locked_by: null, available_at: nowIso })
+      .in('id', staleIds);
+    // A timed-out request must not leave its variant stuck in the UI. Returning
+    // it to scheduled lets this run (or the next one) retry it safely.
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'scheduled', last_error_code: 'publisher_timeout_recovered', last_error_message: 'Previous publish attempt timed out; retrying.' })
+      .in('id', staleJobs.map(job => job.platform_variant_id))
+      .eq('status', 'publishing');
+  }
 
   // 2. Auto-heal: ensure any scheduled variants with scheduled_for <= now have a queued publish job
   const { data: scheduledVariants } = await supabase
