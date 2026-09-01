@@ -74,6 +74,27 @@ export type UpcomingMovieSnapshot = {
   youtubeChannelHandle: string | null;
 };
 
+export type TheatrePlaySnapshot = {
+  kind: 'whats_on_stage';
+  capturedAt: string;
+  playId: string;
+  title: string;
+  slug: string | null;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  synopsis: string | null;
+  venue: string | null;
+  city: string | null;
+  country: string | null;
+  runStartDate: string | null;
+  runEndDate: string | null;
+  performanceTime: string | null;
+  playwright: string | null;
+  director: string | null;
+  status: string | null;
+  year: number | null;
+};
+
 /**
  * A birthday post. Structurally the actor card with a different eyebrow and a
  * celebratory line in place of the bio, so it carries the same person fields
@@ -91,12 +112,18 @@ export type BirthdaySpotlightSnapshot = Omit<ActorSpotlightSnapshot, 'kind'> & {
 export type SocialSourceSnapshot =
   | ActorSpotlightSnapshot
   | BirthdaySpotlightSnapshot
-  | UpcomingMovieSnapshot;
+  | UpcomingMovieSnapshot
+  | TheatrePlaySnapshot;
 
-export const SOURCE_ENTITY_TYPES: Record<SocialContentType, 'person' | 'film'> = {
+export const SOURCE_ENTITY_TYPES: Record<SocialContentType, 'person' | 'film' | 'play'> = {
   actor_spotlight: 'person',
   birthday_spotlight: 'person',
   upcoming_movie: 'film',
+  critics_say: 'film',
+  where_to_watch: 'film',
+  weekend_watchlist: 'film',
+  whats_on_stage: 'play',
+  film_conversation: 'film',
 };
 
 function text(value: unknown): string | null {
@@ -389,6 +416,32 @@ export function buildUpcomingMovieSnapshot(input: {
   };
 }
 
+export function buildTheatrePlaySnapshot(input: {
+  play: Record<string, any>;
+  capturedAt: string;
+}): TheatrePlaySnapshot {
+  return {
+    kind: 'whats_on_stage',
+    capturedAt: input.capturedAt,
+    playId: String(input.play.id),
+    title: String(text(input.play.title) || 'Untitled stage production'),
+    slug: text(input.play.slug),
+    posterUrl: text(input.play.poster_url),
+    backdropUrl: text(input.play.backdrop_url),
+    synopsis: text(input.play.synopsis),
+    venue: text(input.play.venue),
+    city: text(input.play.city),
+    country: text(input.play.country),
+    runStartDate: text(input.play.run_start_date),
+    runEndDate: text(input.play.run_end_date),
+    performanceTime: text(input.play.performance_time),
+    playwright: text(input.play.playwright),
+    director: text(input.play.director),
+    status: text(input.play.status),
+    year: yearFrom(input.play),
+  };
+}
+
 /**
  * Conditions that do not block generation but that a reviewer should see before
  * approving — mostly missing artwork, which slice 2 needs in order to render.
@@ -419,6 +472,13 @@ export function collectSnapshotWarnings(snapshot: SocialSourceSnapshot): string[
       }
     }
 
+    return warnings;
+  }
+
+  if (snapshot.kind === 'whats_on_stage') {
+    if (!snapshot.posterUrl) warnings.push('Play has no poster_url; the stage template needs a production poster.');
+    if (!snapshot.runStartDate && !snapshot.runEndDate) warnings.push('Play has no run date; the theatre card cannot show a date.');
+    if (!snapshot.venue) warnings.push('Play has no venue; the theatre card will use a generic venue line.');
     return warnings;
   }
 

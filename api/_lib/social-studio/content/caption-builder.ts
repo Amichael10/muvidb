@@ -1,5 +1,5 @@
 import type { SocialPlatform } from '../domain/platform-types.js';
-import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SnapshotCastMember, SnapshotCreditedPerson, SocialSourceSnapshot, UpcomingMovieSnapshot } from './snapshots.js';
+import type { ActorSpotlightSnapshot, BirthdaySpotlightSnapshot, SnapshotCastMember, SnapshotCreditedPerson, SocialSourceSnapshot, TheatrePlaySnapshot, UpcomingMovieSnapshot } from './snapshots.js';
 import { firstUsableCopy } from './copy-quality.js';
 
 export type PlatformCaptionLimits = {
@@ -203,6 +203,24 @@ function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
   return lines;
 }
 
+function theatreBody(snapshot: TheatrePlaySnapshot): string[] {
+  const lines: string[] = [];
+  const location = [snapshot.venue, snapshot.city].filter(Boolean).join(', ');
+  lines.push(`${snapshot.title} is on stage 🎭`);
+  if (location) lines.push(location);
+  if (snapshot.runStartDate || snapshot.runEndDate) {
+    const start = snapshot.runStartDate || '';
+    const end = snapshot.runEndDate && snapshot.runEndDate !== snapshot.runStartDate ? ` - ${snapshot.runEndDate}` : '';
+    lines.push(`${start}${end}${snapshot.performanceTime ? ` • ${snapshot.performanceTime}` : ''}`);
+  } else if (snapshot.performanceTime) {
+    lines.push(snapshot.performanceTime);
+  }
+  const synopsis = firstUsableCopy(snapshot.synopsis);
+  if (synopsis) lines.push(synopsis);
+  lines.push('Are you seated for this one? Save it and tell us who you are going with.');
+  return lines;
+}
+
 function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
   if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     return [
@@ -211,6 +229,17 @@ function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
       snapshot.kind === 'birthday_spotlight' ? 'HappyBirthday' : 'ActorSpotlight',
       snapshot.nationality ? toHashtag(snapshot.nationality) : null,
       ...snapshot.knownFor.map(film => toHashtag(film.title)),
+      'Nollywood',
+    ];
+  }
+
+  if (snapshot.kind === 'whats_on_stage') {
+    return [
+      'MuviDB',
+      toHashtag(snapshot.title),
+      'Theatre',
+      'NigerianTheatre',
+      snapshot.city ? toHashtag(snapshot.city) : null,
       'Nollywood',
     ];
   }
@@ -244,7 +273,9 @@ export function buildVariantContent(input: {
       ? birthdayBody(input.snapshot)
       : input.snapshot.kind === 'actor_spotlight'
         ? actorBody(input.snapshot)
-        : movieBody(input.snapshot);
+        : input.snapshot.kind === 'whats_on_stage'
+          ? theatreBody(input.snapshot)
+          : movieBody(input.snapshot);
   const body = lines.filter(Boolean).join('\n\n');
 
   const hashtagBlock = hashtags.map(tag => `#${tag}`).join(' ');
@@ -255,6 +286,8 @@ export function buildVariantContent(input: {
     ? truncateAtWord(
         input.snapshot.kind === 'actor_spotlight' || input.snapshot.kind === 'birthday_spotlight'
           ? `Spotlight: ${input.snapshot.name}`
+          : input.snapshot.kind === 'whats_on_stage'
+            ? input.snapshot.title
           : input.snapshot.title,
         100,
       )

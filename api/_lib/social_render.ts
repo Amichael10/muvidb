@@ -184,6 +184,15 @@ function cardCopy(snapshot: SocialSourceSnapshot): CardCopy {
     };
   }
 
+  if (snapshot.kind === 'whats_on_stage') {
+    return {
+      eyebrow: "What's On Stage",
+      headline: snapshot.title,
+      support: snapshot.year ? String(snapshot.year) : null,
+      imageUrl: snapshot.posterUrl || snapshot.backdropUrl,
+    };
+  }
+
   return {
     eyebrow: snapshot.comingSoon ? 'Coming Soon' : 'Now Showing',
     headline: snapshot.title,
@@ -1132,7 +1141,19 @@ export async function renderSnapshotAsset(input: {
   snapshot: SocialSourceSnapshot;
   format: SocialAssetFormat;
   artwork?: Artwork;
+  templateSlug?: string | null;
 }): Promise<RenderedAsset> {
+  if (input.templateSlug) {
+    const { isHtmlSocialTemplate, renderHtmlSocialTemplateAsset } = await import('./social_html_templates.js');
+    if (isHtmlSocialTemplate(input.templateSlug)) {
+      return renderHtmlSocialTemplateAsset({
+        templateSlug: input.templateSlug,
+        snapshot: input.snapshot,
+        format: input.format,
+      });
+    }
+  }
+
   const { width, height } = ASSET_FORMAT_DIMENSIONS[input.format];
   const copy = cardCopy(input.snapshot);
 
@@ -1185,7 +1206,19 @@ export async function renderSnapshotAsset(input: {
 export async function renderSnapshotAssets(input: {
   snapshot: SocialSourceSnapshot;
   formats: SocialAssetFormat[];
+  templateSlug?: string | null;
 }): Promise<RenderedAsset[]> {
+  if (input.templateSlug) {
+    const { isHtmlSocialTemplate } = await import('./social_html_templates.js');
+    if (isHtmlSocialTemplate(input.templateSlug)) {
+      const rendered: RenderedAsset[] = [];
+      for (const format of input.formats) {
+        rendered.push(await renderSnapshotAsset({ snapshot: input.snapshot, format, templateSlug: input.templateSlug }));
+      }
+      return rendered;
+    }
+  }
+
   const artwork = await loadArtwork(cardCopy(input.snapshot).imageUrl);
 
   const rendered: RenderedAsset[] = [];

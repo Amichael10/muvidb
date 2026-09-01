@@ -32,8 +32,8 @@ export const EDITORIAL_THEMES = [
     entity: 'film',
     description: 'Critical consensus, top reviewer takes, star ratings, and "Do you agree?" debate prompts.',
     placeholder: 'Search reviewed movie (e.g. Jagun Jagun, Lisabi, Breaded Life, Breath of Life)…',
-    templateSlug: 'upcoming-movie-v1',
-    contentType: 'upcoming_movie',
+    templateSlug: 'critics-say-v1',
+    contentType: 'critics_say',
     suggestions: ['Jagun Jagun', 'Lisabi', 'Breaded Life', 'Breath of Life', 'Afamefuna'],
   },
   {
@@ -47,7 +47,7 @@ export const EDITORIAL_THEMES = [
     description: 'Streaming platform callout (Netflix, Prime Video, YouTube, Showmax) with cast tags & watchlist CTAs.',
     placeholder: 'Search streaming film (e.g. A Tribe Called Judah, Anikulapo, The Black Book)…',
     templateSlug: 'upcoming-movie-v1',
-    contentType: 'upcoming_movie',
+    contentType: 'where_to_watch',
     suggestions: ['A Tribe Called Judah', 'Anikulapo', 'The Black Book', 'House of Ga\'a', 'Momiwa'],
   },
   {
@@ -74,8 +74,8 @@ export const EDITORIAL_THEMES = [
     entity: 'film',
     description: 'In-cinema showtimes, upcoming theatrical runs, poster reveals, and "Are you seated?" hype copy.',
     placeholder: 'Search cinema movie (e.g. Alahun, Everybody Loves Jenifa, Farmer\'s Bride)…',
-    templateSlug: 'upcoming-movie-v1',
-    contentType: 'upcoming_movie',
+    templateSlug: 'watchlist-this-week-v1',
+    contentType: 'weekend_watchlist',
     suggestions: ['Alahun', 'Everybody Loves Jenifa', 'Farmer\'s Bride', 'Ajosepo'],
   },
   {
@@ -85,12 +85,12 @@ export const EDITORIAL_THEMES = [
     category: 'Live Theatre & Plays',
     badge: 'Saturday Theme',
     icon: 'solar:masks-linear',
-    entity: 'person',
+    entity: 'play',
     description: 'Live theatre productions, stage performers, venue callouts, and play appreciation.',
-    placeholder: 'Search stage performer or theatre actor (e.g. Joke Silva, Taiwo Ajai-Lycett, Femi Adebayo)…',
-    templateSlug: 'actor-spotlight-v1',
-    contentType: 'actor_spotlight',
-    suggestions: ['Joke Silva', 'Taiwo Ajai-Lycett', 'Femi Adebayo', 'Bimbo Manuel'],
+    placeholder: 'Search stage play or theatre production (e.g. Dear Kaffy London, Obey, Zik of Africa)…',
+    templateSlug: 'on-stage-theatre-v1',
+    contentType: 'whats_on_stage',
+    suggestions: ['Dear Kaffy London', 'Obey the Musical', 'Zik of Africa', 'London Life Lagos Living'],
   },
   {
     id: 'film_conversation',
@@ -102,8 +102,8 @@ export const EDITORIAL_THEMES = [
     entity: 'film',
     description: 'Engaging Nollywood film discussion questions, character debates, and comment provocations.',
     placeholder: 'Search film for debate (e.g. The Wedding Party, King of Boys, Battle on Buka Street)…',
-    templateSlug: 'upcoming-movie-v1',
-    contentType: 'upcoming_movie',
+    templateSlug: 'nollywood-debate-v1',
+    contentType: 'film_conversation',
     suggestions: ['King of Boys', 'The Wedding Party', 'Battle on Buka Street', 'Blood Sisters'],
   },
   {
@@ -619,10 +619,19 @@ export default function SocialDraftComposer({
 
     const timer = setTimeout(async () => {
       try {
-        const { data, error } =
-          activeTheme.entity === 'person'
-            ? await supabase.from('people').select('id,name,photo_url').ilike('name', `%${term}%`).limit(8)
-            : await supabase.from('films').select('id,title,year,poster_url').ilike('title', `%${term}%`).limit(8);
+        let data;
+        let error;
+        if (activeTheme.entity === 'person') {
+          ({ data, error } = await supabase.from('people').select('id,name,photo_url').ilike('name', `%${term}%`).limit(8));
+        } else if (activeTheme.entity === 'play') {
+          ({ data, error } = await supabase
+            .from('plays')
+            .select('id,title,year,poster_url,backdrop_url,venue,city,country,run_start_date,run_end_date,performance_time,synopsis,status')
+            .ilike('title', `%${term}%`)
+            .limit(8));
+        } else {
+          ({ data, error } = await supabase.from('films').select('id,title,year,poster_url').ilike('title', `%${term}%`).limit(8));
+        }
 
         if (error) throw error;
         if (token !== searchToken.current) return;
@@ -1036,6 +1045,7 @@ export default function SocialDraftComposer({
   };
 
   const label = entry => (activeTheme.entity === 'person' ? entry.name : `${entry.title}${entry.year ? ` (${entry.year})` : ''}`);
+  const entityLabel = activeTheme.entity === 'person' ? 'Actor / Talent' : activeTheme.entity === 'play' ? 'Theatre Play' : 'Movie / Film';
   const activeVariant = result?.variants?.find(variant => variant.platform === activePreviewPlatform) || result?.variants?.[0];
   const activePlatform = PLATFORMS.find(platform => platform.value === activeVariant?.platform) || PLATFORMS[0];
   const activeSpec = PLATFORM_SPECS[activeVariant?.platform] || PLATFORM_SPECS.instagram;
@@ -1495,7 +1505,7 @@ export default function SocialDraftComposer({
                 2
               </span>
               <h2 className="text-sm font-black uppercase tracking-widest text-text-primary group-hover:text-brand transition-colors">
-                Choose Subject ({activeTheme.entity === 'person' ? 'Actor / Talent' : 'Movie / Film'})
+                Choose Subject ({entityLabel})
               </h2>
               {!step2Open && selected && (
                 <span className="ml-2 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
@@ -1516,7 +1526,11 @@ export default function SocialDraftComposer({
                 <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-brand/40 bg-brand/5 p-3.5">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-2 border border-border overflow-hidden">
-                      <Icon icon={activeTheme.entity === 'person' ? 'solar:user-linear' : 'solar:clapperboard-linear'} className="text-text-muted" width="22" />
+                      <Icon
+                        icon={activeTheme.entity === 'person' ? 'solar:user-linear' : activeTheme.entity === 'play' ? 'solar:masks-linear' : 'solar:clapperboard-linear'}
+                        className="text-text-muted"
+                        width="22"
+                      />
                     </div>
                     <div>
                       <h4 className="text-sm font-black text-text-primary">{label(selected)}</h4>

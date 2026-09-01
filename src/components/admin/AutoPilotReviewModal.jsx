@@ -308,7 +308,11 @@ export default function AutoPilotReviewModal({
       const res = await fetch('/api/social?task=render_preview', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidate, format: 'portrait_4_5' }),
+        body: JSON.stringify({
+          candidate,
+          format: candidate.templateSlug && candidate.templateSlug !== 'actor-spotlight-v1' ? 'square_1_1' : 'portrait_4_5',
+          templateSlug: candidate.templateSlug,
+        }),
       });
       if (!res.ok) throw new Error('Failed to render graphic asset');
       const blob = await res.blob();
@@ -318,7 +322,7 @@ export default function AutoPilotReviewModal({
       a.download = `${(candidate.name || 'muvidb').replace(/[^a-zA-Z0-9]/g, '_')}_figma_card.png`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success('Downloaded Figma 1080×1350 card!', { id: toastId });
+      toast.success('Downloaded MuviDB graphic!', { id: toastId });
     } catch (err) {
       toast.error('Failed to export rendered card', { id: toastId });
     }

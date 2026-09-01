@@ -278,13 +278,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (task === 'render_preview') {
       await requireSocialStudioAdmin(req);
-      const { candidate, format = 'portrait_4_5' } = (req.method === 'POST' ? req.body : req.query) || {};
+      const { candidate, format = 'portrait_4_5', templateSlug } = (req.method === 'POST' ? req.body : req.query) || {};
       if (!candidate) {
         return res.status(400).json({ error: 'Candidate data is required for preview rendering' });
       }
       const parsedCandidate = typeof candidate === 'string' ? JSON.parse(candidate) : candidate;
       const { renderSnapshotAsset } = await import('./_lib/social_render.js');
       const isPerson = parsedCandidate.type === 'person';
+      const isPlay = parsedCandidate.type === 'play';
       const snapshot = isPerson
         ? {
             kind: 'actor_spotlight' as const,
@@ -308,7 +309,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             })),
             creditCount: parsedCandidate.data?.creditCount || 10,
           }
-        : {
+        : isPlay
+          ? {
+              kind: 'whats_on_stage' as const,
+              capturedAt: new Date().toISOString(),
+              playId: parsedCandidate.id || 'preview-play',
+              title: parsedCandidate.name || parsedCandidate.title,
+              slug: parsedCandidate.data?.slug || null,
+              posterUrl: parsedCandidate.imageUrl || parsedCandidate.data?.poster_url || null,
+              backdropUrl: parsedCandidate.data?.backdrop_url || null,
+              synopsis: parsedCandidate.subtext || parsedCandidate.data?.synopsis || null,
+              venue: parsedCandidate.data?.venue || null,
+              city: parsedCandidate.data?.city || null,
+              country: parsedCandidate.country || parsedCandidate.data?.country || null,
+              runStartDate: parsedCandidate.data?.run_start_date || null,
+              runEndDate: parsedCandidate.data?.run_end_date || null,
+              performanceTime: parsedCandidate.data?.performance_time || null,
+              playwright: parsedCandidate.data?.playwright || null,
+              director: parsedCandidate.data?.director || null,
+              status: parsedCandidate.data?.status || parsedCandidate.data?.derivedStatus || null,
+              year: parsedCandidate.data?.year || null,
+            }
+          : {
             kind: 'upcoming_movie' as const,
             capturedAt: new Date().toISOString(),
             filmId: parsedCandidate.id || 'preview-film',
@@ -338,6 +360,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const rendered = await renderSnapshotAsset({
         snapshot: snapshot as any,
         format: format as any,
+        templateSlug: typeof templateSlug === 'string' ? templateSlug : null,
       });
 
       res.setHeader('Content-Type', 'image/png');

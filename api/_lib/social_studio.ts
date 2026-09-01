@@ -21,12 +21,14 @@ import {
   buildVariantContent,
 } from './social-studio/content/caption-builder.js';
 import { ASSET_FORMAT_DIMENSIONS, renderSnapshotAssets, type SocialAssetFormat } from './social_render.js';
+import { htmlTemplateFormats } from './social_html_templates.js';
 import type { SocialSourceSnapshot } from './social-studio/content/snapshots.js';
 import {
   SOURCE_ENTITY_TYPES,
   buildActorSpotlightSnapshot,
   buildBirthdaySpotlightSnapshot,
   buildUpcomingMovieSnapshot,
+  buildTheatrePlaySnapshot,
   collectSnapshotWarnings,
 } from './social-studio/content/snapshots.js';
 
@@ -790,6 +792,19 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   return buildUpcomingMovieSnapshot({ film: filmWithChannel, credits: creditsResult.data || [], capturedAt, castLimit: 8 });
 }
 
+async function loadPlaySource(playId: string, capturedAt: string) {
+  const { data: play, error } = await supabase
+    .from('plays')
+    .select('id,title,slug,poster_url,backdrop_url,year,venue,city,country,run_start_date,run_end_date,performance_time,synopsis,playwright,director,status')
+    .eq('id', playId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!play) throw httpError(404, 'Theatre play not found');
+
+  return buildTheatrePlaySnapshot({ play, capturedAt });
+}
+
 function getAssetBucket(): string {
   return process.env.SOCIAL_ASSET_BUCKET || 'social-published-assets';
 }
@@ -799,7 +814,12 @@ function getAssetBucket(): string {
  * `template_config.formats` is authored data, so unknown values are dropped
  * rather than trusted into the renderer.
  */
-function templateFormats(config: unknown): SocialAssetFormat[] {
+function templateFormats(config: unknown, templateSlug?: string | null): SocialAssetFormat[] {
+  if (templateSlug) {
+    const htmlFormats = htmlTemplateFormats(templateSlug);
+    if (htmlFormats?.length) return htmlFormats;
+  }
+
   const raw = (config as any)?.formats;
   const known = Object.keys(ASSET_FORMAT_DIMENSIONS) as SocialAssetFormat[];
   if (!Array.isArray(raw)) return known;
@@ -809,6 +829,27 @@ function templateFormats(config: unknown): SocialAssetFormat[] {
 }
 
 type StoredAsset = { id: string; format: SocialAssetFormat; publicUrl: string; width: number; height: number };
+
+function defaultContentTypeForSeries(seriesSlug: string, candidateType: string): SocialContentType {
+  if (seriesSlug === 'critics_say' || seriesSlug === 'one_film_two_takes') return 'critics_say';
+  if (seriesSlug === 'where_to_watch') return 'where_to_watch';
+  if (seriesSlug === 'weekend_watchlist') return 'weekend_watchlist';
+  if (seriesSlug === 'whats_on_stage') return 'whats_on_stage';
+  if (seriesSlug === 'film_conversation') return 'film_conversation';
+  if (candidateType === 'play') return 'whats_on_stage';
+  if (candidateType === 'person') return 'actor_spotlight';
+  return 'upcoming_movie';
+}
+
+function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: string): string {
+  if (seriesSlug === 'critics_say' || seriesSlug === 'one_film_two_takes') return 'critics-say-v1';
+  if (seriesSlug === 'weekend_watchlist') return 'watchlist-this-week-v1';
+  if (seriesSlug === 'whats_on_stage') return 'on-stage-theatre-v1';
+  if (seriesSlug === 'film_conversation') return 'nollywood-debate-v1';
+  if (candidateType === 'play') return 'on-stage-theatre-v1';
+  if (candidateType === 'person') return 'actor-spotlight-v1';
+  return 'upcoming-movie-v1';
+}
 
 /**
  * Renders every format for a content item, uploads each PNG to the asset
@@ -820,13 +861,18 @@ type StoredAsset = { id: string; format: SocialAssetFormat; publicUrl: string; w
 async function renderAndStoreAssets(input: {
   contentItemId: string;
   snapshot: SocialSourceSnapshot;
+  templateSlug?: string | null;
   templateVersion: number | null;
   formats: SocialAssetFormat[];
 }): Promise<{ rows: StoredAsset[]; error?: string }> {
   const bucket = getAssetBucket();
 
   try {
-    const rendered = await renderSnapshotAssets({ snapshot: input.snapshot, formats: input.formats });
+    const rendered = await renderSnapshotAssets({
+      snapshot: input.snapshot,
+      formats: input.formats,
+      templateSlug: input.templateSlug,
+    });
     const rows: StoredAsset[] = [];
 
     for (const asset of rendered) {
@@ -912,7 +958,9 @@ export async function generateSocialDraft(
   const snapshot =
     sourceEntityType === 'person'
       ? await loadPersonSource(input.sourceEntityId, capturedAt, input.contentType)
-      : await loadUpcomingMovieSource(input.sourceEntityId, capturedAt);
+      : sourceEntityType === 'play'
+        ? await loadPlaySource(input.sourceEntityId, capturedAt)
+        : await loadUpcomingMovieSource(input.sourceEntityId, capturedAt);
 
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
@@ -920,7 +968,9 @@ export async function generateSocialDraft(
       ? `Actor Spotlight — ${snapshot.name}`
       : snapshot.kind === 'birthday_spotlight'
         ? `Birthday Spotlight — ${snapshot.name}`
-        : `Upcoming Movie — ${snapshot.title}`;
+        : snapshot.kind === 'whats_on_stage'
+          ? `What's On Stage — ${snapshot.title}`
+          : `Upcoming Movie — ${snapshot.title}`;
 
   const { data: contentItem, error: insertError } = await supabase
     .from('social_content_items')
@@ -948,8 +998,9 @@ export async function generateSocialDraft(
   const assets = await renderAndStoreAssets({
     contentItemId: contentItem.id,
     snapshot,
+    templateSlug: template.slug,
     templateVersion: template.version,
-    formats: templateFormats(template.template_config),
+    formats: templateFormats(template.template_config, template.slug),
   });
 
   if (assets.error) warnings.push(`Asset rendering failed: ${assets.error}`);
@@ -2223,6 +2274,8 @@ export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
       if (intent === 'people' && candidate) {
         peopleByWeek.set(week, (peopleByWeek.get(week) || 0) + 1);
       }
+      const candidateContentType = candidate ? defaultContentTypeForSeries(slug, candidate.type) : null;
+      const candidateTemplateSlug = candidate ? defaultTemplateSlugForSeries(slug, candidate.type) : null;
 
       curatedSlots.push({
         ...slot,
@@ -2244,8 +2297,8 @@ export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
               imageUrl: candidate.imageUrl,
               category: candidate.category,
               completenessScore: candidate.completenessScore,
-              contentType: candidate.type === 'person' ? 'actor_spotlight' : 'upcoming_movie',
-              templateSlug: candidate.type === 'person' ? 'actor-spotlight-v1' : 'upcoming-movie-v1',
+              contentType: candidateContentType,
+              templateSlug: candidateTemplateSlug,
               data: candidate.data || {},
               editorialScore: assessment?.score || 0,
               whyNow: assessment?.whyNow || '',
@@ -2306,8 +2359,8 @@ export async function approveEditorialSlot(
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
 
-  const contentType = input.contentType || (input.candidateType === 'person' ? 'actor_spotlight' : 'upcoming_movie');
-  const templateSlug = input.templateSlug || (input.candidateType === 'person' ? 'actor-spotlight-v1' : 'upcoming-movie-v1');
+  const contentType = input.contentType || defaultContentTypeForSeries('', input.candidateType);
+  const templateSlug = input.templateSlug || defaultTemplateSlugForSeries('', input.candidateType);
   const platforms = input.platforms && input.platforms.length ? input.platforms : (['instagram', 'threads', 'facebook', 'tiktok'] as SocialPlatform[]);
 
   // Validate live theatre productions: reject archived / passed stage plays
