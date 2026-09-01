@@ -74,6 +74,11 @@ export default function AdminFilms() {
   const [channelResults, setChannelResults] = useState([]);
   const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState(false);
   const channelSearchTimeout = useRef(null);
+  const [actorFilter, setActorFilter] = useState(null); // { id, name, photo_url } — films starring this person (via credits)
+  const [actorSearch, setActorSearch] = useState('');
+  const [actorResults, setActorResults] = useState([]);
+  const [isActorDropdownOpen, setIsActorDropdownOpen] = useState(false);
+  const actorSearchTimeout = useRef(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState('library'); // library, youtube_buffer
@@ -215,7 +220,7 @@ export default function AdminFilms() {
   useEffect(() => {
     setPage(1);
     setSelectedFilmIds([]);
-  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, channelFilter, sortBy]);
+  }, [searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, channelFilter, actorFilter, sortBy]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -226,7 +231,7 @@ export default function AdminFilms() {
       }
     }, searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
-  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, channelFilter, sortBy, viewMode]);
+  }, [page, searchTerm, statusFilter, yearFilter, featuredFilter, trendingFilter, sourceFilter, platformFilter, typeFilter, cinemaFilter, channelFilter, actorFilter, sortBy, viewMode]);
 
   useEffect(() => {
     const handleDeepLink = async () => {
@@ -327,10 +332,39 @@ export default function AdminFilms() {
     setIsChannelDropdownOpen(false);
   };
 
+  // Debounced actor search for the "by actor" filter (via credits)
+  const handleActorSearch = (q) => {
+    setActorSearch(q);
+    setIsActorDropdownOpen(true);
+    if (actorSearchTimeout.current) clearTimeout(actorSearchTimeout.current);
+    if (!q.trim()) { setActorResults([]); return; }
+    actorSearchTimeout.current = setTimeout(async () => {
+      try {
+        const rows = await searchPeopleByName(q.trim(), { limit: 8, select: 'id, name, photo_url, known_for_department' });
+        setActorResults(rows || []);
+      } catch {
+        const { data } = await supabase
+          .from('people')
+          .select('id, name, photo_url, known_for_department')
+          .ilike('name', `%${q.trim()}%`)
+          .order('popularity_score', { ascending: false, nullsFirst: false })
+          .limit(8);
+        setActorResults(data || []);
+      }
+    }, 250);
+  };
+
+  const selectActor = (person) => {
+    setActorFilter({ id: person.id, name: person.name, photo_url: person.photo_url });
+    setActorSearch('');
+    setActorResults([]);
+    setIsActorDropdownOpen(false);
+  };
+
   const anyFilterActive =
     statusFilter !== 'all' || yearFilter !== 'all' || featuredFilter !== 'all' ||
     trendingFilter !== 'all' || sourceFilter !== 'all' || platformFilter !== 'all' ||
-    typeFilter !== 'all' || cinemaFilter !== 'all' || channelFilter || duplicateFilter || searchTerm;
+    typeFilter !== 'all' || cinemaFilter !== 'all' || channelFilter || actorFilter || duplicateFilter || searchTerm;
 
   // Count only the filters that live in the collapsible "More filters" panel, so
   // the toggle can show how many are active while it's closed.
@@ -338,7 +372,7 @@ export default function AdminFilms() {
     (typeFilter !== 'all' ? 1 : 0) + (cinemaFilter !== 'all' ? 1 : 0) +
     (platformFilter !== 'all' ? 1 : 0) + (sourceFilter !== 'all' ? 1 : 0) +
     (featuredFilter !== 'all' ? 1 : 0) + (trendingFilter !== 'all' ? 1 : 0) +
-    (channelFilter ? 1 : 0);
+    (channelFilter ? 1 : 0) + (actorFilter ? 1 : 0);
 
   const clearAllFilters = () => {
     setSearchTerm('');
@@ -346,13 +380,13 @@ export default function AdminFilms() {
     setTrendingFilter('all'); setSourceFilter('all'); setPlatformFilter('all');
     setTypeFilter('all'); setCinemaFilter('all'); setDuplicateFilter(false);
     setChannelFilter(null); setChannelSearch(''); setChannelResults([]);
+    setActorFilter(null); setActorSearch(''); setActorResults([]);
   };
 
   const fetchFilms = async () => {
     setLoading(true);
     try {
-      // Channel filter: resolve the films linked to this channel via channel_videos.
-      // If the channel has no linked films, short-circuit to an empty result.
+      // 1. Channel filter: resolve the films linked to this channel via channel_videos.
       let channelFilmIds = null;
       if (channelFilter) {
         const { data: cvs } = await supabase
@@ -366,8 +400,13 @@ export default function AdminFilms() {
         }
       }
 
-      // 1. Get total count
-      let countQuery = supabase.from('films').select('*', { count: 'exact', head: true });
+      const baseSelect = actorFilter
+        ? '*, credits!inner(person_id)'
+        : '*';
+
+      // 2. Get total count
+      let countQuery = supabase.from('films').select(baseSelect, { count: 'exact', head: true });
+      if (actorFilter) countQuery = countQuery.eq('credits.person_id', actorFilter.id);
       if (channelFilmIds) countQuery = countQuery.in('id', channelFilmIds);
       if (searchTerm) countQuery = countQuery.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') countQuery = countQuery.eq('status', statusFilter);
@@ -386,15 +425,16 @@ export default function AdminFilms() {
       const { count } = await countQuery;
       setTotalCount(count || 0);
 
-      // 2. Get paginated data
+      // 3. Get paginated data
       let query;
       
       if (duplicateFilter) {
         query = supabase.rpc('get_duplicate_films');
       } else {
-        query = supabase.from('films').select('*');
+        query = supabase.from('films').select(baseSelect);
       }
       
+      if (actorFilter) query = query.eq('credits.person_id', actorFilter.id);
       if (!duplicateFilter && channelFilmIds) query = query.in('id', channelFilmIds);
       if (!duplicateFilter && searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
@@ -1610,7 +1650,7 @@ export default function AdminFilms() {
                   onChange={(e) => handleChannelSearch(e.target.value)}
                   onFocus={() => setIsChannelDropdownOpen(true)}
                   onBlur={() => setTimeout(() => setIsChannelDropdownOpen(false), 200)}
-                  className="bg-surface border border-border rounded-md pl-8 pr-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all w-[180px]"
+                  className="bg-surface border border-border rounded-md pl-8 pr-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all w-[170px]"
                 />
                 <Icon icon="solar:videocamera-record-linear" className="absolute left-2.5 top-2.5 w-4 h-4 text-text-muted" />
                 {isChannelDropdownOpen && channelResults.length > 0 && (
@@ -1626,6 +1666,58 @@ export default function AdminFilms() {
                           ? <img src={ch.thumbnail_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
                           : <span className="w-6 h-6 rounded-full bg-surface-3 shrink-0" />}
                         <span className="text-xs text-text-primary truncate">{ch.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Actor / Person filter (searchable) */}
+          <div className="relative">
+            {actorFilter ? (
+              <span className="flex items-center gap-2 bg-brand/10 border border-brand/30 text-brand rounded-md px-3 py-2 text-xs font-bold">
+                {actorFilter.photo_url ? (
+                  <img src={actorFilter.photo_url} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                ) : (
+                  <Icon icon="solar:user-bold" className="w-4 h-4" />
+                )}
+                <span className="max-w-[160px] truncate">{actorFilter.name}</span>
+                <button type="button" onClick={() => setActorFilter(null)} title="Clear actor filter" className="hover:text-text-primary">
+                  <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                </button>
+              </span>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="Filter by actor…"
+                  value={actorSearch}
+                  onChange={(e) => handleActorSearch(e.target.value)}
+                  onFocus={() => setIsActorDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setIsActorDropdownOpen(false), 200)}
+                  className="bg-surface border border-border rounded-md pl-8 pr-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all w-[170px]"
+                />
+                <Icon icon="solar:user-linear" className="absolute left-2.5 top-2.5 w-4 h-4 text-text-muted" />
+                {isActorDropdownOpen && actorResults.length > 0 && (
+                  <div className="absolute z-30 mt-1 w-64 max-h-64 overflow-y-auto bg-surface border border-border rounded-lg shadow-xl py-1">
+                    {actorResults.map((person) => (
+                      <button
+                        key={person.id}
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); selectActor(person); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-2 transition-colors"
+                      >
+                        {person.photo_url
+                          ? <img src={person.photo_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                          : <span className="w-6 h-6 rounded-full bg-surface-3 flex items-center justify-center text-[9px] font-bold text-text-muted shrink-0">{person.name?.charAt(0)}</span>}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-text-primary truncate">{person.name}</div>
+                          {person.known_for_department && (
+                            <div className="text-[10px] text-text-muted truncate">{person.known_for_department}</div>
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
