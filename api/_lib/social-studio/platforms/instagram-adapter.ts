@@ -208,6 +208,11 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
         });
       }
 
+      // Instagram processes the carousel container asynchronously too. A
+      // mixed image/video carousel can otherwise reach media_publish before a
+      // media ID exists, returning the opaque "Media ID is not available" error.
+      await this.waitForContainer(String(carousel.id));
+
       const publishRes = await this.post(
         `/${encodeURIComponent(this.instagramAccountId)}/media_publish`,
         new URLSearchParams({ creation_id: String(carousel.id) }),
