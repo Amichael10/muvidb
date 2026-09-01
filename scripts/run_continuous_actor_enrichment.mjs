@@ -1,5 +1,5 @@
 /**
- * Continuous Indefinite Actor Enrichment Worker
+ * Continuous Indefinite Actor Enrichment Worker (Multi-Alias & Name Permutation Enabled)
  * Run anytime on background machines:
  *   node scripts/run_continuous_actor_enrichment.mjs
  * Or with custom batch size:
@@ -20,6 +20,8 @@ const supabase = createClient(
 
 const tmdbKey = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
 const tmdbToken = process.env.VITE_TMDB_READ_ACCESS_TOKEN;
+const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+const zenrowsKey = process.env.ZENROWS_API_KEY;
 
 const STATE_FILE = path.resolve('scripts/data/actor_enrichment_state.json');
 
@@ -54,18 +56,143 @@ function normalizeTitle(t) {
     .trim();
 }
 
-async function searchTmdbPerson(actorName) {
+/**
+ * Generate intelligent search variants and extracted aliases:
+ * - "Olaniyi Afonja (Sanyeri)" -> ["Olaniyi Afonja (Sanyeri)", "Olaniyi Afonja", "Sanyeri"]
+ * - "Funke Akindele Bello" -> ["Funke Akindele Bello", "Funke Akindele", "Akindele Funke"]
+ * - "Dada Omowunmi" -> ["Dada Omowunmi", "Omowunmi Dada"]
+ */
+function generateNameVariants(fullName) {
+  const variants = new Set();
+  const raw = String(fullName || '').trim();
+  if (!raw) return [];
+
+  variants.add(raw);
+
+  // 1. Bracketed or quoted aliases e.g. "Name (Alias)" or "Name 'Alias' Name"
+  const bracketMatch = raw.match(/^(.*?)\s*[\(\[\'\"]([^\)\]\'\"]+)[\)\]\'\"]/);
+  if (bracketMatch) {
+    const main = bracketMatch[1].trim();
+    const alias = bracketMatch[2].trim();
+    if (main) variants.add(main);
+    if (alias && alias.length >= 2) variants.add(alias);
+  }
+
+  // 2. Remove all non-alpha brackets/titles e.g. "Chief", "Dr.", "Alhaji", "Prince"
+  const cleaned = raw.replace(/\b(chief|dr|alhaji|alhaja|prince|princess|pastor|evangelist|ambassador|mrs|mr|ms)\.?\s+/gi, '').trim();
+  if (cleaned && cleaned !== raw) {
+    variants.add(cleaned);
+  }
+
+  // 3. Deaccented
+  const deaccented = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  variants.add(deaccented);
+
+  // 4. Name order permutations for 2 or 3-word names
+  const words = cleaned.split(/\s+/).filter(w => w.length > 1);
+  if (words.length === 2) {
+    variants.add(`${words[1]} ${words[0]}`);
+  } else if (words.length === 3) {
+    // e.g. "Mercy Johnson Okojie" -> "Mercy Johnson", "Johnson Mercy"
+    variants.add(`${words[0]} ${words[1]}`);
+    variants.add(`${words[1]} ${words[0]}`);
+    variants.add(`${words[2]} ${words[0]} ${words[1]}`);
+  }
+
+  return Array.from(variants);
+}
+
+/**
+ * Search TMDB across all generated name variants and aliases
+ */
+async function searchTmdbPersonMulti(nameVariants) {
   const headers = tmdbToken 
     ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
     : { 'Content-Type': 'application/json' };
   const queryParam = tmdbKey ? `?api_key=${tmdbKey}` : '';
 
-  const searchUrl = `https://api.themoviedb.org/3/search/person${queryParam}${queryParam ? '&' : '?'}query=${encodeURIComponent(actorName)}&include_adult=false`;
-  const res = await fetch(searchUrl, { headers });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const match = data.results?.[0];
-  return match ? match.id : null;
+  for (const variant of nameVariants) {
+    try {
+      const searchUrl = `https://api.themoviedb.org/3/search/person${queryParam}${queryParam ? '&' : '?'}query=${encodeURIComponent(variant)}&include_adult=false`;
+      const res = await fetch(searchUrl, { headers });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const results = data.results || [];
+
+      if (results.length > 0) {
+        // Prioritize department = 'Acting' or 'Directing' or 'Production'
+        const best = results.find(r => r.known_for_department === 'Acting') || results[0];
+        if (best) {
+          console.log(`  🎯 Matched TMDB via variant "${variant}": ${best.name} (ID: ${best.id})`);
+          return best.id;
+        }
+      }
+    } catch (e) {
+      // Continue to next variant
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Optional Fallback: Find IMDb ID via name query if TMDB name search fails
+ */
+async function searchImdbPersonMulti(nameVariants) {
+  if (!firecrawlKey && !zenrowsKey) return null;
+
+  for (const variant of nameVariants.slice(0, 2)) {
+    try {
+      const targetUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(variant)}&s=nm`;
+      let html = '';
+
+      if (zenrowsKey) {
+        const apiUrl = `https://api.zenrows.com/v1/?apikey=${zenrowsKey}&url=${encodeURIComponent(targetUrl)}&js_render=true&premium_proxy=true`;
+        const res = await fetch(apiUrl);
+        if (res.ok) html = await res.text();
+      }
+
+      if (!html && firecrawlKey) {
+        const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl, formats: ['html'] })
+        });
+        const data = await res.json();
+        html = data.data?.html || '';
+      }
+
+      const match = html.match(/\/name\/(nm\d{6,9})/);
+      if (match) {
+        const imdbId = match[1];
+        console.log(`  🎬 Matched IMDb ID via search "${variant}": ${imdbId}`);
+        return imdbId;
+      }
+    } catch {}
+  }
+
+  return null;
+}
+
+/**
+ * Resolve TMDB ID from an IMDb name ID (nm...)
+ */
+async function findTmdbByImdbId(imdbId) {
+  const headers = tmdbToken 
+    ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+  const queryParam = tmdbKey ? `?api_key=${tmdbKey}` : '';
+
+  try {
+    const url = `https://api.themoviedb.org/3/find/${imdbId}${queryParam}${queryParam ? '&' : '?'}external_source=imdb_id`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const person = data.person_results?.[0];
+    return person ? person.id : null;
+  } catch {
+    return null;
+  }
 }
 
 async function getTmdbCredits(tmdbPersonId) {
@@ -117,24 +244,40 @@ async function getTmdbCredits(tmdbPersonId) {
 
 async function enrichSinglePerson(person) {
   console.log(`\n======================================================`);
-  console.log(`👤 Processing: ${person.name} (${person.id})`);
+  console.log(`👤 Processing: "${person.name}" (${person.id}) [Current Film Count: ${person.film_count || 0}]`);
+
+  const nameVariants = generateNameVariants(person.name);
+  console.log(`  🔍 Search Variants / Aliases (${nameVariants.length}): ${nameVariants.join(' | ')}`);
 
   let tmdbId = person.tmdb_id;
+
+  // Step 1: Resolve TMDB ID across all name variants and aliases
   if (!tmdbId) {
-    tmdbId = await searchTmdbPerson(person.name);
-    if (tmdbId) {
-      console.log(`  🎯 Matched TMDB Person ID: ${tmdbId}`);
-      await supabase.from('people').update({ tmdb_id: tmdbId }).eq('id', person.id);
+    tmdbId = await searchTmdbPersonMulti(nameVariants);
+  }
+
+  // Step 2: Fallback to IMDb search by Name & Aliases if TMDB is not found
+  if (!tmdbId) {
+    const imdbId = await searchImdbPersonMulti(nameVariants);
+    if (imdbId) {
+      tmdbId = await findTmdbByImdbId(imdbId);
+      if (tmdbId) {
+        console.log(`  🎯 Resolved TMDB ID ${tmdbId} from IMDb ID ${imdbId}`);
+      }
     }
   }
 
+  if (tmdbId && tmdbId !== person.tmdb_id) {
+    await supabase.from('people').update({ tmdb_id: tmdbId }).eq('id', person.id);
+  }
+
   if (!tmdbId) {
-    console.log(`  ⚠️ No TMDB ID found for ${person.name}. Skipping TMDB credit sync.`);
+    console.log(`  ⚠️ No TMDB or IMDb match found across any name variants for "${person.name}". Skipping.`);
     return { created: 0, linked: 0 };
   }
 
   const credits = await getTmdbCredits(tmdbId);
-  console.log(`  🎬 Found ${credits.length} credits on TMDB`);
+  console.log(`  🎬 Found ${credits.length} credits for TMDB ID: ${tmdbId}`);
 
   let createdCount = 0;
   let linkedCount = 0;
@@ -223,7 +366,7 @@ async function enrichSinglePerson(person) {
     }
   }
 
-  // Recount
+  // Recount total credits
   const { count: totalCredits } = await supabase
     .from('credits')
     .select('id', { count: 'exact', head: true })
@@ -237,12 +380,12 @@ async function enrichSinglePerson(person) {
     })
     .eq('id', person.id);
 
-  console.log(`  ✅ Done. Created ${createdCount} films, Linked ${linkedCount} credits. Total Credits: ${totalCredits}`);
+  console.log(`  ✅ Finished: Created ${createdCount} films, Linked ${linkedCount} credits. Total Credits in DB: ${totalCredits}`);
   return { created: createdCount, linked: linkedCount };
 }
 
 async function runDaemon() {
-  console.log('🚀 Starting Indefinite Continuous Actor Enrichment Daemon...');
+  console.log('🚀 Starting Indefinite Continuous Actor Enrichment Daemon (Multi-Alias & Name Enabled)...');
   const state = loadState();
 
   const BATCH_SIZE = 25;
@@ -251,7 +394,7 @@ async function runDaemon() {
   let offset = 0;
 
   while (true) {
-    // Select batch of actors
+    // Select ALL actors in the database, ordered by popularity
     const { data: people, error } = await supabase
       .from('people')
       .select('id, name, tmdb_id, film_count, popularity_score')
@@ -275,7 +418,7 @@ async function runDaemon() {
         state.last_run_at = new Date().toISOString();
         saveState(state);
       } catch (err) {
-        console.error(`❌ Error enriching ${p.name}:`, err.message);
+        console.error(`❌ Error enriching "${p.name}":`, err.message);
       }
       await sleep(DELAY_MS);
     }
