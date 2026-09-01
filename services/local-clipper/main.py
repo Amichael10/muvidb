@@ -153,7 +153,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             "format": "18/best[ext=mp4]/best",
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "web"]
+            # web_safari/web_embedded are less likely to trigger YouTube's
+            # signed-in bot wall than the default web client. Keep Android as
+            # a final compatible fallback for videos that expose it.
+            "player_client": ["web_safari", "web_embedded", "android", "web"]
                 }
             },
             "socket_timeout": 20,
@@ -194,6 +197,11 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "no_warnings": True,
                     "noplaylist": True,
                     "format": "18/bv*[height<=720]+ba/b",
+                    "extractor_args": {
+                        "youtube": {
+                            "player_client": ["web_safari", "web_embedded", "android", "web"]
+                        }
+                    },
                     "outtmpl": raw_template,
                     "merge_output_format": "mp4",
                     "retries": 3,

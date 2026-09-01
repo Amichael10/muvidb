@@ -545,14 +545,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }));
       }
 
+      if (task === 'create_r2_upload_session') {
+        await requireSocialStudioAdmin(req);
+        const { createR2UploadUrl } = await import('./_lib/r2.js');
+        const body = parseBody(req);
+        const fileName = String(body.fileName || 'clip.mp4');
+        const mimeType = String(body.mimeType || 'video/mp4');
+        const fileSize = Number(body.fileSize || 0);
+        if (!fileSize || fileSize <= 0 || fileSize > 2 * 1024 * 1024 * 1024) return res.status(400).json({ error: 'Video size must be between 1 byte and 2 GB' });
+        if (!/^video\/(mp4|webm|quicktime)$/i.test(mimeType)) return res.status(400).json({ error: 'Only MP4, WebM, or MOV videos can be uploaded' });
+        return res.status(200).json(await createR2UploadUrl(fileName, mimeType));
+      }
+
       if (task === 'attach_custom_asset') {
         const actor = await requireSocialStudioAdmin(req);
-        const { contentItemId, variantId, publicUrl, format, width, height, driveFileId, aspectRatio } = req.body || {};
+        const { contentItemId, variantId, publicUrl, format, width, height, driveFileId, r2Key, aspectRatio } = req.body || {};
         if (!contentItemId || !publicUrl) {
           return res.status(400).json({ error: 'contentItemId and publicUrl are required' });
         }
         return res.status(200).json(await attachCustomAsset({
-          contentItemId, variantId, publicUrl, format, width, height, driveFileId, aspectRatio,
+          contentItemId, variantId, publicUrl, format, width, height, driveFileId, r2Key, aspectRatio,
         }, actor));
       }
 

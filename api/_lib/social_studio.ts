@@ -13,6 +13,7 @@ import { getThreadsPublishingCredentials, getPlatformPublishingCredentials, isTh
 import { assertContentTransition, nextRetryAvailableAt } from './social-studio/domain/transitions.js';
 import type { SocialContentStatus } from './social-studio/domain/statuses.js';
 import { parseGenerateDraftRequest, createPublishJobIdempotencyKey } from './social-studio/domain/validation.js';
+import { deleteFromR2 } from './r2.js';
 export { parseGenerateDraftRequest };
 import type { SocialContentType } from './social-studio/domain/content-types.js';
 import { preferredAssetFormat, type SocialPlatform } from './social-studio/domain/platform-types.js';
@@ -310,18 +311,26 @@ export async function cleanupContentItemAssets(contentItemId: string) {
   // by a Supabase storage path, so clean those files explicitly once every
   // selected platform has accepted the post.
   const driveFileIds = new Set<string>();
+  const r2Keys = new Set<string>();
   for (const variant of variants || []) {
     const options = variant?.platform_options || {};
     const directId = options.drive_file_id || options.driveFileId;
     if (typeof directId === 'string' && directId) driveFileIds.add(directId);
+    const directR2Key = options.r2_key || options.r2Key;
+    if (typeof directR2Key === 'string' && directR2Key) r2Keys.add(directR2Key);
     for (const asset of Array.isArray(options.carousel_assets) ? options.carousel_assets : []) {
       const assetId = asset?.drive_file_id || asset?.driveFileId;
       if (typeof assetId === 'string' && assetId) driveFileIds.add(assetId);
+      const r2Key = asset?.r2_key || asset?.r2Key;
+      if (typeof r2Key === 'string' && r2Key) r2Keys.add(r2Key);
     }
   }
   if (driveFileIds.size) {
     const { deleteVideoFromDrive } = await import('./google_drive.js');
     await Promise.allSettled([...driveFileIds].map(fileId => deleteVideoFromDrive(fileId)));
+  }
+  if (r2Keys.size) {
+    await Promise.allSettled([...r2Keys].map(key => deleteFromR2(key)));
   }
 }
 
@@ -1871,6 +1880,7 @@ export async function attachCustomAsset(
     height?: number;
     variantId?: string;
     driveFileId?: string;
+    r2Key?: string;
     aspectRatio?: string;
   },
   actor: SocialActor,
@@ -1880,7 +1890,7 @@ export async function attachCustomAsset(
   if (!/^https:\/\//i.test(String(input.publicUrl || ''))) {
     throw httpError(400, 'The custom artwork must have a public HTTPS URL');
   }
-  const isVideo = Boolean(input.driveFileId) || /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(input.publicUrl) || Boolean(input.format?.includes('video'));
+  const isVideo = Boolean(input.driveFileId) || Boolean(input.r2Key) || /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(input.publicUrl) || Boolean(input.format?.includes('video'));
   const format: SocialAssetFormat = input.format || (isVideo ? 'video_vertical_9_16' as SocialAssetFormat : 'square_1_1');
   const width = input.width || 1080;
   const height = input.height || 1080;
@@ -1924,9 +1934,10 @@ export async function attachCustomAsset(
         height,
         file_size_bytes: 0,
         render_metadata: {
-          source: input.driveFileId ? 'desktop_clipper' : 'custom_upload',
+          source: input.driveFileId || input.r2Key ? 'desktop_clipper' : 'custom_upload',
           uploaded_by: actor.id,
           drive_file_id: input.driveFileId || null,
+          r2_key: input.r2Key || null,
           aspect_ratio: input.aspectRatio || null,
         },
       },
@@ -1956,6 +1967,7 @@ export async function attachCustomAsset(
           asset_url: input.publicUrl,
           video_url: isVideo ? input.publicUrl : null,
           drive_file_id: input.driveFileId || null,
+          r2_key: input.r2Key || null,
           aspect_ratio: input.aspectRatio || null,
           asset_format: format,
         },

@@ -196,3 +196,6 @@ scratch*
 *.part
 cookies.txt
 cookies.txt.txt
+.npm-cache/
+__pycache__/
+*.pyc

@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "http://localhost:5173",
+          "https://muvidb.com",
+          "https://www.muvidb.com"
+        ],
+        "methods": ["PUT", "GET", "HEAD", "DELETE"],
+        "headers": ["Content-Type", "x-amz-*", "Range"]
+      },
+      "exposeHeaders": ["ETag", "Content-Length", "Content-Type"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

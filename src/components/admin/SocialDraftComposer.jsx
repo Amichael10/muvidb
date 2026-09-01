@@ -286,6 +286,7 @@ export default function SocialDraftComposer({
             width: targetDimensions.width,
             height: targetDimensions.height,
             driveFileId: renderedAsset.driveFileId || renderedAsset.drive_file_id,
+            r2Key: renderedAsset.r2Key || renderedAsset.r2_key,
             aspectRatio: ratio,
           }),
         });
@@ -310,6 +311,8 @@ export default function SocialDraftComposer({
       aspectRatio: ratio,
       driveFileId: renderedAsset.driveFileId || renderedAsset.drive_file_id,
       drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
+      r2Key: renderedAsset.r2Key || renderedAsset.r2_key,
+      r2_key: renderedAsset.r2Key || renderedAsset.r2_key,
     };
 
     setResult(prev => {
@@ -323,11 +326,13 @@ export default function SocialDraftComposer({
           selected_asset_id: attachedAssetIds.get(v.id) || v.selected_asset_id,
           media_urls: [videoUrl],
           drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id || v.drive_file_id,
+          r2_key: renderedAsset.r2Key || renderedAsset.r2_key || v.r2_key,
           platform_options: {
             ...(v.platform_options || {}),
             video_url: videoUrl,
             asset_url: videoUrl,
             drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
+            r2_key: renderedAsset.r2Key || renderedAsset.r2_key,
             aspect_ratio: ratio,
             asset_format: targetDimensions.format,
             post_format: 'single',

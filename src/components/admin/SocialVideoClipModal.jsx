@@ -318,7 +318,7 @@ export default function SocialVideoClipModal({
     }
 
     // 2. Google Drive Fallback
-    const sessionResponse = await fetch('/api/social?task=create_upload_session', {
+    const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', {
       method: 'POST',
       headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
       signal,
@@ -329,7 +329,7 @@ export default function SocialVideoClipModal({
       }),
     });
     const session = await sessionResponse.json().catch(() => ({}));
-    if (!sessionResponse.ok || !session.uploadUrl) {
+    if (!sessionResponse.ok || !session.uploadUrl || !session.publicUrl) {
       throw new Error(session.error || 'MuviDB could not prepare the temporary video upload.');
     }
 
@@ -339,20 +339,8 @@ export default function SocialVideoClipModal({
       signal,
       body: clipBlob,
     });
-    const driveFile = await driveResponse.json().catch(() => ({}));
-    if (!driveResponse.ok || !driveFile.id) {
-      throw new Error('Google Drive could not store the rendered clip.');
-    }
-
-    const publicResponse = await fetch('/api/social?task=make_drive_file_public', {
-      method: 'POST',
-      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-      signal,
-      body: JSON.stringify({ fileId: driveFile.id }),
-    });
-    const publicData = await publicResponse.json().catch(() => ({}));
-    if (!publicResponse.ok || !publicData.publicUrl) {
-      throw new Error(publicData.error || 'The temporary video could not be made available to the selected platforms.');
+    if (!driveResponse.ok) {
+      throw new Error('Cloudflare R2 could not store the rendered clip.');
     }
 
     if (localClip.cleanup_url) {
@@ -361,8 +349,8 @@ export default function SocialVideoClipModal({
 
     return {
       ...localClip,
-      public_url: publicData.publicUrl,
-      drive_file_id: driveFile.id,
+      public_url: session.publicUrl,
+      r2_key: session.key,
       size_mb: Number((clipBlob.size / (1024 * 1024)).toFixed(2)),
     };
   };
@@ -486,8 +474,8 @@ export default function SocialVideoClipModal({
         }
         setRenderStage(3);
         setRenderProgress(Math.round(55 + ((index + 0.5) / ratios.length) * 40));
-        setRenderStatusText(`[3/3] Uploading ${ratio} MP4 to Google Drive and attaching it…`);
-        const clipAsset = { url: data.public_url, public_url: data.public_url, publicUrl: data.public_url, driveFileId: data.drive_file_id, drive_file_id: data.drive_file_id, format: 'custom_video', mediaType: 'video', duration: sliceLen, aspectRatio: ratio, fileName: data.file_name, sizeMb: data.size_mb, title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startSec)} - ${formatSecondsToTimecode(endSec)})`, isRenderedMp4: true };
+        setRenderStatusText(`[3/3] Uploading ${ratio} MP4 to Cloudflare R2 and attaching it…`);
+        const clipAsset = { url: data.public_url, public_url: data.public_url, publicUrl: data.public_url, driveFileId: data.drive_file_id, drive_file_id: data.drive_file_id, r2Key: data.r2_key, r2_key: data.r2_key, format: 'custom_video', mediaType: 'video', duration: sliceLen, aspectRatio: ratio, fileName: data.file_name, sizeMb: data.size_mb, title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startSec)} - ${formatSecondsToTimecode(endSec)})`, isRenderedMp4: true };
         if (onAttachRenderedVideo) {
           const attached = await onAttachRenderedVideo(clipAsset);
           if (attached === false) throw new Error(`The ${ratio} video was rendered but could not be attached to this draft.`);
