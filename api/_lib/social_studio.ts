@@ -1545,6 +1545,13 @@ export async function scheduleContentItem(
   if (error) throw error;
   if (!item) throw httpError(404, 'Content item not found');
 
+  // Scheduling is idempotent for already-scheduled posts. This is important
+  // for the Publish Now action, which may be called by an older cached client
+  // that still sends a schedule request before invoking the publisher.
+  if (item.status === 'scheduled') {
+    return { id: item.id, title: item.title, status: item.status, alreadyScheduled: true };
+  }
+
   // Keep one-click scheduling while still honouring the review state machine and
   // recording both audit events. A draft cannot legally jump straight to
   // approved; it must first become ready_for_review.
