@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -16,7 +16,6 @@ import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toTitleCase, toSentenceCase, formatPersonName } from '../../utils/format';
 import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
-import { useMemo } from 'react';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { AFRICAN_NATIONALITIES } from '../../utils/africanCountries';
@@ -160,6 +159,8 @@ export default function AdminPeople() {
     biography: '',
     photo_url: '',
     date_of_birth: '',
+    date_of_death: '',
+    is_deceased: false,
     gender: 'Prefer not to say',
     nationality: 'Nigerian',
     is_verified: false,
@@ -180,19 +181,44 @@ export default function AdminPeople() {
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [youtubeChannelInput, setYoutubeChannelInput] = useState('');
+  const activeFetchIdRef = useRef(0);
 
   const draftKey = isDrawerOpen ? (editingPerson ? `MuviDB_draft_person_${editingPerson.id}` : 'MuviDB_draft_person_new') : null;
   const draftData = useMemo(() => ({ ...formData, youtube_channel_id: youtubeChannelInput || formData.youtube_channel_id || formData.youtube_handle }), [formData, youtubeChannelInput]);
   const { clearDraft } = useLocalStorageDraft(draftKey, draftData, isDrawerOpen);
   const [draftRestoredMessage, setDraftRestoredMessage] = useState('');
 
-  // Server-Side Fetching
+  // Server-Side Fetching with Race-Condition Protection & Resilient Fallback
   const fetchPeople = async () => {
+    const fetchId = ++activeFetchIdRef.current;
     setIsLoading(true);
     try {
       const cleanSearch = (debouncedSearch || '').trim();
 
-      // 1. Get exact total count for the current filters
+      const sortConfigs = {
+        'Most Popular': { col: 'popularity_score', asc: false },
+        'Recently Added': { col: 'created_at', asc: false },
+        'Newest': { col: 'created_at', asc: false },
+        'A-Z': { col: 'name', asc: true },
+        'Z-A': { col: 'name', asc: false },
+        'Oldest': { col: 'created_at', asc: true }
+      };
+      
+      const sort = sortConfigs[sortBy] || sortConfigs['Most Popular'];
+
+      // Build data fetching promise
+      const dataPromise = supabase.rpc('get_people_with_counts', {
+        p_search: cleanSearch,
+        p_verified: verifiedFilter.toLowerCase(),
+        p_spotlight: spotlightFilter.toLowerCase(),
+        p_sort_col: sort.col,
+        p_sort_asc: sort.asc,
+        p_offset: (page - 1) * pageSize,
+        p_limit: pageSize,
+        p_status: profileStatus.toLowerCase()
+      });
+
+      // Build count query promise
       let countQuery = supabase
         .from('people')
         .select('*', { count: 'exact', head: true });
@@ -201,10 +227,8 @@ export default function AdminPeople() {
         countQuery = countQuery.ilike('name', `%${cleanSearch}%`);
       }
       if (profileStatus === 'Incomplete') {
-        // OR logic for incomplete profiles (missing bio OR missing photo)
-        countQuery = countQuery.or('bio.is.null,photo_url.is.null,bio.eq.,photo_url.eq.');
+        countQuery = countQuery.or('bio.is.null,photo_url.is.null');
       } else if (profileStatus === 'Complete') {
-        // Implicit AND logic for complete profiles (must have both bio AND photo)
         countQuery = countQuery
           .not('bio', 'is', null)
           .not('photo_url', 'is', null)
@@ -224,47 +248,48 @@ export default function AdminPeople() {
         countQuery = countQuery.eq('is_spotlight', false);
       }
 
-      const { count, error: countError } = await countQuery;
-      if (countError) throw countError;
-      setTotalCount(count || 0);
+      const [dataResult, countResult] = await Promise.allSettled([dataPromise, countQuery]);
 
-      // 2. Fetch data using RPC
-      const sortConfigs = {
-        'Most Popular': { col: 'popularity_score', asc: false },
-        'Recently Added': { col: 'created_at', asc: false },
-        'Newest': { col: 'created_at', asc: false },
-        'A-Z': { col: 'name', asc: true },
-        'Z-A': { col: 'name', asc: false },
-        'Oldest': { col: 'created_at', asc: true }
-      };
-      
-      const sort = sortConfigs[sortBy] || sortConfigs['Most Popular'];
-      
-      const { data, error } = await supabase.rpc('get_people_with_counts', {
-        p_search: cleanSearch,
-        p_verified: verifiedFilter.toLowerCase(),
-        p_spotlight: spotlightFilter.toLowerCase(),
-        p_sort_col: sort.col,
-        p_sort_asc: sort.asc,
-        p_offset: (page - 1) * pageSize,
-        p_limit: pageSize,
-        p_status: profileStatus.toLowerCase()
-      });
+      if (fetchId !== activeFetchIdRef.current) {
+        // Discard stale out-of-order request
+        return;
+      }
 
-      if (error) {
-        console.warn('RPC get_people_with_counts error, falling back to direct table query:', error);
+      // Update count safely
+      if (countResult.status === 'fulfilled' && !countResult.value.error) {
+        setTotalCount(countResult.value.count || 0);
+      }
+
+      // Process RPC data or fallback to direct table query
+      if (dataResult.status === 'fulfilled' && !dataResult.value.error && Array.isArray(dataResult.value.data)) {
+        setPeople(dataResult.value.data);
+        if (countResult.status !== 'fulfilled' || countResult.value.error) {
+          setTotalCount(dataResult.value.data.length >= pageSize ? 1000 : dataResult.value.data.length);
+        }
+      } else {
+        console.warn('RPC get_people_with_counts failed or timed out, executing direct query fallback:', dataResult.value?.error);
+        
         let fallbackQuery = supabase
           .from('people')
           .select(`
             id, name, photo_url, is_verified, is_spotlight, popularity_score,
-            known_for_department, created_at
+            known_for_department, created_at, film_count
           `);
 
         if (cleanSearch) {
-          fallbackQuery = fallbackQuery.ilike('name', `%${cleanSearch}%`);
+          const searchTokens = cleanSearch.split(/\s+/).filter(Boolean);
+          if (searchTokens.length === 1) {
+            fallbackQuery = fallbackQuery.ilike('name', `%${searchTokens[0]}%`);
+          } else {
+            // Multi-token match
+            searchTokens.forEach(token => {
+              fallbackQuery = fallbackQuery.ilike('name', `%${token}%`);
+            });
+          }
         }
+
         if (profileStatus === 'Incomplete') {
-          fallbackQuery = fallbackQuery.or('bio.is.null,photo_url.is.null,bio.eq.,photo_url.eq.');
+          fallbackQuery = fallbackQuery.or('bio.is.null,photo_url.is.null');
         } else if (profileStatus === 'Complete') {
           fallbackQuery = fallbackQuery
             .not('bio', 'is', null)
@@ -272,11 +297,13 @@ export default function AdminPeople() {
             .neq('bio', '')
             .neq('photo_url', '');
         }
+
         if (verifiedFilter === 'Verified') {
           fallbackQuery = fallbackQuery.eq('is_verified', true);
         } else if (verifiedFilter === 'Member') {
           fallbackQuery = fallbackQuery.eq('is_verified', false);
         }
+
         if (spotlightFilter === 'Spotlight') {
           fallbackQuery = fallbackQuery.eq('is_spotlight', true);
         } else if (spotlightFilter === 'Regular') {
@@ -287,18 +314,32 @@ export default function AdminPeople() {
           .order(sort.col, { ascending: sort.asc })
           .range((page - 1) * pageSize, page * pageSize - 1);
 
-        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-        if (fallbackError) throw fallbackError;
-        setPeople(fallbackData || []);
-      } else {
-        setPeople(data || []);
+        const { data: fbData, error: fbErr } = await fallbackQuery;
+
+        if (fetchId !== activeFetchIdRef.current) return;
+
+        if (fbErr) {
+          throw fbErr;
+        }
+
+        const formattedFb = (fbData || []).map(p => ({
+          ...p,
+          traditional_credits_count: p.film_count || 0,
+          youtube_filmography_count: 0,
+          total_filmography_count: p.film_count || 0
+        }));
+
+        setPeople(formattedFb);
       }
     } catch (error) {
-      console.error('Error fetching people:', error);
-      // Fixed id so a flurry of failed searches/filters shows ONE snackbar, not a stack.
-      toast.error(getFriendlyErrorMessage(error), { id: 'admin-people-fetch' });
+      if (fetchId === activeFetchIdRef.current) {
+        console.error('Error fetching people:', error);
+        toast.error(getFriendlyErrorMessage(error), { id: 'admin-people-fetch' });
+      }
     } finally {
-      setIsLoading(false);
+      if (fetchId === activeFetchIdRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -403,6 +444,8 @@ export default function AdminPeople() {
       biography: '',
       photo_url: '',
       date_of_birth: '',
+      date_of_death: '',
+      is_deceased: false,
       gender: 'Prefer not to say',
       nationality: 'Nigerian',
       is_verified: false,
@@ -449,6 +492,8 @@ export default function AdminPeople() {
       biography: p.biography || p.bio || '',
       photo_url: p.photo_url || '',
       date_of_birth: p.date_of_birth || '',
+      date_of_death: p.date_of_death || '',
+      is_deceased: Boolean(p.is_deceased || p.date_of_death),
       gender: p.gender || 'Prefer not to say',
       nationality: p.nationality || 'Nigerian',
       is_verified: p.is_verified || false,
@@ -549,6 +594,8 @@ export default function AdminPeople() {
         name: toTitleCase(formData.name),
         bio: formData.biography ? toSentenceCase(formData.biography) : (formData.bio || null),
         date_of_birth: formData.date_of_birth || null,
+        date_of_death: formData.date_of_death || null,
+        is_deceased: Boolean(formData.date_of_death || formData.is_deceased),
         gender: formData.gender || 'Prefer not to say',
         nationality: formData.nationality || 'Nigerian',
         photo_url: formData.photo_url || null,
@@ -1108,14 +1155,28 @@ export default function AdminPeople() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-text-primary mb-2">Date of Birth</label>
-                <input 
-                  type="date" 
-                  value={formData.date_of_birth} 
-                  onChange={e => setFormData({...formData, date_of_birth: e.target.value})} 
-                  className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-2">Date of Birth</label>
+                  <input 
+                    type="date" 
+                    value={formData.date_of_birth || ''} 
+                    onChange={e => setFormData({...formData, date_of_birth: e.target.value})} 
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-text-primary mb-2 flex items-center justify-between">
+                    <span>Date of Death</span>
+                    <span className="text-[10px] text-text-muted font-normal">Optional (if deceased)</span>
+                  </label>
+                  <input 
+                    type="date" 
+                    value={formData.date_of_death || ''} 
+                    onChange={e => setFormData({...formData, date_of_death: e.target.value, is_deceased: Boolean(e.target.value)})} 
+                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none" 
+                  />
+                </div>
               </div>
               <div>
                 <ImageField
