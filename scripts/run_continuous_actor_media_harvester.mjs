@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
-import { uploadToR2 } from '../api/_lib/r2.js';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -24,6 +24,113 @@ const tmdbToken = process.env.VITE_TMDB_READ_ACCESS_TOKEN;
 const youtubeKey = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
 
 const STATE_FILE = path.resolve('scripts/data/actor_media_harvester_state.json');
+
+// --- Cloudflare R2 Upload Utilities (Native AWS Signature v4) ---
+function getR2Config() {
+  const accountId = process.env.R2_ACCOUNT_ID || '';
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID || '';
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || '';
+  const bucketName = process.env.R2_BUCKET_NAME || '';
+  const publicUrl = process.env.R2_PUBLIC_URL || '';
+
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
+    return null;
+  }
+
+  return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
+}
+
+function hmacSha256(key, data) {
+  return crypto.createHmac('sha256', key).update(data, 'utf8').digest();
+}
+
+function sha256Hex(data) {
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+async function uploadToR2(fileName, fileBytes, mimeType) {
+  const config = getR2Config();
+  if (!config) {
+    throw new Error('R2 credentials missing. Skipping R2 upload.');
+  }
+
+  const endpoint = `https://${config.accountId}.r2.cloudflarestorage.com`;
+  const region = 'auto';
+  const service = 's3';
+
+  const cleanKey = fileName.replace(/^\/+/, '');
+  const path = `/${config.bucketName}/${cleanKey}`;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.substring(0, 8);
+
+  const payloadHash = sha256Hex(fileBytes);
+
+  const host = `${config.accountId}.r2.cloudflarestorage.com`;
+  const canonicalHeaders =
+    `content-type:${mimeType}\n` +
+    `host:${host}\n` +
+    `x-amz-content-sha256:${payloadHash}\n` +
+    `x-amz-date:${amzDate}\n`;
+  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
+
+  const canonicalRequest =
+    `PUT\n` +
+    `${path}\n` +
+    `\n` +
+    `${canonicalHeaders}\n` +
+    `${signedHeaders}\n` +
+    `${payloadHash}`;
+
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign =
+    `${algorithm}\n` +
+    `${amzDate}\n` +
+    `${credentialScope}\n` +
+    `${sha256Hex(canonicalRequest)}`;
+
+  const kDate = hmacSha256(`AWS4${config.secretAccessKey}`, dateStamp);
+  const kRegion = hmacSha256(kDate, region);
+  const kService = hmacSha256(kRegion, service);
+  const kSigning = hmacSha256(kService, 'aws4_request');
+  const signature = hmacSha256(kSigning, stringToSign).toString('hex');
+
+  const authorizationHeader =
+    `${algorithm} ` +
+    `Credential=${config.accessKeyId}/${credentialScope}, ` +
+    `SignedHeaders=${signedHeaders}, ` +
+    `Signature=${signature}`;
+
+  const uploadUrl = `${endpoint}${path}`;
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': mimeType,
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-date': amzDate,
+      Authorization: authorizationHeader,
+    },
+    body: fileBytes,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Cloudflare R2 upload failed (${response.status}): ${errText}`);
+  }
+
+  const publicBase = config.publicUrl
+    ? config.publicUrl.replace(/\/+$/, '')
+    : `https://${config.bucketName}.${config.accountId}.r2.cloudflarestorage.com`;
+
+  const publicUrl = `${publicBase}/${cleanKey}`;
+
+  return {
+    url: publicUrl,
+    key: cleanKey,
+    sizeMb: Number((fileBytes.length / (1024 * 1024)).toFixed(2)),
+  };
+}
 
 function loadState() {
   try {
@@ -46,10 +153,6 @@ function saveState(state) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function cleanTitle(t) {
-  return String(t || '').replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
 }
 
 /**
@@ -219,7 +322,7 @@ async function processActorMedia(person, state) {
   // Check existing media to avoid duplicate uploads
   const { data: existingMedia } = await supabase
     .from('person_media')
-    .select('url, embed_id, category')
+    .select('url, embed_id, category, media_type')
     .eq('person_id', person.id);
 
   const existingUrls = new Set((existingMedia || []).map(m => m.url));
@@ -235,8 +338,20 @@ async function processActorMedia(person, state) {
       if (existingUrls.has(p.url)) continue;
 
       try {
-        console.log(`  ☁️ Uploading photo ${i + 1}/${rawPhotos.length} to Cloudflare R2...`);
-        const r2Result = await uploadPhotoBufferToR2(person.id, p.url, i);
+        let finalUrl = p.url;
+        let r2Key = null;
+
+        // Try R2 upload if configured
+        const r2Config = getR2Config();
+        if (r2Config) {
+          console.log(`  ☁️ Uploading photo ${i + 1}/${rawPhotos.length} to Cloudflare R2...`);
+          const r2Result = await uploadPhotoBufferToR2(person.id, p.url, i);
+          finalUrl = r2Result.url;
+          r2Key = r2Result.key;
+          console.log(`    ✅ Stored in R2: ${finalUrl}`);
+        } else {
+          console.log(`    ℹ️ R2 env not configured, linking direct CDN URL: ${finalUrl}`);
+        }
 
         // Check if film_id needs matching
         let matchedFilmId = null;
@@ -252,10 +367,10 @@ async function processActorMedia(person, state) {
           media_type: 'photo',
           category: p.category,
           title: p.title,
-          url: r2Result.url,
-          thumbnail_url: r2Result.url,
-          r2_key: r2Result.key,
-          embed_provider: 'r2',
+          url: finalUrl,
+          thumbnail_url: finalUrl,
+          r2_key: r2Key,
+          embed_provider: r2Key ? 'r2' : 'tmdb',
           width: p.width,
           height: p.height,
           aspect_ratio: p.aspect_ratio,
@@ -264,12 +379,11 @@ async function processActorMedia(person, state) {
           status: 'approved'
         });
 
-        existingUrls.add(r2Result.url);
+        existingUrls.add(finalUrl);
         newPhotosCount++;
         state.total_photos++;
-        console.log(`    ✅ Stored in R2: ${r2Result.url}`);
       } catch (err) {
-        console.warn(`    ⚠️ Failed photo upload for ${p.url}:`, err.message);
+        console.warn(`    ⚠️ Failed photo processing for ${p.url}:`, err.message);
       }
       await sleep(200);
     }
@@ -311,7 +425,7 @@ async function processActorMedia(person, state) {
     }
   }
 
-  console.log(`  ✨ Summary for ${person.name}: Added ${newPhotosCount} R2 Photos, ${newVideosCount} Videos.`);
+  console.log(`  ✨ Summary for ${person.name}: Added ${newPhotosCount} Photos, ${newVideosCount} Videos.`);
 }
 
 async function runMediaHarvesterDaemon() {
