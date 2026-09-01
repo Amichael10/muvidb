@@ -1,9 +1,7 @@
 /**
- * Continuous Indefinite Actor Enrichment Worker (Multi-Alias & Name Permutation Enabled)
+ * Continuous Indefinite Actor Enrichment Worker (Guarded for Nollywood & African Cinema)
  * Run anytime on background machines:
  *   node scripts/run_continuous_actor_enrichment.mjs
- * Or with custom batch size:
- *   node scripts/run_continuous_actor_enrichment.mjs --batch=20 --delay=800
  */
 
 import dotenv from 'dotenv';
@@ -24,6 +22,21 @@ const firecrawlKey = process.env.FIRECRAWL_API_KEY;
 const zenrowsKey = process.env.ZENROWS_API_KEY;
 
 const STATE_FILE = path.resolve('scripts/data/actor_enrichment_state.json');
+
+const AFRICAN_BIRTHPLACES = [
+  'nigeria', 'ghana', 'south africa', 'kenya', 'uganda', 'tanzania', 'cameroon',
+  'rwanda', 'zimbabwe', 'senegal', 'zambia', 'egypt', 'morocco', 'ethiopia', 'liberia', 'sierra leone',
+  'lagos', 'abuja', 'ibadan', 'enugu', 'benin city', 'kano', 'port harcourt', 'accra', 'kumasi', 'nairobi', 'johannesburg', 'kampala'
+];
+
+const FOREIGN_COUNTRIES = [
+  'united states', 'usa', 'california', 'new york', 'texas', 'florida', 'illinois',
+  'ohio', 'pennsylvania', 'georgia', 'north carolina', 'michigan', 'kentucky',
+  'england', 'united kingdom', 'uk', 'london', 'scotland', 'wales', 'ireland',
+  'canada', 'ontario', 'toronto', 'vancouver', 'australia', 'sydney', 'melbourne',
+  'france', 'paris', 'germany', 'berlin', 'italy', 'rome', 'spain', 'madrid',
+  'japan', 'tokyo', 'china', 'beijing', 'india', 'mumbai', 'south korea', 'seoul'
+];
 
 function loadState() {
   try {
@@ -56,12 +69,6 @@ function normalizeTitle(t) {
     .trim();
 }
 
-/**
- * Generate intelligent search variants and extracted aliases:
- * - "Olaniyi Afonja (Sanyeri)" -> ["Olaniyi Afonja (Sanyeri)", "Olaniyi Afonja", "Sanyeri"]
- * - "Funke Akindele Bello" -> ["Funke Akindele Bello", "Funke Akindele", "Akindele Funke"]
- * - "Dada Omowunmi" -> ["Dada Omowunmi", "Omowunmi Dada"]
- */
 function generateNameVariants(fullName) {
   const variants = new Set();
   const raw = String(fullName || '').trim();
@@ -69,7 +76,6 @@ function generateNameVariants(fullName) {
 
   variants.add(raw);
 
-  // 1. Bracketed or quoted aliases e.g. "Name (Alias)" or "Name 'Alias' Name"
   const bracketMatch = raw.match(/^(.*?)\s*[\(\[\'\"]([^\)\]\'\"]+)[\)\]\'\"]/);
   if (bracketMatch) {
     const main = bracketMatch[1].trim();
@@ -78,22 +84,18 @@ function generateNameVariants(fullName) {
     if (alias && alias.length >= 2) variants.add(alias);
   }
 
-  // 2. Remove all non-alpha brackets/titles e.g. "Chief", "Dr.", "Alhaji", "Prince"
   const cleaned = raw.replace(/\b(chief|dr|alhaji|alhaja|prince|princess|pastor|evangelist|ambassador|mrs|mr|ms)\.?\s+/gi, '').trim();
   if (cleaned && cleaned !== raw) {
     variants.add(cleaned);
   }
 
-  // 3. Deaccented
   const deaccented = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   variants.add(deaccented);
 
-  // 4. Name order permutations for 2 or 3-word names
   const words = cleaned.split(/\s+/).filter(w => w.length > 1);
   if (words.length === 2) {
     variants.add(`${words[1]} ${words[0]}`);
   } else if (words.length === 3) {
-    // e.g. "Mercy Johnson Okojie" -> "Mercy Johnson", "Johnson Mercy"
     variants.add(`${words[0]} ${words[1]}`);
     variants.add(`${words[1]} ${words[0]}`);
     variants.add(`${words[2]} ${words[0]} ${words[1]}`);
@@ -103,8 +105,61 @@ function generateNameVariants(fullName) {
 }
 
 /**
- * Search TMDB across all generated name variants and aliases
+ * TMDB Person Details to check Place of Birth / African Origin
  */
+async function getTmdbPersonDetails(personId) {
+  const headers = tmdbToken 
+    ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+  const queryParam = tmdbKey ? `?api_key=${tmdbKey}` : '';
+
+  try {
+    const url = `https://api.themoviedb.org/3/person/${personId}${queryParam}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a TMDB Movie is an authentic Nollywood/African production
+ */
+async function isAfricanMovie(tmdbMovieId) {
+  const headers = tmdbToken 
+    ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+  const queryParam = tmdbKey ? `?api_key=${tmdbKey}` : '';
+
+  try {
+    const url = `https://api.themoviedb.org/3/movie/${tmdbMovieId}${queryParam}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) return false;
+    const data = await res.json();
+
+    const originCountries = data.origin_country || [];
+    const prodCountries = (data.production_countries || []).map(c => c.iso_3166_1);
+    const allCountries = [...originCountries, ...prodCountries];
+
+    // Check for African countries (NG, GH, ZA, KE, UG, TZ, etc.)
+    const isAfricanCountry = allCountries.some(c => ['NG', 'GH', 'ZA', 'KE', 'UG', 'TZ', 'RW', 'ZW', 'SN', 'EG', 'MA'].includes(c));
+    if (isAfricanCountry) return true;
+
+    // Check language
+    const lang = (data.original_language || '').toLowerCase();
+    if (['yo', 'ig', 'ha', 'pcm', 'sw'].includes(lang)) return true;
+
+    // Reject pure Hollywood / European / Asian productions (US, GB, FR, DE, CA, AU, JP, KR, IN)
+    const isPureForeign = allCountries.some(c => ['US', 'GB', 'FR', 'DE', 'CA', 'AU', 'JP', 'KR', 'IN'].includes(c));
+    if (isPureForeign && !isAfricanCountry) return false;
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function searchTmdbPersonMulti(nameVariants) {
   const headers = tmdbToken 
     ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
@@ -119,80 +174,29 @@ async function searchTmdbPersonMulti(nameVariants) {
       const data = await res.json();
       const results = data.results || [];
 
-      if (results.length > 0) {
-        // Prioritize department = 'Acting' or 'Directing' or 'Production'
-        const best = results.find(r => r.known_for_department === 'Acting') || results[0];
-        if (best) {
-          console.log(`  🎯 Matched TMDB via variant "${variant}": ${best.name} (ID: ${best.id})`);
-          return best.id;
+      for (const r of results) {
+        if (r.known_for_department !== 'Acting' && r.known_for_department !== 'Directing') continue;
+        
+        // Check TMDB details for place of birth
+        const details = await getTmdbPersonDetails(r.id);
+        const bplace = (details?.place_of_birth || '').toLowerCase();
+
+        // If place of birth is foreign (e.g. USA, UK) with no African ties, skip!
+        const isForeignPlace = FOREIGN_COUNTRIES.some(fc => bplace.includes(fc));
+        const isAfricanPlace = AFRICAN_BIRTHPLACES.some(ac => bplace.includes(ac));
+
+        if (isForeignPlace && !isAfricanPlace) {
+          console.log(`  ⛔ Skipped non-African TMDB person: ${r.name} (Born: ${details?.place_of_birth})`);
+          continue;
         }
+
+        console.log(`  🎯 Matched African/Nollywood TMDB Person: ${r.name} (ID: ${r.id})`);
+        return r.id;
       }
-    } catch (e) {
-      // Continue to next variant
-    }
+    } catch (e) {}
   }
 
   return null;
-}
-
-/**
- * Optional Fallback: Find IMDb ID via name query if TMDB name search fails
- */
-async function searchImdbPersonMulti(nameVariants) {
-  if (!firecrawlKey && !zenrowsKey) return null;
-
-  for (const variant of nameVariants.slice(0, 2)) {
-    try {
-      const targetUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(variant)}&s=nm`;
-      let html = '';
-
-      if (zenrowsKey) {
-        const apiUrl = `https://api.zenrows.com/v1/?apikey=${zenrowsKey}&url=${encodeURIComponent(targetUrl)}&js_render=true&premium_proxy=true`;
-        const res = await fetch(apiUrl);
-        if (res.ok) html = await res.text();
-      }
-
-      if (!html && firecrawlKey) {
-        const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: targetUrl, formats: ['html'] })
-        });
-        const data = await res.json();
-        html = data.data?.html || '';
-      }
-
-      const match = html.match(/\/name\/(nm\d{6,9})/);
-      if (match) {
-        const imdbId = match[1];
-        console.log(`  🎬 Matched IMDb ID via search "${variant}": ${imdbId}`);
-        return imdbId;
-      }
-    } catch {}
-  }
-
-  return null;
-}
-
-/**
- * Resolve TMDB ID from an IMDb name ID (nm...)
- */
-async function findTmdbByImdbId(imdbId) {
-  const headers = tmdbToken 
-    ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
-    : { 'Content-Type': 'application/json' };
-  const queryParam = tmdbKey ? `?api_key=${tmdbKey}` : '';
-
-  try {
-    const url = `https://api.themoviedb.org/3/find/${imdbId}${queryParam}${queryParam ? '&' : '?'}external_source=imdb_id`;
-    const res = await fetch(url, { headers });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const person = data.person_results?.[0];
-    return person ? person.id : null;
-  } catch {
-    return null;
-  }
 }
 
 async function getTmdbCredits(tmdbPersonId) {
@@ -244,27 +248,13 @@ async function getTmdbCredits(tmdbPersonId) {
 
 async function enrichSinglePerson(person) {
   console.log(`\n======================================================`);
-  console.log(`👤 Processing: "${person.name}" (${person.id}) [Current Film Count: ${person.film_count || 0}]`);
+  console.log(`👤 Processing: "${person.name}" (${person.id}) [Current Films: ${person.film_count || 0}]`);
 
   const nameVariants = generateNameVariants(person.name);
-  console.log(`  🔍 Search Variants / Aliases (${nameVariants.length}): ${nameVariants.join(' | ')}`);
 
   let tmdbId = person.tmdb_id;
-
-  // Step 1: Resolve TMDB ID across all name variants and aliases
   if (!tmdbId) {
     tmdbId = await searchTmdbPersonMulti(nameVariants);
-  }
-
-  // Step 2: Fallback to IMDb search by Name & Aliases if TMDB is not found
-  if (!tmdbId) {
-    const imdbId = await searchImdbPersonMulti(nameVariants);
-    if (imdbId) {
-      tmdbId = await findTmdbByImdbId(imdbId);
-      if (tmdbId) {
-        console.log(`  🎯 Resolved TMDB ID ${tmdbId} from IMDb ID ${imdbId}`);
-      }
-    }
   }
 
   if (tmdbId && tmdbId !== person.tmdb_id) {
@@ -272,12 +262,12 @@ async function enrichSinglePerson(person) {
   }
 
   if (!tmdbId) {
-    console.log(`  ⚠️ No TMDB or IMDb match found across any name variants for "${person.name}". Skipping.`);
+    console.log(`  ⚠️ No verified Nollywood/African TMDB ID for "${person.name}". Skipping.`);
     return { created: 0, linked: 0 };
   }
 
   const credits = await getTmdbCredits(tmdbId);
-  console.log(`  🎬 Found ${credits.length} credits for TMDB ID: ${tmdbId}`);
+  console.log(`  🎬 Found ${credits.length} candidate credits on TMDB`);
 
   let createdCount = 0;
   let linkedCount = 0;
@@ -298,7 +288,7 @@ async function enrichSinglePerson(person) {
       if (byTmdb) filmId = byTmdb.id;
     }
 
-    // 2. Search by title
+    // 2. Search by Title
     if (!filmId) {
       const { data: byTitle } = await supabase
         .from('films')
@@ -308,8 +298,16 @@ async function enrichSinglePerson(person) {
       if (byTitle) filmId = byTitle.id;
     }
 
-    // 3. Create film if missing
+    // 3. If film does NOT exist in DB, verify it is an authentic African/Nollywood film before creating!
     if (!filmId) {
+      if (item.tmdb_id) {
+        const isAfrican = await isAfricanMovie(item.tmdb_id);
+        if (!isAfrican) {
+          // Reject Hollywood / foreign title
+          continue;
+        }
+      }
+
       const newSlug = normalizeTitle(title).replace(/\s+/g, '-').slice(0, 80) + '-' + (item.release_year || Math.floor(Math.random()*10000));
       const { data: newFilm, error: createFilmErr } = await supabase
         .from('films')
@@ -320,7 +318,7 @@ async function enrichSinglePerson(person) {
           poster_url: item.poster_url,
           backdrop_url: item.backdrop_url,
           tmdb_id: item.tmdb_id,
-          source: 'tmdb_continuous_worker',
+          source: 'nollywood_tmdb_enrichment',
           slug: newSlug
         })
         .select('id')
@@ -329,7 +327,7 @@ async function enrichSinglePerson(person) {
       if (!createFilmErr && newFilm) {
         filmId = newFilm.id;
         createdCount++;
-        console.log(`    ✨ Created missing film: "${title}" (${item.release_year || 'N/A'})`);
+        console.log(`    ✨ Created verified Nollywood film: "${title}" (${item.release_year || 'N/A'})`);
       }
     }
 
@@ -351,7 +349,7 @@ async function enrichSinglePerson(person) {
           person_id: person.id,
           role: item.role || 'actor',
           character_name: item.character || null,
-          source: 'tmdb_continuous_worker'
+          source: 'nollywood_tmdb_enrichment'
         });
 
       if (!insErr) {
@@ -366,7 +364,7 @@ async function enrichSinglePerson(person) {
     }
   }
 
-  // Recount total credits
+  // Recount
   const { count: totalCredits } = await supabase
     .from('credits')
     .select('id', { count: 'exact', head: true })
@@ -385,19 +383,19 @@ async function enrichSinglePerson(person) {
 }
 
 async function runDaemon() {
-  console.log('🚀 Starting Indefinite Continuous Actor Enrichment Daemon (Multi-Alias & Name Enabled)...');
+  console.log('🚀 Starting Nollywood-Guarded Continuous Actor Enrichment Daemon...');
   const state = loadState();
 
   const BATCH_SIZE = 25;
-  const DELAY_MS = 600;
+  const DELAY_MS = 800;
 
   let offset = 0;
 
   while (true) {
-    // Select ALL actors in the database, ordered by popularity
+    // Only process verified African/Nigerian/Ugandan/Ghanaian people
     const { data: people, error } = await supabase
       .from('people')
-      .select('id, name, tmdb_id, film_count, popularity_score')
+      .select('id, name, tmdb_id, film_count, popularity_score, nationality, birthplace')
       .order('popularity_score', { ascending: false })
       .range(offset, offset + BATCH_SIZE - 1);
 

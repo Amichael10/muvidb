@@ -27,6 +27,7 @@
     "scrape:imdb-bulk": "tsx scripts/imdb_bulk_sync.ts",
     "scrape:imdb-from-db": "tsx scripts/imdb_bulk_sync.ts --from-db --full-credits --skip-people-pages",
     "sync:actors:continuous": "node scripts/run_continuous_actor_enrichment.mjs",
+    "sync:media:continuous": "node scripts/run_continuous_actor_media_harvester.mjs",
     "sync:kava": "tsx scripts/sync_feed_kappa.ts",
     "sync:circuits": "tsx scripts/circuits_sync.ts",
     "sync:nollistream": "tsx scripts/nollistream_sync.ts",
