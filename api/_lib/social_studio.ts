@@ -22,7 +22,7 @@ import {
 } from './social-studio/content/caption-builder.js';
 import { ASSET_FORMAT_DIMENSIONS, renderSnapshotAssets, type SocialAssetFormat } from './social_render.js';
 import { htmlTemplateFormats } from './social_html_templates.js';
-import type { SocialSourceSnapshot } from './social-studio/content/snapshots.js';
+import type { SocialSourceSnapshot, SnapshotWatchlistPick } from './social-studio/content/snapshots.js';
 import {
   SOURCE_ENTITY_TYPES,
   buildActorSpotlightSnapshot,
@@ -792,6 +792,41 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   return buildUpcomingMovieSnapshot({ film: filmWithChannel, credits: creditsResult.data || [], capturedAt, castLimit: 8 });
 }
 
+async function loadSelectedCriticReview(filmId: string, criticReviewId: string) {
+  const { data: review, error } = await supabase
+    .from('critic_reviews')
+    .select('id,film_id,quote,rating,critic_name,critic_title,avatar_url')
+    .eq('id', criticReviewId)
+    .eq('film_id', filmId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!review) throw httpError(404, 'That critic review is not available for the selected film');
+
+  return {
+    id: review.id,
+    quote: review.quote,
+    rating: review.rating === null ? null : Number(review.rating),
+    criticName: review.critic_name,
+    criticTitle: review.critic_title,
+    avatarUrl: review.avatar_url,
+  };
+}
+
+function watchlistPickFrom(snapshot: Awaited<ReturnType<typeof loadUpcomingMovieSource>>): SnapshotWatchlistPick {
+  return {
+    filmId: snapshot.filmId,
+    title: snapshot.title,
+    year: snapshot.year,
+    posterUrl: snapshot.posterUrl,
+    backdropUrl: snapshot.backdropUrl,
+    watchAvailability: snapshot.watchAvailability,
+    synopsis: snapshot.synopsis,
+    tagline: snapshot.tagline,
+    youtubeChannelName: snapshot.youtubeChannelName,
+  };
+}
+
 async function loadPlaySource(playId: string, capturedAt: string) {
   const { data: play, error } = await supabase
     .from('plays')
@@ -936,6 +971,8 @@ export async function generateSocialDraft(
   input: {
     contentType: SocialContentType;
     sourceEntityId: string;
+    sourceEntityIds?: string[];
+    criticReviewId?: string | null;
     templateSlug: string;
     platforms: SocialPlatform[];
   },
@@ -956,12 +993,26 @@ export async function generateSocialDraft(
   if (!template) throw httpError(404, `Template ${input.templateSlug} not found`);
   if (!template.is_active) throw httpError(409, `Template ${input.templateSlug} is not active`);
 
-  const snapshot =
+  let snapshot =
     sourceEntityType === 'person'
       ? await loadPersonSource(input.sourceEntityId, capturedAt, input.contentType)
       : sourceEntityType === 'play'
         ? await loadPlaySource(input.sourceEntityId, capturedAt)
         : await loadUpcomingMovieSource(input.sourceEntityId, capturedAt);
+
+  if (input.contentType === 'weekend_watchlist' && snapshot.kind === 'upcoming_movie') {
+    const filmIds = input.sourceEntityIds?.length ? input.sourceEntityIds : [input.sourceEntityId];
+    const uniqueFilmIds = [...new Set(filmIds)];
+    const films = await Promise.all(uniqueFilmIds.map(id => loadUpcomingMovieSource(id, capturedAt)));
+    snapshot = { ...snapshot, watchlistPicks: films.map(watchlistPickFrom) };
+  }
+
+  if (input.contentType === 'critics_say' && input.criticReviewId && snapshot.kind === 'upcoming_movie') {
+    snapshot = {
+      ...snapshot,
+      criticReview: await loadSelectedCriticReview(input.sourceEntityId, input.criticReviewId),
+    };
+  }
 
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
@@ -971,7 +1022,9 @@ export async function generateSocialDraft(
         ? `Birthday Spotlight — ${snapshot.name}`
         : snapshot.kind === 'whats_on_stage'
           ? `What's On Stage — ${snapshot.title}`
-          : `Upcoming Movie — ${snapshot.title}`;
+          : input.contentType === 'weekend_watchlist'
+            ? `Weekend Watchlist — ${snapshot.title}`
+            : `Upcoming Movie — ${snapshot.title}`;
 
   const { data: contentItem, error: insertError } = await supabase
     .from('social_content_items')
@@ -1054,6 +1107,8 @@ export async function generateSocialDraft(
       content_type: input.contentType,
       template_slug: template.slug,
       platforms: input.platforms,
+      source_entity_ids: input.sourceEntityIds || [input.sourceEntityId],
+      critic_review_id: input.criticReviewId || null,
       warnings,
     },
   });

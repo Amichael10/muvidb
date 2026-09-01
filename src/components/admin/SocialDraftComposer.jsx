@@ -217,6 +217,10 @@ export default function SocialDraftComposer({
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [selectedFilms, setSelectedFilms] = useState([]);
+  const [criticReviews, setCriticReviews] = useState([]);
+  const [selectedCriticReview, setSelectedCriticReview] = useState(null);
+  const [loadingCritics, setLoadingCritics] = useState(false);
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -468,6 +472,8 @@ export default function SocialDraftComposer({
           tiktokSettings,
           customScheduleDate,
           selected,
+          selectedFilms,
+          selectedCriticReview,
           themeId,
         };
         sessionStorage.setItem('muvidb_social_composer_cache', JSON.stringify(stateToSave));
@@ -475,7 +481,7 @@ export default function SocialDraftComposer({
         // quota or privacy mode
       }
     }
-  }, [result, captionDrafts, platforms, activePreviewPlatform, postFormat, carouselAssets, tiktokSettings, customScheduleDate, selected, themeId]);
+  }, [result, captionDrafts, platforms, activePreviewPlatform, postFormat, carouselAssets, tiktokSettings, customScheduleDate, selected, selectedFilms, selectedCriticReview, themeId]);
 
   // 3. Restore cached working draft if available on initial mount without initialDraft prop
   useEffect(() => {
@@ -494,6 +500,8 @@ export default function SocialDraftComposer({
             if (parsed.tiktokSettings) setTikTokSettings(parsed.tiktokSettings);
             if (parsed.customScheduleDate) setCustomScheduleDate(parsed.customScheduleDate);
             if (parsed.selected) setSelected(parsed.selected);
+            if (Array.isArray(parsed.selectedFilms)) setSelectedFilms(parsed.selectedFilms);
+            if (parsed.selectedCriticReview) setSelectedCriticReview(parsed.selectedCriticReview);
             if (parsed.themeId) setThemeId(parsed.themeId);
             setStep1Open(false);
             setStep2Open(false);
@@ -577,6 +585,9 @@ export default function SocialDraftComposer({
     } catch {}
     setResult(null);
     setSelected(null);
+    setSelectedFilms([]);
+    setCriticReviews([]);
+    setSelectedCriticReview(null);
     setResults([]);
     setQuery('');
     setCaptionDrafts({});
@@ -593,6 +604,9 @@ export default function SocialDraftComposer({
   useEffect(() => {
     if (initialDraft) return; // preserve draft if editing
     setSelected(null);
+    setSelectedFilms([]);
+    setCriticReviews([]);
+    setSelectedCriticReview(null);
     setResults([]);
     setQuery('');
     setResult(null);
@@ -609,7 +623,7 @@ export default function SocialDraftComposer({
 
   useEffect(() => {
     const term = query.trim();
-    if (term.length < 2 || selected) {
+    if (term.length < 2 || (selected && activeTheme.id !== 'weekend_watchlist')) {
       setResults([]);
       return undefined;
     }
@@ -646,6 +660,39 @@ export default function SocialDraftComposer({
     return () => clearTimeout(timer);
   }, [query, activeTheme, selected]);
 
+  useEffect(() => {
+    if (activeTheme.id !== 'critics_say' || !selected?.id) {
+      setCriticReviews([]);
+      setSelectedCriticReview(null);
+      setLoadingCritics(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoadingCritics(true);
+    setSelectedCriticReview(null);
+    supabase
+      .from('critic_reviews')
+      .select('id,film_id,quote,rating,critic_name,critic_title,avatar_url,is_featured,created_at')
+      .eq('film_id', selected.id)
+      .order('is_featured', { ascending: false })
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          toast.error(error.message || 'Could not load critics for this film');
+          setCriticReviews([]);
+          return;
+        }
+        setCriticReviews(data || []);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCritics(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeTheme.id, selected?.id]);
+
   const togglePlatform = value => {
     setPlatforms(current =>
       current.includes(value) ? current.filter(entry => entry !== value) : [...current, value],
@@ -657,7 +704,10 @@ export default function SocialDraftComposer({
   };
 
   const generate = async () => {
-    if (!selected) return toast.error('Please pick a subject first');
+    const isWatchlist = activeTheme.id === 'weekend_watchlist';
+    if (isWatchlist && selectedFilms.length !== 3) return toast.error('Weekend Watchlist needs exactly three films');
+    if (!isWatchlist && !selected) return toast.error('Please pick a subject first');
+    if (activeTheme.id === 'critics_say' && !selectedCriticReview) return toast.error('Select the critic review you want to feature');
     if (!platforms.length) return toast.error('Select at least one platform');
 
     setGenerating(true);
@@ -669,7 +719,9 @@ export default function SocialDraftComposer({
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contentType: activeTheme.contentType,
-          sourceEntityId: selected.id,
+          sourceEntityId: isWatchlist ? selectedFilms[0].id : selected.id,
+          sourceEntityIds: isWatchlist ? selectedFilms.map(film => film.id) : undefined,
+          criticReviewId: activeTheme.id === 'critics_say' ? selectedCriticReview.id : undefined,
           templateSlug: activeTheme.templateSlug,
           platforms,
         }),
@@ -1046,6 +1098,8 @@ export default function SocialDraftComposer({
 
   const label = entry => (activeTheme.entity === 'person' ? entry.name : `${entry.title}${entry.year ? ` (${entry.year})` : ''}`);
   const entityLabel = activeTheme.entity === 'person' ? 'Actor / Talent' : activeTheme.entity === 'play' ? 'Theatre Play' : 'Movie / Film';
+  const isWeekendWatchlist = activeTheme.id === 'weekend_watchlist';
+  const canGenerate = isWeekendWatchlist ? selectedFilms.length === 3 : Boolean(selected);
   const activeVariant = result?.variants?.find(variant => variant.platform === activePreviewPlatform) || result?.variants?.[0];
   const activePlatform = PLATFORMS.find(platform => platform.value === activeVariant?.platform) || PLATFORMS[0];
   const activeSpec = PLATFORM_SPECS[activeVariant?.platform] || PLATFORM_SPECS.instagram;
@@ -1507,9 +1561,9 @@ export default function SocialDraftComposer({
               <h2 className="text-sm font-black uppercase tracking-widest text-text-primary group-hover:text-brand transition-colors">
                 Choose Subject ({entityLabel})
               </h2>
-              {!step2Open && selected && (
+              {!step2Open && (isWeekendWatchlist ? selectedFilms.length > 0 : selected) && (
                 <span className="ml-2 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
-                  {label(selected)}
+                  {isWeekendWatchlist ? `${selectedFilms.length}/3 films` : label(selected)}
                 </span>
               )}
             </div>
@@ -1522,7 +1576,61 @@ export default function SocialDraftComposer({
 
           {step2Open && (
             <>
-              {selected ? (
+              {isWeekendWatchlist ? (
+                <div className="mt-3 space-y-3">
+                  <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-text-primary">Build the 3-film thread</p>
+                        <p className="mt-0.5 text-[11px] text-text-muted">Choose three films. Each one fills its own numbered Watchlist card.</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-brand px-2.5 py-1 text-[11px] font-black text-white">{selectedFilms.length}/3</span>
+                    </div>
+                    {selectedFilms.length > 0 && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        {selectedFilms.map((film, index) => (
+                          <div key={film.id} className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface p-2">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-brand/10 text-[10px] font-black text-brand">{index + 1}</span>
+                            <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-text-primary">{label(film)}</span>
+                            <button type="button" onClick={() => setSelectedFilms(current => current.filter(item => item.id !== film.id))} className="text-text-muted hover:text-red-400" aria-label={`Remove ${film.title}`}>
+                              <Icon icon="solar:close-circle-linear" width="16" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {selectedFilms.length < 3 && (
+                    <div className="relative">
+                      <input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder={activeTheme.placeholder}
+                        className="h-11 w-full rounded-lg border border-border bg-surface-2 pl-4 pr-10 text-sm text-text-primary outline-none focus:border-brand"
+                      />
+                      {searching && <Icon icon="solar:spinner-linear" className="absolute right-3.5 top-3.5 animate-spin text-text-muted" width="18" />}
+                      {results.length > 0 && (
+                        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
+                          {results.map(entry => {
+                            const alreadyAdded = selectedFilms.some(film => film.id === entry.id);
+                            return (
+                              <button key={entry.id} type="button" disabled={alreadyAdded} onClick={() => {
+                                setSelectedFilms(current => [...current, entry]);
+                                setQuery('');
+                                setResults([]);
+                              }} className="flex w-full items-center gap-3 border-b border-border/50 px-4 py-2.5 text-left text-sm text-text-primary last:border-0 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40">
+                                <img src={entry.poster_url || ''} alt="" className="h-9 w-9 shrink-0 rounded object-cover border border-border bg-surface-2" onError={e => { e.currentTarget.style.visibility = 'hidden'; }} />
+                                <span className="min-w-0 flex-1 truncate font-bold">{label(entry)}</span>
+                                {alreadyAdded && <span className="text-[10px] font-bold text-brand">Added</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : selected ? (
                 <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-brand/40 bg-brand/5 p-3.5">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-2 border border-border overflow-hidden">
@@ -1610,6 +1718,40 @@ export default function SocialDraftComposer({
                   )}
                 </div>
               )}
+              {activeTheme.id === 'critics_say' && selected && (
+                <div className="mt-3 rounded-lg border border-border bg-surface-2 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black text-text-primary">Choose the critic to feature</p>
+                      <p className="mt-0.5 text-[11px] text-text-muted">The selected quote, rating, and critic credit will appear on the artwork.</p>
+                    </div>
+                    {loadingCritics && <Icon icon="solar:spinner-linear" className="animate-spin text-text-muted" width="17" />}
+                  </div>
+                  {!loadingCritics && criticReviews.length === 0 && (
+                    <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs font-semibold text-amber-600">No critic reviews have been added for this film yet. Choose another film or add a review first.</p>
+                  )}
+                  {criticReviews.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {criticReviews.map(review => {
+                        const active = selectedCriticReview?.id === review.id;
+                        return (
+                          <button key={review.id} type="button" onClick={() => setSelectedCriticReview(review)} className={`w-full rounded-md border p-3 text-left transition-colors ${active ? 'border-brand bg-brand/10 ring-1 ring-brand' : 'border-border bg-surface hover:border-brand/50'}`}>
+                            <div className="flex items-start gap-2.5">
+                              {review.avatar_url ? <img src={review.avatar_url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-brand"><Icon icon="solar:star-linear" width="15" /></span>}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-black text-text-primary">{review.critic_name || 'MuviDB Critics'}</span>{review.rating != null && <span className="shrink-0 text-[11px] font-black text-brand">{review.rating}/5</span>}</div>
+                                {review.critic_title && <p className="text-[10px] font-semibold text-text-muted">{review.critic_title}</p>}
+                                <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-text-muted">“{review.quote}”</p>
+                              </div>
+                              {active && <Icon icon="solar:check-circle-bold" className="shrink-0 text-brand" width="17" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1667,7 +1809,7 @@ export default function SocialDraftComposer({
           <button
             type="button"
             onClick={generate}
-            disabled={disabled || generating || !selected || !platforms.length}
+            disabled={disabled || generating || !canGenerate || !platforms.length || (activeTheme.id === 'critics_say' && !selectedCriticReview)}
             className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand px-6 text-xs font-black uppercase tracking-wider text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50 shadow-md"
           >
             <Icon

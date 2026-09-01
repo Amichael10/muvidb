@@ -100,14 +100,15 @@ function stageData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
 
 function criticsData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const s = movie(snapshot);
-  const review = s.tagline || buildMovieHook(s.tagline, s.synopsis, s.title) || `The conversation around ${s.title} is heating up.`;
+  const selectedReview = s.criticReview;
+  const review = selectedReview?.quote || s.tagline || buildMovieHook(s.tagline, s.synopsis, s.title) || `The conversation around ${s.title} is heating up.`;
   return {
     poster: s.posterUrl || s.backdropUrl || '',
     review,
-    criticImage: '',
-    criticName: 'MuviDB Critics',
-    criticRole: 'African cinema review desk',
-    rating: s.likedPercent ? Math.max(1, Math.min(5, Math.round(s.likedPercent / 20))) : 4,
+    criticImage: selectedReview?.avatarUrl || '',
+    criticName: selectedReview?.criticName || 'MuviDB Critics',
+    criticRole: selectedReview?.criticTitle || 'African cinema review desk',
+    rating: selectedReview?.rating ?? (s.likedPercent ? Math.max(1, Math.min(5, Math.round(s.likedPercent / 20))) : 4),
     ratingMax: 5,
     handle: DEFAULT_HANDLE,
   };
@@ -115,17 +116,23 @@ function criticsData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
 
 function watchlistData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const s = movie(snapshot);
+  const films = s.watchlistPicks?.length ? s.watchlistPicks : [s];
+  // The supplied thread artwork has three numbered film pages. Preserve legacy
+  // one-film drafts by repeating their film rather than sending undefined pages.
+  const picksSource = [...films];
+  while (picksSource.length < 3) picksSource.push(picksSource[0]);
+  const picks = picksSource.slice(0, 3).map(film => ({
+    title: film.title,
+    subtitle: film.year ? String(film.year) : '',
+    poster: film.posterUrl || film.backdropUrl || '',
+    reason: film.watchAvailability || 'MuviDB pick',
+    description: buildMovieHook(film.tagline, film.synopsis, film.title) || 'Add this to your weekend watchlist.',
+    platform: film.youtubeChannelName ? 'youtube' : '',
+    channelName: film.youtubeChannelName || '',
+  }));
   return {
-    picks: [{
-      title: s.title,
-      subtitle: s.year ? String(s.year) : '',
-      poster: s.posterUrl || s.backdropUrl || '',
-      reason: s.watchAvailability || 'MuviDB pick',
-      description: buildMovieHook(s.tagline, s.synopsis, s.title) || 'Add this to your weekend watchlist.',
-      platform: s.youtubeChannelName ? 'youtube' : '',
-      channelName: s.youtubeChannelName || '',
-    }],
-    backPosters: [s.posterUrl, s.backdropUrl].filter(Boolean),
+    picks,
+    backPosters: picks.map(pick => pick.poster).filter(Boolean),
     handle: DEFAULT_HANDLE,
   };
 }

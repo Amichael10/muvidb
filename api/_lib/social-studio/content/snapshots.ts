@@ -72,6 +72,31 @@ export type UpcomingMovieSnapshot = {
   creditedPeople: SnapshotCreditedPerson[];
   youtubeChannelName: string | null;
   youtubeChannelHandle: string | null;
+  /** The reviewer explicitly chosen for a "What the Critics Say" post. */
+  criticReview?: SnapshotCriticReview | null;
+  /** The three films explicitly chosen for a Weekend Watchlist thread. */
+  watchlistPicks?: SnapshotWatchlistPick[];
+};
+
+export type SnapshotCriticReview = {
+  id: string;
+  quote: string;
+  rating: number | null;
+  criticName: string | null;
+  criticTitle: string | null;
+  avatarUrl: string | null;
+};
+
+export type SnapshotWatchlistPick = {
+  filmId: string;
+  title: string;
+  year: number | null;
+  posterUrl: string | null;
+  backdropUrl: string | null;
+  watchAvailability: string | null;
+  synopsis: string | null;
+  tagline: string | null;
+  youtubeChannelName: string | null;
 };
 
 export type TheatrePlaySnapshot = {

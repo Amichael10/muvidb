@@ -28,6 +28,8 @@ const DEFAULT_TEMPLATE_SLUGS: Record<SocialContentType, string> = {
 export function parseGenerateDraftRequest(body: unknown): {
   contentType: SocialContentType;
   sourceEntityId: string;
+  sourceEntityIds: string[];
+  criticReviewId: string | null;
   templateSlug: string;
   platforms: SocialPlatform[];
 } {
@@ -36,6 +38,16 @@ export function parseGenerateDraftRequest(body: unknown): {
   if (!isSocialContentType(contentType)) throw new Error('Unsupported social content type');
 
   assertUuid(input.sourceEntityId, 'sourceEntityId');
+
+  const sourceEntityIds = Array.isArray(input.sourceEntityIds)
+    ? [...new Set(input.sourceEntityIds.map(value => String(value).trim()))]
+    : [input.sourceEntityId];
+  sourceEntityIds.forEach((id, index) => assertUuid(id, `sourceEntityIds[${index}]`));
+
+  const criticReviewId = input.criticReviewId == null || input.criticReviewId === ''
+    ? null
+    : String(input.criticReviewId).trim();
+  if (criticReviewId) assertUuid(criticReviewId, 'criticReviewId');
 
   const templateSlug =
     typeof input.templateSlug === 'string' && input.templateSlug.trim()
@@ -48,6 +60,8 @@ export function parseGenerateDraftRequest(body: unknown): {
   return {
     contentType,
     sourceEntityId: input.sourceEntityId,
+    sourceEntityIds,
+    criticReviewId,
     templateSlug,
     platforms,
   };
