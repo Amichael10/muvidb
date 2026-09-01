@@ -32,6 +32,7 @@ export function parseGenerateDraftRequest(body: unknown): {
   criticReviewId: string | null;
   templateSlug: string;
   platforms: SocialPlatform[];
+  isAdHoc: boolean;
 } {
   const input = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
   const contentType = input.contentType;
@@ -64,6 +65,7 @@ export function parseGenerateDraftRequest(body: unknown): {
     criticReviewId,
     templateSlug,
     platforms,
+    isAdHoc: input.isAdHoc === true || input.source === 'ad_hoc',
   };
 }
 

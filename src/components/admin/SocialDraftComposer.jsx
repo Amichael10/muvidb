@@ -46,7 +46,7 @@ export const EDITORIAL_THEMES = [
     entity: 'film',
     description: 'Streaming platform callout (Netflix, Prime Video, YouTube, Showmax) with cast tags & watchlist CTAs.',
     placeholder: 'Search streaming film (e.g. A Tribe Called Judah, Anikulapo, The Black Book)…',
-    templateSlug: 'upcoming-movie-v1',
+    templateSlug: 'now-showing-cinemas-v1',
     contentType: 'where_to_watch',
     suggestions: ['A Tribe Called Judah', 'Anikulapo', 'The Black Book', 'House of Ga\'a', 'Momiwa'],
   },
@@ -728,6 +728,7 @@ export default function SocialDraftComposer({
           sourceEntityIds: isWatchlist ? selectedFilms.map(film => film.id) : undefined,
           criticReviewId: activeTheme.id === 'critics_say' ? selectedCriticReview.id : undefined,
           templateSlug: activeTheme.templateSlug,
+          source: 'ad_hoc',
           platforms,
         }),
       });

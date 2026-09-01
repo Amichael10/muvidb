@@ -22,7 +22,7 @@ import {
   buildVariantContent,
 } from './social-studio/content/caption-builder.js';
 import { ASSET_FORMAT_DIMENSIONS, renderSnapshotAssets, type SocialAssetFormat } from './social_render.js';
-import { htmlTemplateFormats } from './social_html_templates.js';
+import { htmlTemplateFormats, isHtmlSocialTemplate } from './social_html_templates.js';
 import type { SocialSourceSnapshot, SnapshotWatchlistPick } from './social-studio/content/snapshots.js';
 import {
   SOURCE_ENTITY_TYPES,
@@ -984,6 +984,7 @@ export async function generateSocialDraft(
     criticReviewId?: string | null;
     templateSlug: string;
     platforms: SocialPlatform[];
+    isAdHoc?: boolean;
   },
   actor: SocialActor,
 ) {
@@ -999,8 +1000,23 @@ export async function generateSocialDraft(
     .maybeSingle();
 
   if (templateError) throw templateError;
-  if (!template) throw httpError(404, `Template ${input.templateSlug} not found`);
-  if (!template.is_active) throw httpError(409, `Template ${input.templateSlug} is not active`);
+  // HTML templates are bundled with the API. Keep generation functional when
+  // a deployment is ahead of the database migration that registers the row.
+  // The nullable template_id remains null until the migration is applied.
+  const effectiveTemplate = template || (isHtmlSocialTemplate(input.templateSlug)
+    ? {
+        id: null,
+        slug: input.templateSlug,
+        version: 1,
+        is_active: true,
+        template_config: {
+          renderer: 'html',
+          formats: htmlTemplateFormats(input.templateSlug),
+        },
+      }
+    : null);
+  if (!effectiveTemplate) throw httpError(404, `Template ${input.templateSlug} not found`);
+  if (!effectiveTemplate.is_active) throw httpError(409, `Template ${input.templateSlug} is not active`);
 
   let snapshot =
     sourceEntityType === 'person'
@@ -1043,7 +1059,7 @@ export async function generateSocialDraft(
       source_entity_type: sourceEntityType,
       source_entity_id: input.sourceEntityId,
       source_snapshot: snapshot,
-      template_id: template.id,
+      template_id: effectiveTemplate.id,
       status: 'generating',
       generation_method: 'template',
       generation_notes: warnings.length ? warnings.join(' ') : null,
@@ -1061,9 +1077,9 @@ export async function generateSocialDraft(
   const assets = await renderAndStoreAssets({
     contentItemId: contentItem.id,
     snapshot,
-    templateSlug: template.slug,
-    templateVersion: template.version,
-    formats: templateFormats(template.template_config, template.slug),
+    templateSlug: effectiveTemplate.slug,
+    templateVersion: effectiveTemplate.version,
+    formats: templateFormats(effectiveTemplate.template_config, effectiveTemplate.slug),
   });
 
   if (assets.error) warnings.push(`Asset rendering failed: ${assets.error}`);
@@ -1077,7 +1093,7 @@ export async function generateSocialDraft(
     return {
       content_item_id: contentItem.id,
       platform,
-      status: 'draft',
+      status: input.isAdHoc ? 'approved' : 'draft',
       caption: content.caption,
       title: content.title,
       hashtags: content.hashtags,
@@ -1106,7 +1122,7 @@ export async function generateSocialDraft(
     throw variantError;
   }
 
-  await supabase.from('social_content_items').update({ status: 'draft' }).eq('id', contentItem.id);
+  await supabase.from('social_content_items').update({ status: input.isAdHoc ? 'approved' : 'draft' }).eq('id', contentItem.id);
 
   await insertSocialEvent({
     contentItemId: contentItem.id,
@@ -1114,7 +1130,7 @@ export async function generateSocialDraft(
     eventData: {
       actor_id: actor.id,
       content_type: input.contentType,
-      template_slug: template.slug,
+      template_slug: effectiveTemplate.slug,
       platforms: input.platforms,
       source_entity_ids: input.sourceEntityIds || [input.sourceEntityId],
       critic_review_id: input.criticReviewId || null,
@@ -1123,7 +1139,7 @@ export async function generateSocialDraft(
   });
 
   return {
-    contentItem: { id: contentItem.id, title, status: 'draft', contentType: input.contentType },
+    contentItem: { id: contentItem.id, title, status: input.isAdHoc ? 'approved' : 'draft', contentType: input.contentType },
     variants: variants || [],
     assets: assets.rows,
     warnings,
