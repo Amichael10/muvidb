@@ -830,7 +830,7 @@ function templateFormats(config: unknown, templateSlug?: string | null): SocialA
 
 type StoredAsset = { id: string; format: SocialAssetFormat; publicUrl: string; width: number; height: number };
 
-function defaultContentTypeForSeries(seriesSlug: string, candidateType: string): SocialContentType {
+export function defaultContentTypeForSeries(seriesSlug: string, candidateType: string): SocialContentType {
   if (seriesSlug === 'critics_say' || seriesSlug === 'one_film_two_takes') return 'critics_say';
   if (seriesSlug === 'where_to_watch') return 'where_to_watch';
   if (seriesSlug === 'weekend_watchlist') return 'weekend_watchlist';
@@ -841,11 +841,12 @@ function defaultContentTypeForSeries(seriesSlug: string, candidateType: string):
   return 'upcoming_movie';
 }
 
-function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: string): string {
+export function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: string): string {
   if (seriesSlug === 'critics_say' || seriesSlug === 'one_film_two_takes') return 'critics-say-v1';
   if (seriesSlug === 'weekend_watchlist') return 'watchlist-this-week-v1';
   if (seriesSlug === 'whats_on_stage') return 'on-stage-theatre-v1';
   if (seriesSlug === 'film_conversation') return 'nollywood-debate-v1';
+  if (seriesSlug === 'new_and_upcoming') return 'now-showing-cinemas-v1';
   if (candidateType === 'play') return 'on-stage-theatre-v1';
   if (candidateType === 'person') return 'actor-spotlight-v1';
   return 'upcoming-movie-v1';

@@ -27,6 +27,29 @@ const ANGLES = [
   { value: 'fun_relatable', label: '😂 Fun & Relatable', desc: 'Authentic premise banter' },
 ];
 
+const HTML_TEMPLATE_BY_SERIES = {
+  critics_say: 'critics-say-v1',
+  one_film_two_takes: 'critics-say-v1',
+  weekend_watchlist: 'watchlist-this-week-v1',
+  whats_on_stage: 'on-stage-theatre-v1',
+  film_conversation: 'nollywood-debate-v1',
+  new_and_upcoming: 'now-showing-cinemas-v1',
+};
+
+const HTML_TEMPLATE_SLUGS = new Set([
+  'critics-say-v1',
+  'watchlist-this-week-v1',
+  'on-stage-theatre-v1',
+  'nollywood-debate-v1',
+  'now-showing-cinemas-v1',
+]);
+
+function normalizeCandidateTemplate(nextCandidate, seriesSlug) {
+  if (!nextCandidate) return null;
+  const templateSlug = HTML_TEMPLATE_BY_SERIES[seriesSlug] || nextCandidate.templateSlug;
+  return templateSlug ? { ...nextCandidate, templateSlug } : nextCandidate;
+}
+
 export default function AutoPilotReviewModal({
   isOpen,
   slot,
@@ -44,6 +67,9 @@ export default function AutoPilotReviewModal({
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('11:00');
   const [customImageUrl, setCustomImageUrl] = useState('');
+  const [renderedPreviewUrl, setRenderedPreviewUrl] = useState('');
+  const [previewRendering, setPreviewRendering] = useState(false);
+  const [previewError, setPreviewError] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [approving, setApproving] = useState(false);
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
@@ -171,9 +197,12 @@ export default function AutoPilotReviewModal({
 
   useEffect(() => {
     if (slot && isOpen) {
-      const initialCandidate = slot.candidate || null;
+      const slotSeriesSlug = slot.social_content_series?.slug || '';
+      const initialCandidate = normalizeCandidateTemplate(slot.candidate || null, slotSeriesSlug);
       setCandidate(initialCandidate);
-      setCustomImageUrl(initialCandidate?.imageUrl || '');
+      // Candidate artwork is source material for the HTML design. Only an
+      // editor upload belongs in customImageUrl, because that bypasses design rendering.
+      setCustomImageUrl('');
       setScheduledDate(slot.scheduled_date || new Date().toISOString().split('T')[0]);
       setScheduledTime(slot.scheduled_time?.slice(0, 5) || '11:00');
       setIsEditingCaption(false);
@@ -182,7 +211,7 @@ export default function AutoPilotReviewModal({
       setSearchResults([]);
 
       // Select default angle based on series
-      const slug = slot.social_content_series?.slug || '';
+      const slug = slotSeriesSlug;
       let initialAngle = 'streaming_alert';
       if (slug.includes('critic')) initialAngle = 'critic_debate';
       else if (slug.includes('upcoming') || slug.includes('announcement')) initialAngle = 'dynamic_story';
@@ -208,14 +237,15 @@ export default function AutoPilotReviewModal({
           const data = await res.json().catch(() => []);
           if (!res.ok) throw new Error(data?.error || 'Candidate list could not be loaded');
           if (Array.isArray(data) && data.length) {
-            setCandidatePool(data);
+            const normalizedPool = data.map(entry => normalizeCandidateTemplate(entry, slug));
+            setCandidatePool(normalizedPool);
             const foundIdx = data.findIndex(c => c.id === initialCandidate?.id);
             const activeIdx = foundIdx >= 0 ? foundIdx : 0;
             setPoolIndex(activeIdx);
-            if (!initialCandidate && data[activeIdx]) {
-              const autoCandidate = data[activeIdx];
+            if (!initialCandidate && normalizedPool[activeIdx]) {
+              const autoCandidate = normalizedPool[activeIdx];
               setCandidate(autoCandidate);
-              setCustomImageUrl(autoCandidate.imageUrl || '');
+              setCustomImageUrl('');
               requestAICopy(autoCandidate, initialAngle);
             }
           } else {
@@ -231,6 +261,52 @@ export default function AutoPilotReviewModal({
       loadCandidatePool();
     }
   }, [slot, isOpen]);
+
+  useEffect(() => {
+    const templateSlug = candidate?.templateSlug;
+    if (!isOpen || !candidate || customImageUrl || !HTML_TEMPLATE_SLUGS.has(templateSlug)) {
+      setRenderedPreviewUrl('');
+      setPreviewRendering(false);
+      setPreviewError('');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let objectUrl = '';
+    setPreviewRendering(true);
+    setPreviewError('');
+
+    const renderPreview = async () => {
+      try {
+        const res = await fetch('/api/social?task=render_preview', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate, format: 'square_1_1', templateSlug }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload.error || `Graphic renderer returned HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        objectUrl = URL.createObjectURL(blob);
+        setRenderedPreviewUrl(objectUrl);
+      } catch (error) {
+        if (error?.name !== 'AbortError') {
+          setRenderedPreviewUrl('');
+          setPreviewError(error?.message || 'The HTML graphic could not be rendered.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setPreviewRendering(false);
+      }
+    };
+
+    renderPreview();
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [candidate, customImageUrl, isOpen]);
 
   if (!isOpen || !slot) return null;
 
@@ -252,7 +328,7 @@ export default function AutoPilotReviewModal({
     setPoolIndex(nextIdx);
     const nextCandidate = candidatePool[nextIdx];
     setCandidate(nextCandidate);
-    setCustomImageUrl(nextCandidate.imageUrl || '');
+    setCustomImageUrl('');
     toast.success(`Swapped to ${nextCandidate.name}!`);
     requestAICopy(nextCandidate, selectedAngle);
   };
@@ -310,7 +386,7 @@ export default function AutoPilotReviewModal({
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           candidate,
-          format: candidate.templateSlug && candidate.templateSlug !== 'actor-spotlight-v1' ? 'square_1_1' : 'portrait_4_5',
+          format: HTML_TEMPLATE_SLUGS.has(candidate.templateSlug) ? 'square_1_1' : 'portrait_4_5',
           templateSlug: candidate.templateSlug,
         }),
       });
@@ -402,16 +478,17 @@ export default function AutoPilotReviewModal({
       whyNow: 'Manually selected by the MuviDB editor',
       editorialScore: null,
     };
-    setCandidate(manualCandidate);
-    setCustomImageUrl(manualCandidate.imageUrl || '');
+    const normalizedCandidate = normalizeCandidateTemplate(manualCandidate, series?.slug || '');
+    setCandidate(normalizedCandidate);
+    setCustomImageUrl('');
     setManualSearchOpen(false);
     setSearchQuery('');
     setSearchResults([]);
     toast.success(`Swapped candidate to ${selectedItem.name}!`);
-    requestAICopy(manualCandidate, selectedAngle);
+    requestAICopy(normalizedCandidate, selectedAngle);
   };
 
-  const displayImage = customImageUrl || candidate?.imageUrl;
+  const displayImage = candidate?.imageUrl;
   const seriesSlug = (series?.slug || '').toLowerCase();
   const isPerson = candidate?.type === 'person' ||
     series?.category === 'people' ||
@@ -647,7 +724,7 @@ export default function AutoPilotReviewModal({
             </div>
 
             <SocialCanvasViewport
-              mediaUrl={customImageUrl || displayImage}
+              mediaUrl={customImageUrl || renderedPreviewUrl || displayImage}
               mediaType={/\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(customImageUrl || '') ? 'video' : 'image'}
               aspectRatio={canvasAspectRatio}
               onAspectRatioChange={handleAspectRatioChange}
@@ -673,6 +750,22 @@ export default function AutoPilotReviewModal({
                     className="h-full w-full object-contain"
                   />
                 )
+              ) : renderedPreviewUrl ? (
+                <img
+                  src={renderedPreviewUrl}
+                  alt={`${candidate?.name || 'MuviDB'} rendered social graphic`}
+                  className="h-full w-full object-contain"
+                />
+              ) : previewRendering ? (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-brand">
+                  <Icon icon="solar:gallery-wide-bold-duotone" width="34" className="animate-pulse" />
+                  <span className="text-xs font-black uppercase tracking-widest">Rendering HTML design…</span>
+                </div>
+              ) : previewError && HTML_TEMPLATE_SLUGS.has(candidate?.templateSlug) ? (
+                <div className="mx-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center">
+                  <p className="text-xs font-black text-red-300">Graphic render failed</p>
+                  <p className="mt-1 text-[11px] text-red-200/75">{previewError}</p>
+                </div>
               ) : (
                 <div className="flex h-full w-full items-center justify-center p-4">
                   <FigmaSocialCardPreview

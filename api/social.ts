@@ -414,8 +414,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? new Date(`${scheduledDate}T12:00:00Z`)
           : new Date();
         const ranked = rankEditorialCandidates(candidates, seriesSlug, { referenceDate, recentlyFeaturedIds });
+        const { defaultContentTypeForSeries, defaultTemplateSlugForSeries } = await import('./_lib/social_studio.js');
         return res.status(200).json(ranked.slice(0, 20).map(({ candidate, assessment }) => ({
           ...candidate,
+          contentType: defaultContentTypeForSeries(seriesSlug, candidate.type),
+          templateSlug: defaultTemplateSlugForSeries(seriesSlug, candidate.type),
           editorialScore: assessment.score,
           whyNow: assessment.whyNow,
           editorialReasons: assessment.reasons,
