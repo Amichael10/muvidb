@@ -199,3 +199,23 @@ cookies.txt.txt
 .npm-cache/
 __pycache__/
 *.pyc
+
+# Diagnostic / scratch / scrape dump scripts
+scripts/temp*
+scripts/test_*
+scripts/test-*
+scripts/inspect_*
+scripts/debug_*
+scripts/check_*
+scripts/scrape_*
+scripts/parse_*
+scripts/enrich_*
+scripts/verify_*
+scripts/schedule_*
+scripts/publish_*
+scripts/*.html
+scripts/*.json
+!scripts/data/**/*.json
+!scripts/scraper/package.json
+!scripts/scraper/package-lock.json
+
