@@ -22,6 +22,9 @@ export default defineConfig(({ mode, isSsrBuild }) => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
         workbox: {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+          // Template previews are loaded on demand in an iframe. Do not add
+          // their embedded artwork to the offline service-worker cache.
+          globIgnores: ['**/social-templates/*.html'],
           cleanupOutdatedCaches: true, // purge old precaches so stale chunks don't linger
           // SSR has no static index.html navigate target — never fall back to a SPA shell.
           navigateFallback: null,

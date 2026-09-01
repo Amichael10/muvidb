@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
 import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 import FigmaSocialCardPreview from './FigmaSocialCardPreview.jsx';
+import HtmlSocialTemplatePreview from './HtmlSocialTemplatePreview.jsx';
 import SocialCanvasViewport from './SocialCanvasViewport.jsx';
 import SocialVideoClipModal from './SocialVideoClipModal.jsx';
 
@@ -67,9 +68,6 @@ export default function AutoPilotReviewModal({
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('11:00');
   const [customImageUrl, setCustomImageUrl] = useState('');
-  const [renderedPreviewUrl, setRenderedPreviewUrl] = useState('');
-  const [previewRendering, setPreviewRendering] = useState(false);
-  const [previewError, setPreviewError] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [approving, setApproving] = useState(false);
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
@@ -261,53 +259,6 @@ export default function AutoPilotReviewModal({
       loadCandidatePool();
     }
   }, [slot, isOpen]);
-
-  useEffect(() => {
-    const templateSlug = candidate?.templateSlug;
-    if (!isOpen || !candidate || customImageUrl || !HTML_TEMPLATE_SLUGS.has(templateSlug)) {
-      setRenderedPreviewUrl('');
-      setPreviewRendering(false);
-      setPreviewError('');
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    let objectUrl = '';
-    setPreviewRendering(true);
-    setPreviewError('');
-
-    const renderPreview = async () => {
-      try {
-        const res = await fetch('/api/social?task=render_preview', {
-          method: 'POST',
-          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidate, format: 'square_1_1', templateSlug }),
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          const reference = payload.requestId ? ` (reference: ${payload.requestId})` : '';
-          throw new Error(`${payload.error || `Graphic renderer returned HTTP ${res.status}`}${reference}`);
-        }
-        const blob = await res.blob();
-        objectUrl = URL.createObjectURL(blob);
-        setRenderedPreviewUrl(objectUrl);
-      } catch (error) {
-        if (error?.name !== 'AbortError') {
-          setRenderedPreviewUrl('');
-          setPreviewError(error?.message || 'The HTML graphic could not be rendered.');
-        }
-      } finally {
-        if (!controller.signal.aborted) setPreviewRendering(false);
-      }
-    };
-
-    renderPreview();
-    return () => {
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [candidate, customImageUrl, isOpen]);
 
   if (!isOpen || !slot) return null;
 
@@ -725,7 +676,7 @@ export default function AutoPilotReviewModal({
             </div>
 
             <SocialCanvasViewport
-              mediaUrl={customImageUrl || renderedPreviewUrl || displayImage}
+              mediaUrl={customImageUrl || displayImage}
               mediaType={/\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(customImageUrl || '') ? 'video' : 'image'}
               aspectRatio={canvasAspectRatio}
               onAspectRatioChange={handleAspectRatioChange}
@@ -751,22 +702,8 @@ export default function AutoPilotReviewModal({
                     className="h-full w-full object-contain"
                   />
                 )
-              ) : renderedPreviewUrl ? (
-                <img
-                  src={renderedPreviewUrl}
-                  alt={`${candidate?.name || 'MuviDB'} rendered social graphic`}
-                  className="h-full w-full object-contain"
-                />
-              ) : previewRendering ? (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-brand">
-                  <Icon icon="solar:gallery-wide-bold-duotone" width="34" className="animate-pulse" />
-                  <span className="text-xs font-black uppercase tracking-widest">Rendering HTML design…</span>
-                </div>
-              ) : previewError && HTML_TEMPLATE_SLUGS.has(candidate?.templateSlug) ? (
-                <div className="mx-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center">
-                  <p className="text-xs font-black text-red-300">Graphic render failed</p>
-                  <p className="mt-1 text-[11px] text-red-200/75">{previewError}</p>
-                </div>
+              ) : HTML_TEMPLATE_SLUGS.has(candidate?.templateSlug) ? (
+                <HtmlSocialTemplatePreview candidate={candidate} templateSlug={candidate.templateSlug} />
               ) : (
                 <div className="flex h-full w-full items-center justify-center p-4">
                   <FigmaSocialCardPreview
