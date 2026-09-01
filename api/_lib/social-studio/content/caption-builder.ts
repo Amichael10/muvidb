@@ -203,6 +203,17 @@ function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
   return lines;
 }
 
+function criticsBody(snapshot: UpcomingMovieSnapshot): string[] {
+  const review = snapshot.criticReview;
+  const critic = review?.criticName || 'our critics';
+  const quote = review?.quote?.trim();
+  return [
+    `Hear what ${critic} thinks about ${snapshot.title} 🎬`,
+    quote ? `“${quote}”` : 'A fresh critic take on the performances, story, and craft.',
+    'Do you agree with this verdict? Share your take below 👇',
+  ];
+}
+
 function theatreBody(snapshot: TheatrePlaySnapshot): string[] {
   const lines: string[] = [];
   const location = [snapshot.venue, snapshot.city].filter(Boolean).join(', ');
@@ -275,7 +286,9 @@ export function buildVariantContent(input: {
         ? actorBody(input.snapshot)
         : input.snapshot.kind === 'whats_on_stage'
           ? theatreBody(input.snapshot)
-          : movieBody(input.snapshot);
+          : input.snapshot.kind === 'upcoming_movie' && input.snapshot.criticReview
+            ? criticsBody(input.snapshot)
+            : movieBody(input.snapshot);
   const body = lines.filter(Boolean).join('\n\n');
 
   const hashtagBlock = hashtags.map(tag => `#${tag}`).join(' ');

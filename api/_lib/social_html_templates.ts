@@ -8,6 +8,7 @@ import { buildMovieHook } from './social-studio/content/caption-builder.js';
 type HtmlTemplateSpec = {
   file: string;
   formats: SocialAssetFormat[];
+  slides?: number;
   data: (snapshot: SocialSourceSnapshot) => Record<string, unknown>;
   ratio?: (format: SocialAssetFormat) => string;
 };
@@ -25,6 +26,7 @@ export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
     file: 'critics-say-v1.html',
     formats: ['square_1_1', 'vertical_9_16'],
     data: criticsData,
+    slides: 3,
     ratio: format => (format === 'vertical_9_16' ? '9:16' : '1:1'),
   },
   'watchlist-this-week-v1': {
@@ -165,6 +167,7 @@ async function renderHtmlTemplate(input: {
   templateSlug: string;
   snapshot: SocialSourceSnapshot;
   format: SocialAssetFormat;
+  slide?: number;
 }): Promise<Buffer> {
   const spec = HTML_SOCIAL_TEMPLATES[input.templateSlug];
   if (!spec) throw new Error(`Unknown HTML template: ${input.templateSlug}`);
@@ -182,6 +185,7 @@ async function renderHtmlTemplate(input: {
   const url = new URL(pathToFileURL(templatePath).toString());
   if (ratio) url.searchParams.set('ratio', ratio);
   url.searchParams.set('render', '1');
+  if (input.slide) url.searchParams.set('slide', String(input.slide));
 
   // Vercel functions do not include Playwright's downloaded desktop browser.
   // Use the Lambda-compatible Chromium binary there; retain Playwright's own
@@ -223,6 +227,7 @@ export async function renderHtmlSocialTemplateAsset(input: {
   templateSlug: string;
   snapshot: SocialSourceSnapshot;
   format: SocialAssetFormat;
+  slide?: number;
 }): Promise<RenderedAsset> {
   const { width, height } = {
     square_1_1: { width: 1080, height: 1080 },
@@ -231,5 +236,9 @@ export async function renderHtmlSocialTemplateAsset(input: {
   }[input.format];
 
   const png = await renderHtmlTemplate(input);
-  return { format: input.format, png, width, height, usedArtwork: true };
+  return { format: input.format, png, width, height, usedArtwork: true, slide: input.slide };
+}
+
+export function htmlTemplateSlides(slug: string): number {
+  return HTML_SOCIAL_TEMPLATES[slug]?.slides || 1;
 }

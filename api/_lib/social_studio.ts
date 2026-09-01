@@ -888,7 +888,7 @@ function templateFormats(config: unknown, templateSlug?: string | null): SocialA
   return picked.length ? picked : known;
 }
 
-type StoredAsset = { id: string; format: SocialAssetFormat; publicUrl: string; width: number; height: number };
+type StoredAsset = { id: string; format: SocialAssetFormat; publicUrl: string; width: number; height: number; slide?: number };
 
 export function defaultContentTypeForSeries(seriesSlug: string, candidateType: string): SocialContentType {
   if (seriesSlug === 'critics_say' || seriesSlug === 'one_film_two_takes') return 'critics_say';
@@ -925,7 +925,7 @@ async function renderAndStoreAssets(input: {
   templateSlug?: string | null;
   templateVersion: number | null;
   formats: SocialAssetFormat[];
-}): Promise<{ rows: StoredAsset[]; error?: string }> {
+}): Promise<{ rows: StoredAsset[]; carouselAssets?: Record<string, StoredAsset[]>; error?: string }> {
   const bucket = getAssetBucket();
 
   try {
@@ -935,9 +935,10 @@ async function renderAndStoreAssets(input: {
       templateSlug: input.templateSlug,
     });
     const rows: StoredAsset[] = [];
+    const carouselAssets: Record<string, StoredAsset[]> = {};
 
     for (const asset of rendered) {
-      const storagePath = `${input.contentItemId}/${asset.format}.png`;
+      const storagePath = `${input.contentItemId}/${asset.format}${asset.slide && asset.slide > 1 ? `-slide-${asset.slide}` : ''}.png`;
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)
@@ -946,7 +947,10 @@ async function renderAndStoreAssets(input: {
 
       const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storagePath);
 
-      const { data: assetRow, error: assetError } = await supabase
+      // Carousel slides share a format, so only the first slide is represented
+      // by a social_assets row; all slides remain addressable by their storage URL.
+      const shouldPersistRow = !asset.slide || asset.slide === 1;
+      const { data: assetRow, error: assetError } = shouldPersistRow ? await supabase
         .from('social_assets')
         .upsert(
           {
@@ -965,20 +969,23 @@ async function renderAndStoreAssets(input: {
           { onConflict: 'content_item_id,format' },
         )
         .select('id')
-        .single();
+        .single() : { data: { id: `${input.contentItemId}-${asset.format}-${asset.slide}` }, error: null };
 
       if (assetError) throw assetError;
 
-      rows.push({
+      const stored: StoredAsset = {
         id: assetRow.id,
         format: asset.format,
         publicUrl: urlData.publicUrl,
         width: asset.width,
         height: asset.height,
-      });
+        slide: asset.slide,
+      };
+      if (asset.slide) (carouselAssets[asset.format] ||= []).push(stored);
+      if (!asset.slide || asset.slide === 1) rows.push(stored);
     }
 
-    return { rows };
+    return { rows, carouselAssets };
   } catch (err) {
     return { rows: [], error: (err as Error).message || 'unknown render error' };
   }
@@ -1106,6 +1113,8 @@ export async function generateSocialDraft(
   const variantRows = input.platforms.map(platform => {
     const content = buildVariantContent({ snapshot, platform });
     const format = preferredAssetFormat(platform, availableFormats);
+    const slideAssets = format ? (assets.carouselAssets?.[format] || []) : [];
+    const useCarousel = input.contentType === 'critics_say' && platform !== 'tiktok' && slideAssets.length >= 2;
     return {
       content_item_id: contentItem.id,
       platform,
@@ -1117,6 +1126,19 @@ export async function generateSocialDraft(
       platform_options: {
         caption_limit: PLATFORM_CAPTION_LIMITS[platform].captionLimit,
         asset_format: format,
+        ...(useCarousel
+          ? {
+              post_format: 'carousel',
+              carousel_assets: slideAssets.map((asset, index) => ({
+                id: asset.id,
+                publicUrl: asset.publicUrl,
+                mediaType: 'image',
+                position: index,
+                format: asset.format,
+              })),
+              carousel_asset_urls: slideAssets.map(asset => asset.publicUrl),
+            }
+          : { post_format: 'single' }),
       },
     };
   });

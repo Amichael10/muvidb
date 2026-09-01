@@ -1135,6 +1135,7 @@ export type RenderedAsset = {
   width: number;
   height: number;
   usedArtwork: boolean;
+  slide?: number;
 };
 
 export async function renderSnapshotAsset(input: {
@@ -1142,6 +1143,7 @@ export async function renderSnapshotAsset(input: {
   format: SocialAssetFormat;
   artwork?: Artwork;
   templateSlug?: string | null;
+  slide?: number;
 }): Promise<RenderedAsset> {
   if (input.templateSlug) {
     const { isHtmlSocialTemplate, renderHtmlSocialTemplateAsset } = await import('./social_html_templates.js');
@@ -1150,6 +1152,7 @@ export async function renderSnapshotAsset(input: {
         templateSlug: input.templateSlug,
         snapshot: input.snapshot,
         format: input.format,
+        slide: input.slide,
       });
     }
   }
@@ -1209,11 +1212,14 @@ export async function renderSnapshotAssets(input: {
   templateSlug?: string | null;
 }): Promise<RenderedAsset[]> {
   if (input.templateSlug) {
-    const { isHtmlSocialTemplate } = await import('./social_html_templates.js');
+    const { isHtmlSocialTemplate, htmlTemplateSlides } = await import('./social_html_templates.js');
     if (isHtmlSocialTemplate(input.templateSlug)) {
       const rendered: RenderedAsset[] = [];
       for (const format of input.formats) {
-        rendered.push(await renderSnapshotAsset({ snapshot: input.snapshot, format, templateSlug: input.templateSlug }));
+        const slides = htmlTemplateSlides(input.templateSlug);
+        for (let slide = 1; slide <= slides; slide += 1) {
+          rendered.push(await renderSnapshotAsset({ snapshot: input.snapshot, format, templateSlug: input.templateSlug, slide }));
+        }
       }
       return rendered;
     }
