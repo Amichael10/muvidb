@@ -594,8 +594,6 @@ export default function AdminPeople() {
         name: toTitleCase(formData.name),
         bio: formData.biography ? toSentenceCase(formData.biography) : (formData.bio || null),
         date_of_birth: formData.date_of_birth || null,
-        date_of_death: formData.date_of_death || null,
-        is_deceased: Boolean(formData.date_of_death || formData.is_deceased),
         gender: formData.gender || 'Prefer not to say',
         nationality: formData.nationality || 'Nigerian',
         photo_url: formData.photo_url || null,
@@ -614,8 +612,7 @@ export default function AdminPeople() {
           ...(youtube_stats || {}),
           instagram_highlights: (formData.instagram_highlights || []).map(h => (h || '').trim()).filter(Boolean)
         },
-        // Awards / nominations (jsonb). Drop blank rows and coerce year/season so
-        // the person page's sorting and "N wins & N nominations" tally stay sane.
+        // Awards / nominations (jsonb)
         awards: (formData.awards || [])
           .filter((a) => (a.organization || '').trim() || (a.category || '').trim())
           .map((a) => ({
@@ -629,28 +626,53 @@ export default function AdminPeople() {
           }))
       };
 
-      if (editingPerson) {
-        const { data: updateData, error } = await supabase
-          .from('people')
-          .update(dataToSave)
-          .eq('id', editingPerson.id)
-          .select();
-        if (error) throw error;
-        if (!updateData || updateData.length === 0) {
-          throw new Error('Save failed: No permissions or record not found.');
-        }
-        await logAdminAction(user, 'update', 'person', editingPerson.id, dataToSave.name);
-        toast.success('Profile updated');
-      } else {
-        const { data, error } = await supabase
-          .from('people')
-          .insert([dataToSave])
-          .select();
-        if (error) throw error;
-        const newPersonId = data?.[0]?.id;
-        await logAdminAction(user, 'create', 'person', newPersonId, dataToSave.name);
-        toast.success('Person added');
+      if (formData.date_of_death) {
+        dataToSave.date_of_death = formData.date_of_death;
+        dataToSave.is_deceased = true;
+      } else if (formData.is_deceased) {
+        dataToSave.is_deceased = true;
       }
+
+      const executeSave = async (payload) => {
+        if (editingPerson) {
+          const { data: updateData, error } = await supabase
+            .from('people')
+            .update(payload)
+            .eq('id', editingPerson.id)
+            .select();
+          if (error) throw error;
+          if (!updateData || updateData.length === 0) {
+            throw new Error('Save failed: No permissions or record not found.');
+          }
+          await logAdminAction(user, 'update', 'person', editingPerson.id, payload.name);
+          toast.success('Profile updated');
+        } else {
+          const { data, error } = await supabase
+            .from('people')
+            .insert([payload])
+            .select();
+          if (error) throw error;
+          const newPersonId = data?.[0]?.id;
+          await logAdminAction(user, 'create', 'person', newPersonId, payload.name);
+          toast.success('Person added');
+        }
+      };
+
+      try {
+        await executeSave(dataToSave);
+      } catch (saveErr) {
+        // If date_of_death / is_deceased column does not exist in schema yet, retry without them
+        if (saveErr?.message?.includes('date_of_death') || saveErr?.message?.includes('is_deceased')) {
+          console.warn('date_of_death column not in database schema yet. Retrying save without it...');
+          const stripped = { ...dataToSave };
+          delete stripped.date_of_death;
+          delete stripped.is_deceased;
+          await executeSave(stripped);
+        } else {
+          throw saveErr;
+        }
+      }
+
       clearDraft();
       setIsDrawerOpen(false);
       fetchPeople();
