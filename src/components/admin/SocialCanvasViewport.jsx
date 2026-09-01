@@ -56,7 +56,6 @@ export default function SocialCanvasViewport({
   const isVideo = mediaType === 'video' ||
     Boolean(mediaUrl && (
       /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(mediaUrl) ||
-      mediaUrl.startsWith('blob:') ||
       mediaUrl.includes('youtube.com') ||
       mediaUrl.includes('youtu.be')
     ));
