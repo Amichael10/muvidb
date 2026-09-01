@@ -701,10 +701,11 @@ export async function runSocialPublisher(input: {
 
   if (error) throw error;
 
-  const results = [];
-  for (const job of jobs || []) {
-    results.push(await processJob(job, input.lockedBy || 'social-publisher', now));
-  }
+  // Publish each platform independently. A slow/asynchronous provider such as
+  // Threads must not block Instagram, Facebook, or TikTok in the same run.
+  const results = await Promise.all(
+    (jobs || []).map(job => processJob(job, input.lockedBy || 'social-publisher', now)),
+  );
 
   return {
     skipped: false,

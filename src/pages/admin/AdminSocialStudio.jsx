@@ -418,8 +418,8 @@ export default function AdminSocialStudio() {
     }
   };
 
-  const fetchDrafts = async () => {
-    setDraftsLoading(true);
+  const fetchDrafts = async (silent = false) => {
+    if (!silent) setDraftsLoading(true);
     setDraftsError('');
     try {
       const { data, error } = await supabase
@@ -443,7 +443,7 @@ export default function AdminSocialStudio() {
       console.warn('Failed to load social drafts:', err.message);
       setDraftsError('We could not load your drafts and scheduled posts right now. Please try again.');
     } finally {
-      setDraftsLoading(false);
+      if (!silent) setDraftsLoading(false);
     }
   };
 
@@ -520,7 +520,7 @@ export default function AdminSocialStudio() {
 
     const interval = setInterval(() => {
       fetchSummary(true);
-      fetchDrafts();
+      fetchDrafts(true);
     }, 3500);
 
     return () => clearInterval(interval);
