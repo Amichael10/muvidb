@@ -689,17 +689,21 @@ export default function AdminSocialStudio() {
     }
   };
 
-  const runPublishNow = async contentItemId => {
+  const runPublishNow = async (contentItemId, currentStatus) => {
     setReviewingId(contentItemId);
     const toastId = toast.loading('Initiating instant publish for selected channels...');
     try {
-      const schedRes = await fetch('/api/social?task=schedule', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentItemId, scheduledFor: new Date().toISOString() }),
-      });
-      const schedData = await schedRes.json().catch(() => ({}));
-      if (!schedRes.ok) throw new Error(schedData.error || `HTTP ${schedRes.status}`);
+      // Already-scheduled items are ready for the queue; calling schedule
+      // again makes the state machine reject the action with a 409.
+      if (currentStatus !== 'scheduled') {
+        const schedRes = await fetch('/api/social?task=schedule', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentItemId, scheduledFor: new Date().toISOString() }),
+        });
+        const schedData = await schedRes.json().catch(() => ({}));
+        if (!schedRes.ok) throw new Error(schedData.error || `HTTP ${schedRes.status}`);
+      }
 
       const pubRes = await fetch('/api/social?task=publish_due', {
         headers: await authHeaders(),
@@ -1468,7 +1472,7 @@ export default function AdminSocialStudio() {
                         {item.status !== 'published' && (
                           <button
                             type="button"
-                            onClick={() => runPublishNow(item.id)}
+                            onClick={() => runPublishNow(item.id, item.status)}
                             disabled={reviewingId === item.id || item.status === 'publishing'}
                             className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:opacity-50 shadow-md transition-all"
                           >
