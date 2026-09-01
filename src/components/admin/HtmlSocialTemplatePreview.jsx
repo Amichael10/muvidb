@@ -1,4 +1,13 @@
+import { useEffect, useRef, useState } from 'react';
+
 const DEFAULT_HANDLE = '@muvidb_';
+const NATIVE_ARTBOARD_SIZE = {
+  'on-stage-theatre-v1': 1080,
+  'critics-say-v1': 1080,
+  'watchlist-this-week-v1': 1254,
+  'nollywood-debate-v1': 1254,
+  'now-showing-cinemas-v1': 1254,
+};
 
 function formatDate(value) {
   if (!value) return null;
@@ -32,8 +41,41 @@ function encodeData(data) {
 }
 
 export default function HtmlSocialTemplatePreview({ candidate, templateSlug }) {
+  const containerRef = useRef(null);
+  const [availableSize, setAvailableSize] = useState(0);
   const data = encodeData(templateData(candidate, templateSlug));
   const params = new URLSearchParams({ render: '1', data });
+  const nativeSize = NATIVE_ARTBOARD_SIZE[templateSlug] || 1080;
+  const scale = availableSize ? Math.min(1, availableSize / nativeSize) : 0;
   if (templateSlug === 'critics-say-v1') params.set('ratio', '1:1');
-  return <iframe key={`${templateSlug}:${candidate?.id || candidate?.name || ''}`} title={`${candidate?.name || 'MuviDB'} social graphic preview`} src={`/social-templates/${templateSlug}.html?${params.toString()}`} sandbox="allow-scripts" className="h-full w-full border-0 bg-transparent" />;
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return undefined;
+    const updateSize = () => setAvailableSize(Math.min(element.clientWidth, element.clientHeight));
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+      {scale > 0 && (
+        <iframe
+          key={`${templateSlug}:${candidate?.id || candidate?.name || ''}`}
+          title={`${candidate?.name || 'MuviDB'} social graphic preview`}
+          src={`/social-templates/${templateSlug}.html?${params.toString()}`}
+          sandbox="allow-scripts"
+          className="absolute left-1/2 top-1/2 border-0 bg-transparent"
+          style={{
+            width: `${nativeSize}px`,
+            height: `${nativeSize}px`,
+            transform: `translate(-50%, -50%) scale(${scale})`,
+            transformOrigin: 'center',
+          }}
+        />
+      )}
+    </div>
+  );
 }
