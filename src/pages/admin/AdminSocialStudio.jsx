@@ -492,8 +492,8 @@ export default function AdminSocialStudio() {
     }
   };
 
-  const fetchSummary = async () => {
-    setLoading(true);
+  const fetchSummary = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch('/api/social', { headers: await authHeaders() });
       const data = await res.json().catch(() => ({}));
@@ -502,7 +502,7 @@ export default function AdminSocialStudio() {
     } catch (err) {
       toast.error(err.message || 'Failed to load Social Studio');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -519,7 +519,7 @@ export default function AdminSocialStudio() {
     if (!hasActivePublishing) return;
 
     const interval = setInterval(() => {
-      fetchSummary();
+      fetchSummary(true);
       fetchDrafts();
     }, 3500);
 
