@@ -19,7 +19,7 @@ import { slugOrId } from '../utils/slug'
 import { formatPersonName, toTitleCase, toSentenceCase, formatFilmTitle, formatDateOfBirth } from '../utils/format'
 import { nationalityToCountryName } from '../utils/africanCountries'
 import { fetchPersonStageCredits, getPlayDateLabel } from '../lib/plays'
-import InstagramHighlights from '../components/person/InstagramHighlights'
+import PersonHeroMediaShowcase from '../components/person/PersonHeroMediaShowcase'
 import CareerPassportModal from '../components/professional/CareerPassportModal'
 
 const PLATFORM_STYLES = {
@@ -698,39 +698,21 @@ const PersonDetail = () => {
     <div className="min-h-screen bg-bg overflow-x-hidden">
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-12 pt-24 border-x border-border relative z-10">
-          <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-start text-center md:text-left">
-            <div className="flex-shrink-0 relative group overflow-hidden rounded-lg">
-              <ImageWithFallback
-                src={person.photo_url || person.photo}
-                alt={formatPersonName(person.name)}
-                fallbackType="avatar"
-                name={formatPersonName(person.name)}
-                className="relative w-48 md:w-56 aspect-[3/4] rounded-lg object-cover shadow-2xl border border-border"
-                width={512}
-                sizes="(max-width: 767px) 192px, 224px"
-                loading="eager"
-                fetchPriority="high"
-              />
-              {/* Bottom-Left White Frosted Glass Circular Watermark */}
-              <div className="absolute bottom-3 left-3 z-20 w-9 h-9 rounded-full bg-white/75 backdrop-blur-md border border-white/50 shadow-2xl shadow-black/40 flex items-center justify-center p-1.5 select-none pointer-events-none">
-                <img src="/images/muvidb-icon-watermark.png" alt="MuviDB" className="w-full h-full object-contain" />
-              </div>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 py-10 pt-20 border-x border-border relative z-10 space-y-8">
+          {/* Header: Breadcrumb & Title */}
+          <div>
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-text-secondary mb-3 flex-wrap">
+              <Link to="/" className="hover:text-brand transition-colors">Home</Link>
+              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+              <Link to="/people" className="hover:text-brand transition-colors">People</Link>
+              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+              <span className="text-text-primary truncate max-w-[240px]">{formatPersonName(person.name)}</span>
+            </nav>
 
-            <div className="flex-1 space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                {/* Breadcrumbs Navigation */}
-                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-text-secondary mb-4 flex-wrap justify-center md:justify-start">
-                  <Link to="/" className="hover:text-brand transition-colors">Home</Link>
-                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
-                  <Link to="/people" className="hover:text-brand transition-colors">People</Link>
-                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
-                  <span className="text-text-primary truncate max-w-[240px]">{formatPersonName(person.name)}</span>
-                </nav>
-
-                <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start mb-2">
-                  <h1 className="text-4xl md:text-5xl font-heading font-bold text-text-primary tracking-tighter">
+                <div className="flex items-center gap-3 flex-wrap mb-1">
+                  <h1 className="text-3xl md:text-5xl font-heading font-black text-text-primary tracking-tight">
                     {formatPersonName(person.name)}
                   </h1>
                   {person.is_verified && (
@@ -740,23 +722,22 @@ const PersonDetail = () => {
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center md:justify-start max-w-full">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-text-secondary">
                   {heroRoles.map(role => (
-                    <span
-                      key={role}
-                      className="text-text-secondary text-xs font-bold"
-                    >
+                    <span key={role} className="text-text-secondary">
                       {formatRole(role)}
                     </span>
                   ))}
                 </div>
+              </div>
 
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowEdit(true)}
-                  className="mt-4 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold transition-colors min-h-[36px]"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-secondary hover:border-brand/40 hover:text-brand transition"
                 >
                   <Icon icon="solar:pen-2-linear" width="14" />
-                  Suggest an edit
+                  Suggest edit
                 </button>
                 {showEdit && (
                   <SuggestEditModal
@@ -780,50 +761,24 @@ const PersonDetail = () => {
                   />
                 )}
               </div>
+            </div>
+          </div>
 
-              {/* Credits & Followers pills */}
-              <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden bg-surface shadow-sm max-w-xs">
-                <div className="flex-1 px-5 py-3 text-center border-r border-border">
-                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{totalFilms}</p>
-                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Credits</p>
-                </div>
-                <div className="flex-1 px-5 py-3 text-center">
-                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{followerCount.toLocaleString()}</p>
-                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Followers</p>
-                </div>
-              </div>
+          {/* 3-Pane IMDb-Style Hero Media Showcase */}
+          <PersonHeroMediaShowcase
+            photoUrl={person.photo_url || person.photo}
+            personName={person.name}
+            highlights={person.instagram_highlights || person.youtube_stats?.instagram_highlights}
+            credits={person.credits || []}
+            knownFor={knownFor}
+          />
 
-              {/* Impact card — inline for mobile/tablet, hidden on lg+ (shown as right column) */}
-              {showImpactCard && (
-                <div className="lg:hidden w-full max-w-xl mx-auto md:mx-0">
-                  <div className="grid grid-cols-2 divide-x divide-border border border-border rounded-2xl bg-surface shadow-lg overflow-hidden">
-                    <div className="flex flex-col items-start px-3 sm:px-6 py-4 sm:py-5 gap-1 min-w-0">
-                      <p className="text-text-secondary text-[10px] font-bold uppercase tracking-wider">Reported Box Office</p>
-                      {hasBoxOffice
-                        ? <p className="text-brand text-[clamp(1.4rem,6vw,2.25rem)] font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtMoney(displayBoxOffice)}</p>
-                        : <p className="text-text-muted text-2xl font-black font-heading leading-none">—</p>}
-                    </div>
-                    <div className="flex flex-col items-start px-3 sm:px-6 py-4 sm:py-5 gap-1 min-w-0">
-                      <p className="text-text-secondary text-[10px] font-bold uppercase tracking-wider">YouTube Views</p>
-                      {hasYtViews
-                        ? <p className="text-text-primary text-[clamp(1.4rem,6vw,2.25rem)] font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtViews(displayYtViews)}</p>
-                        : <p className="text-text-muted text-2xl font-black font-heading leading-none">—</p>}
-                    </div>
-                  </div>
-                  <p className="text-text-muted/70 text-[10px] font-semibold mt-1.5 tracking-wider uppercase">
-                    Source-backed credited productions · not personal earnings
-                  </p>
-                </div>
-              )}
-
+          {/* Actor Quick Stats & Bio Section */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
+            <div className="lg:col-span-8 space-y-6">
               {(person.biography || person.bio) && (
                 <Biography text={toSentenceCase(person.biography || person.bio)} />
               )}
-
-              <InstagramHighlights 
-                highlights={person.instagram_highlights || person.youtube_stats?.instagram_highlights} 
-                instagramHandle={person.instagram_url} 
-              />
 
               <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
                 {person.nationality && (() => {
@@ -945,34 +900,40 @@ const PersonDetail = () => {
               </div>
             </div>
 
-            {/* ── Right Impact Card ── */}
-            {showImpactCard && (
-              <div className="hidden lg:flex flex-col flex-shrink-0 self-start mt-10 mr-4 max-w-[min(30vw,440px)]">
-                <div className="border border-border rounded-2xl bg-surface overflow-hidden min-w-[240px] w-max max-w-full" style={{boxShadow: '0 0 0 1px rgba(255,255,255,0.04), 0 12px 40px rgba(0,0,0,0.5)'}}>
+            <div className="lg:col-span-4 space-y-4">
+              {/* Credits & Followers pills */}
+              <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden bg-surface shadow-sm w-full">
+                <div className="flex-1 px-4 py-3 text-center border-r border-border">
+                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{totalFilms}</p>
+                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Credits</p>
+                </div>
+                <div className="flex-1 px-4 py-3 text-center">
+                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{followerCount.toLocaleString()}</p>
+                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Followers</p>
+                </div>
+              </div>
 
+              {/* Impact Card */}
+              {showImpactCard && (
+                <div className="border border-border rounded-2xl bg-surface overflow-hidden shadow-lg">
                   {/* Box Office */}
-                  <div className="flex flex-col items-start px-7 pt-8 pb-6 gap-2 border-b border-border min-w-0">
+                  <div className="flex flex-col items-start px-6 pt-5 pb-4 gap-1 border-b border-border min-w-0">
                     <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Reported Film Box Office</p>
                     {hasBoxOffice
-                      ? <p className="text-brand text-[clamp(2rem,3vw,3.5rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtMoney(displayBoxOffice)}</p>
-                      : <p className="text-text-muted text-4xl font-black font-heading leading-none">—</p>}
+                      ? <p className="text-brand text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtMoney(displayBoxOffice)}</p>
+                      : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
                   </div>
 
                   {/* YouTube Views */}
-                  <div className="flex flex-col items-start px-7 pt-6 pb-8 gap-2 min-w-0">
+                  <div className="flex flex-col items-start px-6 pt-5 pb-5 gap-1 min-w-0">
                     <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">YouTube Views</p>
                     {hasYtViews
-                      ? <p className="text-text-primary text-[clamp(2rem,3vw,3.5rem)] font-black font-heading tracking-tight leading-none whitespace-nowrap max-w-full">{fmtViews(displayYtViews)}</p>
-                      : <p className="text-text-muted text-4xl font-black font-heading leading-none">—</p>}
+                      ? <p className="text-text-primary text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtViews(displayYtViews)}</p>
+                      : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
                   </div>
-
                 </div>
-                <p className="text-text-muted/50 text-[9px] font-semibold mt-2 ml-1 tracking-wider uppercase">
-                  Source-backed credited productions · not personal earnings
-                </p>
-              </div>
-            )}
-
+              )}
+            </div>
           </div>
         </div>
       </div>
