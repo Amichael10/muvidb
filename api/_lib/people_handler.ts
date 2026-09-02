@@ -30,8 +30,13 @@ export async function handlePeople(req: VercelRequest, res: VercelResponse) {
   let query = supabase.from('people').select(FIELDS).range(offset, offset + limit - 1);
 
   if (search) {
-    const formattedQuery = (search as string).trim().split(/\s+/).join(':* & ') + ':*';
-    query = query.textSearch('name', formattedQuery);
+    // Do not use textSearch here: `name` is not guaranteed to have a
+    // tsvector configuration in every environment and that made ordinary
+    // people searches return 500. OR token matching also handles swapped
+    // names and partial surnames (e.g. "oluke").
+    const tokens = String(search).trim().split(/\s+/).filter(Boolean);
+    const clauses = tokens.map(token => `name.ilike.*${token.replace(/[(),]/g, '')}*`).join(',');
+    if (clauses) query = query.or(clauses);
   }
 
   if (sort === 'name') {

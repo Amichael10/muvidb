@@ -340,12 +340,12 @@ export default function AdminFilms() {
     if (!q.trim()) { setActorResults([]); return; }
     actorSearchTimeout.current = setTimeout(async () => {
       try {
-        const rows = await searchPeopleByName(q.trim(), { limit: 8, select: 'id, name, photo_url, known_for_department' });
+        const rows = await searchPeopleByName(q.trim(), { limit: 8, select: 'id, name, photo_url' });
         setActorResults(rows || []);
       } catch {
         const { data } = await supabase
           .from('people')
-          .select('id, name, photo_url, known_for_department')
+          .select('id, name, photo_url')
           .ilike('name', `%${q.trim()}%`)
           .order('popularity_score', { ascending: false, nullsFirst: false })
           .limit(8);
@@ -386,28 +386,26 @@ export default function AdminFilms() {
   const fetchFilms = async () => {
     setLoading(true);
     try {
-      // 1. Channel filter: resolve the films linked to this channel via channel_videos.
+      // Resolve relationship filters to film ids first. Embedding both
+      // `credits!inner` and `channel_videos!inner` in the same PostgREST
+      // select is ambiguous in production and caused 400s (and empty lists).
+      let actorFilmIds = null;
       let channelFilmIds = null;
+      if (actorFilter) {
+        const { data, error } = await supabase.from('credits').select('film_id').eq('person_id', actorFilter.id);
+        if (error) throw error;
+        actorFilmIds = [...new Set((data || []).map(row => row.film_id).filter(Boolean))];
+      }
       if (channelFilter) {
-        const { data: cvs } = await supabase
-          .from('channel_videos')
-          .select('film_id')
-          .eq('channel_id', channelFilter.id)
-          .not('film_id', 'is', null);
-        channelFilmIds = [...new Set((cvs || []).map((c) => c.film_id))];
-        if (channelFilmIds.length === 0) {
-          setFilms([]); setTotalCount(0); setLoading(false); return;
-        }
+        const { data, error } = await supabase.from('channel_videos').select('film_id').eq('channel_id', channelFilter.id).not('film_id', 'is', null);
+        if (error) throw error;
+        channelFilmIds = [...new Set((data || []).map(row => row.film_id).filter(Boolean))];
       }
 
-      const baseSelect = actorFilter
-        ? '*, credits!inner(person_id)'
-        : '*';
-
-      // 2. Get total count
-      let countQuery = supabase.from('films').select(baseSelect, { count: 'exact', head: true });
-      if (actorFilter) countQuery = countQuery.eq('credits.person_id', actorFilter.id);
-      if (channelFilmIds) countQuery = countQuery.in('id', channelFilmIds);
+      // 1. Get total count
+      let countQuery = supabase.from('films').select('*', { count: 'exact', head: true });
+      if (actorFilmIds) countQuery = countQuery.in('id', actorFilmIds.length ? actorFilmIds : ['00000000-0000-0000-0000-000000000000']);
+      if (channelFilmIds) countQuery = countQuery.in('id', channelFilmIds.length ? channelFilmIds : ['00000000-0000-0000-0000-000000000000']);
       if (searchTerm) countQuery = countQuery.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') countQuery = countQuery.eq('status', statusFilter);
       if (yearFilter !== 'all') countQuery = countQuery.eq('year', parseInt(yearFilter));
@@ -425,17 +423,17 @@ export default function AdminFilms() {
       const { count } = await countQuery;
       setTotalCount(count || 0);
 
-      // 3. Get paginated data
+      // 2. Get paginated data
       let query;
       
       if (duplicateFilter) {
         query = supabase.rpc('get_duplicate_films');
       } else {
-        query = supabase.from('films').select(baseSelect);
+        query = supabase.from('films').select('*');
       }
       
-      if (actorFilter) query = query.eq('credits.person_id', actorFilter.id);
-      if (!duplicateFilter && channelFilmIds) query = query.in('id', channelFilmIds);
+      if (actorFilmIds) query = query.in('id', actorFilmIds.length ? actorFilmIds : ['00000000-0000-0000-0000-000000000000']);
+      if (!duplicateFilter && channelFilmIds) query = query.in('id', channelFilmIds.length ? channelFilmIds : ['00000000-0000-0000-0000-000000000000']);
       if (!duplicateFilter && searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
       if (yearFilter !== 'all') query = query.eq('year', parseInt(yearFilter));
