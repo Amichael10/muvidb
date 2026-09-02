@@ -192,6 +192,14 @@ function carouselLimitFor(platforms) {
   return 10;
 }
 
+// These themes are authored as swipeable multi-slide stories. TikTok's
+// publishing path in this studio is video/photo-single only, so fail fast in
+// the composer instead of generating a draft that can never render correctly.
+const CAROUSEL_THEMES = new Set(['critics_say', 'weekend_watchlist']);
+function supportsThemeOnPlatform(themeId, platform) {
+  return !(CAROUSEL_THEMES.has(themeId) && platform === 'tiktok');
+}
+
 function mediaTypeForFile(file) {
   return file?.type?.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file?.name || '') ? 'video' : 'image';
 }
@@ -698,7 +706,16 @@ export default function SocialDraftComposer({
     return () => { cancelled = true; };
   }, [activeTheme.id, selected?.id]);
 
+  useEffect(() => {
+    if (!CAROUSEL_THEMES.has(activeTheme.id)) return;
+    setPlatforms(current => current.filter(platform => supportsThemeOnPlatform(activeTheme.id, platform)));
+  }, [activeTheme.id]);
+
   const togglePlatform = value => {
+    if (!supportsThemeOnPlatform(activeTheme.id, value)) {
+      toast.error(`${activeTheme.name} is a carousel. TikTok carousel publishing is not supported here.`);
+      return;
+    }
     setPlatforms(current =>
       current.includes(value) ? current.filter(entry => entry !== value) : [...current, value],
     );
@@ -714,6 +731,8 @@ export default function SocialDraftComposer({
     if (!isWatchlist && !selected) return toast.error('Please pick a subject first');
     if (activeTheme.id === 'critics_say' && !selectedCriticReview) return toast.error('Select the critic review you want to feature');
     if (!platforms.length) return toast.error('Select at least one platform');
+    const unsupported = platforms.find(platform => !supportsThemeOnPlatform(activeTheme.id, platform));
+    if (unsupported) return toast.error(`${activeTheme.name} is a carousel and cannot be published to TikTok from this studio.`);
 
     setGenerating(true);
     setResult(null);
@@ -1158,6 +1177,10 @@ export default function SocialDraftComposer({
   }, [activeVariant?.id, activeVariant?.platform, activeVariant?.selected_asset_id, activeVariant?.platform_options?.post_format]);
 
   const handleSetPostFormat = async (targetFormat) => {
+    if (targetFormat === 'carousel' && !supportsThemeOnPlatform(activeTheme.id, activeVariant?.platform)) {
+      toast.error(`${activeTheme.name} is a carousel, but TikTok carousel publishing is not supported here.`);
+      return;
+    }
     setPostFormat(targetFormat);
     if (!activeVariant?.id) return;
     const targetVariantId = uploadScope === 'active' ? activeVariant.id : undefined;
@@ -1796,8 +1819,14 @@ export default function SocialDraftComposer({
                   key={platform.value}
                   type="button"
                   onClick={() => togglePlatform(platform.value)}
+                  disabled={!supportsThemeOnPlatform(activeTheme.id, platform.value)}
+                  title={!supportsThemeOnPlatform(activeTheme.id, platform.value)
+                    ? `${activeTheme.name} requires a carousel, which TikTok cannot publish from this studio`
+                    : undefined}
                   className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all ${
-                    platforms.includes(platform.value)
+                    !supportsThemeOnPlatform(activeTheme.id, platform.value)
+                      ? 'cursor-not-allowed border-border bg-surface-2/50 text-text-muted/40'
+                      : platforms.includes(platform.value)
                       ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
                       : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
                   }`}
