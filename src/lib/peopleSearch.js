@@ -114,6 +114,13 @@ export async function searchPeopleByName(
       .limit(limit);
     if (error) throw error;
     addRows(data);
+    // Credit lists commonly use a nickname/alias in brackets. Search those
+    // decorations explicitly so "itele" resolves to "Ibrahim ... (Itele)".
+    const aliasQueries = await Promise.all([
+      supabase.from('people').select(select).ilike('name', `%(${tokens[0]})%`).limit(limit),
+      supabase.from('people').select(select).ilike('name', `%[${tokens[0]}]%`).limit(limit),
+    ]);
+    for (const result of aliasQueries) if (!result.error) addRows(result.data);
   } else {
     // 2) name_key column (same as RPC, kept for envs where RPC lags)
     // 3) OR of strong tokens — wider net than AND, then client-rank by key
