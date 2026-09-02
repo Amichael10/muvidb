@@ -230,6 +230,8 @@ export default function SocialDraftComposer({
   const [selectedCriticReview, setSelectedCriticReview] = useState(null);
   const [loadingCritics, setLoadingCritics] = useState(false);
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
+  const [destinations, setDestinations] = useState([]);
+  const [destinationId, setDestinationId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
   const [captionDrafts, setCaptionDrafts] = useState({});
@@ -379,6 +381,22 @@ export default function SocialDraftComposer({
 
   const activeTheme = useMemo(() => EDITORIAL_THEMES.find(t => t.id === themeId) || EDITORIAL_THEMES[0], [themeId]);
   const carouselLimit = carouselLimitFor(platforms);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from('content_destinations').select('id,slug,name,description').eq('enabled', true).order('name')
+      .then(({ data }) => {
+        if (cancelled) return;
+        const rows = data || [];
+        setDestinations(rows);
+        const preferred = activeTheme.id === 'critics_say' ? 'muvidb-critics'
+          : activeTheme.id === 'where_to_watch' ? 'where-to-watch'
+            : activeTheme.id === 'film_conversation' ? 'nollywood-debate'
+              : activeTheme.id === 'actor_spotlight' || activeTheme.id === 'behind_the_camera' ? 'muvidb-people' : 'main-muvidb';
+        setDestinationId(rows.find(row => row.slug === preferred)?.id || rows[0]?.id || '');
+      });
+    return () => { cancelled = true; };
+  }, [activeTheme.id]);
 
   // Load draft when opened for editing from the Queue / Calendar
   useEffect(() => {
@@ -749,6 +767,7 @@ export default function SocialDraftComposer({
           templateSlug: activeTheme.templateSlug,
           source: 'ad_hoc',
           platforms,
+          destinationId: destinationId || undefined,
         }),
       });
 
@@ -1813,7 +1832,17 @@ export default function SocialDraftComposer({
           </button>
 
           {step3Open && (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 space-y-3">
+              {destinations.length > 0 && (
+                <label className="block max-w-xl rounded-lg border border-border bg-surface-2 px-3 py-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">Destination channel</span>
+                  <select value={destinationId} onChange={event => setDestinationId(event.target.value)} className="mt-1 w-full bg-transparent text-sm font-bold text-text-primary outline-none">
+                    {destinations.map(destination => <option key={destination.id} value={destination.id}>{destination.name}</option>)}
+                  </select>
+                  <span className="text-[10px] text-text-muted">This draft will only route to this channel’s connected social accounts.</span>
+                </label>
+              )}
+              <div className="flex flex-wrap gap-2">
               {PLATFORMS.map(platform => (
                 <button
                   key={platform.value}
@@ -1835,6 +1864,7 @@ export default function SocialDraftComposer({
                   {platform.label}
                 </button>
               ))}
+              </div>
             </div>
           )}
         </div>

@@ -1007,6 +1007,7 @@ export async function generateSocialDraft(
     criticReviewId?: string | null;
     templateSlug: string;
     platforms: SocialPlatform[];
+    destinationId?: string | null;
     isAdHoc?: boolean;
   },
   actor: SocialActor,
@@ -1083,6 +1084,7 @@ export async function generateSocialDraft(
       source_entity_id: input.sourceEntityId,
       source_snapshot: snapshot,
       template_id: effectiveTemplate.id,
+      destination_id: input.destinationId || null,
       status: 'generating',
       generation_method: 'template',
       generation_notes: warnings.length ? warnings.join(' ') : null,

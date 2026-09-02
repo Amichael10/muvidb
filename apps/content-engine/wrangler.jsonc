@@ -1,0 +1,21 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "muvidb-content-engine",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {
+    "PUBLIC_APP_URL": "https://muvidb.com",
+    "ENGINE_ENV": "production"
+  },
+  "env": {
+    "staging": {
+      "name": "muvidb-content-engine-staging",
+      "vars": {
+        "PUBLIC_APP_URL": "https://staging.muvidb.com",
+        "ENGINE_ENV": "staging"
+      }
+    }
+  }
+}

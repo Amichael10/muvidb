@@ -32,6 +32,7 @@ export function parseGenerateDraftRequest(body: unknown): {
   criticReviewId: string | null;
   templateSlug: string;
   platforms: SocialPlatform[];
+  destinationId: string | null;
   isAdHoc: boolean;
 } {
   const input = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
@@ -58,6 +59,9 @@ export function parseGenerateDraftRequest(body: unknown): {
   const platforms = normalizePlatforms(input.platforms);
   if (!platforms.length) throw new Error('Select at least one platform');
 
+  const destinationId = input.destinationId == null || input.destinationId === '' ? null : String(input.destinationId).trim();
+  if (destinationId) assertUuid(destinationId, 'destinationId');
+
   return {
     contentType,
     sourceEntityId: input.sourceEntityId,
@@ -65,6 +69,7 @@ export function parseGenerateDraftRequest(body: unknown): {
     criticReviewId,
     templateSlug,
     platforms,
+    destinationId,
     isAdHoc: input.isAdHoc === true || input.source === 'ad_hoc',
   };
 }
