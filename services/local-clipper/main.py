@@ -205,6 +205,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
         }
 
         direct_stream_url = None
+        direct_stream_headers = {}
         if "youtube.com" not in url and "youtu.be" not in url:
             direct_stream_url = url
         else:
@@ -212,6 +213,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 try:
                     info = downloader.extract_info(url, download=False)
                     direct_stream_url = info.get("url")
+                    direct_stream_headers = info.get("http_headers") or {}
                 except Exception as e:
                     print(f"[Clipper] Direct stream extract fallback: {e}")
 
@@ -220,16 +222,23 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
         if direct_stream_url:
             # Fast direct stream slicing without saving whole 3GB video
             command = [
-                "ffmpeg", "-y", "-ss", str(start), "-i", direct_stream_url,
+                "ffmpeg", "-y", "-ss", str(start),
+            ]
+            if direct_stream_headers:
+                command.extend(["-headers", "\r\n".join(f"{key}: {value}" for key, value in direct_stream_headers.items())])
+            command.extend(["-i", direct_stream_url,
                 "-t", str(duration),
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
                 "-pix_fmt", "yuv420p", "-r", "30",
                 "-c:a", "aac", "-b:a", "64k",
-                "-movflags", "+faststart", str(final_path),
-            ]
-            rendered = subprocess.run(command, capture_output=True, text=True, timeout=120)
-            if rendered.returncode != 0 or not final_path.exists():
+                "-movflags", "+faststart", str(final_path)])
+            try:
+                rendered = subprocess.run(command, capture_output=True, text=True, timeout=120)
+            except subprocess.TimeoutExpired as exc:
+                rendered = None
+                print("[Clipper] Direct stream timed out; falling back to a local download.")
+            if rendered is not None and (rendered.returncode != 0 or not final_path.exists()):
                 print("[Clipper] Direct stream ffmpeg error, falling back to temp file:", rendered.stderr)
 
         # Fallback if direct streaming failed
