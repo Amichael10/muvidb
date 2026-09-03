@@ -50,12 +50,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'generate_missing_bios': return await generateMissingBios(data, res);
       case 'detect_duplicate_films': return await detectDuplicateFilms(data, res);
       case 'generate_social_teaser': return await generateSocialTeaser(data, res);
+      case 'recommend_clip_segment': return await recommendClipSegment(data, res);
       default: return res.status(400).json({ error: 'Invalid task' });
     }
   } catch (err: any) {
     console.error('AI Service Error:', err);
     return res.status(500).json({ error: err.message });
   }
+}
+
+async function recommendClipSegment(data: any, res: VercelResponse) {
+  const title = String(data?.title || 'this video').slice(0, 200);
+  const duration = Math.max(1, Number(data?.duration || 60));
+  const transcript = String(data?.transcript || '').slice(0, 12000);
+  const prompt = `You are MuviDB's short-form video editor. Recommend one high-energy ${Math.min(45, Math.max(8, duration))}-second TikTok/Reels segment from this YouTube clip.\nTitle: ${title}\nDuration: ${duration}s\nTranscript or description: ${transcript || '(not available; make a conservative recommendation near the beginning)'}\nReturn JSON only: {"startTime": number, "endTime": number, "reason": string, "caption": string}. Keep the caption under 35 words and make it a hype hook, not a generic synopsis.`;
+  const { text, telemetry } = await generateAIContent(prompt, { preferredProvider: 'gemini' });
+  const parsed = parseJSON(text);
+  const startTime = Math.max(0, Math.min(duration - 1, Number(parsed.startTime) || 0));
+  const endTime = Math.max(startTime + 1, Math.min(duration, Number(parsed.endTime) || Math.min(duration, startTime + 30)));
+  return res.status(200).json({ ...parsed, startTime, endTime, engine: telemetry?.engine || 'gemini' });
 }
 
 function normalizeInstagramUrl(value: unknown) {

@@ -42,6 +42,9 @@ export default function SocialVideoClipModal({
   const [videoUrl, setVideoUrl] = useState(initialVideoUrl || '');
   const [videoTitle, setVideoTitle] = useState(initialTitle || '');
   const [loading, setLoading] = useState(false);
+  const [clipRecommendation, setClipRecommendation] = useState(null);
+  const [recommendingClip, setRecommendingClip] = useState(false);
+  const [clipperStatus, setClipperStatus] = useState('checking');
 
   // Timecodes & Trimmer State
   const videoRef = useRef(null);
@@ -54,6 +57,55 @@ export default function SocialVideoClipModal({
   const [startTimeInput, setStartTimeInput] = useState('00:00');
   const [endTimeInput, setEndTimeInput] = useState('00:30');
   const [isPreviewingClip, setIsPreviewingClip] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const response = await fetch(`${LOCAL_CLIPPER_URL}/health`, { method: 'GET' });
+        if (!cancelled) setClipperStatus(response.ok ? 'running' : 'offline');
+      } catch {
+        if (!cancelled) setClipperStatus('offline');
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [isOpen]);
+
+  const startDesktopClipper = () => {
+    try {
+      window.location.href = 'muvidb-clipper://start';
+      toast.success('Starting the desktop clipper… keep this tab open while Windows launches it.');
+    } catch {
+      toast.error('Install the MuviDB clipper launcher on this computer first.');
+    }
+  };
+
+  const recommendBestClip = async () => {
+    if (!videoUrl && !videoInput) return toast.error('Fetch the video first so Gemini can analyze it.');
+    setRecommendingClip(true);
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: videoTitle, duration: duration || 60 } }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Gemini could not recommend a segment');
+      setClipRecommendation(data);
+      setStartTime(Number(data.startTime) || 0);
+      setEndTime(Number(data.endTime) || Math.min(duration || 60, 30));
+      setStartTimeInput(formatSecondsToTimecode(Number(data.startTime) || 0));
+      setEndTimeInput(formatSecondsToTimecode(Number(data.endTime) || Math.min(duration || 60, 30)));
+      toast.success('Gemini suggested the strongest clip segment.');
+    } catch (error) {
+      toast.error(error.message || 'Could not recommend a clip');
+    } finally {
+      setRecommendingClip(false);
+    }
+  };
 
   // Crop Aspect Ratio & Framing Mode
   const [cropAspectRatio, setCropAspectRatio] = useState('9:16'); // '9:16' | '1:1' | '16:9' | '4:5'
@@ -750,10 +802,16 @@ export default function SocialVideoClipModal({
           <div className="flex items-start gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-100">
             <Icon icon="solar:laptop-minimalistic-check-linear" width="20" className="mt-0.5 shrink-0 text-emerald-300" />
             <div>
-              <p className="font-black">Free desktop processing</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-black">Free desktop processing</p>
+                <span className={`rounded-full px-2 py-1 text-[10px] font-black uppercase ${clipperStatus === 'running' ? 'bg-emerald-400/20 text-emerald-200' : clipperStatus === 'checking' ? 'bg-amber-400/20 text-amber-200' : 'bg-red-400/20 text-red-200'}`}>
+                  {clipperStatus === 'running' ? 'Running' : clipperStatus === 'checking' ? 'Checking…' : 'Not running'}
+                </span>
+              </div>
               <p className="mt-0.5 text-[11px] leading-5 text-emerald-100/70">
-                For reliable YouTube clips, keep <span className="font-mono text-emerald-200">scripts/start-local-social-clipper.ps1</span> running on this computer. The final MP4 goes directly to temporary Google Drive storage—never through Vercel or Supabase.
+                The clipper runs on this computer so YouTube cookies and FFmpeg stay local. Rendered files go directly to R2/temporary Drive storage.
               </p>
+              <button type="button" onClick={startDesktopClipper} className="mt-2 rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-100 hover:bg-emerald-300/20">Start desktop clipper</button>
             </div>
           </div>
 
@@ -771,6 +829,10 @@ export default function SocialVideoClipModal({
                   <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-xs font-black text-emerald-400">
                     Duration: {formatSecondsToTimecode(clipDuration)}
                   </span>
+                  <button type="button" onClick={recommendBestClip} disabled={recommendingClip || !videoUrl} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-400/40 bg-violet-500/15 px-3.5 py-2 text-xs font-black text-violet-200 hover:bg-violet-500/25 disabled:opacity-50">
+                    <Icon icon={recommendingClip ? 'solar:spinner-linear' : 'solar:stars-minimalistic-bold'} className={recommendingClip ? 'animate-spin' : ''} width="14" />
+                    {recommendingClip ? 'Analyzing…' : 'Suggest with Gemini'}
+                  </button>
                   
                   {/* Preview Loop Button */}
                   <button
@@ -811,6 +873,7 @@ export default function SocialVideoClipModal({
                   </button>
                 </div>
               </div>
+              {clipRecommendation?.reason && <div className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-[11px] text-violet-100"><strong>Gemini recommendation:</strong> {clipRecommendation.reason} {clipRecommendation.caption && <span className="block mt-1 text-violet-200">Suggested caption: “{clipRecommendation.caption}”</span>}</div>}
 
               {isPreviewingClip && (
                 <div className="flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-3.5 py-2 text-xs text-amber-300 animate-pulse">

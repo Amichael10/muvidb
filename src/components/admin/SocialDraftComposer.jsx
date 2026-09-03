@@ -171,6 +171,25 @@ const CAPTION_LIMITS = {
   tiktok: 2200,
 };
 
+const THEME_WORD_LIMITS = {
+  actor_spotlight: 55,
+  critics_say: 85,
+  where_to_watch: 45,
+  behind_the_camera: 55,
+  weekend_watchlist: 50,
+  whats_on_stage: 50,
+  film_conversation: 65,
+  birthday_spotlight: 45,
+};
+
+function clampWords(text, limit) {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length <= limit) return String(text || '').trim();
+  const clipped = words.slice(0, limit).join(' ');
+  const sentenceEnd = Math.max(clipped.lastIndexOf('.'), clipped.lastIndexOf('!'), clipped.lastIndexOf('?'));
+  return (sentenceEnd > Math.floor(clipped.length * 0.65) ? clipped.slice(0, sentenceEnd + 1) : `${clipped.replace(/[,:;\-]+$/, '')}…`).trim();
+}
+
 const DEFAULT_TIKTOK_SETTINGS = {
   privacy_level: 'PUBLIC_TO_EVERYONE',
   post_mode: 'DIRECT_POST',
@@ -231,6 +250,7 @@ export default function SocialDraftComposer({
   const [loadingCritics, setLoadingCritics] = useState(false);
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
   const [destinations, setDestinations] = useState([]);
+  const [destinationAccounts, setDestinationAccounts] = useState([]);
   const [destinationId, setDestinationId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -384,11 +404,14 @@ export default function SocialDraftComposer({
 
   useEffect(() => {
     let cancelled = false;
-    supabase.from('content_destinations').select('id,slug,name,description').eq('enabled', true).order('name')
-      .then(({ data }) => {
+    Promise.all([
+      supabase.from('content_destinations').select('id,slug,name,description').eq('enabled', true).order('name'),
+      supabase.from('content_destination_platforms').select('id,destination_id,platform,social_connection_id,enabled,social_connections(id,platform,username,display_name,external_account_id,status)').eq('enabled', true),
+    ]).then(([destinationResponse, mappingResponse]) => {
         if (cancelled) return;
-        const rows = data || [];
+        const rows = destinationResponse.data || [];
         setDestinations(rows);
+        setDestinationAccounts(mappingResponse.data || []);
         const preferred = activeTheme.id === 'critics_say' ? 'muvidb-critics'
           : activeTheme.id === 'where_to_watch' ? 'where-to-watch'
             : activeTheme.id === 'film_conversation' ? 'nollywood-debate'
@@ -397,6 +420,10 @@ export default function SocialDraftComposer({
       });
     return () => { cancelled = true; };
   }, [activeTheme.id]);
+
+  const selectedDestinationAccounts = useMemo(() => destinationAccounts.filter(row => row.destination_id === destinationId), [destinationAccounts, destinationId]);
+  const accountForPlatform = useMemo(() => Object.fromEntries(selectedDestinationAccounts.map(row => [row.platform, row.social_connections || null])), [selectedDestinationAccounts]);
+  const themeWordLimit = THEME_WORD_LIMITS[activeTheme.id] || 55;
 
   // Load draft when opened for editing from the Queue / Calendar
   useEffect(() => {
@@ -778,6 +805,7 @@ export default function SocialDraftComposer({
         ...data,
         variants: (data.variants || []).map(variant => ({
           ...variant,
+          caption: clampWords(variant.caption, themeWordLimit),
           hashtags: Array.isArray(variant.hashtags) ? variant.hashtags.slice(0, 3) : [],
         })),
       };
@@ -788,6 +816,15 @@ export default function SocialDraftComposer({
         ...(tiktokVariant?.platform_options?.tiktok || {}),
       });
       setCaptionDrafts(Object.fromEntries(normalized.variants.map(variant => [variant.id, variant.caption || ''])));
+      // Persist the editorial word limit so every downstream publisher receives the same bounded copy.
+      await Promise.all(normalized.variants.map(async variant => {
+        if (!variant.id || variant.caption === data.variants?.find(entry => entry.id === variant.id)?.caption) return;
+        await fetch('/api/social?task=update_variant_caption', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variantId: variant.id, caption: variant.caption }),
+        });
+      }));
       setActivePreviewPlatform(normalized.variants?.[0]?.platform || platforms[0] || 'instagram');
       toast.success(`Draft generated with ${normalized.variants?.length || 0} variant(s)!`);
       onGenerated?.(normalized);
@@ -1840,6 +1877,13 @@ export default function SocialDraftComposer({
                     {destinations.map(destination => <option key={destination.id} value={destination.id}>{destination.name}</option>)}
                   </select>
                   <span className="text-[10px] text-text-muted">This draft will only route to this channel’s connected social accounts.</span>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {PLATFORMS.map(platform => {
+                      const account = accountForPlatform[platform.value];
+                      const label = account?.username ? `@${account.username}` : account?.display_name || 'No account linked';
+                      return <span key={platform.value} className={`rounded-full border px-2 py-1 text-[9px] font-bold ${account?.status === 'connected' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{platform.label}: {label}</span>;
+                    })}
+                  </div>
                 </label>
               )}
               <div className="flex flex-wrap gap-2">
@@ -1862,6 +1906,7 @@ export default function SocialDraftComposer({
                 >
                   <Icon icon={platform.icon} width="16" />
                   {platform.label}
+                  <span className="text-[9px] opacity-70">{accountForPlatform[platform.value]?.username ? `@${accountForPlatform[platform.value].username}` : 'Unmapped'}</span>
                 </button>
               ))}
               </div>
@@ -2173,7 +2218,7 @@ export default function SocialDraftComposer({
               )}
 
               {/* Dynamic Viewport Grid */}
-              <div className={`grid gap-6 ${
+              <div className={`grid min-w-0 items-start gap-6 ${
                 viewLayout === 'canvas_focus'
                   ? 'grid-cols-1'
                   : viewLayout === 'caption_focus'
@@ -2182,7 +2227,7 @@ export default function SocialDraftComposer({
               }`}>
                 {/* Visual Canvas Column */}
                 {viewLayout !== 'caption_focus' && (
-                  <section className={`space-y-3 ${viewLayout === 'canvas_focus' ? 'w-full' : 'lg:col-span-6'}`}>
+                  <section className={`min-w-0 space-y-3 ${viewLayout === 'canvas_focus' ? 'w-full' : 'lg:col-span-6'}`}>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} Visual Canvas</p>
@@ -2427,7 +2472,7 @@ export default function SocialDraftComposer({
 
                 {/* Caption & Settings Column */}
                 {viewLayout !== 'canvas_focus' && (
-                  <section className={`space-y-3 ${viewLayout === 'caption_focus' ? 'w-full' : 'lg:col-span-6'}`}>
+                  <section className={`min-w-0 space-y-3 ${viewLayout === 'caption_focus' ? 'w-full' : 'lg:col-span-6'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} caption</p>
