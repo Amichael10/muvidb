@@ -87,10 +87,15 @@ export default function SocialVideoClipModal({
     if (!videoUrl && !videoInput) return toast.error('Fetch the video first so Gemini can analyze it.');
     setRecommendingClip(true);
     try {
+      let source = { title: videoTitle, duration: duration || 60, transcript: '' };
+      try {
+        const metadataResponse = await fetch(`${LOCAL_CLIPPER_URL}/metadata`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: videoInput || videoUrl }) });
+        if (metadataResponse.ok) source = { ...source, ...(await metadataResponse.json()) };
+      } catch { /* Gemini can still provide a conservative recommendation from title/duration. */ }
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: videoTitle, duration: duration || 60 } }),
+        body: JSON.stringify({ task: 'recommend_clip_segment', data: source }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Gemini could not recommend a segment');

@@ -251,6 +251,7 @@ export default function SocialDraftComposer({
   const [platforms, setPlatforms] = useState(['instagram', 'threads']);
   const [destinations, setDestinations] = useState([]);
   const [destinationAccounts, setDestinationAccounts] = useState([]);
+  const [availableSocialAccounts, setAvailableSocialAccounts] = useState([]);
   const [destinationId, setDestinationId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -407,11 +408,13 @@ export default function SocialDraftComposer({
     Promise.all([
       supabase.from('content_destinations').select('id,slug,name,description').eq('enabled', true).order('name'),
       supabase.from('content_destination_platforms').select('id,destination_id,platform,social_connection_id,enabled,social_connections(id,platform,username,display_name,external_account_id,status)').eq('enabled', true),
-    ]).then(([destinationResponse, mappingResponse]) => {
+      supabase.from('social_connections').select('id,platform,username,display_name,external_account_id,status').eq('status', 'connected').order('platform'),
+    ]).then(([destinationResponse, mappingResponse, connectionsResponse]) => {
         if (cancelled) return;
         const rows = destinationResponse.data || [];
         setDestinations(rows);
         setDestinationAccounts(mappingResponse.data || []);
+        setAvailableSocialAccounts(connectionsResponse.data || []);
         const preferred = activeTheme.id === 'critics_say' ? 'muvidb-critics'
           : activeTheme.id === 'where_to_watch' ? 'where-to-watch'
             : activeTheme.id === 'film_conversation' ? 'nollywood-debate'
@@ -422,8 +425,23 @@ export default function SocialDraftComposer({
   }, [activeTheme.id]);
 
   const selectedDestinationAccounts = useMemo(() => destinationAccounts.filter(row => row.destination_id === destinationId), [destinationAccounts, destinationId]);
-  const accountForPlatform = useMemo(() => Object.fromEntries(selectedDestinationAccounts.map(row => [row.platform, row.social_connections || null])), [selectedDestinationAccounts]);
+  const accountForPlatform = useMemo(() => Object.fromEntries(selectedDestinationAccounts.map(row => {
+    const linked = Array.isArray(row.social_connections) ? row.social_connections[0] : row.social_connections;
+    return [row.platform, linked || null];
+  })), [selectedDestinationAccounts]);
   const themeWordLimit = THEME_WORD_LIMITS[activeTheme.id] || 55;
+
+  const setDestinationAccount = async (platform, connectionId) => {
+    if (!destinationId) return;
+    const existing = selectedDestinationAccounts.find(row => row.platform === platform);
+    const payload = { destination_id: destinationId, platform, social_connection_id: connectionId || null, enabled: Boolean(connectionId) };
+    const response = existing
+      ? await supabase.from('content_destination_platforms').update(payload).eq('id', existing.id).select('id,destination_id,platform,social_connection_id,enabled,social_connections(id,platform,username,display_name,external_account_id,status)').single()
+      : await supabase.from('content_destination_platforms').insert(payload).select('id,destination_id,platform,social_connection_id,enabled,social_connections(id,platform,username,display_name,external_account_id,status)').single();
+    if (response.error) { toast.error(response.error.message || 'Could not save channel mapping'); return; }
+    setDestinationAccounts(rows => [...rows.filter(row => !(row.destination_id === destinationId && row.platform === platform)), response.data]);
+    toast.success('Destination account mapping saved');
+  };
 
   // Load draft when opened for editing from the Queue / Calendar
   useEffect(() => {
@@ -1881,7 +1899,14 @@ export default function SocialDraftComposer({
                     {PLATFORMS.map(platform => {
                       const account = accountForPlatform[platform.value];
                       const label = account?.username ? `@${account.username}` : account?.display_name || 'No account linked';
-                      return <span key={platform.value} className={`rounded-full border px-2 py-1 text-[9px] font-bold ${account?.status === 'connected' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{platform.label}: {label}</span>;
+                      const choices = availableSocialAccounts.filter(connection => connection.platform === platform.value);
+                      return <label key={platform.value} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${account?.status === 'connected' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
+                        <span className="mr-1">{platform.label}:</span>
+                        <select value={account?.id || ''} onChange={event => setDestinationAccount(platform.value, event.target.value)} className="max-w-[150px] bg-transparent outline-none">
+                          <option value="">No account linked</option>
+                          {choices.map(connection => <option key={connection.id} value={connection.id}>{connection.username ? `@${connection.username}` : connection.display_name || connection.external_account_id}</option>)}
+                        </select>
+                      </label>;
                     })}
                   </div>
                 </label>

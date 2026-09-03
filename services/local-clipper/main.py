@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import tempfile
 import time
+import urllib.request
+from html import unescape
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
@@ -69,6 +71,10 @@ class ClipRequest(BaseModel):
     aspect_ratio: Literal["1:1", "4:5", "9:16", "16:9"] = "9:16"
     fit_mode: Literal["cover", "contain"] = "cover"
     title: str = "clip"
+
+
+class MetadataRequest(BaseModel):
+    url: HttpUrl
 
 
 def cleanup_expired_files() -> None:
@@ -134,6 +140,32 @@ def health():
         "ffmpeg": bool(shutil.which("ffmpeg")),
         "cookie_source": "file" if os.getenv("YT_COOKIES_FILE") else os.getenv("YT_COOKIES_FROM_BROWSER", "chrome"),
     }
+
+
+@app.post("/metadata")
+def metadata(payload: MetadataRequest):
+    """Return cookie-authenticated metadata and available English captions."""
+    opts = {"quiet": True, "no_warnings": True, "noplaylist": True, **cookie_options()}
+    with yt_dlp.YoutubeDL(opts) as downloader:
+        info = downloader.extract_info(str(payload.url), download=False)
+    transcript = ""
+    subtitle_map = info.get("subtitles") or info.get("automatic_captions") or {}
+    track = next((subtitle_map.get(key) for key in ("en", "en-US", "en-GB") if subtitle_map.get(key)), None)
+    if track:
+        subtitle_url = next((entry.get("url") for entry in track if entry.get("ext") in {"vtt", "srv3"}), track[0].get("url"))
+        try:
+            raw = urllib.request.urlopen(subtitle_url, timeout=15).read().decode("utf-8", "ignore")
+            lines = []
+            for line in raw.splitlines():
+                line = re.sub(r"<[^>]+>", "", line).strip()
+                if not line or line.startswith("WEBVTT") or "-->" in line or re.fullmatch(r"\d+", line):
+                    continue
+                if not lines or lines[-1] != line:
+                    lines.append(unescape(line))
+            transcript = " ".join(lines)[:12000]
+        except Exception as exc:
+            print(f"[Clipper] Caption fetch skipped: {exc}")
+    return {"title": info.get("title") or "", "duration": info.get("duration") or 0, "description": info.get("description") or "", "transcript": transcript}
 
 
 def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: Path) -> None:
