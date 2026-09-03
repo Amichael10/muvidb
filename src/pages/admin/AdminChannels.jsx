@@ -7,6 +7,7 @@ import { Icon } from '@iconify/react';
 import SyncStatusOverlay from '../../components/admin/SyncStatusOverlay';
 import ImageWithFallback from '../../components/ui/ImageWithFallback';
 import { toTitleCase, toSentenceCase } from '../../utils/format';
+import { deleteChannelWithAssociatedFilms } from '../../utils/channelCascadeDelete';
 
 const CATEGORIES = [
   'Movies', 'Comedy', 'Series', 'Yoruba', 'Faith',
@@ -266,12 +267,17 @@ function ChannelModal({ channel, onSave, onClose }) {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete ${channel.name}? This cannot be undone.`)) return;
+    if (!window.confirm(`⚠️ TEMPORARY CASCADE RULE ACTIVE:\n\nAre you sure you want to delete "${channel.name}"?\nThis will permanently delete this channel AND all its associated movies and credits from the database.`)) return;
     setSaving(true);
-    const { error } = await supabase.from('channels').delete().eq('id', channel.id);
-    setSaving(false);
-    if (error) { setError(error.message); return; }
-    onSave();
+    try {
+      const res = await deleteChannelWithAssociatedFilms(channel.id);
+      toast.success(`Deleted ${channel.name} and ${res.deletedFilms} associated movies (${res.deletedCredits} credits)`);
+      onSave();
+    } catch (err) {
+      setError(err.message || 'Deletion failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -509,6 +515,48 @@ export default function AdminChannels() {
     setBulkWorking(false);
   };
 
+  // Bulk cascade delete selected channels + their movies and credits
+  const bulkDeleteChannels = async () => {
+    if (!selectedIds.length) return;
+    const confirmMsg = `⚠️ TEMPORARY CASCADE RULE ACTIVE:\n\nAre you sure you want to delete ${selectedIds.length} selected channel(s)?\n\nThis will permanently delete these channels AND all movies and credits associated with them from the database.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setBulkWorking(true);
+    const tid = toast.loading(`Deleting ${selectedIds.length} channel(s) and their movies...`);
+    try {
+      const res = await deleteChannelWithAssociatedFilms(selectedIds);
+      toast.success(
+        `Deleted ${res.deletedChannels} channel(s), ${res.deletedFilms} movie(s), and ${res.deletedCredits} credit(s)`,
+        { id: tid, duration: 6000 }
+      );
+      setChannels((prev) => prev.filter((c) => !selectedIds.includes(c.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      console.error(err);
+      toast.error(`Bulk deletion failed: ${err.message}`, { id: tid });
+    } finally {
+      setBulkWorking(false);
+    }
+  };
+
+  // Direct single channel cascade delete from card
+  const handleDirectDelete = async (e, ch) => {
+    e.stopPropagation();
+    const confirmMsg = `⚠️ TEMPORARY CASCADE RULE ACTIVE:\n\nAre you sure you want to delete "${ch.name}"?\n\nThis will permanently delete this channel AND all movies and credits associated with it from the database.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const tid = toast.loading(`Deleting ${ch.name} & associated movies...`);
+    try {
+      const res = await deleteChannelWithAssociatedFilms(ch.id);
+      toast.success(`Deleted ${ch.name} and ${res.deletedFilms} movie(s) (${res.deletedCredits} credits)`, { id: tid, duration: 5000 });
+      setChannels((prev) => prev.filter((c) => c.id !== ch.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== ch.id));
+    } catch (err) {
+      console.error(err);
+      toast.error(`Deletion failed: ${err.message}`, { id: tid });
+    }
+  };
+
   const fetchChannels = async () => {
     setLoading(true);
     let query = supabase
@@ -711,6 +759,14 @@ export default function AdminChannels() {
                    >
                      <Icon icon="solar:refresh-circle-bold" width="14" /> Resume selected
                    </button>
+                   <button
+                     onClick={bulkDeleteChannels}
+                     disabled={bulkWorking}
+                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/15 text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white transition-all disabled:opacity-50"
+                     title="Cascade delete selected channels and their movies/credits"
+                   >
+                     <Icon icon="solar:trash-bin-trash-bold" width="14" /> Delete selected ({selectedIds.length})
+                   </button>
                    <button onClick={() => setSelectedIds([])} className="text-xs font-bold text-text-muted hover:text-text-primary transition-colors">Clear</button>
                  </>
                )}
@@ -765,11 +821,14 @@ export default function AdminChannels() {
                        >
                           <Icon icon={ch.is_featured ? "solar:star-bold" : "solar:star-linear"} width="16" />
                        </button>
-                       <button onClick={(e) => { e.stopPropagation(); setEditingChannel(ch); }} className="p-2 bg-surface-2 border border-border rounded-lg text-text-muted hover:text-brand transition-all">
+                       <button onClick={(e) => { e.stopPropagation(); setEditingChannel(ch); }} className="p-2 bg-surface-2 border border-border rounded-lg text-text-muted hover:text-brand transition-all" title="Edit channel">
                           <Icon icon="solar:pen-linear" width="16" />
                        </button>
-                       <button onClick={(e) => handleSync(e, ch)} disabled={syncingId === ch.id} className="p-2 bg-surface-2 border border-border rounded-lg text-text-muted hover:text-green-500 transition-all">
+                       <button onClick={(e) => handleSync(e, ch)} disabled={syncingId === ch.id} className="p-2 bg-surface-2 border border-border rounded-lg text-text-muted hover:text-green-500 transition-all" title="Sync channel">
                           <Icon icon="solar:refresh-linear" width="16" className={syncingId === ch.id ? 'animate-spin' : ''} />
+                       </button>
+                       <button onClick={(e) => handleDirectDelete(e, ch)} className="p-2 bg-surface-2 border border-border rounded-lg text-text-muted hover:bg-red-500 hover:text-white transition-all" title="Cascade delete channel & movies">
+                          <Icon icon="solar:trash-bin-trash-linear" width="16" />
                        </button>
                     </div>
                   </div>

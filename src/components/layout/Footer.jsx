@@ -29,6 +29,7 @@ const footerGroups = [
     title: 'Platform',
     links: [
       { label: 'About Us', to: '/about' },
+      { label: 'Title Search', to: '/tools/title-checker', isNew: true },
       { label: 'MuviDB Pro', comingSoon: true },
       { label: 'Add a Film', to: '/submit/film' },
       { label: 'Contribute', to: '/submit' },
@@ -116,9 +117,14 @@ export default function Footer() {
                       ) : (
                         <Link
                           to={link.to}
-                          className="block text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
+                          className="inline-flex items-center gap-2 text-xs font-semibold leading-none text-text-muted transition-colors hover:text-brand"
                         >
-                          {link.label}
+                          {link.isNew && (
+                            <span className="rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-black bg-brand">
+                              New
+                            </span>
+                          )}
+                          <span>{link.label}</span>
                         </Link>
                       )}
                     </li>

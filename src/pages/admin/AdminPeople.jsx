@@ -10,6 +10,7 @@ import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AddCreditModal from '../../components/admin/AddCreditModal';
 import AwardsEditor from '../../components/admin/AwardsEditor';
+import PersonMediaEditor from '../../components/admin/PersonMediaEditor';
 import { ALL_ROLES, CAST_ROLE, formatRole, normalizeRole } from '../../lib/creditRoles';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -1451,6 +1452,14 @@ export default function AdminPeople() {
               </div>
             </div>
           </section>
+
+          {/* Actor Media & Gallery: Showreels, Monologues, Scene Clips, BTS, Stills */}
+          {editingPerson && (
+            <PersonMediaEditor
+              personId={editingPerson.id}
+              personName={formData.name}
+            />
+          )}
 
           {/* Awards & nominations -> people.awards (jsonb). Renders on the
               person page grouped by organisation, IMDb-style. */}

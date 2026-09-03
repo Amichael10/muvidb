@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 import SyncStatusOverlay from '../../components/admin/SyncStatusOverlay';
 import ImageWithFallback from '../../components/ui/ImageWithFallback';
+import { deleteChannelWithAssociatedFilms } from '../../utils/channelCascadeDelete';
 
 export default function AdminChannelDetail() {
   const { id } = useParams();
@@ -123,6 +124,23 @@ export default function AdminChannelDetail() {
     }
   };
 
+  const handleDeleteChannel = async () => {
+    const confirmMsg = `⚠️ TEMPORARY CASCADE RULE ACTIVE:\n\nAre you sure you want to delete "${channel.name}"?\n\nThis will permanently delete this channel AND all associated movies (${videos.length} items) and their credits from the database.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setSyncing(true);
+    const tid = toast.loading(`Deleting ${channel.name} and associated movies...`);
+    try {
+      const res = await deleteChannelWithAssociatedFilms(id);
+      toast.success(`Deleted ${channel.name} and ${res.deletedFilms} movies (${res.deletedCredits} credits)`, { id: tid, duration: 5000 });
+      navigate('/admin/channels');
+    } catch (err) {
+      console.error(err);
+      toast.error(`Deletion failed: ${err.message}`, { id: tid });
+      setSyncing(false);
+    }
+  };
+
   const filteredFilms = useMemo(() => {
     return videos.filter(v => {
       const filmTitle = v.films?.title || '';
@@ -189,6 +207,15 @@ export default function AdminChannelDetail() {
              ) : (
                'Sync Signal'
              )}
+           </button>
+           <button
+             onClick={handleDeleteChannel}
+             disabled={syncing}
+             className="px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-md text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all disabled:opacity-50 flex items-center gap-2"
+             title="Cascade delete channel and its movies"
+           >
+             <Icon icon="solar:trash-bin-trash-bold" width="14" />
+             Delete Channel & Movies
            </button>
            <div className="hidden lg:block text-right">
               <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1">Network Capacity</p>

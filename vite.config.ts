@@ -96,22 +96,38 @@ export default defineConfig(({ mode, isSsrBuild }) => {
           bypass: async (req, res) => {
             try {
               const url = new URL(req.url, 'http://localhost:3001');
-              const extMod = './api/_lib/external_provider_handler.js';
-              const { handleExternalProvider } = await import(/* @vite-ignore */ extMod);
-              await handleExternalProvider(
-                { query: Object.fromEntries(url.searchParams), method: req.method },
-                {
-                  status: (code) => ({
-                    json: (data) => {
-                      res.statusCode = code;
-                      res.setHeader('Content-Type', 'application/json');
-                      res.end(JSON.stringify(data));
-                    },
-                  }),
+              const provider = url.searchParams.get('provider');
+              const endpoint = url.searchParams.get('endpoint');
+
+              if (provider === 'youtube') {
+                const apiKey = env.YOUTUBE_API_KEY || env.VITE_YOUTUBE_API_KEY || process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
+                if (!apiKey) {
+                  res.statusCode = 500;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'YouTube API key not found' }));
+                  return false;
                 }
-              );
+                const ytUrl = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
+                ytUrl.searchParams.set('key', apiKey);
+                for (const [k, v] of url.searchParams.entries()) {
+                  if (k !== 'provider' && k !== 'endpoint') {
+                    ytUrl.searchParams.set(k, v);
+                  }
+                }
+                const ytRes = await fetch(ytUrl.toString());
+                const data = await ytRes.json();
+                res.statusCode = ytRes.status;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(data));
+                return false;
+              }
+
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Unsupported provider' }));
             } catch (err) {
               res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ error: err.message }));
             }
             return false;

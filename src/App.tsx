@@ -72,6 +72,7 @@ const CriticsList = lazyWithRetry(() => import('./pages/CriticsList'));
 const CriticDetail = lazyWithRetry(() => import('./pages/CriticDetail'));
 const PlaysList = lazyWithRetry(() => import('./pages/PlaysList'));
 const PlayDetail = lazyWithRetry(() => import('./pages/PlayDetail'));
+const TitleChecker = lazyWithRetry(() => import('./pages/TitleChecker'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
@@ -263,6 +264,8 @@ const ROUTE_TITLES: Record<string, string> = {
   '/careers': 'MuviDB | Careers',
   '/critics': 'MuviDB | Critics',
   '/plays': 'MuviDB | Plays',
+  '/tools/title-checker': 'MuviDB | Nollywood Title Radar',
+  '/title-checker': 'MuviDB | Nollywood Title Radar',
   '/onboarding': 'MuviDB | Complete Your Profile',
   '/waitlist': 'MuviDB | The Home of African Cinema',
 };
@@ -354,6 +357,10 @@ export default function App() {
                 <Route path="/critics/:slug" element={<CriticDetail />} />
                 <Route path="/plays" element={<PlaysList />} />
                 <Route path="/plays/:slug" element={<PlayDetail />} />
+                <Route path="/tools/title-search" element={<TitleChecker />} />
+                <Route path="/title-search" element={<TitleChecker />} />
+                <Route path="/tools/title-checker" element={<TitleChecker />} />
+                <Route path="/title-checker" element={<TitleChecker />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />
@@ -390,6 +397,8 @@ export default function App() {
                   <Route path="spotlight" element={<AdminSpotlight />} />
                   <Route path="jobs" element={<AdminJobs />} />
                   <Route path="top10" element={<AdminTop10 />} />
+                  <Route path="title-search" element={<TitleChecker />} />
+                  <Route path="title-checker" element={<TitleChecker />} />
                   <Route path="automation" element={<AdminAutomation />} />
                   <Route path="countries" element={<AdminCountries />} />
                   <Route path="critics" element={<AdminCritics />} />

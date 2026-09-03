@@ -68,11 +68,12 @@ export default function AdminLayout() {
     { path: '/admin/jobs', label: 'Careers', icon: 'solar:case-round-linear' },
     { path: '/admin/top10', label: 'Top 10', icon: 'solar:medal-star-linear' },
     { path: '/admin/new-releases', label: 'New to Stream', icon: 'solar:tv-linear' },
+    { path: '/admin/title-checker', label: 'Title Search', icon: 'solar:magnifer-zoom-in-bold' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
     { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear' },
   ];
 
-  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/plays'];
+  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/plays', '/admin/title-checker'];
   
   // Security guard for manual URL entry by admin_limited
   const isPathAllowed = (path) => {
