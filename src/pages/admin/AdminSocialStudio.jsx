@@ -270,6 +270,11 @@ export default function AdminSocialStudio() {
   const [seedingCalendar, setSeedingCalendar] = useState(false);
   const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
   const [videoPlan, setVideoPlan] = useState({ days: 7, startDate: new Date().toISOString().slice(0, 10), videoStart: '18:00', videoEnd: '20:00', clipLength: 30 });
+  const [videoRows, setVideoRows] = useState([
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatio: '1:1', filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatio: '9:16', filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
+  ]);
+  const [videoFilmOptions, setVideoFilmOptions] = useState([]);
   const [clipperStatus, setClipperStatus] = useState('checking');
   const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
   const [postsPerDay, setPostsPerDay] = useState(1);
@@ -506,6 +511,15 @@ export default function AdminSocialStudio() {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
+  useEffect(() => {
+    if (activeTab !== 'calendar') return undefined;
+    let cancelled = false;
+    supabase.from('films').select('id,title,release_date,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(50).then(({ data }) => {
+      if (!cancelled) setVideoFilmOptions(data || []);
+    });
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
   const launchDesktopClipper = () => {
     const link = document.createElement('a');
     link.href = 'muvidb-clipper://start';
@@ -590,6 +604,83 @@ export default function AdminSocialStudio() {
       setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Daily video autopilot failed.' }));
       toast.error(err.message || 'Daily video autopilot failed.');
     }
+  };
+
+  const updateVideoRow = (id, patch) => setVideoRows(rows => rows.map(row => row.id === id ? { ...row, ...patch } : row));
+  const addVideoRow = () => setVideoRows(rows => [...rows, {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    date: videoPlan.startDate,
+    time: '20:00',
+    aspectRatio: '9:16',
+    filmId: videoFilmOptions[0]?.id || '',
+    mode: 'gemini',
+    start: 0,
+    end: videoPlan.clipLength,
+    caption: '',
+  }]);
+  const buildVideoPlanRows = () => {
+    const baseDate = new Date(`${videoPlan.startDate}T12:00:00`);
+    const films = videoFilmOptions;
+    if (!films.length) return toast.error('No films with usable video sources are available yet.');
+    const rows = [];
+    for (let day = 0; day < videoPlan.days; day += 1) {
+      const date = new Date(baseDate); date.setDate(baseDate.getDate() + day);
+      const dateString = date.toISOString().slice(0, 10);
+      [
+        { time: videoPlan.videoStart, aspectRatio: '1:1' },
+        { time: videoPlan.videoEnd, aspectRatio: '9:16' },
+      ].forEach((slot, slotIndex) => rows.push({ id: `${Date.now()}-${day}-${slotIndex}`, date: dateString, time: slot.time, aspectRatio: slot.aspectRatio, filmId: films[(day * 2 + slotIndex) % films.length].id, mode: 'gemini', start: 0, end: videoPlan.clipLength, caption: '' }));
+    }
+    setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days. Review them, then prepare or schedule.`);
+  };
+  const removeVideoRow = id => setVideoRows(rows => rows.length > 1 ? rows.filter(row => row.id !== id) : rows);
+  const generateRowCaption = async row => {
+    const film = videoFilmOptions.find(item => item.id === row.filmId);
+    if (!film) return toast.error('Choose a film before generating a caption.');
+    updateVideoRow(row.id, { caption: 'Generating Gemini caption…' });
+    try {
+      const response = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: film.title, duration: Math.max(1, Number(row.end) || videoPlan.clipLength), transcript: '' } }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Gemini caption generation failed');
+      updateVideoRow(row.id, { caption: data.caption || '', start: Number(data.startTime) || 0, end: Number(data.endTime) || videoPlan.clipLength });
+    } catch (err) { updateVideoRow(row.id, { caption: '' }); toast.error(err.message); }
+  };
+  const prepareCustomVideoPlan = async (action = 'draft') => {
+    const validRows = videoRows.filter(row => row.filmId && row.date && row.time);
+    if (!validRows.length) return toast.error('Add at least one video row with a film, date, and time.');
+    setVideoAutopilot({ running: true, message: `Preparing ${validRows.length} planned video${validRows.length === 1 ? '' : 's'}…`, jobs: [] });
+    try {
+      let created = 0;
+      for (const row of validRows) {
+        const film = videoFilmOptions.find(item => item.id === row.filmId);
+        if (!film) continue;
+        const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
+        let start = Number(row.start) || 0; let end = Math.max(start + 1, Number(row.end) || start + videoPlan.clipLength);
+        let caption = row.caption || '';
+        if (row.mode === 'gemini' || !caption) {
+          const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: film.title, duration: end, transcript: '' } }) });
+          const recommendation = await recommendationResponse.json().catch(() => ({}));
+          if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
+          start = Number(recommendation.startTime) || start; end = Number(recommendation.endTime) || end; caption = caption || recommendation.caption || '';
+        }
+        const batchResponse = await fetch('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips: [{ url: sourceUrl, start_time: start, end_time: end, aspect_ratio: row.aspectRatio, fit_mode: 'cover', title: film.title }] }) });
+        const batch = await batchResponse.json().catch(() => ({}));
+        if (!batchResponse.ok) throw new Error(batch.detail || 'The local clipper could not queue this video.');
+        const job = batch.jobs?.[0]; if (!job) throw new Error('The local clipper returned no job.');
+        let status;
+        for (;;) { await new Promise(resolve => setTimeout(resolve, 1200)); const response = await fetch(job.status_url); status = await response.json().catch(() => ({})); if (!response.ok) throw new Error(status.detail || 'Video render failed.'); if (status.success) break; setVideoAutopilot(prev => ({ ...prev, message: `Rendering ${film.title}… ${status.progress || 0}%` })); }
+        const blob = await (await fetch(status.download_url)).blob();
+        const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: blob.size }) });
+        const session = await sessionResponse.json().catch(() => ({})); if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
+        const uploadResponse = await fetch(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob }); if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
+        const draftResponse = await fetch('/api/social?task=create_editor_video_draft', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `${film.title} — ${row.aspectRatio} clip`, publicUrl: session.publicUrl, storagePath: session.key, mimeType: 'video/mp4', fileSizeBytes: blob.size, width: row.aspectRatio === '9:16' ? 540 : 720, height: row.aspectRatio === '9:16' ? 960 : 720, captions: { instagram: caption, facebook: caption, threads: caption, tiktok: caption }, platforms: ['instagram', 'facebook', 'threads', 'tiktok'] }) });
+        const draft = await draftResponse.json().catch(() => ({})); if (!draftResponse.ok) throw new Error(draft.error || 'Could not create the video draft.');
+        const contentItemId = draft.id || draft.contentItemId || draft.content_item_id || draft.item?.id;
+        if (contentItemId && (action === 'schedule' || action === 'publish')) { const task = action === 'publish' ? 'publish_editor_video_now' : 'schedule'; const response = await fetch(`/api/social?task=${task}`, { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ contentItemId, scheduledFor: new Date(`${row.date}T${row.time}`).toISOString() }) }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || `Could not ${action} video.`); }
+        created += 1;
+      }
+      setVideoAutopilot({ running: false, message: `Prepared ${created} custom video draft${created === 1 ? '' : 's'}.`, jobs: [] }); await fetchDrafts(true); toast.success(`${created} video${created === 1 ? '' : 's'} added to drafts.`);
+    } catch (err) { setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.' })); toast.error(err.message || 'Custom video plan failed.'); }
   };
 
   const fetchSummary = async (silent = false) => {
@@ -1117,8 +1208,35 @@ export default function AdminSocialStudio() {
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">9:16 time<input type="time" value={videoPlan.videoEnd} onChange={e => setVideoPlan(p => ({ ...p, videoEnd: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary" /></label>
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">Clip length<select value={videoPlan.clipLength} onChange={e => setVideoPlan(p => ({ ...p, clipLength: Number(e.target.value) }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary"><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></label>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" onClick={runDailyVideoAutopilot} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg bg-violet-500 px-3.5 py-2 text-xs font-black text-white hover:bg-violet-400 disabled:opacity-50">{videoAutopilot.running ? 'Preparing plan…' : `Prepare ${videoPlan.days}-day videos now`}</button><span className="text-[11px] text-text-muted">Set the dates/times, then use this button to render sequentially into drafts.</span></div>
+            <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" onClick={buildVideoPlanRows} disabled={videoAutopilot.running} className="rounded-lg bg-violet-500 px-3.5 py-2 text-xs font-black text-white hover:bg-violet-400 disabled:opacity-50">Build {videoPlan.days}-day video plan</button><span className="text-[11px] text-text-muted">This creates two editable rows per day. Review or adjust them below before rendering.</span></div>
           </div>
+          <section className="rounded-xl border border-border bg-surface p-4 shadow-sm" aria-labelledby="custom-video-plan-title">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h3 id="custom-video-plan-title" className="text-sm font-black uppercase tracking-widest text-text-primary">Custom video plan</h3><p className="mt-1 text-xs text-text-muted">Add as many clips as you need. Gemini can choose the moment and caption, or you can enter both manually.</p></div>
+              <button type="button" onClick={addVideoRow} className="rounded-lg border border-brand/50 bg-brand/10 px-3 py-2 text-xs font-black text-brand hover:bg-brand/20">＋ Add video</button>
+            </div>
+            <div className="mt-4 space-y-3">
+              {videoRows.map((row, index) => (
+                <div key={row.id} className="rounded-lg border border-border bg-surface-2 p-3">
+                  <div className="mb-3 flex items-center justify-between"><span className="text-xs font-black uppercase tracking-wider text-text-muted">Video {index + 1}</span><button type="button" onClick={() => removeVideoRow(row.id)} className="text-xs font-bold text-red-300 hover:text-red-200" disabled={videoRows.length === 1}>Remove</button></div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                    <label className="text-[10px] font-black uppercase text-text-muted">Date<input aria-label={`Video ${index + 1} date`} type="date" value={row.date} onChange={e => updateVideoRow(row.id, { date: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary" /></label>
+                    <label className="text-[10px] font-black uppercase text-text-muted">Time<input aria-label={`Video ${index + 1} time`} type="time" value={row.time} onChange={e => updateVideoRow(row.id, { time: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary" /></label>
+                    <label className="text-[10px] font-black uppercase text-text-muted sm:col-span-2">Film<select aria-label={`Video ${index + 1} film`} value={row.filmId} onChange={e => updateVideoRow(row.id, { filmId: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option value="">Choose a film…</option>{videoFilmOptions.map(film => <option key={film.id} value={film.id}>{film.title}{film.release_date ? ` (${new Date(film.release_date).getFullYear()})` : ''}</option>)}</select></label>
+                    <label className="text-[10px] font-black uppercase text-text-muted">Format<select aria-label={`Video ${index + 1} format`} value={row.aspectRatio} onChange={e => updateVideoRow(row.id, { aspectRatio: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option>1:1</option><option>9:16</option><option>4:5</option><option>16:9</option></select></label>
+                    <label className="text-[10px] font-black uppercase text-text-muted">Timing<select aria-label={`Video ${index + 1} timing mode`} value={row.mode} onChange={e => updateVideoRow(row.id, { mode: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option value="gemini">Gemini chooses</option><option value="manual">Manual</option></select></label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-end gap-2">
+                    <label className="text-[10px] font-black uppercase text-text-muted">Start (sec)<input type="number" min="0" value={row.start} onChange={e => updateVideoRow(row.id, { start: Number(e.target.value) })} disabled={row.mode === 'gemini'} className="mt-1 h-9 w-24 rounded-lg border border-border bg-surface px-2 text-xs text-text-primary disabled:opacity-50" /></label>
+                    <label className="text-[10px] font-black uppercase text-text-muted">End (sec)<input type="number" min="1" value={row.end} onChange={e => updateVideoRow(row.id, { end: Number(e.target.value) })} disabled={row.mode === 'gemini'} className="mt-1 h-9 w-24 rounded-lg border border-border bg-surface px-2 text-xs text-text-primary disabled:opacity-50" /></label>
+                    <button type="button" onClick={() => generateRowCaption(row)} className="h-9 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 text-xs font-bold text-violet-200 hover:bg-violet-500/20">✨ Generate with Gemini</button>
+                  </div>
+                  <label className="mt-3 block text-[10px] font-black uppercase text-text-muted">Caption<textarea value={row.caption} onChange={e => updateVideoRow(row.id, { caption: e.target.value })} rows={2} placeholder="Write a caption or generate one with Gemini…" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-primary" /></label>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => prepareCustomVideoPlan('draft')} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg bg-brand px-4 py-2 text-xs font-black text-white disabled:opacity-50">{videoAutopilot.running ? 'Preparing…' : 'Prepare to drafts'}</button><button type="button" onClick={() => prepareCustomVideoPlan('schedule')} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-xs font-black text-amber-200 disabled:opacity-50">Schedule all</button><button type="button" onClick={() => prepareCustomVideoPlan('publish')} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg border border-green-400/50 bg-green-500/10 px-4 py-2 text-xs font-black text-green-200 disabled:opacity-50">Post all now</button></div>
+          </section>
           <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 lg:flex-row lg:items-center lg:justify-between shadow-sm">
             <div>
               <div className="flex items-center gap-2">
