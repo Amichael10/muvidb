@@ -83,6 +83,17 @@ export default function SocialVideoClipModal({
     }
   };
 
+  const stopDesktopClipper = () => {
+    try { window.location.href = 'muvidb-clipper://stop'; toast.success('Stopping the desktop clipper…'); }
+    catch { toast.error('Could not stop the desktop clipper. Close its terminal window.'); }
+  };
+
+  const copyGeminiCaption = async () => {
+    if (!clipRecommendation?.caption) return;
+    await navigator.clipboard?.writeText(clipRecommendation.caption);
+    toast.success('Gemini caption copied');
+  };
+
   const recommendBestClip = async () => {
     if (!videoUrl && !videoInput) return toast.error('Fetch the video first so Gemini can analyze it.');
     setRecommendingClip(true);
@@ -816,7 +827,7 @@ export default function SocialVideoClipModal({
               <p className="mt-0.5 text-[11px] leading-5 text-emerald-100/70">
                 The clipper runs on this computer so YouTube cookies and FFmpeg stay local. Rendered files go directly to R2/temporary Drive storage.
               </p>
-              <button type="button" onClick={startDesktopClipper} className="mt-2 rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-100 hover:bg-emerald-300/20">Start desktop clipper</button>
+              <div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={startDesktopClipper} disabled={clipperStatus === 'running'} className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50">Start desktop clipper</button><button type="button" onClick={stopDesktopClipper} disabled={clipperStatus !== 'running'} className="rounded-lg border border-red-300/30 bg-red-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-red-100 hover:bg-red-300/20 disabled:opacity-50">Stop clipper</button></div>
             </div>
           </div>
 
@@ -878,7 +889,7 @@ export default function SocialVideoClipModal({
                   </button>
                 </div>
               </div>
-              {clipRecommendation?.reason && <div className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-[11px] text-violet-100"><strong>Gemini recommendation:</strong> {clipRecommendation.reason} {clipRecommendation.caption && <span className="block mt-1 text-violet-200">Suggested caption: “{clipRecommendation.caption}”</span>}</div>}
+              {clipRecommendation?.reason && <div className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-[11px] text-violet-100"><strong>Gemini recommendation:</strong> {clipRecommendation.reason} {clipRecommendation.caption && <span className="mt-1 flex items-start justify-between gap-2 text-violet-200"><span>Suggested caption: “{clipRecommendation.caption}”</span><button type="button" onClick={copyGeminiCaption} className="shrink-0 rounded border border-violet-300/40 px-2 py-1 text-[10px] font-black uppercase hover:bg-violet-300/20">Copy</button></span>}</div>}
 
               {isPreviewingClip && (
                 <div className="flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/30 px-3.5 py-2 text-xs text-amber-300 animate-pulse">

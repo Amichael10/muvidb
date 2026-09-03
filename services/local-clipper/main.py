@@ -196,12 +196,15 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
         }
 
         direct_stream_url = None
-        with yt_dlp.YoutubeDL(opts) as downloader:
-            try:
-                info = downloader.extract_info(url, download=False)
-                direct_stream_url = info.get("url")
-            except Exception as e:
-                print(f"[Clipper] Direct stream extract fallback: {e}")
+        if "youtube.com" not in url and "youtu.be" not in url:
+            direct_stream_url = url
+        else:
+            with yt_dlp.YoutubeDL(opts) as downloader:
+                try:
+                    info = downloader.extract_info(url, download=False)
+                    direct_stream_url = info.get("url")
+                except Exception as e:
+                    print(f"[Clipper] Direct stream extract fallback: {e}")
 
         CLIP_JOBS[token].update({"message": "Slicing & rendering optimized clip with FFmpeg…", "progress": 40})
         
@@ -294,8 +297,8 @@ def create_clip(payload: ClipRequest):
     if duration < 1 or duration > 600:
         raise HTTPException(400, "Choose a clip between 1 second and 10 minutes.")
     url = str(payload.url)
-    if "youtube.com" not in url and "youtu.be" not in url:
-        raise HTTPException(400, "The desktop clipper currently accepts YouTube links.")
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(400, "Use a YouTube link or a direct HTTP(S) video URL.")
     token = secrets.token_urlsafe(18)
     safe_title = re.sub(r"[^a-zA-Z0-9_-]+", "_", payload.title).strip("_")[:60] or "clip"
     final_name = f"{safe_title}_{int(start)}-{int(end)}_{payload.aspect_ratio.replace(':', 'x')}_{token}.mp4"
