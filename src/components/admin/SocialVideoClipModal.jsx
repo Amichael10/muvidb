@@ -76,7 +76,12 @@ export default function SocialVideoClipModal({
 
   const startDesktopClipper = () => {
     try {
-      window.open('muvidb-clipper://start', '_blank', 'noopener,noreferrer');
+      const launcher = document.createElement('a');
+      launcher.href = 'muvidb-clipper://start';
+      launcher.style.display = 'none';
+      document.body.appendChild(launcher);
+      launcher.click();
+      launcher.remove();
       toast.success('Starting the desktop clipper… a separate PowerShell window should open.');
       window.setTimeout(async () => {
         try {
@@ -93,7 +98,15 @@ export default function SocialVideoClipModal({
   };
 
   const stopDesktopClipper = () => {
-    try { window.location.href = 'muvidb-clipper://stop'; toast.success('Stopping the desktop clipper…'); }
+    try {
+      const launcher = document.createElement('a');
+      launcher.href = 'muvidb-clipper://stop';
+      launcher.style.display = 'none';
+      document.body.appendChild(launcher);
+      launcher.click();
+      launcher.remove();
+      toast.success('Stopping the desktop clipper…');
+    }
     catch { toast.error('Could not stop the desktop clipper. Close its terminal window.'); }
   };
 
@@ -836,6 +849,7 @@ export default function SocialVideoClipModal({
               <p className="mt-0.5 text-[11px] leading-5 text-emerald-100/70">
                 The clipper runs on this computer so YouTube cookies and FFmpeg stay local. Rendered files go directly to R2/temporary Drive storage.
               </p>
+              <p className="mt-1 text-[10px] leading-4 text-emerald-100/60">First time here? Double-click <span className="font-mono">scripts\install-local-clipper-launcher.cmd</span> in your MuviDB folder once. No terminal command needs to be copied.</p>
               <div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={startDesktopClipper} disabled={clipperStatus === 'running'} className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-emerald-100 hover:bg-emerald-300/20 disabled:opacity-50">Start desktop clipper</button><button type="button" onClick={stopDesktopClipper} disabled={clipperStatus !== 'running'} className="rounded-lg border border-red-300/30 bg-red-300/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-red-100 hover:bg-red-300/20 disabled:opacity-50">Stop clipper</button></div>
             </div>
           </div>
