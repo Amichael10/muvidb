@@ -209,9 +209,9 @@ export async function createEditorVideoDraft(input: {
   const title = String(input.title || '').trim().slice(0, 180) || 'MuviDB Studio video';
   const url = String(input.publicUrl || '').trim();
   const bucket = getAssetBucket();
-  if (!url.startsWith('https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/')) {
-    throw httpError(400, 'Editor video must be stored in MuviDB media storage');
-  }
+  const isSupabaseAsset = url.startsWith('https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/');
+  const isR2Asset = /^https:\/\//i.test(url) && Boolean(input.storagePath);
+  if (!isSupabaseAsset && !isR2Asset) throw httpError(400, 'Editor video must be stored in MuviDB media storage');
   const platforms = [...new Set(input.platforms)].filter((p): p is SocialPlatform => ['instagram', 'facebook', 'threads', 'tiktok'].includes(p));
   if (!platforms.length) throw httpError(400, 'Choose at least one social platform');
 
@@ -224,7 +224,7 @@ export async function createEditorVideoDraft(input: {
   if (itemError) throw itemError;
 
   const { data: asset, error: assetError } = await supabase.from('social_assets').insert({
-    content_item_id: contentItem.id, format: 'video_vertical_9_16', storage_bucket: bucket,
+    content_item_id: contentItem.id, format: input.width >= input.height ? 'video_square_1_1' : 'video_vertical_9_16', storage_bucket: isR2Asset ? 'external' : bucket,
     storage_path: input.storagePath, public_url: url, mime_type: input.mimeType || 'video/webm',
     width: Math.max(1, Math.round(input.width || 1080)), height: Math.max(1, Math.round(input.height || 1920)),
     file_size_bytes: Math.max(0, Math.round(input.fileSizeBytes || 0)), render_metadata: { source: 'opencut' },
