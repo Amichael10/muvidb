@@ -77,6 +77,11 @@ class MetadataRequest(BaseModel):
     url: HttpUrl
 
 
+class BatchClipRequest(BaseModel):
+    """Queue a set of aspect-ratio renders for the daily video autopilot."""
+    clips: list[ClipRequest] = Field(default_factory=list, max_length=12)
+
+
 def cleanup_expired_files() -> None:
     cutoff = time.time() - FILE_TTL_SECONDS
     for path in OUTPUT_DIR.glob("*.mp4"):
@@ -306,6 +311,30 @@ def create_clip(payload: ClipRequest):
     CLIP_JOBS[token] = {"status": "processing", "message": "Starting the clipper…", "progress": 5}
     CLIP_EXECUTOR.submit(process_clip, payload, token, final_name, final_path)
     return {"success": False, "status": "processing", "job_id": token, "status_url": f"http://127.0.0.1:{PORT}/clip/{token}"}
+
+
+@app.post("/batch", status_code=202)
+def create_batch(payload: BatchClipRequest):
+    """Queue multiple local renders without blocking the browser on each one."""
+    require_dependencies()
+    if not payload.clips:
+        raise HTTPException(400, "At least one clip is required")
+    jobs = []
+    for clip in payload.clips:
+        url = str(clip.url)
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise HTTPException(400, "Each clip must use an HTTP(S) URL")
+        duration = float(clip.end_time) - float(clip.start_time)
+        if duration < 1 or duration > 600:
+            raise HTTPException(400, "Each clip must be between 1 second and 10 minutes")
+        token = secrets.token_urlsafe(18)
+        safe_title = re.sub(r"[^a-zA-Z0-9_-]+", "_", clip.title).strip("_")[:60] or "clip"
+        final_name = f"{safe_title}_{int(clip.start_time)}-{int(clip.end_time)}_{clip.aspect_ratio.replace(':', 'x')}_{token}.mp4"
+        final_path = OUTPUT_DIR / final_name
+        CLIP_JOBS[token] = {"status": "processing", "message": "Queued by daily autopilot…", "progress": 5}
+        CLIP_EXECUTOR.submit(process_clip, clip, token, final_name, final_path)
+        jobs.append({"job_id": token, "status_url": f"http://127.0.0.1:{PORT}/clip/{token}"})
+    return {"success": True, "status": "processing", "jobs": jobs}
 
 
 @app.get("/clip/{token}")
