@@ -1,6 +1,9 @@
 export interface Env {
   ENGINE_ENV: string;
   PUBLIC_APP_URL: string;
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  ENGINE_API_TOKEN?: string;
 }
 
 const destinations = [
@@ -20,9 +23,41 @@ const html = (env: Env) => `<!doctype html>
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === '/health') return Response.json({ ok: true, service: 'content-engine', environment: env.ENGINE_ENV });
-    if (url.pathname === '/api/destinations') return Response.json({ destinations });
+    const headers = { 'access-control-allow-origin': env.PUBLIC_APP_URL || '*', 'access-control-allow-methods': 'GET,OPTIONS', 'access-control-allow-headers': 'authorization,content-type' };
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+    if (url.pathname === '/health') return Response.json({ ok: true, service: 'content-engine', environment: env.ENGINE_ENV, supabaseConfigured: Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) }, { headers });
+    if (url.pathname === '/api/destinations') {
+      const live = await supabaseQuery(env, 'content_destinations?select=id,slug,name,description,editorial_profile,enabled&enabled=eq.true&order=name.asc');
+      return Response.json({ destinations: live.ok ? live.data : destinations, source: live.ok ? 'supabase' : 'fallback' }, { headers });
+    }
+    if (url.pathname === '/api/content') {
+      if (!isAuthorized(request, env)) return Response.json({ error: 'Unauthorized' }, { status: 401, headers });
+      const params = new URLSearchParams({ select: 'id,title,status,source,scheduled_at,destination_id,created_at', order: 'created_at.desc', limit: String(Math.min(Number(url.searchParams.get('limit') || 50), 100)) });
+      const destination = url.searchParams.get('destination');
+      const status = url.searchParams.get('status');
+      if (destination) params.set('destination_id', `eq.${destination}`);
+      if (status) params.set('status', `eq.${status}`);
+      const live = await supabaseQuery(env, `social_content_items?${params}`);
+      if (!live.ok) return Response.json({ error: live.error, items: [] }, { status: 503, headers });
+      return Response.json({ items: live.data }, { headers });
+    }
     if (url.pathname === '/') return new Response(html(env), { headers: { 'content-type': 'text/html; charset=UTF-8' } });
     return new Response('Not found', { status: 404 });
   },
 };
+
+function isAuthorized(request: Request, env: Env) {
+  const expected = env.ENGINE_API_TOKEN;
+  return Boolean(expected && request.headers.get('authorization') === `Bearer ${expected}`);
+}
+
+async function supabaseQuery(env: Env, path: string): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return { ok: false, error: 'Supabase secrets are not configured' };
+  try {
+    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+    const data = await response.json();
+    return response.ok ? { ok: true, data } : { ok: false, error: typeof data?.message === 'string' ? data.message : `Supabase returned ${response.status}` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Supabase request failed' };
+  }
+}
