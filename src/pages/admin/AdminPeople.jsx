@@ -636,22 +636,18 @@ export default function AdminPeople() {
 
       const executeSave = async (payload) => {
         if (editingPerson) {
-          const { data: updateData, error } = await supabase
+          const { error } = await supabase
             .from('people')
             .update(payload)
-            .eq('id', editingPerson.id)
-            .select();
+            .eq('id', editingPerson.id);
           if (error) throw error;
-          if (!updateData || updateData.length === 0) {
-            throw new Error('Save failed: No permissions or record not found.');
-          }
           await logAdminAction(user, 'update', 'person', editingPerson.id, payload.name);
           toast.success('Profile updated');
         } else {
           const { data, error } = await supabase
             .from('people')
             .insert([payload])
-            .select();
+            .select('id');
           if (error) throw error;
           const newPersonId = data?.[0]?.id;
           await logAdminAction(user, 'create', 'person', newPersonId, payload.name);
