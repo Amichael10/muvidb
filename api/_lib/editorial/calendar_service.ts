@@ -68,10 +68,21 @@ export const SINGLE_POST_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
   0: [{ seriesSlug: 'film_conversation', time: '14:00:00', format: 'text', notes: 'Sunday Cinema: Community Debate & Conversation' }],
 };
 
+// Three-lane daily plan: the existing graphic lane plus two video preparation lanes.
+export const VIDEO_LANE_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
+  0: [{ seriesSlug: 'film_conversation', time: '14:00:00', format: 'single_image', notes: 'Graphic lane' }, { seriesSlug: 'film_conversation', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'film_conversation', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+  1: [{ seriesSlug: 'where_to_watch', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'where_to_watch', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'where_to_watch', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+  2: [{ seriesSlug: 'critics_say', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'critics_say', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'critics_say', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+  3: [{ seriesSlug: 'where_to_watch', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'where_to_watch', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'where_to_watch', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+  4: [{ seriesSlug: 'behind_the_camera', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'behind_the_camera', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'behind_the_camera', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+  5: [{ seriesSlug: 'weekend_watchlist', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'weekend_watchlist', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'weekend_watchlist', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+  6: [{ seriesSlug: 'whats_on_stage', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'whats_on_stage', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'whats_on_stage', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+};
+
 export interface SeedCalendarOptions {
   daysAhead?: number;
   startDate?: string;
-  postsPerDay?: 1 | 2;
+  postsPerDay?: 1 | 2 | 3;
   clearExistingPlanned?: boolean;
 }
 
@@ -117,7 +128,7 @@ export async function seedRollingCalendar(options: SeedCalendarOptions | number 
     const dateStr = d.toISOString().split('T')[0];
     const dayOfWeek = d.getDay();
 
-    const scheduleMap = postsPerDay === 1 ? SINGLE_POST_SCHEDULE : WEEKDAY_SCHEDULE;
+    const scheduleMap = postsPerDay === 1 ? SINGLE_POST_SCHEDULE : postsPerDay === 3 ? VIDEO_LANE_SCHEDULE : WEEKDAY_SCHEDULE;
     const slotConfigs = scheduleMap[dayOfWeek] || [
       { seriesSlug: 'filmography', time: '11:00:00' },
     ];

@@ -269,6 +269,7 @@ export default function AdminSocialStudio() {
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [seedingCalendar, setSeedingCalendar] = useState(false);
   const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
+  const [clipperStatus, setClipperStatus] = useState('checking');
   const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
   const [postsPerDay, setPostsPerDay] = useState(1);
   const [shuffleOffset, setShuffleOffset] = useState(0);
@@ -491,6 +492,27 @@ export default function AdminSocialStudio() {
     } finally {
       setSeedingCalendar(false);
     }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkClipper = async () => {
+      try { const response = await fetch('http://127.0.0.1:4317/health'); if (!cancelled) setClipperStatus(response.ok ? 'running' : 'offline'); }
+      catch { if (!cancelled) setClipperStatus('offline'); }
+    };
+    checkClipper();
+    const timer = window.setInterval(checkClipper, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
+  const launchDesktopClipper = () => {
+    const link = document.createElement('a');
+    link.href = 'muvidb-clipper://start';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    toast.success('Launching the desktop clipper in a separate window…');
   };
 
   const runDailyVideoAutopilot = async () => {
@@ -926,6 +948,17 @@ export default function AdminSocialStudio() {
           </button>
 
           <button
+            type="button"
+            onClick={launchDesktopClipper}
+            disabled={clipperStatus === 'running'}
+            className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-black ${clipperStatus === 'running' ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300' : 'border-violet-400/50 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25'}`}
+            title="Start the local FFmpeg/YouTube clipper"
+          >
+            <Icon icon={clipperStatus === 'running' ? 'solar:check-circle-linear' : 'solar:laptop-minimalistic-linear'} width="14" />
+            {clipperStatus === 'running' ? 'Clipper Running' : 'Start Clipper'}
+          </button>
+
+          <button
             onClick={async () => {
               setPublishing(true);
               try {
@@ -1103,6 +1136,13 @@ export default function AdminSocialStudio() {
                   }`}
                 >
                   2 Posts/Day
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostsPerDay(3)}
+                  className={`rounded-md px-2.5 py-1 transition-all ${postsPerDay === 3 ? 'bg-brand text-white shadow-sm' : 'text-text-muted hover:text-text-primary'}`}
+                >
+                  3 Lanes/Day
                 </button>
               </div>
 
