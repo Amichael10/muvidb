@@ -121,9 +121,13 @@ def cookie_options() -> dict:
     if not cookie_file:
         # Convenient local fallback: keep an exported Netscape cookie file in
         # the project root. The file is ignored by Git and never uploaded.
-        candidate = Path.cwd() / "cookies.txt"
-        if candidate.is_file():
-            cookie_file = str(candidate)
+        candidates = [Path.cwd() / "cookies.txt", Path(__file__).resolve().parents[2] / "cookies.txt"]
+        for candidate in candidates:
+            if candidate.is_file() and candidate.stat().st_size > 0:
+                first_line = candidate.read_text(encoding="utf-8", errors="ignore").splitlines()[:1]
+                if first_line and ("Netscape" in first_line[0] or first_line[0].startswith("#")):
+                    cookie_file = str(candidate)
+                    break
     if cookie_file and Path(cookie_file).is_file():
         return {"cookiefile": cookie_file}
 

@@ -522,11 +522,18 @@ export default function AdminSocialStudio() {
       const { data: films, error } = await supabase.from('films')
         .select('id,title,trailer_youtube_id,trailer_external_url,youtube_watch_url,created_at')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
-        .order('created_at', { ascending: false }).limit(1);
+        .order('created_at', { ascending: false }).limit(25);
       if (error) throw error;
-      const film = films?.[0];
+      const isVideoSource = value => {
+        if (!value) return false;
+        try {
+          const parsed = new URL(value);
+          return /youtube\.com|youtu\.be|\.mp4(?:$|\?)|\.webm(?:$|\?)|\.mov(?:$|\?)/i.test(parsed.hostname + parsed.pathname + parsed.search);
+        } catch { return false; }
+      };
+      const film = (films || []).map(candidate => ({ ...candidate, sourceUrl: candidate.youtube_watch_url || (candidate.trailer_youtube_id ? `https://www.youtube.com/watch?v=${candidate.trailer_youtube_id}` : candidate.trailer_external_url) })).find(candidate => isVideoSource(candidate.sourceUrl));
       if (!film) throw new Error('No recently added film with a usable video source was found.');
-      const sourceUrl = film.youtube_watch_url || film.trailer_external_url || `https://www.youtube.com/watch?v=${film.trailer_youtube_id}`;
+      const sourceUrl = film.sourceUrl;
       setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest moment from ${film.title}…` }));
       const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: film.title, duration: 60, transcript: '' } }) });
       const recommendation = await recommendationResponse.json().catch(() => ({}));
