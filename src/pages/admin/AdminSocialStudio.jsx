@@ -268,6 +268,7 @@ export default function AdminSocialStudio() {
   const [calendarSlots, setCalendarSlots] = useState([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [seedingCalendar, setSeedingCalendar] = useState(false);
+  const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
   const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
   const [postsPerDay, setPostsPerDay] = useState(1);
   const [shuffleOffset, setShuffleOffset] = useState(0);
@@ -489,6 +490,58 @@ export default function AdminSocialStudio() {
       toast.error(err.message || 'Failed to seed 30-day calendar');
     } finally {
       setSeedingCalendar(false);
+    }
+  };
+
+  const runDailyVideoAutopilot = async () => {
+    if (videoAutopilot.running) return;
+    setVideoAutopilot({ running: true, message: 'Selecting the newest eligible film…', jobs: [] });
+    try {
+      const { data: films, error } = await supabase.from('films')
+        .select('id,title,trailer_youtube_id,trailer_external_url,youtube_watch_url,created_at')
+        .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
+        .order('created_at', { ascending: false }).limit(1);
+      if (error) throw error;
+      const film = films?.[0];
+      if (!film) throw new Error('No recently added film with a usable video source was found.');
+      const sourceUrl = film.youtube_watch_url || film.trailer_external_url || `https://www.youtube.com/watch?v=${film.trailer_youtube_id}`;
+      setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest moment from ${film.title}…` }));
+      const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: film.title, duration: 60, transcript: '' } }) });
+      const recommendation = await recommendationResponse.json().catch(() => ({}));
+      if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
+      const clips = ['1:1', '9:16'].map(aspect_ratio => ({ url: sourceUrl, start_time: Number(recommendation.startTime) || 0, end_time: Number(recommendation.endTime) || 30, aspect_ratio, fit_mode: 'cover', title: film.title }));
+      const batchResponse = await fetch('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips }) });
+      const batch = await batchResponse.json().catch(() => ({}));
+      if (!batchResponse.ok) throw new Error(batch.detail || 'The local clipper could not queue the video batch.');
+      setVideoAutopilot(prev => ({ ...prev, message: 'Rendering 1:1 and 9:16 videos locally…', jobs: batch.jobs || [] }));
+      const completed = [];
+      for (const job of batch.jobs || []) {
+        let status;
+        for (;;) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          const response = await fetch(job.status_url);
+          status = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(status.detail || 'A local video render failed.');
+          if (status.success) break;
+          setVideoAutopilot(prev => ({ ...prev, message: `Rendering ${status.result?.aspect_ratio || 'video'}… ${status.progress || 0}%` }));
+        }
+        const blob = await (await fetch(status.download_url)).blob();
+        const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: blob.size }) });
+        const session = await sessionResponse.json().catch(() => ({}));
+        if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
+        const uploadResponse = await fetch(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob });
+        if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
+        completed.push({ ...status, public_url: session.publicUrl, r2_key: session.key });
+      }
+      for (const asset of completed) {
+        await fetch('/api/social?task=create_editor_video_draft', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `${film.title} — ${asset.aspect_ratio} daily clip`, publicUrl: asset.public_url, storagePath: asset.r2_key, mimeType: 'video/mp4', fileSizeBytes: asset.size_bytes, width: asset.aspect_ratio === '9:16' ? 540 : 720, height: asset.aspect_ratio === '9:16' ? 960 : 720, captions: { instagram: recommendation.caption || '', facebook: recommendation.caption || '', threads: recommendation.caption || '', tiktok: recommendation.caption || '' }, platforms: ['instagram', 'facebook', 'threads', 'tiktok'] }) });
+      }
+      setVideoAutopilot({ running: false, message: `Prepared ${completed.length} video drafts for approval.`, jobs: completed });
+      await fetchDrafts(true);
+      toast.success(`Prepared ${completed.length} daily video drafts for approval.`);
+    } catch (err) {
+      setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Daily video autopilot failed.' }));
+      toast.error(err.message || 'Daily video autopilot failed.');
     }
   };
 
@@ -1079,8 +1132,24 @@ export default function AdminSocialStudio() {
                 />
                 {seedingCalendar ? 'Generating Plan…' : '⚡ Generate Schedule'}
               </button>
+              <button
+                type="button"
+                onClick={runDailyVideoAutopilot}
+                disabled={videoAutopilot.running}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-500/15 px-3.5 py-1.5 text-xs font-bold text-violet-200 transition-all hover:bg-violet-500/25 disabled:opacity-50"
+                title="Choose the newest film, render 1:1 and 9:16 locally, and create drafts for approval"
+              >
+                <Icon icon={videoAutopilot.running ? 'solar:spinner-linear' : 'solar:clapperboard-play-bold'} className={videoAutopilot.running ? 'animate-spin' : ''} width="14" />
+                {videoAutopilot.running ? 'Preparing Videos…' : 'Prepare Daily Videos'}
+              </button>
             </div>
           </div>
+
+          {videoAutopilot.message && (
+            <div className="mt-3 rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">
+              <strong>Daily video autopilot:</strong> {videoAutopilot.message}
+            </div>
+          )}
 
           {loadingCalendar ? (
             <div className="rounded-lg border border-border bg-surface p-12 text-center">
