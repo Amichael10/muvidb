@@ -21,6 +21,11 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 $env:PYTHONPATH = $serviceRoot
+$cookiePath = Join-Path $repoRoot 'cookies.txt'
+if (Test-Path $cookiePath) {
+  $env:YT_COOKIES_FILE = $cookiePath
+  Write-Host "Using local cookies file: $cookiePath" -ForegroundColor DarkGray
+}
 
 Write-Host ''
 Write-Host 'MuviDB desktop clipper is ready at http://127.0.0.1:4317' -ForegroundColor Green
