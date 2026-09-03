@@ -520,9 +520,9 @@ export default function AdminSocialStudio() {
     setVideoAutopilot({ running: true, message: 'Selecting the newest eligible film…', jobs: [] });
     try {
       const { data: films, error } = await supabase.from('films')
-        .select('id,title,trailer_youtube_id,trailer_external_url,youtube_watch_url,created_at')
+        .select('id,title,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
-        .order('created_at', { ascending: false }).limit(25);
+        .order('release_date', { ascending: false, nullsLast: true }).order('created_at', { ascending: false }).limit(50);
       if (error) throw error;
       const isVideoSource = value => {
         if (!value) return false;
@@ -531,7 +531,17 @@ export default function AdminSocialStudio() {
           return /youtube\.com|youtu\.be|\.mp4(?:$|\?)|\.webm(?:$|\?)|\.mov(?:$|\?)/i.test(parsed.hostname + parsed.pathname + parsed.search);
         } catch { return false; }
       };
-      const film = (films || []).map(candidate => ({ ...candidate, sourceUrl: candidate.youtube_watch_url || (candidate.trailer_youtube_id ? `https://www.youtube.com/watch?v=${candidate.trailer_youtube_id}` : candidate.trailer_external_url) })).find(candidate => isVideoSource(candidate.sourceUrl));
+      const releaseCutoff = new Date();
+      releaseCutoff.setMonth(releaseCutoff.getMonth() - 12);
+      const eligibleFilms = (films || []).map(candidate => ({ ...candidate, sourceUrl: candidate.youtube_watch_url || (candidate.trailer_youtube_id ? `https://www.youtube.com/watch?v=${candidate.trailer_youtube_id}` : candidate.trailer_external_url) }))
+        .filter(candidate => isVideoSource(candidate.sourceUrl))
+        .sort((a, b) => {
+          const aRelease = a.release_date ? new Date(a.release_date).getTime() : 0;
+          const bRelease = b.release_date ? new Date(b.release_date).getTime() : 0;
+          if (aRelease !== bRelease) return bRelease - aRelease;
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        });
+      const film = eligibleFilms.find(candidate => !candidate.release_date || new Date(candidate.release_date) >= releaseCutoff) || eligibleFilms[0];
       if (!film) throw new Error('No recently added film with a usable video source was found.');
       const sourceUrl = film.sourceUrl;
       setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest moment from ${film.title}…` }));
