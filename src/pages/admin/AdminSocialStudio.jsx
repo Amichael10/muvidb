@@ -275,6 +275,7 @@ export default function AdminSocialStudio() {
     { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatio: '9:16', filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
   ]);
   const [videoFilmOptions, setVideoFilmOptions] = useState([]);
+  const [videoFilmSearch, setVideoFilmSearch] = useState({});
   const [clipperStatus, setClipperStatus] = useState('checking');
   const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
   const [postsPerDay, setPostsPerDay] = useState(1);
@@ -514,7 +515,7 @@ export default function AdminSocialStudio() {
   useEffect(() => {
     if (activeTab !== 'calendar') return undefined;
     let cancelled = false;
-    supabase.from('films').select('id,title,release_date,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(50).then(({ data }) => {
+    supabase.from('films').select('id,title,release_date,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(250).then(({ data }) => {
       if (!cancelled) setVideoFilmOptions(data || []);
     });
     return () => { cancelled = true; };
@@ -1222,7 +1223,7 @@ export default function AdminSocialStudio() {
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                     <label className="text-[10px] font-black uppercase text-text-muted">Date<input aria-label={`Video ${index + 1} date`} type="date" value={row.date} onChange={e => updateVideoRow(row.id, { date: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary" /></label>
                     <label className="text-[10px] font-black uppercase text-text-muted">Time<input aria-label={`Video ${index + 1} time`} type="time" value={row.time} onChange={e => updateVideoRow(row.id, { time: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary" /></label>
-                    <label className="text-[10px] font-black uppercase text-text-muted sm:col-span-2">Film<select aria-label={`Video ${index + 1} film`} value={row.filmId} onChange={e => updateVideoRow(row.id, { filmId: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option value="">Choose a film…</option>{videoFilmOptions.map(film => <option key={film.id} value={film.id}>{film.title}{film.release_date ? ` (${new Date(film.release_date).getFullYear()})` : ''}</option>)}</select></label>
+                    <label className="text-[10px] font-black uppercase text-text-muted sm:col-span-2">Film<div className="relative mt-1"><input aria-label={`Search films for video ${index + 1}`} value={videoFilmSearch[row.id] || ''} onChange={e => setVideoFilmSearch(prev => ({ ...prev, [row.id]: e.target.value }))} placeholder="Search films…" className="h-9 w-full rounded-t-lg border border-border bg-surface px-2 text-xs text-text-primary" /><select aria-label={`Video ${index + 1} film`} value={row.filmId} onChange={e => updateVideoRow(row.id, { filmId: e.target.value })} className="h-9 w-full rounded-b-lg border border-t-0 border-border bg-surface px-2 text-xs text-text-primary"><option value="">Choose a film…</option>{videoFilmOptions.filter(film => (film.title || '').toLowerCase().includes((videoFilmSearch[row.id] || '').toLowerCase())).map(film => <option key={film.id} value={film.id}>{film.title}{film.release_date ? ` (${new Date(film.release_date).getFullYear()})` : ''}</option>)}</select></div></label>
                     <label className="text-[10px] font-black uppercase text-text-muted">Format<select aria-label={`Video ${index + 1} format`} value={row.aspectRatio} onChange={e => updateVideoRow(row.id, { aspectRatio: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option>1:1</option><option>9:16</option><option>4:5</option><option>16:9</option></select></label>
                     <label className="text-[10px] font-black uppercase text-text-muted">Timing<select aria-label={`Video ${index + 1} timing mode`} value={row.mode} onChange={e => updateVideoRow(row.id, { mode: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option value="gemini">Gemini chooses</option><option value="manual">Manual</option></select></label>
                   </div>
