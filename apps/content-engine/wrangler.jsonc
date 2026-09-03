@@ -5,16 +5,29 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "triggers": { "crons": ["0 */5 * * *"] },
+  "queues": {
+    "producers": [{ "binding": "PUBLISH_QUEUE", "queue": "muvidb-content-publish-prod" }],
+    "consumers": [{ "queue": "muvidb-content-publish-prod", "max_batch_size": 5, "max_batch_timeout": 30, "max_retries": 5 }]
+  },
+  "r2_buckets": [{ "binding": "MEDIA_BUCKET", "bucket_name": "muvidb", "remote": true }],
   "vars": {
     "PUBLIC_APP_URL": "https://muvidb.com",
-    "ENGINE_ENV": "production"
+    "ENGINE_ENV": "production",
+    "PUBLISHER_BASE_URL": "https://muvidb.com"
   },
   "env": {
     "staging": {
       "name": "muvidb-content-engine-staging",
+      "queues": {
+        "producers": [{ "binding": "PUBLISH_QUEUE", "queue": "muvidb-content-publish-staging" }],
+        "consumers": [{ "queue": "muvidb-content-publish-staging", "max_batch_size": 5, "max_batch_timeout": 30, "max_retries": 5 }]
+      },
+      "r2_buckets": [{ "binding": "MEDIA_BUCKET", "bucket_name": "muvidb", "remote": true }],
       "vars": {
         "PUBLIC_APP_URL": "https://staging.muvidb.com",
-        "ENGINE_ENV": "staging"
+        "ENGINE_ENV": "staging",
+        "PUBLISHER_BASE_URL": "https://staging.muvidb.com"
       }
     }
   }
