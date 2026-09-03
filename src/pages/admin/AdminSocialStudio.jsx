@@ -269,6 +269,7 @@ export default function AdminSocialStudio() {
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [seedingCalendar, setSeedingCalendar] = useState(false);
   const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
+  const [videoPlan, setVideoPlan] = useState({ days: 7, startDate: new Date().toISOString().slice(0, 10), videoStart: '18:00', videoEnd: '20:00', clipLength: 30 });
   const [clipperStatus, setClipperStatus] = useState('checking');
   const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
   const [postsPerDay, setPostsPerDay] = useState(1);
@@ -545,10 +546,17 @@ export default function AdminSocialStudio() {
       if (!film) throw new Error('No recently added film with a usable video source was found.');
       const sourceUrl = film.sourceUrl;
       setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest moment from ${film.title}…` }));
-      const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: film.title, duration: 60, transcript: '' } }) });
+      let sourceMetadata = { title: film.title, duration: 60, transcript: '' };
+      try {
+        const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }) });
+        if (metadataResponse.ok) sourceMetadata = { ...sourceMetadata, ...(await metadataResponse.json()) };
+      } catch { /* Gemini can still use the safe fallback duration. */ }
+      const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { ...sourceMetadata, duration: Math.max(1, Number(sourceMetadata.duration) || 60) } }) });
       const recommendation = await recommendationResponse.json().catch(() => ({}));
       if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
-      const clips = ['1:1', '9:16'].map(aspect_ratio => ({ url: sourceUrl, start_time: Number(recommendation.startTime) || 0, end_time: Number(recommendation.endTime) || 30, aspect_ratio, fit_mode: 'cover', title: film.title }));
+      const safeStart = Math.max(0, Number(recommendation.startTime) || 0);
+      const safeEnd = Math.min(Math.max(safeStart + 1, Number(recommendation.endTime) || safeStart + videoPlan.clipLength), Number(sourceMetadata.duration) || safeStart + videoPlan.clipLength);
+      const clips = ['1:1', '9:16'].map(aspect_ratio => ({ url: sourceUrl, start_time: safeStart, end_time: safeEnd, aspect_ratio, fit_mode: 'cover', title: film.title }));
       const batchResponse = await fetch('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips }) });
       const batch = await batchResponse.json().catch(() => ({}));
       if (!batchResponse.ok) throw new Error(batch.detail || 'The local clipper could not queue the video batch.');
@@ -1100,6 +1108,17 @@ export default function AdminSocialStudio() {
       {/* TAB 1: 30-Day Auto-Pilot Editorial Plan */}
       {activeTab === 'calendar' && (
         <div className="space-y-4">
+          <div className="rounded-xl border border-violet-400/30 bg-gradient-to-br from-violet-500/10 via-surface to-surface p-4 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-black uppercase tracking-widest text-text-primary">Video autopilot planner</h3><p className="mt-1 max-w-2xl text-xs text-text-muted">Choose a horizon and time window. Each day uses the newest release with a real video source, asks Gemini for the strongest segment, then saves 1:1 and 9:16 drafts for approval.</p></div><span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-black uppercase text-violet-200">Approval required</span></div>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">Days<select value={videoPlan.days} onChange={e => setVideoPlan(p => ({ ...p, days: Number(e.target.value) }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary"><option value="7">7 days</option><option value="30">30 days</option></select></label>
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">Start date<input type="date" value={videoPlan.startDate} onChange={e => setVideoPlan(p => ({ ...p, startDate: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary" /></label>
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">1:1 time<input type="time" value={videoPlan.videoStart} onChange={e => setVideoPlan(p => ({ ...p, videoStart: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary" /></label>
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">9:16 time<input type="time" value={videoPlan.videoEnd} onChange={e => setVideoPlan(p => ({ ...p, videoEnd: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary" /></label>
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">Clip length<select value={videoPlan.clipLength} onChange={e => setVideoPlan(p => ({ ...p, clipLength: Number(e.target.value) }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary"><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" onClick={runDailyVideoAutopilot} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg bg-violet-500 px-3.5 py-2 text-xs font-black text-white hover:bg-violet-400 disabled:opacity-50">{videoAutopilot.running ? 'Preparing plan…' : `Prepare ${videoPlan.days}-day videos now`}</button><span className="text-[11px] text-text-muted">Set the dates/times, then use this button to render sequentially into drafts.</span></div>
+          </div>
           <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 lg:flex-row lg:items-center lg:justify-between shadow-sm">
             <div>
               <div className="flex items-center gap-2">
