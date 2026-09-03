@@ -76,8 +76,17 @@ export default function SocialVideoClipModal({
 
   const startDesktopClipper = () => {
     try {
-      window.location.href = 'muvidb-clipper://start';
-      toast.success('Starting the desktop clipper… keep this tab open while Windows launches it.');
+      window.open('muvidb-clipper://start', '_blank', 'noopener,noreferrer');
+      toast.success('Starting the desktop clipper… a separate PowerShell window should open.');
+      window.setTimeout(async () => {
+        try {
+          const response = await fetch(`${LOCAL_CLIPPER_URL}/health`);
+          if (!response.ok) throw new Error();
+          setClipperStatus('running');
+        } catch {
+          toast.error('Windows did not launch the clipper. Run scripts\\start-local-social-clipper.ps1 once, then reinstall the launcher.');
+        }
+      }, 2500);
     } catch {
       toast.error('Install the MuviDB clipper launcher on this computer first.');
     }
