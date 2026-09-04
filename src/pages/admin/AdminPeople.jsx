@@ -157,6 +157,7 @@ export default function AdminPeople() {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
+    aliases: [],
     biography: '',
     photo_url: '',
     date_of_birth: '',
@@ -442,6 +443,7 @@ export default function AdminPeople() {
     setYoutubeChannelInput('');
     setFormData(draft || {
       name: '',
+      aliases: [],
       biography: '',
       photo_url: '',
       date_of_birth: '',
@@ -485,11 +487,13 @@ export default function AdminPeople() {
       .single();
     
     const p = fullPerson || person;
+    const { data: aliasRows } = await supabase.from('person_aliases').select('alias').eq('person_id', person.id).order('alias');
     const highlightsRaw = p.instagram_highlights || p.youtube_stats?.instagram_highlights || [];
     const highlightsArr = Array.isArray(highlightsRaw) ? highlightsRaw : [];
 
     const baseForm = {
       name: p.name || '',
+      aliases: (aliasRows || []).map(row => row.alias).filter(Boolean),
       biography: p.biography || p.bio || '',
       photo_url: p.photo_url || '',
       date_of_birth: p.date_of_birth || '',
@@ -626,6 +630,7 @@ export default function AdminPeople() {
             won: a.won === true,
           }))
       };
+      const aliasesToSave = [...new Set((formData.aliases || []).map(alias => String(alias).trim()).filter(Boolean))];
 
       if (formData.date_of_death) {
         dataToSave.date_of_death = formData.date_of_death;
@@ -643,6 +648,7 @@ export default function AdminPeople() {
           if (error) throw error;
           await logAdminAction(user, 'update', 'person', editingPerson.id, payload.name);
           toast.success('Profile updated');
+          return editingPerson.id;
         } else {
           const { data, error } = await supabase
             .from('people')
@@ -652,11 +658,19 @@ export default function AdminPeople() {
           const newPersonId = data?.[0]?.id;
           await logAdminAction(user, 'create', 'person', newPersonId, payload.name);
           toast.success('Person added');
+          return newPersonId;
         }
       };
 
       try {
-        await executeSave(dataToSave);
+        const savedPersonId = await executeSave(dataToSave);
+        if (savedPersonId) {
+          await supabase.from('person_aliases').delete().eq('person_id', savedPersonId);
+          if (aliasesToSave.length) {
+            const { error: aliasError } = await supabase.from('person_aliases').insert(aliasesToSave.map(alias => ({ person_id: savedPersonId, alias, source: 'admin' })));
+            if (aliasError) throw aliasError;
+          }
+        }
       } catch (saveErr) {
         // If date_of_death / is_deceased column does not exist in schema yet, retry without them
         if (saveErr?.message?.includes('date_of_death') || saveErr?.message?.includes('is_deceased')) {
@@ -1126,6 +1140,30 @@ export default function AdminPeople() {
                   className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none transition-colors" 
                   placeholder="e.g. Funke Akindele" 
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-text-primary mb-2">Aliases</label>
+                <p className="mb-2 text-[11px] text-text-muted">Add stage names and channel spellings used in credits. OCR and people search will match these automatically.</p>
+                <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-surface-2 p-2">
+                  {(formData.aliases || []).map((alias, index) => (
+                    <span key={`${alias}-${index}`} className="inline-flex items-center gap-1 rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">
+                      {alias}
+                      <button type="button" aria-label={`Remove alias ${alias}`} onClick={() => setFormData(prev => ({ ...prev, aliases: prev.aliases.filter((_, i) => i !== index) }))} className="text-brand/70 hover:text-red-300">×</button>
+                    </span>
+                  ))}
+                  <input
+                    aria-label="Add person alias"
+                    placeholder="Type an alias and press Enter"
+                    className="min-w-[220px] flex-1 bg-transparent px-2 py-1 text-xs text-text-primary outline-none"
+                    onKeyDown={e => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      const value = e.currentTarget.value.trim();
+                      if (value && !(formData.aliases || []).some(alias => alias.toLowerCase() === value.toLowerCase())) setFormData(prev => ({ ...prev, aliases: [...(prev.aliases || []), value] }));
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
