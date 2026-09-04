@@ -210,6 +210,23 @@ async function main() {
     if (data.length < 1000) break;
     pPage++;
   }
+  // Include canonical aliases (stage names and distributor spellings) in the
+  // same lookup used by title extraction. This prevents names such as
+  // "Atoribewu" from being missed when the linked person is stored as
+  // "Olaide Olajire Ajani".
+  let aliasPage = 0;
+  while (true) {
+    const { data: aliases, error: aliasError } = await supabase
+      .from('person_aliases')
+      .select('person_id, alias')
+      .range(aliasPage * 1000, (aliasPage + 1) * 1000 - 1);
+    if (aliasError || !aliases?.length) break;
+    for (const alias of aliases) {
+      if (alias.alias && alias.person_id) personMap.set(alias.alias.toLowerCase().trim(), alias.person_id);
+    }
+    if (aliases.length < 1000) break;
+    aliasPage++;
+  }
   console.log(`Loaded ${personMap.size} people.`);
 
   const knownLower = new Set([
@@ -243,6 +260,22 @@ async function main() {
 
   // ─── Process batch ────────────────────────────────────────────────────────
   async function processBatch(films: { id: string; title: string; slug: string | null }[]) {
+    const filmIds = films.map(film => film.id);
+    const { data: batchCredits } = await supabase
+      .from('credits')
+      .select('film_id, person_id, people(name)')
+      .in('film_id', filmIds);
+    const personIds = [...new Set((batchCredits || []).map((credit: any) => credit.person_id).filter(Boolean))];
+    const { data: batchAliases } = personIds.length
+      ? await supabase.from('person_aliases').select('person_id, alias').in('person_id', personIds)
+      : { data: [] };
+    const aliasesByPerson = new Map<string, string[]>();
+    for (const alias of batchAliases || []) aliasesByPerson.set(alias.person_id, [...(aliasesByPerson.get(alias.person_id) || []), alias.alias]);
+    const creditedByFilm = new Map<string, string[]>();
+    for (const credit of batchCredits || []) {
+      const names = [credit.people?.name, ...(aliasesByPerson.get(credit.person_id) || [])].filter(Boolean);
+      creditedByFilm.set(credit.film_id, [...(creditedByFilm.get(credit.film_id) || []), ...names]);
+    }
     for (const film of films) {
       totalFilms++;
       if (!film.title) continue;
@@ -252,6 +285,13 @@ async function main() {
 
       // Step 0: Decode HTML entities
       let t = decodeHtmlEntities(originalTitle);
+      const creditedNames = creditedByFilm.get(film.id) || [];
+      // Remove credited canonical names and aliases wherever distributors put
+      // them in the title (prefix, suffix, or inline), longest first.
+      for (const creditedName of [...new Set(creditedNames)].sort((a, b) => b.length - a.length)) {
+        const escaped = creditedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+        if (escaped.length >= 3) t = t.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), ' ');
+      }
 
       // Step 0c: Strip pipe content FIRST (before noise regexes which use $ anchor)
       const pipeIdx0 = t.indexOf('|');
@@ -466,15 +506,16 @@ async function main() {
     filmPage++;
   }
 
-  // ─── Pass 3: Non-youtube with obvious noise ────────────────────────────────
-  console.log('\n═══ PASS 3: Non-YouTube films with noise ═══\n');
+  // ─── Pass 3: Every remaining film ─────────────────────────────────────────
+  // The previous implementation filtered this pass to four noise phrases,
+  // leaving thousands of existing catalogue rows untouched.
+  console.log('\n═══ PASS 3: All remaining films ═══\n');
   filmPage = 0;
   while (true) {
     const { data: films, error } = await supabase
       .from('films')
       .select('id, title, slug')
-      .neq('source', 'youtube')
-      .or('title.ilike.%nollywood%,title.ilike.%latest movie%,title.ilike.%mr latin%,title.ilike.%full movie%')
+      .or('source.neq.youtube,source.is.null')
       .range(filmPage * PAGE_SIZE, (filmPage + 1) * PAGE_SIZE - 1)
       .order('created_at', { ascending: true });
 
