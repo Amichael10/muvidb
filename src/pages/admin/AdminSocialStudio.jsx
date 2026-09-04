@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
@@ -53,22 +53,22 @@ const emptySummary = {
 
 function Metric({ label, value, icon, tone = 'brand' }) {
   const tones = {
-    brand: 'bg-brand/10 text-brand',
-    green: 'bg-emerald-500/10 text-emerald-500',
-    amber: 'bg-amber-500/10 text-amber-500',
-    red: 'bg-red-500/10 text-red-500',
-    blue: 'bg-blue-500/10 text-blue-500',
+    brand: 'bg-brand/10 text-brand border-brand/20',
+    green: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    amber: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    red: 'bg-red-500/10 text-red-400 border-red-500/20',
+    blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   };
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-surface/90 p-4 shadow-sm backdrop-blur transition-all hover:border-white/20 hover:bg-surface">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-text-muted">{label}</p>
+          <p className="text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</p>
           <p className="mt-1 text-2xl font-black tracking-tight text-text-primary">{value}</p>
         </div>
-        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tones[tone] || tones.brand}`}>
-          <Icon icon={icon} width="18" />
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${tones[tone] || tones.brand}`}>
+          <Icon icon={icon} width="20" />
         </div>
       </div>
     </div>
@@ -77,15 +77,16 @@ function Metric({ label, value, icon, tone = 'brand' }) {
 
 function Pill({ children, tone = 'brand' }) {
   const tones = {
-    brand: 'border-brand/20 bg-brand/10 text-brand',
-    green: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
-    amber: 'border-amber-500/20 bg-amber-500/10 text-amber-500',
-    red: 'border-red-500/20 bg-red-500/10 text-red-500',
-    blue: 'border-blue-500/20 bg-blue-500/10 text-blue-500',
+    brand: 'border-brand/30 bg-brand/10 text-brand',
+    green: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+    amber: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+    red: 'border-red-500/30 bg-red-500/10 text-red-400',
+    blue: 'border-blue-500/30 bg-blue-500/10 text-blue-400',
+    neutral: 'border-white/10 bg-white/5 text-text-secondary',
   };
 
   return (
-    <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest ${tones[tone] || tones.brand}`}>
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${tones[tone] || tones.brand}`}>
       {children}
     </span>
   );
@@ -119,7 +120,7 @@ function SocialAssetThumbnail({ asset }) {
   const [loadFailed, setLoadFailed] = useState(false);
   if (!asset?.public_url || loadFailed) {
     return (
-      <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border border-dashed border-border bg-surface-2 text-text-muted">
+      <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/10 bg-surface-2 text-text-muted">
         <Icon icon="solar:gallery-linear" width="28" />
       </div>
     );
@@ -133,29 +134,29 @@ function SocialAssetThumbnail({ asset }) {
   );
 
   const formatLabel = {
-    video_vertical_9_16: 'Vertical Video',
+    video_vertical_9_16: '9:16 Video',
     custom_video: 'Video',
     custom_design: 'Custom',
-    square_1_1: 'Square 1:1',
-    portrait_4_5: 'Portrait 4:5',
+    square_1_1: '1:1 Square',
+    portrait_4_5: '4:5 Portrait',
     carousel: 'Carousel',
   }[asset.format] || (asset.format ? asset.format.replace(/_/g, ' ') : 'Media');
 
   if (ytId) {
     return (
-      <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
+      <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-surface-2 shadow-sm">
         <img
           src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           onError={() => setLoadFailed(true)}
         />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 group-hover:bg-black/20 transition-all">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-[10px] text-white shadow">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/20 transition-all">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-[10px] text-white shadow-lg">
             ▶
           </span>
         </div>
-        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+        <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/80 backdrop-blur px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
           YouTube
         </span>
       </div>
@@ -164,10 +165,10 @@ function SocialAssetThumbnail({ asset }) {
 
   if (isDirectVideo) {
     return (
-      <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
+      <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-surface-2 shadow-sm">
         <video
           src={publicUrl}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           muted
           playsInline
           preload="metadata"
@@ -175,12 +176,12 @@ function SocialAssetThumbnail({ asset }) {
           onMouseEnter={(e) => { try { e.target.play(); } catch {} }}
           onMouseLeave={(e) => { try { e.target.pause(); e.target.currentTime = 0; } catch {} }}
         />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 group-hover:opacity-0 transition-opacity">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-[10px] text-white shadow">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30 group-hover:opacity-0 transition-opacity">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 backdrop-blur text-[10px] text-white shadow-lg">
             ▶
           </span>
         </div>
-        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+        <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/80 backdrop-blur px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
           {formatLabel}
         </span>
       </div>
@@ -188,14 +189,14 @@ function SocialAssetThumbnail({ asset }) {
   }
 
   return (
-    <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2">
+    <div className="relative group h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-surface-2 shadow-sm">
       <img
         src={publicUrl}
         alt=""
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         onError={() => setLoadFailed(true)}
       />
-      <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+      <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/80 backdrop-blur px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
         {formatLabel}
       </span>
     </div>
@@ -227,7 +228,8 @@ function normalizeSocialContentItem(item) {
 
 export default function AdminSocialStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'intake' ? 'intake' : 'calendar'); // 'calendar' | 'drafts' | 'composer' | 'intake'
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'intake' ? 'intake' : 'calendar'); // 'calendar' | 'drafts' | 'composer' | 'intake' | 'channels' | 'video_plan'
+  const [calendarViewMode, setCalendarViewMode] = useState('month'); // 'month' | 'cards'
   const [selectedSlotForReview, setSelectedSlotForReview] = useState(null);
   const [summary, setSummary] = useState(emptySummary);
   const [loading, setLoading] = useState(true);
@@ -243,6 +245,7 @@ export default function AdminSocialStudio() {
   const [queueEditTitle, setQueueEditTitle] = useState('');
   const [queueEditCaptions, setQueueEditCaptions] = useState({});
   const [savingQueueEdit, setSavingQueueEdit] = useState(false);
+  const [queueFilterStatus, setQueueFilterStatus] = useState('all');
   const [connections, setConnections] = useState({
     loading: true,
     connecting: false,
@@ -280,6 +283,9 @@ export default function AdminSocialStudio() {
   const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
   const [postsPerDay, setPostsPerDay] = useState(1);
   const [shuffleOffset, setShuffleOffset] = useState(0);
+
+  // Month navigation for Month View
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState(() => new Date());
 
   // Selected slot state for creating draft directly from a calendar day
   const [selectedThemeId, setSelectedThemeId] = useState('actor_spotlight');
@@ -444,7 +450,7 @@ export default function AdminSocialStudio() {
           social_assets(id,public_url,format,width,height)
         `)
         .order('created_at', { ascending: false })
-        .limit(25);
+        .limit(30);
 
       if (error) throw error;
       setDrafts(asRelationArray(data).map(normalizeSocialContentItem));
@@ -513,7 +519,7 @@ export default function AdminSocialStudio() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== 'calendar') return undefined;
+    if (activeTab !== 'calendar' && activeTab !== 'video_plan') return undefined;
     let cancelled = false;
     supabase.from('films').select('id,title,release_date,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(250).then(({ data }) => {
       if (!cancelled) setVideoFilmOptions(data || []);
@@ -565,7 +571,7 @@ export default function AdminSocialStudio() {
       try {
         const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }) });
         if (metadataResponse.ok) sourceMetadata = { ...sourceMetadata, ...(await metadataResponse.json()) };
-      } catch { /* Gemini can still use the safe fallback duration. */ }
+      } catch { /* Gemini safe fallback */ }
       const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { ...sourceMetadata, duration: Math.max(1, Number(sourceMetadata.duration) || 60) } }) });
       const recommendation = await recommendationResponse.json().catch(() => ({}));
       if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
@@ -885,8 +891,6 @@ export default function AdminSocialStudio() {
     setReviewingId(contentItemId);
     const toastId = toast.loading('Initiating instant publish for selected channels...');
     try {
-      // Already-scheduled items are ready for the queue; calling schedule
-      // again makes the state machine reject the action with a 409.
       if (currentStatus !== 'scheduled') {
         const schedRes = await fetch('/api/social?task=schedule', {
           method: 'POST',
@@ -1026,338 +1030,590 @@ export default function AdminSocialStudio() {
   };
 
   const counts = summary.counts || emptySummary.counts;
+  const connectedPlatformsList = Object.entries(connections.platforms).filter(([, v]) => Boolean(v));
+  const connectedCount = connectedPlatformsList.length;
+
+  // Group calendar slots by scheduled_date for Month Grid view
+  const slotsByDate = useMemo(() => {
+    const map = {};
+    for (const slot of calendarSlots) {
+      const dateKey = slot.scheduled_date ? slot.scheduled_date.slice(0, 10) : '';
+      if (dateKey) {
+        if (!map[dateKey]) map[dateKey] = [];
+        map[dateKey].push(slot);
+      }
+    }
+    return map;
+  }, [calendarSlots]);
+
+  // Build calendar matrix for month view
+  const calendarMatrix = useMemo(() => {
+    const year = currentCalendarMonth.getFullYear();
+    const month = currentCalendarMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const startOffset = firstDay.getDay(); // 0 = Sun, 1 = Mon...
+    const daysInMonth = lastDay.getDate();
+
+    const days = [];
+    // Leading days
+    for (let i = 0; i < startOffset; i++) {
+      const prevDate = new Date(year, month, 1 - (startOffset - i));
+      days.push({
+        date: prevDate,
+        dateStr: prevDate.toISOString().slice(0, 10),
+        isCurrentMonth: false,
+      });
+    }
+    // Month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      const currDate = new Date(year, month, i);
+      days.push({
+        date: currDate,
+        dateStr: currDate.toISOString().slice(0, 10),
+        isCurrentMonth: true,
+      });
+    }
+    // Trailing days to fill 35 or 42 grid cells
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      const nextDate = new Date(year, month + 1, i);
+      days.push({
+        date: nextDate,
+        dateStr: nextDate.toISOString().slice(0, 10),
+        isCurrentMonth: false,
+      });
+    }
+    return days;
+  }, [currentCalendarMonth]);
+
+  const filteredDrafts = useMemo(() => {
+    if (queueFilterStatus === 'all') return drafts;
+    return drafts.filter(d => d.status === queueFilterStatus);
+  }, [drafts, queueFilterStatus]);
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-black tracking-tight text-text-primary">Social Studio</h1>
-            <Pill tone={summary.enabled ? 'green' : 'amber'}>
-              {summary.enabled ? 'Active' : 'Flag off'}
-            </Pill>
-            <Pill tone={Object.values(connections.platforms).some(Boolean) ? 'green' : 'amber'}>
-              {Object.values(connections.platforms).filter(Boolean).length}/4 Channels Connected
-            </Pill>
+      {/* ========================================================================= */}
+      {/* 1. TOP HEADER & CHANNELS STATUS BAR (SchedulePress / Pastis Inspired)   */}
+      {/* ========================================================================= */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-surface via-surface to-surface-2 p-6 shadow-xl backdrop-blur">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          {/* Left: Studio Branding & Status */}
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-white shadow-lg shadow-brand/25">
+                <Icon icon="solar:clapperboard-play-bold" width="20" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-white">Social Studio</h1>
+              
+              <Pill tone={summary.enabled ? 'green' : 'amber'}>
+                {summary.enabled ? 'Live Mode' : 'Draft Mock'}
+              </Pill>
+
+              {/* Connected Channels Pill */}
+              <button
+                type="button"
+                onClick={() => setChannelsModalOpen(true)}
+                className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs font-bold text-text-primary hover:border-brand/40 hover:bg-black/60 transition-all"
+                title="View and manage connected social profiles"
+              >
+                <div className="flex -space-x-1.5">
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${connections.platforms.threads ? 'bg-white text-black' : 'bg-surface-3 text-text-muted'}`}>
+                    <Icon icon="simple-icons:threads" width="9" />
+                  </span>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${connections.platforms.instagram ? 'bg-[#E1306C] text-white' : 'bg-surface-3 text-text-muted'}`}>
+                    <Icon icon="mdi:instagram" width="9" />
+                  </span>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${connections.platforms.facebook ? 'bg-[#1877F2] text-white' : 'bg-surface-3 text-text-muted'}`}>
+                    <Icon icon="mdi:facebook" width="9" />
+                  </span>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${connections.platforms.tiktok ? 'bg-[#25F4EE] text-black' : 'bg-surface-3 text-text-muted'}`}>
+                    <Icon icon="simple-icons:tiktok" width="9" />
+                  </span>
+                </div>
+                <span className="text-[11px] font-bold">
+                  {connectedCount}/4 Connected
+                </span>
+                <Icon icon="solar:alt-arrow-right-linear" className="text-text-muted group-hover:text-brand group-hover:translate-x-0.5 transition-all" width="12" />
+              </button>
+            </div>
+
+            <p className="text-xs text-text-muted max-w-2xl leading-relaxed">
+              Multi-channel Nollywood publishing studio: 30-day automated editorial planner, Figma/HTML canvas generator, AI copywriter, and one-click instant distribution to Instagram, Threads, Facebook & TikTok.
+            </p>
           </div>
-          <p className="mt-1 text-xs text-text-muted">
-            30-day editorial pipeline: Auto-assigned Nollywood stars & movies, Figma graphic generation, and 1-click multi-platform scheduling (Instagram, Facebook, Threads, TikTok).
-          </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setChannelsModalOpen(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-bold text-text-primary hover:border-brand hover:text-brand"
-          >
-            <Icon icon="solar:share-circle-linear" width="14" />
-            Channels ({Object.values(connections.platforms).filter(Boolean).length}/4)
-          </button>
+          {/* Right: Studio Primary Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={refreshAll}
+              disabled={loading}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-white/10 bg-surface-2 px-3.5 text-xs font-bold text-text-primary hover:border-white/20 hover:bg-surface-3 active:scale-95 transition-all shadow-sm"
+              title="Refresh all studio data"
+            >
+              <Icon icon="solar:refresh-linear" className={loading ? 'animate-spin text-brand' : ''} width="16" />
+              <span>Refresh</span>
+            </button>
 
-          <button
-            onClick={refreshAll}
-            disabled={loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-bold text-text-primary hover:bg-surface-2"
-          >
-            <Icon icon="solar:refresh-linear" width="14" /> Refresh
-          </button>
+            <button
+              type="button"
+              onClick={launchDesktopClipper}
+              disabled={clipperStatus === 'running'}
+              className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3.5 text-xs font-black transition-all shadow-sm ${
+                clipperStatus === 'running'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                  : 'border-violet-500/30 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25'
+              }`}
+              title="Start the local FFmpeg/YouTube desktop video clipper"
+            >
+              <Icon icon={clipperStatus === 'running' ? 'solar:check-circle-bold' : 'solar:laptop-minimalistic-bold'} width="16" />
+              <span>{clipperStatus === 'running' ? 'Clipper Ready' : 'Start Clipper'}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={launchDesktopClipper}
-            disabled={clipperStatus === 'running'}
-            className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-black ${clipperStatus === 'running' ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300' : 'border-violet-400/50 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25'}`}
-            title="Start the local FFmpeg/YouTube clipper"
-          >
-            <Icon icon={clipperStatus === 'running' ? 'solar:check-circle-linear' : 'solar:laptop-minimalistic-linear'} width="14" />
-            {clipperStatus === 'running' ? 'Clipper Running' : 'Start Clipper'}
-          </button>
+            <button
+              onClick={async () => {
+                setPublishing(true);
+                try {
+                  const res = await fetch('/api/social?task=publish_due', {
+                    method: 'POST',
+                    headers: await authHeaders(),
+                    body: JSON.stringify({ limit: 10 }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                  if (data.skipped) toast(`Publisher skipped: ${data.reason}`);
+                  else toast.success(`${summary.publishMode === 'live' ? 'Live' : 'Mock'} publisher processed ${data.processed || 0} job(s)`);
+                  refreshAll();
+                } catch (err) {
+                  toast.error(err.message || 'Publisher run failed');
+                } finally {
+                  setPublishing(false);
+                }
+              }}
+              disabled={publishing || !summary.enabled}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/15 px-4 text-xs font-bold text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-all shadow-sm"
+              title="Trigger publishing for all scheduled posts that are due now"
+            >
+              <Icon icon={publishing ? 'solar:spinner-linear' : 'solar:play-bold'} className={publishing ? 'animate-spin' : ''} width="16" />
+              <span>Publish Due</span>
+            </button>
 
-          <button
-            onClick={async () => {
-              setPublishing(true);
-              try {
-                const res = await fetch('/api/social?task=publish_due', {
-                  method: 'POST',
-                  headers: await authHeaders(),
-                  body: JSON.stringify({ limit: 10 }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                if (data.skipped) toast(`Publisher skipped: ${data.reason}`);
-                else toast.success(`${summary.publishMode === 'live' ? 'Live' : 'Mock'} publisher processed ${data.processed || 0} job(s)`);
-                refreshAll();
-              } catch (err) {
-                toast.error(err.message || 'Publisher run failed');
-              } finally {
-                setPublishing(false);
-              }
-            }}
-            disabled={publishing || !summary.enabled}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-xs font-bold text-white hover:bg-brand-hover"
-          >
-            <Icon icon={publishing ? 'solar:spinner-linear' : 'solar:play-linear'} className={publishing ? 'animate-spin' : ''} width="14" />
-            Publish Due Posts
-          </button>
+            {/* Main Create Post CTA */}
+            <button
+              type="button"
+              onClick={() => {
+                setEditingDraft(null);
+                setSlotContext(null);
+                setActiveTab('composer');
+              }}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-5 text-xs font-black text-white hover:bg-brand-hover active:scale-95 shadow-lg shadow-brand/25 transition-all"
+            >
+              <Icon icon="solar:add-circle-bold" width="18" />
+              <span>Create Post</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Overview Metrics */}
+      {/* ========================================================================= */}
+      {/* 2. OVERVIEW METRICS ROW                                                  */}
+      {/* ========================================================================= */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <Metric label="30-Day Plan Slots" value={calendarSlots.length} icon="solar:calendar-date-linear" tone="brand" />
-        <Metric label="Active Drafts" value={counts.draftItems} icon="solar:document-add-linear" tone="blue" />
-        <Metric label="Scheduled" value={counts.scheduledItems} icon="solar:calendar-mark-linear" tone="amber" />
-        <Metric label="Queued Jobs" value={counts.queuedJobs} icon="solar:server-square-linear" tone="green" />
-        <Metric label="Total Content" value={counts.contentItems} icon="solar:posts-carousel-vertical-linear" tone="blue" />
-        <Metric label="Failed Jobs" value={counts.failedJobs} icon="solar:danger-triangle-linear" tone={counts.failedJobs ? 'red' : 'green'} />
+        <Metric label="30-Day Plan Slots" value={calendarSlots.length} icon="solar:calendar-date-bold" tone="brand" />
+        <Metric label="Active Drafts" value={counts.draftItems} icon="solar:document-add-bold" tone="blue" />
+        <Metric label="Scheduled" value={counts.scheduledItems} icon="solar:calendar-mark-bold" tone="amber" />
+        <Metric label="Queued Jobs" value={counts.queuedJobs} icon="solar:server-square-bold" tone="green" />
+        <Metric label="Total Content" value={counts.contentItems} icon="solar:posts-carousel-vertical-bold" tone="blue" />
+        <Metric label="Failed Jobs" value={counts.failedJobs} icon="solar:danger-triangle-bold" tone={counts.failedJobs ? 'red' : 'green'} />
       </div>
 
-      {/* Main Tab Navigation */}
-      <div className="flex overflow-x-auto border-b border-border">
-        <button
-          type="button"
-          onClick={() => setActiveTab('intake')}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
-            activeTab === 'intake'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-text-muted hover:text-text-primary'
-          }`}
-        >
-          <Icon icon="solar:inbox-in-linear" width="16" />
-          Telegram Approval Inbox
-        </button>
-
+      {/* ========================================================================= */}
+      {/* 3. SEGMENTED TAB NAVIGATOR (Pastis / SchedulePress Style)                */}
+      {/* ========================================================================= */}
+      <div className="flex overflow-x-auto rounded-2xl border border-white/10 bg-surface p-1.5 shadow-sm">
         <button
           type="button"
           onClick={() => setActiveTab('calendar')}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
             activeTab === 'calendar'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-text-muted hover:text-text-primary'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
           }`}
         >
-          <Icon icon="solar:calendar-mark-linear" width="16" />
-          30-Day Auto-Pilot Plan ({calendarSlots.length} Slots)
+          <Icon icon="solar:calendar-mark-bold" width="16" />
+          <span>30-Day Auto-Pilot Plan</span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeTab === 'calendar' ? 'bg-black/30 text-white' : 'bg-surface-3 text-text-muted'}`}>
+            {calendarSlots.length}
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('drafts')}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
             activeTab === 'drafts'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-text-muted hover:text-text-primary'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
           }`}
         >
-          <Icon icon="solar:posts-carousel-vertical-linear" width="16" />
-          Queue & Scheduled Posts ({drafts.length})
+          <Icon icon="solar:posts-carousel-vertical-bold" width="16" />
+          <span>Queue & Scheduled</span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeTab === 'drafts' ? 'bg-black/30 text-white' : 'bg-surface-3 text-text-muted'}`}>
+            {drafts.length}
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('composer')}
-          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black uppercase tracking-wider transition-colors ${
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
             activeTab === 'composer'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-text-muted hover:text-text-primary'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
           }`}
         >
-          <Icon icon="solar:magic-stick-3-linear" width="16" />
-          Ad-Hoc Custom Composer
+          <Icon icon="solar:magic-stick-3-bold" width="16" />
+          <span>Ad-Hoc Composer</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('intake')}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'intake'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+          }`}
+        >
+          <Icon icon="solar:inbox-in-bold" width="16" />
+          <span>Telegram Intake Inbox</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('video_plan')}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'video_plan'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+          }`}
+        >
+          <Icon icon="solar:clapperboard-edit-bold" width="16" />
+          <span>Video Autopilot</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setChannelsModalOpen(true)}
+          className="ml-auto flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-text-muted hover:text-text-primary hover:bg-surface-2 transition-all"
+        >
+          <Icon icon="solar:settings-bold" width="16" />
+          <span>Channels Hub</span>
         </button>
       </div>
 
-      {activeTab === 'intake' && (
-        <SocialIntakeInbox
-          onCreateSocialDraft={async () => {
-            await refreshAll();
-            setActiveTab('drafts');
-          }}
-        />
-      )}
-
-      {/* TAB 3: Ad-Hoc Custom Composer */}
-      {activeTab === 'composer' && (
-        <SocialDraftComposer
-          disabled={!summary.enabled}
-          initialDraft={editingDraft}
-          onClearDraft={() => setEditingDraft(null)}
-          selectedThemeId={selectedThemeId}
-          slotContext={slotContext}
-          onClearSlot={() => setSlotContext(null)}
-          onGenerated={async (res, meta) => {
-            await refreshAll();
-            if (meta?.action === 'scheduled' || meta?.action === 'published') {
-              setActiveTab('drafts');
-              setEditingDraft(null);
-            }
-          }}
-        />
-      )}
-
-      {/* TAB 1: 30-Day Auto-Pilot Editorial Plan */}
+      {/* ========================================================================= */}
+      {/* 4. TAB 1: 30-DAY AUTO-PILOT CALENDAR VIEW (SchedulePress Inspired)        */}
+      {/* ========================================================================= */}
       {activeTab === 'calendar' && (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-violet-400/30 bg-gradient-to-br from-violet-500/10 via-surface to-surface p-4 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-black uppercase tracking-widest text-text-primary">Video autopilot planner</h3><p className="mt-1 max-w-2xl text-xs text-text-muted">Choose a horizon and time window. Each day uses the newest release with a real video source, asks Gemini for the strongest segment, then saves 1:1 and 9:16 drafts for approval.</p></div><span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-black uppercase text-violet-200">Approval required</span></div>
-            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">Days<select value={videoPlan.days} onChange={e => setVideoPlan(p => ({ ...p, days: Number(e.target.value) }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary"><option value="7">7 days</option><option value="30">30 days</option></select></label>
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">Start date<input type="date" value={videoPlan.startDate} onChange={e => setVideoPlan(p => ({ ...p, startDate: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary" /></label>
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">1:1 time<input type="time" value={videoPlan.videoStart} onChange={e => setVideoPlan(p => ({ ...p, videoStart: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary" /></label>
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">9:16 time<input type="time" value={videoPlan.videoEnd} onChange={e => setVideoPlan(p => ({ ...p, videoEnd: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary" /></label>
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">Clip length<select value={videoPlan.clipLength} onChange={e => setVideoPlan(p => ({ ...p, clipLength: Number(e.target.value) }))} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs font-bold text-text-primary"><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></label>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2"><button type="button" onClick={buildVideoPlanRows} disabled={videoAutopilot.running} className="rounded-lg bg-violet-500 px-3.5 py-2 text-xs font-black text-white hover:bg-violet-400 disabled:opacity-50">Build {videoPlan.days}-day video plan</button><span className="text-[11px] text-text-muted">This creates two editable rows per day. Review or adjust them below before rendering.</span></div>
-          </div>
-          <section className="rounded-xl border border-border bg-surface p-4 shadow-sm" aria-labelledby="custom-video-plan-title">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h3 id="custom-video-plan-title" className="text-sm font-black uppercase tracking-widest text-text-primary">Custom video plan</h3><p className="mt-1 text-xs text-text-muted">Add as many clips as you need. Gemini can choose the moment and caption, or you can enter both manually.</p></div>
-              <button type="button" onClick={addVideoRow} className="rounded-lg border border-brand/50 bg-brand/10 px-3 py-2 text-xs font-black text-brand hover:bg-brand/20">＋ Add video</button>
-            </div>
-            <div className="mt-4 space-y-3">
-              {videoRows.map((row, index) => (
-                <div key={row.id} className="rounded-lg border border-border bg-surface-2 p-3">
-                  <div className="mb-3 flex items-center justify-between"><span className="text-xs font-black uppercase tracking-wider text-text-muted">Video {index + 1}</span><button type="button" onClick={() => removeVideoRow(row.id)} className="text-xs font-bold text-red-300 hover:text-red-200" disabled={videoRows.length === 1}>Remove</button></div>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                    <label className="text-[10px] font-black uppercase text-text-muted">Date<input aria-label={`Video ${index + 1} date`} type="date" value={row.date} onChange={e => updateVideoRow(row.id, { date: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary" /></label>
-                    <label className="text-[10px] font-black uppercase text-text-muted">Time<input aria-label={`Video ${index + 1} time`} type="time" value={row.time} onChange={e => updateVideoRow(row.id, { time: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary" /></label>
-                    <label className="text-[10px] font-black uppercase text-text-muted sm:col-span-2">Film<div className="relative mt-1"><input aria-label={`Search films for video ${index + 1}`} value={videoFilmSearch[row.id] || ''} onChange={e => setVideoFilmSearch(prev => ({ ...prev, [row.id]: e.target.value }))} placeholder="Search films…" className="h-9 w-full rounded-t-lg border border-border bg-surface px-2 text-xs text-text-primary" /><select aria-label={`Video ${index + 1} film`} value={row.filmId} onChange={e => updateVideoRow(row.id, { filmId: e.target.value })} className="h-9 w-full rounded-b-lg border border-t-0 border-border bg-surface px-2 text-xs text-text-primary"><option value="">Choose a film…</option>{videoFilmOptions.filter(film => (film.title || '').toLowerCase().includes((videoFilmSearch[row.id] || '').toLowerCase())).map(film => <option key={film.id} value={film.id}>{film.title}{film.release_date ? ` (${new Date(film.release_date).getFullYear()})` : ''}</option>)}</select></div></label>
-                    <label className="text-[10px] font-black uppercase text-text-muted">Format<select aria-label={`Video ${index + 1} format`} value={row.aspectRatio} onChange={e => updateVideoRow(row.id, { aspectRatio: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option>1:1</option><option>9:16</option><option>4:5</option><option>16:9</option></select></label>
-                    <label className="text-[10px] font-black uppercase text-text-muted">Timing<select aria-label={`Video ${index + 1} timing mode`} value={row.mode} onChange={e => updateVideoRow(row.id, { mode: e.target.value })} className="mt-1 h-9 w-full rounded-lg border border-border bg-surface px-2 text-xs text-text-primary"><option value="gemini">Gemini chooses</option><option value="manual">Manual</option></select></label>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-end gap-2">
-                    <label className="text-[10px] font-black uppercase text-text-muted">Start (sec)<input type="number" min="0" value={row.start} onChange={e => updateVideoRow(row.id, { start: Number(e.target.value) })} disabled={row.mode === 'gemini'} className="mt-1 h-9 w-24 rounded-lg border border-border bg-surface px-2 text-xs text-text-primary disabled:opacity-50" /></label>
-                    <label className="text-[10px] font-black uppercase text-text-muted">End (sec)<input type="number" min="1" value={row.end} onChange={e => updateVideoRow(row.id, { end: Number(e.target.value) })} disabled={row.mode === 'gemini'} className="mt-1 h-9 w-24 rounded-lg border border-border bg-surface px-2 text-xs text-text-primary disabled:opacity-50" /></label>
-                    <button type="button" onClick={() => generateRowCaption(row)} className="h-9 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 text-xs font-bold text-violet-200 hover:bg-violet-500/20">✨ Generate with Gemini</button>
-                  </div>
-                  <label className="mt-3 block text-[10px] font-black uppercase text-text-muted">Caption<textarea value={row.caption} onChange={e => updateVideoRow(row.id, { caption: e.target.value })} rows={2} placeholder="Write a caption or generate one with Gemini…" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-primary" /></label>
+        <div className="space-y-5">
+          {/* Calendar Control Bar */}
+          <div className="rounded-2xl border border-white/10 bg-surface p-5 shadow-sm">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              {/* Left: Month Navigator & View Switcher */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface-2 p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prev = new Date(currentCalendarMonth);
+                      prev.setMonth(prev.getMonth() - 1);
+                      setCurrentCalendarMonth(prev);
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface hover:text-text-primary transition-all"
+                    title="Previous month"
+                  >
+                    <Icon icon="solar:alt-arrow-left-linear" width="16" />
+                  </button>
+
+                  <span className="px-3 font-mono text-sm font-black text-white">
+                    {currentCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = new Date(currentCalendarMonth);
+                      next.setMonth(next.getMonth() + 1);
+                      setCurrentCalendarMonth(next);
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface hover:text-text-primary transition-all"
+                    title="Next month"
+                  >
+                    <Icon icon="solar:alt-arrow-right-linear" width="16" />
+                  </button>
                 </div>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => prepareCustomVideoPlan('draft')} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg bg-brand px-4 py-2 text-xs font-black text-white disabled:opacity-50">{videoAutopilot.running ? 'Preparing…' : 'Prepare to drafts'}</button><button type="button" onClick={() => prepareCustomVideoPlan('schedule')} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-xs font-black text-amber-200 disabled:opacity-50">Schedule all</button><button type="button" onClick={() => prepareCustomVideoPlan('publish')} disabled={videoAutopilot.running || clipperStatus !== 'running'} className="rounded-lg border border-green-400/50 bg-green-500/10 px-4 py-2 text-xs font-black text-green-200 disabled:opacity-50">Post all now</button></div>
-          </section>
-          <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 lg:flex-row lg:items-center lg:justify-between shadow-sm">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">
-                  30-Day Auto-Pilot Editorial Plan
-                </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-400">
-                  <Icon icon="solar:crown-bold" width="11" />
-                  Nollistream, Docuth & EbonyLife Priority
-                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentCalendarMonth(new Date())}
+                  className="rounded-xl border border-white/10 bg-surface-2 px-3 py-1.5 text-xs font-bold text-text-primary hover:bg-surface-3 transition-all"
+                >
+                  Today
+                </button>
+
+                {/* View Switch: Month Grid vs Cards */}
+                <div className="flex items-center rounded-xl border border-white/10 bg-surface-2 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarViewMode('month')}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                      calendarViewMode === 'month'
+                        ? 'bg-brand text-white shadow-sm'
+                        : 'text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon="solar:calendar-bold" width="14" />
+                    Month Grid
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCalendarViewMode('cards')}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                      calendarViewMode === 'cards'
+                        ? 'bg-brand text-white shadow-sm'
+                        : 'text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon="solar:widget-2-bold" width="14" />
+                    Card View
+                  </button>
+                </div>
               </div>
-              <p className="mt-1 text-xs text-text-muted">
-                Pre-matched daily schedule with verified Nollywood stars, crew, and streamers. Approve in 1 click or manually search/swap any candidate.
+
+              {/* Right: Editorial Generation Toolbar */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Start Date */}
+                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-surface-2 px-3 py-1.5 text-xs">
+                  <Icon icon="solar:calendar-date-bold" className="text-brand" width="16" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">Start:</span>
+                  <input
+                    type="date"
+                    value={calendarStartDate}
+                    onChange={e => setCalendarStartDate(e.target.value)}
+                    className="bg-transparent font-mono text-xs font-bold text-white outline-none cursor-pointer"
+                  />
+                </div>
+
+                {/* Posts per day pills */}
+                <div className="flex items-center rounded-xl border border-white/10 bg-surface-2 p-1 text-xs font-bold">
+                  {[1, 2, 3].map(num => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setPostsPerDay(num)}
+                      className={`rounded-lg px-3 py-1 text-xs transition-all ${
+                        postsPerDay === num
+                          ? 'bg-brand text-white shadow-sm'
+                          : 'text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      {num} {num === 1 ? 'Post' : num === 3 ? 'Lanes' : 'Posts'}/Day
+                    </button>
+                  ))}
+                </div>
+
+                {/* Shuffle Candidates */}
+                <button
+                  type="button"
+                  onClick={handleShuffleAllCandidates}
+                  disabled={loadingCalendar}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-white/10 bg-surface-2 px-3.5 text-xs font-bold text-text-primary hover:border-brand/40 hover:text-brand disabled:opacity-50 transition-all shadow-sm"
+                  title="Shuffle candidate actors, crew, and movies across the 30-day plan"
+                >
+                  <Icon icon="solar:shuffle-bold" width="15" />
+                  <span>Shuffle</span>
+                </button>
+
+                {/* Generate Schedule CTA */}
+                <button
+                  type="button"
+                  onClick={seedCalendar}
+                  disabled={seedingCalendar}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand px-4 text-xs font-black text-white hover:bg-brand-hover shadow-lg shadow-brand/20 active:scale-95 disabled:opacity-50 transition-all"
+                >
+                  <Icon icon={seedingCalendar ? 'solar:spinner-linear' : 'solar:magic-stick-3-bold'} className={seedingCalendar ? 'animate-spin' : ''} width="15" />
+                  <span>{seedingCalendar ? 'Generating…' : '⚡ Generate Schedule'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {loadingCalendar ? (
+            <div className="rounded-2xl border border-white/10 bg-surface p-16 text-center shadow-xl">
+              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="36" />
+              <p className="mt-3 text-sm font-bold text-white">Loading 30-day schedule & verified Nollywood stars…</p>
+              <p className="mt-1 text-xs text-text-muted">Fetching editorial series, movies, reviews, and streaming availability.</p>
+            </div>
+          ) : calendarSlots.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-surface/50 p-12 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand border border-brand/20">
+                <Icon icon="solar:calendar-mark-bold" width="28" />
+              </div>
+              <h3 className="mt-4 text-base font-black text-white">No Calendar Slots Generated Yet</h3>
+              <p className="mx-auto mt-1 max-w-md text-xs text-text-muted">
+                Click <strong>"⚡ Generate Schedule"</strong> above to automatically populate 30 days of curated Nollywood content matched to each day’s editorial theme.
               </p>
-            </div>
-
-            {/* Editorial Control Toolbar */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Start Date Selector */}
-              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs">
-                <Icon icon="solar:calendar-date-bold" className="text-brand" width="14" />
-                <span className="text-[11px] font-bold text-text-muted">Start:</span>
-                <input
-                  type="date"
-                  value={calendarStartDate}
-                  onChange={e => setCalendarStartDate(e.target.value)}
-                  className="bg-transparent font-mono text-xs font-bold text-text-primary outline-none"
-                />
-              </div>
-
-              {/* Posts Per Day Toggle */}
-              <div className="flex items-center rounded-lg border border-border bg-surface-2 p-0.5 text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setPostsPerDay(1)}
-                  className={`rounded-md px-2.5 py-1 transition-all ${
-                    postsPerDay === 1
-                      ? 'bg-brand text-white shadow-sm'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  1 Post/Day
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPostsPerDay(2)}
-                  className={`rounded-md px-2.5 py-1 transition-all ${
-                    postsPerDay === 2
-                      ? 'bg-brand text-white shadow-sm'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  2 Posts/Day
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPostsPerDay(3)}
-                  className={`rounded-md px-2.5 py-1 transition-all ${postsPerDay === 3 ? 'bg-brand text-white shadow-sm' : 'text-text-muted hover:text-text-primary'}`}
-                >
-                  3 Lanes/Day
-                </button>
-              </div>
-
-              {/* Shuffle All Candidates Button */}
-              <button
-                type="button"
-                onClick={handleShuffleAllCandidates}
-                disabled={loadingCalendar}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-bold text-text-primary hover:border-brand hover:text-brand transition-all disabled:opacity-50"
-                title="Shuffle and rotate all candidate actors, crew, and movies across the plan"
-              >
-                <Icon icon="solar:shuffle-bold" width="14" />
-                Shuffle All ({calendarSlots.length})
-              </button>
-
-              {/* Generate / Refresh Plan Button */}
               <button
                 type="button"
                 onClick={seedCalendar}
                 disabled={seedingCalendar}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-xs font-bold text-white transition-all hover:bg-brand-hover hover:shadow-lg hover:shadow-brand/20 disabled:opacity-50 shadow-sm"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-white hover:bg-brand-hover shadow-lg shadow-brand/20"
               >
-                <Icon
-                  icon={seedingCalendar ? 'solar:spinner-linear' : 'solar:magic-stick-3-bold'}
-                  className={seedingCalendar ? 'animate-spin' : ''}
-                  width="14"
-                />
-                {seedingCalendar ? 'Generating Plan…' : '⚡ Generate Schedule'}
-              </button>
-              <button
-                type="button"
-                onClick={runDailyVideoAutopilot}
-                disabled={videoAutopilot.running}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-400/40 bg-violet-500/15 px-3.5 py-1.5 text-xs font-bold text-violet-200 transition-all hover:bg-violet-500/25 disabled:opacity-50"
-                title="Choose the newest film, render 1:1 and 9:16 locally, and create drafts for approval"
-              >
-                <Icon icon={videoAutopilot.running ? 'solar:spinner-linear' : 'solar:clapperboard-play-bold'} className={videoAutopilot.running ? 'animate-spin' : ''} width="14" />
-                {videoAutopilot.running ? 'Preparing Videos…' : 'Prepare Daily Videos'}
+                <Icon icon="solar:magic-stick-3-bold" width="16" />
+                <span>Generate 30-Day Auto-Pilot Plan</span>
               </button>
             </div>
-          </div>
+          ) : calendarViewMode === 'month' ? (
+            /* ========================================================================= */
+            /* 7-DAY MONTH CALENDAR MATRIX (Reference Image 1: SchedulePress Style)      */
+            /* ========================================================================= */
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-xl">
+              {/* Day Headers (Sun - Sat) */}
+              <div className="grid grid-cols-7 border-b border-white/10 bg-surface-2 text-center">
+                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => (
+                  <div key={day} className="py-3 text-[11px] font-black uppercase tracking-wider text-text-muted border-r border-white/5 last:border-r-0">
+                    <span className="hidden sm:inline">{day}</span>
+                    <span className="sm:hidden">{day.slice(0, 3)}</span>
+                  </div>
+                ))}
+              </div>
 
-          {videoAutopilot.message && (
-            <div className="mt-3 rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">
-              <strong>Daily video autopilot:</strong> {videoAutopilot.message}
-            </div>
-          )}
+              {/* Month Grid Cells */}
+              <div className="grid grid-cols-7 divide-x divide-y divide-white/10 bg-surface">
+                {calendarMatrix.map(cell => {
+                  const daySlots = slotsByDate[cell.dateStr] || [];
+                  const isToday = cell.dateStr === new Date().toISOString().slice(0, 10);
 
-          {loadingCalendar ? (
-            <div className="rounded-lg border border-border bg-surface p-12 text-center">
-              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="28" />
-              <p className="mt-2 text-sm text-text-muted">Loading auto-pilot calendar & candidates…</p>
-            </div>
-          ) : calendarSlots.length === 0 ? (
-            <div className="rounded-lg border border-border bg-surface p-8 text-center">
-              <Icon icon="solar:calendar-mark-linear" className="mx-auto text-text-muted" width="32" />
-              <p className="mt-2 text-sm font-bold text-text-primary">No calendar slots found</p>
+                  return (
+                    <div
+                      key={cell.dateStr}
+                      className={`group relative min-h-[140px] p-2 transition-colors flex flex-col justify-between ${
+                        !cell.isCurrentMonth
+                          ? 'bg-black/40 text-text-muted/40'
+                          : isToday
+                            ? 'bg-brand/5'
+                            : 'bg-surface hover:bg-surface-2/40'
+                      }`}
+                    >
+                      {/* Cell Header: Date Number + Quick Add */}
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-xs font-black ${
+                            isToday
+                              ? 'bg-brand text-white shadow-md shadow-brand/30'
+                              : cell.isCurrentMonth
+                                ? 'text-white'
+                                : 'text-text-muted'
+                          }`}
+                        >
+                          {cell.date.getDate()}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSlotContext({ scheduled_date: cell.dateStr, scheduled_time: '11:00' });
+                            setActiveTab('composer');
+                          }}
+                          className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-text-muted hover:border-brand hover:text-brand transition-all"
+                          title={`Schedule post for ${cell.dateStr}`}
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Day Slots List */}
+                      <div className="my-1.5 space-y-1.5 flex-1">
+                        {daySlots.map(slot => {
+                          const series = slot.social_content_series || {};
+                          const icon = SERIES_ICONS[series.slug] || 'solar:posts-carousel-vertical-linear';
+                          const candidate = slot.candidate;
+                          const isScheduled = slot.status === 'scheduled';
+                          const isPublished = slot.status === 'published';
+
+                          return (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              onClick={() => setSelectedSlotForReview(slot)}
+                              className={`w-full text-left rounded-lg p-1.5 border transition-all shadow-sm hover:scale-[1.02] active:scale-95 ${
+                                isPublished
+                                  ? 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15'
+                                  : isScheduled
+                                    ? 'border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15'
+                                    : 'border-white/10 bg-surface-2 hover:border-brand/40 hover:bg-surface-3'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-mono text-[9px] font-bold text-text-muted">
+                                  {slot.scheduled_time?.slice(0, 5) || '11:00'}
+                                </span>
+                                <span
+                                  className={`rounded px-1 text-[8px] font-black uppercase ${
+                                    isPublished
+                                      ? 'bg-emerald-500/20 text-emerald-400'
+                                      : isScheduled
+                                        ? 'bg-amber-500/20 text-amber-400'
+                                        : 'bg-brand/20 text-brand'
+                                  }`}
+                                >
+                                  {isPublished ? 'Live' : isScheduled ? 'Sched' : 'Plan'}
+                                </span>
+                              </div>
+
+                              <div className="mt-1 flex items-center gap-1.5">
+                                {candidate?.imageUrl ? (
+                                  <img
+                                    src={candidate.imageUrl}
+                                    alt=""
+                                    className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-3 text-text-muted">
+                                    <Icon icon={icon} width="10" />
+                                  </div>
+                                )}
+                                <span className="truncate text-[10px] font-black text-white leading-tight">
+                                  {candidate?.name || series.name || 'Post'}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Day bottom indicator */}
+                      <div className="text-right">
+                        {daySlots.length > 0 && (
+                          <span className="text-[9px] font-mono text-text-muted">
+                            {daySlots.length} {daySlots.length === 1 ? 'item' : 'items'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            /* ========================================================================= */
+            /* CARD VIEW MODE                                                           */
+            /* ========================================================================= */
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {calendarSlots.map(slot => {
                 const dateObj = new Date(slot.scheduled_date);
                 const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
@@ -1371,19 +1627,19 @@ export default function AdminSocialStudio() {
                 return (
                   <div
                     key={slot.id}
-                    className={`group flex flex-col justify-between rounded-xl border p-4 transition-all ${
+                    className={`group flex flex-col justify-between rounded-2xl border p-4 transition-all shadow-md ${
                       isPublished
-                        ? 'border-green-500/30 bg-surface shadow-sm'
+                        ? 'border-emerald-500/30 bg-surface'
                         : isScheduled
-                          ? 'border-amber-500/30 bg-surface shadow-sm'
-                          : 'border-border bg-surface hover:border-brand/60 hover:shadow-md'
+                          ? 'border-amber-500/30 bg-surface'
+                          : 'border-white/10 bg-surface hover:border-brand/50 hover:bg-surface-2'
                     }`}
                   >
                     <div>
                       {/* Header: Date + Status */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                          <span className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[11px] font-bold text-text-primary">
+                          <span className="rounded-lg bg-surface-2 px-2.5 py-1 font-mono text-xs font-bold text-white border border-white/5">
                             {dayName}, {monthDay}
                           </span>
                           {slot.scheduled_time && (
@@ -1398,16 +1654,16 @@ export default function AdminSocialStudio() {
                       </div>
 
                       {/* Series Badge */}
-                      <div className="mt-2.5 flex items-center gap-1.5 text-brand">
-                        <Icon icon={icon} width="14" />
-                        <span className="text-[11px] font-black uppercase tracking-wider truncate">
+                      <div className="mt-3 flex items-center gap-1.5 text-brand">
+                        <Icon icon={icon} width="16" />
+                        <span className="text-xs font-black uppercase tracking-wider truncate">
                           {series.name || 'Editorial Series'}
                         </span>
                       </div>
 
-                      {/* Auto-Assigned Candidate Preview Box */}
-                      <div className="mt-2.5 flex items-center gap-3 rounded-lg border border-border/80 bg-surface-2/60 p-2.5">
-                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-surface">
+                      {/* Auto-Assigned Candidate Box */}
+                      <div className="mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-surface-2 p-3">
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-surface">
                           {candidate?.imageUrl ? (
                             <img src={candidate.imageUrl} alt="" className="h-full w-full object-cover" />
                           ) : (
@@ -1418,22 +1674,20 @@ export default function AdminSocialStudio() {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1">
-                            <span className="truncate text-xs font-black text-text-primary">
-                              {candidate?.name || 'Curated Nollywood Star'}
-                            </span>
-                          </div>
-                          <p className="truncate text-[10px] text-text-muted">
+                          <span className="truncate text-xs font-black text-white block">
+                            {candidate?.name || 'Curated Nollywood Star'}
+                          </span>
+                          <p className="truncate text-[10px] text-text-muted mt-0.5">
                             {candidate?.subtext || series.description || 'Ready for review'}
                           </p>
                         </div>
                       </div>
 
                       {slot.selection && candidate && (
-                        <div className="mt-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-2">
+                        <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400">Why this post</span>
-                            <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400">Match Reason</span>
+                            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
                               {slot.selection.score}/100
                             </span>
                           </div>
@@ -1445,29 +1699,22 @@ export default function AdminSocialStudio() {
                     </div>
 
                     {/* Action Footer */}
-                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-text-muted">
+                    <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
                         {series.category || 'Editorial'}
                       </span>
-                      {isScheduled || isPublished ? (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSlotForReview(slot)}
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-green-400 hover:text-green-300"
-                        >
-                          <Icon icon="solar:check-circle-bold" width="13" />
-                          {isPublished ? 'View Post' : 'Scheduled'}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSlotForReview(slot)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white shadow transition-all hover:bg-brand-hover hover:shadow-brand/20 active:scale-95"
-                        >
-                          <Icon icon="solar:bolt-bold" width="13" />
-                          Review & Schedule
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSlotForReview(slot)}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                          isScheduled || isPublished
+                            ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                            : 'bg-brand text-white hover:bg-brand-hover shadow-brand/20 active:scale-95'
+                        }`}
+                      >
+                        <Icon icon={isScheduled || isPublished ? 'solar:check-circle-bold' : 'solar:bolt-bold'} width="14" />
+                        <span>{isPublished ? 'View Post' : isScheduled ? 'Scheduled' : 'Review & Schedule'}</span>
+                      </button>
                     </div>
                   </div>
                 );
@@ -1477,48 +1724,57 @@ export default function AdminSocialStudio() {
         </div>
       )}
 
-      {/* TAB 2: Queue & Drafts List */}
+      {/* ========================================================================= */}
+      {/* 5. TAB 2: QUEUE & SCHEDULED POSTS (SchedulePress / Pastis Style)          */}
+      {/* ========================================================================= */}
       {activeTab === 'drafts' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="space-y-5">
+          {/* Header & Filter Bar */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-white/10 bg-surface p-4 shadow-sm">
             <div className="flex items-center gap-2">
-              <Icon icon="solar:posts-carousel-vertical-linear" className="text-brand" width="20" />
-              <h2 className="text-sm font-black uppercase tracking-widest text-text-primary">Drafts & Scheduled Posts</h2>
+              <Icon icon="solar:posts-carousel-vertical-bold" className="text-brand" width="22" />
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-widest text-white">Queue & Scheduled Content</h2>
+                <p className="text-[11px] text-text-muted">Manage scheduled jobs, review drafts, and trigger instant publishing.</p>
+              </div>
             </div>
-            <button
-              onClick={fetchDrafts}
-              className="inline-flex items-center gap-1 text-xs font-bold text-text-muted hover:text-text-primary"
-            >
-              <Icon icon="solar:refresh-linear" width="14" /> Refresh List
-            </button>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'scheduled', label: 'Scheduled' },
+                { key: 'draft', label: 'Drafts' },
+                { key: 'published', label: 'Published' },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setQueueFilterStatus(tab.key)}
+                  className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                    queueFilterStatus === tab.key
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {draftsLoading ? (
-            <div className="rounded-lg border border-border bg-surface p-8 text-center">
-              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="28" />
-              <p className="mt-3 text-sm font-bold text-text-primary">Loading your content queue…</p>
-              <p className="mt-1 text-xs text-text-muted">Fetching drafts, scheduled posts, and their artwork.</p>
+            <div className="rounded-2xl border border-white/10 bg-surface p-16 text-center shadow-xl">
+              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="32" />
+              <p className="mt-3 text-sm font-bold text-white">Loading content queue…</p>
             </div>
-          ) : draftsError ? (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-8 text-center">
-              <Icon icon="solar:danger-triangle-linear" className="mx-auto text-red-500" width="28" />
-              <p className="mt-3 text-sm font-bold text-text-primary">Couldn’t load this section</p>
-              <p className="mx-auto mt-1 max-w-lg text-xs text-text-muted">{draftsError}</p>
-              <button
-                type="button"
-                onClick={fetchDrafts}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-xs font-bold text-white hover:bg-brand-hover"
-              >
-                <Icon icon="solar:refresh-linear" width="14" /> Try again
-              </button>
-            </div>
-          ) : drafts.length === 0 ? (
-            <div className="rounded-lg border border-border bg-surface p-8 text-center">
-              <p className="text-sm text-text-muted">No content items yet. Approve one in the 30-Day Plan tab or create one in Composer.</p>
+          ) : filteredDrafts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-surface/50 p-12 text-center">
+              <p className="text-sm text-text-muted">No content items found in this view. Create a new post or approve a slot from the 30-Day Plan.</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {drafts.map(item => {
+              {filteredDrafts.map(item => {
                 const variants = asRelationArray(item.social_platform_variants);
                 const assets = asRelationArray(item.social_assets);
                 const selectedAssetId = variants.find(variant => variant.selected_asset_id)?.selected_asset_id;
@@ -1531,18 +1787,16 @@ export default function AdminSocialStudio() {
                 const canChangeQueueItem = !['publishing', 'partially_published', 'published'].includes(item.status);
                 const isExpanded = Boolean(expandedCaptions[item.id]);
 
-                // Find schedule timestamp
                 const scheduledTime = item.scheduled_for || variants.find(v => v.scheduled_for)?.scheduled_for;
                 const publishedTime = item.published_at || (item.status === 'published' ? item.updated_at : null);
 
                 return (
                   <div
                     key={item.id}
-                    className="group relative rounded-2xl border border-white/10 bg-[#141419] p-5 shadow-xl transition-all hover:border-white/20 hover:bg-[#16161f] space-y-4"
+                    className="group relative rounded-2xl border border-white/10 bg-surface p-5 shadow-lg hover:border-white/20 transition-all space-y-4"
                   >
-                    {/* Top Main Row */}
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      {/* Left: Thumbnail & Replace Media Button */}
+                      {/* Left: Thumbnail & Replace */}
                       <div className="flex items-start gap-4 shrink-0">
                         <div className="relative">
                           <SocialAssetThumbnail asset={previewAsset} />
@@ -1561,10 +1815,7 @@ export default function AdminSocialStudio() {
                                 const res = await fetch('/api/social?task=attach_custom_asset', {
                                   method: 'POST',
                                   headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    contentItemId: item.id,
-                                    publicUrl,
-                                  }),
+                                  body: JSON.stringify({ contentItemId: item.id, publicUrl }),
                                 });
                                 const data = await res.json().catch(() => ({}));
                                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1594,44 +1845,29 @@ export default function AdminSocialStudio() {
                             type="button"
                             onClick={() => fileInputRefs.current[item.id]?.click()}
                             disabled={uploadingAssetId === item.id}
-                            className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded bg-black/60 border border-white/10 px-2 py-1 text-[10px] font-bold text-white hover:bg-white/10 hover:text-brand disabled:opacity-50 transition-colors"
+                            className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded-lg bg-surface-2 border border-white/10 px-2 py-1 text-[10px] font-bold text-white hover:bg-surface-3 hover:text-brand disabled:opacity-50 transition-colors"
                           >
-                            <Icon icon={uploadingAssetId === item.id ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'} className={uploadingAssetId === item.id ? 'animate-spin' : ''} width="11" />
-                            {uploadingAssetId === item.id ? 'Uploading…' : '🖼️ Replace'}
+                            <Icon icon={uploadingAssetId === item.id ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'} className={uploadingAssetId === item.id ? 'animate-spin' : ''} width="12" />
+                            <span>{uploadingAssetId === item.id ? 'Uploading…' : 'Replace Media'}</span>
                           </button>
                         </div>
 
-                        {/* Middle: Title, Badges, Schedule Timing & Platform Delivery Grid */}
-                        <div className="flex-1 min-w-0 space-y-3">
-                          {/* Title & Status Pills */}
+                        {/* Title, Badges, Schedule Timing & Platforms */}
+                        <div className="flex-1 min-w-0 space-y-2.5">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-base font-black text-white tracking-tight">{item.title}</h3>
-                            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
-                              item.status === 'published'
-                                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
-                                : item.status === 'scheduled'
-                                  ? 'border-blue-500/40 bg-blue-500/15 text-blue-300'
-                                  : item.status === 'partially_published'
-                                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
-                                    : item.status === 'failed'
-                                      ? 'border-red-500/40 bg-red-500/15 text-red-400'
-                                      : 'border-white/10 bg-white/5 text-white/60'
-                            }`}>
-                              {item.status === 'published' && <Icon icon="solar:check-circle-bold" width="12" />}
-                              {item.status === 'scheduled' && <Icon icon="solar:calendar-bold" width="12" />}
-                              {item.status === 'publishing' && <Icon icon="solar:spinner-linear" className="animate-spin" width="12" />}
-                              {item.status === 'failed' && <Icon icon="solar:close-circle-bold" width="12" />}
+                            <Pill tone={STATUS_TONES[item.status] || 'neutral'}>
                               {item.status}
-                            </span>
-                            <span className="rounded bg-black/40 border border-white/5 px-2 py-0.5 text-[10px] font-bold text-white/50">
+                            </Pill>
+                            <span className="rounded-md bg-surface-2 border border-white/5 px-2 py-0.5 text-[10px] font-bold text-text-muted">
                               {item.content_type?.replace(/_/g, ' ')}
                             </span>
                           </div>
 
                           {/* Timing Banner */}
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/60 font-mono">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted font-mono">
                             {item.status === 'scheduled' && scheduledTime ? (
-                              <span className="inline-flex items-center gap-1.5 font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">
+                              <span className="inline-flex items-center gap-1.5 font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
                                 <Icon icon="solar:clock-circle-bold" width="14" />
                                 Scheduled: {new Date(scheduledTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                               </span>
@@ -1645,75 +1881,25 @@ export default function AdminSocialStudio() {
                             )}
                           </div>
 
-                          {/* Platform Delivery Rectangular Grid */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                          {/* Platform Badges */}
+                          <div className="flex flex-wrap gap-2 pt-1">
                             {variants.map(variant => {
-                              const isPublished = variant.status === 'published';
-                              const isPublishing = variant.status === 'publishing' || variant.status === 'processing';
-                              const isFailed = variant.status === 'failed';
-                              const isScheduled = variant.status === 'scheduled' || (item.status === 'scheduled' && !isPublished && !isFailed);
-                              const permalink = variant.external_permalink || variant.platform_options?.post_url || variant.platform_options?.permalink;
-
-                              const platformIcons = {
-                                tiktok: 'simple-icons:tiktok',
-                                instagram: 'simple-icons:instagram',
-                                facebook: 'simple-icons:facebook',
+                              const icon = {
+                                instagram: 'mdi:instagram',
                                 threads: 'simple-icons:threads',
-                                youtube: 'simple-icons:youtube',
-                              };
+                                facebook: 'mdi:facebook',
+                                tiktok: 'simple-icons:tiktok',
+                                youtube: 'mdi:youtube',
+                              }[variant.platform] || 'solar:share-linear';
 
                               return (
                                 <div
                                   key={variant.id}
-                                  className={`flex flex-col justify-between rounded-xl border p-3 transition-all ${
-                                    isPublished
-                                      ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400'
-                                      : isPublishing
-                                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 animate-pulse'
-                                        : isFailed
-                                          ? 'border-red-500/30 bg-red-500/10 text-red-400'
-                                          : isScheduled
-                                            ? 'border-blue-500/30 bg-blue-500/5 text-blue-300'
-                                            : 'border-white/10 bg-black/40 text-white/60'
-                                  }`}
+                                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-surface-2 px-2.5 py-1 text-xs"
                                 >
-                                  {/* Platform Header */}
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                      <Icon icon={platformIcons[variant.platform] || 'solar:share-circle-bold'} width="14" />
-                                      <span className="text-xs font-black capitalize text-white">{variant.platform}</span>
-                                    </div>
-                                    {isPublished && <Icon icon="solar:check-circle-bold" width="14" className="text-emerald-400" />}
-                                    {isPublishing && <Icon icon="solar:spinner-linear" width="14" className="animate-spin text-amber-400" />}
-                                    {isFailed && <Icon icon="solar:close-circle-bold" width="14" className="text-red-400" />}
-                                  </div>
-
-                                  {/* Status Text / Live View Post Link */}
-                                  <div className="mt-2.5">
-                                    {isPublished ? (
-                                      permalink ? (
-                                        <a
-                                          href={permalink}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-1 text-[11px] font-black text-emerald-300 hover:bg-emerald-500/30 hover:text-emerald-200 transition-colors shadow-xs"
-                                        >
-                                          <span>View Post</span>
-                                          <Icon icon="solar:arrow-right-up-linear" width="12" />
-                                        </a>
-                                      ) : (
-                                        <span className="text-[11px] font-bold text-emerald-400">Published</span>
-                                      )
-                                    ) : isPublishing ? (
-                                      <span className="text-[11px] font-bold text-amber-300">Publishing…</span>
-                                    ) : isFailed ? (
-                                      <span className="text-[11px] font-bold text-red-400">Failed</span>
-                                    ) : isScheduled ? (
-                                      <span className="text-[11px] font-bold text-blue-300">Scheduled</span>
-                                    ) : (
-                                      <span className="text-[11px] font-bold text-white/50">Draft</span>
-                                    )}
-                                  </div>
+                                  <Icon icon={icon} width="14" className="text-brand" />
+                                  <span className="capitalize font-bold text-text-primary text-[11px]">{variant.platform}</span>
+                                  <span className="text-[10px] text-text-muted uppercase">({variant.status})</span>
                                 </div>
                               );
                             })}
@@ -1721,146 +1907,52 @@ export default function AdminSocialStudio() {
                         </div>
                       </div>
 
-                      {/* Right Actions Column */}
-                      <div className="flex flex-wrap items-center gap-2 lg:flex-col lg:items-end shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => openFullStudioEditor(item)}
-                          disabled={reviewingId === item.id}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-brand hover:bg-brand/20 transition-all disabled:opacity-50 shadow-xs"
-                        >
-                          <Icon icon="solar:pen-new-square-bold" width="14" />
-                          Studio Edit
-                        </button>
-
-                        {item.status !== 'published' && (
+                      {/* Right: Actions */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canChangeQueueItem && (
                           <button
                             type="button"
-                            onClick={() => runPublishNow(item.id, item.status)}
-                            disabled={reviewingId === item.id || item.status === 'publishing'}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-emerald-500 disabled:opacity-50 shadow-md transition-all"
+                            onClick={() => openFullStudioEditor(item)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface-2 px-3 py-1.5 text-xs font-bold text-text-primary hover:border-brand/40 hover:text-brand transition-all shadow-sm"
                           >
-                            <Icon
-                              icon={reviewingId === item.id || item.status === 'publishing' ? 'solar:spinner-linear' : 'solar:bolt-bold'}
-                              className={reviewingId === item.id || item.status === 'publishing' ? 'animate-spin' : ''}
-                              width="14"
-                            />
-                            <span>{reviewingId === item.id || item.status === 'publishing' ? 'Publishing…' : 'Publish Now'}</span>
+                            <Icon icon="solar:pen-2-bold" width="14" />
+                            <span>Edit in Studio</span>
                           </button>
                         )}
 
-                        {item.status === 'scheduled' && (
+                        {item.status === 'scheduled' ? (
                           <button
                             type="button"
                             onClick={() => runCancelSchedule(item.id)}
-                            disabled={reviewingId === item.id}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-3 py-1.5 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-500/20 transition-all"
                           >
-                            <Icon icon="solar:calendar-minimalistic-linear" width="14" />
-                            Cancel Schedule
+                            <Icon icon="solar:close-circle-bold" width="14" />
+                            <span>Cancel Schedule</span>
                           </button>
-                        )}
+                        ) : item.status !== 'published' ? (
+                          <button
+                            type="button"
+                            onClick={() => runPublishNow(item.id, item.status)}
+                            disabled={reviewingId === item.id}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1.5 text-xs font-black text-white hover:bg-brand-hover shadow-md shadow-brand/20 active:scale-95 transition-all"
+                          >
+                            <Icon icon="solar:play-bold" width="14" />
+                            <span>Publish Now</span>
+                          </button>
+                        ) : null}
 
                         {canChangeQueueItem && (
                           <button
                             type="button"
                             onClick={() => deleteQueueItem(item)}
-                            disabled={reviewingId === item.id}
-                            className="inline-flex items-center gap-1 rounded-lg p-1.5 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                            title="Delete post from queue"
+                            className="flex h-8 w-8 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
+                            title="Delete post"
                           >
-                            <Icon icon="solar:trash-bin-trash-linear" width="15" />
-                            <span>Delete</span>
+                            <Icon icon="solar:trash-bin-trash-bold" width="14" />
                           </button>
                         )}
                       </div>
                     </div>
-
-                    {/* Schedule Bar for Drafts */}
-                    {item.status !== 'published' && (
-                      <div className="border-t border-white/10 pt-3 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
-                            Quick Reschedule:
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => runQuickSchedulePreset(item.id, 'today_6pm')}
-                            disabled={reviewingId === item.id}
-                            className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold text-white hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
-                          >
-                            🕒 Today 6 PM
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => runQuickSchedulePreset(item.id, 'tomorrow_10am')}
-                            disabled={reviewingId === item.id}
-                            className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold text-white hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
-                          >
-                            🕒 Tomorrow 10 AM
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => runQuickSchedulePreset(item.id, 'tomorrow_6pm')}
-                            disabled={reviewingId === item.id}
-                            className="rounded-lg border border-white/10 bg-black/40 px-2.5 py-1 text-xs font-bold text-white hover:border-brand hover:text-brand disabled:opacity-50 transition-colors"
-                          >
-                            🕒 Tomorrow 6 PM
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="datetime-local"
-                            value={scheduleAt[item.id] || ''}
-                            onChange={e => setScheduleAt(curr => ({ ...curr, [item.id]: e.target.value }))}
-                            className="h-8 rounded-lg border border-white/10 bg-black/50 px-2 text-xs text-white outline-none focus:border-brand"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => runSchedule(item.id)}
-                            disabled={reviewingId === item.id || !scheduleAt[item.id]}
-                            className="rounded-lg bg-brand px-3 py-1 text-xs font-black uppercase text-white hover:bg-brand-hover disabled:opacity-50 shadow-xs"
-                          >
-                            Schedule
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Errors Banner if any */}
-                    {variants.some(v => v.last_error_message) && (
-                      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-300 space-y-1.5">
-                        <div className="flex items-center gap-2 font-bold text-red-400">
-                          <Icon icon="solar:danger-triangle-bold" width="16" />
-                          <span>Delivery Issues on Platform(s):</span>
-                        </div>
-                        {variants.filter(v => v.last_error_message).map(v => (
-                          <div key={v.id} className="pl-6 font-mono text-[11px]">
-                            <strong className="uppercase text-red-400">[{v.platform}]:</strong> {v.last_error_message}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Caption Preview Accordion */}
-                    {variants[0]?.caption && (
-                      <div className="border-t border-white/5 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedCaptions(curr => ({ ...curr, [item.id]: !curr[item.id] }))}
-                          className="flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white transition-colors"
-                        >
-                          <Icon icon={isExpanded ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'} width="14" />
-                          <span>{isExpanded ? 'Hide Captions' : 'View Captions & Hashtags'}</span>
-                        </button>
-                        {isExpanded && (
-                          <div className="mt-2.5 rounded-xl border border-white/5 bg-black/60 p-3.5 text-xs text-white/80 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
-                            {variants[0].caption}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1869,174 +1961,390 @@ export default function AdminSocialStudio() {
         </div>
       )}
 
-      {/* Queue Item Editor */}
-      {editingQueueItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-surface p-5">
+      {/* ========================================================================= */}
+      {/* 6. TAB 3: AD-HOC CUSTOM COMPOSER                                         */}
+      {/* ========================================================================= */}
+      {activeTab === 'composer' && (
+        <SocialDraftComposer
+          disabled={!summary.enabled}
+          initialDraft={editingDraft}
+          onClearDraft={() => setEditingDraft(null)}
+          selectedThemeId={selectedThemeId}
+          slotContext={slotContext}
+          onClearSlot={() => setSlotContext(null)}
+          onGenerated={async (res, meta) => {
+            await refreshAll();
+            if (meta?.action === 'scheduled' || meta?.action === 'published') {
+              setActiveTab('drafts');
+              setEditingDraft(null);
+            }
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7. TAB 4: TELEGRAM INTAKE INBOX                                          */}
+      {/* ========================================================================= */}
+      {activeTab === 'intake' && (
+        <SocialIntakeInbox
+          onCreateSocialDraft={async () => {
+            await refreshAll();
+            setActiveTab('drafts');
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 8. TAB 5: VIDEO AUTOPILOT PLANNER                                        */}
+      {/* ========================================================================= */}
+      {activeTab === 'video_plan' && (
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-surface to-surface p-6 shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2">
-                  <Icon icon="solar:pen-new-square-linear" className="text-brand" width="20" />
-                  <h3 className="text-lg font-black tracking-tight text-text-primary">Edit queued post</h3>
-                  <Pill tone="blue">Draft</Pill>
-                </div>
-                <p className="mt-1 text-xs text-text-muted">
-                  Update the internal title and each platform’s caption. Artwork and carousel slides stay attached.
+                <h3 className="text-base font-black text-white">Video Autopilot Planner</h3>
+                <p className="mt-1 max-w-2xl text-xs text-text-muted leading-relaxed">
+                  Automated video generation pipeline: Selects the latest verified Nollywood releases, extracts highlight moments with Gemini, and renders high-res 1:1 and 9:16 video clips locally.
                 </p>
+              </div>
+              <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] font-black uppercase text-violet-300">
+                Local FFmpeg Clipper
+              </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Days
+                <select
+                  value={videoPlan.days}
+                  onChange={e => setVideoPlan(p => ({ ...p, days: Number(e.target.value) }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none"
+                >
+                  <option value="7">7 days</option>
+                  <option value="30">30 days</option>
+                </select>
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Start Date
+                <input
+                  type="date"
+                  value={videoPlan.startDate}
+                  onChange={e => setVideoPlan(p => ({ ...p, startDate: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                1:1 Time
+                <input
+                  type="time"
+                  value={videoPlan.videoStart}
+                  onChange={e => setVideoPlan(p => ({ ...p, videoStart: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                9:16 Time
+                <input
+                  type="time"
+                  value={videoPlan.videoEnd}
+                  onChange={e => setVideoPlan(p => ({ ...p, videoEnd: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Clip Length
+                <select
+                  value={videoPlan.clipLength}
+                  onChange={e => setVideoPlan(p => ({ ...p, clipLength: Number(e.target.value) }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none"
+                >
+                  <option value="15">15 seconds</option>
+                  <option value="30">30 seconds</option>
+                  <option value="45">45 seconds</option>
+                  <option value="60">60 seconds</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={buildVideoPlanRows}
+                disabled={videoAutopilot.running}
+                className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-500 shadow-md shadow-violet-600/20 disabled:opacity-50 transition-all"
+              >
+                Build {videoPlan.days}-Day Video Plan
+              </button>
+
+              <button
+                type="button"
+                onClick={runDailyVideoAutopilot}
+                disabled={videoAutopilot.running}
+                className="rounded-xl border border-violet-500/40 bg-violet-500/15 px-4 py-2.5 text-xs font-black text-violet-200 hover:bg-violet-500/25 disabled:opacity-50 transition-all"
+              >
+                {videoAutopilot.running ? 'Processing…' : '⚡ Auto-Generate Today’s Clips'}
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Video Plan Rows */}
+          <section className="rounded-2xl border border-white/10 bg-surface p-6 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-white">Planned Video Clips ({videoRows.length})</h3>
+                <p className="mt-0.5 text-xs text-text-muted">Review clips, regenerate AI captions, or adjust crop timings before rendering.</p>
               </div>
               <button
                 type="button"
-                onClick={() => setEditingQueueItem(null)}
-                disabled={savingQueueEdit}
-                className="rounded-lg p-1.5 text-text-muted hover:bg-surface-2 hover:text-text-primary disabled:opacity-50"
-                aria-label="Close queue editor"
+                onClick={addVideoRow}
+                className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-xs font-black text-brand hover:bg-brand/20 transition-all"
               >
-                <Icon icon="solar:close-circle-linear" width="22" />
+                ＋ Add Video Clip
               </button>
             </div>
 
-            <div className="space-y-5 p-5">
-              <label className="block">
-                <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">Post title</span>
-                <input
-                  value={queueEditTitle}
-                  onChange={event => setQueueEditTitle(event.target.value)}
-                  maxLength={180}
-                  className="mt-2 h-11 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm font-bold text-text-primary outline-none focus:border-brand"
-                />
-                <span className="mt-1 block text-right text-[10px] text-text-muted">{queueEditTitle.length}/180</span>
-              </label>
+            <div className="mt-4 space-y-3">
+              {videoRows.map((row, index) => (
+                <div key={row.id} className="rounded-xl border border-white/10 bg-surface-2 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-brand">Clip #{index + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeVideoRow(row.id)}
+                      className="text-xs font-bold text-red-400 hover:text-red-300"
+                      disabled={videoRows.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                {asRelationArray(editingQueueItem.social_platform_variants).map(variant => {
-                  const caption = queueEditCaptions[variant.id] || '';
-                  const limit = variant.platform === 'threads' ? 500 : variant.platform === 'facebook' ? 2000 : 2200;
-                  return (
-                    <label key={variant.id} className="block rounded-lg border border-border bg-surface-2 p-4">
-                      <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-text-primary">
-                        <Icon icon={`simple-icons:${variant.platform}`} className="text-brand" width="15" />
-                        {variant.platform} caption
-                      </span>
-                      <textarea
-                        value={caption}
-                        onChange={event => setQueueEditCaptions(current => ({ ...current, [variant.id]: event.target.value }))}
-                        maxLength={limit}
-                        rows={12}
-                        className="mt-3 w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm leading-relaxed text-text-primary outline-none focus:border-brand"
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Date
+                      <input
+                        type="date"
+                        value={row.date}
+                        onChange={e => updateVideoRow(row.id, { date: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
                       />
-                      <span className={`mt-1 block text-right text-[10px] ${caption.length >= limit ? 'text-red-500' : 'text-text-muted'}`}>
-                        {caption.length}/{limit}
-                      </span>
                     </label>
-                  );
-                })}
-              </div>
+
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Time
+                      <input
+                        type="time"
+                        value={row.time}
+                        onChange={e => updateVideoRow(row.id, { time: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                      />
+                    </label>
+
+                    <label className="text-[10px] font-black uppercase text-text-muted sm:col-span-2">
+                      Film
+                      <div className="relative mt-1">
+                        <select
+                          value={row.filmId}
+                          onChange={e => updateVideoRow(row.id, { filmId: e.target.value })}
+                          className="h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                        >
+                          <option value="">Choose a film…</option>
+                          {videoFilmOptions.map(film => (
+                            <option key={film.id} value={film.id}>
+                              {film.title} {film.release_date ? `(${new Date(film.release_date).getFullYear()})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </label>
+
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Format
+                      <select
+                        value={row.aspectRatio}
+                        onChange={e => updateVideoRow(row.id, { aspectRatio: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                      >
+                        <option>1:1</option>
+                        <option>9:16</option>
+                        <option>4:5</option>
+                        <option>16:9</option>
+                      </select>
+                    </label>
+
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Timing Mode
+                      <select
+                        value={row.mode}
+                        onChange={e => updateVideoRow(row.id, { mode: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                      >
+                        <option value="gemini">Gemini Auto</option>
+                        <option value="manual">Manual Seconds</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Start (sec)
+                      <input
+                        type="number"
+                        min="0"
+                        value={row.start}
+                        onChange={e => updateVideoRow(row.id, { start: Number(e.target.value) })}
+                        disabled={row.mode === 'gemini'}
+                        className="mt-1 h-9 w-24 rounded-lg border border-white/10 bg-surface px-2 text-xs text-white disabled:opacity-50"
+                      />
+                    </label>
+
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      End (sec)
+                      <input
+                        type="number"
+                        min="1"
+                        value={row.end}
+                        onChange={e => updateVideoRow(row.id, { end: Number(e.target.value) })}
+                        disabled={row.mode === 'gemini'}
+                        className="mt-1 h-9 w-24 rounded-lg border border-white/10 bg-surface px-2 text-xs text-white disabled:opacity-50"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => generateRowCaption(row)}
+                      className="h-9 rounded-lg border border-violet-400/40 bg-violet-500/15 px-3 text-xs font-bold text-violet-200 hover:bg-violet-500/25 transition-all"
+                    >
+                      ✨ Generate Caption with Gemini
+                    </button>
+                  </div>
+
+                  <label className="block text-[10px] font-black uppercase text-text-muted">
+                    Caption
+                    <textarea
+                      value={row.caption}
+                      onChange={e => updateVideoRow(row.id, { caption: e.target.value })}
+                      rows={2}
+                      placeholder="Write social caption or generate one with Gemini…"
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-xs text-white outline-none focus:border-brand"
+                    />
+                  </label>
+                </div>
+              ))}
             </div>
 
-            <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface p-5">
-              <p className="text-xs text-text-muted">Saving keeps this item in Draft so you can review or schedule it when ready.</p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingQueueItem(null)}
-                  disabled={savingQueueEdit}
-                  className="rounded-lg border border-border bg-surface-2 px-4 py-2 text-xs font-bold text-text-muted hover:text-text-primary disabled:opacity-50"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={saveQueueEditor}
-                  disabled={savingQueueEdit}
-                  className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50"
-                >
-                  <Icon icon={savingQueueEdit ? 'solar:spinner-linear' : 'solar:diskette-linear'} className={savingQueueEdit ? 'animate-spin' : ''} width="15" />
-                  {savingQueueEdit ? 'Saving…' : 'Save changes'}
-                </button>
-              </div>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <button
+                type="button"
+                onClick={() => prepareCustomVideoPlan('draft')}
+                disabled={videoAutopilot.running || clipperStatus !== 'running'}
+                className="rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50 shadow-md shadow-brand/20 transition-all"
+              >
+                {videoAutopilot.running ? 'Processing…' : 'Render & Save to Drafts'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => prepareCustomVideoPlan('schedule')}
+                disabled={videoAutopilot.running || clipperStatus !== 'running'}
+                className="rounded-xl border border-amber-400/40 bg-amber-500/15 px-5 py-2.5 text-xs font-black text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-all"
+              >
+                Schedule All
+              </button>
+
+              <button
+                type="button"
+                onClick={() => prepareCustomVideoPlan('publish')}
+                disabled={videoAutopilot.running || clipperStatus !== 'running'}
+                className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-5 py-2.5 text-xs font-black text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 transition-all"
+              >
+                Post All Now
+              </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
-      {/* Social Channels & Platform Connections Modal */}
+      {/* ========================================================================= */}
+      {/* 9. CHANNELS HUB MODAL (SchedulePress Inspired Reference Image 3)          */}
+      {/* ========================================================================= */}
       {channelsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <div>
-                <h3 className="text-lg font-black tracking-tight text-text-primary">Connected Social Channels</h3>
-                <p className="text-xs text-text-muted">Manage active publishing accounts across Instagram, Facebook, Threads, and TikTok.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-white/15 bg-surface p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand border border-brand/20">
+                  <Icon icon="solar:share-circle-bold" width="22" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Social Profiles & Channel Connections</h3>
+                  <p className="text-xs text-text-muted">Link and authenticate your official brand accounts for automated publishing.</p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setChannelsModalOpen(false);
-                  setManualConnectPlatform(null);
-                }}
-                className="rounded-lg p-1.5 text-text-muted hover:bg-surface-2 hover:text-text-primary"
+                onClick={() => setChannelsModalOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-2 hover:text-white"
               >
-                <Icon icon="solar:close-circle-linear" width="20" />
+                <Icon icon="solar:close-circle-bold" width="20" />
               </button>
             </div>
 
-            {/* One-Click OAuth Banner */}
-            <div className="mt-4 rounded-lg border border-brand/20 bg-brand/5 p-3 text-xs text-text-muted">
-              <span className="font-bold text-text-primary">💡 One-Click OAuth Login:</span> Click the OAuth connect buttons below to authenticate directly via Meta (for Instagram & Facebook), Threads, or TikTok without needing to manually find access tokens.
-            </div>
-
             {/* Platform Grid */}
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {/* Instagram */}
-              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {/* Instagram Card */}
+              <div className="flex flex-col justify-between rounded-xl border border-white/10 bg-surface-2 p-5 shadow-sm">
                 <div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#E1306C]/10 text-[#E1306C]">
-                        <Icon icon="simple-icons:instagram" width="18" />
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E1306C]/15 text-[#E1306C] border border-[#E1306C]/20">
+                        <Icon icon="mdi:instagram" width="22" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-text-primary">Instagram</h4>
-                        <p className="text-[11px] text-text-muted">Feed, Carousels & Reels</p>
+                        <h4 className="text-sm font-black text-white">Instagram</h4>
+                        <p className="text-[11px] text-text-muted">Feed Posts, Reels & Carousels</p>
                       </div>
                     </div>
                     <Pill tone={connections.platforms.instagram ? 'green' : 'amber'}>
-                      {connections.platforms.instagram ? 'Connected' : 'Offline'}
+                      {connections.platforms.instagram ? 'Active' : 'Offline'}
                     </Pill>
                   </div>
 
-                  <div className="mt-3 space-y-1 text-xs">
+                  <div className="mt-4 space-y-1.5 text-xs">
                     <div className="flex justify-between text-text-muted">
-                      <span>Handle:</span>
-                      <span className="font-mono font-bold text-text-primary">
+                      <span>Connected Profile:</span>
+                      <span className="font-mono font-bold text-white">
                         {connections.platforms.instagram ? `@${connections.platforms.instagram.username}` : 'Not connected'}
                       </span>
                     </div>
-                    {connections.platforms.instagram?.tokenExpiresAt && (
-                      <div className="flex justify-between text-text-muted text-[11px]">
-                        <span>Expires:</span>
-                        <span>{new Date(connections.platforms.instagram.tokenExpiresAt).toLocaleDateString()}</span>
+                    {connections.platforms.instagram?.displayName && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Account Name:</span>
+                        <span className="font-bold text-text-secondary">{connections.platforms.instagram.displayName}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-                  {connections.platforms.instagram ? (
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+                  {connections.platforms.instagram && (
                     <button
                       type="button"
                       onClick={() => disconnectAccount('instagram')}
                       disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
                     >
                       Disconnect
                     </button>
-                  ) : null}
+                  )}
                   <button
                     type="button"
                     onClick={connectMeta}
                     disabled={connections.connecting}
-                    className="rounded bg-[#E1306C] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+                    className="rounded-xl bg-[#E1306C] px-4 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:opacity-50 shadow-md"
                   >
                     ⚡ Connect via Meta
                   </button>
@@ -2051,65 +2359,124 @@ export default function AdminSocialStudio() {
                         accessToken: '',
                       });
                     }}
-                    className="rounded border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text-primary"
+                    className="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-white"
                   >
                     Token
                   </button>
                 </div>
               </div>
 
-              {/* Facebook */}
-              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
+              {/* Threads Card */}
+              <div className="flex flex-col justify-between rounded-xl border border-white/10 bg-surface-2 p-5 shadow-sm">
                 <div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1877F2]/10 text-[#1877F2]">
-                        <Icon icon="simple-icons:facebook" width="18" />
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white border border-white/20">
+                        <Icon icon="simple-icons:threads" width="22" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-text-primary">Facebook</h4>
-                        <p className="text-[11px] text-text-muted">Pages & Community Feed</p>
+                        <h4 className="text-sm font-black text-white">Threads</h4>
+                        <p className="text-[11px] text-text-muted">Meta Threads API</p>
                       </div>
                     </div>
-                    <Pill tone={connections.platforms.facebook ? 'green' : 'amber'}>
-                      {connections.platforms.facebook ? 'Connected' : 'Offline'}
+                    <Pill tone={connections.platforms.threads ? 'green' : 'amber'}>
+                      {connections.platforms.threads ? 'Active' : 'Offline'}
                     </Pill>
                   </div>
 
-                  <div className="mt-3 space-y-1 text-xs">
+                  <div className="mt-4 space-y-1.5 text-xs">
                     <div className="flex justify-between text-text-muted">
-                      <span>Page:</span>
-                      <span className="font-mono font-bold text-text-primary">
-                        {connections.platforms.facebook ? (connections.platforms.facebook.displayName || connections.platforms.facebook.username) : 'Not connected'}
+                      <span>Connected Profile:</span>
+                      <span className="font-mono font-bold text-white">
+                        {connections.platforms.threads ? `@${connections.platforms.threads.username}` : 'Not connected'}
                       </span>
                     </div>
-                    {connections.platforms.facebook?.tokenExpiresAt && (
-                      <div className="flex justify-between text-text-muted text-[11px]">
-                        <span>Expires:</span>
-                        <span>{new Date(connections.platforms.facebook.tokenExpiresAt).toLocaleDateString()}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-                  {connections.platforms.facebook ? (
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+                  {connections.platforms.threads && (
+                    <button
+                      type="button"
+                      onClick={() => disconnectAccount('threads')}
+                      disabled={connections.connecting}
+                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={connectThreads}
+                    disabled={connections.connecting}
+                    className="rounded-xl bg-white px-4 py-1.5 text-xs font-black text-black hover:opacity-90 disabled:opacity-50 shadow-md"
+                  >
+                    ⚡ Connect Threads
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualConnectPlatform('threads');
+                      setManualFormData({
+                        username: connections.platforms.threads?.username || 'muvidb_',
+                        displayName: connections.platforms.threads?.displayName || 'MuviDB Threads',
+                        externalAccountId: connections.platforms.threads?.externalAccountId || 'muvidb_threads_id',
+                        accessToken: '',
+                      });
+                    }}
+                    className="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-white"
+                  >
+                    Token
+                  </button>
+                </div>
+              </div>
+
+              {/* Facebook Card */}
+              <div className="flex flex-col justify-between rounded-xl border border-white/10 bg-surface-2 p-5 shadow-sm">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1877F2]/15 text-[#1877F2] border border-[#1877F2]/20">
+                        <Icon icon="mdi:facebook" width="22" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-white">Facebook</h4>
+                        <p className="text-[11px] text-text-muted">Official Pages & Group Posts</p>
+                      </div>
+                    </div>
+                    <Pill tone={connections.platforms.facebook ? 'green' : 'amber'}>
+                      {connections.platforms.facebook ? 'Active' : 'Offline'}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-4 space-y-1.5 text-xs">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Connected Page:</span>
+                      <span className="font-mono font-bold text-white">
+                        {connections.platforms.facebook ? `@${connections.platforms.facebook.username}` : 'Not connected'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+                  {connections.platforms.facebook && (
                     <button
                       type="button"
                       onClick={() => disconnectAccount('facebook')}
                       disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
                     >
                       Disconnect
                     </button>
-                  ) : null}
+                  )}
                   <button
                     type="button"
                     onClick={connectMeta}
                     disabled={connections.connecting}
-                    className="rounded bg-[#1877F2] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+                    className="rounded-xl bg-[#1877F2] px-4 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:opacity-50 shadow-md"
                   >
-                    ⚡ Connect via Meta
+                    ⚡ Connect Facebook
                   </button>
                   <button
                     type="button"
@@ -2122,124 +2489,59 @@ export default function AdminSocialStudio() {
                         accessToken: '',
                       });
                     }}
-                    className="rounded border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text-primary"
+                    className="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-white"
                   >
                     Token
                   </button>
                 </div>
               </div>
 
-              {/* Threads */}
-              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
+              {/* TikTok Card */}
+              <div className="flex flex-col justify-between rounded-xl border border-white/10 bg-surface-2 p-5 shadow-sm">
                 <div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-text-primary/10 text-text-primary">
-                        <Icon icon="simple-icons:threads" width="18" />
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black text-[#25F4EE] border border-[#25F4EE]/30 shadow-md">
+                        <Icon icon="simple-icons:tiktok" width="22" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-text-primary">Threads</h4>
-                        <p className="text-[11px] text-text-muted">Meta Threads API</p>
-                      </div>
-                    </div>
-                    <Pill tone={connections.platforms.threads ? 'green' : 'amber'}>
-                      {connections.platforms.threads ? 'Connected' : 'Offline'}
-                    </Pill>
-                  </div>
-
-                  <div className="mt-3 space-y-1 text-xs">
-                    <div className="flex justify-between text-text-muted">
-                      <span>Account:</span>
-                      <span className="font-mono font-bold text-text-primary">
-                        {connections.platforms.threads ? `@${connections.platforms.threads.username}` : 'Not connected'}
-                      </span>
-                    </div>
-                    {connections.platforms.threads?.tokenExpiresAt && (
-                      <div className="flex justify-between text-text-muted text-[11px]">
-                        <span>Expires:</span>
-                        <span>{new Date(connections.platforms.threads.tokenExpiresAt).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-                  {connections.platforms.threads ? (
-                    <button
-                      type="button"
-                      onClick={() => disconnectAccount('threads')}
-                      disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
-                    >
-                      Disconnect
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={connectThreads}
-                    disabled={connections.connecting}
-                    className="rounded bg-text-primary px-3 py-1.5 text-xs font-bold text-background hover:opacity-90 disabled:opacity-50"
-                  >
-                    <span className="flex items-center gap-1">
-                      <Icon icon="simple-icons:threads" width="12" />
-                      {connections.platforms.threads ? 'Reconnect OAuth' : 'Connect via Meta OAuth'}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* TikTok */}
-              <div className="flex flex-col justify-between rounded-lg border border-border bg-surface-2 p-4">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black text-[#25F4EE] border border-border">
-                        <Icon icon="simple-icons:tiktok" width="18" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-text-primary">TikTok</h4>
-                        <p className="text-[11px] text-text-muted">Vertical Shorts & Clips</p>
+                        <h4 className="text-sm font-black text-white">TikTok</h4>
+                        <p className="text-[11px] text-text-muted">Vertical Video Clips & Shorts</p>
                       </div>
                     </div>
                     <Pill tone={connections.platforms.tiktok ? 'green' : 'amber'}>
-                      {connections.platforms.tiktok ? 'Connected' : 'Offline'}
+                      {connections.platforms.tiktok ? 'Active' : 'Offline'}
                     </Pill>
                   </div>
 
-                  <div className="mt-3 space-y-1 text-xs">
+                  <div className="mt-4 space-y-1.5 text-xs">
                     <div className="flex justify-between text-text-muted">
-                      <span>Account:</span>
-                      <span className="font-mono font-bold text-text-primary">
+                      <span>Connected Handle:</span>
+                      <span className="font-mono font-bold text-white">
                         {connections.platforms.tiktok ? `@${connections.platforms.tiktok.username}` : 'Not connected'}
                       </span>
                     </div>
-                    {connections.platforms.tiktok?.tokenExpiresAt && (
-                      <div className="flex justify-between text-text-muted text-[11px]">
-                        <span>Expires:</span>
-                        <span>{new Date(connections.platforms.tiktok.tokenExpiresAt).toLocaleDateString()}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
-                  {connections.platforms.tiktok ? (
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+                  {connections.platforms.tiktok && (
                     <button
                       type="button"
                       onClick={() => disconnectAccount('tiktok')}
                       disabled={connections.connecting}
-                      className="rounded border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
                     >
                       Disconnect
                     </button>
-                  ) : null}
+                  )}
                   <button
                     type="button"
                     onClick={connectTikTok}
                     disabled={connections.connecting}
-                    className="rounded bg-black border border-[#25F4EE]/40 text-[#25F4EE] px-3 py-1.5 text-xs font-bold hover:bg-surface-3 disabled:opacity-50"
+                    className="rounded-xl bg-black border border-[#25F4EE]/40 text-[#25F4EE] px-4 py-1.5 text-xs font-black hover:bg-surface-3 disabled:opacity-50 shadow-md"
                   >
-                    ⚡ Connect via TikTok
+                    ⚡ Connect TikTok
                   </button>
                   <button
                     type="button"
@@ -2252,7 +2554,7 @@ export default function AdminSocialStudio() {
                         accessToken: '',
                       });
                     }}
-                    className="rounded border border-border bg-surface px-2.5 py-1.5 text-[11px] font-bold text-text-muted hover:text-text-primary"
+                    className="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-white"
                   >
                     Token
                   </button>
@@ -2260,67 +2562,59 @@ export default function AdminSocialStudio() {
               </div>
             </div>
 
-            {/* Manual / Direct Token Connection Form */}
+            {/* Manual Token Connection Form */}
             {manualConnectPlatform && (
-              <form onSubmit={saveManualConnection} className="mt-6 rounded-lg border border-brand/30 bg-surface-2 p-5">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <form onSubmit={saveManualConnection} className="mt-6 rounded-2xl border border-brand/30 bg-surface-2 p-5 shadow-xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
                   <div>
-                    <h4 className="text-sm font-bold text-brand uppercase tracking-wider">
-                      Configure {manualConnectPlatform.toUpperCase()} Connection
+                    <h4 className="text-sm font-black text-brand uppercase tracking-wider">
+                      Configure {manualConnectPlatform.toUpperCase()} Token Connection
                     </h4>
-                    <p className="text-[11px] text-text-muted">Enter your exact handle and API token to link this channel.</p>
+                    <p className="text-xs text-text-muted">Enter your handle and long-lived access token.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setManualConnectPlatform(null)}
-                    className="text-xs text-text-muted hover:text-text-primary"
+                    className="text-xs text-text-muted hover:text-white"
                   >
                     Cancel
                   </button>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-[11px] font-bold text-text-muted uppercase">
-                      {manualConnectPlatform === 'instagram' ? 'Instagram Handle' : manualConnectPlatform === 'facebook' ? 'Facebook Page Handle' : 'Account Handle'}
-                    </label>
+                    <label className="block text-[10px] font-black uppercase text-text-muted">Account Handle</label>
                     <input
                       type="text"
                       required
                       value={manualFormData.username}
                       onChange={e => setManualFormData(prev => ({ ...prev, username: e.target.value }))}
                       placeholder={manualConnectPlatform === 'instagram' ? 'muvidb_' : 'muvidb'}
-                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand"
+                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs text-white outline-none focus:border-brand"
                     />
-                    <p className="mt-0.5 text-[10px] text-text-muted">
-                      {manualConnectPlatform === 'instagram' ? 'e.g. muvidb_ (without leading @)' : 'e.g. muvidb'}
-                    </p>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-text-muted uppercase">Display Name</label>
+                    <label className="block text-[10px] font-black uppercase text-text-muted">Display Name</label>
                     <input
                       type="text"
                       value={manualFormData.displayName}
                       onChange={e => setManualFormData(prev => ({ ...prev, displayName: e.target.value }))}
                       placeholder="MuviDB Official"
-                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand"
+                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs text-white outline-none focus:border-brand"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-text-muted uppercase">API Access Token</label>
+                    <label className="block text-[10px] font-black uppercase text-text-muted">API Access Token</label>
                     <input
                       type="password"
                       required
                       value={manualFormData.accessToken}
                       onChange={e => setManualFormData(prev => ({ ...prev, accessToken: e.target.value }))}
                       placeholder="Paste API Access Token"
-                      className="mt-1 h-9 w-full rounded border border-border bg-surface px-3 text-xs text-text-primary outline-none focus:border-brand font-mono"
+                      className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-mono text-white outline-none focus:border-brand"
                     />
-                    <p className="mt-1 text-[10px] text-text-muted">
-                      All tokens are securely encrypted with AES-256-GCM prior to storage in database.
-                    </p>
                   </div>
                 </div>
 
@@ -2328,14 +2622,14 @@ export default function AdminSocialStudio() {
                   <button
                     type="button"
                     onClick={() => setManualConnectPlatform(null)}
-                    className="rounded border border-border px-3 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary"
+                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-bold text-text-muted hover:text-white"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={connections.connecting}
-                    className="rounded bg-brand px-4 py-1.5 text-xs font-bold text-white hover:bg-brand-hover disabled:opacity-50"
+                    className="rounded-xl bg-brand px-5 py-2 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50 shadow-md shadow-brand/20"
                   >
                     {connections.connecting ? 'Saving…' : `Save ${manualConnectPlatform} Connection`}
                   </button>
@@ -2346,7 +2640,9 @@ export default function AdminSocialStudio() {
         </div>
       )}
 
-      {/* Auto-Pilot 1-Click Review & Approve Modal */}
+      {/* ========================================================================= */}
+      {/* 10. AUTO-PILOT REVIEW & APPROVAL MODAL                                   */}
+      {/* ========================================================================= */}
       <AutoPilotReviewModal
         isOpen={!!selectedSlotForReview}
         slot={selectedSlotForReview}

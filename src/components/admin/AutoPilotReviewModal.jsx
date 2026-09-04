@@ -737,14 +737,18 @@ export default function AutoPilotReviewModal({
                         key={p.value}
                         type="button"
                         onClick={() => togglePlatform(p.value)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all ${
                           isSelected
-                            ? 'border-brand bg-brand/10 text-brand shadow-sm'
-                            : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
+                            ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand shadow-sm'
+                            : 'border-white/10 bg-surface-2 text-text-muted hover:border-white/20 hover:text-text-primary'
                         }`}
                       >
-                        <Icon icon={p.icon} width="14" />
-                        {p.label}
+                        <span className={`flex h-4 w-4 items-center justify-center rounded-full text-white ${
+                          isSelected ? 'bg-brand text-white' : 'bg-white/10 text-text-muted'
+                        }`}>
+                          <Icon icon={p.icon} width="11" />
+                        </span>
+                        <span>{p.label}</span>
                       </button>
                     );
                   })}

@@ -230,6 +230,243 @@ function readableNetworkError(error, action) {
   return error?.message || `Could not finish ${action}. Your draft is still saved.`;
 }
 
+function CharacterProgressRing({ current = 0, max = 2200 }) {
+  const radius = 13;
+  const circumference = 2 * Math.PI * radius;
+  const percent = Math.min(100, Math.max(0, (current / max) * 100));
+  const strokeDashoffset = circumference - (percent / 100) * circumference;
+  const isOver = current > max;
+  const isNear = percent >= 90;
+
+  const strokeColor = isOver ? '#EF4444' : isNear ? '#F59E0B' : '#FF5A1F';
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative flex h-8 w-8 items-center justify-center">
+        <svg className="h-8 w-8 -rotate-90 transform" viewBox="0 0 32 32">
+          <circle
+            cx="16"
+            cy="16"
+            r={radius}
+            className="stroke-white/10"
+            strokeWidth="2.5"
+            fill="transparent"
+          />
+          <circle
+            cx="16"
+            cy="16"
+            r={radius}
+            stroke={strokeColor}
+            strokeWidth="2.5"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            fill="transparent"
+            className="transition-all duration-200"
+          />
+        </svg>
+      </div>
+      <div className="text-right leading-tight">
+        <span className={`font-mono text-xs font-black ${isOver ? 'text-red-400' : 'text-text-primary'}`}>
+          {current}
+        </span>
+        <span className="text-[10px] text-text-muted"> / {max}</span>
+      </div>
+    </div>
+  );
+}
+
+function LivePhoneFeedPreview({
+  platform = 'instagram',
+  mediaUrl,
+  mediaType = 'image',
+  aspectRatio = '4:5',
+  caption = '',
+  hashtags = [],
+  mentions = [],
+  accountHandle = 'muvidb_',
+  displayName = 'MuviDB Nollywood',
+  carouselAssets = [],
+  isCarousel = false,
+}) {
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [expandedCaption, setExpandedCaption] = useState(false);
+
+  const displayMediaList = isCarousel && carouselAssets.length > 0
+    ? carouselAssets
+    : [{ publicUrl: mediaUrl, mediaType }];
+
+  const currentMedia = displayMediaList[activeSlide] || displayMediaList[0];
+
+  const aspectClassMap = {
+    '1:1': 'aspect-square',
+    '4:5': 'aspect-[4/5]',
+    '9:16': 'aspect-[9/16]',
+    '16:9': 'aspect-[16/9]',
+  };
+  const aspectClass = aspectClassMap[aspectRatio] || 'aspect-[4/5]';
+
+  return (
+    <div className="mx-auto flex w-full max-w-[340px] flex-col overflow-hidden rounded-[36px] border-4 border-[#282828] bg-black shadow-2xl ring-1 ring-white/10">
+      {/* Smartphone Top Notch Bar */}
+      <div className="relative flex items-center justify-between bg-black px-6 pt-3 pb-2 text-[10px] text-white">
+        <span className="font-bold">9:41</span>
+        <div className="h-4 w-20 rounded-full bg-[#1A1A1A]" />
+        <div className="flex items-center gap-1.5 opacity-80">
+          <Icon icon="solar:signal-bold" width="12" />
+          <Icon icon="solar:wifi-bold" width="12" />
+          <Icon icon="solar:battery-charge-bold" width="14" />
+        </div>
+      </div>
+
+      {/* Feed Post Card Header */}
+      <div className="flex items-center justify-between border-b border-white/5 bg-[#0C0C0C] px-3.5 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-brand via-amber-500 to-rose-500 p-[1.5px]">
+            <div className="flex h-full w-full items-center justify-center rounded-full bg-black font-black text-[10px] text-brand">
+              M
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1">
+              <span className="truncate text-xs font-bold text-white">@{accountHandle.replace(/^@/, '')}</span>
+              <Icon icon="solar:verified-check-bold" className="shrink-0 text-sky-400" width="13" />
+            </div>
+            <span className="block text-[9px] text-neutral-400">Lagos, Nigeria · Nollywood</span>
+          </div>
+        </div>
+        <button type="button" className="text-neutral-400 hover:text-white">
+          <Icon icon="solar:menu-dots-bold" width="16" />
+        </button>
+      </div>
+
+      {/* Media Viewport */}
+      <div className={`relative w-full ${aspectClass} overflow-hidden bg-[#141414]`}>
+        {currentMedia?.publicUrl ? (
+          currentMedia.mediaType === 'video' ? (
+            <video
+              src={currentMedia.publicUrl}
+              controls
+              playsInline
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <img
+              src={currentMedia.publicUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          )
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-neutral-500">
+            <Icon icon="solar:gallery-linear" width="32" />
+            <span className="text-[10px]">Media canvas preview</span>
+          </div>
+        )}
+
+        {/* Carousel Slide Indicators */}
+        {isCarousel && displayMediaList.length > 1 && (
+          <>
+            <span className="absolute top-2.5 right-2.5 rounded-full bg-black/70 px-2 py-0.5 text-[9px] font-bold text-white backdrop-blur">
+              {activeSlide + 1}/{displayMediaList.length}
+            </span>
+            <div className="absolute inset-x-0 bottom-2.5 flex items-center justify-center gap-1">
+              {displayMediaList.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveSlide(idx)}
+                  className={`h-1.5 rounded-full transition-all ${
+                    activeSlide === idx ? 'w-4 bg-brand' : 'w-1.5 bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Action Bar (Like, Comment, Share, Bookmark) */}
+      <div className="bg-[#0C0C0C] px-3.5 pt-2.5 pb-1.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-white">
+            <button
+              type="button"
+              onClick={() => setLiked(!liked)}
+              className={`transition-transform active:scale-125 ${liked ? 'text-rose-500' : 'text-white hover:text-neutral-300'}`}
+            >
+              <Icon icon={liked ? 'solar:heart-bold' : 'solar:heart-linear'} width="20" />
+            </button>
+            <button type="button" className="text-white hover:text-neutral-300">
+              <Icon icon="solar:chat-round-dots-linear" width="20" />
+            </button>
+            <button type="button" className="text-white hover:text-neutral-300">
+              <Icon icon="solar:plain-linear" width="20" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSaved(!saved)}
+            className={`transition-transform active:scale-125 ${saved ? 'text-amber-400' : 'text-white hover:text-neutral-300'}`}
+          >
+            <Icon icon={saved ? 'solar:bookmark-bold' : 'solar:bookmark-linear'} width="20" />
+          </button>
+        </div>
+
+        <p className="mt-1.5 text-[11px] font-bold text-white">
+          {liked ? '1,421 likes' : '1,420 likes'}
+        </p>
+      </div>
+
+      {/* Caption & Tags preview */}
+      <div className="flex-1 bg-[#0C0C0C] px-3.5 pb-4 text-xs">
+        <div className="leading-relaxed text-neutral-200">
+          <span className="mr-1.5 font-black text-white">@{accountHandle.replace(/^@/, '')}</span>
+          <span className={expandedCaption ? '' : 'line-clamp-3'}>
+            {caption || 'Your generated high-impact caption will appear here.'}
+          </span>
+          {caption.length > 120 && (
+            <button
+              type="button"
+              onClick={() => setExpandedCaption(!expandedCaption)}
+              className="ml-1 font-bold text-neutral-400 hover:text-white"
+            >
+              {expandedCaption ? 'less' : 'more'}
+            </button>
+          )}
+        </div>
+
+        {/* Mentions & Hashtags */}
+        {(hashtags.length > 0 || mentions.length > 0) && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {mentions.map((tag, i) => (
+              <span key={`m-${i}`} className="text-[10px] font-bold text-brand hover:underline">
+                {tag}
+              </span>
+            ))}
+            {hashtags.slice(0, 4).map((tag, i) => (
+              <span key={`h-${i}`} className="text-[10px] font-bold text-brand hover:underline">
+                #{tag.replace(/^#/, '')}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <span className="mt-2 block text-[9px] font-semibold text-neutral-500 uppercase tracking-wider">
+          Just now · via MuviDB Social Studio
+        </span>
+      </div>
+
+      {/* Smartphone Home Bar */}
+      <div className="flex justify-center bg-[#0C0C0C] py-2">
+        <div className="h-1 w-28 rounded-full bg-white/30" />
+      </div>
+    </div>
+  );
+}
+
 export default function SocialDraftComposer({
   disabled,
   onGenerated,
@@ -1911,29 +2148,63 @@ export default function SocialDraftComposer({
                   </div>
                 </label>
               )}
-              <div className="flex flex-wrap gap-2">
-              {PLATFORMS.map(platform => (
-                <button
-                  key={platform.value}
-                  type="button"
-                  onClick={() => togglePlatform(platform.value)}
-                  disabled={!supportsThemeOnPlatform(activeTheme.id, platform.value)}
-                  title={!supportsThemeOnPlatform(activeTheme.id, platform.value)
-                    ? `${activeTheme.name} requires a carousel, which TikTok cannot publish from this studio`
-                    : undefined}
-                  className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold transition-all ${
-                    !supportsThemeOnPlatform(activeTheme.id, platform.value)
-                      ? 'cursor-not-allowed border-border bg-surface-2/50 text-text-muted/40'
-                      : platforms.includes(platform.value)
-                      ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
-                      : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  <Icon icon={platform.icon} width="16" />
-                  {platform.label}
-                  <span className="text-[9px] opacity-70">{accountForPlatform[platform.value]?.username ? `@${accountForPlatform[platform.value].username}` : 'Unmapped'}</span>
-                </button>
-              ))}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {PLATFORMS.map(platform => {
+                const isSelected = platforms.includes(platform.value);
+                const isSupported = supportsThemeOnPlatform(activeTheme.id, platform.value);
+                const account = accountForPlatform[platform.value];
+                const handle = account?.username ? `@${account.username}` : 'Unmapped';
+                const isConnected = account?.status === 'connected';
+
+                return (
+                  <button
+                    key={platform.value}
+                    type="button"
+                    onClick={() => togglePlatform(platform.value)}
+                    disabled={!isSupported}
+                    title={!isSupported
+                      ? `${activeTheme.name} requires a carousel, which TikTok cannot publish from this studio`
+                      : undefined}
+                    className={`group relative flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all ${
+                      !isSupported
+                        ? 'cursor-not-allowed border-white/5 bg-surface-2/40 opacity-40'
+                        : isSelected
+                        ? 'border-brand bg-brand/10 shadow-sm ring-1 ring-brand'
+                        : 'border-white/10 bg-surface-2 hover:border-brand/40 hover:bg-surface-2/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="relative">
+                        <span className={`flex h-10 w-10 items-center justify-center rounded-full text-white transition-all ${
+                          isSelected
+                            ? 'bg-gradient-to-tr ' + platform.accent + ' ring-2 ring-brand ring-offset-2 ring-offset-surface shadow-md'
+                            : 'bg-white/10 text-text-muted group-hover:bg-white/20'
+                        }`}>
+                          <Icon icon={platform.icon} width="20" />
+                        </span>
+                        {isConnected && (
+                          <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 text-[8px] text-black">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+
+                      <div className={`flex h-5 w-5 items-center justify-center rounded-full border transition-all ${
+                        isSelected ? 'border-brand bg-brand text-white' : 'border-white/20 bg-transparent text-transparent'
+                      }`}>
+                        <Icon icon="solar:check-read-bold" width="12" />
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <p className="text-xs font-black text-text-primary">{platform.label}</p>
+                      <p className="mt-0.5 truncate font-mono text-[10px] text-text-muted">
+                        {handle}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
               </div>
             </div>
           )}
@@ -2112,43 +2383,56 @@ export default function SocialDraftComposer({
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-text-muted">
-                    Preview each publishing channel
+                    Active Publishing Channel & Format
                   </p>
                   <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
                     {result.variants?.map(variant => {
                       const platform = PLATFORMS.find(entry => entry.value === variant.platform) || PLATFORMS[0];
                       const isActive = variant.platform === activeVariant?.platform;
+                      const account = accountForPlatform[variant.platform];
+                      const handle = account?.username ? `@${account.username}` : null;
                       return (
                         <button
                           key={variant.id}
                           type="button"
                           onClick={() => setActivePreviewPlatform(variant.platform)}
-                          className={`inline-flex min-w-fit items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-black transition-all ${
+                          className={`inline-flex min-w-fit items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-black transition-all ${
                             isActive
-                              ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand'
-                              : 'border-border bg-surface text-text-muted hover:text-text-primary'
+                              ? 'border-brand bg-brand/10 text-brand ring-2 ring-brand/40 shadow-sm'
+                              : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-text-primary'
                           }`}
                         >
-                          <Icon icon={platform.icon} width="16" /> {platform.label}
+                          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-white ${
+                            isActive ? 'bg-gradient-to-tr ' + platform.accent : 'bg-white/10 text-text-muted'
+                          }`}>
+                            <Icon icon={platform.icon} width="12" />
+                          </span>
+                          <span>{platform.label}</span>
+                          {handle && (
+                            <span className="font-mono text-[9px] font-normal opacity-70">
+                              {handle}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* View Space Layout Switcher (CapCut-Style Workspace Mode) */}
-                <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
+                {/* View Space Layout Switcher (CapCut-Style + Live Phone Preview Mode) */}
+                <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-surface p-1">
                   {[
                     { id: 'split', label: 'Split View', icon: 'solar:sidebar-minimalistic-linear' },
                     { id: 'canvas_focus', label: 'Canvas Focus', icon: 'solar:maximize-square-2-linear' },
                     { id: 'caption_focus', label: 'Caption Focus', icon: 'solar:document-text-linear' },
+                    { id: 'phone_preview', label: 'Live Phone Feed', icon: 'solar:smartphone-linear' },
                   ].map(mode => (
                     <button
                       key={mode.id}
                       type="button"
                       onClick={() => setViewLayout(mode.id)}
                       title={mode.label}
-                      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold transition-all ${
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all ${
                         viewLayout === mode.id
                           ? 'bg-brand text-white shadow-sm'
                           : 'text-text-muted hover:bg-surface-2 hover:text-text-primary'
@@ -2248,10 +2532,12 @@ export default function SocialDraftComposer({
                   ? 'grid-cols-1'
                   : viewLayout === 'caption_focus'
                     ? 'grid-cols-1'
-                    : 'lg:grid-cols-12'
+                    : viewLayout === 'phone_preview'
+                      ? 'grid-cols-1 lg:grid-cols-12'
+                      : 'lg:grid-cols-12'
               }`}>
                 {/* Visual Canvas Column */}
-                {viewLayout !== 'caption_focus' && (
+                {viewLayout !== 'caption_focus' && viewLayout !== 'phone_preview' && (
                   <section className={`min-w-0 space-y-3 ${viewLayout === 'canvas_focus' ? 'w-full' : 'lg:col-span-6'}`}>
                     <div className="flex items-center justify-between">
                       <div>
@@ -2495,56 +2781,150 @@ export default function SocialDraftComposer({
                   </section>
                 )}
 
+                {/* Live Phone Feed Preview Mode (Pastis-Style) */}
+                {viewLayout === 'phone_preview' && (
+                  <section className="lg:col-span-5 flex flex-col items-center justify-center space-y-3 py-2">
+                    <div className="flex items-center justify-between w-full max-w-[340px] px-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                        Live {activePlatform.label} Simulator
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-400">
+                        ● Live Render
+                      </span>
+                    </div>
+                    <LivePhoneFeedPreview
+                      platform={activeVariant?.platform}
+                      mediaUrl={activeVisualAssets[0]?.publicUrl}
+                      mediaType={activeVisualAssets[0]?.mediaType || (activeVisualAssets[0]?.format === 'custom_video' ? 'video' : 'image')}
+                      aspectRatio={canvasAspectRatio}
+                      caption={activeCaption}
+                      hashtags={activeVariant?.hashtags || []}
+                      mentions={activeMentions}
+                      accountHandle={accountForPlatform[activeVariant?.platform]?.username || 'muvidb_'}
+                      carouselAssets={activeVariantCarouselAssets}
+                      isCarousel={activeVariantPostFormat === 'carousel'}
+                    />
+                  </section>
+                )}
+
                 {/* Caption & Settings Column */}
                 {viewLayout !== 'canvas_focus' && (
-                  <section className={`min-w-0 space-y-3 ${viewLayout === 'caption_focus' ? 'w-full' : 'lg:col-span-6'}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} caption</p>
-                      <p className="text-[10px] text-text-muted">Edit the generated copy here. Each platform keeps its own caption.</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await persistCaption(activeVariant, activeCaption);
-                          } catch (err) {
-                            toast.error(err.message || 'Could not save caption');
-                          }
-                        }}
-                        disabled={!captionIsDirty || savingCaptionId === activeVariant?.id}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[11px] font-bold text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Icon icon={savingCaptionId === activeVariant?.id ? 'solar:spinner-linear' : 'solar:diskette-linear'} className={savingCaptionId === activeVariant?.id ? 'animate-spin' : ''} width="14" />
-                        {savingCaptionId === activeVariant?.id ? 'Saving…' : 'Save changes'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const full = `${activeCaption}\n\n${(activeVariant?.hashtags || []).slice(0, 3).map(tag => `#${tag}`).join(' ')}`;
-                          navigator.clipboard.writeText(full.trim());
-                          toast.success(`${activePlatform.label} caption copied`);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[11px] font-bold text-text-muted hover:border-brand hover:text-brand"
-                      >
-                        <Icon icon="solar:copy-linear" width="14" /> Copy
-                      </button>
-                    </div>
-                  </div>
+                  <section className={`min-w-0 space-y-4 ${
+                    viewLayout === 'caption_focus'
+                      ? 'w-full'
+                      : viewLayout === 'phone_preview'
+                        ? 'lg:col-span-7'
+                        : 'lg:col-span-6'
+                  }`}>
+                  {/* Caption Editor Card with Rich Pastis Toolbar */}
+                  <div className="rounded-2xl border border-white/10 bg-surface p-5 shadow-sm space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+                      <div className="flex items-center gap-3">
+                        <span className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr ${activePlatform.accent} text-white shadow-sm`}>
+                          <Icon icon={activePlatform.icon} width="20" />
+                        </span>
+                        <div>
+                          <p className="text-xs font-black text-text-primary">MuviDB Caption on {activePlatform.label}</p>
+                          <p className="text-[10px] text-text-muted">Tailor the copy for this specific audience.</p>
+                        </div>
+                      </div>
 
-                  <div className="min-h-[420px] rounded-2xl border border-border bg-surface p-5">
-                    <div className="flex items-center gap-2 border-b border-border pb-3">
-                      <span className={`flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br ${activePlatform.accent} text-white`}>
-                        <Icon icon={activePlatform.icon} width="18" />
-                      </span>
-                      <div>
-                        <p className="text-xs font-black text-text-primary">MuviDB on {activePlatform.label}</p>
-                        <p className={`text-[10px] ${activeCaption.length > activeCaptionLimit ? 'text-red-500' : 'text-text-muted'}`}>
-                          {activeCaption.length}/{activeCaptionLimit} characters
-                        </p>
+                      {/* Circular Character Counter Ring & Actions */}
+                      <div className="flex items-center gap-3">
+                        <CharacterProgressRing
+                          current={activeCaption.length}
+                          max={activeCaptionLimit}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await persistCaption(activeVariant, activeCaption);
+                            } catch (err) {
+                              toast.error(err.message || 'Could not save caption');
+                            }
+                          }}
+                          disabled={!captionIsDirty || savingCaptionId === activeVariant?.id}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-xs font-black text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40 transition-all shadow-sm"
+                        >
+                          <Icon icon={savingCaptionId === activeVariant?.id ? 'solar:spinner-linear' : 'solar:diskette-bold'} className={savingCaptionId === activeVariant?.id ? 'animate-spin' : ''} width="15" />
+                          {savingCaptionId === activeVariant?.id ? 'Saving…' : 'Save'}
+                        </button>
                       </div>
                     </div>
+
+                    {/* Rich Formatting & Tag Helpers Toolbar */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-surface-2/80 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-1 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = `${activeCaption} **highlight**`;
+                            setCaptionDrafts(curr => ({ ...curr, [activeVariant.id]: updated }));
+                          }}
+                          title="Bold text"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/5 bg-surface text-text-secondary hover:border-brand/40 hover:text-brand transition-all font-serif font-black"
+                        >
+                          B
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = `${activeCaption} *italic*`;
+                            setCaptionDrafts(curr => ({ ...curr, [activeVariant.id]: updated }));
+                          }}
+                          title="Italic text"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/5 bg-surface text-text-secondary hover:border-brand/40 hover:text-brand transition-all italic font-serif"
+                        >
+                          I
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = `${activeCaption}\n• `;
+                            setCaptionDrafts(curr => ({ ...curr, [activeVariant.id]: updated }));
+                          }}
+                          title="Bullet point"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/5 bg-surface text-text-secondary hover:border-brand/40 hover:text-brand transition-all"
+                        >
+                          •
+                        </button>
+                        <span className="h-4 w-px bg-white/10 mx-1" />
+
+                        {/* Quick Nollywood Hashtag Insert Pills */}
+                        {['#Nollywood', '#NollywoodCinema', '#MuviDB', '#NigerianMovies'].map(tag => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              const updated = activeCaption.includes(tag) ? activeCaption : `${activeCaption} ${tag}`.trim();
+                              setCaptionDrafts(curr => ({ ...curr, [activeVariant.id]: updated }));
+                              toast.success(`Added ${tag}`);
+                            }}
+                            className="rounded-md border border-white/5 bg-surface px-2 py-0.5 text-[10px] font-mono font-bold text-text-muted hover:border-brand/40 hover:text-brand transition-all"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const full = `${activeCaption}\n\n${(activeVariant?.hashtags || []).slice(0, 3).map(tag => `#${tag}`).join(' ')}`;
+                            navigator.clipboard.writeText(full.trim());
+                            toast.success(`${activePlatform.label} caption copied`);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-surface px-2.5 py-1 text-[11px] font-bold text-text-muted hover:border-brand hover:text-brand transition-all"
+                        >
+                          <Icon icon="solar:copy-linear" width="13" />
+                          <span>Copy</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <textarea
                       value={activeCaption}
                       onChange={event => setCaptionDrafts(current => ({
@@ -2552,20 +2932,31 @@ export default function SocialDraftComposer({
                         [activeVariant.id]: event.target.value,
                       }))}
                       maxLength={activeCaptionLimit}
-                      rows={15}
+                      rows={14}
                       aria-label={`Edit ${activePlatform.label} caption`}
-                      className="mt-4 min-h-[300px] w-full resize-y rounded-xl border border-border bg-surface-2 p-4 text-sm leading-relaxed text-text-primary outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand"
+                      className="min-h-[280px] w-full resize-y rounded-xl border border-white/10 bg-surface-2 p-4 text-sm leading-relaxed text-text-primary outline-none transition-colors focus:border-brand focus:ring-1 focus:ring-brand font-sans"
                       placeholder="Write the caption for this platform…"
                     />
+
                     {activeVariant?.hashtags?.length > 0 && (
-                      <p className="mt-4 text-sm font-bold leading-relaxed text-brand">
-                        {activeVariant.hashtags.slice(0, 3).map(tag => `#${tag}`).join(' ')}
-                      </p>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-text-muted self-center mr-1">
+                          Generated Hashtags:
+                        </span>
+                        {activeVariant.hashtags.map(tag => (
+                          <span
+                            key={tag}
+                            className="rounded-md border border-brand/20 bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand"
+                          >
+                            #{tag.replace(/^#/, '')}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
 
                   {/* Tagged Accounts & Collaborators (@mentions) */}
-                  <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+                  <div className="rounded-2xl border border-white/10 bg-surface p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10 text-brand">
@@ -2744,15 +3135,15 @@ export default function SocialDraftComposer({
                   )}
 
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-lg border border-border bg-surface p-3">
+                    <div className="rounded-xl border border-white/10 bg-surface p-3">
                       <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Format</p>
                       <p className="mt-1 text-xs font-bold text-text-primary">{postFormat === 'carousel' ? 'Carousel' : 'Single image'}</p>
                     </div>
-                    <div className="rounded-lg border border-border bg-surface p-3">
+                    <div className="rounded-xl border border-white/10 bg-surface p-3">
                       <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Visual</p>
                       <p className="mt-1 text-xs font-bold text-text-primary">{selectedSingleAsset?.format === 'custom_design' ? 'Custom poster' : 'Generated'}</p>
                     </div>
-                    <div className="rounded-lg border border-border bg-surface p-3">
+                    <div className="rounded-xl border border-white/10 bg-surface p-3">
                       <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Channel</p>
                       <p className="mt-1 text-xs font-bold text-text-primary">{activePlatform.label}</p>
                     </div>
