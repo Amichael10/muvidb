@@ -121,6 +121,16 @@ export async function searchPeopleByName(
       supabase.from('people').select(select).ilike('name', `%[${tokens[0]}]%`).limit(limit),
     ]);
     for (const result of aliasQueries) if (!result.error) addRows(result.data);
+    const { data: aliasRows } = await supabase
+      .from('person_aliases')
+      .select('person_id,alias')
+      .ilike('alias', `%${tokens[0]}%`)
+      .limit(limit * 2);
+    const aliasIds = [...new Set((aliasRows || []).map(row => row.person_id).filter(Boolean))];
+    if (aliasIds.length) {
+      const { data: aliasPeople } = await supabase.from('people').select(select).in('id', aliasIds);
+      addRows(aliasPeople);
+    }
   } else {
     // 2) name_key column (same as RPC, kept for envs where RPC lags)
     // 3) OR of strong tokens — wider net than AND, then client-rank by key
@@ -147,6 +157,16 @@ export async function searchPeopleByName(
         continue;
       }
       addRows(data);
+    }
+    const { data: aliasRows } = await supabase
+      .from('person_aliases')
+      .select('person_id,alias')
+      .ilike('alias', `%${tokens.join('%')}%`)
+      .limit(limit * 2);
+    const aliasIds = [...new Set((aliasRows || []).map(row => row.person_id).filter(Boolean))];
+    if (aliasIds.length) {
+      const { data: aliasPeople } = await supabase.from('people').select(select).in('id', aliasIds);
+      addRows(aliasPeople);
     }
   }
 
