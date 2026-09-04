@@ -63,9 +63,8 @@ const SINGLE_FRAME_MIN_OCR_CONFIDENCE = Number(arg('single-frame-min-ocr')) || 0
 const REHARVEST_EXISTING = arg('reharvest-existing') !== undefined;
 const YTDLP_TIMEOUT = 900_000;  // 15 min ceiling for a throttled tail
 const DEFAULT_VIDEO_FORMAT =
-  // 240p avc1 first: android_vr section downloads are heavily throttled, and
-  // direct recon showed 480p can time out while 240p still leaves credits legible.
-  '133/134/135/160/bv*[height<=360][vcodec^=avc1]/bv*[height<=360]/bv*[height<=480][vcodec^=avc1]/bv*[height<=480]/best[height<=480]/best';
+  // Prefer 720p for clearer OCR, then fall back for videos without that rendition.
+  'bestvideo[height<=720]+bestaudio/best[height<=720][ext=mp4]/best[height<=720]/best';
 const VIDEO_FORMAT = arg('format') ?? process.env.YTDLP_FORMAT ?? DEFAULT_VIDEO_FORMAT;
 const AUTO_ENQUEUE_LATEST_LIMIT = Math.max(0, Math.floor(numberSetting('auto-enqueue-latest', 'CREDIT_HARVEST_AUTO_ENQUEUE_LATEST', 1000)));
 const AUTO_ENQUEUE_MIN_CREDITS = Math.max(0, Math.floor(numberSetting('auto-enqueue-min-credits', 'CREDIT_HARVEST_AUTO_ENQUEUE_MIN_CREDITS', 4)));
@@ -89,6 +88,12 @@ const NOISE_LINE = /^(the end|end|thanks for watching|©|copyright|all rights|ww
 /** Role labels that mark a real credit line ("DIRECTOR: X", "Produced by Y"). */
 const ROLE_HINT =
   /\b(directed|produced|written|screenplay|story|editor|edited|camera|cinematograph|dop|d\.o\.p|sound|music|makeup|make-up|costume|wardrobe|continuity|starring|featuring|cast|crew|production manager|executive|assistant|art director|location)\b/i;
+
+// These channels routinely append adverts/promos, so skip them in automation.
+const IGNORED_CHANNEL_PATTERNS = [/apatatv/i, /yorubahood/i];
+function ignoredChannel(name: string | null | undefined): boolean {
+  return !!name && IGNORED_CHANNEL_PATTERNS.some((pattern) => pattern.test(name));
+}
 
 type Job = {
   // null in --film debug mode: there's no queue row, and job_id is a FK, so it
@@ -612,6 +617,20 @@ function candidateKey(row: { raw_name: string; role_or_character?: string | null
   ].join('|');
 }
 
+/** Collapse exact OCR repeats while retaining a person in distinct roles. */
+function dedupeCandidateRows(rows: Array<Record<string, any>>) {
+  const unique = new Map<string, Record<string, any>>();
+  for (const row of rows) {
+    const key = candidateKey(row as any);
+    const previous = unique.get(key);
+    if (!previous) { unique.set(key, row); continue; }
+    const prevScore = Number(previous.ocr_confidence ?? 0) + Number(previous.frame_support ?? 0) * 0.05;
+    const nextScore = Number(row.ocr_confidence ?? 0) + Number(row.frame_support ?? 0) * 0.05;
+    if (nextScore > prevScore) unique.set(key, row);
+  }
+  return [...unique.values()];
+}
+
 
 // ------------------------------------------------------------- metadata ----
 // Text-only metadata extraction from the YouTube title/description. This avoids
@@ -1035,6 +1054,38 @@ async function processJob(job: Job) {
     return;
   }
 
+  // Enforce the channel exclusion at execution time as well as enqueue time.
+  // Jobs can be left over from an older queue, and some enqueue modes do not
+  // carry channel metadata on the job row.
+  const channelLabels: string[] = [];
+  if (job.channel_id) {
+    const { data: channel } = await supabase
+      .from('channels')
+      .select('name, slug')
+      .eq('id', job.channel_id)
+      .maybeSingle();
+    if (channel?.name) channelLabels.push(channel.name);
+    if (channel?.slug) channelLabels.push(channel.slug);
+  } else {
+    // Most automatic enqueue modes only store film_id. Resolve its source
+    // channel here so the ignore list still applies to those jobs.
+    const { data: sources } = await supabase
+      .from('channel_videos')
+      .select('channels(name, slug)')
+      .eq('film_id', job.film_id)
+      .limit(10);
+    for (const source of (sources ?? []) as any[]) {
+      if (source.channels?.name) channelLabels.push(source.channels.name);
+      if (source.channels?.slug) channelLabels.push(source.channels.slug);
+    }
+  }
+  const ignoredLabel = channelLabels.find((label) => ignoredChannel(label));
+  if (ignoredLabel) {
+    await finish(job, 'unavailable', 0, `ignored channel: ${ignoredLabel}`, filmLabel);
+    console.log(`   ⏭️  ${filmLabel.slice(0, 45)} → ignored channel ${ignoredLabel}`);
+    return;
+  }
+
   await saveMetadataCandidate(job, film as FilmSnapshot);
 
   // Queue runs are resumable and may be re-enqueued while an earlier debug run
@@ -1157,6 +1208,12 @@ async function processJob(job: Job) {
       );
       return;
     }
+
+    // A name can be visible on several adjacent OCR frames. Consolidation
+    // normally handles this, but exact duplicate rows can still be emitted by
+    // different layout detectors. Remove those repeats without collapsing
+    // distinct role/character entries (including Extras).
+    rows = dedupeCandidateRows(rows);
 
     const { data: existingRows, error: existingRowsError } = await supabase
       .from('credit_candidates')

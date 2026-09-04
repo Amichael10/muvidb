@@ -88,6 +88,8 @@ const DIALOGUE_WORDS = new Set([
 ]);
 
 const ROLE_PATTERNS: Array<[RegExp, string]> = [
+  [/^(?:EXTRAS?|BACKGROUND(?: ARTISTS?| CAST)?)(?: BY)?$/, 'Extra'],
+  [/^(?:CAMEO|CAMEO APPEARANCE|SPECIAL APPEARANCE)$/, 'Cameo'],
   [/^STORY(?: BY)?$/, 'Story'],
   [/^(?:SCREEN ?PLAY|SCRIPT)(?: BY)?$/, 'Screenplay'],
   [/^(?:WRITTEN|WRITER)(?: BY)?$/, 'Writer'],
@@ -177,6 +179,10 @@ function canonicalRole(value: string): string | null {
     if (pattern.test(key)) return role;
   }
   return null;
+}
+
+function isCastCreditRole(role: string): boolean {
+  return /^(?:Extra|Cameo|Special Appearance|Supporting Cast|Actor)$/i.test(role.trim());
 }
 
 function canonicalCastGroup(value: string): string | null {
@@ -625,7 +631,7 @@ export function parseCreditFrame(
       observations.push({
         name: smartTitle(lettersAndSpaces(inline.name)),
         roleOrCharacter: inline.role,
-        creditType: 'crew',
+        creditType: isCastCreditRole(inline.role) ? 'actor' : 'crew',
         frameIndex,
         frameSec,
         videoSec,
@@ -663,7 +669,7 @@ export function parseCreditFrame(
           observations.push({
             name: person.name,
             roleOrCharacter: currentRole,
-            creditType: 'crew',
+            creditType: isCastCreditRole(currentRole) ? 'actor' : 'crew',
             frameIndex,
             frameSec,
             videoSec,
@@ -760,7 +766,7 @@ export function parseCreditFrame(
     observations.push({
       name: smartTitle(lettersAndSpaces(line.text)),
       roleOrCharacter: currentRole,
-      creditType: 'crew',
+      creditType: isCastCreditRole(currentRole) ? 'actor' : 'crew',
       frameIndex,
       frameSec,
       videoSec,
