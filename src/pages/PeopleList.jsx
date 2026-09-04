@@ -14,6 +14,7 @@ import {
 } from '../lib/creditRoles'
 import { searchPeopleByName } from '../lib/peopleSearch'
 import ImageWithFallback from '../components/ui/ImageWithFallback'
+import { formatViewCount } from '../utils/youtube'
 
 // Quick-access primary roles
 const PRIMARY_ROLE_FILTERS = [
@@ -295,14 +296,7 @@ const PersonCard = ({ person, currentUser }) => {
 
         {/* Badges Overlay */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1 pointer-events-none">
-          {person.is_verified ? (
-            <span className="inline-flex items-center gap-1 bg-brand text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shadow-md backdrop-blur-sm">
-              <Icon icon="solar:verified-check-bold" width="12" />
-              VERIFIED
-            </span>
-          ) : (
-            <span />
-          )}
+          <span />
 
           {person.is_spotlight && (
             <span className="inline-flex items-center gap-1 bg-amber-500/90 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shadow-md backdrop-blur-sm">
@@ -317,8 +311,9 @@ const PersonCard = ({ person, currentUser }) => {
 
       <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between">
         <div>
-          <h3 className="text-text-primary font-bold text-xs sm:text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1">
-            {formatPersonName(person.name)}
+          <h3 className="flex items-center gap-1 text-text-primary font-bold text-xs sm:text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1">
+            {person.is_verified && <Icon icon="solar:verified-check-bold" width="14" className="shrink-0 text-brand" title="Verified" />}
+            <span className="truncate">{formatPersonName(person.name)}</span>
           </h3>
 
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
@@ -344,7 +339,7 @@ const PersonCard = ({ person, currentUser }) => {
             {person.popularity_score > 0 && (
               <div className="flex items-center gap-1 opacity-70">
                 <Icon icon="solar:fire-linear" width="11" />
-                <span>{Math.round(person.popularity_score)}</span>
+                <span>{formatViewCount(Math.round(person.popularity_score))}</span>
               </div>
             )}
           </div>
@@ -428,14 +423,14 @@ const PersonRow = ({ person, currentUser }) => {
 
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <h3 className="text-text-primary font-bold text-xs sm:text-base group-hover:text-brand transition-colors truncate">
-              {formatPersonName(person.name)}
-            </h3>
             {person.is_verified && (
               <span title="Verified Talent" className="text-brand flex-shrink-0">
                 <Icon icon="solar:verified-check-bold" width="15" />
               </span>
             )}
+            <h3 className="text-text-primary font-bold text-xs sm:text-base group-hover:text-brand transition-colors truncate">
+              {formatPersonName(person.name)}
+            </h3>
             {person.is_spotlight && (
               <span title="Spotlight Feature" className="text-amber-500 flex-shrink-0">
                 <Icon icon="solar:star-bold" width="13" />
@@ -460,7 +455,7 @@ const PersonRow = ({ person, currentUser }) => {
         <div className="hidden sm:flex flex-col items-end text-right">
           <div className="flex items-center gap-1.5 text-text-primary font-bold text-xs">
             <Icon icon="solar:clapperboard-play-linear" className="text-brand" width="14" />
-            <span>{creditCount}</span>
+            <span>{formatViewCount(creditCount)}</span>
             <span className="text-text-muted font-normal text-[11px]">
               {creditCount === 1 ? 'film' : 'films'}
             </span>
