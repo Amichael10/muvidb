@@ -27,6 +27,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, rm, readdir, writeFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { supabase } from './lib/db';
@@ -56,7 +57,7 @@ function numberSetting(name: string, envName: string, fallback: number) {
 // Credit rolls sit in the final minutes. Use explicit positive timestamps for
 // --download-sections; the negative form (`*-300-inf`) produced empty stubs on
 // this source even though yt-dlp exited successfully.
-const TAIL_SECONDS = Number(arg('tail')) || 180; // last 3 min default (override: --tail=180)
+const TAIL_SECONDS = Number(arg('tail')) || 240; // last 4 min default (override: --tail=180 for 3 min)
 const MIN_ENTRIES = 4;          // structural gate: fewer than this isn't a roll
 const FRAME_EVERY_SEC = Number(arg('frame-every')) || 1; // sample cadence inside the tail
 const SINGLE_FRAME_MIN_OCR_CONFIDENCE = Number(arg('single-frame-min-ocr')) || 0.65;
@@ -308,7 +309,15 @@ process.on('SIGTERM', () => requestGracefulStop('termination signal'));
 // tv formats are DRM'd, and ios needs a PO token. Pass a Netscape cookies.txt
 // via --cookies=<path> (or COOKIES_FILE/YT_COOKIES env), or pull from a browser
 // via --cookies-from-browser=chrome|edge|firefox.
-const COOKIES_FILE = arg('cookies') ?? process.env.COOKIES_FILE ?? process.env.YT_COOKIES;
+const configuredCookies = arg('cookies') ?? process.env.COOKIES_FILE ?? process.env.YT_COOKIES;
+// Prefer the repository's checked-out cookie file when no explicit path is
+// supplied. This keeps the worker reproducible on a fresh laptop while still
+// allowing --cookies or an environment variable to override it.
+const COOKIES_FILE = configuredCookies || [
+  resolve(process.cwd(), 'cookies.txt'),
+  resolve(process.cwd(), 'cookies.txt.txt'),
+  resolve(process.cwd(), 'services/media-extractor/cookies.txt'),
+].find((path) => existsSync(path));
 const COOKIES_BROWSER = arg('cookies-from-browser');
 function cookieArgs(): string[] {
   if (COOKIES_FILE) return ['--cookies', COOKIES_FILE];
