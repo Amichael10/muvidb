@@ -647,7 +647,6 @@ export default function AdminPeople() {
             .eq('id', editingPerson.id);
           if (error) throw error;
           await logAdminAction(user, 'update', 'person', editingPerson.id, payload.name);
-          toast.success('Profile updated');
           return editingPerson.id;
         } else {
           const { data, error } = await supabase
@@ -657,7 +656,6 @@ export default function AdminPeople() {
           if (error) throw error;
           const newPersonId = data?.[0]?.id;
           await logAdminAction(user, 'create', 'person', newPersonId, payload.name);
-          toast.success('Person added');
           return newPersonId;
         }
       };
@@ -671,6 +669,7 @@ export default function AdminPeople() {
             if (aliasError) throw aliasError;
           }
         }
+        toast.success(editingPerson ? 'Profile updated' : 'Person added');
       } catch (saveErr) {
         // If date_of_death / is_deceased column does not exist in schema yet, retry without them
         if (saveErr?.message?.includes('date_of_death') || saveErr?.message?.includes('is_deceased')) {
