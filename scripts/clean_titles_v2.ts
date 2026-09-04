@@ -575,31 +575,19 @@ async function getOrCreatePerson(
   const norm = sanitized.toLowerCase();
   if (personMap.has(norm)) return personMap.get(norm)!;
 
-  const { data: existing } = await supabase
-    .from('people')
-    .select('id, name')
-    .ilike('name', sanitized)
-    .maybeSingle();
-
-  if (existing) {
-    personMap.set(existing.name.toLowerCase(), existing.id);
-    return existing.id;
-  }
-
-  const { data: created, error } = await supabase
-    .from('people')
-    .insert([{ name: sanitized, nationality: 'Nigerian', gender: 'Prefer not to say' }])
-    .select('id, name')
-    .single();
-
-  if (error || !created) {
-    console.error(`  ✗ Failed to create stub for "${sanitized}": ${error?.message}`);
+  // Use the canonical DB resolver so punctuation, reordered names, and
+  // person_aliases are checked atomically before any insert can occur.
+  const { data: resolved, error } = await supabase.rpc('upsert_person_by_name', {
+    p_name: sanitized,
+    p_extra: { nationality: 'Nigerian', source: 'title_extraction' },
+  });
+  if (error || !resolved) {
+    console.error(`  ✗ Failed to resolve person for "${sanitized}": ${error?.message}`);
     return null;
   }
 
-  console.log(`  ✨ Created person stub: "${created.name}"`);
-  personMap.set(norm, created.id);
-  return created.id;
+  personMap.set(norm, resolved);
+  return resolved;
 }
 
 main().catch(err => {
