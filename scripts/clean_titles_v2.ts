@@ -555,9 +555,11 @@ function validateName(raw: string, knownLower: Set<string>): string | null {
 
   if (words.some(w => NON_NAME_WORDS.has(w))) return null;
 
+  // This legacy-catalogue pass must never promote ordinary title phrases
+  // ("The Sequel", "Lost Homeland", etc.) into new people. Only names already
+  // present in people or person_aliases are safe extraction candidates.
   const inKnown = knownLower.has(lower);
-  if (!inKnown && words.length < 2) return null;
-  if (!inKnown && words.length > 4) return null;
+  if (!inKnown) return null;
 
   return toTitleCase(name);
 }
