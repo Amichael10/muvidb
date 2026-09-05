@@ -12,7 +12,7 @@
 // Optional pg_trgm RPCs (see migration) add typo tolerance on top; if they
 // aren't installed yet we silently skip them.
 import { supabase } from './supabase';
-import { searchPeopleByName } from './peopleSearch';
+import { searchPeopleByName, rankPeopleResults } from './peopleSearch';
 import { sortedNameKey } from './personNameMatch';
 
 const FILM_FIELDS = `
@@ -144,9 +144,7 @@ export async function searchAll(query) {
     return [...rows, ...fz.filter((r) => r?.id && !seen.has(r.id))];
   };
 
-  const people = mergeFuzzy(peopleRows, peopleFz)
-    .map((p) => ({ ...p, _score: scoreText(p.name, fullQ, terms) }))
-    .sort((a, b) => b._score - a._score)
+  const people = rankPeopleResults(query, mergeFuzzy(peopleRows, peopleFz))
     .slice(0, 24);
 
   // Films by title, plus fuzzy matches so a typo'd title still lands
@@ -213,7 +211,7 @@ export async function searchAll(query) {
       });
       if (res.ok) {
         const body = await res.json();
-        const order = new Map((body.films || []).map((r, i) => [r.id, (r._semantic ?? 0) * 500 - i]));
+        const order = new Map((body.films || []).map((r, i) => [r.id, (r.score ?? r._semantic ?? 0) * 500 - i]));
         if (order.size) {
           films = films
             .map((f) => (order.has(f.id) ? { ...f, _score: Math.max(f._score, order.get(f.id)) } : f))

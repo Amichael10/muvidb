@@ -52,7 +52,13 @@ export default function HtmlSocialTemplatePreview({ candidate, templateSlug }) {
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return undefined;
-    const updateSize = () => setAvailableSize(Math.min(element.clientWidth, element.clientHeight));
+    const updateSize = () => {
+      const w = element.clientWidth || 0;
+      const h = element.clientHeight || 0;
+      if (w > 0 && h > 0) {
+        setAvailableSize(Math.min(w, h));
+      }
+    };
     updateSize();
     const observer = new ResizeObserver(updateSize);
     observer.observe(element);
@@ -60,21 +66,31 @@ export default function HtmlSocialTemplatePreview({ candidate, templateSlug }) {
   }, []);
 
   return (
-    <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden flex items-center justify-center">
       {scale > 0 && (
-        <iframe
-          key={`${templateSlug}:${candidate?.id || candidate?.name || ''}`}
-          title={`${candidate?.name || 'MuviDB'} social graphic preview`}
-          src={`/social-templates/${templateSlug}.html?${params.toString()}`}
-          sandbox="allow-scripts"
-          className="absolute left-1/2 top-1/2 border-0 bg-transparent"
+        <div
           style={{
             width: `${nativeSize}px`,
             height: `${nativeSize}px`,
-            transform: `translate(-50%, -50%) scale(${scale})`,
-            transformOrigin: 'center',
+            transform: `scale(${scale})`,
+            transformOrigin: 'center center',
           }}
-        />
+          className="flex items-center justify-center shrink-0 pointer-events-none select-none"
+        >
+          <iframe
+            key={`${templateSlug}:${candidate?.id || candidate?.name || ''}`}
+            title={`${candidate?.name || 'MuviDB'} social graphic preview`}
+            src={`/social-templates/${templateSlug}.html?${params.toString()}`}
+            scrolling="no"
+            sandbox="allow-scripts"
+            className="h-full w-full border-0 bg-transparent block"
+            style={{
+              width: `${nativeSize}px`,
+              height: `${nativeSize}px`,
+              overflow: 'hidden',
+            }}
+          />
+        </div>
       )}
     </div>
   );

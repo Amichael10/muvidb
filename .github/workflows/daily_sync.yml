@@ -15,6 +15,8 @@ on:
     # 2026), so each run re-checks a trailing six-month window rather than
     # only the month that just closed.
     - cron: '0 3 1 * *'
+    # Sunday Weekly Critics Reviews Sync (4:00 AM UTC = 5:00 AM WAT)
+    - cron: '0 4 * * 0'
   workflow_dispatch:
     inputs:
       task:
@@ -36,6 +38,7 @@ on:
           - ai_maintenance
           - nfvcb
           - credits_enrichment
+          - critics
 
 jobs:
   sync:
@@ -346,3 +349,15 @@ jobs:
           GEMINI_API_KEY_7: ${{ secrets.GEMINI_API_KEY_7 }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Sync Critics Reviews (Sundays & Manual)
+        if: github.event.schedule == '0 4 * * 0' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'critics'))
+        run: |
+          echo "Scanning Nollywood critic publications & syncing reviews..."
+          npx tsx scripts/sync-critics.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+

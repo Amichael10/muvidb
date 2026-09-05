@@ -619,4 +619,119 @@ describe('credit roll layout parser', () => {
     expect(lorentta?.frameSupport).toBe(2);
     expect(consolidated.filter((credit) => credit.name.startsWith('Lorentta'))).toHaveLength(1);
   });
+
+  it('parses two-column cast card with characters on left and actor names on right including brackets and nicknames', () => {
+    const rows = alignOcrRows([
+      line(100, [['Emeka', 100, 45]]), line(102, [['TOOSWEET', 250, 80], ['ANNAN', 340, 50]]),
+      line(135, [['Juliet', 100, 40]]), line(136, [['EMMANUELLA', 250, 100], ['ISIOMA', 360, 60], ['ILOBA', 430, 50]]),
+      line(170, [['Chioma', 100, 50]]), line(171, [['STELLA', 250, 60], ['UDEZE', 320, 60]]),
+      line(205, [['Nelson', 100, 48]]), line(206, [['NWEKE', 250, 60], ['DAVID', 320, 55]]),
+      line(240, [['Tara', 100, 35]]), line(241, [['EJIOFOR', 250, 70], ['VICTORIA', 330, 80], ['UTO', 420, 35]]),
+      line(275, [['Kemi', 100, 38]]), line(276, [['NMACHUKWU', 250, 100], ['EJIOFOR', 360, 70]]),
+      line(310, [['Rebecca', 100, 60]]), line(311, [['DANIELLA', 250, 80], ['EJIOFOR', 340, 70]]),
+      line(345, [['Ngozi', 100, 40]]), line(346, [['NCHEDO', 250, 65], ['EJIOFOR', 325, 70], ['(LOLO)', 405, 50]]),
+      line(380, [['Mr', 100, 20], ['Gregg', 125, 45]]), line(381, [['COURAGE', 250, 80], ['ANNOR', 340, 60]]),
+      line(415, [['Tunde', 100, 45]]), line(416, [['ANIEROBI', 250, 80], ['IRO', 340, 30], ['COURAGE', 380, 80], ['[NWASOUTH]', 470, 95]]),
+      line(450, [['Landlord', 100, 65]]), line(451, [['GOODLUCK', 250, 85], ['CLEMENT', 345, 75]]),
+    ]);
+    const parsed = parseCreditFrame(rows, 1, 1, 100);
+    expect(parsed.map((c) => [c.name, c.roleOrCharacter, c.creditType])).toEqual([
+      ['Toosweet Annan', 'Emeka', 'actor'],
+      ['Emmanuella Isioma Iloba', 'Juliet', 'actor'],
+      ['Stella Udeze', 'Chioma', 'actor'],
+      ['Nweke David', 'Nelson', 'actor'],
+      ['Ejiofor Victoria Uto', 'Tara', 'actor'],
+      ['Nmachukwu Ejiofor', 'Kemi', 'actor'],
+      ['Daniella Ejiofor', 'Rebecca', 'actor'],
+      ['Nchedo Ejiofor', 'Ngozi', 'actor'],
+      ['Courage Annor', 'Mr Gregg', 'actor'],
+      ['Anierobi Iro Courage', 'Tunde', 'actor'],
+      ['Goodluck Clement', 'Landlord', 'actor'],
+    ]);
+  });
+
+  it('parses two-column crew cards where left column has crew roles and right column has crew names', () => {
+    const rows = alignOcrRows([
+      line(100, [['DIRECTOR', 100, 80]]), line(100, [['KUNLE', 300, 50], ['AFOLAYAN', 360, 70]]),
+      line(135, [['PRODUCER', 100, 80]]), line(135, [['SOLOMON', 300, 75], ['APETE', 385, 55]]),
+      line(170, [['DIRECTOR', 100, 75], ['OF', 180, 20], ['PHOTOGRAPHY', 205, 95]]), line(170, [['EMEKA', 310, 50], ['EZEMONYE', 370, 75]]),
+      line(205, [['SOUND', 100, 50], ['RECORDIST', 155, 80]]), line(205, [['EJIKE', 300, 45], ['MBA', 355, 35]]),
+      line(240, [['EDITOR', 100, 55]]), line(240, [['EMMANUEL', 300, 80], ['NWAOGU', 390, 65]]),
+      line(275, [['COSTUME', 100, 70], ['DESIGNER', 175, 75]]), line(275, [['CHIKODI', 300, 65], ['AKUCHIE', 375, 70]]),
+      line(310, [['GAFFER', 100, 60]]), line(310, [['OLAWALE', 300, 70], ['IBRAHIM', 380, 65]]),
+      line(345, [['CONTINUITY', 100, 95]]), line(345, [['OKOCHI', 300, 65], ['LAWRENCE', 375, 75]]),
+    ]);
+    const parsed = parseCreditFrame(rows, 1, 1, 100);
+    expect(parsed.map((c) => [c.name, c.roleOrCharacter, c.creditType])).toEqual([
+      ['Kunle Afolayan', 'Director', 'crew'],
+      ['Solomon Apete', 'Producer', 'crew'],
+      ['Emeka Ezemonye', 'Director of Photography', 'crew'],
+      ['Ejike Mba', 'Sound Recordist', 'crew'],
+      ['Emmanuel Nwaogu', 'Editor', 'crew'],
+      ['Chikodi Akuchie', 'Costume', 'crew'],
+      ['Olawale Ibrahim', 'Gaffer', 'crew'],
+      ['Okochi Lawrence', 'Continuity', 'crew'],
+    ]);
+  });
+
+  it('does not make a single first name become the character for subsequent cast', () => {
+    const unmergedLines = [
+      line(80, [['CAST', 200, 50]]),
+      line(100, [['EMEKA', 200, 60]]),
+      line(135, [['TOOSWEET', 180, 80], ['ANNAN', 270, 60]]),
+      line(170, [['STELLA', 180, 60], ['UDEZE', 250, 60]]),
+      line(205, [['NWEKE', 180, 60], ['DAVID', 250, 55]]),
+    ];
+    const parsed = parseCreditFrame(unmergedLines, 1, 1, 100);
+    expect(parsed.length).toBeGreaterThan(0);
+    expect(parsed.every((c) => c.roleOrCharacter === 'Emeka')).toBe(false);
+    expect(parsed.map((c) => c.roleOrCharacter)).toEqual(['Actor', 'Actor', 'Actor']);
+  });
+
+  it('ignores Special Thanks / Appreciation / Alhamdulillah cards completely', () => {
+    const thanksLines = [
+      line(30, [['Alhamdulillah', 400, 150]]),
+      line(80, [['Special', 50, 60], ['Thanks', 120, 70]]),
+      line(110, [['Ado', 50, 30], ['Gwanja', 90, 60]]),
+      line(135, [['Hafsat', 50, 50], ['Umar', 110, 45]]),
+      line(160, [['Umar', 50, 45], ['Muhammad', 105, 80]]),
+      line(185, [['Global', 50, 50], ['Time', 110, 40], ['Movie', 160, 45]]),
+    ];
+    const parsed = parseCreditFrame(thanksLines, 1, 1, 100);
+    expect(parsed).toHaveLength(0);
+  });
+
+  it('parses two-column cast card with actor on left and character on right', () => {
+    const castRows = alignOcrRows([
+      line(50, [['Cast', 350, 50]]),
+      line(100, [['Yakubu', 100, 50], ['Muhammad', 160, 70]]), line(100, [['Dady', 500, 40]]),
+      line(130, [['Dan', 100, 30], ['Musa', 140, 40], ['Gombe', 190, 50]]), line(130, [['Saif', 500, 35]]),
+      line(160, [['Amal', 100, 40], ['Umar', 150, 40]]), line(160, [['Safeera', 500, 60]]),
+      line(190, [['Fareeda', 100, 60], ['Abdullahi', 170, 70]]), line(190, [['Sumayya', 500, 65]]),
+      line(220, [['Anty', 100, 35], ['Aisha', 145, 45]]), line(220, [['Mommy', 500, 55]]),
+    ]);
+    const parsed = parseCreditFrame(castRows, 1, 1, 100);
+    expect(parsed.map((c) => [c.name, c.roleOrCharacter, c.creditType])).toEqual([
+      ['Yakubu Muhammad', 'Dady', 'actor'],
+      ['Dan Musa Gombe', 'Saif', 'actor'],
+      ['Amal Umar', 'Safeera', 'actor'],
+      ['Fareeda Abdullahi', 'Sumayya', 'actor'],
+      ['Anty Aisha', 'Mommy', 'actor'],
+    ]);
+  });
+
+  it('parses EXT.PRODUCER and names containing role words like Abdul Continuity', () => {
+    const crewRows = [
+      line(50, [['EXT.PRODUCER', 200, 120]]),
+      line(80, [['Amal', 200, 40], ['Umar', 250, 40]]),
+      line(120, [['CONTINUITY', 200, 100]]),
+      line(150, [['Abdul', 200, 45], ['Continuity', 255, 80]]),
+    ];
+    const parsed = parseCreditFrame(crewRows, 1, 1, 100);
+    expect(parsed.map((c) => [c.name, c.roleOrCharacter, c.creditType])).toEqual([
+      ['Amal Umar', 'Executive Producer', 'crew'],
+      ['Abdul Continuity', 'Continuity', 'crew'],
+    ]);
+  });
 });
+

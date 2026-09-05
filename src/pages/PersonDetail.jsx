@@ -210,6 +210,7 @@ const PersonDetail = () => {
       .from('people')
       .select(`
         *,
+        person_aliases(alias),
         credits(
           id, role, character_name, billing_order,
           films(
@@ -721,6 +722,15 @@ const PersonDetail = () => {
                     </span>
                   )}
                 </div>
+
+                {person.person_aliases?.length > 0 && (
+                  <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+                    <span>Also known as</span>
+                    {person.person_aliases.map(({ alias }) => (
+                      <span key={alias} className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-text-primary">{alias}</span>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-text-secondary">
                   {heroRoles.map(role => (

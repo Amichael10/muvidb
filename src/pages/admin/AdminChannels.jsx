@@ -1,3 +1,4 @@
+import { searchPeopleByName } from '../../lib/peopleSearch';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -46,11 +47,7 @@ function PeopleSearch({ value, onChange }) {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const { data } = await supabase
-          .from('people')
-          .select('id, name, photo_url, known_for_department')
-          .ilike('name', `%${query}%`)
-          .limit(8);
+        const data = await searchPeopleByName(query, { limit: 8, select: 'id, name, photo_url, known_for_department' });
         setResults(data || []);
         setOpen(true);
       } catch (err) {

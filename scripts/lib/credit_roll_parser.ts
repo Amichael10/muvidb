@@ -65,11 +65,21 @@ const STOP_MARKERS = [
   'STAY TUNED',
   'UP NEXT',
   'TRAILER',
+  'SPECIAL THANKS',
+  'SPECIAL THANK',
+  'APPRECIATION',
+  'ACKNOWLEDGEMENT',
+  'ACKNOWLEDGEMENTS',
+  'ALHAMDULILLAH',
+  'ALHAMDULILAH',
+  'THANKS TO',
 ];
 
 const NOISE_PATTERNS = [
   /^(THE END|END|CAST|CREW|CREDITS?)$/,
   /^(THANKS?|THANK YOU)( FOR WATCHING)?$/,
+  /^(?:SPECIAL THANKS|SPECIAL THANK|MANY THANKS|THANKS TO|APPRECIATION|ACKNOWLEDGEMENTS?|ALHAMDULILLAH|ALHAMDULILAH|ALLAHU AKBAR)(?: TO)?$/i,
+  /^(?:SPECIAL THANKS|APPRECIATION|ACKNOWLEDGEMENTS?|THANKS TO)\b/i,
   /^(COPYRIGHT|ALL RIGHTS RESERVED)/,
   /^(WWW\.|HTTP|YOUTUBE|INSTAGRAM|FACEBOOK|TWITTER|TIKTOK)/,
   /^RO(?:YAL|TA|TVAL) ?ARTS(?: TV| T)?$/,
@@ -93,73 +103,73 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/^(?:CAMEO|CAMEO APPEARANCE|SPECIAL APPEARANCE)$/, 'Cameo'],
   [/^STORY(?: BY)?$/, 'Story'],
   [/^(?:SCREEN ?PLAY|SCRIPT)(?: BY)?$/, 'Screenplay'],
-  [/^(?:STORYI?SCREEN ?PLAY|STORY SCREEN ?PLAY|STORV SCREEN ?PLAY|SCREEN ?PLAY STORY)(?: BY)?$/, 'Story/Screenplay'],
+  [/^(?:STORYI?SCREEN ?PLAY|STORY SCREEN ?PLAY|STORV SCREEN ?PLAY|SCREEN ?PLAY STORY|STORY & SCREEN ?PLAY|STORY AND SCREEN ?PLAY)(?: BY)?$/, 'Story/Screenplay'],
   [/^(?:WRITTEN|WRITER)(?: BY)?$/, 'Writer'],
   [/^ALL SONGS WRITTEN AND PERFORMED BY$/, 'Songs written and performed by'],
   [/^(?:SONGS?|MUSIC) (?:WRITTEN|PERFORMED) BY$/, 'Music'],
-  [/^(?:MUSIC|SCORE)(?: BY)?$/, 'Music'],
+  [/^(?:MUSIC|SCORE|ORIGINAL SCORE|MUSIC DIRECTOR)(?: BY)?$/, 'Music'],
   [/^COMPOSER$/, 'Composer'],
-  [/^(?:DIRECTED BY|DIRECTOR)$/, 'Director'],
+  [/^(?:DIRECTED BY|DIRECTOR|CO-?DIRECTOR)$/, 'Director'],
   [/^(?:PRODUCED BY|PRODUCER)$/, 'Producer'],
-  [/^(?:EXECUTIVE PRODUCED BY|EXECUTIVE PRODUCER)$/, 'Executive Producer'],
+  [/^(?:EXECUTIVE PRODUCED BY|EXECUTIVE PRODUCER|EXEC(?:UTIVE)? PRODUCER|EXEC\.? ?PRODUCER|EXT\.? ?PRODUCER|EX\.? ?PRODUCER)$/i, 'Executive Producer'],
   [/^(?:ASSOCIATE|CO) PRODUCER$/, 'Associate Producer'],
-  [/^(?:LINE PRODUCER|PRODUCTION MANAGER)$/, 'Production Manager'],
-  [/^(?:UNIT MANAGER|UNIT PRODUCTION MANAGER)$/, 'Unit Manager'],
-  [/^(?:PRODUCTION COORDINATOR|PRODUCTION CORDINATOR|PRODUCTION SUPERVISOR)$/, 'Production Coordinator'],
-  [/^(?:PRODUCTION ASSISTANTS?|PRODUCTION ASST(?: \d+)?)$/, 'Production Assistant'],
+  [/^(?:LINE PRODUCER|PRODUCTION MANAGER|SUPERVISING PRODUCER|PM)$/, 'Production Manager'],
+  [/^(?:UNIT MANAGER|UNIT PRODUCTION MANAGER|UPM)$/, 'Unit Manager'],
+  [/^(?:PRODUCTION COORDINATOR|PRODUCTION CORDINATOR|PRODUCTION SUPERVISOR|PRODUCTION SECRETARY)$/, 'Production Coordinator'],
+  [/^(?:PRODUCTION ASSISTANTS?|PRODUCTION ASST(?: \d+)?|PROD ASST|SET PA|OFFICE PA)$/, 'Production Assistant'],
   [/^(?:PRODUCTION DESIGNER|PRODUCTION DESIGN)$/, 'Production Designer'],
-  [/^(?:ASSISTANT DIRECTOR|FIRST ASSISTANT DIRECTOR|1ST ASSISTANT DIRECTOR)$/, 'Assistant Director'],
-  [/^(?:SECOND ASSISTANT DIRECTOR|2ND ASSISTANT DIRECTOR)$/, 'Second Assistant Director'],
-  [/^(?:DIRECTOR OF PHOTOGRAPHY|CINEMATOGRAPHER|D ?O ?P(?: S)?|BOP|POP)$/, 'Director of Photography'],
+  [/^(?:ASSISTANT DIRECTOR|FIRST ASSISTANT DIRECTOR|1ST ASSISTANT DIRECTOR|1ST AD)$/, 'Assistant Director'],
+  [/^(?:SECOND ASSISTANT DIRECTOR|2ND ASSISTANT DIRECTOR|2ND AD)$/, 'Second Assistant Director'],
+  [/^(?:DIRECTOR OF PHOTOGRAPHY|CINEMATOGRAPHER|CINEMATOGRAPHY|HEAD OF PHOTOGRAPHY|D ?O ?P(?: S)?|BOP|POP)$/, 'Director of Photography'],
   [/^(?:CAMERA(?: OPERATOR)?|CAMERAMAN)$/, 'Camera Operator'],
   [/^(?:CAMERA ASSISTANTS?|CAMERA ASST|CAMERA ASS?T(?: \d+)?)$/, 'Camera Assistant'],
   [/^(?:CAMERA TECH|CAMERA TECHNICIAN)$/, 'Camera Technician'],
-  [/^(?:1ST AC|FIRST AC|1ST ASSISTANT CAMERA|FIRST ASSISTANT CAMERA)$/, 'First Assistant Camera'],
+  [/^(?:1ST AC|FIRST AC|1ST ASSISTANT CAMERA|FIRST ASSISTANT CAMERA|FOCUS PULLER)$/, 'First Assistant Camera'],
   [/^(?:2ND AC|SECOND AC|2ND ASSISTANT CAMERA|SECOND ASSISTANT CAMERA)$/, 'Second Assistant Camera'],
   [/^(?:SECOND UNIT OPERATOR|SECOND CAMERA|2ND CAMERA)$/, 'Second Unit Operator'],
-  [/^(?:DRONE|DRONE OPERATOR|AERIAL CAMERA)$/, 'Drone Operator'],
-  [/^(?:BTS|B ?T ?S|BEHIND THE SCENES)$/, 'BTS'],
-  [/^(?:STILL PHOTOGRAPHER|STILL PHOTO|STILL PHOTOGRAPHY|PHOTOGRAPHY)$/, 'Still Photographer'],
-  [/^(?:EDITED BY|EDITOR|FILM EDITOR)$/, 'Editor'],
+  [/^(?:DRONE|DRONE OPERATOR|DRONE PILOT|AERIAL CAMERA|GIMBAL OPERATOR|STEADICAM OPERATOR)$/, 'Drone Operator'],
+  [/^(?:BTS|B ?T ?S|BEHIND THE SCENES|BTS CAMERA|BTS VIDEO)$/, 'BTS'],
+  [/^(?:STILL PHOTOGRAPHER|STILL PHOTO|STILL PHOTOGRAPHY|PHOTOGRAPHY|STILLS)$/, 'Still Photographer'],
+  [/^(?:EDITED BY|EDITOR|FILM EDITOR|LEAD EDITOR|ONLINE EDITOR|OFFLINE EDITOR)$/, 'Editor'],
   [/^(?:ASSISTANT EDITOR|ASSIST(?:ANT)? FILM EDITOR)$/, 'Assistant Editor'],
-  [/^(?:COLORIST|COLOURIST|COLOR GRADING)$/, 'Colorist'],
-  [/^(?:POST PRODUCTION|POST PRODUCTION SUPERVISOR)$/, 'Post Production'],
-  [/^(?:CASTING|CASTING DIRECTOR)$/, 'Casting Director'],
-  [/^(?:MAKE ?UP|MAKE ?UP ARTIST)$/, 'Makeup'],
+  [/^(?:COLORIST|COLOURIST|COLOR GRADING|DI COLORIST)$/, 'Colorist'],
+  [/^(?:POST PRODUCTION|POST PRODUCTION SUPERVISOR|POST PRODUCTION COORDINATOR)$/, 'Post Production'],
+  [/^(?:CASTING|CASTING DIRECTOR|CASTING ASSOCIATE)$/, 'Casting Director'],
+  [/^(?:MAKE ?UP|MAKE ?UP ARTIST|MAKE-?UP ARTIST)$/, 'Makeup'],
   [/^(?:ASSISTANT MAKE ?UP|MAKE ?UP ASSISTANT)$/, 'Assistant Makeup'],
-  [/^(?:HOD HAIR AND MAKE ?UP|HEAD OF HAIR AND MAKE ?UP|HAIR AND MAKE ?UP HOD)$/, 'Head of Hair and Makeup'],
-  [/^(?:COSTUME|COSTUMIER|WARDROBE)$/, 'Costume'],
+  [/^(?:HOD HAIR AND MAKE ?UP|HEAD OF HAIR AND MAKE ?UP|HAIR AND MAKE ?UP HOD|HAIR STYLIST|HAIRDRESSER)$/, 'Head of Hair and Makeup'],
+  [/^(?:COSTUME|COSTUMIER|COSTUMIERS|COSTUME DESIGNER|WARDROBE|WARDROBE SUPERVISOR)$/, 'Costume'],
   [/^(?:ASSIST(?:ANT)? COSTUME|ASSIST(?:ANT)? COSTUMIER|WARDROBE ASSISTANT)$/, 'Assistant Costume'],
   [/^(?:ART DIRECTOR|ART DIRECTION)$/, 'Art Director'],
   [/^(?:PROPERTIES|PROPS)(?: SET DESIGN)?$/, 'Properties/Set Design'],
   [/^(?:PROPS MASTER|PROP MASTER)$/, 'Props Master'],
   [/^(?:PROPS ASSISTANT|PROP ASSISTANT|PROPERTIES ASSISTANT)$/, 'Props Assistant'],
-  [/^(?:SET DESIGN|SET DESIGNER)$/, 'Set Design'],
-  [/^(?:SET MAN|SET ASSISTANTS?)$/, 'Set Assistant'],
-  [/^(?:SOUND RECORDIST|LOCATION SOUND|SOUND MAN)$/, 'Sound Recordist'],
+  [/^(?:SET DESIGN|SET DESIGNER|SET DRESSER)$/, 'Set Design'],
+  [/^(?:SET MAN|SET ASSISTANTS?|SET CONSTRUCTION)$/, 'Set Assistant'],
+  [/^(?:SOUND RECORDIST|LOCATION SOUND|SOUND MAN|SOUND MIXER|AUDIO ENGINEER)$/, 'Sound Recordist'],
   [/^(?:SOUND DESIGN|SOUND DESIGNER)$/, 'Sound Designer'],
   [/^(?:SOUND|AUDIO)(?: ENGINEER)?$/, 'Sound'],
   [/^(?:SOUND TRACK|SOUNDTRACK)$/, 'Soundtrack'],
-  [/^(?:BOOM OPERATOR|BOOM)$/, 'Boom Operator'],
-  [/^(?:GAFFER|LIGHTING|LIGHTS?|LIGHTING TECH(?:NICIAN)?|LIGHT MAN|LIGHTMAN)$/, 'Gaffer'],
+  [/^(?:BOOM OPERATOR|BOOM|BOOM SWINGER)$/, 'Boom Operator'],
+  [/^(?:GAFFER|LIGHTING|LIGHTS?|LIGHTING TECH(?:NICIAN)?|LIGHT MAN|LIGHTMAN|KEY GRIP|GRIP|ELECTRICIAN|SPARK)$/, 'Gaffer'],
   [/^(?:BEST BOY|BEST BOY ELECTRIC|BEST BOY GRIP)$/, 'Best Boy'],
-  [/^(?:LOCATIONS?|LOCATION MANAGER)$/, 'Locations'],
+  [/^(?:LOCATIONS?|LOCATION MANAGER|LOCATION SCOUT|LOCATION COORDINATOR)$/, 'Locations'],
   [/^(?:LOCATION ASSISTANTS?)$/, 'Location Assistant'],
-  [/^ASSISTANTS?$/, 'Assistant'],
-  [/^(?:CONTINUITY|SCRIPT SUPERVISOR)$/, 'Continuity'],
-  [/^CONTINUITY MANAGER$/, 'Continuity'],
+  [/^(?:ASSISTANTS?|PRODUCTION ASSISTANTS?|GENERAL ASSISTANTS?)$/, 'Assistant'],
+  [/^(?:CONTINUITY|SCRIPT SUPERVISOR|SCRIPT CONTINUITY)$/, 'Continuity'],
+  [/^(?:CONTINUITY MANAGER|CONTINUITY ASSISTANT)$/, 'Continuity'],
   [/^(?:DIALOGUE|DIALOG)$/, 'Dialogue'],
   [/^(?:SUBTITLES?|SUBTITLER|CAPTIONS?)$/, 'Subtitler'],
-  [/^(?:VFX|VISUAL EFFECTS)$/, 'Visual Effects'],
-  [/^(?:GRAPHICS?|GRAPHIC DESIGNER)$/, 'Graphics'],
-  [/^(?:PUBLICITY|MEDIA|SOCIAL MEDIA)$/, 'Publicity'],
-  [/^(?:CHOREOGRAPHER|CHOREOGRAPHY)$/, 'Choreographer'],
-  [/^(?:STUNTS?|STUNT COORDINATOR)$/, 'Stunts'],
-  [/^SECURITY$/, 'Security'],
-  [/^(?:TRANSPORTATION|TRANSPORT|DRIVERS?)$/, 'Transportation'],
-  [/^(?:RENTAL|EQUIPMENT RENTAL)$/, 'Equipment Rental'],
-  [/^(?:CATERING|CATERER)$/, 'Catering'],
-  [/^(?:WELFARE|WELFARE MANAGER)$/, 'Welfare'],
+  [/^(?:VFX|VISUAL EFFECTS|VFX ARTIST)$/, 'Visual Effects'],
+  [/^(?:GRAPHICS?|GRAPHIC DESIGNER|MOTION GRAPHICS)$/, 'Graphics'],
+  [/^(?:PUBLICITY|MEDIA|SOCIAL MEDIA|PUBLICIST|PR)$/, 'Publicity'],
+  [/^(?:CHOREOGRAPHER|CHOREOGRAPHY|DANCE INSTRUCTOR)$/, 'Choreographer'],
+  [/^(?:STUNTS?|STUNT COORDINATOR|STUNT DIRECTOR)$/, 'Stunts'],
+  [/^(?:SECURITY|SECURITY TEAM|CHIEF SECURITY OFFICER|CSO)$/, 'Security'],
+  [/^(?:TRANSPORTATION|TRANSPORT|TRANSPORT MANAGER|CHIEF DRIVER|LOGISTICS)$/, 'Transportation'],
+  [/^(?:RENTAL|EQUIPMENT RENTAL|EQUIPMENT)$/, 'Equipment Rental'],
+  [/^(?:CATERING|CATERER|CRAFT SERVICES)$/, 'Catering'],
+  [/^(?:WELFARE|WELFARE MANAGER|WELFARE ASSISTANT)$/, 'Welfare'],
 ];
 
 function normalizeSpace(value: string): string {
@@ -186,7 +196,11 @@ function normalizeKey(value: string): string {
 function canonicalRole(value: string): string | null {
   const key = normalizeKey(value)
     .replace(/\bASSISTANTS\b/g, 'ASSISTANTS')
-    .replace(/\bMAKEUP\b/g, 'MAKE UP');
+    .replace(/\bMAKEUP\b/g, 'MAKE UP')
+    .replace(/\bSCREEN PLAY\b/g, 'SCREENPLAY')
+    .replace(/\bSET DESIGNER\b/g, 'SET DESIGN')
+    .replace(/\bCOSTUME DESIGNER\b/g, 'COSTUME')
+    .replace(/\bD O P S?\b/g, 'DOP');
   for (const [pattern, role] of ROLE_PATTERNS) {
     if (pattern.test(key)) return role;
   }
@@ -197,14 +211,19 @@ function isCastCreditRole(role: string): boolean {
   return /^(?:Extra|Cameo|Special Appearance|Supporting Cast|Actor)$/i.test(role.trim());
 }
 
+function isCrewSectionHeading(value: string): boolean {
+  const key = normalizeKey(value);
+  return /^(?:CREW|CREWS|THE CREW|CREW LIST|CREW MEMBERS|PRODUCTION CREW|TECHNICAL CREW|BEHIND THE CAMERA|CREW CREDITS)$/.test(key);
+}
+
 function canonicalCastGroup(value: string): string | null {
   const key = normalizeKey(value)
     .replace(/\bEXTARS?\b/g, 'EXTRAS')
     .replace(/\bEXTERS?\b/g, 'EXTRAS');
-  if (/^(?:CAST|CASTS|CAST LIST|CAST MEMBERS|STARRING|MAIN CAST|LEAD CAST|ACTORS?|ARTISTES?|ARTISTS?)$/.test(key)) return 'Actor';
+  if (/^(?:CAST|CASTS|CAST LIST|CAST MEMBERS|STARRING|MAIN CAST|LEAD CAST|ACTORS?|ARTISTES?|ARTISTS?|STARRING CAST|FEATURING|FEATURED CAST)$/.test(key)) return 'Actor';
   if (/^(?:SUPPORTING CAST|SUPPORTING ACTORS?|SUPPORTING ROLES?|SUPPORTING ARTISTES?|SUPPORTING ARTISTS?|SUPPORTING)$/.test(key)) return 'Supporting Cast';
   if (/^(?:GUEST CAST|GUEST APPEARANCES?|SPECIAL APPEARANCES?|SPECIAL GUESTS?)$/.test(key)) return 'Special Appearance';
-  if (/^(?:ADDITIONAL CAST|OTHER CAST|FEATURED CAST|FEATURING)$/.test(key)) return 'Actor';
+  if (/^(?:ADDITIONAL CAST|OTHER CAST)$/.test(key)) return 'Actor';
   const extras = key.match(/^(?:(.+?) )?(?:EXTRAS?|EXTRA CAST|BACKGROUND CAST|BACKGROUND ARTISTES?|BACKGROUND ARTISTS?)$/);
   if (extras) {
     const prefix = extras[1]?.trim();
@@ -237,23 +256,27 @@ function smartTitle(value: string): string {
         .replace(/(^|[-'’])\p{L}/gu, (letter) => letter.toUpperCase());
     })
     .join(' ')
-    .replace(/(['â€™])S\b/g, '$1s');
+    .replace(/(['’])S\b/g, '$1s');
 }
 
 function personCandidateText(value: string): string {
   const text = lettersAndSpaces(
     value
       .replace(/^[^A-Z]{8,}(?=[A-Z])/g, '')
+      .replace(/\[[^\]]{1,40}\]/g, ' ')
+      .replace(/\s*\[[^\]]{1,40}$/g, ' ')
+      .replace(/\{[^}]{1,40}\}/g, ' ')
+      .replace(/\s*\{[^}]{1,40}$/g, ' ')
       .replace(/\([^)]{1,40}\)/g, ' ')
       .replace(/\s*\([^)]{1,40}$/g, ' ')
       .replace(/\|\./g, ' I ')
-      .replace(/["“”]/g, ' ')
-      .replace(/\|/g, ' ')
+      .replace(/["“”'‘’`]/g, ' ')
+      .replace(/[|[\]{}]/g, ' ')
       .replace(/(^|\s)\.([A-Z])\.(?=\s|$)/g, '$1$2')
       .replace(/(^|\s)([A-Z])\.(?=\s|$)/g, '$1$2')
       .replace(/\.(?=\s*$)/, ''),
   );
-  const words = text.split(' ');
+  const words = text.split(' ').filter(Boolean);
   if (
     words.length >= 3
     && /^[A-Z]$/i.test(words[0])
@@ -261,22 +284,22 @@ function personCandidateText(value: string): string {
   ) {
     return words.slice(1).join(' ');
   }
-  return text;
+  return words.join(' ');
 }
 
 function personTextLooksValid(text: string, allowSingleWord = false): boolean {
-  if (text.length < 5 || text.length > 60) return false;
+  if (text.length < (allowSingleWord ? 3 : 5) || text.length > 60) return false;
   if (/\d/.test(text) || canonicalRole(text) || isNoiseLine(text)) return false;
   const shape = allowSingleWord
     ? /^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*)*$/u
     : /^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*)+$/u;
   if (!shape.test(text)) return false;
 
-  const words = text.split(' ');
+  const words = text.split(' ').filter(Boolean);
   if (words.length < (allowSingleWord ? 1 : 2) || words.length > 5) return false;
-  if (allowSingleWord && words.length === 1 && words[0].replace(/[.'’/-]/g, '').length < 5) return false;
+  if (allowSingleWord && words.length === 1 && words[0].replace(/[.'’/-]/g, '').length < 3) return false;
   if (words.some((word) => word.replace(/[.'’/-]/g, '').length === 0)) return false;
-  if (words.some((word) => canonicalRole(word))) return false;
+  if (words.every((word) => canonicalRole(word)) || (words.length === 1 && canonicalRole(words[0]))) return false;
   if (words.some((word) => {
     const key = normalizeKey(word);
     return key.length > 1 && DIALOGUE_WORDS.has(key);
@@ -284,7 +307,7 @@ function personTextLooksValid(text: string, allowSingleWord = false): boolean {
 
   const letterLengths = words.map((word) => word.replace(/[^\p{L}]/gu, '').length);
   const averageLength = letterLengths.reduce((sum, length) => sum + length, 0) / letterLengths.length;
-  if (averageLength < 3) return false;
+  if (words.length > 1 && averageLength < 3) return false;
   return true;
 }
 
@@ -310,20 +333,38 @@ function cleanCrewPersonName(value: string, confidence = 1): string | null {
 }
 
 function cleanCharacter(value: string): string | null {
-  const text = lettersAndSpaces(value).replace(/\.(?=\s*$)/, '');
-  if (!text || text.length > 60 || /\d/.test(text) || canonicalRole(text) || isNoiseLine(text)) return null;
+  const text = lettersAndSpaces(
+    value
+      .replace(/\[[^\]]{1,40}\]/g, ' ')
+      .replace(/\{[^}]{1,40}\}/g, ' ')
+      .replace(/\([^)]{1,40}\)/g, ' ')
+  ).replace(/\.(?=\s*$)/, '');
+  if (!text || text.length > 60 || /\d/.test(text) || isNoiseLine(text)) return null;
+  if (isExclusiveCrewRole(text)) return null;
   if (!/^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*){0,5}$/u.test(text)) return null;
   return smartTitle(text);
 }
 
+function isExclusiveCrewRole(value: string): boolean {
+  const role = canonicalRole(value);
+  if (!role) return false;
+  return !/^(?:Extra|Cameo|Special Appearance|Supporting Cast|Actor)$/i.test(role);
+}
+
 function cleanCreditCharacter(value: string): string | null {
-  const text = lettersAndSpaces(value).replace(/\.(?=\s*$)/, '');
-  if (text.length < 2 || text.length > 60 || canonicalRole(text) || isNoiseLine(text)) return null;
+  const text = lettersAndSpaces(
+    value
+      .replace(/\[[^\]]{1,40}\]/g, ' ')
+      .replace(/\{[^}]{1,40}\}/g, ' ')
+      .replace(/\([^)]{1,40}\)/g, ' ')
+  ).replace(/\.(?=\s*$)/, '');
+  if (text.length < 2 || text.length > 60 || isNoiseLine(text)) return null;
+  if (isExclusiveCrewRole(text)) return null;
   if (/\d/.test(text)) {
     const digits = text.match(/\d/g) ?? [];
     if (digits.length > 2 || !/\b\d{1,2}$/.test(text)) return null;
   }
-  if (!/^[\p{L}][\p{L}\p{N}.'â€™/-]*(?: [\p{L}\p{N}][\p{L}\p{N}.'â€™/-]*){0,5}$/u.test(text)) return null;
+  if (!/^[\p{L}][\p{L}\p{N}.'’/-]*(?: [\p{L}\p{N}][\p{L}\p{N}.'’/-]*){0,5}$/u.test(text)) return null;
   return smartTitle(text);
 }
 
@@ -416,10 +457,14 @@ export function alignOcrRows(lines: OcrLine[]): OcrLine[] {
   for (const line of [...lines].sort((a, b) => a.top - b.top || a.left - b.left)) {
     const row = rows.find((candidate) => {
       const height = Math.min(candidate.bottom - candidate.top, line.bottom - line.top);
+      const maxHeight = Math.max(candidate.bottom - candidate.top, line.bottom - line.top);
       const overlap = Math.min(candidate.bottom, line.bottom) - Math.max(candidate.top, line.top);
       const centerDistance = Math.abs((candidate.top + candidate.bottom - line.top - line.bottom) / 2);
-      return height > 0 && overlap >= height * 0.55 && centerDistance <= height * 0.45
-        && (candidate.right <= line.left || line.right <= candidate.left);
+      const topDistance = Math.abs(candidate.top - line.top);
+      const isHorizontallySeparate = (candidate.right <= line.left + 10 || line.right <= candidate.left + 10);
+      const onSameLine = (height > 0 && overlap >= height * 0.35 && centerDistance <= maxHeight * 0.6)
+        || (topDistance <= maxHeight * 0.45 && overlap > 0);
+      return isHorizontallySeparate && onSameLine;
     });
     if (!row) {
       rows.push({ ...line, words: [...line.words] });
@@ -432,7 +477,6 @@ export function alignOcrRows(lines: OcrLine[]): OcrLine[] {
     row.top = Math.min(row.top, line.top);
     row.right = Math.max(row.right, line.right);
     row.bottom = Math.max(row.bottom, line.bottom);
-    row.confidence = averageConfidence(row.words);
   }
   return rows.sort((a, b) => a.top - b.top || a.left - b.left);
 }
@@ -577,30 +621,98 @@ function splitLeaderCreditLine(
   };
 }
 
-function splitCastLine(
+function splitTwoColumnLine(
   line: OcrLine,
   separatorX: number,
   actorSide?: 'left' | 'right',
-): { name: string; character: string; words: OcrWord[] } | null {
-  const split = splitAtSeparator(line, separatorX);
+): {
+  name: string;
+  roleOrCharacter: string;
+  creditType: CreditType;
+  words: OcrWord[];
+  mode: 'two-column-cast' | 'role-then-name';
+} | null {
+  let split = splitAtSeparator(line, separatorX);
+  if (!split) {
+    for (let i = line.words.length - 1; i >= 1; i--) {
+      const leftW = line.words.slice(0, i);
+      const rightW = line.words.slice(i);
+      const gap = rightW[0].left - (leftW[leftW.length - 1].left + leftW[leftW.length - 1].width);
+      if (gap >= 8) {
+        const leftT = textForWords(leftW);
+        const rightT = textForWords(rightW);
+        const lRole = canonicalRole(leftT);
+        const rRole = canonicalRole(rightT);
+        if ((lRole && !isCastCreditRole(lRole)) || (rRole && !isCastCreditRole(rRole))) {
+          split = [leftW, rightW];
+          break;
+        }
+      }
+    }
+  }
   if (!split) return null;
   const [leftWords, rightWords] = split;
   const leftText = textForWords(leftWords);
   const rightText = textForWords(rightWords);
+
+  // 1. Crew role on Left, Crew person on Right
+  const leftRole = canonicalRole(leftText);
+  const rightRole = canonicalRole(rightText);
+
+  if (leftRole && !isCastCreditRole(leftRole)) {
+    const person = cleanCrewPersonName(rightText, averageConfidence(rightWords));
+    if (person) {
+      return {
+        name: person,
+        roleOrCharacter: leftRole,
+        creditType: 'crew',
+        words: rightWords,
+        mode: 'role-then-name',
+      };
+    }
+  }
+
+  // 2. Crew person on Left, Crew role on Right
+  if (rightRole && !isCastCreditRole(rightRole)) {
+    const person = cleanCrewPersonName(leftText, averageConfidence(leftWords));
+    if (person) {
+      return {
+        name: person,
+        roleOrCharacter: rightRole,
+        creditType: 'crew',
+        words: leftWords,
+        mode: 'role-then-name',
+      };
+    }
+  }
+
+  // 3. Two column cast: Character and Actor
   const leftPerson = cleanPersonName(leftText);
   const rightPerson = cleanPersonName(rightText);
   const leftCharacter = cleanCreditCharacter(leftText);
   const rightCharacter = cleanCreditCharacter(rightText);
   const leftLooksPerson = !!leftPerson;
   const rightLooksPerson = !!rightPerson;
-  const actorOnLeft = leftLooksPerson && !!rightCharacter;
-  const actorOnRight = rightLooksPerson && !!leftCharacter;
+  const actorOnLeft = leftLooksPerson && !!rightCharacter && !leftRole;
+  const actorOnRight = rightLooksPerson && !!leftCharacter && !rightRole;
 
   if (actorSide === 'left') {
-    return actorOnLeft ? { name: leftPerson!, character: rightCharacter!, words: leftWords } : null;
+    return actorOnLeft ? {
+      name: leftPerson!,
+      roleOrCharacter: rightCharacter!,
+      creditType: 'actor',
+      words: leftWords,
+      mode: 'two-column-cast',
+    } : null;
   }
   if (actorSide === 'right') {
-    return actorOnRight ? { name: rightPerson!, character: leftCharacter!, words: rightWords } : null;
+    return actorOnRight ? {
+      name: rightPerson!,
+      roleOrCharacter: leftCharacter!,
+      creditType: 'actor',
+      words: rightWords,
+      mode: 'two-column-cast',
+    } : null;
   }
 
   if (!actorOnLeft && !actorOnRight) return null;
@@ -614,20 +726,51 @@ function splitCastLine(
     return null;
   }
 
+  if (actorOnRight && !actorOnLeft) {
+    return {
+      name: rightPerson!,
+      roleOrCharacter: leftCharacter!,
+      creditType: 'actor',
+      words: rightWords,
+      mode: 'two-column-cast',
+    };
+  }
+
+  if (actorOnLeft && !actorOnRight) {
+    return {
+      name: leftPerson!,
+      roleOrCharacter: rightCharacter!,
+      creditType: 'actor',
+      words: leftWords,
+      mode: 'two-column-cast',
+    };
+  }
+
   if (actorOnLeft && actorOnRight) {
-    const leftCharacterScore = characterScore(leftCharacter ?? '');
-    const rightCharacterScore = characterScore(rightCharacter ?? '');
-    if (rightCharacterScore >= leftCharacterScore + 2) {
-      return { name: leftPerson, character: rightCharacter!, words: leftWords };
+    const leftScore = characterScore(leftCharacter ?? '');
+    const rightScore = characterScore(rightCharacter ?? '');
+    if (rightScore >= leftScore + 2) {
+      return {
+        name: leftPerson!,
+        roleOrCharacter: rightCharacter!,
+        creditType: 'actor',
+        words: leftWords,
+        mode: 'two-column-cast',
+      };
     }
-    if (leftCharacterScore >= rightCharacterScore + 2) {
-      return { name: rightPerson, character: leftCharacter!, words: rightWords };
+    if (leftScore >= rightScore + 2) {
+      return {
+        name: rightPerson!,
+        roleOrCharacter: leftCharacter!,
+        creditType: 'actor',
+        words: rightWords,
+        mode: 'two-column-cast',
+      };
     }
     return null;
   }
 
-  if (actorOnLeft) return { name: leftPerson, character: rightCharacter!, words: leftWords };
-  return { name: rightPerson!, character: leftCharacter!, words: rightWords };
+  return null;
 }
 
 function findLineSeparator(line: OcrLine): number | null {
@@ -714,19 +857,21 @@ function consecutivePersonLines(lines: OcrLine[], maxLines = 8): number {
   let count = 0;
   for (const line of lines.slice(0, maxLines)) {
     const section = normalizeKey(line.text);
-    if (section === 'CREW' || canonicalRole(line.text) || canonicalCastGroup(line.text)) break;
+    if (section === 'CREW' || isCrewSectionHeading(line.text) || canonicalRole(line.text) || canonicalCastGroup(line.text)) break;
     if (!looksLikePerson(line.text)) break;
     count++;
   }
   return count;
 }
 
+const CHARACTER_GROUP_KEYWORDS = /\b(?:FRIENDS?|BOYFRIEND|GIRLFRIEND|HUSBAND|WIFE|WIVES|FAMILY|BROTHERS?|SISTERS?|ELDERS?|GUARDS?|MAIDS?|VILLAGERS?|STUDENTS?|CHILDREN|GUESTS?|WORKERS?|OFFICERS?|MEMBERS?|CUSTOMERS?|GIRLS?|BOYS?|WOMEN|MEN|EXTRAS?|DANCERS?|KIDNAPPERS?|THUGS?|NURSES?|DOCTORS?|PATIENTS?|COUPLE|CROWD)\b/i;
+
 function castCharacterHeading(
   line: OcrLine,
   followingLines: OcrLine[],
   inCastContext: boolean,
 ): string | null {
-  if (canonicalCastGroup(line.text) || canonicalRole(line.text) || isNoiseLine(line.text)) return null;
+  if (canonicalCastGroup(line.text) || isCrewSectionHeading(line.text) || canonicalRole(line.text) || isNoiseLine(line.text)) return null;
   const character = cleanCharacter(line.text);
   if (!character) return null;
 
@@ -734,18 +879,15 @@ function castCharacterHeading(
   const words = key.split(' ').filter(Boolean);
   if (words.length > 5) return null;
 
+  const possessive = /(?:'|’|')S\b/i.test(line.text);
+  const hasGroupKeyword = CHARACTER_GROUP_KEYWORDS.test(key);
+
+  if (!possessive && !hasGroupKeyword) return null;
+
   const followingPeople = consecutivePersonLines(followingLines);
   if (followingPeople < (inCastContext ? 1 : 2)) return null;
 
-  const possessive = /(?:'|â€™)S\b/i.test(line.text);
-  const characterish = characterScore(character) >= 3 || possessive;
-  const personLike = looksLikePerson(line.text);
-  const creditStyled = mostlyUppercase(line.text);
-
-  if (characterish) return character;
-  if (!personLike && creditStyled && followingPeople >= 3 && words.length <= 4) return character;
-  if (inCastContext && !personLike && creditStyled) return character;
-  return null;
+  return character;
 }
 
 function sameLineRoleAndName(line: OcrLine): { role: string; name: string; words: OcrWord[] } | null {
@@ -770,66 +912,73 @@ export function parseCreditFrame(
   const observations: CreditObservation[] = [];
   const stopIndex = lines.findIndex((line) => isStopLine(line.text));
   const usable = stopIndex >= 0 ? lines.slice(0, stopIndex) : lines;
-  let castEligible = true;
-  const castRows = usable.filter((line) => {
-    const group = canonicalCastGroup(line.text);
-    if (group) castEligible = group === 'Actor';
-    else if (normalizeKey(line.text) === 'CREW' || canonicalRole(line.text)) castEligible = false;
-    return castEligible && !group && !isNoiseLine(line.text);
-  });
-  const separatorX = findCastSeparator(castRows);
-  const handledCastRows = new Set<OcrLine>();
+
+  const candidateRows = usable.filter((line) => !isNoiseLine(line.text));
+  const separatorX = findCastSeparator(candidateRows);
+  const handledRows = new Set<OcrLine>();
   const explicitCreditSignal = usable.some((line) => {
     const section = normalizeKey(line.text);
     return section === 'CAST' || section === 'CREW' || section === 'CREDITS'
+      || isCrewSectionHeading(line.text)
       || !!canonicalCastGroup(line.text)
       || !!canonicalRole(line.text);
   });
 
   if (separatorX !== null) {
-    const votes = castRows.flatMap((line) => {
-      const parsed = splitCastLine(line, separatorX);
-      return parsed ? [parsed.words[0].left < separatorX ? 'left' : 'right'] : [];
+    const castVotes = candidateRows.flatMap((line) => {
+      const parsed = splitTwoColumnLine(line, separatorX);
+      if (parsed && parsed.creditType === 'actor') {
+        return [parsed.words[0].left < separatorX ? 'left' : 'right'];
+      }
+      return [];
     });
-    const leftVotes = votes.filter((side) => side === 'left').length;
-    const rightVotes = votes.length - leftVotes;
+    const leftVotes = castVotes.filter((side) => side === 'left').length;
+    const rightVotes = castVotes.length - leftVotes;
     const actorSide = rightVotes >= 2 && rightVotes > leftVotes * 2 ? 'right'
       : leftVotes >= 2 && leftVotes > rightVotes * 2 ? 'left' : undefined;
-    const castLines = castRows
-      .map((line) => ({ line, castLine: splitCastLine(line, separatorX, actorSide) }))
-      .filter((item): item is { line: OcrLine; castLine: { name: string; character: string; words: OcrWord[] } } => !!item.castLine);
-    if (castLines.length >= 3 || (explicitCreditSignal && castLines.length >= 2)) {
+
+    const twoColumnLines = candidateRows
+      .map((line) => ({ line, item: splitTwoColumnLine(line, separatorX, actorSide) }))
+      .filter((entry): entry is { line: OcrLine; item: NonNullable<ReturnType<typeof splitTwoColumnLine>> } => !!entry.item);
+
+    if (twoColumnLines.length >= 3 || (explicitCreditSignal && twoColumnLines.length >= 2)) {
       let previous: { line: OcrLine; character: string } | null = null;
-      for (const line of castRows) {
-        const paired = castLines.find((item) => item.line === line)?.castLine;
+      for (const line of candidateRows) {
+        const paired = twoColumnLines.find((entry) => entry.line === line)?.item;
         const onPersonSide = actorSide === 'right' ? line.left > separatorX
           : actorSide === 'left' ? line.right < separatorX : false;
         const continuation = !paired && onPersonSide && previous
           && /\b(?:birds|friends|guards|extras|villagers|children|students|guests|workers|couple|crowd)\b/i.test(previous.character)
           && line.top - previous.line.bottom <= Math.max(14, previous.line.bottom - previous.line.top) * 4
           ? cleanPersonName(line.text) : null;
-        const castLine = paired ?? (continuation && previous
-          ? { name: continuation, character: previous.character, words: line.words } : null);
-        // An unresolved pair must not fall through to the names-only list parser.
-        if (line.left < separatorX && line.right > separatorX) handledCastRows.add(line);
-        if (!castLine) {
+        const result = paired ?? (continuation && previous
+          ? {
+            name: continuation,
+            roleOrCharacter: previous.character,
+            creditType: 'actor' as CreditType,
+            words: line.words,
+            mode: 'two-column-cast' as const,
+          } : null);
+
+        if (line.left < separatorX && line.right > separatorX) handledRows.add(line);
+        if (!result) {
           previous = null;
           continue;
         }
-        handledCastRows.add(line);
-        previous = { line, character: castLine.character };
+        handledRows.add(line);
+        previous = result.creditType === 'actor' ? { line, character: result.roleOrCharacter } : null;
         observations.push({
-          name: castLine.name,
-          roleOrCharacter: castLine.character,
-          creditType: 'actor',
+          name: result.name,
+          roleOrCharacter: result.roleOrCharacter,
+          creditType: result.creditType,
           frameIndex,
           frameSec,
           videoSec,
-          ocrConfidence: averageConfidence(castLine.words),
+          ocrConfidence: averageConfidence(result.words),
           evidenceText: line.text,
           layout: {
-            mode: 'two-column-cast',
-            personBox: boxFor(castLine.words),
+            mode: result.mode,
+            personBox: boxFor(result.words),
             separatorX: Math.round(separatorX),
           },
         });
@@ -842,7 +991,7 @@ export function parseCreditFrame(
   let previousRoleLine: OcrLine | null = null;
   for (let lineIndex = 0; lineIndex < usable.length; lineIndex++) {
     const line = usable[lineIndex];
-    if (handledCastRows.has(line)) continue;
+    if (handledRows.has(line)) continue;
     if (currentRole && previousRoleLine
       && line.top - previousRoleLine.bottom > Math.max(28, (previousRoleLine.bottom - previousRoleLine.top) * 2.5)) {
       currentRole = null;
@@ -854,8 +1003,7 @@ export function parseCreditFrame(
       currentCastCharacter = castGroup;
       continue;
     }
-    const section = normalizeKey(line.text);
-    if (section === 'CREW') {
+    if (isCrewSectionHeading(line.text)) {
       currentRole = null;
       currentCastCharacter = null;
       continue;
@@ -943,21 +1091,21 @@ export function parseCreditFrame(
     if (currentCastCharacter) {
       const contextualSeparator = separatorX ?? findLineSeparator(line);
       if (contextualSeparator !== null) {
-        const castLine = splitCastLine(line, contextualSeparator);
-        if (castLine && currentCastCharacter === 'Actor') {
+        const twoCol = splitTwoColumnLine(line, contextualSeparator);
+        if (twoCol && currentCastCharacter === 'Actor') {
           if (separatorX !== null) continue;
           observations.push({
-            name: castLine.name,
-            roleOrCharacter: castLine.character,
-            creditType: 'actor',
+            name: twoCol.name,
+            roleOrCharacter: twoCol.roleOrCharacter,
+            creditType: twoCol.creditType,
             frameIndex,
             frameSec,
             videoSec,
-            ocrConfidence: averageConfidence(castLine.words),
+            ocrConfidence: averageConfidence(twoCol.words),
             evidenceText: line.text,
             layout: {
-              mode: 'two-column-cast',
-              personBox: boxFor(castLine.words),
+              mode: twoCol.mode,
+              personBox: boxFor(twoCol.words),
               separatorX: Math.round(contextualSeparator),
             },
           });

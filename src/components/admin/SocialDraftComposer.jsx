@@ -1,3 +1,4 @@
+import { searchPeopleByName } from '../../lib/peopleSearch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
@@ -949,7 +950,7 @@ export default function SocialDraftComposer({
         let data;
         let error;
         if (activeTheme.entity === 'person') {
-          ({ data, error } = await supabase.from('people').select('id,name,photo_url').ilike('name', `%${term}%`).limit(8));
+          data = await searchPeopleByName(term, { limit: 8, select: 'id,name,photo_url' });
         } else if (activeTheme.entity === 'play') {
           ({ data, error } = await supabase
             .from('plays')
@@ -957,7 +958,12 @@ export default function SocialDraftComposer({
             .ilike('title', `%${term}%`)
             .limit(8));
         } else {
-          ({ data, error } = await supabase.from('films').select('id,title,year,poster_url').ilike('title', `%${term}%`).limit(8));
+          ({ data, error } = await supabase
+            .from('films')
+            .select('id,title,year,release_date,poster_url,backdrop_url,trailer_youtube_id,trailer_external_url,youtube_watch_url')
+            .ilike('title', `%${term}%`)
+            .order('release_date', { ascending: false, nullsLast: true })
+            .limit(10));
         }
 
         if (error) throw error;
@@ -1432,7 +1438,12 @@ export default function SocialDraftComposer({
     }
   };
 
-  const label = entry => (activeTheme.entity === 'person' ? entry.name : `${entry.title}${entry.year ? ` (${entry.year})` : ''}`);
+  const label = entry => {
+    if (!entry) return '';
+    if (activeTheme.entity === 'person') return entry.name || '';
+    const yearStr = entry.year || (entry.release_date ? new Date(entry.release_date).getFullYear() || entry.release_date.slice(0, 4) : null);
+    return `${entry.title}${yearStr ? ` (${yearStr})` : ''}`;
+  };
   const entityLabel = activeTheme.entity === 'person' ? 'Actor / Talent' : activeTheme.entity === 'play' ? 'Theatre Play' : 'Movie / Film';
   const isWeekendWatchlist = activeTheme.id === 'weekend_watchlist';
   const canGenerate = isWeekendWatchlist ? selectedFilms.length === 3 : Boolean(selected);
@@ -2011,29 +2022,40 @@ export default function SocialDraftComposer({
                     )}
                     {results.length > 0 && (
                       <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
-                        {results.map(entry => (
-                          <button
-                            key={entry.id}
-                            type="button"
-                            onClick={() => {
-                              setSelected(entry);
-                              setResults([]);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-text-primary hover:bg-surface-2 border-b border-border/50 last:border-0"
-                          >
-                            <img
-                              src={entry.photo_url || entry.poster_url || ''}
-                              alt=""
-                              className="h-9 w-9 shrink-0 rounded object-cover border border-border bg-surface-2"
-                              onError={e => {
-                                e.currentTarget.style.visibility = 'hidden';
+                        {results.map(entry => {
+                          const hasYt = !!(entry?.trailer_youtube_id || entry?.youtube_watch_url || (entry?.trailer_external_url && entry.trailer_external_url.includes('youtu')));
+                          return (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              onClick={() => {
+                                setSelected(entry);
+                                setResults([]);
                               }}
-                            />
-                            <div className="min-w-0">
-                              <span className="font-bold truncate block">{label(entry)}</span>
-                            </div>
-                          </button>
-                        ))}
+                              className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm text-text-primary hover:bg-surface-2 border-b border-border/50 last:border-0"
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <img
+                                  src={entry.photo_url || entry.poster_url || ''}
+                                  alt=""
+                                  className="h-9 w-9 shrink-0 rounded object-cover border border-border bg-surface-2"
+                                  onError={e => {
+                                    e.currentTarget.style.visibility = 'hidden';
+                                  }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <span className="font-bold truncate block">{label(entry)}</span>
+                                  {hasYt && (
+                                    <span className="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-red-500/20 text-red-400 border border-red-500/30">
+                                      <Icon icon="mdi:youtube" width="10" /> YouTube Ready
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Icon icon="solar:alt-arrow-right-linear" className="text-text-muted shrink-0" width="14" />
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

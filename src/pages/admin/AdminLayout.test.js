@@ -23,6 +23,7 @@ vi.mock('@iconify/react', () => ({ Icon: () => null }));
 
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/admin' }),
+  useNavigate: () => vi.fn(),
   Navigate: () => null,
   Outlet: () => React.createElement('div', null, 'Admin overview'),
   Link: ({ children, to, ...props }) => React.createElement('a', { href: to, ...props }, children),

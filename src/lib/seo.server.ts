@@ -73,6 +73,7 @@ export async function personSeo(slug: string, base: string) {
     // round-trip serves both.
     .select(`
       *,
+      person_aliases(alias),
       credits(
         id, role, character_name, billing_order,
         films(

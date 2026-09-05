@@ -1,7 +1,7 @@
 // Shared people directory search — order-insensitive first, Cohere optional.
 // Used by global search, People list, claim flow, OCR credits, and admin typeaheads.
 import { supabase } from './supabase';
-import { personNameTokens, sortedNameKey, foldPersonText, pickAutoMatch } from './personNameMatch';
+import { personNameTokens, sortedNameKey, foldPersonText, personAliasKey, matchesPersonAlias } from './personNameMatch';
 
 const DEFAULT_SELECT = 'id, slug, name, photo_url, film_count, known_for_department, popularity_score, is_verified';
 
@@ -12,6 +12,20 @@ const DEFAULT_SELECT = 'id, slug, name, photo_url, film_count, known_for_departm
 export async function matchPeopleByNameKey(query, { limit = 8 } = {}) {
   const q = String(query || '').trim();
   if (!q) return [];
+  const aliasKey = personAliasKey(q);
+  const { data: aliasRows, error: aliasError } = aliasKey
+    ? await supabase.from('person_aliases').select('person_id,alias').eq('alias_key', aliasKey)
+    : { data: [], error: null };
+  if (aliasError) console.warn('Alias lookup failed:', aliasError.message);
+  const aliasIds = [...new Set((aliasRows || []).map(row => row.person_id))];
+  const { data: aliasPeople } = aliasIds.length
+    ? await supabase.from('people').select(DEFAULT_SELECT).in('id', aliasIds)
+    : { data: [] };
+  const aliasMatches = (aliasPeople || []).map(person => ({
+    ...person,
+    aliases: aliasRows.filter(row => row.person_id === person.id).map(row => row.alias),
+    _matchKind: 'alias',
+  }));
   const { data, error } = await supabase.rpc('match_people_by_name', {
     p_name: q,
     p_limit: limit,
@@ -19,12 +33,14 @@ export async function matchPeopleByNameKey(query, { limit = 8 } = {}) {
   if (error) {
     // Older envs without the RPC — fall through to lexical search.
     if (/match_people_by_name|Could not find the function/i.test(error.message || '')) {
-      return [];
+      return aliasMatches;
     }
     console.warn('match_people_by_name failed:', error.message);
-    return [];
+    return aliasMatches;
   }
-  return (data || []).map((p) => ({ ...p, _matchKind: p.match_kind }));
+  const merged = new Map(aliasMatches.map(p => [p.id, p]));
+  for (const person of data || []) merged.set(person.id, { ...person, aliases: merged.get(person.id)?.aliases || [], _matchKind: person.match_kind });
+  return [...merged.values()];
 }
 
 export async function suggestSimilarPeople(query, { limit = 8 } = {}) {
@@ -54,7 +70,7 @@ export async function rerankPeopleWithCohere(query, people, { limit } = {}) {
         mode: 'rerank',
         entity: 'people',
         limit: Math.min(list.length, limit || 24),
-        candidates: list.slice(0, 40).map((p) => ({ id: p.id, name: p.name })),
+        candidates: list.slice(0, 40).map((p) => ({ id: p.id, name: [p.name, ...(p.aliases || [])].join(' | ') })),
       }),
     });
     if (!res.ok) return list;
@@ -71,8 +87,8 @@ export async function rerankPeopleWithCohere(query, people, { limit } = {}) {
       seen.add(r.id);
       out.push({
         ...base,
-        _semantic: r._semantic,
-        _cohere: r._semantic,
+        _semantic: Number(r.score ?? r._semantic ?? 0),
+        _cohere: Number(r.score ?? r._semantic ?? 0),
         _score: Math.max(Number(base._score || 0), Number(r._score || 0)),
       });
     }
@@ -98,12 +114,17 @@ export async function searchPeopleByName(
 
   const addRows = (rows = []) => {
     for (const p of rows) {
-      if (p?.id && !seen.has(p.id)) seen.set(p.id, p);
+      if (p?.id) seen.set(p.id, { ...seen.get(p.id), ...p, aliases: [...new Set([...(seen.get(p.id)?.aliases || []), ...(p.aliases || [])])] });
     }
   };
 
+  // Fetch the full requested row even when the name-key RPC is unavailable.
+  const exactResult = await supabase.from('people').select(select).ilike('name', q.replace(/[%_]/g, ' ')).limit(limit);
+  if (exactResult.error) throw exactResult.error;
+
   // 1) Authoritative order-insensitive RPC (exact + name_key swap)
   addRows(await matchPeopleByNameKey(q, { limit }));
+  addRows(exactResult.data || []);
 
   if (tokens.length === 1) {
     const { data, error } = await supabase
@@ -129,7 +150,7 @@ export async function searchPeopleByName(
     const aliasIds = [...new Set((aliasRows || []).map(row => row.person_id).filter(Boolean))];
     if (aliasIds.length) {
       const { data: aliasPeople } = await supabase.from('people').select(select).in('id', aliasIds);
-      addRows(aliasPeople);
+      addRows((aliasPeople || []).map(p => ({ ...p, aliases: (aliasRows || []).filter(a => a.person_id === p.id).map(a => a.alias) })));
     }
   } else {
     // 2) name_key column (same as RPC, kept for envs where RPC lags)
@@ -166,7 +187,7 @@ export async function searchPeopleByName(
     const aliasIds = [...new Set((aliasRows || []).map(row => row.person_id).filter(Boolean))];
     if (aliasIds.length) {
       const { data: aliasPeople } = await supabase.from('people').select(select).in('id', aliasIds);
-      addRows(aliasPeople);
+      addRows((aliasPeople || []).map(p => ({ ...p, aliases: (aliasRows || []).filter(a => a.person_id === p.id).map(a => a.alias) })));
     }
   }
 
@@ -175,38 +196,34 @@ export async function searchPeopleByName(
     addRows(await suggestSimilarPeople(q, { limit: Math.max(limit, 12) }));
   }
 
-  const qFold = foldPersonText(q);
-  let ranked = [...seen.values()]
-    .map((p) => {
-      const pFold = foldPersonText(p.name);
-      const pKey = sortedNameKey(p.name);
-      let score = Number(p.popularity_score || 0) * 0.01;
-      if (pFold === qFold) score += 1000;
-      else if (key && pKey === key) score += 900;
-      else if (p._matchKind === 'name_key') score += 900;
-      else if (tokens.length >= 2 && tokens.every((t) => pFold.includes(t))) score += 400;
-      else if (p._suggested) score += 120;
-      else score += 50;
-      if (p.photo_url) score += 5;
-      return { ...p, _score: score };
-    })
-    .sort((a, b) => b._score - a._score)
-    .slice(0, Math.max(limit, 24));
-
-  // Cohere is optional polish for ranking — never required for order-swap.
-  if (useCohere && ranked.length >= 2) {
-    const topIsCertain =
-      ranked[0]._score >= 900 || pickAutoMatch(q, ranked.slice(0, 3));
-    if (!topIsCertain) {
-      ranked = await rerankPeopleWithCohere(q, ranked, { limit });
-      ranked = ranked
-        .map((p) => ({
-          ...p,
-          _score: Math.max(Number(p._score || 0), Number(p._semantic || 0) * 500),
-        }))
-        .sort((a, b) => b._score - a._score);
-    }
+  // Hydrate RPC candidates with the caller's fields (filters need more than names).
+  if (seen.size) {
+    const { data, error } = await supabase.from('people').select(select).in('id', [...seen.keys()]);
+    if (error) throw error;
+    addRows(data || []);
   }
-
+  let ranked = rankPeopleResults(q, [...seen.values()]);
+  if (useCohere && ranked.length >= 2) {
+    ranked = await rerankPeopleWithCohere(q, ranked, { limit: Math.min(ranked.length, 40) });
+    ranked = rankPeopleResults(q, ranked);
+  }
   return ranked.slice(0, limit);
+}
+
+// Relevance tiers are absolute: popularity and semantic scores cannot bury an
+// exact canonical name, exact alias, or complete name-order match.
+export function rankPeopleResults(query, people) {
+  const folded = foldPersonText(query).trim().replace(/\s+/g, ' ');
+  const key = sortedNameKey(query);
+  const tokens = personNameTokens(query);
+  return people.map(person => {
+    const name = foldPersonText(person.name).trim().replace(/\s+/g, ' ');
+    const tier = name === folded ? 5
+      : matchesPersonAlias(query, person) ? 4
+      : key && sortedNameKey(person.name) === key ? 3
+      : tokens.length && tokens.every(token => name.includes(token)) ? 2 : 1;
+    const semantic = Math.min(1, Math.max(0, Number(person._semantic || 0)));
+    const popularity = Math.min(1, Math.max(0, Number(person.popularity_score || 0)) / 10000);
+    return { ...person, _score: tier * 1000 + semantic * 100 + popularity + (person.photo_url ? 0.01 : 0) };
+  }).sort((a, b) => b._score - a._score);
 }

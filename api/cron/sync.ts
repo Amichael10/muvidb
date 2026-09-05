@@ -12,6 +12,7 @@ import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
 import { sweepAndUpdatePlayStatuses } from '../_lib/theatre_service.js';
 import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
+import { runCriticsSync } from '../_lib/critics_sync.js';
 
 
 /**
@@ -31,16 +32,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { task } = req.query;
   const startTime = Date.now();
+  const isSunday = new Date().getUTCDay() === 0;
 
   try {
     // ── CASE 1: Run ALL Tasks ────────────────────────────────────────────────
     if (!task) {
-      console.log('[cron/sync] No task specified, running ALL tasks in sequence...');
+      console.log(`[cron/sync] No task specified, running master daily sync (isSunday=${isSunday})...`);
       
       const { data: masterLog } = await supabase.from('sync_logs').insert({
         source: 'master',
         status: 'running',
-        message: 'Running all sync tasks...'
+        message: `Running all sync tasks (Sunday weekly tasks: ${isSunday})...`
       }).select().single();
 
       const results: any = {};
@@ -49,6 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { name: 'videos', fn: runVideosSync },
         { name: 'tmdb', fn: runTMDBSync },
         { name: 'theatre_status_sweep', fn: sweepAndUpdatePlayStatuses },
+        ...(isSunday ? [{ name: 'critics', fn: runCriticsSync }] : []),
         { name: 'ai_maintenance', fn: runAIMaintenance }
       ];
 
@@ -136,6 +139,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
       case 'youtube_watch':        result = await runYouTubeUploadWatch(); break;
+      case 'critics':              result = await runCriticsSync(); break;
       case 'kava':      
         return res.status(200).json({ 
           task: 'kava', 

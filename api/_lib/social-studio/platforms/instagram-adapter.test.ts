@@ -66,12 +66,14 @@ describe('InstagramPlatformAdapter', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child_1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child_2' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'carousel_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'media_1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ permalink: 'https://instagram.com/p/carousel' }), { status: 200 }));
     const adapter = new InstagramPlatformAdapter({
       accessToken: 'token',
       instagramAccountId: 'ig-user-1',
       fetchImpl,
+      pollIntervalMs: 10,
     });
 
     const result = await adapter.publish(request({

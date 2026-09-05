@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { authHeaders } from '../../lib/apiAuth';
 import {
   foldPersonText,
   namesLookSame,
@@ -11,6 +12,7 @@ import {
   sortedNameKey,
 } from '../../lib/personNameMatch';
 import { searchPeopleByName } from '../../lib/peopleSearch';
+import { extractCreditsWithLocalOCR } from '../../utils/localCreditOcr';
 import { AFRICAN_LANGUAGES, parseLanguages } from '../../utils/languages';
 
 const PEOPLE_SEARCH_SELECT = 'id, name, photo_url, film_count';
@@ -244,6 +246,17 @@ export default function AdminCreditHarvest() {
   const [errorsOnly, setErrorsOnly] = useState(false);
   const autoResolveSignatureRef = useRef('');
 
+  // Screenshot / Comparison Studio States
+  const [screenshots, setScreenshots] = useState([]); // [{ id, name, base64, size }]
+  const [activeScreenshotIndex, setActiveScreenshotIndex] = useState(0);
+  const [isScreenshotSplitOpen, setIsScreenshotSplitOpen] = useState(false);
+  const [ocrTarget, setOcrTarget] = useState('cast'); // 'cast' | 'crew'
+  const [isExtractingScreenshot, setIsExtractingScreenshot] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [isResettingQueue, setIsResettingQueue] = useState(false);
+  const screenshotInputRef = useRef(null);
+
   const loadStats = useCallback(async () => {
     // Pipeline progress — mirrors what the worker is doing on the other machine.
     const counts = {};
@@ -305,7 +318,7 @@ export default function AdminCreditHarvest() {
 
       let candidateQuery = supabase
         .from('credit_candidates')
-        .select('*, films:film_id (id, title, slug, poster_url, year, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, language, languages, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)')
+        .select('*, films:film_id (id, title, slug, poster_url, year, release_date, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, language, languages, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)')
         .eq('film_id', pageRow.film_id)
         .eq('status', statusFilter)
         .gte('confidence', minConfidence);
@@ -332,21 +345,26 @@ export default function AdminCreditHarvest() {
           .from('film_companies')
           .select('role, companies(id, name)')
           .eq('film_id', pageRow.film_id)
-          .eq('role', 'production')
-          .limit(1),
+          .in('role', ['production', 'distribution']),
       ]);
       if (metadataResult.error) throw metadataResult.error;
       if (companyResult.error) throw companyResult.error;
 
       const film = data?.[0]?.films;
-      const productionCompany = companyResult.data?.[0]?.companies || null;
+      const companiesList = companyResult.data || [];
+      const prodCompany = companiesList.find((c) => c.role === 'production')?.companies || null;
+      const distCompany = companiesList.find((c) => c.role === 'distribution')?.companies || null;
+
       setGroups(data?.length
         ? [{
             film: {
               ...film,
+              release_date: film?.release_date || '',
               language: film?.language || (Array.isArray(film?.languages) ? film.languages.join(', ') : ''),
-              production_company: productionCompany?.name || '',
-              production_company_id: productionCompany?.id || null,
+              production_company: prodCompany?.name || '',
+              production_company_id: prodCompany?.id || null,
+              distribution_company: distCompany?.name || '',
+              distribution_company_id: distCompany?.id || null,
               genre_ids: (film?.film_genres || []).map((row) => row.genre_id),
               _metadataDirty: false,
             },
@@ -754,7 +772,7 @@ export default function AdminCreditHarvest() {
     toast.success('Suggestion copied into movie details');
   };
 
-  const ensureProductionCompany = async (companyName) => {
+  const ensureCompany = async (companyName, companyType = 'production') => {
     const name = compactInput(companyName);
     if (!name) return null;
 
@@ -773,7 +791,7 @@ export default function AdminCreditHarvest() {
         description: '.',
         website: '.',
         logo_url: null,
-        company_type: 'production',
+        company_type: companyType,
       }])
       .select('id, name')
       .single();
@@ -782,7 +800,7 @@ export default function AdminCreditHarvest() {
   };
 
   const syncProductionCompany = async (filmId, companyName) => {
-    const company = await ensureProductionCompany(companyName);
+    const company = await ensureCompany(companyName, 'production');
     const { error: deleteError } = await supabase
       .from('film_companies')
       .delete()
@@ -797,6 +815,27 @@ export default function AdminCreditHarvest() {
         film_id: filmId,
         company_id: company.id,
         role: 'production',
+      }]);
+    if (insertError) throw insertError;
+    return company;
+  };
+
+  const syncDistributionCompany = async (filmId, companyName) => {
+    const company = await ensureCompany(companyName, 'distribution');
+    const { error: deleteError } = await supabase
+      .from('film_companies')
+      .delete()
+      .eq('film_id', filmId)
+      .eq('role', 'distribution');
+    if (deleteError) throw deleteError;
+
+    if (!company) return null;
+    const { error: insertError } = await supabase
+      .from('film_companies')
+      .insert([{
+        film_id: filmId,
+        company_id: company.id,
+        role: 'distribution',
       }]);
     if (insertError) throw insertError;
     return company;
@@ -887,9 +926,11 @@ export default function AdminCreditHarvest() {
     const runtimeText = String(film.runtime_minutes ?? '').trim();
     const runtime = runtimeText === '' ? null : Number(runtimeText);
     const year = numberOrNull(film.year);
+    const releaseDate = String(film.release_date || '').trim() || null;
     const language = compactInput(film.language) || null;
     const rating = String(film.nfvcb_rating || '').trim();
     const productionCompanyName = compactInput(film.production_company);
+    const distributionCompanyName = compactInput(film.distribution_company);
     const genreIds = [...new Set(film.genre_ids || [])];
     const maxYear = new Date().getFullYear() + 2;
 
@@ -912,6 +953,7 @@ export default function AdminCreditHarvest() {
         synopsis,
         runtime_minutes: runtime,
         year,
+        release_date: releaseDate,
         language,
         languages: parseLanguages(language),
         nfvcb_rating: rating || null,
@@ -923,7 +965,10 @@ export default function AdminCreditHarvest() {
         .eq('id', film.id);
       if (filmError) throw filmError;
 
-      const linkedCompany = await syncProductionCompany(film.id, productionCompanyName);
+      const [linkedProdCompany, linkedDistCompany] = await Promise.all([
+        syncProductionCompany(film.id, productionCompanyName),
+        syncDistributionCompany(film.id, distributionCompanyName),
+      ]);
 
       const { data: currentLinks, error: linksError } = await supabase
         .from('film_genres')
@@ -964,11 +1009,14 @@ export default function AdminCreditHarvest() {
                 synopsis,
                 runtime_minutes: runtime,
                 year,
+                release_date: releaseDate || '',
                 language,
                 languages: parseLanguages(language),
                 nfvcb_rating: rating || null,
-                production_company: linkedCompany?.name || '',
-                production_company_id: linkedCompany?.id || null,
+                production_company: linkedProdCompany?.name || '',
+                production_company_id: linkedProdCompany?.id || null,
+                distribution_company: linkedDistCompany?.name || '',
+                distribution_company_id: linkedDistCompany?.id || null,
                 genre_ids: genreIds,
                 _metadataDirty: false,
               },
@@ -980,6 +1028,166 @@ export default function AdminCreditHarvest() {
       toast.error(`Could not save movie details: ${error.message}`);
     } finally {
       setMetadataSaving(false);
+    }
+  };
+
+  const handleAddManualCandidate = async (group, creditType = 'actor') => {
+    if (!group?.film?.id) return;
+    try {
+      const defaultName = 'New Person';
+      const defaultRole = creditType === 'actor' ? 'Character' : 'Role';
+      const { data, error } = await supabase
+        .from('credit_candidates')
+        .insert([{
+          film_id: group.film.id,
+          credit_type: creditType,
+          raw_name: defaultName,
+          role_or_character: defaultRole,
+          confidence: 1.0,
+          ocr_confidence: 1.0,
+          frame_support: 1,
+          status: 'pending',
+          source_layout: { mode: 'manual_entry' },
+        }])
+        .select('*, films:film_id (id, title, slug, poster_url, year, release_date, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, language, languages, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)')
+        .single();
+      if (error) throw error;
+
+      setGroups((current) => current.map((g) => (
+        g.film?.id === group.film.id
+          ? { ...g, candidates: [data, ...g.candidates] }
+          : g
+      )));
+      toast.success(`Added new ${creditType} candidate`);
+    } catch (err) {
+      toast.error(`Could not add candidate: ${err.message}`);
+    }
+  };
+
+  const handleScreenshotUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const validFiles = files.filter((f) => f.type.startsWith('image/'));
+    if (!validFiles.length) {
+      toast.error('Please upload valid image files (PNG, JPEG, WebP)');
+      return;
+    }
+
+    validFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target.result;
+        setScreenshots((prev) => [
+          ...prev,
+          {
+            id: `shot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name: file.name,
+            base64,
+            size: file.size,
+          },
+        ]);
+        setIsScreenshotSplitOpen(true);
+      };
+      reader.readAsDataURL(file);
+    });
+    toast.success(`Loaded ${validFiles.length} screenshot(s)`);
+    if (screenshotInputRef.current) screenshotInputRef.current.value = '';
+  };
+
+  const handleExtractFromScreenshot = async (group, engine = 'local') => {
+    if (!group?.film?.id) return;
+    if (!screenshots.length) {
+      toast.error('Please upload at least one screenshot first.');
+      return;
+    }
+    const shot = screenshots[activeScreenshotIndex] || screenshots[0];
+    if (!shot) return;
+
+    setIsExtractingScreenshot(true);
+    try {
+      let extracted = [];
+      if (engine === 'local') {
+        toast('Running free local Tesseract OCR on screenshot...');
+        extracted = await extractCreditsWithLocalOCR(shot.base64, ocrTarget);
+      } else {
+        toast('Running Gemini AI Vision OCR on screenshot...');
+        const response = await fetch('/api/ai', {
+          method: 'POST',
+          headers: await authHeaders(),
+          body: JSON.stringify({
+            task: 'extract_credits_from_image',
+            data: { image: shot.base64, creditType: ocrTarget },
+          }),
+        });
+        if (!response.ok) {
+          const errJson = await response.json().catch(() => ({}));
+          throw new Error(errJson.error || 'Server returned an error');
+        }
+        const resData = await response.json();
+        extracted = resData.results || [];
+      }
+
+      if (!extracted || !extracted.length) {
+        toast.error('No credits found in this screenshot. Try a clearer image or different crop.');
+        return;
+      }
+
+      const rowsToInsert = extracted.map((item) => ({
+        film_id: group.film.id,
+        credit_type: ocrTarget,
+        raw_name: compactInput(item.name || 'Unknown Person'),
+        role_or_character: compactInput(item.role_or_character || (ocrTarget === 'actor' ? 'Character' : 'Role')),
+        confidence: engine === 'local' ? 0.85 : 0.95,
+        ocr_confidence: engine === 'local' ? 0.85 : 0.95,
+        frame_support: 1,
+        status: 'pending',
+        source_layout: { mode: `screenshot_${engine}_ocr`, filename: shot.name },
+      }));
+
+      const { data: inserted, error } = await supabase
+        .from('credit_candidates')
+        .insert(rowsToInsert)
+        .select('*, films:film_id (id, title, slug, poster_url, year, release_date, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, language, languages, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)');
+      if (error) throw error;
+
+      setGroups((current) => current.map((g) => (
+        g.film?.id === group.film.id
+          ? { ...g, candidates: [...(inserted || []), ...g.candidates] }
+          : g
+      )));
+
+      toast.success(`Extracted & added ${inserted.length} ${ocrTarget} credits from screenshot!`);
+    } catch (err) {
+      console.error('Screenshot extraction failed:', err);
+      toast.error(`Extraction failed: ${err.message}`);
+    } finally {
+      setIsExtractingScreenshot(false);
+    }
+  };
+
+  const handleResetQueueAndLogs = async () => {
+    setIsResettingQueue(true);
+    try {
+      const { error: cError } = await supabase.from('credit_candidates').delete().eq('status', 'pending');
+      if (cError) throw cError;
+
+      const { error: mError } = await supabase.from('credit_metadata_candidates').delete().eq('status', 'pending');
+      if (mError) throw mError;
+
+      const { error: lError } = await supabase.from('credit_harvest_logs').delete().gt('id', 0);
+      if (lError) throw lError;
+
+      const { error: jError } = await supabase.from('credit_harvest_jobs').delete().neq('status', 'impossible_status');
+      if (jError) throw jError;
+
+      setResetModalOpen(false);
+      toast.success('Queue & logs reset successfully! Ready to start afresh.');
+      await Promise.all([loadCandidates(), loadStats(), loadMonitor(true)]);
+    } catch (err) {
+      toast.error(`Could not reset queue: ${err.message}`);
+    } finally {
+      setIsResettingQueue(false);
     }
   };
 
@@ -1338,6 +1546,14 @@ export default function AdminCreditHarvest() {
                 : 'Pause after current movies'}
           </button>
           <button
+            type="button"
+            onClick={() => setResetModalOpen(true)}
+            className="text-xs font-bold px-3 py-2 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center gap-1.5"
+            title="Clear all pending candidates, logs, and reset jobs queue"
+          >
+            <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" /> Reset Queue & Logs
+          </button>
+          <button
             onClick={() => {
               loadStats();
               loadCandidates();
@@ -1349,6 +1565,54 @@ export default function AdminCreditHarvest() {
           </button>
         </div>
       </div>
+
+      {/* Reset Confirmation Modal */}
+      {resetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-bg border border-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                <Icon icon="solar:danger-triangle-bold" className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-text-primary">Reset Harvest Queue & Logs?</h3>
+                <p className="text-xs text-text-muted">This will start the harvester completely afresh.</p>
+              </div>
+            </div>
+            <div className="text-xs text-text-muted leading-relaxed space-y-2 bg-surface-2/60 border border-border/60 p-3 rounded-lg">
+              <p>• All <strong>pending credit candidates</strong> will be cleared.</p>
+              <p>• All <strong>pending movie metadata proposals</strong> will be cleared.</p>
+              <p>• All <strong>harvest jobs and logs</strong> will be removed from the queue.</p>
+              <p className="text-green-400 font-bold">✓ Already approved live credits in the database remain safe and intact.</p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isResettingQueue}
+                onClick={() => setResetModalOpen(false)}
+                className="px-4 py-2 rounded-lg border border-border text-xs font-bold text-text-muted hover:text-text-primary hover:bg-surface-2 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isResettingQueue}
+                onClick={handleResetQueueAndLogs}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-bold hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isResettingQueue ? (
+                  <>
+                    <Icon icon="solar:refresh-linear" className="w-4 h-4 animate-spin" />
+                    Clearing…
+                  </>
+                ) : (
+                  'Yes, Clear & Reset Everything'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pipeline progress — what the worker machine is doing */}
       {stats && (
@@ -1735,6 +1999,21 @@ export default function AdminCreditHarvest() {
 
                       <label>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                          Release date
+                        </span>
+                        <input
+                          type="date"
+                          value={group.film?.release_date || ''}
+                          onChange={(event) => editFilmMetadata(group.film.id, {
+                            release_date: event.target.value,
+                          })}
+                          aria-label="Release date"
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                        />
+                      </label>
+
+                      <label>
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
                           Runtime
                         </span>
                         <div className="relative">
@@ -1778,7 +2057,7 @@ export default function AdminCreditHarvest() {
                         </select>
                       </label>
 
-                      <label>
+                      <label className="col-span-2">
                         <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
                           Language
                         </span>
@@ -1794,7 +2073,7 @@ export default function AdminCreditHarvest() {
                         />
                       </label>
 
-                      <label className="col-span-2">
+                      <label>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
                           Production company
                         </span>
@@ -1805,6 +2084,21 @@ export default function AdminCreditHarvest() {
                           })}
                           aria-label="Production company"
                           placeholder="Production company"
+                          className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                        />
+                      </label>
+
+                      <label>
+                        <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                          Distribution company
+                        </span>
+                        <input
+                          value={group.film?.distribution_company || ''}
+                          onChange={(event) => editFilmMetadata(group.film.id, {
+                            distribution_company: event.target.value,
+                          })}
+                          aria-label="Distribution company"
+                          placeholder="Distribution company"
                           className="w-full bg-surface border border-border rounded-md px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
                         />
                       </label>
@@ -1851,154 +2145,423 @@ export default function AdminCreditHarvest() {
                   </fieldset>
                 </div>
 
-                <div className="divide-y divide-border">
-                  {group.candidates.map((c) => (
-                    <div key={c.id} className="px-4 py-3 hover:bg-surface-2/30">
-                      <div className="flex items-end gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(c.id)}
-                          onChange={() => toggle(c.id)}
-                          className="w-4 h-4 mb-2 accent-[color:var(--color-brand)]"
-                        />
+                {/* Candidate Action Toolbar */}
+                <div className="p-3.5 bg-surface-2/40 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleAddManualCandidate(group, 'actor')}
+                      className="text-xs font-black px-3 py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-brand/5 text-text-primary flex items-center gap-1.5"
+                    >
+                      <Icon icon="solar:user-plus-bold" className="w-3.5 h-3.5 text-brand" />
+                      + Add Cast
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleAddManualCandidate(group, 'crew')}
+                      className="text-xs font-black px-3 py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-brand/5 text-text-primary flex items-center gap-1.5"
+                    >
+                      <Icon icon="solar:clapperboard-play-bold" className="w-3.5 h-3.5 text-amber-400" />
+                      + Add Crew
+                    </button>
+                  </div>
 
-                        <div className="min-w-0 flex-[2]">
-                          <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                            Person name
-                          </span>
-                          <CandidatePersonNameCell
-                            candidate={c}
-                            disabled={statusFilter !== 'pending'}
-                            onTextChange={(name) => editCandidate(c.id, { raw_name: name })}
-                            onAutoLink={(person) => linkCandidateFamily(c.id, person)}
-                            onPickPerson={(person) => linkCandidateFamily(c.id, person, {
-                              canonicalName: true,
-                            })}
-                          />
-                        </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      ref={screenshotInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleScreenshotUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => screenshotInputRef.current?.click()}
+                      className="text-xs font-black px-3 py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-surface-2 text-text-primary flex items-center gap-1.5"
+                    >
+                      <Icon icon="solar:camera-add-linear" className="w-3.5 h-3.5 text-brand" />
+                      Upload Screenshot(s)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsScreenshotSplitOpen((prev) => !prev)}
+                      className={`text-xs font-black px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors ${
+                        isScreenshotSplitOpen || screenshots.length > 0
+                          ? 'bg-brand/15 text-brand border-brand/40'
+                          : 'bg-surface border-border text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon icon="solar:slider-vertical-linear" className="w-3.5 h-3.5" />
+                      {isScreenshotSplitOpen ? 'Hide Studio' : 'Split Studio'}
+                      {screenshots.length > 0 && (
+                        <span className="w-4 h-4 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center ml-1">
+                          {screenshots.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
 
-                        <label className="w-28 shrink-0">
-                          <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                            Type
-                          </span>
-                          <select
-                            value={c.credit_type}
-                            disabled={statusFilter !== 'pending'}
-                            onChange={(e) => editCandidate(c.id, { credit_type: e.target.value })}
-                            className="w-full bg-surface border border-border rounded-md px-2 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand disabled:opacity-70"
-                          >
-                            <option value="actor">Actor</option>
-                            <option value="crew">Crew</option>
-                          </select>
-                        </label>
+                {/* Split comparison layout vs Single column */}
+                <div className={isScreenshotSplitOpen || screenshots.length > 0 ? 'grid grid-cols-1 xl:grid-cols-2 gap-0 divide-y xl:divide-y-0 xl:divide-x divide-border' : ''}>
+                  {/* Left Column: Candidates list */}
+                  <div className="divide-y divide-border min-w-0">
+                    {group.candidates.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-text-muted">
+                        No candidates in this list yet. Click <strong>+ Add Cast</strong> or <strong>+ Add Crew</strong> above, or upload a screenshot to extract them.
+                      </div>
+                    ) : (
+                      group.candidates.map((c) => (
+                        <div key={c.id} className="px-4 py-3 hover:bg-surface-2/30">
+                          <div className="flex items-end gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selected.has(c.id)}
+                              onChange={() => toggle(c.id)}
+                              className="w-4 h-4 mb-2 accent-[color:var(--color-brand)]"
+                            />
 
-                        <label className="min-w-0 flex-[2]">
-                          <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                            {c.credit_type === 'actor' ? 'Character' : 'Crew role'}
-                          </span>
-                          <input
-                            value={c.role_or_character || ''}
-                            disabled={statusFilter !== 'pending'}
-                            onChange={(e) => editCandidate(c.id, { role_or_character: e.target.value })}
-                            placeholder={c.credit_type === 'actor' ? 'Character name' : 'e.g. Director'}
-                            className="w-full bg-surface border border-border rounded-md px-2.5 py-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-70"
-                          />
-                        </label>
+                            <div className="min-w-0 flex-[2]">
+                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                                Person name
+                              </span>
+                              <CandidatePersonNameCell
+                                candidate={c}
+                                disabled={statusFilter !== 'pending'}
+                                onTextChange={(name) => editCandidate(c.id, { raw_name: name })}
+                                onAutoLink={(person) => linkCandidateFamily(c.id, person)}
+                                onPickPerson={(person) => linkCandidateFamily(c.id, person, {
+                                  canonicalName: true,
+                                })}
+                              />
+                            </div>
 
-                        <div className="flex items-center gap-2 pb-1.5 shrink-0">
-                          {c.people ? (
-                            <span
-                              className="max-w-36 text-[10px] font-bold text-green-400 flex items-center gap-1"
-                              title={`Linked to existing profile: ${c.people.name}`}
-                            >
-                              <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5" />
-                              <span className="truncate">{c.people.name}</span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-text-muted" title="Will create a new person on approve">
-                              new person
-                            </span>
-                          )}
-                          {c._autoLinked && (
-                            <span
-                              className="text-[9px] font-black uppercase text-brand bg-brand/10 border border-brand/20 rounded px-1.5 py-0.5"
-                              title="Matched by safe auto-link"
-                            >
-                              auto
-                            </span>
-                          )}
+                            <label className="w-28 shrink-0">
+                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                                Type
+                              </span>
+                              <select
+                                value={c.credit_type}
+                                disabled={statusFilter !== 'pending'}
+                                onChange={(e) => editCandidate(c.id, { credit_type: e.target.value })}
+                                className="w-full bg-surface border border-border rounded-md px-2 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand disabled:opacity-70"
+                              >
+                                <option value="actor">Actor</option>
+                                <option value="crew">Crew</option>
+                              </select>
+                            </label>
 
-                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${confidenceStyle(c.confidence)}`}>
-                            {Math.round(c.confidence * 100)}%
-                          </span>
+                            <label className="min-w-0 flex-[2]">
+                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                                {c.credit_type === 'actor' ? 'Character' : 'Crew role'}
+                              </span>
+                              <input
+                                value={c.role_or_character || ''}
+                                disabled={statusFilter !== 'pending'}
+                                onChange={(e) => editCandidate(c.id, { role_or_character: e.target.value })}
+                                placeholder={c.credit_type === 'actor' ? 'Character name' : 'e.g. Director'}
+                                className="w-full bg-surface border border-border rounded-md px-2.5 py-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-70"
+                              />
+                            </label>
 
-                          {statusFilter === 'pending' && (
-                            <div className="flex items-center gap-1">
-                              {c._dirty && (
-                                <button
-                                  disabled={busy || autoResolving}
-                                  onClick={() => saveCandidate(c)}
-                                  title="Save edits"
-                                  className="w-7 h-7 rounded flex items-center justify-center text-brand hover:bg-brand/15 disabled:opacity-40"
+                            <div className="flex items-center gap-2 pb-1.5 shrink-0">
+                              {c.people ? (
+                                <span
+                                  className="max-w-36 text-[10px] font-bold text-green-400 flex items-center gap-1"
+                                  title={`Linked to existing profile: ${c.people.name}`}
                                 >
-                                  <Icon icon="solar:diskette-linear" className="w-4 h-4" />
-                                </button>
+                                  <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5" />
+                                  <span className="truncate">{c.people.name}</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-text-muted" title="Will create a new person on approve">
+                                  new person
+                                </span>
                               )}
-                              <button
-                                disabled={busy || autoResolving}
-                                onClick={() => approve([c])}
-                                title="Approve"
-                                className="w-7 h-7 rounded flex items-center justify-center text-green-400 hover:bg-green-500/15 disabled:opacity-40"
+                              {c._autoLinked && (
+                                <span
+                                  className="text-[9px] font-black uppercase text-brand bg-brand/10 border border-brand/20 rounded px-1.5 py-0.5"
+                                  title="Matched by safe auto-link"
+                                >
+                                  auto
+                                </span>
+                              )}
+
+                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${confidenceStyle(c.confidence)}`}>
+                                {Math.round(c.confidence * 100)}%
+                              </span>
+
+                              {statusFilter === 'pending' && (
+                                <div className="flex items-center gap-1">
+                                  {c._dirty && (
+                                    <button
+                                      disabled={busy || autoResolving}
+                                      onClick={() => saveCandidate(c)}
+                                      title="Save edits"
+                                      className="w-7 h-7 rounded flex items-center justify-center text-brand hover:bg-brand/15 disabled:opacity-40"
+                                    >
+                                      <Icon icon="solar:diskette-linear" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  <button
+                                    disabled={busy || autoResolving}
+                                    onClick={() => approve([c])}
+                                    title="Approve"
+                                    className="w-7 h-7 rounded flex items-center justify-center text-green-400 hover:bg-green-500/15 disabled:opacity-40"
+                                  >
+                                    <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    disabled={busy || autoResolving}
+                                    onClick={() => reject([c])}
+                                    title="Reject"
+                                    className="w-7 h-7 rounded flex items-center justify-center text-text-muted hover:bg-surface-3 disabled:opacity-40"
+                                  >
+                                    <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    disabled={busy || autoResolving}
+                                    onClick={() => remove([c])}
+                                    title="Delete"
+                                    className="w-7 h-7 rounded flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-40"
+                                  >
+                                    <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="ml-7 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted">
+                            <span>
+                              OCR {Math.round((c.ocr_confidence ?? c.confidence) * 100)}%
+                            </span>
+                            <span>{c.frame_support || 1} frame{c.frame_support === 1 ? '' : 's'}</span>
+                            {c.source_layout?.mode && <span>{c.source_layout.mode}</span>}
+                            {c.source_ocr_text && (
+                              <code className="max-w-xl truncate text-[10px] text-text-primary bg-surface-2 border border-border rounded px-1.5 py-0.5">
+                                {c.source_ocr_text}
+                              </code>
+                            )}
+                            {sourceUrl(group.film, c) && (
+                              <a
+                                href={sourceUrl(group.film, c)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-bold text-brand hover:underline"
                               >
-                                <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
-                              </button>
-                              <button
-                                disabled={busy || autoResolving}
-                                onClick={() => reject([c])}
-                                title="Reject"
-                                className="w-7 h-7 rounded flex items-center justify-center text-text-muted hover:bg-surface-3 disabled:opacity-40"
-                              >
-                                <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
-                              </button>
-                              <button
-                                disabled={busy || autoResolving}
-                                onClick={() => remove([c])}
-                                title="Delete"
-                                className="w-7 h-7 rounded flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-40"
-                              >
-                                <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
-                              </button>
+                                Open source at {Number.isFinite(c.source_video_sec)
+                                  ? `${Math.floor(c.source_video_sec / 60)}:${String(Math.round(c.source_video_sec % 60)).padStart(2, '0')}`
+                                  : 'video'}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Right Column: Screenshot Comparison & OCR Studio */}
+                  {(isScreenshotSplitOpen || screenshots.length > 0) && (
+                    <div className="p-4 bg-surface/80 flex flex-col gap-4 sticky top-4 h-fit max-h-[85vh] overflow-y-auto">
+                      <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
+                        <div className="flex items-center gap-2">
+                          <Icon icon="solar:gallery-wide-bold" className="w-5 h-5 text-brand" />
+                          <h3 className="text-xs font-black text-text-primary">Screenshot Comparison Studio</h3>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => screenshotInputRef.current?.click()}
+                            className="text-[10px] font-bold px-2 py-1 rounded bg-surface border border-border hover:bg-surface-2 text-text-primary flex items-center gap-1"
+                          >
+                            <Icon icon="solar:add-circle-linear" className="w-3.5 h-3.5" />
+                            Add image
+                          </button>
+                          {screenshots.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScreenshots([]);
+                                setActiveScreenshotIndex(0);
+                              }}
+                              className="text-[10px] font-bold px-2 py-1 rounded text-red-400 hover:bg-red-500/10 flex items-center gap-1"
+                            >
+                              <Icon icon="solar:trash-bin-minimalistic-linear" className="w-3.5 h-3.5" />
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {screenshots.length === 0 ? (
+                        <div
+                          onClick={() => screenshotInputRef.current?.click()}
+                          className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-brand/40 hover:bg-surface-2/40 transition-colors"
+                        >
+                          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-surface-2 flex items-center justify-center text-text-muted">
+                            <Icon icon="solar:upload-track-2-linear" className="w-6 h-6" />
+                          </div>
+                          <p className="text-xs font-bold text-text-primary">Upload credit screenshots to compare</p>
+                          <p className="text-[10px] text-text-muted mt-1">
+                            Drop images here or click to select multiple credit roll frames.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Carousel Thumbnails Slider */}
+                          {screenshots.length > 1 && (
+                            <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border/60">
+                              {screenshots.map((shot, idx) => (
+                                <div
+                                  key={shot.id}
+                                  className={`relative group shrink-0 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
+                                    activeScreenshotIndex === idx
+                                      ? 'border-brand shadow-lg scale-105'
+                                      : 'border-border/80 opacity-70 hover:opacity-100'
+                                  }`}
+                                  onClick={() => setActiveScreenshotIndex(idx)}
+                                >
+                                  <img
+                                    src={shot.base64}
+                                    alt={shot.name}
+                                    className="w-16 h-12 object-cover"
+                                  />
+                                  <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-bold text-white text-center truncate px-1">
+                                    {idx + 1}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const next = screenshots.filter((_, i) => i !== idx);
+                                      setScreenshots(next);
+                                      setActiveScreenshotIndex((curr) => Math.min(curr, Math.max(0, next.length - 1)));
+                                    }}
+                                    className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           )}
-                        </div>
-                      </div>
 
-                      <div className="ml-7 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted">
-                        <span>
-                          OCR {Math.round((c.ocr_confidence ?? c.confidence) * 100)}%
-                        </span>
-                        <span>{c.frame_support || 1} frame{c.frame_support === 1 ? '' : 's'}</span>
-                        {c.source_layout?.mode && <span>{c.source_layout.mode}</span>}
-                        {c.source_ocr_text && (
-                          <code className="max-w-xl truncate text-[10px] text-text-primary bg-surface-2 border border-border rounded px-1.5 py-0.5">
-                            {c.source_ocr_text}
-                          </code>
-                        )}
-                        {sourceUrl(group.film, c) && (
-                          <a
-                            href={sourceUrl(group.film, c)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-bold text-brand hover:underline"
-                          >
-                            Open source at {Number.isFinite(c.source_video_sec)
-                              ? `${Math.floor(c.source_video_sec / 60)}:${String(Math.round(c.source_video_sec % 60)).padStart(2, '0')}`
-                              : 'video'}
-                          </a>
-                        )}
-                      </div>
+                          {/* Active Screenshot Display & Zoom */}
+                          {screenshots[activeScreenshotIndex] && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between text-[10px] text-text-muted">
+                                <span className="font-bold truncate max-w-[200px]">
+                                  {screenshots[activeScreenshotIndex].name} ({activeScreenshotIndex + 1}/{screenshots.length})
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
+                                    className="w-6 h-6 rounded bg-surface-2 border border-border flex items-center justify-center font-bold"
+                                    title="Zoom out"
+                                  >
+                                    -
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setZoomLevel(1)}
+                                    className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] font-bold"
+                                    title="Reset zoom"
+                                  >
+                                    {Math.round(zoomLevel * 100)}%
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
+                                    className="w-6 h-6 rounded bg-surface-2 border border-border flex items-center justify-center font-bold"
+                                    title="Zoom in"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="relative bg-black/60 rounded-xl overflow-auto max-h-[380px] border border-border flex items-center justify-center p-2">
+                                <img
+                                  src={screenshots[activeScreenshotIndex].base64}
+                                  alt="Active screenshot"
+                                  style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
+                                  className="max-w-full rounded transition-transform duration-150"
+                                />
+                              </div>
+
+                              {/* OCR Extraction from screenshot controls */}
+                              <div className="bg-surface-2/60 border border-border/70 p-3 rounded-xl space-y-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                                    Extract As
+                                  </span>
+                                  <div className="flex items-center bg-surface border border-border rounded-lg p-0.5 text-[10px] font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() => setOcrTarget('actor')}
+                                      className={`px-3 py-1 rounded-md transition-colors ${
+                                        ocrTarget === 'actor'
+                                          ? 'bg-brand text-white'
+                                          : 'text-text-muted hover:text-text-primary'
+                                      }`}
+                                    >
+                                      🎭 Cast (Actors)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setOcrTarget('crew')}
+                                      className={`px-3 py-1 rounded-md transition-colors ${
+                                        ocrTarget === 'crew'
+                                          ? 'bg-brand text-white'
+                                          : 'text-text-muted hover:text-text-primary'
+                                      }`}
+                                    >
+                                      🎬 Crew Members
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    disabled={isExtractingScreenshot}
+                                    onClick={() => handleExtractFromScreenshot(group, 'local')}
+                                    className="px-3 py-2 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-surface-2 text-text-primary text-[11px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    {isExtractingScreenshot ? (
+                                      <Icon icon="solar:refresh-linear" className="w-4 h-4 animate-spin text-brand" />
+                                    ) : (
+                                      <Icon icon="solar:text-square-linear" className="w-4 h-4 text-brand" />
+                                    )}
+                                    Local OCR (Free)
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={isExtractingScreenshot}
+                                    onClick={() => handleExtractFromScreenshot(group, 'ai')}
+                                    className="px-3 py-2 rounded-lg bg-brand/15 border border-brand/40 text-brand hover:bg-brand/25 text-[11px] font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    {isExtractingScreenshot ? (
+                                      <Icon icon="solar:refresh-linear" className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Icon icon="solar:magic-stick-3-bold" className="w-4 h-4" />
+                                    )}
+                                    AI Vision OCR
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             );

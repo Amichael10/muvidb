@@ -786,12 +786,8 @@ const PeopleList = () => {
             (a, b) =>
               new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
           )
-        } else {
-          // popularity
-          filtered = [...filtered].sort(
-            (a, b) => Number(b.popularity_score || 0) - Number(a.popularity_score || 0)
-          )
         }
+        // Default search order is relevance; explicit user sorts still apply.
 
         const slice = filtered.slice(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE)
         setHasMore((pageNum + 1) * PAGE_SIZE < filtered.length)

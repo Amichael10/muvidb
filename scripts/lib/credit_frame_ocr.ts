@@ -1,9 +1,39 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   parseCreditFrame,
   parseTesseractTsv,
   type CreditObservation,
 } from './credit_roll_parser';
+
+if (process.platform === 'win32') {
+  const tesseractDir = existsSync('C:\\Program Files\\Tesseract-OCR')
+    ? 'C:\\Program Files\\Tesseract-OCR'
+    : existsSync(join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'))
+      ? join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR')
+      : null;
+
+  if (tesseractDir && !process.env.TESSDATA_PREFIX) {
+    const tessdata = join(tesseractDir, 'tessdata');
+    if (existsSync(tessdata)) process.env.TESSDATA_PREFIX = tessdata;
+  }
+
+  const extraPaths = [
+    'C:\\Program Files\\Tesseract-OCR',
+    join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'),
+    join(process.env.APPDATA || '', 'Python\\Python313\\Scripts'),
+    join(process.env.LOCALAPPDATA || '', 'Programs\\Python\\Python313\\Scripts'),
+    'C:\\Python313\\Scripts',
+    join(process.cwd(), '.local-clipper-venv\\Scripts'),
+    'C:\\ffmpeg\\ffmpeg-8.1.1-essentials_build\\bin',
+    'C:\\ffmpeg\\bin',
+  ].filter((p) => p && existsSync(p));
+
+  if (extraPaths.length > 0) {
+    process.env.PATH = `${extraPaths.join(';')};${process.env.PATH || ''}`;
+  }
+}
 
 function run(command: string, args: string[], input?: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {

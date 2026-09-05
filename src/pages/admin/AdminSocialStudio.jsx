@@ -8,6 +8,7 @@ import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
 import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
 import SocialIntakeInbox from '../../components/admin/SocialIntakeInbox';
+import FilmSearchCombobox from '../../components/admin/FilmSearchCombobox';
 
 const STATUS_TONES = {
   draft: 'blue',
@@ -641,8 +642,26 @@ export default function AdminSocialStudio() {
     setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days. Review them, then prepare or schedule.`);
   };
   const removeVideoRow = id => setVideoRows(rows => rows.length > 1 ? rows.filter(row => row.id !== id) : rows);
+  const resolveFilmForRow = async row => {
+    if (row.film && row.film.id === row.filmId) return row.film;
+    const existing = videoFilmOptions.find(item => item.id === row.filmId);
+    if (existing) return existing;
+    if (!row.filmId) return null;
+    try {
+      const { data, error } = await supabase
+        .from('films')
+        .select('id,title,release_date,trailer_youtube_id,trailer_external_url,youtube_watch_url')
+        .eq('id', row.filmId)
+        .single();
+      if (!error && data) return data;
+    } catch {
+      // fallback
+    }
+    return null;
+  };
+
   const generateRowCaption = async row => {
-    const film = videoFilmOptions.find(item => item.id === row.filmId);
+    const film = await resolveFilmForRow(row);
     if (!film) return toast.error('Choose a film before generating a caption.');
     updateVideoRow(row.id, { caption: 'Generating Gemini caption…' });
     try {
@@ -659,7 +678,7 @@ export default function AdminSocialStudio() {
     try {
       let created = 0;
       for (const row of validRows) {
-        const film = videoFilmOptions.find(item => item.id === row.filmId);
+        const film = await resolveFilmForRow(row);
         if (!film) continue;
         const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
         let start = Number(row.start) || 0; let end = Math.max(start + 1, Number(row.end) || start + videoPlan.clipLength);
@@ -2143,23 +2162,18 @@ export default function AdminSocialStudio() {
                       />
                     </label>
 
-                    <label className="text-[10px] font-black uppercase text-text-muted sm:col-span-2">
-                      Film
-                      <div className="relative mt-1">
-                        <select
-                          value={row.filmId}
-                          onChange={e => updateVideoRow(row.id, { filmId: e.target.value })}
-                          className="h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
-                        >
-                          <option value="">Choose a film…</option>
-                          {videoFilmOptions.map(film => (
-                            <option key={film.id} value={film.id}>
-                              {film.title} {film.release_date ? `(${new Date(film.release_date).getFullYear()})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </label>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-black uppercase text-text-muted">
+                        Film Selection
+                      </label>
+                      <FilmSearchCombobox
+                        value={row.filmId}
+                        onChange={(filmId, film) => updateVideoRow(row.id, { filmId, film })}
+                        films={videoFilmOptions}
+                        placeholder="Search Nollywood films…"
+                        className="mt-1"
+                      />
+                    </div>
 
                     <label className="text-[10px] font-black uppercase text-text-muted">
                       Format

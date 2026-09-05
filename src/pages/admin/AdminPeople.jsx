@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { searchPeopleByName } from '../../lib/peopleSearch';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import Drawer from '../../components/admin/Drawer';
@@ -207,6 +208,32 @@ export default function AdminPeople() {
       };
       
       const sort = sortConfigs[sortBy] || sortConfigs['Most Popular'];
+
+      if (cleanSearch) {
+        let rows = await searchPeopleByName(cleanSearch, { limit: 1000, select: '*' });
+        if (fetchId !== activeFetchIdRef.current) return;
+        rows = rows.filter(person => {
+          if (verifiedFilter === 'Verified' && !person.is_verified) return false;
+          if (verifiedFilter === 'Member' && person.is_verified) return false;
+          if (spotlightFilter === 'Spotlight' && !person.is_spotlight) return false;
+          if (spotlightFilter === 'Regular' && person.is_spotlight) return false;
+          if (profileStatus === 'Incomplete' && person.bio != null && person.photo_url != null) return false;
+          if (profileStatus === 'Complete' && (!person.bio || !person.photo_url)) return false;
+          return true;
+        });
+        const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+        // Preserve the admin's separate film/YouTube counts for visible results.
+        const counts = await Promise.all(pageRows.map(person => supabase.rpc('get_people_with_counts', {
+          p_search: person.id, p_limit: 1, p_offset: 0,
+        })));
+        if (fetchId !== activeFetchIdRef.current) return;
+        setTotalCount(rows.length);
+        setPeople(pageRows.map((person, index) => ({
+          ...person,
+          ...(counts[index].data?.find(row => row.id === person.id) || {}),
+        })));
+        return;
+      }
 
       // Build data fetching promise
       const dataPromise = supabase.rpc('get_people_with_counts', {
@@ -487,7 +514,13 @@ export default function AdminPeople() {
       .single();
     
     const p = fullPerson || person;
-    const { data: aliasRows } = await supabase.from('person_aliases').select('alias').eq('person_id', person.id).order('alias');
+    let aliasRows = [];
+    try {
+      const { data: aData, error: aErr } = await supabase.from('person_aliases').select('alias').eq('person_id', person.id).order('alias');
+      if (!aErr && aData) aliasRows = aData;
+    } catch (err) {
+      console.warn('Could not fetch person aliases:', err);
+    }
     const highlightsRaw = p.instagram_highlights || p.youtube_stats?.instagram_highlights || [];
     const highlightsArr = Array.isArray(highlightsRaw) ? highlightsRaw : [];
 
@@ -663,10 +696,18 @@ export default function AdminPeople() {
       try {
         const savedPersonId = await executeSave(dataToSave);
         if (savedPersonId) {
-          await supabase.from('person_aliases').delete().eq('person_id', savedPersonId);
-          if (aliasesToSave.length) {
-            const { error: aliasError } = await supabase.from('person_aliases').insert(aliasesToSave.map(alias => ({ person_id: savedPersonId, alias, source: 'admin' })));
-            if (aliasError) throw aliasError;
+          try {
+            const { error: delErr } = await supabase.from('person_aliases').delete().eq('person_id', savedPersonId);
+            if (delErr) throw delErr;
+            if (aliasesToSave.length) {
+              const { error: aliasError } = await supabase.from('person_aliases').insert(
+                aliasesToSave.map(alias => ({ person_id: savedPersonId, alias, source: 'admin' }))
+              );
+              if (aliasError) throw aliasError;
+            }
+          } catch (aliasErr) {
+            console.error('Failed to sync person aliases:', aliasErr);
+            toast.error('Profile saved, but alias sync failed (please apply DB permissions): ' + (aliasErr.message || aliasErr));
           }
         }
         toast.success(editingPerson ? 'Profile updated' : 'Person added');
@@ -865,7 +906,8 @@ export default function AdminPeople() {
             <option value="Verified">Verified Only</option>
             <option value="Member">Members Only</option>
           </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+          <select value={debouncedSearch.trim() ? 'Relevance' : sortBy} disabled={Boolean(debouncedSearch.trim())} onChange={(e) => setSortBy(e.target.value)} className="lg:col-span-2 bg-surface-2 border border-border rounded-md px-4 py-2 text-sm text-text-primary cursor-pointer">
+            {debouncedSearch.trim() && <option value="Relevance">Relevance</option>}
             <option value="Recently Added">Recently Added</option>
             <option value="Most Popular">Most Popular</option>
             <option value="A-Z">Alphabetical (A-Z)</option>

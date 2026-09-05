@@ -1,3 +1,4 @@
+import { searchPeopleByName } from '../../lib/peopleSearch';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
@@ -57,13 +58,7 @@ export default function AdminSpotlight() {
 
   const searchPeople = async (query) => {
     try {
-      const { data, error } = await supabase
-        .from('people')
-        .select('id, name, photo_url')
-        .ilike('name', `%${query}%`)
-        .limit(5);
-      
-      if (error) throw error;
+      const data = await searchPeopleByName(query, { limit: 5, select: 'id, name, photo_url' });
       setPersonResults(data || []);
     } catch (err) {
       console.error('Error searching people:', err);

@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
+import FilmSearchCombobox from './FilmSearchCombobox';
 
 const LOCAL_CLIPPER_URL = 'http://127.0.0.1:4317';
 
@@ -38,6 +39,8 @@ export default function SocialVideoClipModal({
   onAttachRenderedVideo,
 }) {
   const [activeTab, setActiveTab] = useState('clip_range'); // 'whole_video' | 'clip_range'
+  const [videoSourceMode, setVideoSourceMode] = useState(initialVideoUrl ? 'direct_url' : 'film_search');
+  const [selectedFilmId, setSelectedFilmId] = useState('');
   const [videoInput, setVideoInput] = useState(initialVideoUrl || '');
   const [videoUrl, setVideoUrl] = useState(initialVideoUrl || '');
   const [videoTitle, setVideoTitle] = useState(initialTitle || '');
@@ -206,6 +209,23 @@ export default function SocialVideoClipModal({
       return `https://www.youtube.com/embed/${raw}?autoplay=1&enablejsapi=1`;
     }
     return raw;
+  };
+
+  const handleFilmSelect = (filmId, film) => {
+    setSelectedFilmId(filmId);
+    if (!film) return;
+    if (film.title) setVideoTitle(film.title);
+    const trailer = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
+    if (trailer) {
+      setVideoInput(trailer);
+      const resolved = extractVideoUrl(trailer);
+      setVideoUrl(resolved);
+      setIsPreviewingClip(false);
+      toast.success(`Loaded video trailer for "${film.title}"`);
+    } else {
+      setVideoInput('');
+      toast('Film selected. Please enter or paste its video/trailer URL to clip.', { icon: '🎬' });
+    }
   };
 
   const handleFetchVideo = () => {
@@ -683,32 +703,83 @@ export default function SocialVideoClipModal({
           </button>
         </div>
 
-        {/* Video Input Bar */}
-        <div className="border-b border-white/10 bg-[#121216] p-4">
-          <label className="text-[10px] font-black uppercase tracking-wider text-white/70">
-            Video Source (YouTube Trailer, Nollywood Stream, or Direct MP4 Link)
-          </label>
-          <div className="mt-1.5 flex gap-2">
-            <div className="relative flex-1">
-              <Icon icon="solar:link-linear" className="absolute left-3 top-3 text-white/40" width="18" />
-              <input
-                type="text"
-                value={videoInput}
-                onChange={e => setVideoInput(e.target.value)}
-                placeholder="Paste YouTube link (e.g. https://youtu.be/...) or MP4 video URL…"
-                className="h-10 w-full rounded-lg border border-white/10 bg-black/50 pl-10 pr-4 text-xs text-white outline-none focus:border-brand"
-              />
+        {/* Video Source Bar (Film Search + Direct URL options) */}
+        <div className="border-b border-white/10 bg-[#121216] p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-[10px] font-black uppercase tracking-wider text-white/70">
+              Video Source
+            </label>
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/40 p-0.5">
+              <button
+                type="button"
+                onClick={() => setVideoSourceMode('film_search')}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+                  videoSourceMode === 'film_search'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-text-muted hover:text-white'
+                }`}
+              >
+                <Icon icon="solar:magnifer-linear" width="13" />
+                <span>Search Film Database</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setVideoSourceMode('direct_url')}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold transition-all ${
+                  videoSourceMode === 'direct_url'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-text-muted hover:text-white'
+                }`}
+              >
+                <Icon icon="solar:link-linear" width="13" />
+                <span>Paste Direct URL</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleFetchVideo}
-              disabled={loading || !videoInput.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 text-xs font-black uppercase tracking-wider text-white hover:bg-red-500 disabled:opacity-50"
-            >
-              <Icon icon="solar:cloud-download-linear" width="16" />
-              <span>Fetch Video</span>
-            </button>
           </div>
+
+          {videoSourceMode === 'film_search' ? (
+            <div className="space-y-2">
+              <FilmSearchCombobox
+                value={selectedFilmId}
+                onChange={handleFilmSelect}
+                placeholder="Type to search any Nollywood movie by title or year…"
+              />
+              {selectedFilmId && videoInput && (
+                <div className="flex items-center justify-between text-[11px] text-text-muted px-1 font-mono">
+                  <span className="truncate">Loaded URL: <span className="text-white/80">{videoInput}</span></span>
+                  <button
+                    type="button"
+                    onClick={() => setVideoSourceMode('direct_url')}
+                    className="text-brand hover:underline font-bold text-xs shrink-0 ml-2"
+                  >
+                    Edit URL
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Icon icon="solar:link-linear" className="absolute left-3 top-3 text-white/40" width="18" />
+                <input
+                  type="text"
+                  value={videoInput}
+                  onChange={e => setVideoInput(e.target.value)}
+                  placeholder="Paste YouTube link (e.g. https://youtu.be/...) or MP4 video URL…"
+                  className="h-10 w-full rounded-lg border border-white/10 bg-black/50 pl-10 pr-4 text-xs text-white outline-none focus:border-brand"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleFetchVideo}
+                disabled={loading || !videoInput.trim()}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 text-xs font-black uppercase tracking-wider text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                <Icon icon="solar:cloud-download-linear" width="16" />
+                <span>Fetch Video</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Mode Selector Tabs: 2 Options */}

@@ -56,6 +56,16 @@ export function namesLookSame(a, b) {
   return Boolean(ka && kb && ka === kb);
 }
 
+// Match the database's person_alias_key without dropping stage-name words.
+export function personAliasKey(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+export function matchesPersonAlias(query, person) {
+  const key = personAliasKey(query);
+  return Boolean(key && (person.aliases || []).some(alias => personAliasKey(alias) === key));
+}
+
 /** Prefer richer / more-credited people when several candidates match. */
 export function rankPersonMatch(a, b) {
   const films = Number(b.film_count || 0) - Number(a.film_count || 0);
@@ -153,6 +163,10 @@ export function pickAutoMatch(query, candidates = [], { minSemantic = 0.42 } = {
     const swaps = candidates.filter((p) => sortedNameKey(p.name) === qKey);
     if (swaps.length) return [...swaps].sort(rankPersonMatch)[0];
   }
+
+  const aliases = candidates.filter((p) => matchesPersonAlias(q, p));
+  // Shared stage names require a manual choice, regardless of popularity.
+  if (aliases.length) return new Set(aliases.map(p => p.id)).size === 1 ? aliases[0] : null;
 
   const near = candidates.filter((p) => namesNearMatch(q, p.name));
   if (near.length) return [...near].sort(rankPersonMatch)[0];

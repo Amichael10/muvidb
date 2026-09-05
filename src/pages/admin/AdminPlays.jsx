@@ -1,3 +1,4 @@
+import { searchPeopleByName } from '../../lib/peopleSearch';
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { fetchPlays, getPlayDateLabel, upsertPlay, upsertStageCredit, deleteStageCredit } from '../../lib/plays';
@@ -291,13 +292,15 @@ export default function AdminPlays() {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(async () => {
       setIsSearchingPeople(true);
-      const { data } = await supabase
-        .from('people')
-        .select('id, name, slug, photo_url')
-        .ilike('name', `%${query}%`)
-        .limit(8);
-      setPeopleResults(data || []);
-      setIsSearchingPeople(false);
+      try {
+        const data = await searchPeopleByName(query, { limit: 8, select: 'id, name, slug, photo_url' });
+        setPeopleResults(data || []);
+      } catch (error) {
+        console.error('People search failed:', error);
+        setPeopleResults([]);
+      } finally {
+        setIsSearchingPeople(false);
+      }
     }, 300);
   }
 

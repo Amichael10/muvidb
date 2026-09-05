@@ -37,13 +37,34 @@ import {
 } from './lib/credit_roll_parser';
 import { parseCreditFrameWithOcr } from './lib/credit_frame_ocr';
 
+if (process.platform === 'win32') {
+  const extraPaths = [
+    'C:\\Program Files\\Tesseract-OCR',
+    join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'),
+    join(process.env.APPDATA || '', 'Python\\Python313\\Scripts'),
+    join(process.env.LOCALAPPDATA || '', 'Programs\\Python\\Python313\\Scripts'),
+    'C:\\Python313\\Scripts',
+    join(process.cwd(), '.local-clipper-venv\\Scripts'),
+    'C:\\ffmpeg\\ffmpeg-8.1.1-essentials_build\\bin',
+    'C:\\ffmpeg\\bin',
+  ].filter((p) => p && existsSync(p));
+
+  if (extraPaths.length > 0) {
+    process.env.PATH = `${extraPaths.join(';')};${process.env.PATH || ''}`;
+  }
+}
+
 const run = promisify(execFile);
 
 const arg = (n: string) => {
-  const hit = process.argv.find((a) => a.startsWith(`--${n}`));
-  if (!hit) return undefined;
+  const index = process.argv.findIndex((a) => a === `--${n}` || a.startsWith(`--${n}=`));
+  if (index === -1) return undefined;
+  const hit = process.argv[index];
   const eq = hit.indexOf('=');
-  return eq === -1 ? 'true' : hit.slice(eq + 1);
+  if (eq !== -1) return hit.slice(eq + 1);
+  const next = process.argv[index + 1];
+  if (next && !next.startsWith('--')) return next;
+  return 'true';
 };
 
 function numberSetting(name: string, envName: string, fallback: number) {
@@ -65,9 +86,7 @@ const SINGLE_FRAME_MIN_OCR_CONFIDENCE = Number(arg('single-frame-min-ocr')) || 0
 const REHARVEST_EXISTING = arg('reharvest-existing') !== undefined;
 const YTDLP_TIMEOUT = 900_000;  // 15 min ceiling for a throttled tail
 const DEFAULT_VIDEO_FORMAT =
-  // Prefer progressive MP4. These are lower-risk than signed DASH/HLS URLs and
-  // still give Tesseract enough detail for credit cards when 720p is available.
-  '22/18/best[height<=720][ext=mp4][vcodec!=none][acodec!=none]/best[height<=720]/bestvideo[height<=720]+bestaudio/best';
+  '18/134/135/bestvideo[height<=480][vcodec^=avc1]/bestvideo[height<=480]/best[height<=480]/136/best';
 const VIDEO_FORMAT = arg('format') ?? process.env.YTDLP_FORMAT ?? DEFAULT_VIDEO_FORMAT;
 const AUTO_ENQUEUE_LATEST_LIMIT = Math.max(0, Math.floor(numberSetting('auto-enqueue-latest', 'CREDIT_HARVEST_AUTO_ENQUEUE_LATEST', 1000)));
 const AUTO_ENQUEUE_MIN_CREDITS = Math.max(0, Math.floor(numberSetting('auto-enqueue-min-credits', 'CREDIT_HARVEST_AUTO_ENQUEUE_MIN_CREDITS', 4)));
@@ -325,6 +344,7 @@ const configuredCookies = arg('cookies') ?? process.env.COOKIES_FILE ?? process.
 // supplied. This keeps the worker reproducible on a fresh laptop while still
 // allowing --cookies or an environment variable to override it.
 const COOKIES_FILE = configuredCookies || [
+  resolve(process.cwd(), 'Cookies.txt'),
   resolve(process.cwd(), 'cookies.txt'),
   resolve(process.cwd(), 'cookies.txt.txt'),
   resolve(process.cwd(), 'services/media-extractor/cookies.txt'),
@@ -342,9 +362,9 @@ function cookieArgs(): string[] {
 // gives a stable progressive MP4 that is enough for OCR. Use --client=default
 // or --client=auto to let yt-dlp choose, or override with --client=web.
 const configuredClient = arg('client') ?? process.env.YTDLP_YOUTUBE_CLIENT;
-const YT_CLIENT = configuredClient === 'default' || configuredClient === 'auto'
-  ? ''
-  : (configuredClient || 'mweb');
+const YT_CLIENT = !configuredClient || configuredClient === 'default' || configuredClient === 'auto'
+  ? 'android,web'
+  : configuredClient;
 function clientArgs(): string[] {
   return YT_CLIENT ? ['--extractor-args', `youtube:player_client=${YT_CLIENT}`] : [];
 }
@@ -356,6 +376,34 @@ const FRAMES_ONLY = arg('frames-only') !== undefined;
 const EXISTING_FRAMES_DIR = arg('frames-dir');
 
 // ---------------------------------------------------------------- prereqs ---
+if (process.platform === 'win32') {
+  const tesseractDir = existsSync('C:\\Program Files\\Tesseract-OCR')
+    ? 'C:\\Program Files\\Tesseract-OCR'
+    : existsSync(join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'))
+      ? join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR')
+      : null;
+
+  if (tesseractDir && !process.env.TESSDATA_PREFIX) {
+    const tessdata = join(tesseractDir, 'tessdata');
+    if (existsSync(tessdata)) process.env.TESSDATA_PREFIX = tessdata;
+  }
+
+  const extraPaths = [
+    'C:\\Program Files\\Tesseract-OCR',
+    join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'),
+    join(process.env.APPDATA || '', 'Python\\Python313\\Scripts'),
+    join(process.env.LOCALAPPDATA || '', 'Programs\\Python\\Python313\\Scripts'),
+    'C:\\Python313\\Scripts',
+    join(process.cwd(), '.local-clipper-venv\\Scripts'),
+    'C:\\ffmpeg\\ffmpeg-8.1.1-essentials_build\\bin',
+    'C:\\ffmpeg\\bin',
+  ].filter((p) => p && existsSync(p));
+
+  if (extraPaths.length > 0) {
+    process.env.PATH = `${extraPaths.join(';')};${process.env.PATH || ''}`;
+  }
+}
+
 async function checkPrereqs() {
   const need: Array<[string, string[]]> = [['ffmpeg', ['-version']]];
   if (!EXISTING_FRAMES_DIR) need.push(['yt-dlp', ['--version']]);
@@ -959,13 +1007,13 @@ async function extractTailFrames(
   const duration = await probeDuration(url);
   if (!duration) throw new Error('could not determine video duration');
   const start = Math.max(0, duration - TAIL_SECONDS);
-  const end = duration + 5;
+  const end = duration;
 
   const t0 = Date.now();
   await ytdlp([
     '-f', VIDEO_FORMAT,
     '--download-sections', `*${start}-${end}`,
-    '--retries', 'infinite', '--fragment-retries', 'infinite', '--socket-timeout', '30',
+    '--retries', '3', '--fragment-retries', '3', '--socket-timeout', '30',
     ...clientArgs(),
     ...cookieArgs(),
     '-o', tail,

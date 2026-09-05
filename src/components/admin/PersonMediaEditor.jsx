@@ -141,7 +141,10 @@ export default function PersonMediaEditor({ personId, personName }) {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
     if (!formData.title.trim()) return toast.error('Please enter a title');
     if (!formData.url.trim()) return toast.error('Please provide a media URL');
 
@@ -485,8 +488,17 @@ export default function PersonMediaEditor({ personId, personName }) {
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+            {/* Modal Form Container */}
+            <div
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSave(e);
+                }
+              }}
+              className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1 flex flex-col"
+            >
               {/* Media Type & Category */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -643,7 +655,7 @@ export default function PersonMediaEditor({ personId, personName }) {
               </div>
 
               {/* Submit Buttons */}
-              <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-border flex items-center justify-end gap-3 mt-auto">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
@@ -652,7 +664,8 @@ export default function PersonMediaEditor({ personId, personName }) {
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSave}
                   disabled={isSaving}
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-brand text-white hover:bg-brand/90 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                 >
@@ -660,7 +673,7 @@ export default function PersonMediaEditor({ personId, personName }) {
                   <span>{editingItem ? 'Update Media' : 'Save Media Asset'}</span>
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
