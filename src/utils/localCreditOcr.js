@@ -1,3 +1,5 @@
+import { dedupeCreditCandidates } from '../lib/creditReconciliation';
+
 // Common role labels in credit rolls
 const ROLE_PATTERNS = [
   { pattern: /^(?:STORY)(?: BY)?$/i, label: 'Story' },
@@ -53,8 +55,8 @@ function cleanPersonName(raw) {
  * Returns array of extracted items: [{ name: string, role_or_character: string }]
  */
 export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast') {
-  const modName = 'tesseract.js';
-  const { createWorker } = await import(/* @vite-ignore */ modName);
+  const { createWorker } = await import('tesseract.js');
+  creditType = creditType === 'actor' ? 'cast' : creditType;
   const worker = await createWorker('eng');
   
   try {
@@ -72,7 +74,7 @@ export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast
 
       // 1. Check if line contains a colon separator (e.g. "Director: John Doe" or "John Doe ... Producer")
       if (line.includes(':') || line.includes(' - ') || line.includes(' – ') || line.includes('...')) {
-        const parts = line.split(/[:\-\u2013]|(?:\.{2,})/);
+        const parts = line.split(/:|\s+[-\u2013]\s+|\.{2,}/);
         if (parts.length >= 2) {
           const p1 = parts[0].trim();
           const p2 = parts[1].trim();
@@ -101,7 +103,7 @@ export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast
           const name1 = cleanPersonName(p1);
           const name2 = cleanPersonName(p2);
           if (name1 && name2) {
-            results.push({ name: name2, role_or_character: name1 });
+            results.push({ name: name1, role_or_character: p2 });
             continue;
           } else if (name1) {
             results.push({ name: name1, role_or_character: p2 });
@@ -139,7 +141,9 @@ export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast
       }
     }
 
-    return results;
+    return dedupeCreditCandidates(results.map(item => ({
+      ...item, raw_name: item.name, credit_type: creditType,
+    }))).map(({ name, role_or_character }) => ({ name, role_or_character }));
   } finally {
     await worker.terminate();
   }

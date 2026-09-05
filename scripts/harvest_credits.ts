@@ -35,6 +35,7 @@ import {
   consolidateCreditObservations,
   type CreditObservation,
 } from './lib/credit_roll_parser';
+import { candidateKey, dedupeCreditCandidates as dedupeCandidateRows } from '../src/lib/creditReconciliation.js';
 import { parseCreditFrameWithOcr } from './lib/credit_frame_ocr';
 
 if (process.platform === 'win32') {
@@ -670,38 +671,6 @@ async function requeueFailed() {
   console.log(`✅ Requeued ${(data || []).length} failed jobs back to pending queue.`);
 }
 
-function normalizeCandidateValue(value: string | null | undefined): string {
-  return String(value ?? '')
-    .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .trim();
-}
-
-function candidateKey(row: { raw_name: string; role_or_character?: string | null; credit_type: string }) {
-  return [
-    normalizeCandidateValue(row.raw_name),
-    normalizeCandidateValue(row.role_or_character),
-    normalizeCandidateValue(row.credit_type),
-  ].join('|');
-}
-
-/** Collapse exact OCR repeats while retaining a person in distinct roles. */
-function dedupeCandidateRows(rows: Array<Record<string, any>>) {
-  const unique = new Map<string, Record<string, any>>();
-  for (const row of rows) {
-    const key = candidateKey(row as any);
-    const previous = unique.get(key);
-    if (!previous) { unique.set(key, row); continue; }
-    const prevScore = Number(previous.ocr_confidence ?? 0) + Number(previous.frame_support ?? 0) * 0.05;
-    const nextScore = Number(row.ocr_confidence ?? 0) + Number(row.frame_support ?? 0) * 0.05;
-    if (nextScore > prevScore) unique.set(key, row);
-  }
-  return [...unique.values()];
-}
-
-
 // ------------------------------------------------------------- metadata ----
 // Text-only metadata extraction from the YouTube title/description. This avoids
 // frame/video storage and paid model calls; admins still approve before live data
@@ -1287,7 +1256,7 @@ async function processJob(job: Job) {
 
     const { data: existingRows, error: existingRowsError } = await supabase
       .from('credit_candidates')
-      .select('raw_name, role_or_character, credit_type')
+      .select('film_id, raw_name, role_or_character, credit_type')
       .eq('film_id', job.film_id);
     if (existingRowsError) throw new Error(`existing candidate rows: ${existingRowsError.message}`);
 

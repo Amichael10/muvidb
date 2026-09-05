@@ -12,6 +12,8 @@ import {
   sortedNameKey,
 } from '../../lib/personNameMatch';
 import { searchPeopleByName } from '../../lib/peopleSearch';
+import CreditScreenshotComparison from '../../components/admin/CreditScreenshotComparison';
+import { candidateKey, creditNameKey, creditType, compareScreenshotCredits, duplicateCreditGroups, groupCreditReadings } from '../../lib/creditReconciliation';
 import { extractCreditsWithLocalOCR } from '../../utils/localCreditOcr';
 import { AFRICAN_LANGUAGES, parseLanguages } from '../../utils/languages';
 
@@ -250,12 +252,155 @@ export default function AdminCreditHarvest() {
   const [screenshots, setScreenshots] = useState([]); // [{ id, name, base64, size }]
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState(0);
   const [isScreenshotSplitOpen, setIsScreenshotSplitOpen] = useState(false);
-  const [ocrTarget, setOcrTarget] = useState('cast'); // 'cast' | 'crew'
+  const [ocrTarget, setOcrTarget] = useState('actor'); // 'actor' | 'crew'
+  const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [isExtractingScreenshot, setIsExtractingScreenshot] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [isResettingQueue, setIsResettingQueue] = useState(false);
   const screenshotInputRef = useRef(null);
+
+  useEffect(() => {
+    setScreenshots([]);
+    setScreenshotPreview(null);
+    setActiveScreenshotIndex(0);
+  }, [groups[0]?.film?.id]);
+
+  const fetchFilmCandidateRows = async (filmId) => {
+    const rows = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase.from('credit_candidates').select('*')
+        .eq('film_id', filmId).order('id').range(offset, offset + 999);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 1000) return rows;
+    }
+  };
+
+  const rejectMergedRows = async (rows, survivorId) => {
+    for (const row of rows) {
+      const { data, error } = await supabase.from('credit_candidates').update({
+        status: 'rejected', reviewed_at: new Date().toISOString(),
+        source_layout: { ...(row.source_layout || {}), merged_into: survivorId },
+      }).eq('id', row.id).eq('status', 'pending').select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('A credit changed during review. Reload and compare again.');
+    }
+  };
+
+  const mergeExactRepeats = async (group) => {
+    if (group.candidates.some(row => row._dirty)) { toast.error('Save your edited rows before merging repeats.'); return; }
+    setBusy(true);
+    try {
+      const rows = await fetchFilmCandidateRows(group.film.id);
+      const duplicates = duplicateCreditGroups(rows);
+      const removed = new Set();
+      for (const [survivor, ...repeats] of duplicates) {
+        await rejectMergedRows(repeats, survivor.id);
+        repeats.forEach(row => removed.add(row.id));
+      }
+      setGroups(current => current.map(item => item.film.id === group.film.id
+        ? { ...item, candidates: item.candidates.filter(row => !removed.has(row.id)) } : item));
+      setSelected(current => new Set([...current].filter(id => !removed.has(id))));
+      setScreenshotPreview(null);
+      toast.success(`Merged ${removed.size} exact repeats; different roles kept for review.`);
+      loadStats();
+    } catch (error) { toast.error(error.message); await loadCandidates(); }
+    finally { setBusy(false); }
+  };
+
+  const applyScreenshotReading = async (group, reading, targetId, duplicateIds, { quiet = false } = {}) => {
+    if (group.candidates.some(row => row._dirty)) {
+      if (!quiet) toast.error('Save your edited rows before applying a screenshot reading.');
+      return false;
+    }
+    if (!quiet) setBusy(true);
+    try {
+      const existing = await fetchFilmCandidateRows(group.film.id);
+      let target = existing.find(row => row.id === targetId);
+      const cleanReading = { ...reading, film_id: group.film.id, credit_type: creditType(reading.credit_type) };
+      // Re-check before insertion: re-running a screenshot cannot append an exact repeat.
+      if (targetId === '__new__') target = existing.find(row => candidateKey(row) === candidateKey(cleanReading));
+      if (target && target.status !== 'pending') throw new Error(`This credit is already ${target.status}. It has not been changed.`);
+      if (targetId !== '__new__' && !target) throw new Error('The selected row no longer exists. Compare again.');
+      const repeats = existing.filter(row => duplicateIds.includes(row.id) && row.id !== target?.id);
+      if (repeats.some(row => row.status !== 'pending' || creditType(row.credit_type) !== cleanReading.credit_type)) throw new Error('Only pending credits of the same type can be merged.');
+      if (repeats.some(row => row.matched_person_id && target?.matched_person_id && row.matched_person_id !== target.matched_person_id)) throw new Error('These rows link to different people. Correct their profile links before merging.');
+      
+      let matchedPersonId = target && creditNameKey(target.raw_name) === creditNameKey(reading.raw_name) ? target.matched_person_id : null;
+      let matchedPersonObj = null;
+      if (!matchedPersonId && cleanReading.raw_name) {
+        const { data: foundId } = await supabase.rpc('find_person_by_name', { p_name: cleanReading.raw_name });
+        if (foundId) {
+          matchedPersonId = foundId;
+          const { data: pData } = await supabase.from('people').select('id, name, photo_url').eq('id', foundId).single();
+          if (pData) matchedPersonObj = pData;
+        }
+      }
+
+      const patch = {
+        ...cleanReading,
+        matched_person_id: matchedPersonId,
+        source_layout: { ...(target?.source_layout || {}), screenshot_review: {
+          filename: screenshotPreview?.filename || 'screenshot', engine: screenshotPreview?.engine || 'ocr',
+          original_name: target?.raw_name || null, original_role: target?.role_or_character || null,
+          reviewed_at: new Date().toISOString(),
+        } },
+      };
+      const request = target
+        ? supabase.from('credit_candidates').update(patch).eq('id', target.id).eq('status', 'pending')
+        : supabase.from('credit_candidates').insert({ ...patch, status: 'pending', confidence: 0.8, ocr_confidence: 0.9, frame_support: 1 });
+      const { data: saved, error } = await request.select('*').single();
+      if (error) throw error;
+      if (repeats.length) await rejectMergedRows(repeats, saved.id);
+      const removed = new Set(repeats.map(row => row.id));
+      
+      setGroups(current => current.map(item => item.film.id === group.film.id ? {
+        ...item, candidates: item.candidates.some(row => row.id === saved.id)
+          ? item.candidates.filter(row => !removed.has(row.id)).map(row => row.id === saved.id ? {
+              ...saved,
+              people: matchedPersonObj || (saved.matched_person_id ? row.people : null)
+            } : row)
+          : [{ ...saved, people: matchedPersonObj }, ...item.candidates.filter(row => !removed.has(row.id))],
+      } : item));
+      
+      setSelected(current => new Set([...current].filter(id => !removed.has(id))));
+      if (!quiet) toast.success(`Updated ${cleanReading.raw_name}${removed.size ? ` and merged ${removed.size} repeats` : ''}.`);
+      if (!quiet) loadStats();
+      return true;
+    } catch (error) {
+      if (!quiet) toast.error(error.message);
+      return false;
+    } finally {
+      if (!quiet) setBusy(false);
+    }
+  };
+
+  const applyAllScreenshotReadings = async (group, comparisons) => {
+    if (!comparisons || !comparisons.length) return;
+    setBusy(true);
+    let updatedCount = 0;
+    let addedCount = 0;
+    try {
+      for (const comp of comparisons) {
+        if (!comp.targetId && !comp.reading.raw_name) continue;
+        const targetId = comp.targetId;
+        const reading = comp.reading;
+        const duplicateIds = comp.duplicateIds || [];
+        const success = await applyScreenshotReading(group, reading, targetId, duplicateIds, { quiet: true });
+        if (success) {
+          if (targetId === '__new__') addedCount++;
+          else updatedCount++;
+        }
+      }
+      toast.success(`Reconciliation complete: ${updatedCount} candidate(s) corrected in-place${addedCount ? `, ${addedCount} added` : ''}.`);
+      await loadStats();
+    } catch (err) {
+      toast.error(`Reconciliation error: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const loadStats = useCallback(async () => {
     // Pipeline progress — mirrors what the worker is doing on the other machine.
@@ -1107,11 +1252,15 @@ export default function AdminCreditHarvest() {
     setIsExtractingScreenshot(true);
     try {
       let extracted = [];
+      let localReadings = [];
+      let localError = false;
       if (engine === 'local') {
         toast('Running free local Tesseract OCR on screenshot...');
         extracted = await extractCreditsWithLocalOCR(shot.base64, ocrTarget);
       } else {
-        toast('Running Gemini AI Vision OCR on screenshot...');
+        toast('Comparing local OCR and AI Vision with the queued credits...');
+        try { localReadings = await extractCreditsWithLocalOCR(shot.base64, ocrTarget); }
+        catch (error) { localError = true; console.warn('Local screenshot OCR failed:', error); }
         const response = await fetch('/api/ai', {
           method: 'POST',
           headers: await authHeaders(),
@@ -1133,31 +1282,13 @@ export default function AdminCreditHarvest() {
         return;
       }
 
-      const rowsToInsert = extracted.map((item) => ({
-        film_id: group.film.id,
-        credit_type: ocrTarget,
-        raw_name: compactInput(item.name || 'Unknown Person'),
-        role_or_character: compactInput(item.role_or_character || (ocrTarget === 'actor' ? 'Character' : 'Role')),
-        confidence: engine === 'local' ? 0.85 : 0.95,
-        ocr_confidence: engine === 'local' ? 0.85 : 0.95,
-        frame_support: 1,
-        status: 'pending',
-        source_layout: { mode: `screenshot_${engine}_ocr`, filename: shot.name },
-      }));
-
-      const { data: inserted, error } = await supabase
-        .from('credit_candidates')
-        .insert(rowsToInsert)
-        .select('*, films:film_id (id, title, slug, poster_url, year, release_date, youtube_watch_url, synopsis, runtime_minutes, nfvcb_rating, language, languages, film_genres(genre_id)), people:matched_person_id (id, name, photo_url)');
-      if (error) throw error;
-
-      setGroups((current) => current.map((g) => (
-        g.film?.id === group.film.id
-          ? { ...g, candidates: [...(inserted || []), ...g.candidates] }
-          : g
-      )));
-
-      toast.success(`Extracted & added ${inserted.length} ${ocrTarget} credits from screenshot!`);
+      const existing = await fetchFilmCandidateRows(group.film.id);
+      setScreenshotPreview({
+        id: `${shot.id}-${Date.now()}`, filmId: group.film.id, shotId: shot.id,
+        filename: shot.name, engine, localError,
+        comparisons: compareScreenshotCredits(existing, extracted, ocrTarget, localReadings),
+      });
+      toast.success('Comparison ready. Review readings before applying changes.');
     } catch (err) {
       console.error('Screenshot extraction failed:', err);
       toast.error(`Extraction failed: ${err.message}`);
@@ -1261,6 +1392,7 @@ export default function AdminCreditHarvest() {
   /** Approve → create the person if needed, then write a real credit row. */
   const approve = async (rows) => {
     if (!rows.length) return;
+    if (duplicateCreditGroups(rows).length) { toast.error('Merge exact repeats before approving this selection.'); return; }
     setBusy(true);
     setApprovalProgress({ done: 0, total: rows.length });
     let created = 0;
@@ -1821,6 +1953,154 @@ export default function AdminCreditHarvest() {
       ) : (
         <div className="space-y-4">
           {groups.map((group) => {
+            const renderCandidate = (c) => (
+                        <div key={c.id} className="px-4 py-3 hover:bg-surface-2/30">
+                          <div className="flex items-end gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selected.has(c.id)}
+                              onChange={() => toggle(c.id)}
+                              className="w-4 h-4 mb-2 accent-[color:var(--color-brand)]"
+                            />
+
+                            <div className="min-w-0 flex-[2]">
+                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                                Person name
+                              </span>
+                              <CandidatePersonNameCell
+                                candidate={c}
+                                disabled={statusFilter !== 'pending'}
+                                onTextChange={(name) => editCandidate(c.id, { raw_name: name })}
+                                onAutoLink={(person) => linkCandidateFamily(c.id, person)}
+                                onPickPerson={(person) => linkCandidateFamily(c.id, person, {
+                                  canonicalName: true,
+                                })}
+                              />
+                            </div>
+
+                            <label className="w-28 shrink-0">
+                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                                Type
+                              </span>
+                              <select
+                                value={c.credit_type}
+                                disabled={statusFilter !== 'pending'}
+                                onChange={(e) => editCandidate(c.id, { credit_type: e.target.value })}
+                                className="w-full bg-surface border border-border rounded-md px-2 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand disabled:opacity-70"
+                              >
+                                <option value="actor">Actor</option>
+                                <option value="crew">Crew</option>
+                              </select>
+                            </label>
+
+                            <label className="min-w-0 flex-[2]">
+                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                                {c.credit_type === 'actor' ? 'Character' : 'Crew role'}
+                              </span>
+                              <input
+                                value={c.role_or_character || ''}
+                                disabled={statusFilter !== 'pending'}
+                                onChange={(e) => editCandidate(c.id, { role_or_character: e.target.value })}
+                                placeholder={c.credit_type === 'actor' ? 'Character name' : 'e.g. Director'}
+                                className="w-full bg-surface border border-border rounded-md px-2.5 py-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-70"
+                              />
+                            </label>
+
+                            <div className="flex items-center gap-2 pb-1.5 shrink-0">
+                              {c.people ? (
+                                <span
+                                  className="max-w-36 text-[10px] font-bold text-green-400 flex items-center gap-1"
+                                  title={`Linked to existing profile: ${c.people.name}`}
+                                >
+                                  <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5" />
+                                  <span className="truncate">{c.people.name}</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-text-muted" title="Will create a new person on approve">
+                                  new person
+                                </span>
+                              )}
+                              {c._autoLinked && (
+                                <span
+                                  className="text-[9px] font-black uppercase text-brand bg-brand/10 border border-brand/20 rounded px-1.5 py-0.5"
+                                  title="Matched by safe auto-link"
+                                >
+                                  auto
+                                </span>
+                              )}
+
+                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${confidenceStyle(c.confidence)}`}>
+                                {Math.round(c.confidence * 100)}%
+                              </span>
+
+                              {statusFilter === 'pending' && (
+                                <div className="flex items-center gap-1">
+                                  {c._dirty && (
+                                    <button
+                                      disabled={busy || autoResolving}
+                                      onClick={() => saveCandidate(c)}
+                                      title="Save edits"
+                                      className="w-7 h-7 rounded flex items-center justify-center text-brand hover:bg-brand/15 disabled:opacity-40"
+                                    >
+                                      <Icon icon="solar:diskette-linear" className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                  <button
+                                    disabled={busy || autoResolving}
+                                    onClick={() => approve([c])}
+                                    title="Approve"
+                                    className="w-7 h-7 rounded flex items-center justify-center text-green-400 hover:bg-green-500/15 disabled:opacity-40"
+                                  >
+                                    <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    disabled={busy || autoResolving}
+                                    onClick={() => reject([c])}
+                                    title="Reject"
+                                    className="w-7 h-7 rounded flex items-center justify-center text-text-muted hover:bg-surface-3 disabled:opacity-40"
+                                  >
+                                    <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    disabled={busy || autoResolving}
+                                    onClick={() => remove([c])}
+                                    title="Delete"
+                                    className="w-7 h-7 rounded flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-40"
+                                  >
+                                    <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="ml-7 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted">
+                            <span>
+                              OCR {Math.round((c.ocr_confidence ?? c.confidence) * 100)}%
+                            </span>
+                            <span>{c.frame_support || 1} frame{c.frame_support === 1 ? '' : 's'}</span>
+                            {c.source_layout?.mode && <span>{c.source_layout.mode}</span>}
+                            {c.source_ocr_text && (
+                              <code className="max-w-xl truncate text-[10px] text-text-primary bg-surface-2 border border-border rounded px-1.5 py-0.5">
+                                {c.source_ocr_text}
+                              </code>
+                            )}
+                            {sourceUrl(group.film, c) && (
+                              <a
+                                href={sourceUrl(group.film, c)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-bold text-brand hover:underline"
+                              >
+                                Open source at {Number.isFinite(c.source_video_sec)
+                                  ? `${Math.floor(c.source_video_sec / 60)}:${String(Math.round(c.source_video_sec % 60)).padStart(2, '0')}`
+                                  : 'video'}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+            );
+            const exactRepeats = duplicateCreditGroups(group.candidates).reduce((total, rows) => total + rows.length - 1, 0);
             const ids = group.candidates.map((c) => c.id);
             const allOn = ids.every((id) => selected.has(id));
             const pendingUnmatched = group.candidates.filter((candidate) => (
@@ -1879,6 +2159,13 @@ export default function AdminCreditHarvest() {
                       : `Approve all ${group.candidates.length}`}
                   </button>
                 </div>
+
+                {statusFilter === 'pending' && exactRepeats > 0 && (
+                  <div className="p-3 border-b border-border flex items-center justify-between gap-3 bg-amber-500/5">
+                    <p className="text-xs text-text-secondary">{exactRepeats} exact repeated credits. Different character or role readings need screenshot review.</p>
+                    <button type="button" disabled={busy || isExtractingScreenshot} onClick={() => mergeExactRepeats(group)} className="text-xs font-bold text-brand disabled:opacity-40">Merge exact repeats</button>
+                  </div>
+                )}
 
                 <div className="p-4 border-b border-border bg-surface/60">
                   <div className="flex items-center justify-between gap-3 mb-3">
@@ -2214,153 +2501,17 @@ export default function AdminCreditHarvest() {
                         No candidates in this list yet. Click <strong>+ Add Cast</strong> or <strong>+ Add Crew</strong> above, or upload a screenshot to extract them.
                       </div>
                     ) : (
-                      group.candidates.map((c) => (
-                        <div key={c.id} className="px-4 py-3 hover:bg-surface-2/30">
-                          <div className="flex items-end gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selected.has(c.id)}
-                              onChange={() => toggle(c.id)}
-                              className="w-4 h-4 mb-2 accent-[color:var(--color-brand)]"
-                            />
-
-                            <div className="min-w-0 flex-[2]">
-                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                                Person name
-                              </span>
-                              <CandidatePersonNameCell
-                                candidate={c}
-                                disabled={statusFilter !== 'pending'}
-                                onTextChange={(name) => editCandidate(c.id, { raw_name: name })}
-                                onAutoLink={(person) => linkCandidateFamily(c.id, person)}
-                                onPickPerson={(person) => linkCandidateFamily(c.id, person, {
-                                  canonicalName: true,
-                                })}
-                              />
-                            </div>
-
-                            <label className="w-28 shrink-0">
-                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                                Type
-                              </span>
-                              <select
-                                value={c.credit_type}
-                                disabled={statusFilter !== 'pending'}
-                                onChange={(e) => editCandidate(c.id, { credit_type: e.target.value })}
-                                className="w-full bg-surface border border-border rounded-md px-2 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand disabled:opacity-70"
-                              >
-                                <option value="actor">Actor</option>
-                                <option value="crew">Crew</option>
-                              </select>
-                            </label>
-
-                            <label className="min-w-0 flex-[2]">
-                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                                {c.credit_type === 'actor' ? 'Character' : 'Crew role'}
-                              </span>
-                              <input
-                                value={c.role_or_character || ''}
-                                disabled={statusFilter !== 'pending'}
-                                onChange={(e) => editCandidate(c.id, { role_or_character: e.target.value })}
-                                placeholder={c.credit_type === 'actor' ? 'Character name' : 'e.g. Director'}
-                                className="w-full bg-surface border border-border rounded-md px-2.5 py-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-70"
-                              />
-                            </label>
-
-                            <div className="flex items-center gap-2 pb-1.5 shrink-0">
-                              {c.people ? (
-                                <span
-                                  className="max-w-36 text-[10px] font-bold text-green-400 flex items-center gap-1"
-                                  title={`Linked to existing profile: ${c.people.name}`}
-                                >
-                                  <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5" />
-                                  <span className="truncate">{c.people.name}</span>
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold text-text-muted" title="Will create a new person on approve">
-                                  new person
-                                </span>
-                              )}
-                              {c._autoLinked && (
-                                <span
-                                  className="text-[9px] font-black uppercase text-brand bg-brand/10 border border-brand/20 rounded px-1.5 py-0.5"
-                                  title="Matched by safe auto-link"
-                                >
-                                  auto
-                                </span>
-                              )}
-
-                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${confidenceStyle(c.confidence)}`}>
-                                {Math.round(c.confidence * 100)}%
-                              </span>
-
-                              {statusFilter === 'pending' && (
-                                <div className="flex items-center gap-1">
-                                  {c._dirty && (
-                                    <button
-                                      disabled={busy || autoResolving}
-                                      onClick={() => saveCandidate(c)}
-                                      title="Save edits"
-                                      className="w-7 h-7 rounded flex items-center justify-center text-brand hover:bg-brand/15 disabled:opacity-40"
-                                    >
-                                      <Icon icon="solar:diskette-linear" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  <button
-                                    disabled={busy || autoResolving}
-                                    onClick={() => approve([c])}
-                                    title="Approve"
-                                    className="w-7 h-7 rounded flex items-center justify-center text-green-400 hover:bg-green-500/15 disabled:opacity-40"
-                                  >
-                                    <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    disabled={busy || autoResolving}
-                                    onClick={() => reject([c])}
-                                    title="Reject"
-                                    className="w-7 h-7 rounded flex items-center justify-center text-text-muted hover:bg-surface-3 disabled:opacity-40"
-                                  >
-                                    <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    disabled={busy || autoResolving}
-                                    onClick={() => remove([c])}
-                                    title="Delete"
-                                    className="w-7 h-7 rounded flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-40"
-                                  >
-                                    <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="ml-7 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted">
-                            <span>
-                              OCR {Math.round((c.ocr_confidence ?? c.confidence) * 100)}%
-                            </span>
-                            <span>{c.frame_support || 1} frame{c.frame_support === 1 ? '' : 's'}</span>
-                            {c.source_layout?.mode && <span>{c.source_layout.mode}</span>}
-                            {c.source_ocr_text && (
-                              <code className="max-w-xl truncate text-[10px] text-text-primary bg-surface-2 border border-border rounded px-1.5 py-0.5">
-                                {c.source_ocr_text}
-                              </code>
-                            )}
-                            {sourceUrl(group.film, c) && (
-                              <a
-                                href={sourceUrl(group.film, c)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-bold text-brand hover:underline"
-                              >
-                                Open source at {Number.isFinite(c.source_video_sec)
-                                  ? `${Math.floor(c.source_video_sec / 60)}:${String(Math.round(c.source_video_sec % 60)).padStart(2, '0')}`
-                                  : 'video'}
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))
+                      groupCreditReadings(group.candidates).map((readings) => readings.length === 1
+                        ? renderCandidate(readings[0])
+                        : (
+                          <details key={readings[0].id} className="border-b border-border">
+                            <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-text-primary">
+                              {readings[0].people?.name || readings[0].raw_name}
+                              <span className="ml-2 text-xs font-normal text-amber-400">{readings.length} readings / roles — expand to review</span>
+                            </summary>
+                            {readings.map(renderCandidate)}
+                          </details>
+                        ))
                     )}
                   </div>
 
@@ -2494,6 +2645,15 @@ export default function AdminCreditHarvest() {
                                 />
                               </div>
 
+                              {screenshotPreview?.filmId === group.film.id && screenshotPreview.shotId === screenshots[activeScreenshotIndex]?.id && (
+                                <CreditScreenshotComparison 
+                                  preview={screenshotPreview} 
+                                  disabled={busy || isExtractingScreenshot || statusFilter !== 'pending'} 
+                                  onApply={(reading, targetId, duplicateIds) => applyScreenshotReading(group, reading, targetId, duplicateIds)} 
+                                  onApplyAll={(comparisons) => applyAllScreenshotReadings(group, comparisons)}
+                                />
+                              )}
+
                               {/* OCR Extraction from screenshot controls */}
                               <div className="bg-surface-2/60 border border-border/70 p-3 rounded-xl space-y-2.5">
                                 <div className="flex items-center justify-between gap-2">
@@ -2529,7 +2689,7 @@ export default function AdminCreditHarvest() {
                                 <div className="grid grid-cols-2 gap-2 pt-1">
                                   <button
                                     type="button"
-                                    disabled={isExtractingScreenshot}
+                                    disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
                                     onClick={() => handleExtractFromScreenshot(group, 'local')}
                                     className="px-3 py-2 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-surface-2 text-text-primary text-[11px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
                                   >
@@ -2538,12 +2698,12 @@ export default function AdminCreditHarvest() {
                                     ) : (
                                       <Icon icon="solar:text-square-linear" className="w-4 h-4 text-brand" />
                                     )}
-                                    Local OCR (Free)
+                                    Compare Local OCR
                                   </button>
 
                                   <button
                                     type="button"
-                                    disabled={isExtractingScreenshot}
+                                    disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
                                     onClick={() => handleExtractFromScreenshot(group, 'ai')}
                                     className="px-3 py-2 rounded-lg bg-brand/15 border border-brand/40 text-brand hover:bg-brand/25 text-[11px] font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
                                   >
@@ -2552,7 +2712,7 @@ export default function AdminCreditHarvest() {
                                     ) : (
                                       <Icon icon="solar:magic-stick-3-bold" className="w-4 h-4" />
                                     )}
-                                    AI Vision OCR
+                                    Compare AI + Local
                                   </button>
                                 </div>
                               </div>

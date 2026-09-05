@@ -806,7 +806,7 @@ async function extractCreditsFromImage(data: any, res: VercelResponse) {
   const base64Data = matches[2];
 
   let prompt = '';
-  if (creditType === 'cast') {
+  if (creditType === 'cast' || creditType === 'actor') {
     prompt = `
       You are an expert Nollywood credit extractor.
       Perform high-accuracy OCR on the uploaded screenshot of opening or closing movie credits.
