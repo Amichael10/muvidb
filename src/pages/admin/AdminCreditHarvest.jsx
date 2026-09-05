@@ -23,8 +23,8 @@ const METADATA_FIELDS = [
   ['Production company', 'production_company'],
 ];
 const WORKER_COMMAND = [
-  'cd C:\\Users\\User\\muvidb',
-  'npx tsx scripts/harvest_credits.ts --cookies="C:\\Users\\User\\Downloads\\Cookies.txt"',
+  'cd C:\\Users\\User\\Filmdba\\lumi',
+  'npx.cmd tsx scripts/harvest_credits.ts --workers=2 --cookies="cookies.txt"',
 ].join('\n');
 const WORKER_ONLINE_MS = 45_000;
 

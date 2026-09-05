@@ -72,8 +72,9 @@ const NOISE_PATTERNS = [
   /^(THANKS?|THANK YOU)( FOR WATCHING)?$/,
   /^(COPYRIGHT|ALL RIGHTS RESERVED)/,
   /^(WWW\.|HTTP|YOUTUBE|INSTAGRAM|FACEBOOK|TWITTER|TIKTOK)/,
+  /^RO(?:YAL|TA|TVAL) ?ARTS(?: TV| T)?$/,
   /^(A |AN )?(FILM|MOVIE|PRODUCTION|PRESENTATION) BY$/,
-  /\b(PRODUCTIONS?|ENTERTAINMENT|STUDIOS?|PICTURES|FILMS?|LIMITED|LTD|INC)\b/,
+  /\b(PRODUCTIONS?|ENTERTAINMENT|STUDIOS?|PICTURES|FILMS?|LIMITED|LTD|INC|TV|CHANNEL|NETWORK|RENTALS?|SERVICES?|CONCEPT|DIRECTION|ZONE)\b/,
 ];
 
 const DIALOGUE_WORDS = new Set([
@@ -92,6 +93,7 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/^(?:CAMEO|CAMEO APPEARANCE|SPECIAL APPEARANCE)$/, 'Cameo'],
   [/^STORY(?: BY)?$/, 'Story'],
   [/^(?:SCREEN ?PLAY|SCRIPT)(?: BY)?$/, 'Screenplay'],
+  [/^(?:STORYI?SCREEN ?PLAY|STORY SCREEN ?PLAY|STORV SCREEN ?PLAY|SCREEN ?PLAY STORY)(?: BY)?$/, 'Story/Screenplay'],
   [/^(?:WRITTEN|WRITER)(?: BY)?$/, 'Writer'],
   [/^ALL SONGS WRITTEN AND PERFORMED BY$/, 'Songs written and performed by'],
   [/^(?:SONGS?|MUSIC) (?:WRITTEN|PERFORMED) BY$/, 'Music'],
@@ -103,18 +105,21 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/^(?:ASSOCIATE|CO) PRODUCER$/, 'Associate Producer'],
   [/^(?:LINE PRODUCER|PRODUCTION MANAGER)$/, 'Production Manager'],
   [/^(?:UNIT MANAGER|UNIT PRODUCTION MANAGER)$/, 'Unit Manager'],
-  [/^(?:PRODUCTION COORDINATOR|PRODUCTION SUPERVISOR)$/, 'Production Coordinator'],
-  [/^PRODUCTION ASSISTANTS?$/, 'Production Assistant'],
+  [/^(?:PRODUCTION COORDINATOR|PRODUCTION CORDINATOR|PRODUCTION SUPERVISOR)$/, 'Production Coordinator'],
+  [/^(?:PRODUCTION ASSISTANTS?|PRODUCTION ASST(?: \d+)?)$/, 'Production Assistant'],
   [/^(?:PRODUCTION DESIGNER|PRODUCTION DESIGN)$/, 'Production Designer'],
   [/^(?:ASSISTANT DIRECTOR|FIRST ASSISTANT DIRECTOR|1ST ASSISTANT DIRECTOR)$/, 'Assistant Director'],
   [/^(?:SECOND ASSISTANT DIRECTOR|2ND ASSISTANT DIRECTOR)$/, 'Second Assistant Director'],
-  [/^(?:DIRECTOR OF PHOTOGRAPHY|CINEMATOGRAPHER|D ?O ?P)$/, 'Director of Photography'],
+  [/^(?:DIRECTOR OF PHOTOGRAPHY|CINEMATOGRAPHER|D ?O ?P S?|BOP|POP)$/, 'Director of Photography'],
   [/^(?:CAMERA(?: OPERATOR)?|CAMERAMAN)$/, 'Camera Operator'],
+  [/^(?:CAMERA ASSISTANTS?|CAMERA ASST|CAMERA ASS?T(?: \d+)?)$/, 'Camera Assistant'],
   [/^(?:CAMERA TECH|CAMERA TECHNICIAN)$/, 'Camera Technician'],
+  [/^(?:1ST AC|FIRST AC|1ST ASSISTANT CAMERA|FIRST ASSISTANT CAMERA)$/, 'First Assistant Camera'],
+  [/^(?:2ND AC|SECOND AC|2ND ASSISTANT CAMERA|SECOND ASSISTANT CAMERA)$/, 'Second Assistant Camera'],
   [/^(?:SECOND UNIT OPERATOR|SECOND CAMERA|2ND CAMERA)$/, 'Second Unit Operator'],
   [/^(?:DRONE|DRONE OPERATOR|AERIAL CAMERA)$/, 'Drone Operator'],
-  [/^(?:BTS|BEHIND THE SCENES)$/, 'BTS'],
-  [/^(?:STILL PHOTOGRAPHER|PHOTOGRAPHY)$/, 'Still Photographer'],
+  [/^(?:BTS|B ?T ?S|BEHIND THE SCENES)$/, 'BTS'],
+  [/^(?:STILL PHOTOGRAPHER|STILL PHOTO|STILL PHOTOGRAPHY|PHOTOGRAPHY)$/, 'Still Photographer'],
   [/^(?:EDITED BY|EDITOR|FILM EDITOR)$/, 'Editor'],
   [/^(?:ASSISTANT EDITOR|ASSIST(?:ANT)? FILM EDITOR)$/, 'Assistant Editor'],
   [/^(?:COLORIST|COLOURIST|COLOR GRADING)$/, 'Colorist'],
@@ -122,19 +127,25 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/^(?:CASTING|CASTING DIRECTOR)$/, 'Casting Director'],
   [/^(?:MAKE ?UP|MAKE ?UP ARTIST)$/, 'Makeup'],
   [/^(?:ASSISTANT MAKE ?UP|MAKE ?UP ASSISTANT)$/, 'Assistant Makeup'],
+  [/^(?:HOD HAIR AND MAKE ?UP|HEAD OF HAIR AND MAKE ?UP|HAIR AND MAKE ?UP HOD)$/, 'Head of Hair and Makeup'],
   [/^(?:COSTUME|COSTUMIER|WARDROBE)$/, 'Costume'],
   [/^(?:ASSIST(?:ANT)? COSTUME|ASSIST(?:ANT)? COSTUMIER|WARDROBE ASSISTANT)$/, 'Assistant Costume'],
   [/^(?:ART DIRECTOR|ART DIRECTION)$/, 'Art Director'],
   [/^(?:PROPERTIES|PROPS)(?: SET DESIGN)?$/, 'Properties/Set Design'],
   [/^(?:PROPS MASTER|PROP MASTER)$/, 'Props Master'],
+  [/^(?:PROPS ASSISTANT|PROP ASSISTANT|PROPERTIES ASSISTANT)$/, 'Props Assistant'],
   [/^(?:SET DESIGN|SET DESIGNER)$/, 'Set Design'],
   [/^(?:SET MAN|SET ASSISTANTS?)$/, 'Set Assistant'],
   [/^(?:SOUND RECORDIST|LOCATION SOUND|SOUND MAN)$/, 'Sound Recordist'],
   [/^(?:SOUND DESIGN|SOUND DESIGNER)$/, 'Sound Designer'],
   [/^(?:SOUND|AUDIO)(?: ENGINEER)?$/, 'Sound'],
+  [/^(?:SOUND TRACK|SOUNDTRACK)$/, 'Soundtrack'],
+  [/^(?:BOOM OPERATOR|BOOM)$/, 'Boom Operator'],
   [/^(?:GAFFER|LIGHTING|LIGHTS?|LIGHTING TECH(?:NICIAN)?|LIGHT MAN|LIGHTMAN)$/, 'Gaffer'],
+  [/^(?:BEST BOY|BEST BOY ELECTRIC|BEST BOY GRIP)$/, 'Best Boy'],
   [/^(?:LOCATIONS?|LOCATION MANAGER)$/, 'Locations'],
   [/^(?:LOCATION ASSISTANTS?)$/, 'Location Assistant'],
+  [/^ASSISTANTS?$/, 'Assistant'],
   [/^(?:CONTINUITY|SCRIPT SUPERVISOR)$/, 'Continuity'],
   [/^CONTINUITY MANAGER$/, 'Continuity'],
   [/^(?:DIALOGUE|DIALOG)$/, 'Dialogue'],
@@ -146,6 +157,7 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/^(?:STUNTS?|STUNT COORDINATOR)$/, 'Stunts'],
   [/^SECURITY$/, 'Security'],
   [/^(?:TRANSPORTATION|TRANSPORT|DRIVERS?)$/, 'Transportation'],
+  [/^(?:RENTAL|EQUIPMENT RENTAL)$/, 'Equipment Rental'],
   [/^(?:CATERING|CATERER)$/, 'Catering'],
   [/^(?:WELFARE|WELFARE MANAGER)$/, 'Welfare'],
 ];
@@ -228,17 +240,47 @@ function smartTitle(value: string): string {
     .replace(/(['â€™])S\b/g, '$1s');
 }
 
-function looksLikePerson(value: string): boolean {
-  const text = lettersAndSpaces(value);
+function personCandidateText(value: string): string {
+  const text = lettersAndSpaces(
+    value
+      .replace(/^[^A-Z]{8,}(?=[A-Z])/g, '')
+      .replace(/\([^)]{1,40}\)/g, ' ')
+      .replace(/\s*\([^)]{1,40}$/g, ' ')
+      .replace(/\|\./g, ' I ')
+      .replace(/["“”]/g, ' ')
+      .replace(/\|/g, ' ')
+      .replace(/(^|\s)\.([A-Z])\.(?=\s|$)/g, '$1$2')
+      .replace(/(^|\s)([A-Z])\.(?=\s|$)/g, '$1$2')
+      .replace(/\.(?=\s*$)/, ''),
+  );
+  const words = text.split(' ');
+  if (
+    words.length >= 3
+    && /^[A-Z]$/i.test(words[0])
+    && words[1].replace(/[^\p{L}]/gu, '').length >= 4
+  ) {
+    return words.slice(1).join(' ');
+  }
+  return text;
+}
+
+function personTextLooksValid(text: string, allowSingleWord = false): boolean {
   if (text.length < 5 || text.length > 60) return false;
   if (/\d/.test(text) || canonicalRole(text) || isNoiseLine(text)) return false;
-  if (!/^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*)+$/u.test(text)) return false;
+  const shape = allowSingleWord
+    ? /^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*)*$/u
+    : /^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*)+$/u;
+  if (!shape.test(text)) return false;
 
   const words = text.split(' ');
-  if (words.length < 2 || words.length > 5) return false;
+  if (words.length < (allowSingleWord ? 1 : 2) || words.length > 5) return false;
+  if (allowSingleWord && words.length === 1 && words[0].replace(/[.'’/-]/g, '').length < 5) return false;
   if (words.some((word) => word.replace(/[.'’/-]/g, '').length === 0)) return false;
   if (words.some((word) => canonicalRole(word))) return false;
-  if (words.some((word) => DIALOGUE_WORDS.has(normalizeKey(word)))) return false;
+  if (words.some((word) => {
+    const key = normalizeKey(word);
+    return key.length > 1 && DIALOGUE_WORDS.has(key);
+  })) return false;
 
   const letterLengths = words.map((word) => word.replace(/[^\p{L}]/gu, '').length);
   const averageLength = letterLengths.reduce((sum, length) => sum + length, 0) / letterLengths.length;
@@ -246,15 +288,36 @@ function looksLikePerson(value: string): boolean {
   return true;
 }
 
+function looksLikePerson(value: string): boolean {
+  return personTextLooksValid(personCandidateText(value));
+}
+
+function cleanPersonName(value: string): string | null {
+  const text = personCandidateText(value);
+  if (!personTextLooksValid(text)) return null;
+  return smartTitle(text);
+}
+
+export function cleanCreditPersonName(value: string): string | null {
+  return cleanPersonName(value);
+}
+
+function cleanCrewPersonName(value: string, confidence = 1): string | null {
+  const text = personCandidateText(value);
+  if (personTextLooksValid(text)) return smartTitle(text);
+  if (confidence < 0.65 || !personTextLooksValid(text, true)) return null;
+  return smartTitle(text);
+}
+
 function cleanCharacter(value: string): string | null {
-  const text = lettersAndSpaces(value);
+  const text = lettersAndSpaces(value).replace(/\.(?=\s*$)/, '');
   if (!text || text.length > 60 || /\d/.test(text) || canonicalRole(text) || isNoiseLine(text)) return null;
   if (!/^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*){0,5}$/u.test(text)) return null;
   return smartTitle(text);
 }
 
 function cleanCreditCharacter(value: string): string | null {
-  const text = lettersAndSpaces(value);
+  const text = lettersAndSpaces(value).replace(/\.(?=\s*$)/, '');
   if (!text || text.length > 60 || canonicalRole(text) || isNoiseLine(text)) return null;
   if (/\d/.test(text)) {
     const digits = text.match(/\d/g) ?? [];
@@ -408,6 +471,85 @@ function textForWords(words: OcrWord[]): string {
   return words.map((word) => word.text).join(' ');
 }
 
+const LEADER_SEPARATOR_PATTERN = /(?:[.:;,+_=~]\s*){2,}[^A-Z]{0,64}(?=[A-Z])/g;
+const LEADER_SPLIT_MARKER = '\x1f';
+
+function creditSideText(value: string): string {
+  return lettersAndSpaces(value)
+    .replace(/\.(?=\s*$)/, '')
+    .replace(/^[|:;,+_=~\s-]+/, '')
+    .replace(/[|:;,+_=~\s-]+$/, '')
+    .trim();
+}
+
+function leaderRightText(value: string): string {
+  return normalizeSpace(value)
+    .replace(/^[|:;,+_=~\s-]+/, '')
+    .replace(/[|:;,+_=~\s-]+$/, '')
+    .trim();
+}
+
+function splitLeaderText(value: string): { left: string; right: string } | null {
+  const marked = normalizeSpace(value).replace(LEADER_SEPARATOR_PATTERN, ` ${LEADER_SPLIT_MARKER} `);
+  if (!marked.includes(LEADER_SPLIT_MARKER)) return null;
+  const [leftPart, ...rightParts] = marked.split(LEADER_SPLIT_MARKER);
+  const left = creditSideText(leftPart);
+  const right = leaderRightText(rightParts.join(' '));
+  if (!left || !right) return null;
+  return { left, right };
+}
+
+function roleFromLeaderLeft(value: string, currentRole: string | null): string | null {
+  const role = canonicalRole(value);
+  if (role) return role;
+  const key = normalizeKey(value);
+  if (/^(?:ASST|ASSISTANT) \d+$/.test(key) && currentRole) return currentRole;
+  return null;
+}
+
+function splitLeaderCreditLine(
+  line: OcrLine,
+  currentRole: string | null,
+): { role: string | null; observation: Omit<CreditObservation, 'frameIndex' | 'frameSec' | 'videoSec'> | null } | null {
+  const split = splitLeaderText(line.text);
+  if (!split) return null;
+
+  const role = roleFromLeaderLeft(split.left, currentRole);
+  if (role) {
+    const person = isCastCreditRole(role)
+      ? cleanPersonName(split.right)
+      : cleanCrewPersonName(split.right, line.confidence);
+    return {
+      role,
+      observation: person
+        ? {
+          name: person,
+          roleOrCharacter: role,
+          creditType: isCastCreditRole(role) ? 'actor' : 'crew',
+          ocrConfidence: line.confidence,
+          evidenceText: line.text,
+          layout: { mode: 'role-then-name', personBox: boxFor(line.words) },
+        }
+        : null,
+    };
+  }
+
+  const character = cleanCreditCharacter(split.left);
+  const person = cleanPersonName(split.right);
+  if (!character || !person) return null;
+  return {
+    role: null,
+    observation: {
+      name: person,
+      roleOrCharacter: character,
+      creditType: 'actor',
+      ocrConfidence: line.confidence,
+      evidenceText: line.text,
+      layout: { mode: 'two-column-cast', personBox: boxFor(line.words) },
+    },
+  };
+}
+
 function splitCastLine(
   line: OcrLine,
   separatorX: number,
@@ -417,31 +559,40 @@ function splitCastLine(
   const [leftWords, rightWords] = split;
   const leftText = textForWords(leftWords);
   const rightText = textForWords(rightWords);
-  const leftPerson = lettersAndSpaces(leftText);
-  const rightPerson = lettersAndSpaces(rightText);
+  const leftPerson = cleanPersonName(leftText);
+  const rightPerson = cleanPersonName(rightText);
   const leftCharacter = cleanCreditCharacter(leftText);
   const rightCharacter = cleanCreditCharacter(rightText);
-  const leftLooksPerson = looksLikePerson(leftPerson);
-  const rightLooksPerson = looksLikePerson(rightPerson);
+  const leftLooksPerson = !!leftPerson;
+  const rightLooksPerson = !!rightPerson;
   const actorOnLeft = leftLooksPerson && !!rightCharacter;
   const actorOnRight = rightLooksPerson && !!leftCharacter;
 
   if (!actorOnLeft && !actorOnRight) return null;
+  if (
+    actorOnLeft
+    && !actorOnRight
+    && !mostlyUppercase(leftText)
+    && mostlyUppercase(rightText)
+    && rightWords.length <= 2
+  ) {
+    return null;
+  }
 
   if (actorOnLeft && actorOnRight) {
     const leftCharacterScore = characterScore(leftCharacter ?? '');
     const rightCharacterScore = characterScore(rightCharacter ?? '');
     if (rightCharacterScore >= leftCharacterScore + 2) {
-      return { name: smartTitle(leftPerson), character: rightCharacter!, words: leftWords };
+      return { name: leftPerson, character: rightCharacter!, words: leftWords };
     }
     if (leftCharacterScore >= rightCharacterScore + 2) {
-      return { name: smartTitle(rightPerson), character: leftCharacter!, words: rightWords };
+      return { name: rightPerson, character: leftCharacter!, words: rightWords };
     }
     return null;
   }
 
-  if (actorOnLeft) return { name: smartTitle(leftPerson), character: rightCharacter!, words: leftWords };
-  return { name: smartTitle(rightPerson), character: leftCharacter!, words: rightWords };
+  if (actorOnLeft) return { name: leftPerson, character: rightCharacter!, words: leftWords };
+  return { name: rightPerson!, character: leftCharacter!, words: rightWords };
 }
 
 function findLineSeparator(line: OcrLine): number | null {
@@ -458,7 +609,11 @@ function findLineSeparator(line: OcrLine): number | null {
   return best?.midpoint ?? null;
 }
 
-function splitPeopleColumns(line: OcrLine, separatorX: number | null): Array<{ name: string; words: OcrWord[] }> {
+function splitPeopleColumns(
+  line: OcrLine,
+  separatorX: number | null,
+  allowSingleWord = false,
+): Array<{ name: string; words: OcrWord[] }> {
   const split = separatorX === null
     ? null
     : splitAtSeparator(line, separatorX);
@@ -467,8 +622,10 @@ function splitPeopleColumns(line: OcrLine, separatorX: number | null): Array<{ n
   if (!resolvedSplit) return [];
   const people: Array<{ name: string; words: OcrWord[] }> = [];
   for (const words of resolvedSplit) {
-    const person = lettersAndSpaces(textForWords(words));
-    if (looksLikePerson(person)) people.push({ name: smartTitle(person), words });
+    const person = allowSingleWord
+      ? cleanCrewPersonName(textForWords(words), averageConfidence(words))
+      : cleanPersonName(textForWords(words));
+    if (person) people.push({ name: person, words });
   }
 
   const seen = new Set<string>();
@@ -502,15 +659,15 @@ function splitMergedActorCharacter(line: OcrLine): { name: string; character: st
     if (nameWords.length > 4 || characterWords.length > 3) continue;
     if (!nameWords.every((word) => wordLooksUppercase(word.text))) continue;
 
-    const name = lettersAndSpaces(textForWords(nameWords));
+    const name = cleanPersonName(textForWords(nameWords));
     const character = cleanCreditCharacter(textForWords(characterWords));
-    if (!character || !looksLikePerson(name)) continue;
+    if (!character || !name) continue;
 
     const characterHasLowercase = characterWords.some((word) => /[a-z]/.test(word.text));
     if (!characterHasLowercase && characterScore(character) < 3) continue;
 
     return {
-      name: smartTitle(name),
+      name,
       character,
       words: nameWords,
     };
@@ -561,8 +718,10 @@ function sameLineRoleAndName(line: OcrLine): { role: string; name: string; words
     const left = line.words.slice(0, i);
     const right = line.words.slice(i);
     const role = canonicalRole(left.map((word) => word.text).join(' '));
-    const name = right.map((word) => word.text).join(' ');
-    if (role && looksLikePerson(name)) return { role, name, words: right };
+    const name = role && isCastCreditRole(role)
+      ? cleanPersonName(right.map((word) => word.text).join(' '))
+      : cleanCrewPersonName(right.map((word) => word.text).join(' '), averageConfidence(right));
+    if (role && name) return { role, name, words: right };
   }
   return null;
 }
@@ -626,10 +785,37 @@ export function parseCreditFrame(
       continue;
     }
 
+    const role = canonicalRole(line.text);
+    if (role) {
+      currentRole = role;
+      currentCastCharacter = null;
+      continue;
+    }
+
+    const leader = splitLeaderCreditLine(line, currentRole);
+    if (leader) {
+      if (leader.observation) {
+        observations.push({
+          ...leader.observation,
+          frameIndex,
+          frameSec,
+          videoSec,
+        });
+      }
+      currentRole = leader.role;
+      currentCastCharacter = null;
+      continue;
+    }
+
+    if (isNoiseLine(line.text)) {
+      currentRole = null;
+      continue;
+    }
+
     const inline = sameLineRoleAndName(line);
     if (inline) {
       observations.push({
-        name: smartTitle(lettersAndSpaces(inline.name)),
+        name: inline.name,
         roleOrCharacter: inline.role,
         creditType: isCastCreditRole(inline.role) ? 'actor' : 'crew',
         frameIndex,
@@ -640,13 +826,6 @@ export function parseCreditFrame(
         layout: { mode: 'role-then-name', personBox: boxFor(inline.words) },
       });
       currentRole = inline.role;
-      currentCastCharacter = null;
-      continue;
-    }
-
-    const role = canonicalRole(line.text);
-    if (role) {
-      currentRole = role;
       currentCastCharacter = null;
       continue;
     }
@@ -663,7 +842,7 @@ export function parseCreditFrame(
       }
     }
     if (currentRole) {
-      const people = splitPeopleColumns(line, separatorX);
+      const people = splitPeopleColumns(line, separatorX, !isCastCreditRole(currentRole));
       if (people.length) {
         for (const person of people) {
           observations.push({
@@ -747,9 +926,10 @@ export function parseCreditFrame(
         });
         continue;
       }
-      if (!looksLikePerson(line.text)) continue;
+      const person = cleanPersonName(line.text);
+      if (!person) continue;
       observations.push({
-        name: smartTitle(lettersAndSpaces(line.text)),
+        name: person,
         roleOrCharacter: currentCastCharacter,
         creditType: 'actor',
         frameIndex,
@@ -761,10 +941,15 @@ export function parseCreditFrame(
       });
       continue;
     }
-    if (!currentRole || isNoiseLine(line.text) || !looksLikePerson(line.text)) continue;
+    if (!currentRole || isNoiseLine(line.text)) continue;
+    const person = cleanCrewPersonName(
+      line.text,
+      line.confidence,
+    );
+    if (!person) continue;
 
     observations.push({
-      name: smartTitle(lettersAndSpaces(line.text)),
+      name: person,
       roleOrCharacter: currentRole,
       creditType: isCastCreditRole(currentRole) ? 'actor' : 'crew',
       frameIndex,
@@ -864,14 +1049,21 @@ function namesAreNear(a: string, b: string): boolean {
   return editDistance(left, right) <= allowance;
 }
 
+function isGenericActorRole(value: string): boolean {
+  return normalizeKey(value) === 'ACTOR';
+}
+
 export function consolidateCreditObservations(observations: CreditObservation[]): ParsedCredit[] {
   const groups: CreditObservation[][] = [];
   for (const observation of observations) {
     const roleKey = normalizeKey(observation.roleOrCharacter);
     const existing = groups.find((group) => {
       const first = group[0];
+      const sameActorWithGenericRole = first.creditType === 'actor'
+        && observation.creditType === 'actor'
+        && (isGenericActorRole(first.roleOrCharacter) || isGenericActorRole(observation.roleOrCharacter));
       return first.creditType === observation.creditType
-        && normalizeKey(first.roleOrCharacter) === roleKey
+        && (normalizeKey(first.roleOrCharacter) === roleKey || sameActorWithGenericRole)
         && namesAreNear(first.name, observation.name);
     });
     if (existing) existing.push(observation);
@@ -887,15 +1079,27 @@ export function consolidateCreditObservations(observations: CreditObservation[])
       variant.confidence += item.ocrConfidence;
       variants.set(key, variant);
     }
-    const bestVariant = [...variants.values()].sort(
+    const roleSpecificItems = group.filter((item) => (
+      item.creditType !== 'actor' || !isGenericActorRole(item.roleOrCharacter)
+    ));
+    const variantKeys = new Set((roleSpecificItems.length ? roleSpecificItems : group)
+      .map((item) => normalizeKey(item.name)));
+    const bestVariant = [...variants.values()]
+      .filter((variant) => variantKeys.has(normalizeKey(variant.name)))
+      .sort(
       (a, b) => b.count - a.count || b.confidence - a.confidence,
     )[0];
     const matching = group.filter((item) => normalizeKey(item.name) === normalizeKey(bestVariant.name));
     const bestEvidence = [...matching].sort((a, b) => b.ocrConfidence - a.ocrConfidence)[0] ?? group[0];
+    const bestRoleEvidence = [...matching].sort((a, b) => {
+      const aGenericActor = a.creditType === 'actor' && isGenericActorRole(a.roleOrCharacter) ? 1 : 0;
+      const bGenericActor = b.creditType === 'actor' && isGenericActorRole(b.roleOrCharacter) ? 1 : 0;
+      return aGenericActor - bGenericActor || b.ocrConfidence - a.ocrConfidence;
+    })[0] ?? bestEvidence;
     const frames = new Set(group.map((item) => item.frameIndex));
     return {
       name: bestVariant.name,
-      roleOrCharacter: bestEvidence.roleOrCharacter,
+      roleOrCharacter: bestRoleEvidence.roleOrCharacter,
       creditType: bestEvidence.creditType,
       frameIndex: bestEvidence.frameIndex,
       frameSec: bestEvidence.frameSec,

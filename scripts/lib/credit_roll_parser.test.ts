@@ -349,6 +349,189 @@ describe('credit roll layout parser', () => {
     ]);
   });
 
+  it('parses Royal Arts-style crew cards without accepting watermarks or companies', () => {
+    const parsed = parseCreditFrame([
+      line(100, [['CREW', 408, 61]]),
+      line(130, [['EXECUTIVE', 350, 100], ['PRODUCER', 458, 96]]),
+      line(155, [['DIANA', 374, 62], ['CHILDS', 446, 72]]),
+      line(180, [['DIRECTOR', 385, 90]]),
+      line(205, [['OLAIDE', 245, 78], ['ABRAHAM', 335, 100], ['CROSS', 447, 70], ['AYODELE', 529, 88]]),
+      line(230, [['STORY/SCREENPLAY', 330, 170]]),
+      line(255, [['DIANA', 374, 62], ['CHILDS', 446, 72]]),
+      line(280, [['ASSISTANT', 345, 102], ['DIRECTOR', 457, 90]]),
+      line(305, [['DEMILADE', 252, 98], ['MEDUOYE', 360, 92], ['(HENDS)', 462, 82]]),
+      line(330, [['PROPS', 354, 66], ['ASSISTANT', 430, 102]]),
+      line(355, [['MATTHEW', 238, 96], ['JAMES', 344, 68], ['GODSPOWER', 424, 118]]),
+      line(380, [['1st', 402, 35], ['Ac', 446, 28]]),
+      line(405, [['EZEKIEL', 354, 84], ['ENIOLA', 448, 74]]),
+      line(430, [['BOOM', 354, 62], ['OPERATOR', 426, 98]]),
+      line(455, [['OJUKWU', 396, 78]]),
+      line(480, [['HOD', 294, 42], ['HAIR', 345, 54], ['AND', 408, 44], ['MAKEUP', 462, 82]]),
+      line(505, [['GRACE', 370, 70], ['ANYIM', 450, 64]]),
+      line(530, [['ROYALARTS', 312, 122], ['T', 446, 16]]),
+      line(555, [['MAKE', 323, 56], ['UP', 389, 28], ['ASSISTANT', 428, 102]]),
+      line(580, [['IFETOMIWA', 320, 108], ['ADEBAYO', 438, 92]]),
+      line(605, [['POST', 360, 56], ['PRODUCTION', 426, 120]]),
+      line(630, [['THE7EVENTH', 326, 132], ['STUDIO', 470, 76]]),
+    ], 55, 255, 6_784);
+
+    expect(parsed.map(({ name, roleOrCharacter, creditType }) => ({
+      name,
+      roleOrCharacter,
+      creditType,
+    }))).toEqual([
+      { name: 'Diana Childs', roleOrCharacter: 'Executive Producer', creditType: 'crew' },
+      { name: 'Olaide Abraham Cross Ayodele', roleOrCharacter: 'Director', creditType: 'crew' },
+      { name: 'Diana Childs', roleOrCharacter: 'Story/Screenplay', creditType: 'crew' },
+      { name: 'Demilade Meduoye', roleOrCharacter: 'Assistant Director', creditType: 'crew' },
+      { name: 'Matthew James Godspower', roleOrCharacter: 'Props Assistant', creditType: 'crew' },
+      { name: 'Ezekiel Eniola', roleOrCharacter: 'First Assistant Camera', creditType: 'crew' },
+      { name: 'Ojukwu', roleOrCharacter: 'Boom Operator', creditType: 'crew' },
+      { name: 'Grace Anyim', roleOrCharacter: 'Head of Hair and Makeup', creditType: 'crew' },
+      { name: 'Ifetomiwa Adebayo', roleOrCharacter: 'Assistant Makeup', creditType: 'crew' },
+    ]);
+    expect(parsed.some((credit) => /Royal|Studio|The7/i.test(credit.name))).toBe(false);
+  });
+
+  it('parses sparse-text crew OCR when normal OCR misses small headings', () => {
+    const parsed = parseCreditFrame([
+      line(100, [['GAFFER', 400, 70]]),
+      line(125, [['OLAWALE', 350, 88], ['IBRAHIM', 448, 82]]),
+      line(150, [['BEST', 386, 52], ['BOY', 448, 42]]),
+      line(175, [['BABATUNDE', 326, 112], ['ADELEKE', 450, 86]]),
+      line(200, [['SCRIPT', 362, 74], ['SUPERVISOR', 446, 114]]),
+      line(225, [['ATTAH', 306, 66], ['AYEGBA', 382, 82], ['VICTOR', 474, 74]]),
+      line(250, [['PRODUCTION', 284, 120], ['CORDINATOR', 414, 112]]),
+      line(275, [['ABASS', 255, 68], ['ADEKUNLE', 333, 102], ['GBOLAHAN', 445, 106]]),
+      line(300, [['PRODUCTION', 318, 120], ['ASSISTANT', 448, 102]]),
+      line(325, [['AYOMIDE', 346, 90], ['ADEWALE', 446, 88]]),
+      line(350, [['POST', 354, 56], ['PRODUCTION', 420, 120]]),
+      line(375, [['THE7EVENTH', 326, 132], ['STUDIO', 470, 76]]),
+      line(400, [['EDITOR', 398, 70]]),
+      line(425, [['JOSHUA', 344, 78], ['CASSIDY', 432, 84]]),
+      line(450, [['ROYAL', 292, 70], ['ARTS', 374, 54], ['TV', 438, 28]]),
+      line(475, [['SOUND', 400, 70]]),
+      line(500, [['DIM', 382, 40], ['SINCLAIR', 432, 90]]),
+      line(525, [['RENTAL', 398, 72]]),
+      line(550, [['KMINDS', 354, 82], ['RENTALS', 446, 86]]),
+    ], 56, 256, 6_785);
+
+    expect(parsed.map(({ name, roleOrCharacter, creditType }) => ({
+      name,
+      roleOrCharacter,
+      creditType,
+    }))).toEqual([
+      { name: 'Olawale Ibrahim', roleOrCharacter: 'Gaffer', creditType: 'crew' },
+      { name: 'Babatunde Adeleke', roleOrCharacter: 'Best Boy', creditType: 'crew' },
+      { name: 'Attah Ayegba Victor', roleOrCharacter: 'Continuity', creditType: 'crew' },
+      { name: 'Abass Adekunle Gbolahan', roleOrCharacter: 'Production Coordinator', creditType: 'crew' },
+      { name: 'Ayomide Adewale', roleOrCharacter: 'Production Assistant', creditType: 'crew' },
+      { name: 'Joshua Cassidy', roleOrCharacter: 'Editor', creditType: 'crew' },
+      { name: 'Dim Sinclair', roleOrCharacter: 'Sound', creditType: 'crew' },
+    ]);
+    expect(parsed.some((credit) => /Royal|Studio|Rental/i.test(credit.name))).toBe(false);
+  });
+
+  it('does not invert title-case character labels when OCR compacts the actor name', () => {
+    const parsed = parseCreditFrame([
+      line(100, [['Susan', 142, 54], ['TERSY', 316, 60], ['AKPATA', 388, 72]]),
+      line(125, [['Patrick', 126, 72], ['RAY', 318, 42], ['ADEKA', 370, 62]]),
+      line(150, [['Chuddy', 132, 72], ['BRYAN', 318, 70], ['OKOYE', 400, 70]]),
+      line(175, [['Love', 118, 52], ['Birds', 180, 58], ['FUNMIODUSE', 318, 126]]),
+    ], 57, 257, 6_786);
+
+    expect(parsed.map(({ name, roleOrCharacter, creditType }) => ({
+      name,
+      roleOrCharacter,
+      creditType,
+    }))).toEqual([
+      { name: 'Tersy Akpata', roleOrCharacter: 'Susan', creditType: 'actor' },
+      { name: 'Ray Adeka', roleOrCharacter: 'Patrick', creditType: 'actor' },
+      { name: 'Bryan Okoye', roleOrCharacter: 'Chuddy', creditType: 'actor' },
+    ]);
+    expect(parsed.some((credit) => credit.name === 'Love Birds')).toBe(false);
+  });
+
+  it('parses dotted-leader cast cards even when OCR misses the cast heading', () => {
+    const parsed = parseCreditFrame([
+      line(100, [['RAYMOND.....osseseueuennESO', 105, 199, 0], ['DIKE', 310, 32]]),
+      line(125, [['JANE\'S', 104, 49], ['BOYFRIEND.......IGUNWE', 158, 172, 48], ['ALFRED', 334, 57, 61]]),
+      line(150, [['DETECTIVE', 105, 80], ['1.....scseeneeCHUKWU', 191, 144, 0], ['FRANCIS', 341, 62]]),
+      line(175, [['DETECTIVE', 105, 80], ['2.....eaeseaenCHIEKE', 190, 134, 0], ['DONALD', 330, 59]]),
+      line(200, [['BARRISTER.........:.s:e-BRIGHT', 105, 222, 0], ['OMOREGIE', 331, 79, 69]]),
+      line(225, [['GATEMAN.', 104, 70, 42], ['......sseseseeeeD', 180, 66, 0], ['ESMOND', 261, 85], ['ANYANWU.', 350, 72, 66]]),
+      line(250, [['MAN.', 105, 30, 60], ['.ssssstststsnseseeeeAKANNO', 142, 189, 0], ['CHIMEZIE', 336, 68], ['FERDINARD', 410, 83]]),
+    ], 58, 258, 6_787);
+
+    expect(parsed.map(({ name, roleOrCharacter, creditType }) => ({
+      name,
+      roleOrCharacter,
+      creditType,
+    }))).toEqual([
+      { name: 'Eso Dike', roleOrCharacter: 'Raymond', creditType: 'actor' },
+      { name: 'Igunwe Alfred', roleOrCharacter: 'Jane\'s Boyfriend', creditType: 'actor' },
+      { name: 'Chukwu Francis', roleOrCharacter: 'Detective 1', creditType: 'actor' },
+      { name: 'Chieke Donald', roleOrCharacter: 'Detective 2', creditType: 'actor' },
+      { name: 'Bright Omoregie', roleOrCharacter: 'Barrister', creditType: 'actor' },
+      { name: 'Esmond Anyanwu', roleOrCharacter: 'Gateman', creditType: 'actor' },
+      { name: 'Akanno Chimezie Ferdinard', roleOrCharacter: 'Man', creditType: 'actor' },
+    ]);
+  });
+
+  it('parses dotted-leader crew cards and rejects company-like assignees', () => {
+    const parsed = parseCreditFrame([
+      line(100, [['STORYISCREENPLAY......0:sseenneneeeMIRIAM', 10, 270, 70], ['OGBONNA', 285, 86]]),
+      line(125, [['SCRIPT', 10, 70], ['SUPERVISOR.......:.nssssenneeeOKOCHI', 92, 265, 70], ['|.', 365, 14], ['LAWERNCE', 385, 88]]),
+      line(150, [['SOUND', 10, 68], ['RECORDIST......sssesuneeEJIKE', 88, 252, 75], ['MBA', 350, 42], ['(HOMEBOY)', 402, 96]]),
+      line(175, [['MAKE', 10, 55], ['-', 72, 8], ['UP', 88, 28], ['ARTIST......sssnssessennennesAKUCHIE', 124, 286, 70], ['CHIKODI', 418, 82]]),
+      line(200, [['WARDROBE', 10, 100], ['DESIGNER.......:.esssneUK,', 122, 238, 70], ['CONCEPT', 368, 88], ['12', 466, 24]]),
+      line(225, [['D.O.P\'s..................EMEKA', 10, 250, 70], ['EZEMONYE', 270, 92]]),
+      line(250, [['sessesessssstiniianssnsestestseeesssssned', 10, 265, 0], ['CHIDOMERE', 284, 108], ['.B.', 402, 22], ['OBINNA', 434, 76], ['(C.S.N)', 520, 70]]),
+      line(275, [['CAMERA', 10, 76], ['ASST....:ssnsseennennADEWALE', 98, 245, 70], ['ABIODUN', 352, 84]]),
+      line(300, [['STILL', 10, 54], ['-', 72, 8], ['PHOTO....snsnsstsnnnnseennEMZY', 88, 280, 70], ['DIRECTION', 380, 96]]),
+      line(325, [['PRODUCTION', 10, 120], ['ASST', 140, 45], ['1.....essnsneesneOMOTAYO', 194, 220, 70], ['SAMUEL', 424, 76]]),
+      line(350, [['ASST', 194, 45], ['2................JOHN', 248, 160, 70], ['ABUA', 418, 54]]),
+      line(375, [['PRODUCTION', 10, 120], ['MANAGER......s::snseneAKANNO', 140, 270, 70], ['CHIMEZIE', 420, 92], ['FERDINARD', 522, 102]]),
+      line(400, [['ART', 10, 42], ['DIRECTOR.....csennnssessnseeOKORO', 64, 280, 70], ['IFEBUCHE', 354, 92], ['(LILY', 456, 48], ['FLOWER)', 512, 78]]),
+      line(425, [['WELFARE', 10, 84], ['MANAGER......r.sessensenneCOMFORTABLE', 104, 300, 70], ['ZONE', 414, 54]]),
+      line(450, [['EDITOR...nnnssnennsnasnnsnneinsenseeeNWAOGU', 10, 350, 70], ['EMMANUEL', 370, 100], ['(YOUNGMASTER)', 482, 130]]),
+      line(475, [['ASSISTANTS....scssnssnsnnsnsnsseNWAOGU', 10, 330, 70], ['JOHNPAUL', 350, 94], ['(PATORCHIZZY)', 454, 124]]),
+      line(500, [['sessesessssstiniianssnsestestseeesssssned', 10, 265, 0], ['KWUEGBU', 284, 88], ['CHISOM', 382, 76], ['CYNTHIA', 468, 84], ['(SUNSHINE)', 560, 100]]),
+      line(525, [['ssoseesseannaennsessen', 10, 160, 0], ['CHINONSOBLACK', 180, 150], ['AGU.', 340, 45]]),
+      line(550, [['SOUND', 10, 68], ['TRACK....nnsssnnnsnnnneKANIFE', 88, 270, 70], ['UDOCHUKWU', 368, 112], ['WEST', 490, 52], ['(UD)', 552, 40]]),
+      line(575, [['PRODUCER..w.sns:nsennsnnnnsenseesnn', 10, 320, 70], ['SOLOMON', 342, 86], ['APETE', 438, 66]]),
+      line(600, [['EXECUTIVE', 10, 108], ['PRODUCER......n.seuMERCY', 128, 240, 70], ['JOHNSON', 378, 86], ['OKOJIE', 474, 74]]),
+      line(625, [['DIRECTOR....nsssnssnsenenssesenseeee', 10, 320, 70], ['ESMOND', 342, 84], ['ANYANWU', 436, 88]]),
+    ], 59, 259, 6_788);
+
+    expect(parsed.map(({ name, roleOrCharacter, creditType }) => ({
+      name,
+      roleOrCharacter,
+      creditType,
+    }))).toEqual([
+      { name: 'Miriam Ogbonna', roleOrCharacter: 'Story/Screenplay', creditType: 'crew' },
+      { name: 'Okochi I Lawernce', roleOrCharacter: 'Continuity', creditType: 'crew' },
+      { name: 'Ejike Mba', roleOrCharacter: 'Sound Recordist', creditType: 'crew' },
+      { name: 'Akuchie Chikodi', roleOrCharacter: 'Makeup', creditType: 'crew' },
+      { name: 'Emeka Ezemonye', roleOrCharacter: 'Director of Photography', creditType: 'crew' },
+      { name: 'Chidomere B Obinna', roleOrCharacter: 'Director of Photography', creditType: 'crew' },
+      { name: 'Adewale Abiodun', roleOrCharacter: 'Camera Assistant', creditType: 'crew' },
+      { name: 'Omotayo Samuel', roleOrCharacter: 'Production Assistant', creditType: 'crew' },
+      { name: 'John Abua', roleOrCharacter: 'Production Assistant', creditType: 'crew' },
+      { name: 'Akanno Chimezie Ferdinard', roleOrCharacter: 'Production Manager', creditType: 'crew' },
+      { name: 'Okoro Ifebuche', roleOrCharacter: 'Art Director', creditType: 'crew' },
+      { name: 'Nwaogu Emmanuel', roleOrCharacter: 'Editor', creditType: 'crew' },
+      { name: 'Nwaogu Johnpaul', roleOrCharacter: 'Assistant', creditType: 'crew' },
+      { name: 'Kwuegbu Chisom Cynthia', roleOrCharacter: 'Assistant', creditType: 'crew' },
+      { name: 'Chinonsoblack Agu', roleOrCharacter: 'Assistant', creditType: 'crew' },
+      { name: 'Kanife Udochukwu West', roleOrCharacter: 'Soundtrack', creditType: 'crew' },
+      { name: 'Solomon Apete', roleOrCharacter: 'Producer', creditType: 'crew' },
+      { name: 'Mercy Johnson Okojie', roleOrCharacter: 'Executive Producer', creditType: 'crew' },
+      { name: 'Esmond Anyanwu', roleOrCharacter: 'Director', creditType: 'crew' },
+    ]);
+    expect(parsed.some((credit) => /Concept|Direction|Comfortable Zone/i.test(credit.name))).toBe(false);
+  });
+
   it('requires repeated frame support downstream and merges tiny OCR variants', () => {
     const base = parseCreditFrame([
       line(100, [['CAST', 400, 55]]),

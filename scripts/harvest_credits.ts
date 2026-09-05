@@ -24,7 +24,7 @@
  *
  * PREREQS on the worker machine: yt-dlp, ffmpeg, tesseract (all on PATH).
  */
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, rm, readdir, writeFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -32,10 +32,12 @@ import { hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { supabase } from './lib/db';
 import {
+  cleanCreditPersonName,
   consolidateCreditObservations,
   parseCreditFrame,
   parseTesseractTsv,
   type CreditObservation,
+  type OcrLine,
 } from './lib/credit_roll_parser';
 
 const run = promisify(execFile);
@@ -59,17 +61,22 @@ function numberSetting(name: string, envName: string, fallback: number) {
 // this source even though yt-dlp exited successfully.
 const TAIL_SECONDS = Number(arg('tail')) || 240; // last 4 min default (override: --tail=180 for 3 min)
 const MIN_ENTRIES = 4;          // structural gate: fewer than this isn't a roll
+const MIN_ACTOR_CANDIDATES = Math.max(0, Math.floor(numberSetting('min-actors', 'CREDIT_HARVEST_MIN_ACTORS', 3)));
+const ALLOW_CREW_ONLY = arg('allow-crew-only') !== undefined || process.env.CREDIT_HARVEST_ALLOW_CREW_ONLY === '1';
 const FRAME_EVERY_SEC = Number(arg('frame-every')) || 1; // sample cadence inside the tail
 const SINGLE_FRAME_MIN_OCR_CONFIDENCE = Number(arg('single-frame-min-ocr')) || 0.65;
 const REHARVEST_EXISTING = arg('reharvest-existing') !== undefined;
 const YTDLP_TIMEOUT = 900_000;  // 15 min ceiling for a throttled tail
 const DEFAULT_VIDEO_FORMAT =
-  // Prefer 720p for clearer OCR, then fall back for videos without that rendition.
-  'bestvideo[height<=720]+bestaudio/best[height<=720][ext=mp4]/best[height<=720]/best';
+  // Prefer progressive MP4. These are lower-risk than signed DASH/HLS URLs and
+  // still give Tesseract enough detail for credit cards when 720p is available.
+  '22/18/best[height<=720][ext=mp4][vcodec!=none][acodec!=none]/best[height<=720]/bestvideo[height<=720]+bestaudio/best';
 const VIDEO_FORMAT = arg('format') ?? process.env.YTDLP_FORMAT ?? DEFAULT_VIDEO_FORMAT;
 const AUTO_ENQUEUE_LATEST_LIMIT = Math.max(0, Math.floor(numberSetting('auto-enqueue-latest', 'CREDIT_HARVEST_AUTO_ENQUEUE_LATEST', 1000)));
 const AUTO_ENQUEUE_MIN_CREDITS = Math.max(0, Math.floor(numberSetting('auto-enqueue-min-credits', 'CREDIT_HARVEST_AUTO_ENQUEUE_MIN_CREDITS', 4)));
 const SKIP_AUTO_ENQUEUE = arg('skip-auto-enqueue') !== undefined;
+const WORKER_CHILD = arg('worker-child') !== undefined;
+const WORKER_COUNT = Math.max(1, Math.floor(numberSetting('workers', 'CREDIT_HARVEST_WORKERS', 2)));
 
 /**
  * Anything at/after these markers is promo, not credits. This is the direct fix
@@ -154,6 +161,7 @@ let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let heartbeatBusy = false;
 let stopRequested = false;
 let monitorWarningShown = false;
+let supervisorStopAll: ((signal: NodeJS.Signals, requested?: boolean) => void) | null = null;
 function isTransientSupabaseError(error: unknown) {
   const message = String(error instanceof Error ? error.message : error).toLowerCase();
   return [
@@ -301,8 +309,14 @@ function requestGracefulStop(signal: string) {
   void writeWorkerLog('warning', 'stop_requested', workerMessage);
 }
 
-process.on('SIGINT', () => requestGracefulStop('Ctrl-C'));
-process.on('SIGTERM', () => requestGracefulStop('termination signal'));
+process.on('SIGINT', () => {
+  if (supervisorStopAll) supervisorStopAll('SIGINT', true);
+  else requestGracefulStop('Ctrl-C');
+});
+process.on('SIGTERM', () => {
+  if (supervisorStopAll) supervisorStopAll('SIGTERM', true);
+  else requestGracefulStop('termination signal');
+});
 
 // Cookies are what UNLOCK the good (un-throttled, non-DRM) formats — a prior
 // recon found guest downloads get only a throttled android_vr stream (~7 KiB/s),
@@ -325,10 +339,15 @@ function cookieArgs(): string[] {
   return [];
 }
 
-// Player client. Default = don't force one, so cookies can unlock the default
-// client's good formats. Forcing tv/ios is a dead end (DRM / PO-token). Override
-// with --client=android_vr as a last resort.
-const YT_CLIENT = arg('client') || '';
+// Player client. yt-dlp's automatic choice can drift to android_vr, whose
+// signed googlevideo URLs are currently rejected with HTTP 403 during tail cuts.
+// Desktop web can expose only storyboards for some videos. Mobile web usually
+// gives a stable progressive MP4 that is enough for OCR. Use --client=default
+// or --client=auto to let yt-dlp choose, or override with --client=web.
+const configuredClient = arg('client') ?? process.env.YTDLP_YOUTUBE_CLIENT;
+const YT_CLIENT = configuredClient === 'default' || configuredClient === 'auto'
+  ? ''
+  : (configuredClient || 'mweb');
 function clientArgs(): string[] {
   return YT_CLIENT ? ['--extractor-args', `youtube:player_client=${YT_CLIENT}`] : [];
 }
@@ -990,15 +1009,82 @@ async function extractTailFrames(
 }
 
 /** Local OCR — no API tokens. */
-async function ocrTsv(frame: string): Promise<string> {
+async function ocrTsv(frame: string, pageSegMode = '6'): Promise<string> {
   try {
     const { stdout } = await run(
       'tesseract',
-      [frame, 'stdout', '--psm', '6', 'tsv'],
+      [frame, 'stdout', '--psm', pageSegMode, 'tsv'],
       { timeout: 60_000, maxBuffer: 16 * 1024 * 1024 },
     );
     return stdout;
   } catch { return ''; }
+}
+
+function hasLeaderOcrArtifacts(lines: OcrLine[]): boolean {
+  return lines.some((line) => /[.:]{3,}|[a-z]{4,}(?=[A-Z])/u.test(line.text));
+}
+
+function shouldRunSparseOcr(lines: OcrLine[], parsed: CreditObservation[]): boolean {
+  const hasLeaderArtifacts = hasLeaderOcrArtifacts(lines);
+  if (hasLeaderArtifacts) return true;
+  if (parsed.some((credit) => credit.creditType === 'crew')) return true;
+  const readableLines = lines.filter((line) => line.confidence >= 0.35 && /[\p{L}\p{N}]/u.test(line.text));
+  return parsed.length < MIN_ENTRIES && readableLines.length >= MIN_ENTRIES + 2;
+}
+
+function sparseCastNameObservations(
+  lines: OcrLine[],
+  frameIndex: number,
+  frameSec: number,
+  videoSec: number,
+): CreditObservation[] {
+  const castIndex = lines.findIndex((line) => line.text.toUpperCase().replace(/[^A-Z]+/g, ' ').trim() === 'CAST');
+  if (castIndex < 0) return [];
+
+  return lines.slice(castIndex + 1).flatMap((line): CreditObservation[] => {
+    if (/\d/.test(line.text) || /(?:'|’)S\b/i.test(line.text)) return [];
+    if (/\b(?:BOYFRIEND|GIRLFRIEND|DETECTIVE|BARRISTER|GATEMAN|GATE MAN|MAN|WOMAN|MOTHER|FATHER|OFFICER|DOCTOR|FRIEND|NEIGHBOU?R)\b/i.test(line.text)) {
+      return [];
+    }
+    const name = cleanCreditPersonName(line.text);
+    if (!name) return [];
+    return [{
+      name,
+      roleOrCharacter: 'Actor',
+      creditType: 'actor',
+      frameIndex,
+      frameSec,
+      videoSec,
+      ocrConfidence: line.confidence,
+      evidenceText: line.text,
+      layout: {
+        mode: 'grouped-cast',
+        personBox: [line.left, line.top, line.right - line.left, line.bottom - line.top],
+      },
+    }];
+  });
+}
+
+async function parseCreditFrameWithOcr(
+  frame: string,
+  frameIndex: number,
+  frameSec: number,
+  videoSec: number,
+): Promise<CreditObservation[]> {
+  const primaryLines = parseTesseractTsv(await ocrTsv(frame, '6'));
+  const primary = parseCreditFrame(primaryLines, frameIndex, frameSec, videoSec);
+  if (!shouldRunSparseOcr(primaryLines, primary)) return primary;
+
+  const sparseLines = parseTesseractTsv(await ocrTsv(frame, '11'));
+  const sparse = hasLeaderOcrArtifacts(primaryLines)
+    ? sparseCastNameObservations(sparseLines, frameIndex, frameSec, videoSec)
+    : parseCreditFrame(
+      sparseLines,
+      frameIndex,
+      frameSec,
+      videoSec,
+    ).filter((credit) => credit.creditType === 'crew');
+  return sparse.length ? [...primary, ...sparse] : primary;
 }
 
 type Parsed = { name: string; role: string | null; type: 'cast' | 'crew' };
@@ -1159,8 +1245,8 @@ async function processJob(job: Job) {
     let rollFrames = 0;
     for (let i = frames.length - 1; i >= 0; i--) {
       const frameSec = i * FRAME_EVERY_SEC;
-      const parsed = parseCreditFrame(
-        parseTesseractTsv(await ocrTsv(frames[i])),
+      const parsed = await parseCreditFrameWithOcr(
+        frames[i],
         i,
         frameSec,
         videoStartSec + frameSec,
@@ -1223,6 +1309,18 @@ async function processJob(job: Job) {
     // different layout detectors. Remove those repeats without collapsing
     // distinct role/character entries (including Extras).
     rows = dedupeCandidateRows(rows);
+    const actorRows = rows.filter((row) => row.credit_type === 'actor');
+    if (!ALLOW_CREW_ONLY && actorRows.length < MIN_ACTOR_CANDIDATES && !REHARVEST_EXISTING) {
+      await finish(
+        job,
+        'no_credits',
+        0,
+        `only ${actorRows.length} actor candidates; refusing low-cast OCR output`,
+        filmLabel,
+      );
+      console.log(`   ⏭️  ${film.title?.slice(0, 45)} → only ${actorRows.length} actor candidates; skipped noisy crew-only output`);
+      return;
+    }
 
     const { data: existingRows, error: existingRowsError } = await supabase
       .from('credit_candidates')
@@ -1248,7 +1346,7 @@ async function processJob(job: Job) {
       job,
       'error',
       0,
-      String(e?.message ?? e).slice(0, 300),
+      String(e?.message ?? e).slice(0, 1200),
       filmLabel,
     );
     // Print the full (multi-line) message, and dump everything to a log file so
@@ -1347,6 +1445,76 @@ async function finish(
 
 let consecutiveTimeouts = 0;
 
+function supervisorChildArgs(): string[] {
+  const args = process.argv
+    .slice(2)
+    .filter((value) => value !== '--worker-child' && !value.startsWith('--workers'));
+
+  if (!args.includes('--skip-auto-enqueue')) args.push('--skip-auto-enqueue');
+  args.push('--worker-child');
+  return args;
+}
+
+async function runWorkerSupervisor(workerCount: number) {
+  if (!SKIP_AUTO_ENQUEUE) {
+    await enqueueLatestSparse(AUTO_ENQUEUE_LATEST_LIMIT, AUTO_ENQUEUE_MIN_CREDITS);
+  }
+
+  const scriptPath = resolve(process.cwd(), 'scripts/harvest_credits.ts');
+  const tsxCli = resolve(process.cwd(), 'node_modules/tsx/dist/cli.mjs');
+  const useLocalTsx = existsSync(tsxCli);
+  const command = useLocalTsx ? process.execPath : (process.platform === 'win32' ? 'npx.cmd' : 'npx');
+  const commandPrefix = useLocalTsx ? [tsxCli, scriptPath] : ['tsx', scriptPath];
+  const childArgs = supervisorChildArgs();
+  const children: ReturnType<typeof spawn>[] = [];
+  let stopping = false;
+  let requestedStop = false;
+
+  supervisorStopAll = (signal, requested = false) => {
+    if (stopping) return;
+    stopping = true;
+    requestedStop = requested;
+    console.log(`\nStopping ${children.length} credit harvest workers...`);
+    for (const child of children) {
+      if (child.exitCode === null && !child.killed) child.kill(signal);
+    }
+  };
+
+  console.log(`Starting ${workerCount} credit harvest workers...`);
+  const exits = Array.from({ length: workerCount }, (_, index) => new Promise<number>((resolveExit) => {
+    const workerNumber = index + 1;
+    const child = spawn(command, [...commandPrefix, ...childArgs], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        CREDIT_HARVEST_WORKER_SLOT: String(workerNumber),
+      },
+      stdio: 'inherit',
+    });
+    children.push(child);
+    console.log(`   worker ${workerNumber}/${workerCount} started${child.pid ? ` (pid ${child.pid})` : ''}`);
+
+    child.once('error', (error) => {
+      console.error(`Worker ${workerNumber} failed to start: ${error.message}`);
+      resolveExit(1);
+    });
+
+    child.once('exit', (code, signal) => {
+      const exitCode = code ?? (signal ? 130 : 0);
+      if (!stopping && exitCode !== 0) {
+        console.error(`Worker ${workerNumber} exited with ${signal || exitCode}; stopping the other workers.`);
+        supervisorStopAll?.('SIGTERM', false);
+      }
+      resolveExit(exitCode);
+    });
+  }));
+
+  const exitCodes = await Promise.all(exits);
+  supervisorStopAll = null;
+  const failedCode = requestedStop ? 0 : exitCodes.find((code) => code !== 0);
+  if (failedCode) process.exitCode = failedCode;
+}
+
 /** Claim the next pending job (newest created YouTube film first). */
 async function claim(): Promise<Job | null> {
   const { data, error } = await supabase.rpc('claim_credit_harvest_job', {
@@ -1369,6 +1537,11 @@ async function main() {
   const single = arg('film');
   if (single) {
     await processJob({ id: null, film_id: single, channel_id: null, attempts: 0 });
+    return;
+  }
+
+  if (!WORKER_CHILD && WORKER_COUNT > 1) {
+    await runWorkerSupervisor(WORKER_COUNT);
     return;
   }
 
