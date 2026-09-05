@@ -110,7 +110,7 @@ const ROLE_PATTERNS: Array<[RegExp, string]> = [
   [/^(?:PRODUCTION DESIGNER|PRODUCTION DESIGN)$/, 'Production Designer'],
   [/^(?:ASSISTANT DIRECTOR|FIRST ASSISTANT DIRECTOR|1ST ASSISTANT DIRECTOR)$/, 'Assistant Director'],
   [/^(?:SECOND ASSISTANT DIRECTOR|2ND ASSISTANT DIRECTOR)$/, 'Second Assistant Director'],
-  [/^(?:DIRECTOR OF PHOTOGRAPHY|CINEMATOGRAPHER|D ?O ?P S?|BOP|POP)$/, 'Director of Photography'],
+  [/^(?:DIRECTOR OF PHOTOGRAPHY|CINEMATOGRAPHER|D ?O ?P(?: S)?|BOP|POP)$/, 'Director of Photography'],
   [/^(?:CAMERA(?: OPERATOR)?|CAMERAMAN)$/, 'Camera Operator'],
   [/^(?:CAMERA ASSISTANTS?|CAMERA ASST|CAMERA ASS?T(?: \d+)?)$/, 'Camera Assistant'],
   [/^(?:CAMERA TECH|CAMERA TECHNICIAN)$/, 'Camera Technician'],
@@ -318,7 +318,7 @@ function cleanCharacter(value: string): string | null {
 
 function cleanCreditCharacter(value: string): string | null {
   const text = lettersAndSpaces(value).replace(/\.(?=\s*$)/, '');
-  if (!text || text.length > 60 || canonicalRole(text) || isNoiseLine(text)) return null;
+  if (text.length < 2 || text.length > 60 || canonicalRole(text) || isNoiseLine(text)) return null;
   if (/\d/.test(text)) {
     const digits = text.match(/\d/g) ?? [];
     if (digits.length > 2 || !/\b\d{1,2}$/.test(text)) return null;
@@ -363,7 +363,7 @@ export function parseTesseractTsv(tsv: string): OcrLine[] {
     const columns = row.split('\t');
     if (columns[index.level] !== '5') continue;
     const rawText = columns.slice(index.text).join('\t');
-    const text = lettersAndSpaces(rawText);
+    const text = normalizeSpace(rawText);
     if (!text || !/\p{L}|\p{N}/u.test(text)) continue;
     const confidence = Number(columns[index.conf]);
     if (!Number.isFinite(confidence) || confidence < 0) continue;
@@ -388,7 +388,7 @@ export function parseTesseractTsv(tsv: string): OcrLine[] {
     grouped.set(lineKey, words);
   }
 
-  return [...grouped.values()]
+  const lines = [...grouped.values()]
     .map((words) => {
       words.sort((a, b) => a.left - b.left);
       const left = Math.min(...words.map((word) => word.left));
@@ -406,51 +406,78 @@ export function parseTesseractTsv(tsv: string): OcrLine[] {
       };
     })
     .sort((a, b) => a.top - b.top || a.left - b.left);
+  return alignOcrRows(lines);
+}
+
+// Auto/sparse segmentation often puts each column in a separate OCR block.
+// Pair by baseline before interpreting names or roles, never by block order.
+export function alignOcrRows(lines: OcrLine[]): OcrLine[] {
+  const rows: OcrLine[] = [];
+  for (const line of [...lines].sort((a, b) => a.top - b.top || a.left - b.left)) {
+    const row = rows.find((candidate) => {
+      const height = Math.min(candidate.bottom - candidate.top, line.bottom - line.top);
+      const overlap = Math.min(candidate.bottom, line.bottom) - Math.max(candidate.top, line.top);
+      const centerDistance = Math.abs((candidate.top + candidate.bottom - line.top - line.bottom) / 2);
+      return height > 0 && overlap >= height * 0.55 && centerDistance <= height * 0.45
+        && (candidate.right <= line.left || line.right <= candidate.left);
+    });
+    if (!row) {
+      rows.push({ ...line, words: [...line.words] });
+      continue;
+    }
+    row.words.push(...line.words);
+    row.words.sort((a, b) => a.left - b.left);
+    row.text = textForWords(row.words);
+    row.left = Math.min(row.left, line.left);
+    row.top = Math.min(row.top, line.top);
+    row.right = Math.max(row.right, line.right);
+    row.bottom = Math.max(row.bottom, line.bottom);
+    row.confidence = averageConfidence(row.words);
+  }
+  return rows.sort((a, b) => a.top - b.top || a.left - b.left);
 }
 
 function findCastSeparator(lines: OcrLine[]): number | null {
-  const gaps: Array<{ midpoint: number; lineKey: string }> = [];
-  for (const line of lines) {
+  const gaps: Array<{ start: number; end: number; lineIndex: number }> = [];
+  for (const [lineIndex, line] of lines.entries()) {
     for (let i = 0; i < line.words.length - 1; i++) {
       const current = line.words[i];
       const next = line.words[i + 1];
       const gap = next.left - (current.left + current.width);
       const threshold = Math.max(18, Math.max(current.height, next.height) * 1.35);
       if (gap >= threshold) {
-        gaps.push({ midpoint: current.left + current.width + gap / 2, lineKey: current.lineKey });
+        gaps.push({ start: current.left + current.width, end: next.left, lineIndex });
       }
     }
   }
 
   let best: { midpoint: number; support: number } | null = null;
   for (const gap of gaps) {
-    const nearby = gaps.filter((candidate) => Math.abs(candidate.midpoint - gap.midpoint) <= 24);
-    const support = new Set(nearby.map((candidate) => candidate.lineKey)).size;
-    if (!best || support > best.support) {
-      best = {
-        midpoint: nearby.reduce((sum, candidate) => sum + candidate.midpoint, 0) / nearby.length,
-        support,
-      };
+    for (const point of [gap.start + 1, (gap.start + gap.end) / 2, gap.end - 1]) {
+      const nearby = gaps.filter((candidate) => candidate.start < point && candidate.end > point);
+      const support = new Set(nearby.map((candidate) => candidate.lineIndex)).size;
+      if (!best || support > best.support) {
+        best = {
+          midpoint: (Math.max(...nearby.map((candidate) => candidate.start))
+            + Math.min(...nearby.map((candidate) => candidate.end))) / 2,
+          support,
+        };
+      }
     }
   }
   return best && best.support >= 3 ? best.midpoint : null;
 }
 
 function splitAtSeparator(line: OcrLine, separatorX: number): [OcrWord[], OcrWord[]] | null {
-  let bestIndex = -1;
-  let bestDistance = Number.POSITIVE_INFINITY;
   for (let i = 0; i < line.words.length - 1; i++) {
     const current = line.words[i];
     const next = line.words[i + 1];
     const gap = next.left - (current.left + current.width);
-    const midpoint = current.left + current.width + gap / 2;
-    if (gap >= 18 && Math.abs(midpoint - separatorX) < bestDistance) {
-      bestDistance = Math.abs(midpoint - separatorX);
-      bestIndex = i;
+    if (gap >= 18 && current.left + current.width <= separatorX && next.left >= separatorX) {
+      return [line.words.slice(0, i + 1), line.words.slice(i + 1)];
     }
   }
-  if (bestIndex < 0 || bestDistance > 32) return null;
-  return [line.words.slice(0, bestIndex + 1), line.words.slice(bestIndex + 1)];
+  return null;
 }
 
 const CHARACTER_HINT = /\b(?:MR|MRS|MISS|MS|DR|DOCTOR|PROF|PROFESSOR|PRINCIPAL|TEACHER|KING|QUEEN|CHIEF|PRINCE|PRINCESS|PASTOR|IMAM|ALFA|BABA|MAMA|MOTHER|FATHER|OFFICER|POLICE|INSPECTOR|LAWYER|BARRISTER|NURSE|JUDGE|ELDER|LANDLORD|LANDLADY|CHAIRMAN|MADAM|SIR|MAID|GUARD|GATEMAN|GATE MAN|BOSS|DRIVER|WIFE|HUSBAND|SON|DAUGHTER|FRIEND|NEIGHBOUR|NEIGHBOR|CUSTOMER|VENDOR|VILLAGER|CHILD)\b/;
@@ -553,6 +580,7 @@ function splitLeaderCreditLine(
 function splitCastLine(
   line: OcrLine,
   separatorX: number,
+  actorSide?: 'left' | 'right',
 ): { name: string; character: string; words: OcrWord[] } | null {
   const split = splitAtSeparator(line, separatorX);
   if (!split) return null;
@@ -567,6 +595,13 @@ function splitCastLine(
   const rightLooksPerson = !!rightPerson;
   const actorOnLeft = leftLooksPerson && !!rightCharacter;
   const actorOnRight = rightLooksPerson && !!leftCharacter;
+
+  if (actorSide === 'left') {
+    return actorOnLeft ? { name: leftPerson!, character: rightCharacter!, words: leftWords } : null;
+  }
+  if (actorSide === 'right') {
+    return actorOnRight ? { name: rightPerson!, character: leftCharacter!, words: rightWords } : null;
+  }
 
   if (!actorOnLeft && !actorOnRight) return null;
   if (
@@ -714,7 +749,7 @@ function castCharacterHeading(
 }
 
 function sameLineRoleAndName(line: OcrLine): { role: string; name: string; words: OcrWord[] } | null {
-  for (let i = 1; i < line.words.length; i++) {
+  for (let i = line.words.length - 1; i >= 1; i--) {
     const left = line.words.slice(0, i);
     const right = line.words.slice(i);
     const role = canonicalRole(left.map((word) => word.text).join(' '));
@@ -735,7 +770,15 @@ export function parseCreditFrame(
   const observations: CreditObservation[] = [];
   const stopIndex = lines.findIndex((line) => isStopLine(line.text));
   const usable = stopIndex >= 0 ? lines.slice(0, stopIndex) : lines;
-  const separatorX = findCastSeparator(usable);
+  let castEligible = true;
+  const castRows = usable.filter((line) => {
+    const group = canonicalCastGroup(line.text);
+    if (group) castEligible = group === 'Actor';
+    else if (normalizeKey(line.text) === 'CREW' || canonicalRole(line.text)) castEligible = false;
+    return castEligible && !group && !isNoiseLine(line.text);
+  });
+  const separatorX = findCastSeparator(castRows);
+  const handledCastRows = new Set<OcrLine>();
   const explicitCreditSignal = usable.some((line) => {
     const section = normalizeKey(line.text);
     return section === 'CAST' || section === 'CREW' || section === 'CREDITS'
@@ -744,11 +787,37 @@ export function parseCreditFrame(
   });
 
   if (separatorX !== null) {
-    const castLines = usable
-      .map((line) => ({ line, castLine: splitCastLine(line, separatorX) }))
+    const votes = castRows.flatMap((line) => {
+      const parsed = splitCastLine(line, separatorX);
+      return parsed ? [parsed.words[0].left < separatorX ? 'left' : 'right'] : [];
+    });
+    const leftVotes = votes.filter((side) => side === 'left').length;
+    const rightVotes = votes.length - leftVotes;
+    const actorSide = rightVotes >= 2 && rightVotes > leftVotes * 2 ? 'right'
+      : leftVotes >= 2 && leftVotes > rightVotes * 2 ? 'left' : undefined;
+    const castLines = castRows
+      .map((line) => ({ line, castLine: splitCastLine(line, separatorX, actorSide) }))
       .filter((item): item is { line: OcrLine; castLine: { name: string; character: string; words: OcrWord[] } } => !!item.castLine);
     if (castLines.length >= 3 || (explicitCreditSignal && castLines.length >= 2)) {
-      for (const { line, castLine } of castLines) {
+      let previous: { line: OcrLine; character: string } | null = null;
+      for (const line of castRows) {
+        const paired = castLines.find((item) => item.line === line)?.castLine;
+        const onPersonSide = actorSide === 'right' ? line.left > separatorX
+          : actorSide === 'left' ? line.right < separatorX : false;
+        const continuation = !paired && onPersonSide && previous
+          && /\b(?:birds|friends|guards|extras|villagers|children|students|guests|workers|couple|crowd)\b/i.test(previous.character)
+          && line.top - previous.line.bottom <= Math.max(14, previous.line.bottom - previous.line.top) * 4
+          ? cleanPersonName(line.text) : null;
+        const castLine = paired ?? (continuation && previous
+          ? { name: continuation, character: previous.character, words: line.words } : null);
+        // An unresolved pair must not fall through to the names-only list parser.
+        if (line.left < separatorX && line.right > separatorX) handledCastRows.add(line);
+        if (!castLine) {
+          previous = null;
+          continue;
+        }
+        handledCastRows.add(line);
+        previous = { line, character: castLine.character };
         observations.push({
           name: castLine.name,
           roleOrCharacter: castLine.character,
@@ -770,8 +839,15 @@ export function parseCreditFrame(
 
   let currentRole: string | null = null;
   let currentCastCharacter: string | null = null;
+  let previousRoleLine: OcrLine | null = null;
   for (let lineIndex = 0; lineIndex < usable.length; lineIndex++) {
     const line = usable[lineIndex];
+    if (handledCastRows.has(line)) continue;
+    if (currentRole && previousRoleLine
+      && line.top - previousRoleLine.bottom > Math.max(28, (previousRoleLine.bottom - previousRoleLine.top) * 2.5)) {
+      currentRole = null;
+    }
+    previousRoleLine = line;
     const castGroup = canonicalCastGroup(line.text);
     if (castGroup) {
       currentRole = null;
@@ -829,7 +905,7 @@ export function parseCreditFrame(
       currentCastCharacter = null;
       continue;
     }
-    if (separatorX === null) {
+    if (separatorX === null && findLineSeparator(line) === null) {
       const groupHeading = castCharacterHeading(
         line,
         usable.slice(lineIndex + 1),

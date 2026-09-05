@@ -22,7 +22,7 @@
  *  - Nothing is written to `credits`. Everything lands in credit_candidates for
  *    human approval in the admin UI.
  *
- * PREREQS on the worker machine: yt-dlp, ffmpeg, tesseract (all on PATH).
+ * PREREQS on the worker machine: yt-dlp, ffmpeg, ffprobe, tesseract (all on PATH).
  */
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -32,13 +32,10 @@ import { hostname, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { supabase } from './lib/db';
 import {
-  cleanCreditPersonName,
   consolidateCreditObservations,
-  parseCreditFrame,
-  parseTesseractTsv,
   type CreditObservation,
-  type OcrLine,
 } from './lib/credit_roll_parser';
+import { parseCreditFrameWithOcr } from './lib/credit_frame_ocr';
 
 const run = promisify(execFile);
 
@@ -360,12 +357,9 @@ const EXISTING_FRAMES_DIR = arg('frames-dir');
 
 // ---------------------------------------------------------------- prereqs ---
 async function checkPrereqs() {
-  // Only require the tools the chosen mode actually uses. yt-dlp + ffmpeg are
-  // always needed; tesseract only when we OCR (skipped in --frames-only).
-  const need: Array<[string, string[]]> = EXISTING_FRAMES_DIR
-    ? []
-    : [['yt-dlp', ['--version']], ['ffmpeg', ['-version']]];
-  if (!FRAMES_ONLY) need.push(['tesseract', ['--version']]);
+  const need: Array<[string, string[]]> = [['ffmpeg', ['-version']]];
+  if (!EXISTING_FRAMES_DIR) need.push(['yt-dlp', ['--version']]);
+  if (!FRAMES_ONLY) need.push(['ffprobe', ['-version']], ['tesseract', ['--version']]);
   const missing: string[] = [];
   for (const [bin, args] of need) {
     try {
@@ -1006,85 +1000,6 @@ async function extractTailFrames(
     .sort()
     .map((f) => join(dir, f));
   return { frames, videoStartSec: start };
-}
-
-/** Local OCR — no API tokens. */
-async function ocrTsv(frame: string, pageSegMode = '6'): Promise<string> {
-  try {
-    const { stdout } = await run(
-      'tesseract',
-      [frame, 'stdout', '--psm', pageSegMode, 'tsv'],
-      { timeout: 60_000, maxBuffer: 16 * 1024 * 1024 },
-    );
-    return stdout;
-  } catch { return ''; }
-}
-
-function hasLeaderOcrArtifacts(lines: OcrLine[]): boolean {
-  return lines.some((line) => /[.:]{3,}|[a-z]{4,}(?=[A-Z])/u.test(line.text));
-}
-
-function shouldRunSparseOcr(lines: OcrLine[], parsed: CreditObservation[]): boolean {
-  const hasLeaderArtifacts = hasLeaderOcrArtifacts(lines);
-  if (hasLeaderArtifacts) return true;
-  if (parsed.some((credit) => credit.creditType === 'crew')) return true;
-  const readableLines = lines.filter((line) => line.confidence >= 0.35 && /[\p{L}\p{N}]/u.test(line.text));
-  return parsed.length < MIN_ENTRIES && readableLines.length >= MIN_ENTRIES + 2;
-}
-
-function sparseCastNameObservations(
-  lines: OcrLine[],
-  frameIndex: number,
-  frameSec: number,
-  videoSec: number,
-): CreditObservation[] {
-  const castIndex = lines.findIndex((line) => line.text.toUpperCase().replace(/[^A-Z]+/g, ' ').trim() === 'CAST');
-  if (castIndex < 0) return [];
-
-  return lines.slice(castIndex + 1).flatMap((line): CreditObservation[] => {
-    if (/\d/.test(line.text) || /(?:'|’)S\b/i.test(line.text)) return [];
-    if (/\b(?:BOYFRIEND|GIRLFRIEND|DETECTIVE|BARRISTER|GATEMAN|GATE MAN|MAN|WOMAN|MOTHER|FATHER|OFFICER|DOCTOR|FRIEND|NEIGHBOU?R)\b/i.test(line.text)) {
-      return [];
-    }
-    const name = cleanCreditPersonName(line.text);
-    if (!name) return [];
-    return [{
-      name,
-      roleOrCharacter: 'Actor',
-      creditType: 'actor',
-      frameIndex,
-      frameSec,
-      videoSec,
-      ocrConfidence: line.confidence,
-      evidenceText: line.text,
-      layout: {
-        mode: 'grouped-cast',
-        personBox: [line.left, line.top, line.right - line.left, line.bottom - line.top],
-      },
-    }];
-  });
-}
-
-async function parseCreditFrameWithOcr(
-  frame: string,
-  frameIndex: number,
-  frameSec: number,
-  videoSec: number,
-): Promise<CreditObservation[]> {
-  const primaryLines = parseTesseractTsv(await ocrTsv(frame, '6'));
-  const primary = parseCreditFrame(primaryLines, frameIndex, frameSec, videoSec);
-  if (!shouldRunSparseOcr(primaryLines, primary)) return primary;
-
-  const sparseLines = parseTesseractTsv(await ocrTsv(frame, '11'));
-  const sparse = hasLeaderOcrArtifacts(primaryLines)
-    ? sparseCastNameObservations(sparseLines, frameIndex, frameSec, videoSec)
-    : parseCreditFrame(
-      sparseLines,
-      frameIndex,
-      frameSec,
-      videoSec,
-    ).filter((credit) => credit.creditType === 'crew');
-  return sparse.length ? [...primary, ...sparse] : primary;
 }
 
 type Parsed = { name: string; role: string | null; type: 'cast' | 'crew' };

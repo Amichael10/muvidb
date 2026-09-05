@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  alignOcrRows,
   consolidateCreditObservations,
   parseCreditFrame,
+  parseTesseractTsv,
   type OcrLine,
   type OcrWord,
 } from './credit_roll_parser';
@@ -28,6 +30,72 @@ function line(top: number, entries: Array<[string, number, number, number?]>): O
 }
 
 describe('credit roll layout parser', () => {
+  it('pairs separate OCR blocks by baseline and keeps shared characters in the actor column', () => {
+    const rows = alignOcrRows([
+      line(90, [['CAST', 189, 38]]),
+      line(204, [['Susan', 121, 43]]), line(203, [['TERSY', 209, 47], ['AKPATA', 259, 61]]),
+      line(243, [['Patrick', 116, 49]]), line(242, [['RAY', 210, 28], ['ADEKA', 243, 53]]),
+      line(281, [['Chuddy', 108, 57]]), line(280, [['BRYAN', 210, 51], ['OKOYE', 265, 52]]),
+      line(320, [['Neighbor', 98, 67]]), line(319, [['DIANA', 210, 49], ['CHILDS', 264, 53]]),
+      line(359, [['Love', 92, 33], ['Birds', 129, 36]]), line(357, [['FUNMI', 210, 49], ['ODUSE', 263, 52]]),
+      line(396, [['OLAWALE', 209, 76], ['IBRAHIM', 289, 64]]),
+      line(436, [['Handyman', 21, 81], ['NG', 107, 21], ['Rep', 137, 28]]),
+      line(435, [['BELLE', 210, 46], ['MARIAM', 260, 62], ['SOROH', 326, 54]]),
+    ]);
+    const parsed = parseCreditFrame(rows, 1, 1, 100);
+    expect(parsed.map((credit) => [credit.name, credit.roleOrCharacter])).toEqual([
+      ['Tersy Akpata', 'Susan'], ['Ray Adeka', 'Patrick'], ['Bryan Okoye', 'Chuddy'],
+      ['Diana Childs', 'Neighbor'], ['Funmi Oduse', 'Love Birds'], ['Olawale Ibrahim', 'Love Birds'],
+      ['Belle Mariam Soroh', 'Handyman NG Rep'],
+    ]);
+  });
+
+  it('does not turn unresolved cast pairs into names-only Actor entries after a CAST heading', () => {
+    const parsed = parseCreditFrame([
+      line(80, [['CAST', 189, 38]]),
+      line(100, [['Susan', 121, 43], ['TERSY', 209, 47], ['AKPATA', 259, 61]]),
+      line(125, [['Patrick', 116, 49], ['RAY', 210, 28], ['ADEKA', 243, 53]]),
+      line(150, [['Chuddy', 108, 57], ['BRYAN', 210, 51], ['OKOYE', 265, 52]]),
+      line(175, [['Love', 92, 33], ['Birds', 129, 36], ['FUNMIODUSE', 210, 105]]),
+      line(200, [['Handyman', 21, 81], ['NG', 107, 21], ['Rep', 137, 28], ['BELLEMARIAMSOROH', 210, 170]]),
+    ], 1, 1, 100);
+    expect(parsed).toHaveLength(3);
+    expect(parsed.some((credit) => /Love Birds|Handyman/.test(credit.name))).toBe(false);
+  });
+
+  it('matches complete crew headings before shorter prefixes', () => {
+    const parsed = parseCreditFrame([
+      line(100, [['SCRIPT', 10, 60], ['SUPERVISOR', 80, 100], ['OKOCHI', 300, 80], ['LAWRENCE', 390, 100]]),
+      line(125, [['SOUND', 10, 60], ['RECORDIST', 80, 100], ['EJIKE', 300, 50], ['MBA', 360, 45]]),
+      line(150, [['CAMERA', 10, 70], ['ASST', 90, 60], ['ADEWALE', 300, 90], ['ABIODUN', 400, 90]]),
+      line(175, [['MAKE', 10, 40], ['UP', 60, 25], ['ARTIST', 95, 60], ['AKUCHIE', 300, 90], ['CHIKODI', 400, 90]]),
+    ], 1, 1, 100);
+    expect(parsed.map((credit) => [credit.name, credit.roleOrCharacter])).toEqual([
+      ['Okochi Lawrence', 'Continuity'], ['Ejike Mba', 'Sound Recordist'],
+      ['Adewale Abiodun', 'Camera Assistant'], ['Akuchie Chikodi', 'Makeup'],
+    ]);
+  });
+
+  it('does not carry a crew role across a blank section when the next heading is unreadable', () => {
+    const parsed = parseCreditFrame([
+      line(100, [['GAFFER', 100, 75]]),
+      line(125, [['OLAWALE', 80, 90], ['IBRAHIM', 180, 90]]),
+      line(230, [['BABATUNDE', 60, 110], ['ADELEKE', 180, 90]]),
+    ], 1, 1, 100);
+    expect(parsed.map((credit) => credit.name)).toEqual(['Olawale Ibrahim']);
+  });
+
+  it('preserves OCR punctuation until person-name cleanup removes a parenthetical nickname', () => {
+    const tsv = [
+      'level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext',
+      '5\t1\t1\t1\t1\t1\t100\t100\t100\t14\t95\tDIRECTOR',
+      '5\t1\t2\t1\t1\t1\t100\t130\t80\t14\t95\tDEMILADE',
+      '5\t1\t2\t1\t1\t2\t185\t130\t80\t14\t95\tMEDUOYE',
+      '5\t1\t2\t1\t1\t3\t270\t130\t60\t14\t95\t(HENDS)',
+    ].join('\n');
+    expect(parseCreditFrame(parseTesseractTsv(tsv), 1, 1, 100)[0].name).toBe('Demilade Meduoye');
+  });
+
   it('consolidates swapped and near OCR variants of the same credited name', () => {
     const parsed = consolidateCreditObservations([
       {
