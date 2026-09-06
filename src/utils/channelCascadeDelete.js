@@ -54,14 +54,21 @@ export async function deleteChannelWithAssociatedFilms(channelIds, options = {})
       .in('film_id', chunk);
     if (credCount) deletedCreditsCount += credCount;
 
-    // Delete other film relations (swallow if table does not exist or empty)
+    // Delete other film relations & clear foreign keys (swallow if table does not exist or empty)
     await Promise.allSettled([
+      supabase.from('pending_cinema_films').update({ promoted_film_id: null }).in('promoted_film_id', chunk),
+      supabase.from('pending_cinema_films').delete().in('promoted_film_id', chunk),
       supabase.from('film_genres').delete().in('film_id', chunk),
       supabase.from('film_companies').delete().in('film_id', chunk),
       supabase.from('reviews').delete().in('film_id', chunk),
       supabase.from('box_office_records').delete().in('film_id', chunk),
       supabase.from('comments').delete().in('film_id', chunk),
       supabase.from('showtimes').delete().in('film_id', chunk),
+      supabase.from('social_content_items').delete().in('film_id', chunk),
+      supabase.from('watchlist').delete().in('film_id', chunk),
+      supabase.from('user_favorites').delete().in('film_id', chunk),
+      supabase.from('film_sync_logs').delete().in('film_id', chunk),
+      supabase.from('screenplay_analyses').delete().in('film_id', chunk),
     ]);
 
     // Delete films

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
@@ -8,6 +8,7 @@ import SkeletonRow from '../../components/admin/SkeletonRow';
 import { useAuth } from '../../context/AuthContext';
 import { logAdminAction } from '../../lib/adminLogger';
 import { toTitleCase, toSentenceCase } from '../../utils/format';
+import { uploadAdminImage } from '../../lib/imageUpload';
 
 export default function AdminCompanies() {
   const { user } = useAuth();
@@ -22,6 +23,11 @@ export default function AdminCompanies() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState(null);
   const [deletingCompany, setDeletingCompany] = useState(null);
+
+  // Logo upload state
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isDraggingLogo, setIsDraggingLogo] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Merge state: ids of selected duplicates + the chosen primary for confirmation
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -114,7 +120,9 @@ export default function AdminCompanies() {
     description: '',
     logo_url: '',
     website_url: '',
-    founded_year: ''
+    founded_year: '',
+    company_type: '',
+    headquarters: '',
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -168,7 +176,9 @@ export default function AdminCompanies() {
       description: '',
       logo_url: '',
       website_url: '',
-      founded_year: ''
+      founded_year: '',
+      company_type: '',
+      headquarters: '',
     });
     setIsDrawerOpen(true);
   };
@@ -180,9 +190,51 @@ export default function AdminCompanies() {
       description: company.description || '',
       logo_url: company.logo_url || '',
       website_url: company.website || '',
-      founded_year: company.founded_year || ''
+      founded_year: company.founded_year || '',
+      company_type: company.company_type || '',
+      headquarters: company.headquarters || '',
     });
     setIsDrawerOpen(true);
+  };
+
+  const handleLogoFile = async (file) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size must be less than 10MB');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    const toastId = toast.loading('Uploading and optimizing logo…');
+    try {
+      const res = await uploadAdminImage(file, 'film-images');
+      if (res.error) {
+        toast.error(res.error, { id: toastId });
+        return;
+      }
+      if (res.url) {
+        setFormData((prev) => ({ ...prev, logo_url: res.url }));
+        toast.success('Company logo uploaded successfully!', { id: toastId });
+      }
+    } catch (err) {
+      console.error('Logo upload error:', err);
+      toast.error(err.message || 'Failed to upload logo', { id: toastId });
+    } finally {
+      setIsUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileInputChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleLogoFile(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDraggingLogo(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleLogoFile(file);
   };
 
   const handleSave = async (e) => {
@@ -195,6 +247,8 @@ export default function AdminCompanies() {
         logo_url: formData.logo_url || null,
         website: formData.website_url || null,
         founded_year: formData.founded_year ? parseInt(formData.founded_year, 10) : null,
+        company_type: formData.company_type ? formData.company_type.trim() : null,
+        headquarters: formData.headquarters ? formData.headquarters.trim() : null,
       };
 
       if (editingCompany) {
@@ -468,15 +522,125 @@ export default function AdminCompanies() {
         title={editingCompany ? "Edit Company" : "Add Company"}
       >
         <form onSubmit={handleSave} className="space-y-6">
-          {/* Logo Preview */}
-          <div className="flex flex-col items-center gap-4">
-            {formData.logo_url ? (
-              <img src={formData.logo_url} alt="Preview" className="w-20 h-20 rounded-lg object-cover border-2 border-border bg-white" />
-            ) : (
-              <div className="w-20 h-20 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-3xl">
-                {formData.name ? getInitials(formData.name) : '?'}
+          {/* Logo & Profile Picture Section */}
+          <div className="bg-surface-2/60 border border-border rounded-xl p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                <Icon icon="solar:camera-bold" className="text-brand w-4 h-4" />
+                Company Profile Picture / Logo
+              </label>
+              {formData.logo_url && (
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, logo_url: '' }))}
+                  className="text-[11px] font-bold text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
+                >
+                  <Icon icon="solar:trash-bin-minimalistic-bold" className="w-3.5 h-3.5" />
+                  Remove
+                </button>
+              )}
+            </div>
+
+            {/* Logo Preview & Dropzone */}
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative group shrink-0">
+                <div className="w-24 h-24 rounded-2xl border-2 border-border overflow-hidden bg-white/95 flex items-center justify-center shadow-lg transition-transform group-hover:scale-105">
+                  {formData.logo_url ? (
+                    <img
+                      src={formData.logo_url}
+                      alt="Logo preview"
+                      className="w-full h-full object-contain p-1"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-brand/20 to-amber-500/20 flex flex-col items-center justify-center text-brand">
+                      <span className="font-heading font-black text-3xl">
+                        {formData.name ? getInitials(formData.name) : '?'}
+                      </span>
+                    </div>
+                  )}
+
+                  {isUploadingLogo && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center text-white gap-1 z-20">
+                      <Icon icon="solar:refresh-circle-bold" className="w-6 h-6 animate-spin text-brand" />
+                      <span className="text-[10px] font-bold">Uploading…</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+
+              {/* Upload Drop Area */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingLogo(true); }}
+                onDragLeave={() => setIsDraggingLogo(false)}
+                onDrop={handleDrop}
+                onClick={() => !isUploadingLogo && fileInputRef.current?.click()}
+                className={`flex-1 w-full border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 ${
+                  isDraggingLogo
+                    ? 'border-brand bg-brand/10 scale-[1.01]'
+                    : 'border-border hover:border-brand/60 hover:bg-surface-3/50'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                />
+                <div className="p-2 rounded-full bg-brand/10 text-brand">
+                  <Icon icon="solar:upload-track-bold" className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-text-primary">
+                    {isUploadingLogo ? 'Processing image…' : 'Upload from device'}
+                  </p>
+                  <p className="text-[10px] text-text-muted mt-0.5">
+                    Click to browse or drag & drop (PNG, JPG, WebP up to 10MB)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Direct Image URL Input */}
+            <div className="pt-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-bold text-text-muted flex items-center gap-1">
+                  <Icon icon="solar:link-bold" className="w-3.5 h-3.5" />
+                  Or paste Image URL
+                </span>
+                {formData.logo_url && (
+                  <a
+                    href={formData.logo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-brand hover:underline font-bold flex items-center gap-0.5"
+                  >
+                    Open link <Icon icon="solar:arrow-right-up-linear" className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="url"
+                  value={formData.logo_url}
+                  onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+                  className="w-full bg-bg border border-border text-text-primary rounded-lg pl-3 pr-8 py-2 text-xs focus:border-brand focus:outline-none transition-colors"
+                  placeholder="https://example.com/company-logo.png"
+                />
+                {formData.logo_url && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, logo_url: '' }))}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary p-0.5"
+                  >
+                    <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           <div>
@@ -487,42 +651,64 @@ export default function AdminCompanies() {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-bg border border-border text-text-primary rounded-md px-4 py-2 text-sm focus:border-gold focus:outline-none"
+              placeholder="e.g. EbonyLife Films"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text-muted mb-1">Logo URL</label>
-            <input
-              type="url"
-              value={formData.logo_url}
-              onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-              className="w-full bg-bg border border-border text-text-primary rounded-md px-4 py-2 text-sm focus:border-gold focus:outline-none"
-              placeholder="https://..."
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-text-muted uppercase mb-1">Company Type</label>
+              <select
+                value={formData.company_type}
+                onChange={(e) => setFormData({ ...formData, company_type: e.target.value })}
+                className="w-full bg-bg border border-border text-text-primary rounded-md px-3 py-2 text-xs focus:border-gold focus:outline-none"
+              >
+                <option value="">Select type...</option>
+                <option value="Production Company">Production Company</option>
+                <option value="Distribution">Distributor</option>
+                <option value="Studio">Studio</option>
+                <option value="Streaming Platform">Streaming Platform</option>
+                <option value="Broadcaster">Broadcaster</option>
+                <option value="Agency">Agency</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-text-muted uppercase mb-1">Headquarters</label>
+              <input
+                type="text"
+                value={formData.headquarters}
+                onChange={(e) => setFormData({ ...formData, headquarters: e.target.value })}
+                className="w-full bg-bg border border-border text-text-primary rounded-md px-3 py-2 text-xs focus:border-gold focus:outline-none"
+                placeholder="e.g. Lagos, Nigeria"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text-muted mb-1">Website URL</label>
-            <input
-              type="url"
-              value={formData.website_url}
-              onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
-              className="w-full bg-bg border border-border text-text-primary rounded-md px-4 py-2 text-sm focus:border-gold focus:outline-none"
-              placeholder="https://..."
-            />
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-text-muted mb-1">Website URL</label>
+              <input
+                type="url"
+                value={formData.website_url}
+                onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
+                className="w-full bg-bg border border-border text-text-primary rounded-md px-4 py-2 text-sm focus:border-gold focus:outline-none"
+                placeholder="https://..."
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text-muted mb-1">Founded Year</label>
-            <input
-              type="number"
-              min="1800"
-              max={new Date().getFullYear()}
-              value={formData.founded_year}
-              onChange={(e) => setFormData({ ...formData, founded_year: e.target.value })}
-              className="w-full bg-bg border border-border text-text-primary rounded-md px-4 py-2 text-sm focus:border-gold focus:outline-none"
-              placeholder="e.g. 2010"
-            />
+            <div>
+              <label className="block text-sm font-medium text-text-muted mb-1">Founded Year</label>
+              <input
+                type="number"
+                min="1800"
+                max={new Date().getFullYear()}
+                value={formData.founded_year}
+                onChange={(e) => setFormData({ ...formData, founded_year: e.target.value })}
+                className="w-full bg-bg border border-border text-text-primary rounded-md px-4 py-2 text-sm focus:border-gold focus:outline-none"
+                placeholder="e.g. 2010"
+              />
+            </div>
           </div>
 
           <div>
@@ -532,13 +718,14 @@ export default function AdminCompanies() {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               className="w-full bg-bg border border-border text-text-primary rounded-md px-4 py-2 text-sm focus:border-gold focus:outline-none resize-none"
+              placeholder="Overview of the company's productions, distribution footprint, and history..."
             />
           </div>
 
           <div className="pt-4 flex flex-col gap-3">
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || isUploadingLogo}
               className="w-full bg-brand text-white font-bold py-3.5 rounded-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-brand/20"
             >
               {isSaving ? 'Saving...' : 'Save changes'}
