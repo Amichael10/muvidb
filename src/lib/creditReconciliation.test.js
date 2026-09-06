@@ -53,4 +53,16 @@ describe('credit reconciliation', () => {
     expect(comparison.localAgreement).toBe(false);
     expect(comparison.local).toHaveLength(1);
   });
+  it('correctly matches OCR typos (e.g. Taofeek -> Taofeeq) to the existing candidate', () => {
+    const existing = [row('10', 'Taofeek Adewale', 'Inspector')];
+    const [comparison] = compareScreenshotCredits(existing, [{ name: 'Taofeeq Adewale', role_or_character: 'Inspector' }], 'actor');
+    expect(comparison.targetId).toBe('10');
+    expect(comparison.isCorrection).toBe(true);
+  });
+  it('matches token order permutations (e.g. Lateef Adedimeji -> Adedimeji Lateef)', () => {
+    const existing = [row('20', 'Lateef Adedimeji', 'Lawyer')];
+    const [comparison] = compareScreenshotCredits(existing, [{ name: 'Adedimeji Lateef', role_or_character: 'Lawyer' }], 'actor');
+    expect(comparison.targetId).toBe('20');
+  });
 });
+

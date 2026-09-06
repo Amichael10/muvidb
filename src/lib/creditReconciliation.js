@@ -1,4 +1,39 @@
-import { namesNearMatch, namesLookSame, personNameTokens } from './personNameMatch.js';
+import { namesNearMatch, namesLookSame, personNameTokens, foldPersonText } from './personNameMatch.js';
+
+export function levenshteinDistance(a, b) {
+  const s = String(a || '').toLowerCase().trim();
+  const t = String(b || '').toLowerCase().trim();
+  if (s === t) return 0;
+  const m = s.length;
+  const n = t.length;
+  if (!m) return n;
+  if (!n) return m;
+  const row = new Array(n + 1);
+  for (let j = 0; j <= n; j++) row[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = row[j];
+      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+      prev = tmp;
+    }
+  }
+  return row[n];
+}
+
+export function stringSimilarity(a, b) {
+  const s = String(a || '').trim();
+  const t = String(b || '').trim();
+  if (!s && !t) return 1.0;
+  if (!s || !t) return 0.0;
+  if (s.toLowerCase() === t.toLowerCase()) return 1.0;
+  const maxLen = Math.max(s.length, t.length);
+  if (maxLen === 0) return 1.0;
+  const dist = levenshteinDistance(s, t);
+  return Math.max(0, 1 - dist / maxLen);
+}
 
 export function creditTextKey(value) {
   return String(value || '').normalize('NFKD').replace(/\p{M}/gu, '')
@@ -22,14 +57,38 @@ export function scoreCandidateMatch(candidate, reading) {
   
   const cName = creditNameKey(candidate.raw_name);
   const rName = creditNameKey(reading.raw_name);
+  const cFold = foldPersonText(candidate.raw_name);
+  const rFold = foldPersonText(reading.raw_name);
+
+  // Exact match
   if (cName && cName === rName) {
     const roleMatch = creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character);
-    return roleMatch ? 1.0 : 0.92;
+    return roleMatch ? 1.0 : 0.94;
   }
   
-  if (namesNearMatch(candidate.raw_name, reading.raw_name) || namesLookSame(candidate.raw_name, reading.raw_name)) {
+  // Cleaned folded match (handles casing, punctuation, honorifics)
+  if (cFold && rFold && cFold === rFold) {
     const roleMatch = creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character);
-    return roleMatch ? 0.88 : 0.80;
+    return roleMatch ? 0.96 : 0.90;
+  }
+
+  // Token-order swaps & alias logic
+  if (namesLookSame(candidate.raw_name, reading.raw_name)) {
+    const roleMatch = creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character);
+    return roleMatch ? 0.93 : 0.88;
+  }
+
+  // Near typo match from personNameMatch
+  if (namesNearMatch(candidate.raw_name, reading.raw_name)) {
+    const roleMatch = creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character);
+    return roleMatch ? 0.90 : 0.84;
+  }
+
+  // Full string Levenshtein similarity check (handles OCR character misrecognitions e.g. "Adekola" vs "Adeko1a", "Taofeek" vs "Taofeeq")
+  const fullSim = stringSimilarity(cFold, rFold);
+  if (fullSim >= 0.72) {
+    const roleMatch = (candidate.role_or_character && reading.role_or_character && creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character));
+    return 0.65 + (fullSim - 0.72) * 0.65 + (roleMatch ? 0.08 : 0);
   }
   
   const cTokens = personNameTokens(candidate.raw_name);
@@ -39,14 +98,24 @@ export function scoreCandidateMatch(candidate, reading) {
     const commonTokens = cTokens.filter(t => rTokens.includes(t));
     if (commonTokens.length > 0) {
       const overlapRatio = commonTokens.length / Math.max(cTokens.length, rTokens.length);
-      const roleBonus = (candidate.role_or_character && reading.role_or_character && creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character)) ? 0.15 : 0;
-      return 0.55 + (overlapRatio * 0.25) + roleBonus;
+      // Check if non-matching tokens have high similarity (e.g. single typo token)
+      const remainingC = cTokens.filter(t => !commonTokens.includes(t));
+      const remainingR = rTokens.filter(t => !commonTokens.includes(t));
+      let tokenSimBonus = 0;
+      if (remainingC.length === 1 && remainingR.length === 1) {
+        const tokenSim = stringSimilarity(remainingC[0], remainingR[0]);
+        if (tokenSim >= 0.6) tokenSimBonus = 0.15 * tokenSim;
+      }
+      const roleBonus = (candidate.role_or_character && reading.role_or_character && creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character)) ? 0.12 : 0;
+      return 0.52 + (overlapRatio * 0.28) + tokenSimBonus + roleBonus;
     }
   }
 
+  // Role/Character match with partial name clue
   if (candidate.role_or_character && reading.role_or_character && creditTextKey(candidate.role_or_character).length > 3) {
     if (creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character)) {
-      return 0.52;
+      if (fullSim >= 0.5) return 0.60;
+      return 0.48;
     }
   }
 

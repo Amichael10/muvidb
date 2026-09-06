@@ -67,14 +67,32 @@ function ComparisonRow({ comparison, disabled, onApply, compareLocal }) {
         )}
       </div>
 
+      {/* Person profile database match badge */}
+      {(comparison.person || target?.people) && (
+        <div className="text-[11px] bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 flex items-center gap-2 text-blue-300">
+          {(comparison.person?.photo_url || target?.people?.photo_url) ? (
+            <img 
+              src={comparison.person?.photo_url || target?.people?.photo_url} 
+              alt="Person profile" 
+              className="w-5 h-5 rounded-full object-cover shrink-0" 
+            />
+          ) : (
+            <Icon icon="solar:user-circle-bold" className="w-4 h-4 text-blue-400 shrink-0" />
+          )}
+          <div className="truncate text-xs">
+            <span className="text-text-muted">Matched Profile:</span> <strong className="text-text-primary ml-1">{comparison.person?.name || target?.people?.name}</strong>
+          </div>
+        </div>
+      )}
+
       {isCorrection && target && (
         <div className="text-[11px] bg-surface-2/80 rounded-lg p-2 border border-border/80 flex items-center justify-between gap-2 text-text-secondary">
           <div className="truncate">
-            <span className="text-text-muted">Current:</span> <strong className="text-text-primary">{target.raw_name}</strong> {target.role_or_character ? `(${target.role_or_character})` : ''}
+            <span className="text-text-muted">Worker Candidate:</span> <strong className="text-text-primary ml-1">{target.raw_name}</strong> {target.role_or_character ? `(${target.role_or_character})` : ''}
           </div>
           <Icon icon="solar:arrow-right-linear" className="w-4 h-4 text-amber-400 shrink-0" />
           <div className="truncate">
-            <span className="text-text-muted">New:</span> <strong className="text-brand">{name}</strong> {role ? `(${role})` : ''}
+            <span className="text-text-muted">Screenshot Reading:</span> <strong className="text-brand ml-1">{name}</strong> {role ? `(${role})` : ''}
           </div>
         </div>
       )}

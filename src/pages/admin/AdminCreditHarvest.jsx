@@ -269,7 +269,8 @@ export default function AdminCreditHarvest() {
   const fetchFilmCandidateRows = async (filmId) => {
     const rows = [];
     for (let offset = 0; ; offset += 1000) {
-      const { data, error } = await supabase.from('credit_candidates').select('*')
+      const { data, error } = await supabase.from('credit_candidates')
+        .select('*, people:matched_person_id (id, name, photo_url)')
         .eq('film_id', filmId).order('id').range(offset, offset + 999);
       if (error) throw error;
       rows.push(...(data || []));
@@ -327,13 +328,14 @@ export default function AdminCreditHarvest() {
       if (repeats.some(row => row.status !== 'pending' || creditType(row.credit_type) !== cleanReading.credit_type)) throw new Error('Only pending credits of the same type can be merged.');
       if (repeats.some(row => row.matched_person_id && target?.matched_person_id && row.matched_person_id !== target.matched_person_id)) throw new Error('These rows link to different people. Correct their profile links before merging.');
       
-      let matchedPersonId = target && creditNameKey(target.raw_name) === creditNameKey(reading.raw_name) ? target.matched_person_id : null;
-      let matchedPersonObj = null;
-      if (!matchedPersonId && cleanReading.raw_name) {
+      let matchedPersonId = target?.matched_person_id || null;
+      let matchedPersonObj = target?.people || null;
+
+      if (cleanReading.raw_name) {
         const { data: foundId } = await supabase.rpc('find_person_by_name', { p_name: cleanReading.raw_name });
         if (foundId) {
           matchedPersonId = foundId;
-          const { data: pData } = await supabase.from('people').select('id, name, photo_url').eq('id', foundId).single();
+          const { data: pData } = await supabase.from('people').select('id, name, photo_url').eq('id', foundId).maybeSingle();
           if (pData) matchedPersonObj = pData;
         }
       }
@@ -349,7 +351,7 @@ export default function AdminCreditHarvest() {
       };
       const request = target
         ? supabase.from('credit_candidates').update(patch).eq('id', target.id).eq('status', 'pending')
-        : supabase.from('credit_candidates').insert({ ...patch, status: 'pending', confidence: 0.8, ocr_confidence: 0.9, frame_support: 1 });
+        : supabase.from('credit_candidates').insert({ ...patch, status: 'pending', confidence: 0.85, ocr_confidence: 0.95, frame_support: 1 });
       const { data: saved, error } = await request.select('*').single();
       if (error) throw error;
       if (repeats.length) await rejectMergedRows(repeats, saved.id);
@@ -1283,10 +1285,29 @@ export default function AdminCreditHarvest() {
       }
 
       const existing = await fetchFilmCandidateRows(group.film.id);
+      const rawComparisons = compareScreenshotCredits(existing, extracted, ocrTarget, localReadings);
+      
+      // Pre-resolve database people profiles for each candidate
+      const comparisons = await Promise.all(rawComparisons.map(async (comp) => {
+        let person = comp.targetCandidate?.people || null;
+        if (!person && comp.reading?.raw_name) {
+          try {
+            const { data: foundId } = await supabase.rpc('find_person_by_name', { p_name: comp.reading.raw_name });
+            if (foundId) {
+              const { data: pData } = await supabase.from('people').select('id, name, photo_url').eq('id', foundId).maybeSingle();
+              if (pData) person = pData;
+            }
+          } catch (e) {
+            console.warn('Could not pre-resolve person profile for', comp.reading.raw_name, e);
+          }
+        }
+        return { ...comp, person };
+      }));
+
       setScreenshotPreview({
         id: `${shot.id}-${Date.now()}`, filmId: group.film.id, shotId: shot.id,
         filename: shot.name, engine, localError,
-        comparisons: compareScreenshotCredits(existing, extracted, ocrTarget, localReadings),
+        comparisons,
       });
       toast.success('Comparison ready. Review readings before applying changes.');
     } catch (err) {
