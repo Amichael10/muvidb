@@ -60,15 +60,78 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function recommendClipSegment(data: any, res: VercelResponse) {
-  const title = String(data?.title || 'this video').slice(0, 200);
-  const duration = Math.max(1, Number(data?.duration || 60));
+  const title = String(data?.title || 'this Nollywood film').slice(0, 200);
+  const rawDuration = Number(data?.duration);
+  // Default to 1 hour (3600s) if duration is missing/invalid, assuming full movie context
+  const duration = (!rawDuration || isNaN(rawDuration) || rawDuration <= 60) ? 3600 : rawDuration;
   const transcript = String(data?.transcript || '').slice(0, 12000);
-  const prompt = `You are MuviDB's short-form video editor. Recommend one high-energy ${Math.min(45, Math.max(8, duration))}-second TikTok/Reels segment from this YouTube clip.\nTitle: ${title}\nDuration: ${duration}s\nTranscript or description: ${transcript || '(not available; make a conservative recommendation near the beginning)'}\nReturn JSON only: {"startTime": number, "endTime": number, "reason": string, "caption": string}. Keep the caption under 35 words and make it a hype hook, not a generic synopsis.`;
+  const description = String(data?.description || '').slice(0, 3000);
+  const synopsis = String(data?.synopsis || '').slice(0, 2000);
+  const genre = String(data?.genre || '').slice(0, 200);
+  const targetLength = Math.min(60, Math.max(15, Number(data?.targetLength || 45)));
+
+  // Calculate safety boundaries to avoid opening ads/intros and closing credits
+  let minStart = 0;
+  let maxEnd = duration;
+  if (duration > 300) {
+    // For videos longer than 5 mins (e.g. full movies / long clips), skip the first 90s (adverts/intros) and last 8% (credits)
+    minStart = Math.min(90, Math.floor(duration * 0.05));
+    maxEnd = Math.max(minStart + targetLength + 10, Math.floor(duration * 0.92));
+  } else if (duration > 90) {
+    // For shorter videos / trailers, skip the first 15s and last 10s
+    minStart = 15;
+    maxEnd = Math.max(minStart + targetLength, duration - 10);
+  }
+
+  const prompt = `You are MuviDB's viral Nollywood short-form video producer.
+Your mission is to recommend one exciting, high-retention ${targetLength}-second TikTok/Reels clip from this Nollywood film to blow up on social media.
+
+Movie Context:
+- Title: ${title}
+- Genre: ${genre || 'Drama/Comedy'}
+- Synopsis: ${synopsis || 'Exciting Nollywood release'}
+- Video Duration: ${duration}s (${Math.floor(duration / 60)} minutes)
+- YouTube Description / Context: ${description || '(none provided)'}
+- Subtitles / Transcript Snippets: ${transcript || '(auto-segment analysis)'}
+
+CRITICAL RULES FOR SCENE SELECTION:
+1. Target an intensely emotional, hilarious, dramatic, or suspenseful scene that hooks viewers within the first 3 seconds.
+2. ABSOLUTELY DO NOT select the beginning of the video (0s to ${minStart}s). Opening segments contain channel intros, sponsor advertisements, logos, or commercial banners.
+3. ABSOLUTELY DO NOT select the end of the video (${maxEnd}s to ${duration}s). End segments contain closing credits, cast/crew rolls, and YouTube outro subscribe screens.
+4. The startTime MUST be between ${minStart} and ${Math.max(minStart, maxEnd - targetLength)}.
+5. The endTime should be startTime + approximately ${targetLength} seconds (max endTime <= ${maxEnd}).
+
+Return ONLY valid JSON with this exact shape:
+{
+  "startTime": number,
+  "endTime": number,
+  "reason": "Why this specific scene is viral/emotional/funny",
+  "caption": "Short punchy hook caption with 2-3 emojis and #Nollywood #MuviDB hashtags (under 35 words)"
+}`;
+
   const { text, telemetry } = await generateAIContent(prompt, { preferredProvider: 'gemini' });
   const parsed = parseJSON(text);
-  const startTime = Math.max(0, Math.min(duration - 1, Number(parsed.startTime) || 0));
-  const endTime = Math.max(startTime + 1, Math.min(duration, Number(parsed.endTime) || Math.min(duration, startTime + 30)));
-  return res.status(200).json({ ...parsed, startTime, endTime, engine: telemetry?.engine || 'gemini' });
+
+  let startTime = Number(parsed?.startTime);
+  if (isNaN(startTime) || startTime < minStart || startTime >= maxEnd) {
+    // Fallback to golden section (around 25%-40% into the film)
+    startTime = Math.floor(minStart + (maxEnd - minStart) * 0.3);
+  }
+  let endTime = Number(parsed?.endTime);
+  if (isNaN(endTime) || endTime <= startTime || endTime > maxEnd) {
+    endTime = Math.min(maxEnd, startTime + targetLength);
+  }
+
+  const caption = String(parsed?.caption || `Wait for the reaction! 🍿 Watch ${title} now on MuviDB #Nollywood #AfricanCinema`).trim();
+  const reason = String(parsed?.reason || 'High-stakes dramatic dialogue scene').trim();
+
+  return res.status(200).json({
+    startTime,
+    endTime,
+    caption,
+    reason,
+    engine: telemetry?.engine || 'gemini',
+  });
 }
 
 function normalizeInstagramUrl(value: unknown) {

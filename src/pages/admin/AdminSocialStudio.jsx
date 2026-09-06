@@ -52,6 +52,37 @@ const emptySummary = {
   },
 };
 
+const AVAILABLE_ASPECT_RATIOS = [
+  { id: '9:16', label: '9:16', subtitle: 'Reels / TikTok' },
+  { id: '1:1', label: '1:1', subtitle: 'Square Feed' },
+  { id: '4:5', label: '4:5', subtitle: 'Portrait' },
+  { id: '16:9', label: '16:9', subtitle: 'Landscape' },
+];
+
+function getDimensionsForAspectRatio(aspectRatio) {
+  switch (aspectRatio) {
+    case '9:16':
+      return { width: 540, height: 960 };
+    case '4:5':
+      return { width: 720, height: 900 };
+    case '16:9':
+      return { width: 960, height: 540 };
+    case '1:1':
+    default:
+      return { width: 720, height: 720 };
+  }
+}
+
+function getRowAspectRatios(row) {
+  if (Array.isArray(row?.aspectRatios) && row.aspectRatios.length > 0) {
+    return row.aspectRatios;
+  }
+  if (row?.aspectRatio) {
+    return [row.aspectRatio];
+  }
+  return ['9:16', '1:1'];
+}
+
 function Metric({ label, value, icon, tone = 'brand' }) {
   const tones = {
     brand: 'bg-brand/10 text-brand border-brand/20',
@@ -275,8 +306,8 @@ export default function AdminSocialStudio() {
   const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
   const [videoPlan, setVideoPlan] = useState({ days: 7, startDate: new Date().toISOString().slice(0, 10), videoStart: '18:00', videoEnd: '20:00', clipLength: 30 });
   const [videoRows, setVideoRows] = useState([
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatio: '1:1', filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatio: '9:16', filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16'], filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
   ]);
   const [videoFilmOptions, setVideoFilmOptions] = useState([]);
   const [videoFilmSearch, setVideoFilmSearch] = useState({});
@@ -522,7 +553,7 @@ export default function AdminSocialStudio() {
   useEffect(() => {
     if (activeTab !== 'calendar' && activeTab !== 'video_plan') return undefined;
     let cancelled = false;
-    supabase.from('films').select('id,title,release_date,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(250).then(({ data }) => {
+    supabase.from('films').select('id,title,release_date,synopsis,genre,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(250).then(({ data }) => {
       if (!cancelled) setVideoFilmOptions(data || []);
     });
     return () => { cancelled = true; };
@@ -543,7 +574,7 @@ export default function AdminSocialStudio() {
     setVideoAutopilot({ running: true, message: 'Selecting the newest eligible film…', jobs: [] });
     try {
       const { data: films, error } = await supabase.from('films')
-        .select('id,title,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
+        .select('id,title,synopsis,genre,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
         .order('release_date', { ascending: false, nullsLast: true }).order('created_at', { ascending: false }).limit(50);
       if (error) throw error;
@@ -567,22 +598,22 @@ export default function AdminSocialStudio() {
       const film = eligibleFilms.find(candidate => !candidate.release_date || new Date(candidate.release_date) >= releaseCutoff) || eligibleFilms[0];
       if (!film) throw new Error('No recently added film with a usable video source was found.');
       const sourceUrl = film.sourceUrl;
-      setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest moment from ${film.title}…` }));
-      let sourceMetadata = { title: film.title, duration: 60, transcript: '' };
+      setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest viral scene from ${film.title}…` }));
+      let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: film.genre || '' };
       try {
         const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }) });
         if (metadataResponse.ok) sourceMetadata = { ...sourceMetadata, ...(await metadataResponse.json()) };
       } catch { /* Gemini safe fallback */ }
-      const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { ...sourceMetadata, duration: Math.max(1, Number(sourceMetadata.duration) || 60) } }) });
+      const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { ...sourceMetadata, duration: Math.max(1, Number(sourceMetadata.duration) || 3600), targetLength: videoPlan.clipLength || 45 } }) });
       const recommendation = await recommendationResponse.json().catch(() => ({}));
       if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
       const safeStart = Math.max(0, Number(recommendation.startTime) || 0);
-      const safeEnd = Math.min(Math.max(safeStart + 1, Number(recommendation.endTime) || safeStart + videoPlan.clipLength), Number(sourceMetadata.duration) || safeStart + videoPlan.clipLength);
-      const clips = ['1:1', '9:16'].map(aspect_ratio => ({ url: sourceUrl, start_time: safeStart, end_time: safeEnd, aspect_ratio, fit_mode: 'cover', title: film.title }));
+      const safeEnd = Math.min(Math.max(safeStart + 1, Number(recommendation.endTime) || safeStart + (videoPlan.clipLength || 45)), Number(sourceMetadata.duration) || safeStart + (videoPlan.clipLength || 45));
+      const clips = ['9:16', '1:1'].map(aspect_ratio => ({ url: sourceUrl, start_time: safeStart, end_time: safeEnd, aspect_ratio, fit_mode: 'cover', title: film.title }));
       const batchResponse = await fetch('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips }) });
       const batch = await batchResponse.json().catch(() => ({}));
       if (!batchResponse.ok) throw new Error(batch.detail || 'The local clipper could not queue the video batch.');
-      setVideoAutopilot(prev => ({ ...prev, message: 'Rendering 1:1 and 9:16 videos locally…', jobs: batch.jobs || [] }));
+      setVideoAutopilot(prev => ({ ...prev, message: 'Rendering 9:16 and 1:1 videos locally…', jobs: batch.jobs || [] }));
       const completed = [];
       for (const job of batch.jobs || []) {
         let status;
@@ -603,7 +634,8 @@ export default function AdminSocialStudio() {
         completed.push({ ...status, public_url: session.publicUrl, r2_key: session.key });
       }
       for (const asset of completed) {
-        await fetch('/api/social?task=create_editor_video_draft', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `${film.title} — ${asset.aspect_ratio} daily clip`, publicUrl: asset.public_url, storagePath: asset.r2_key, mimeType: 'video/mp4', fileSizeBytes: asset.size_bytes, width: asset.aspect_ratio === '9:16' ? 540 : 720, height: asset.aspect_ratio === '9:16' ? 960 : 720, captions: { instagram: recommendation.caption || '', facebook: recommendation.caption || '', threads: recommendation.caption || '', tiktok: recommendation.caption || '' }, platforms: ['instagram', 'facebook', 'threads', 'tiktok'] }) });
+        const dims = getDimensionsForAspectRatio(asset.aspect_ratio);
+        await fetch('/api/social?task=create_editor_video_draft', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `${film.title} — ${asset.aspect_ratio} daily clip`, publicUrl: asset.public_url, storagePath: asset.r2_key, mimeType: 'video/mp4', fileSizeBytes: asset.size_bytes, width: dims.width, height: dims.height, captions: { instagram: recommendation.caption || '', facebook: recommendation.caption || '', threads: recommendation.caption || '', tiktok: recommendation.caption || '' }, platforms: ['instagram', 'facebook', 'threads', 'tiktok'] }) });
       }
       setVideoAutopilot({ running: false, message: `Prepared ${completed.length} video drafts for approval.`, jobs: completed });
       await fetchDrafts(true);
@@ -619,11 +651,11 @@ export default function AdminSocialStudio() {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     date: videoPlan.startDate,
     time: '20:00',
-    aspectRatio: '9:16',
+    aspectRatios: ['9:16', '1:1'],
     filmId: videoFilmOptions[0]?.id || '',
     mode: 'gemini',
     start: 0,
-    end: videoPlan.clipLength,
+    end: videoPlan.clipLength || 45,
     caption: '',
   }]);
   const buildVideoPlanRows = () => {
@@ -635,9 +667,19 @@ export default function AdminSocialStudio() {
       const date = new Date(baseDate); date.setDate(baseDate.getDate() + day);
       const dateString = date.toISOString().slice(0, 10);
       [
-        { time: videoPlan.videoStart, aspectRatio: '1:1' },
-        { time: videoPlan.videoEnd, aspectRatio: '9:16' },
-      ].forEach((slot, slotIndex) => rows.push({ id: `${Date.now()}-${day}-${slotIndex}`, date: dateString, time: slot.time, aspectRatio: slot.aspectRatio, filmId: films[(day * 2 + slotIndex) % films.length].id, mode: 'gemini', start: 0, end: videoPlan.clipLength, caption: '' }));
+        { time: videoPlan.videoStart, aspectRatios: ['9:16', '1:1'] },
+        { time: videoPlan.videoEnd, aspectRatios: ['9:16'] },
+      ].forEach((slot, slotIndex) => rows.push({
+        id: `${Date.now()}-${day}-${slotIndex}`,
+        date: dateString,
+        time: slot.time,
+        aspectRatios: slot.aspectRatios,
+        filmId: films[(day * 2 + slotIndex) % films.length].id,
+        mode: 'gemini',
+        start: 0,
+        end: videoPlan.clipLength || 45,
+        caption: '',
+      }));
     }
     setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days. Review them, then prepare or schedule.`);
   };
@@ -645,68 +687,208 @@ export default function AdminSocialStudio() {
   const resolveFilmForRow = async row => {
     if (row.film && row.film.id === row.filmId) return row.film;
     const existing = videoFilmOptions.find(item => item.id === row.filmId);
-    if (existing) return existing;
+    if (existing && existing.synopsis) return existing;
     if (!row.filmId) return null;
     try {
       const { data, error } = await supabase
         .from('films')
-        .select('id,title,release_date,trailer_youtube_id,trailer_external_url,youtube_watch_url')
+        .select('id,title,release_date,synopsis,genre,trailer_youtube_id,trailer_external_url,youtube_watch_url')
         .eq('id', row.filmId)
         .single();
       if (!error && data) return data;
     } catch {
       // fallback
     }
-    return null;
+    return existing || null;
   };
 
   const generateRowCaption = async row => {
     const film = await resolveFilmForRow(row);
     if (!film) return toast.error('Choose a film before generating a caption.');
-    updateVideoRow(row.id, { caption: 'Generating Gemini caption…' });
+    updateVideoRow(row.id, { caption: 'Analyzing video & selecting best viral scene…' });
     try {
-      const response = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: film.title, duration: Math.max(1, Number(row.end) || videoPlan.clipLength), transcript: '' } }) });
+      const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
+      let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: film.genre || '' };
+      if (sourceUrl) {
+        try {
+          const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: sourceUrl }),
+          });
+          if (metadataResponse.ok) {
+            const meta = await metadataResponse.json();
+            sourceMetadata = { ...sourceMetadata, ...meta };
+          }
+        } catch {
+          // clipper offline fallback
+        }
+      }
+
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'recommend_clip_segment',
+          data: {
+            ...sourceMetadata,
+            targetLength: videoPlan.clipLength || 45,
+          },
+        }),
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Gemini caption generation failed');
-      updateVideoRow(row.id, { caption: data.caption || '', start: Number(data.startTime) || 0, end: Number(data.endTime) || videoPlan.clipLength });
-    } catch (err) { updateVideoRow(row.id, { caption: '' }); toast.error(err.message); }
+      const startSec = Number(data.startTime) || 0;
+      const endSec = Number(data.endTime) || startSec + (videoPlan.clipLength || 45);
+      updateVideoRow(row.id, {
+        caption: data.caption || '',
+        start: startSec,
+        end: endSec,
+      });
+      const startMin = Math.floor(startSec / 60);
+      const startRem = startSec % 60;
+      const endMin = Math.floor(endSec / 60);
+      const endRem = endSec % 60;
+      toast.success(`Gemini scene selected: ${startMin}:${startRem < 10 ? '0' : ''}${startRem} – ${endMin}:${endRem < 10 ? '0' : ''}${endRem}`);
+    } catch (err) {
+      updateVideoRow(row.id, { caption: '' });
+      toast.error(err.message);
+    }
   };
+
   const prepareCustomVideoPlan = async (action = 'draft') => {
     const validRows = videoRows.filter(row => row.filmId && row.date && row.time);
     if (!validRows.length) return toast.error('Add at least one video row with a film, date, and time.');
-    setVideoAutopilot({ running: true, message: `Preparing ${validRows.length} planned video${validRows.length === 1 ? '' : 's'}…`, jobs: [] });
+    setVideoAutopilot({ running: true, message: `Preparing ${validRows.length} planned video item${validRows.length === 1 ? '' : 's'}…`, jobs: [] });
     try {
       let created = 0;
       for (const row of validRows) {
         const film = await resolveFilmForRow(row);
         if (!film) continue;
         const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
-        let start = Number(row.start) || 0; let end = Math.max(start + 1, Number(row.end) || start + videoPlan.clipLength);
+        let start = Number(row.start) || 0;
+        let end = Math.max(start + 1, Number(row.end) || start + (videoPlan.clipLength || 45));
         let caption = row.caption || '';
         if (row.mode === 'gemini' || !caption) {
-          const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { title: film.title, duration: end, transcript: '' } }) });
+          let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: film.genre || '' };
+          if (sourceUrl) {
+            try {
+              const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: sourceUrl }),
+              });
+              if (metadataResponse.ok) {
+                const meta = await metadataResponse.json();
+                sourceMetadata = { ...sourceMetadata, ...meta };
+              }
+            } catch { /* clipper fallback */ }
+          }
+          const recommendationResponse = await fetch('/api/ai', {
+            method: 'POST',
+            headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              task: 'recommend_clip_segment',
+              data: {
+                ...sourceMetadata,
+                targetLength: videoPlan.clipLength || 45,
+              },
+            }),
+          });
           const recommendation = await recommendationResponse.json().catch(() => ({}));
           if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
-          start = Number(recommendation.startTime) || start; end = Number(recommendation.endTime) || end; caption = caption || recommendation.caption || '';
+          start = Number(recommendation.startTime) || start;
+          end = Number(recommendation.endTime) || end;
+          caption = caption || recommendation.caption || '';
         }
-        const batchResponse = await fetch('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips: [{ url: sourceUrl, start_time: start, end_time: end, aspect_ratio: row.aspectRatio, fit_mode: 'cover', title: film.title }] }) });
+
+        const formats = getRowAspectRatios(row);
+        const clips = formats.map(ar => ({
+          url: sourceUrl,
+          start_time: start,
+          end_time: end,
+          aspect_ratio: ar,
+          fit_mode: 'cover',
+          title: film.title,
+        }));
+
+        const batchResponse = await fetch('http://127.0.0.1:4317/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clips }),
+        });
         const batch = await batchResponse.json().catch(() => ({}));
         if (!batchResponse.ok) throw new Error(batch.detail || 'The local clipper could not queue this video.');
-        const job = batch.jobs?.[0]; if (!job) throw new Error('The local clipper returned no job.');
-        let status;
-        for (;;) { await new Promise(resolve => setTimeout(resolve, 1200)); const response = await fetch(job.status_url); status = await response.json().catch(() => ({})); if (!response.ok) throw new Error(status.detail || 'Video render failed.'); if (status.success) break; setVideoAutopilot(prev => ({ ...prev, message: `Rendering ${film.title}… ${status.progress || 0}%` })); }
-        const blob = await (await fetch(status.download_url)).blob();
-        const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: blob.size }) });
-        const session = await sessionResponse.json().catch(() => ({})); if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
-        const uploadResponse = await fetch(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob }); if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
-        const draftResponse = await fetch('/api/social?task=create_editor_video_draft', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `${film.title} — ${row.aspectRatio} clip`, publicUrl: session.publicUrl, storagePath: session.key, mimeType: 'video/mp4', fileSizeBytes: blob.size, width: row.aspectRatio === '9:16' ? 540 : 720, height: row.aspectRatio === '9:16' ? 960 : 720, captions: { instagram: caption, facebook: caption, threads: caption, tiktok: caption }, platforms: ['instagram', 'facebook', 'threads', 'tiktok'] }) });
-        const draft = await draftResponse.json().catch(() => ({})); if (!draftResponse.ok) throw new Error(draft.error || 'Could not create the video draft.');
-        const contentItemId = draft.id || draft.contentItemId || draft.content_item_id || draft.item?.id;
-        if (contentItemId && (action === 'schedule' || action === 'publish')) { const task = action === 'publish' ? 'publish_editor_video_now' : 'schedule'; const response = await fetch(`/api/social?task=${task}`, { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ contentItemId, scheduledFor: new Date(`${row.date}T${row.time}`).toISOString() }) }); const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || `Could not ${action} video.`); }
-        created += 1;
+        
+        for (let j = 0; j < (batch.jobs || []).length; j++) {
+          const job = batch.jobs[j];
+          const targetFormat = formats[j] || formats[0];
+          let status;
+          for (;;) {
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            const response = await fetch(job.status_url);
+            status = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(status.detail || 'Video render failed.');
+            if (status.success) break;
+            setVideoAutopilot(prev => ({
+              ...prev,
+              message: `Rendering ${film.title} (${targetFormat})… ${status.progress || 0}%`,
+            }));
+          }
+          const blob = await (await fetch(status.download_url)).blob();
+          const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', {
+            method: 'POST',
+            headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: blob.size }),
+          });
+          const session = await sessionResponse.json().catch(() => ({}));
+          if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
+          const uploadResponse = await fetch(session.uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'video/mp4' },
+            body: blob,
+          });
+          if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
+
+          const dims = getDimensionsForAspectRatio(targetFormat);
+          const draftResponse = await fetch('/api/social?task=create_editor_video_draft', {
+            method: 'POST',
+            headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: `${film.title} — ${targetFormat} clip`,
+              publicUrl: session.publicUrl,
+              storagePath: session.key,
+              mimeType: 'video/mp4',
+              fileSizeBytes: blob.size,
+              width: dims.width,
+              height: dims.height,
+              captions: { instagram: caption, facebook: caption, threads: caption, tiktok: caption },
+              platforms: ['instagram', 'facebook', 'threads', 'tiktok'],
+            }),
+          });
+          const draft = await draftResponse.json().catch(() => ({}));
+          if (!draftResponse.ok) throw new Error(draft.error || 'Could not create the video draft.');
+          const contentItemId = draft.id || draft.contentItemId || draft.content_item_id || draft.item?.id;
+          if (contentItemId && (action === 'schedule' || action === 'publish')) {
+            const task = action === 'publish' ? 'publish_editor_video_now' : 'schedule';
+            const response = await fetch(`/api/social?task=${task}`, {
+              method: 'POST',
+              headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contentItemId, scheduledFor: new Date(`${row.date}T${row.time}`).toISOString() }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || `Could not ${action} video.`);
+          }
+          created += 1;
+        }
       }
-      setVideoAutopilot({ running: false, message: `Prepared ${created} custom video draft${created === 1 ? '' : 's'}.`, jobs: [] }); await fetchDrafts(true); toast.success(`${created} video${created === 1 ? '' : 's'} added to drafts.`);
-    } catch (err) { setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.' })); toast.error(err.message || 'Custom video plan failed.'); }
+      setVideoAutopilot({ running: false, message: `Prepared ${created} custom video draft${created === 1 ? '' : 's'}.`, jobs: [] });
+      await fetchDrafts(true);
+      toast.success(`${created} video format${created === 1 ? '' : 's'} added to drafts.`);
+    } catch (err) {
+      setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.' }));
+      toast.error(err.message || 'Custom video plan failed.');
+    }
   };
 
   const fetchSummary = async (silent = false) => {
@@ -2162,7 +2344,7 @@ export default function AdminSocialStudio() {
                       />
                     </label>
 
-                    <div className="sm:col-span-2">
+                    <div className="sm:col-span-2 lg:col-span-2">
                       <label className="block text-[10px] font-black uppercase text-text-muted">
                         Film Selection
                       </label>
@@ -2175,31 +2357,57 @@ export default function AdminSocialStudio() {
                       />
                     </div>
 
-                    <label className="text-[10px] font-black uppercase text-text-muted">
-                      Format
-                      <select
-                        value={row.aspectRatio}
-                        onChange={e => updateVideoRow(row.id, { aspectRatio: e.target.value })}
-                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
-                      >
-                        <option>1:1</option>
-                        <option>9:16</option>
-                        <option>4:5</option>
-                        <option>16:9</option>
-                      </select>
-                    </label>
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="text-[10px] font-black uppercase text-text-muted">
+                        Timing Mode
+                        <select
+                          value={row.mode}
+                          onChange={e => updateVideoRow(row.id, { mode: e.target.value })}
+                          className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                        >
+                          <option value="gemini">Gemini Auto (Finds Best Scene)</option>
+                          <option value="manual">Manual Seconds</option>
+                        </select>
+                      </label>
+                    </div>
 
-                    <label className="text-[10px] font-black uppercase text-text-muted">
-                      Timing Mode
-                      <select
-                        value={row.mode}
-                        onChange={e => updateVideoRow(row.id, { mode: e.target.value })}
-                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
-                      >
-                        <option value="gemini">Gemini Auto</option>
-                        <option value="manual">Manual Seconds</option>
-                      </select>
-                    </label>
+                    <div className="col-span-full">
+                      <label className="block text-[10px] font-black uppercase text-text-muted mb-1">
+                        Formats to Generate ({getRowAspectRatios(row).length} selected)
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {AVAILABLE_ASPECT_RATIOS.map(fmt => {
+                          const activeFormats = getRowAspectRatios(row);
+                          const isSelected = activeFormats.includes(fmt.id);
+                          return (
+                            <button
+                              key={fmt.id}
+                              type="button"
+                              onClick={() => {
+                                let next;
+                                if (isSelected) {
+                                  next = activeFormats.filter(f => f !== fmt.id);
+                                  if (next.length === 0) next = [fmt.id];
+                                } else {
+                                  next = [...activeFormats, fmt.id];
+                                }
+                                updateVideoRow(row.id, { aspectRatios: next });
+                              }}
+                              className={`h-8 px-3 rounded-lg border text-xs font-bold transition-all flex items-center gap-2 ${
+                                isSelected
+                                  ? 'border-brand bg-brand/20 text-brand-light shadow-sm shadow-brand/20'
+                                  : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-white'
+                              }`}
+                              title={`${fmt.label} (${fmt.subtitle})`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-brand' : 'bg-white/20'}`} />
+                              <span>{fmt.label}</span>
+                              <span className="text-[10px] opacity-70">({fmt.subtitle})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-end gap-2">
