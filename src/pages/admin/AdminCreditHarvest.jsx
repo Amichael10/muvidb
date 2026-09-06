@@ -256,6 +256,7 @@ export default function AdminCreditHarvest() {
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [isExtractingScreenshot, setIsExtractingScreenshot] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [isImagePreviewCollapsed, setIsImagePreviewCollapsed] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [isResettingQueue, setIsResettingQueue] = useState(false);
   const screenshotInputRef = useRef(null);
@@ -1211,7 +1212,7 @@ export default function AdminCreditHarvest() {
     }
   };
 
-  const handleScreenshotUpload = (e) => {
+  const handleScreenshotUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
@@ -1221,72 +1222,107 @@ export default function AdminCreditHarvest() {
       return;
     }
 
-    validFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target.result;
-        setScreenshots((prev) => [
-          ...prev,
-          {
-            id: `shot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            name: file.name,
-            base64,
-            size: file.size,
-          },
-        ]);
-        setIsScreenshotSplitOpen(true);
-      };
-      reader.readAsDataURL(file);
-    });
-    toast.success(`Loaded ${validFiles.length} screenshot(s)`);
-    if (screenshotInputRef.current) screenshotInputRef.current.value = '';
+    try {
+      const loadedShots = await Promise.all(
+        validFiles.map((file) => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            resolve({
+              id: `shot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              name: file.name,
+              base64: event.target.result,
+              size: file.size,
+            });
+          };
+          reader.onerror = () => reject(new Error(`Failed to read file ${file.name}`));
+          reader.readAsDataURL(file);
+        }))
+      );
+
+      setScreenshots((prev) => [...prev, ...loadedShots]);
+      setIsScreenshotSplitOpen(true);
+      toast.success(`Loaded ${validFiles.length} screenshot(s)`);
+    } catch (err) {
+      toast.error(err.message || 'Error loading screenshots');
+    } finally {
+      if (screenshotInputRef.current) screenshotInputRef.current.value = '';
+    }
   };
 
-  const handleExtractFromScreenshot = async (group, engine = 'local') => {
+  const handleExtractFromScreenshot = async (group, engine = 'local', scope = 'all') => {
     if (!group?.film?.id) return;
     if (!screenshots.length) {
       toast.error('Please upload at least one screenshot first.');
       return;
     }
-    const shot = screenshots[activeScreenshotIndex] || screenshots[0];
-    if (!shot) return;
+
+    const targetShots = scope === 'all'
+      ? screenshots
+      : [screenshots[activeScreenshotIndex] || screenshots[0]];
+
+    if (!targetShots.length) return;
 
     setIsExtractingScreenshot(true);
     try {
-      let extracted = [];
-      let localReadings = [];
+      const allExtracted = [];
+      const allLocalReadings = [];
       let localError = false;
-      if (engine === 'local') {
-        toast('Running free local Tesseract OCR on screenshot...');
-        extracted = await extractCreditsWithLocalOCR(shot.base64, ocrTarget);
-      } else {
-        toast('Comparing local OCR and AI Vision with the queued credits...');
-        try { localReadings = await extractCreditsWithLocalOCR(shot.base64, ocrTarget); }
-        catch (error) { localError = true; console.warn('Local screenshot OCR failed:', error); }
-        const response = await fetch('/api/ai', {
-          method: 'POST',
-          headers: await authHeaders(),
-          body: JSON.stringify({
-            task: 'extract_credits_from_image',
-            data: { image: shot.base64, creditType: ocrTarget },
-          }),
-        });
-        if (!response.ok) {
-          const errJson = await response.json().catch(() => ({}));
-          throw new Error(errJson.error || 'Server returned an error');
+
+      for (let i = 0; i < targetShots.length; i++) {
+        const shot = targetShots[i];
+        if (targetShots.length > 1) {
+          toast(`Processing image ${i + 1} of ${targetShots.length}... (${shot.name})`);
         }
-        const resData = await response.json();
-        extracted = resData.results || [];
+
+        let extracted = [];
+        let localReadings = [];
+
+        if (engine === 'local') {
+          if (targetShots.length === 1) toast('Running free local Tesseract OCR on screenshot...');
+          extracted = await extractCreditsWithLocalOCR(shot.base64, ocrTarget);
+        } else {
+          if (targetShots.length === 1) toast('Comparing local OCR and AI Vision with the queued credits...');
+          try {
+            localReadings = await extractCreditsWithLocalOCR(shot.base64, ocrTarget);
+          } catch (error) {
+            localError = true;
+            console.warn('Local screenshot OCR failed:', error);
+          }
+
+          const response = await fetch('/api/ai', {
+            method: 'POST',
+            headers: await authHeaders(),
+            body: JSON.stringify({
+              task: 'extract_credits_from_image',
+              data: { image: shot.base64, creditType: ocrTarget },
+            }),
+          });
+
+          if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(errJson.error || 'Server returned an error');
+          }
+
+          const resData = await response.json();
+          extracted = resData.results || [];
+        }
+
+        if (Array.isArray(extracted)) {
+          allExtracted.push(...extracted);
+        }
+        if (Array.isArray(localReadings)) {
+          allLocalReadings.push(...localReadings);
+        }
       }
 
-      if (!extracted || !extracted.length) {
-        toast.error('No credits found in this screenshot. Try a clearer image or different crop.');
+      if (!allExtracted.length) {
+        toast.error('No credits found in the uploaded screenshot(s). Try clearer images or different crops.');
         return;
       }
 
       const existing = await fetchFilmCandidateRows(group.film.id);
-      const rawComparisons = compareScreenshotCredits(existing, extracted, ocrTarget, localReadings);
-      
+      const rawComparisons = compareScreenshotCredits(existing, allExtracted, ocrTarget, allLocalReadings);
+
       // Pre-resolve database people profiles for each candidate
       const comparisons = await Promise.all(rawComparisons.map(async (comp) => {
         let person = comp.targetCandidate?.people || null;
@@ -1305,11 +1341,16 @@ export default function AdminCreditHarvest() {
       }));
 
       setScreenshotPreview({
-        id: `${shot.id}-${Date.now()}`, filmId: group.film.id, shotId: shot.id,
-        filename: shot.name, engine, localError,
+        id: `batch-${Date.now()}`,
+        filmId: group.film.id,
+        shotId: targetShots.length === 1 ? targetShots[0].id : 'all',
+        filename: targetShots.length === 1 ? targetShots[0].name : `${targetShots.length} Images (Batch)`,
+        engine,
+        localError,
         comparisons,
       });
-      toast.success('Comparison ready. Review readings before applying changes.');
+
+      toast.success(`Comparison ready for ${targetShots.length} screenshot(s) (${comparisons.length} credits detected).`);
     } catch (err) {
       console.error('Screenshot extraction failed:', err);
       toast.error(`Extraction failed: ${err.message}`);
@@ -2538,32 +2579,39 @@ export default function AdminCreditHarvest() {
 
                   {/* Right Column: Screenshot Comparison & OCR Studio */}
                   {(isScreenshotSplitOpen || screenshots.length > 0) && (
-                    <div className="p-4 bg-surface/80 flex flex-col gap-4 sticky top-4 h-fit max-h-[85vh] overflow-y-auto">
+                    <div className="p-4 bg-surface/90 border-l border-border flex flex-col gap-3.5 sticky top-4 h-fit max-h-[88vh] overflow-y-auto rounded-xl">
+                      {/* Studio Top Header */}
                       <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
                         <div className="flex items-center gap-2">
                           <Icon icon="solar:gallery-wide-bold" className="w-5 h-5 text-brand" />
-                          <h3 className="text-xs font-black text-text-primary">Screenshot Comparison Studio</h3>
+                          <div>
+                            <h3 className="text-xs font-black text-text-primary">Screenshot Comparison Studio</h3>
+                            {screenshots.length > 0 && (
+                              <p className="text-[10px] text-text-muted">{screenshots.length} frame{screenshots.length === 1 ? '' : 's'} loaded</p>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => screenshotInputRef.current?.click()}
-                            className="text-[10px] font-bold px-2 py-1 rounded bg-surface border border-border hover:bg-surface-2 text-text-primary flex items-center gap-1"
+                            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-2 text-text-primary flex items-center gap-1 transition-colors"
                           >
-                            <Icon icon="solar:add-circle-linear" className="w-3.5 h-3.5" />
-                            Add image
+                            <Icon icon="solar:add-circle-linear" className="w-3.5 h-3.5 text-brand" />
+                            Add image(s)
                           </button>
                           {screenshots.length > 0 && (
                             <button
                               type="button"
                               onClick={() => {
                                 setScreenshots([]);
+                                setScreenshotPreview(null);
                                 setActiveScreenshotIndex(0);
                               }}
-                              className="text-[10px] font-bold px-2 py-1 rounded text-red-400 hover:bg-red-500/10 flex items-center gap-1"
+                              className="text-[10px] font-bold px-2 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 flex items-center gap-1 transition-colors"
                             >
                               <Icon icon="solar:trash-bin-minimalistic-linear" className="w-3.5 h-3.5" />
-                              Clear all
+                              Clear
                             </button>
                           )}
                         </div>
@@ -2575,7 +2623,7 @@ export default function AdminCreditHarvest() {
                           className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-brand/40 hover:bg-surface-2/40 transition-colors"
                         >
                           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-surface-2 flex items-center justify-center text-text-muted">
-                            <Icon icon="solar:upload-track-2-linear" className="w-6 h-6" />
+                            <Icon icon="solar:upload-track-2-linear" className="w-6 h-6 text-brand" />
                           </div>
                           <p className="text-xs font-bold text-text-primary">Upload credit screenshots to compare</p>
                           <p className="text-[10px] text-text-muted mt-1">
@@ -2584,160 +2632,186 @@ export default function AdminCreditHarvest() {
                         </div>
                       ) : (
                         <>
-                          {/* Carousel Thumbnails Slider */}
-                          {screenshots.length > 1 && (
-                            <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-border/60">
-                              {screenshots.map((shot, idx) => (
-                                <div
-                                  key={shot.id}
-                                  className={`relative group shrink-0 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
-                                    activeScreenshotIndex === idx
-                                      ? 'border-brand shadow-lg scale-105'
-                                      : 'border-border/80 opacity-70 hover:opacity-100'
+                          {/* Top Extraction Action Controls */}
+                          <div className="bg-surface-2/70 border border-border/80 p-3 rounded-xl space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                                Extract As
+                              </span>
+                              <div className="flex items-center bg-surface border border-border rounded-lg p-0.5 text-[10px] font-bold">
+                                <button
+                                  type="button"
+                                  onClick={() => setOcrTarget('actor')}
+                                  className={`px-3 py-1 rounded-md transition-colors ${
+                                    ocrTarget === 'actor'
+                                      ? 'bg-brand text-white'
+                                      : 'text-text-muted hover:text-text-primary'
                                   }`}
-                                  onClick={() => setActiveScreenshotIndex(idx)}
                                 >
-                                  <img
-                                    src={shot.base64}
-                                    alt={shot.name}
-                                    className="w-16 h-12 object-cover"
-                                  />
-                                  <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] font-bold text-white text-center truncate px-1">
-                                    {idx + 1}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const next = screenshots.filter((_, i) => i !== idx);
-                                      setScreenshots(next);
-                                      setActiveScreenshotIndex((curr) => Math.min(curr, Math.max(0, next.length - 1)));
-                                    }}
-                                    className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  🎭 Cast (Actors)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setOcrTarget('crew')}
+                                  className={`px-3 py-1 rounded-md transition-colors ${
+                                    ocrTarget === 'crew'
+                                      ? 'bg-brand text-white'
+                                      : 'text-text-muted hover:text-text-primary'
+                                  }`}
+                                >
+                                  🎬 Crew Members
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Batch & Single Extraction Buttons */}
+                            <div className="space-y-1.5 pt-1">
+                              <button
+                                type="button"
+                                disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
+                                onClick={() => handleExtractFromScreenshot(group, 'ai', 'all')}
+                                className="w-full px-3 py-2.5 rounded-lg bg-brand text-white text-xs font-black hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-brand/20 transition-all"
+                              >
+                                {isExtractingScreenshot ? (
+                                  <Icon icon="solar:refresh-linear" className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Icon icon="solar:magic-stick-3-bold" className="w-4 h-4" />
+                                )}
+                                Extract & Compare All ({screenshots.length}) Images (AI Vision)
+                              </button>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
+                                  onClick={() => handleExtractFromScreenshot(group, 'local', 'all')}
+                                  className="px-2.5 py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-2 text-text-primary text-[10px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                >
+                                  <Icon icon="solar:text-square-linear" className="w-3.5 h-3.5 text-brand" />
+                                  Local OCR (All)
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
+                                  onClick={() => handleExtractFromScreenshot(group, 'ai', 'single')}
+                                  className="px-2.5 py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-2 text-text-primary text-[10px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                >
+                                  <Icon icon="solar:eye-bold" className="w-3.5 h-3.5 text-amber-400" />
+                                  Extract Active Frame Only
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Multi-Image Thumbnails Gallery */}
+                          {screenshots.length > 1 && (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-[10px] font-bold text-text-muted">
+                                <span>Screenshots ({screenshots.length})</span>
+                                <span>Click thumbnail to preview frame</span>
+                              </div>
+                              <div className="flex items-center gap-2 overflow-x-auto pb-2 min-h-[64px] scrollbar-thin">
+                                {screenshots.map((shot, idx) => (
+                                  <div
+                                    key={shot.id}
+                                    className={`relative group shrink-0 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
+                                      activeScreenshotIndex === idx
+                                        ? 'border-brand shadow-lg scale-105 ring-2 ring-brand/30'
+                                        : 'border-border opacity-70 hover:opacity-100 hover:border-text-muted'
+                                    }`}
+                                    onClick={() => setActiveScreenshotIndex(idx)}
                                   >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
+                                    <img
+                                      src={shot.base64}
+                                      alt={shot.name}
+                                      className="w-20 h-14 object-cover"
+                                    />
+                                    <span className="absolute bottom-0 inset-x-0 bg-black/80 text-[9px] font-black text-white text-center truncate px-1">
+                                      Frame {idx + 1}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const next = screenshots.filter((_, i) => i !== idx);
+                                        setScreenshots(next);
+                                        setActiveScreenshotIndex((curr) => Math.min(curr, Math.max(0, next.length - 1)));
+                                      }}
+                                      className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-black shadow"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
 
-                          {/* Active Screenshot Display & Zoom */}
+                          {/* Active Screenshot Display & Collapsible Zoom Panel */}
                           {screenshots[activeScreenshotIndex] && (
-                            <div className="space-y-3">
+                            <div className="space-y-2 border border-border/80 rounded-xl p-2.5 bg-surface-2/40">
                               <div className="flex items-center justify-between text-[10px] text-text-muted">
-                                <span className="font-bold truncate max-w-[200px]">
-                                  {screenshots[activeScreenshotIndex].name} ({activeScreenshotIndex + 1}/{screenshots.length})
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
-                                    className="w-6 h-6 rounded bg-surface-2 border border-border flex items-center justify-center font-bold"
-                                    title="Zoom out"
-                                  >
-                                    -
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setZoomLevel(1)}
-                                    className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] font-bold"
-                                    title="Reset zoom"
-                                  >
-                                    {Math.round(zoomLevel * 100)}%
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
-                                    className="w-6 h-6 rounded bg-surface-2 border border-border flex items-center justify-center font-bold"
-                                    title="Zoom in"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="relative bg-black/60 rounded-xl overflow-auto max-h-[380px] border border-border flex items-center justify-center p-2">
-                                <img
-                                  src={screenshots[activeScreenshotIndex].base64}
-                                  alt="Active screenshot"
-                                  style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-                                  className="max-w-full rounded transition-transform duration-150"
-                                />
-                              </div>
-
-                              {screenshotPreview?.filmId === group.film.id && screenshotPreview.shotId === screenshots[activeScreenshotIndex]?.id && (
-                                <CreditScreenshotComparison 
-                                  preview={screenshotPreview} 
-                                  disabled={busy || isExtractingScreenshot || statusFilter !== 'pending'} 
-                                  onApply={(reading, targetId, duplicateIds) => applyScreenshotReading(group, reading, targetId, duplicateIds)} 
-                                  onApplyAll={(comparisons) => applyAllScreenshotReadings(group, comparisons)}
-                                />
-                              )}
-
-                              {/* OCR Extraction from screenshot controls */}
-                              <div className="bg-surface-2/60 border border-border/70 p-3 rounded-xl space-y-2.5">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                                    Extract As
-                                  </span>
-                                  <div className="flex items-center bg-surface border border-border rounded-lg p-0.5 text-[10px] font-bold">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsImagePreviewCollapsed((prev) => !prev)}
+                                  className="font-bold flex items-center gap-1 hover:text-text-primary transition-colors text-text-secondary"
+                                >
+                                  <Icon icon={isImagePreviewCollapsed ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} className="w-3.5 h-3.5 text-brand" />
+                                  <span>{isImagePreviewCollapsed ? 'Show image preview' : 'Hide image preview'}</span>
+                                  <span className="text-text-muted font-normal">({screenshots[activeScreenshotIndex].name})</span>
+                                </button>
+                                {!isImagePreviewCollapsed && (
+                                  <div className="flex items-center gap-1">
                                     <button
                                       type="button"
-                                      onClick={() => setOcrTarget('actor')}
-                                      className={`px-3 py-1 rounded-md transition-colors ${
-                                        ocrTarget === 'actor'
-                                          ? 'bg-brand text-white'
-                                          : 'text-text-muted hover:text-text-primary'
-                                      }`}
+                                      onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
+                                      className="w-5 h-5 rounded bg-surface border border-border flex items-center justify-center font-bold text-[10px]"
+                                      title="Zoom out"
                                     >
-                                      🎭 Cast (Actors)
+                                      -
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => setOcrTarget('crew')}
-                                      className={`px-3 py-1 rounded-md transition-colors ${
-                                        ocrTarget === 'crew'
-                                          ? 'bg-brand text-white'
-                                          : 'text-text-muted hover:text-text-primary'
-                                      }`}
+                                      onClick={() => setZoomLevel(1)}
+                                      className="px-1.5 py-0.5 rounded bg-surface border border-border text-[9px] font-bold"
+                                      title="Reset zoom"
                                     >
-                                      🎬 Crew Members
+                                      {Math.round(zoomLevel * 100)}%
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
+                                      className="w-5 h-5 rounded bg-surface border border-border flex items-center justify-center font-bold text-[10px]"
+                                      title="Zoom in"
+                                    >
+                                      +
                                     </button>
                                   </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2 pt-1">
-                                  <button
-                                    type="button"
-                                    disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
-                                    onClick={() => handleExtractFromScreenshot(group, 'local')}
-                                    className="px-3 py-2 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-surface-2 text-text-primary text-[11px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                  >
-                                    {isExtractingScreenshot ? (
-                                      <Icon icon="solar:refresh-linear" className="w-4 h-4 animate-spin text-brand" />
-                                    ) : (
-                                      <Icon icon="solar:text-square-linear" className="w-4 h-4 text-brand" />
-                                    )}
-                                    Compare Local OCR
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
-                                    onClick={() => handleExtractFromScreenshot(group, 'ai')}
-                                    className="px-3 py-2 rounded-lg bg-brand/15 border border-brand/40 text-brand hover:bg-brand/25 text-[11px] font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
-                                  >
-                                    {isExtractingScreenshot ? (
-                                      <Icon icon="solar:refresh-linear" className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                      <Icon icon="solar:magic-stick-3-bold" className="w-4 h-4" />
-                                    )}
-                                    Compare AI + Local
-                                  </button>
-                                </div>
+                                )}
                               </div>
+
+                              {!isImagePreviewCollapsed && (
+                                <div className="relative bg-black/80 rounded-lg overflow-auto max-h-[260px] border border-border flex items-center justify-center p-2">
+                                  <img
+                                    src={screenshots[activeScreenshotIndex].base64}
+                                    alt="Active screenshot"
+                                    style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
+                                    className="max-w-full rounded transition-transform duration-150"
+                                  />
+                                </div>
+                              )}
                             </div>
+                          )}
+
+                          {/* Comparison Results Section (Always rendered when available) */}
+                          {screenshotPreview?.filmId === group.film.id && (
+                            <CreditScreenshotComparison 
+                              preview={screenshotPreview} 
+                              disabled={busy || isExtractingScreenshot || statusFilter !== 'pending'} 
+                              onApply={(reading, targetId, duplicateIds) => applyScreenshotReading(group, reading, targetId, duplicateIds)} 
+                              onApplyAll={(comparisons) => applyAllScreenshotReadings(group, comparisons)}
+                            />
                           )}
                         </>
                       )}
