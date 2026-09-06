@@ -553,7 +553,7 @@ export default function AdminSocialStudio() {
   useEffect(() => {
     if (activeTab !== 'calendar' && activeTab !== 'video_plan') return undefined;
     let cancelled = false;
-    supabase.from('films').select('id,title,release_date,synopsis,genre,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(250).then(({ data }) => {
+    supabase.from('films').select('id,title,release_date,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(250).then(({ data }) => {
       if (!cancelled) setVideoFilmOptions(data || []);
     });
     return () => { cancelled = true; };
@@ -574,7 +574,7 @@ export default function AdminSocialStudio() {
     setVideoAutopilot({ running: true, message: 'Selecting the newest eligible film…', jobs: [] });
     try {
       const { data: films, error } = await supabase.from('films')
-        .select('id,title,synopsis,genre,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
+        .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
         .order('release_date', { ascending: false, nullsLast: true }).order('created_at', { ascending: false }).limit(50);
       if (error) throw error;
@@ -599,7 +599,7 @@ export default function AdminSocialStudio() {
       if (!film) throw new Error('No recently added film with a usable video source was found.');
       const sourceUrl = film.sourceUrl;
       setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest viral scene from ${film.title}…` }));
-      let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: film.genre || '' };
+      let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || '') };
       try {
         const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }) });
         if (metadataResponse.ok) sourceMetadata = { ...sourceMetadata, ...(await metadataResponse.json()) };
@@ -692,7 +692,7 @@ export default function AdminSocialStudio() {
     try {
       const { data, error } = await supabase
         .from('films')
-        .select('id,title,release_date,synopsis,genre,trailer_youtube_id,trailer_external_url,youtube_watch_url')
+        .select('id,title,release_date,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url')
         .eq('id', row.filmId)
         .single();
       if (!error && data) return data;
@@ -708,7 +708,7 @@ export default function AdminSocialStudio() {
     updateVideoRow(row.id, { caption: 'Analyzing video & selecting best viral scene…' });
     try {
       const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
-      let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: film.genre || '' };
+      let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || '') };
       if (sourceUrl) {
         try {
           const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {
