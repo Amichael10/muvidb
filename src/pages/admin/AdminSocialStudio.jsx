@@ -59,6 +59,54 @@ const AVAILABLE_ASPECT_RATIOS = [
   { id: '16:9', label: '16:9', subtitle: 'Landscape' },
 ];
 
+function parseTimestampToSeconds(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return isNaN(value) ? 0 : Math.max(0, Math.floor(value));
+  
+  const str = String(value).trim();
+  if (!str) return 0;
+
+  if (/^\d+(\.\d+)?$/.test(str)) {
+    return Math.max(0, Math.floor(Number(str)));
+  }
+
+  const parts = str.split(':').map(p => Number(p.trim()));
+  if (parts.some(p => isNaN(p))) return 0;
+
+  if (parts.length === 3) {
+    const [hours, minutes, seconds] = parts;
+    return Math.max(0, Math.floor(hours * 3600 + minutes * 60 + seconds));
+  }
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    return Math.max(0, Math.floor(minutes * 60 + seconds));
+  }
+  if (parts.length === 1) {
+    return Math.max(0, Math.floor(parts[0]));
+  }
+  return 0;
+}
+
+function formatSecondsToTimestamp(totalSeconds) {
+  if (typeof totalSeconds === 'string' && totalSeconds.includes(':')) {
+    return totalSeconds;
+  }
+  const sec = typeof totalSeconds === 'number' ? totalSeconds : parseTimestampToSeconds(totalSeconds);
+  if (isNaN(sec) || sec <= 0) return '00:00';
+
+  const s = Math.floor(sec);
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+
+  const pad = n => (n < 10 ? `0${n}` : `${n}`);
+
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds)}`;
+}
+
 function getDimensionsForAspectRatio(aspectRatio) {
   switch (aspectRatio) {
     case '9:16':
@@ -306,8 +354,8 @@ export default function AdminSocialStudio() {
   const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
   const [videoPlan, setVideoPlan] = useState({ days: 7, startDate: new Date().toISOString().slice(0, 10), videoStart: '18:00', videoEnd: '20:00', clipLength: 30 });
   const [videoRows, setVideoRows] = useState([
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16'], filmId: '', mode: 'gemini', start: 0, end: 30, caption: '' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '' },
   ]);
   const [videoFilmOptions, setVideoFilmOptions] = useState([]);
   const [videoFilmSearch, setVideoFilmSearch] = useState({});
@@ -607,8 +655,8 @@ export default function AdminSocialStudio() {
       const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { ...sourceMetadata, duration: Math.max(1, Number(sourceMetadata.duration) || 3600), targetLength: videoPlan.clipLength || 45 } }) });
       const recommendation = await recommendationResponse.json().catch(() => ({}));
       if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
-      const safeStart = Math.max(0, Number(recommendation.startTime) || 0);
-      const safeEnd = Math.min(Math.max(safeStart + 1, Number(recommendation.endTime) || safeStart + (videoPlan.clipLength || 45)), Number(sourceMetadata.duration) || safeStart + (videoPlan.clipLength || 45));
+      const safeStart = Math.max(0, parseTimestampToSeconds(recommendation.startTime ?? recommendation.startTimeFormatted));
+      const safeEnd = Math.min(Math.max(safeStart + 1, parseTimestampToSeconds(recommendation.endTime ?? recommendation.endTimeFormatted) || safeStart + (videoPlan.clipLength || 45)), Number(sourceMetadata.duration) || safeStart + (videoPlan.clipLength || 45));
       const clips = ['9:16', '1:1'].map(aspect_ratio => ({ url: sourceUrl, start_time: safeStart, end_time: safeEnd, aspect_ratio, fit_mode: 'cover', title: film.title }));
       const batchResponse = await fetch('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips }) });
       const batch = await batchResponse.json().catch(() => ({}));
@@ -654,8 +702,8 @@ export default function AdminSocialStudio() {
     aspectRatios: ['9:16', '1:1'],
     filmId: videoFilmOptions[0]?.id || '',
     mode: 'gemini',
-    start: 0,
-    end: videoPlan.clipLength || 45,
+    start: '01:30',
+    end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 45)),
     caption: '',
   }]);
   const buildVideoPlanRows = () => {
@@ -676,8 +724,8 @@ export default function AdminSocialStudio() {
         aspectRatios: slot.aspectRatios,
         filmId: films[(day * 2 + slotIndex) % films.length].id,
         mode: 'gemini',
-        start: 0,
-        end: videoPlan.clipLength || 45,
+        start: '01:30',
+        end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 45)),
         caption: '',
       }));
     }
@@ -738,18 +786,16 @@ export default function AdminSocialStudio() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Gemini caption generation failed');
-      const startSec = Number(data.startTime) || 0;
-      const endSec = Number(data.endTime) || startSec + (videoPlan.clipLength || 45);
+      const startSec = parseTimestampToSeconds(data.startTime ?? data.startTimeFormatted);
+      const endSec = parseTimestampToSeconds(data.endTime ?? data.endTimeFormatted) || (startSec + (videoPlan.clipLength || 45));
+      const formattedStart = data.startTimeFormatted || formatSecondsToTimestamp(startSec);
+      const formattedEnd = data.endTimeFormatted || formatSecondsToTimestamp(endSec);
       updateVideoRow(row.id, {
         caption: data.caption || '',
-        start: startSec,
-        end: endSec,
+        start: formattedStart,
+        end: formattedEnd,
       });
-      const startMin = Math.floor(startSec / 60);
-      const startRem = startSec % 60;
-      const endMin = Math.floor(endSec / 60);
-      const endRem = endSec % 60;
-      toast.success(`Gemini scene selected: ${startMin}:${startRem < 10 ? '0' : ''}${startRem} – ${endMin}:${endRem < 10 ? '0' : ''}${endRem}`);
+      toast.success(`Gemini scene selected: ${formattedStart} – ${formattedEnd}`);
     } catch (err) {
       updateVideoRow(row.id, { caption: '' });
       toast.error(err.message);
@@ -766,8 +812,11 @@ export default function AdminSocialStudio() {
         const film = await resolveFilmForRow(row);
         if (!film) continue;
         const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
-        let start = Number(row.start) || 0;
-        let end = Math.max(start + 1, Number(row.end) || start + (videoPlan.clipLength || 45));
+        let start = parseTimestampToSeconds(row.start);
+        let end = parseTimestampToSeconds(row.end);
+        if (end <= start) {
+          end = start + (videoPlan.clipLength || 45);
+        }
         let caption = row.caption || '';
         if (row.mode === 'gemini' || !caption) {
           let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: film.genre || '' };
@@ -797,8 +846,10 @@ export default function AdminSocialStudio() {
           });
           const recommendation = await recommendationResponse.json().catch(() => ({}));
           if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
-          start = Number(recommendation.startTime) || start;
-          end = Number(recommendation.endTime) || end;
+          if (row.mode === 'gemini') {
+            start = parseTimestampToSeconds(recommendation.startTime ?? recommendation.startTimeFormatted) || start;
+            end = parseTimestampToSeconds(recommendation.endTime ?? recommendation.endTimeFormatted) || end;
+          }
           caption = caption || recommendation.caption || '';
         }
 
@@ -2366,7 +2417,7 @@ export default function AdminSocialStudio() {
                           className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
                         >
                           <option value="gemini">Gemini Auto (Finds Best Scene)</option>
-                          <option value="manual">Manual Seconds</option>
+                          <option value="manual">Manual Exact Timing (MM:SS)</option>
                         </select>
                       </label>
                     </div>
@@ -2410,30 +2461,44 @@ export default function AdminSocialStudio() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-end gap-2">
+                  <div className="flex flex-wrap items-end gap-2.5">
                     <label className="text-[10px] font-black uppercase text-text-muted">
-                      Start (sec)
+                      Start Time (MM:SS)
                       <input
-                        type="number"
-                        min="0"
+                        type="text"
+                        placeholder="e.g. 22:22"
                         value={row.start}
-                        onChange={e => updateVideoRow(row.id, { start: Number(e.target.value) })}
+                        onChange={e => updateVideoRow(row.id, { start: e.target.value })}
                         disabled={row.mode === 'gemini'}
-                        className="mt-1 h-9 w-24 rounded-lg border border-white/10 bg-surface px-2 text-xs text-white disabled:opacity-50"
+                        className="mt-1 h-9 w-28 rounded-lg border border-white/10 bg-surface px-2.5 text-xs text-white placeholder:text-white/30 disabled:opacity-50 focus:border-brand"
                       />
                     </label>
 
                     <label className="text-[10px] font-black uppercase text-text-muted">
-                      End (sec)
+                      End Time (MM:SS)
                       <input
-                        type="number"
-                        min="1"
+                        type="text"
+                        placeholder="e.g. 24:30"
                         value={row.end}
-                        onChange={e => updateVideoRow(row.id, { end: Number(e.target.value) })}
+                        onChange={e => updateVideoRow(row.id, { end: e.target.value })}
                         disabled={row.mode === 'gemini'}
-                        className="mt-1 h-9 w-24 rounded-lg border border-white/10 bg-surface px-2 text-xs text-white disabled:opacity-50"
+                        className="mt-1 h-9 w-28 rounded-lg border border-white/10 bg-surface px-2.5 text-xs text-white placeholder:text-white/30 disabled:opacity-50 focus:border-brand"
                       />
                     </label>
+
+                    {(() => {
+                      const s = parseTimestampToSeconds(row.start);
+                      const e = parseTimestampToSeconds(row.end);
+                      const duration = Math.max(0, e - s);
+                      if (duration > 0) {
+                        return (
+                          <div className="flex h-9 items-center rounded-lg border border-brand/30 bg-brand/10 px-2.5 text-[11px] font-semibold text-brand-light">
+                            ⏱️ {duration}s ({Math.floor(duration / 60) > 0 ? `${Math.floor(duration / 60)}m ` : ''}${duration % 60}s)
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
 
                     <button
                       type="button"

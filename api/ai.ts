@@ -59,6 +59,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+function parseTimestampToSeconds(value: any): number {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return isNaN(value) ? 0 : Math.max(0, Math.floor(value));
+  const str = String(value).trim();
+  if (!str) return 0;
+  if (/^\d+(\.\d+)?$/.test(str)) return Math.max(0, Math.floor(Number(str)));
+  const parts = str.split(':').map(p => Number(p.trim()));
+  if (parts.some(p => isNaN(p))) return 0;
+  if (parts.length === 3) return Math.max(0, Math.floor(parts[0] * 3600 + parts[1] * 60 + parts[2]));
+  if (parts.length === 2) return Math.max(0, Math.floor(parts[0] * 60 + parts[1]));
+  if (parts.length === 1) return Math.max(0, Math.floor(parts[0]));
+  return 0;
+}
+
+function formatSecondsToTimestamp(sec: number): string {
+  if (isNaN(sec) || sec <= 0) return '00:00';
+  const s = Math.floor(sec);
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  if (hours > 0) return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  return `${pad(minutes)}:${pad(seconds)}`;
+}
+
 async function recommendClipSegment(data: any, res: VercelResponse) {
   const title = String(data?.title || 'this Nollywood film').slice(0, 200);
   const rawDuration = Number(data?.duration);
@@ -90,21 +115,22 @@ Movie Context:
 - Title: ${title}
 - Genre: ${genre || 'Drama/Comedy'}
 - Synopsis: ${synopsis || 'Exciting Nollywood release'}
-- Video Duration: ${duration}s (${Math.floor(duration / 60)} minutes)
+- Video Duration: ${duration}s (${formatSecondsToTimestamp(duration)})
+- Allowed Window: Between ${minStart}s (${formatSecondsToTimestamp(minStart)}) and ${maxEnd}s (${formatSecondsToTimestamp(maxEnd)})
 - YouTube Description / Context: ${description || '(none provided)'}
 - Subtitles / Transcript Snippets: ${transcript || '(auto-segment analysis)'}
 
 CRITICAL RULES FOR SCENE SELECTION:
 1. Target an intensely emotional, hilarious, dramatic, or suspenseful scene that hooks viewers within the first 3 seconds.
-2. ABSOLUTELY DO NOT select the beginning of the video (0s to ${minStart}s). Opening segments contain channel intros, sponsor advertisements, logos, or commercial banners.
-3. ABSOLUTELY DO NOT select the end of the video (${maxEnd}s to ${duration}s). End segments contain closing credits, cast/crew rolls, and YouTube outro subscribe screens.
-4. The startTime MUST be between ${minStart} and ${Math.max(minStart, maxEnd - targetLength)}.
+2. ABSOLUTELY DO NOT select the beginning of the video (00:00 to ${formatSecondsToTimestamp(minStart)}). Opening segments contain channel intros, sponsor advertisements, logos, or commercial banners.
+3. ABSOLUTELY DO NOT select the end of the video (${formatSecondsToTimestamp(maxEnd)} to ${formatSecondsToTimestamp(duration)}). End segments contain closing credits, cast/crew rolls, and YouTube outro subscribe screens.
+4. The startTime MUST be between ${minStart} and ${Math.max(minStart, maxEnd - targetLength)} (e.g. "22:22" or in seconds).
 5. The endTime should be startTime + approximately ${targetLength} seconds (max endTime <= ${maxEnd}).
 
 Return ONLY valid JSON with this exact shape:
 {
-  "startTime": number,
-  "endTime": number,
+  "startTime": "22:22" (or total seconds as number),
+  "endTime": "23:07" (or total seconds as number),
   "reason": "Why this specific scene is viral/emotional/funny",
   "caption": "Short punchy hook caption with 2-3 emojis and #Nollywood #MuviDB hashtags (under 35 words)"
 }`;
@@ -112,22 +138,26 @@ Return ONLY valid JSON with this exact shape:
   const { text, telemetry } = await generateAIContent(prompt, { preferredProvider: 'gemini' });
   const parsed = parseJSON(text);
 
-  let startTime = Number(parsed?.startTime);
-  if (isNaN(startTime) || startTime < minStart || startTime >= maxEnd) {
+  let startTime = parseTimestampToSeconds(parsed?.startTime);
+  if (!startTime || isNaN(startTime) || startTime < minStart || startTime >= maxEnd) {
     // Fallback to golden section (around 25%-40% into the film)
-    startTime = Math.floor(minStart + (maxEnd - minStart) * 0.3);
+    startTime = Math.floor(minStart + (maxEnd - minStart) * 0.35);
   }
-  let endTime = Number(parsed?.endTime);
-  if (isNaN(endTime) || endTime <= startTime || endTime > maxEnd) {
+  let endTime = parseTimestampToSeconds(parsed?.endTime);
+  if (!endTime || isNaN(endTime) || endTime <= startTime || endTime > maxEnd) {
     endTime = Math.min(maxEnd, startTime + targetLength);
   }
 
+  const startTimeFormatted = formatSecondsToTimestamp(startTime);
+  const endTimeFormatted = formatSecondsToTimestamp(endTime);
   const caption = String(parsed?.caption || `Wait for the reaction! 🍿 Watch ${title} now on MuviDB #Nollywood #AfricanCinema`).trim();
   const reason = String(parsed?.reason || 'High-stakes dramatic dialogue scene').trim();
 
   return res.status(200).json({
     startTime,
     endTime,
+    startTimeFormatted,
+    endTimeFormatted,
     caption,
     reason,
     engine: telemetry?.engine || 'gemini',
