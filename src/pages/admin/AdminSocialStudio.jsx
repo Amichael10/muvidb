@@ -121,6 +121,71 @@ function getDimensionsForAspectRatio(aspectRatio) {
   }
 }
 
+function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Set(), usedFilmTitles = new Set()) {
+  const currentYear = new Date().getFullYear(); // e.g. 2026
+  const now = Date.now();
+  const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+  const isVideoSource = value => {
+    if (!value) return false;
+    try {
+      const parsed = new URL(value);
+      return /youtube\.com|youtu\.be|\.mp4(?:$|\?)|\.webm(?:$|\?)|\.mov(?:$|\?)/i.test(parsed.hostname + parsed.pathname + parsed.search);
+    } catch { return false; }
+  };
+
+  const processed = (rawFilms || []).map(f => {
+    const sourceUrl = f.youtube_watch_url || (f.trailer_youtube_id ? `https://www.youtube.com/watch?v=${f.trailer_youtube_id}` : f.trailer_external_url);
+    const releaseTime = f.release_date ? new Date(f.release_date).getTime() : 0;
+    const createdTime = f.created_at ? new Date(f.created_at).getTime() : 0;
+    const year = f.year || (f.release_date ? new Date(f.release_date).getFullYear() : null);
+
+    const isUsed = usedFilmIds.has(f.id) || (f.title && usedFilmTitles.has(f.title.toLowerCase().trim()));
+    const isUltraFresh = (createdTime > 0 && now - createdTime <= FORTY_EIGHT_HOURS) || (releaseTime > 0 && Math.abs(now - releaseTime) <= FORTY_EIGHT_HOURS);
+    const isRecentWeek = (createdTime > 0 && now - createdTime <= SEVEN_DAYS) || (releaseTime > 0 && Math.abs(now - releaseTime) <= SEVEN_DAYS);
+    const isCurrentYear = year === currentYear || (releaseTime > 0 && new Date(releaseTime).getFullYear() === currentYear);
+
+    return {
+      ...f,
+      sourceUrl,
+      isUsed,
+      isUltraFresh,
+      isRecentWeek,
+      isCurrentYear,
+      releaseTime,
+      createdTime,
+      year,
+    };
+  }).filter(f => isVideoSource(f.sourceUrl));
+
+  // If there are 2026 / current-year films, strictly prioritize them and ignore older years unless not enough exist
+  const currentYearFilms = processed.filter(f => f.isCurrentYear);
+  const targetPool = currentYearFilms.length >= 5 ? currentYearFilms : processed;
+
+  return [...targetPool].sort((a, b) => {
+    // 1. Unused films take priority over previously used ones
+    if (!a.isUsed && b.isUsed) return -1;
+    if (a.isUsed && !b.isUsed) return 1;
+
+    // 2. Ultra fresh (today / yesterday / hours ago) take absolute top priority
+    if (a.isUltraFresh && !b.isUltraFresh) return -1;
+    if (!a.isUltraFresh && b.isUltraFresh) return 1;
+
+    // 3. Past 7-day uploads/releases
+    if (a.isRecentWeek && !b.isRecentWeek) return -1;
+    if (!a.isRecentWeek && b.isRecentWeek) return 1;
+
+    // 4. By release date (month and date descending)
+    if (a.releaseTime !== b.releaseTime) {
+      return b.releaseTime - a.releaseTime;
+    }
+
+    // 5. By DB upload timestamp (created_at descending)
+    return b.createdTime - a.createdTime;
+  });
+}
+
 function getRowAspectRatios(row) {
   if (Array.isArray(row?.aspectRatios) && row.aspectRatios.length > 0) {
     return row.aspectRatios;
@@ -609,8 +674,33 @@ export default function AdminSocialStudio() {
   useEffect(() => {
     if (activeTab !== 'calendar' && activeTab !== 'video_plan') return undefined;
     let cancelled = false;
-    supabase.from('films').select('id,title,release_date,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url').or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null').order('release_date', { ascending: false, nullsLast: true }).limit(250).then(({ data }) => {
-      if (!cancelled) setVideoFilmOptions(data || []);
+    Promise.all([
+      supabase.from('films')
+        .select('id,title,release_date,year,created_at,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url')
+        .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
+        .order('created_at', { ascending: false })
+        .limit(300),
+      supabase.from('social_content_items')
+        .select('id,title,source_entity_id,source_snapshot')
+        .limit(500)
+    ]).then(([{ data: filmsData }, { data: socialData }]) => {
+      if (cancelled) return;
+      const usedIds = new Set();
+      const usedTitles = new Set();
+      (socialData || []).forEach(item => {
+        if (item.source_entity_id) usedIds.add(item.source_entity_id);
+        if (item.source_snapshot?.film_id) usedIds.add(item.source_snapshot.film_id);
+        if (item.source_snapshot?.filmId) usedIds.add(item.source_snapshot.filmId);
+        if (item.source_snapshot?.title) usedTitles.add(String(item.source_snapshot.title).toLowerCase().trim());
+        if (item.title) {
+          const cleanTitle = item.title.split('—')[0].split('-')[0].trim().toLowerCase();
+          if (cleanTitle) usedTitles.add(cleanTitle);
+        }
+      });
+      const sorted = sortAndFilterFilmsForVideoAutopilot(filmsData || [], usedIds, usedTitles);
+      setVideoFilmOptions(sorted);
+    }).catch(err => {
+      console.warn('Failed to load video film options:', err);
     });
     return () => { cancelled = true; };
   }, [activeTab]);
@@ -629,29 +719,31 @@ export default function AdminSocialStudio() {
     if (videoAutopilot.running) return;
     setVideoAutopilot({ running: true, message: 'Selecting the newest eligible film…', jobs: [] });
     try {
-      const { data: films, error } = await supabase.from('films')
-        .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
-        .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
-        .order('release_date', { ascending: false, nullsLast: true }).order('created_at', { ascending: false }).limit(50);
-      if (error) throw error;
-      const isVideoSource = value => {
-        if (!value) return false;
-        try {
-          const parsed = new URL(value);
-          return /youtube\.com|youtu\.be|\.mp4(?:$|\?)|\.webm(?:$|\?)|\.mov(?:$|\?)/i.test(parsed.hostname + parsed.pathname + parsed.search);
-        } catch { return false; }
-      };
-      const releaseCutoff = new Date();
-      releaseCutoff.setMonth(releaseCutoff.getMonth() - 12);
-      const eligibleFilms = (films || []).map(candidate => ({ ...candidate, sourceUrl: candidate.youtube_watch_url || (candidate.trailer_youtube_id ? `https://www.youtube.com/watch?v=${candidate.trailer_youtube_id}` : candidate.trailer_external_url) }))
-        .filter(candidate => isVideoSource(candidate.sourceUrl))
-        .sort((a, b) => {
-          const aRelease = a.release_date ? new Date(a.release_date).getTime() : 0;
-          const bRelease = b.release_date ? new Date(b.release_date).getTime() : 0;
-          if (aRelease !== bRelease) return bRelease - aRelease;
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      let eligibleFilms = videoFilmOptions;
+      if (!eligibleFilms.length) {
+        const [{ data: films }, { data: socialData }] = await Promise.all([
+          supabase.from('films')
+            .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
+            .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
+            .order('created_at', { ascending: false }).limit(200),
+          supabase.from('social_content_items')
+            .select('id,title,source_entity_id,source_snapshot').limit(500)
+        ]);
+        const usedIds = new Set();
+        const usedTitles = new Set();
+        (socialData || []).forEach(item => {
+          if (item.source_entity_id) usedIds.add(item.source_entity_id);
+          if (item.source_snapshot?.film_id) usedIds.add(item.source_snapshot.film_id);
+          if (item.source_snapshot?.filmId) usedIds.add(item.source_snapshot.filmId);
+          if (item.source_snapshot?.title) usedTitles.add(String(item.source_snapshot.title).toLowerCase().trim());
+          if (item.title) {
+            const cleanTitle = item.title.split('—')[0].split('-')[0].trim().toLowerCase();
+            if (cleanTitle) usedTitles.add(cleanTitle);
+          }
         });
-      const film = eligibleFilms.find(candidate => !candidate.release_date || new Date(candidate.release_date) >= releaseCutoff) || eligibleFilms[0];
+        eligibleFilms = sortAndFilterFilmsForVideoAutopilot(films || [], usedIds, usedTitles);
+      }
+      const film = eligibleFilms[0];
       if (!film) throw new Error('No recently added film with a usable video source was found.');
       const sourceUrl = film.sourceUrl;
       setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest viral scene from ${film.title}…` }));
@@ -755,25 +847,30 @@ export default function AdminSocialStudio() {
     const films = videoFilmOptions;
     if (!films.length) return toast.error('No films with usable video sources are available yet.');
     const rows = [];
+    let filmIdx = 0;
     for (let day = 0; day < videoPlan.days; day += 1) {
       const date = new Date(baseDate); date.setDate(baseDate.getDate() + day);
       const dateString = date.toISOString().slice(0, 10);
       [
         { time: videoPlan.videoStart, aspectRatios: ['9:16', '1:1'] },
         { time: videoPlan.videoEnd, aspectRatios: ['9:16'] },
-      ].forEach((slot, slotIndex) => rows.push({
-        id: `${Date.now()}-${day}-${slotIndex}`,
-        date: dateString,
-        time: slot.time,
-        aspectRatios: slot.aspectRatios,
-        filmId: films[(day * 2 + slotIndex) % films.length].id,
-        mode: 'gemini',
-        start: '01:30',
-        end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 45)),
-        caption: '',
-      }));
+      ].forEach((slot, slotIndex) => {
+        const film = films[filmIdx % films.length];
+        filmIdx += 1;
+        rows.push({
+          id: `${Date.now()}-${day}-${slotIndex}`,
+          date: dateString,
+          time: slot.time,
+          aspectRatios: slot.aspectRatios,
+          filmId: film?.id || '',
+          mode: 'gemini',
+          start: '01:30',
+          end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 45)),
+          caption: '',
+        });
+      });
     }
-    setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days. Review them, then prepare or schedule.`);
+    setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days prioritizing newest 2026 uploads & unused releases.`);
   };
   const removeVideoRow = id => setVideoRows(rows => rows.length > 1 ? rows.filter(row => row.id !== id) : rows);
   const resolveFilmForRow = async row => {
