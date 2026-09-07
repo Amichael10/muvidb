@@ -1792,6 +1792,32 @@ export default function SocialDraftComposer({
     toast.success(`Added ${tag} to caption`);
   };
 
+  const toggleVariantStatus = async (variantToToggle) => {
+    if (!variantToToggle?.id) return;
+    const isCurrentlyCancelled = variantToToggle.status === 'cancelled';
+    const nextStatus = isCurrentlyCancelled ? 'draft' : 'cancelled';
+
+    setResult(curr => ({
+      ...curr,
+      variants: (curr?.variants || []).map(v => v.id === variantToToggle.id ? { ...v, status: nextStatus } : v),
+    }));
+
+    try {
+      await fetch('/api/social?task=update_variant_options', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variantId: variantToToggle.id,
+          status: nextStatus,
+          options: variantToToggle.platform_options || {},
+        }),
+      });
+      toast.success(`${variantToToggle.platform} ${isCurrentlyCancelled ? 're-included in post' : 'excluded from post'}`);
+    } catch (err) {
+      toast.error(`Failed to update ${variantToToggle.platform}: ${err.message}`);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Active 30-Day Plan Slot Banner */}
@@ -2411,31 +2437,37 @@ export default function SocialDraftComposer({
                     {result.variants?.map(variant => {
                       const platform = PLATFORMS.find(entry => entry.value === variant.platform) || PLATFORMS[0];
                       const isActive = variant.platform === activeVariant?.platform;
+                      const isCancelled = variant.status === 'cancelled';
                       const account = accountForPlatform[variant.platform];
                       const handle = account?.username ? `@${account.username}` : null;
                       return (
-                        <button
-                          key={variant.id}
-                          type="button"
-                          onClick={() => setActivePreviewPlatform(variant.platform)}
-                          className={`inline-flex min-w-fit items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-black transition-all ${
-                            isActive
-                              ? 'border-brand bg-brand/10 text-brand ring-2 ring-brand/40 shadow-sm'
-                              : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-text-primary'
-                          }`}
-                        >
-                          <span className={`flex h-5 w-5 items-center justify-center rounded-full text-white ${
-                            isActive ? 'bg-gradient-to-tr ' + platform.accent : 'bg-white/10 text-text-muted'
-                          }`}>
-                            <Icon icon={platform.icon} width="12" />
-                          </span>
-                          <span>{platform.label}</span>
-                          {handle && (
-                            <span className="font-mono text-[9px] font-normal opacity-70">
-                              {handle}
+                        <div key={variant.id} className="inline-flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => setActivePreviewPlatform(variant.platform)}
+                            className={`inline-flex min-w-fit items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-black transition-all ${
+                              isCancelled
+                                ? 'border-dashed border-rose-500/30 bg-rose-500/5 text-rose-300 opacity-60'
+                                : isActive
+                                  ? 'border-brand bg-brand/10 text-brand ring-2 ring-brand/40 shadow-sm'
+                                  : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-text-primary'
+                            }`}
+                          >
+                            <span className={`flex h-5 w-5 items-center justify-center rounded-full text-white ${
+                              isCancelled ? 'bg-rose-500/20 text-rose-400' : isActive ? 'bg-gradient-to-tr ' + platform.accent : 'bg-white/10 text-text-muted'
+                            }`}>
+                              <Icon icon={platform.icon} width={12} />
                             </span>
-                          )}
-                        </button>
+                            <span className={isCancelled ? 'line-through text-rose-300/80' : ''}>{platform.label}</span>
+                            {isCancelled ? (
+                              <span className="rounded bg-rose-500/20 px-1 py-0.2 text-[8px] font-mono font-bold text-rose-400 uppercase">OFF</span>
+                            ) : handle ? (
+                              <span className="font-mono text-[9px] font-normal opacity-70">
+                                {handle}
+                              </span>
+                            ) : null}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -2467,6 +2499,27 @@ export default function SocialDraftComposer({
                 </div>
               </div>
 
+              {/* Excluded Channel Warning Banner */}
+              {activeVariant?.status === 'cancelled' && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3.5 text-xs text-rose-200">
+                  <div className="flex items-center gap-2.5">
+                    <Icon icon="solar:close-circle-bold" className="text-lg text-rose-400 shrink-0" />
+                    <div>
+                      <p className="font-bold text-rose-100">{activePlatform.label} is excluded from this draft</p>
+                      <p className="text-[11px] text-rose-200/80">This channel will be skipped when scheduling or publishing.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleVariantStatus(activeVariant)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 shadow-sm transition-all"
+                  >
+                    <Icon icon="solar:check-circle-bold" width="14" />
+                    <span>Re-Include {activePlatform.label}</span>
+                  </button>
+                </div>
+              )}
+
               {/* Platform Guidelines & Aspect Ratio Assistant */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-xs">
                 <div className="flex items-center gap-3">
@@ -2486,7 +2539,7 @@ export default function SocialDraftComposer({
                   </div>
                 </div>
 
-                {/* Per-Platform Aspect Ratio Selector */}
+                {/* Per-Platform Aspect Ratio Selector & Platform Toggle */}
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[10px] font-black uppercase tracking-wider text-text-muted mr-1">Aspect Ratio:</span>
                   {[
@@ -2511,6 +2564,21 @@ export default function SocialDraftComposer({
                   ))}
 
                   <span className="h-4 w-px bg-border mx-1 hidden sm:block" />
+
+                  {/* Exclude / Include Channel Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => toggleVariantStatus(activeVariant)}
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold transition-all border ${
+                      activeVariant?.status === 'cancelled'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                        : 'border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                    }`}
+                    title={activeVariant?.status === 'cancelled' ? `Re-include ${activePlatform.label}` : `Unselect / exclude ${activePlatform.label} from this post`}
+                  >
+                    <Icon icon={activeVariant?.status === 'cancelled' ? 'solar:check-circle-bold' : 'solar:close-circle-bold'} width="13" />
+                    <span>{activeVariant?.status === 'cancelled' ? 'Include Channel' : 'Exclude Channel'}</span>
+                  </button>
 
                   {/* 1-Click Round-Trip Open in Studio Button */}
                   <button
@@ -2566,9 +2634,24 @@ export default function SocialDraftComposer({
                         <p className="text-xs font-black uppercase tracking-wider text-text-primary">{activePlatform.label} Visual Canvas</p>
                         <p className="text-[10px] text-text-muted">Framed in {canvasAspectRatio} ratio for {activePlatform.label}.</p>
                       </div>
-                      <span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted">
-                        {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {activeVisualAssets[0]?.publicUrl && (
+                          <a
+                            href={activeVisualAssets[0].publicUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-surface px-2.5 py-1 text-[10px] font-bold text-white hover:border-brand hover:text-brand transition-colors shadow-2xs"
+                            title="Download current media file"
+                          >
+                            <Icon icon="solar:download-minimalistic-bold" width="12" />
+                            <span>Download Media</span>
+                          </a>
+                        )}
+                        <span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted">
+                          {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Media Library Selector Strip for Active Platform */}
@@ -2600,53 +2683,70 @@ export default function SocialDraftComposer({
                             const isHighlighted = activeVariantPostFormat === 'carousel' ? isInCarousel : isSingleSelected;
 
                             return (
-                              <button
+                              <div
                                 key={asset.id || idx}
-                                type="button"
-                                onClick={() => handleSelectAssetForActivePlatform(asset)}
-                                title={activeVariantPostFormat === 'carousel'
-                                  ? (isInCarousel ? `Remove Slide ${carouselIndex + 1} from ${activePlatform.label} carousel` : `Add to ${activePlatform.label} carousel`)
-                                  : `Use this ${isVid ? 'video' : 'image'} for ${activePlatform.label}`}
-                                className={`relative group shrink-0 rounded-lg overflow-hidden border-2 transition-all text-left ${
+                                className={`relative group shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
                                   isHighlighted
                                     ? 'border-brand ring-2 ring-brand/30 shadow-md scale-[1.02]'
                                     : 'border-border bg-black hover:border-brand/50 opacity-60 hover:opacity-100'
                                 }`}
                                 style={{ width: '88px', height: '88px' }}
                               >
-                                {isVid ? (
-                                  <video src={asset.publicUrl} muted className="h-full w-full object-cover" />
-                                ) : (
-                                  <img src={asset.publicUrl} alt="Asset thumbnail" className="h-full w-full object-cover" />
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectAssetForActivePlatform(asset)}
+                                  title={activeVariantPostFormat === 'carousel'
+                                    ? (isInCarousel ? `Remove Slide ${carouselIndex + 1} from ${activePlatform.label} carousel` : `Add to ${activePlatform.label} carousel`)
+                                    : `Use this ${isVid ? 'video' : 'image'} for ${activePlatform.label}`}
+                                  className="h-full w-full block text-left"
+                                >
+                                  {isVid ? (
+                                    <video src={asset.publicUrl} muted className="h-full w-full object-cover" />
+                                  ) : (
+                                    <img src={asset.publicUrl} alt="Asset thumbnail" className="h-full w-full object-cover" />
+                                  )}
+                                </button>
 
                                 {/* Asset Format Badge */}
-                                <span className="absolute top-1 left-1 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
+                                <span className="absolute top-1 left-1 rounded bg-black/80 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white pointer-events-none">
                                   {isVid ? 'Video' : asset.format?.replace(/_/g, ' ') || 'Image'}
                                 </span>
+
+                                {/* Quick Download Icon Button */}
+                                <a
+                                  href={asset.publicUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  onClick={e => e.stopPropagation()}
+                                  className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded bg-black/80 text-white opacity-0 group-hover:opacity-100 hover:bg-brand transition-all"
+                                  title="Download this file"
+                                >
+                                  <Icon icon="solar:download-minimalistic-bold" width="10" />
+                                </a>
 
                                 {/* Selection Badge */}
                                 {activeVariantPostFormat === 'carousel' ? (
                                   isInCarousel ? (
-                                    <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5">
+                                    <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5 pointer-events-none">
                                       <Icon icon="solar:check-circle-bold" width="10" />
                                       <span>Slide {carouselIndex + 1}</span>
                                     </div>
                                   ) : (
-                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 text-text-muted group-hover:text-white group-hover:bg-brand/90 text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5 transition-colors">
+                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 text-text-muted group-hover:text-white group-hover:bg-brand/90 text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5 transition-colors pointer-events-none">
                                       <Icon icon="solar:add-circle-linear" width="10" />
                                       <span>+ Add Slide</span>
                                     </div>
                                   )
                                 ) : (
                                   isSingleSelected && (
-                                    <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5">
+                                    <div className="absolute inset-x-0 bottom-0 bg-brand text-white text-[8px] font-black text-center py-0.5 flex items-center justify-center gap-0.5 pointer-events-none">
                                       <Icon icon="solar:check-circle-bold" width="10" />
                                       <span>Active</span>
                                     </div>
                                   )
                                 )}
-                              </button>
+                              </div>
                             );
                           })}
                         </div>

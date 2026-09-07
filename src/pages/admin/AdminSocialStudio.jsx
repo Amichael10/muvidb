@@ -908,6 +908,7 @@ export default function AdminSocialStudio() {
         const batch = await batchResponse.json().catch(() => ({}));
         if (!batchResponse.ok) throw new Error(batch.detail || 'The local clipper could not queue this video.');
         
+        const renderedAssets = [];
         for (let j = 0; j < (batch.jobs || []).length; j++) {
           const job = batch.jobs[j];
           const targetFormat = formats[j] || formats[0];
@@ -960,18 +961,32 @@ export default function AdminSocialStudio() {
           }
 
           const dims = getDimensionsForAspectRatio(targetFormat);
+          renderedAssets.push({
+            publicUrl: session.publicUrl,
+            storagePath: session.key,
+            mimeType: 'video/mp4',
+            format: targetFormat,
+            fileSizeBytes: status.size_bytes || 1024,
+            width: dims.width,
+            height: dims.height,
+          });
+        }
+
+        if (renderedAssets.length > 0) {
+          const primaryAsset = renderedAssets[0];
           const draftResponse = await fetch('/api/social?task=create_editor_video_draft', {
             method: 'POST',
             headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              title: `${film.title} — ${targetFormat} clip`,
-              publicUrl: session.publicUrl,
-              storagePath: session.key,
-              mimeType: 'video/mp4',
-              format: targetFormat,
-              fileSizeBytes: status.size_bytes || 1024,
-              width: dims.width,
-              height: dims.height,
+              title: `${film.title} — Highlight Clip`,
+              publicUrl: primaryAsset.publicUrl,
+              storagePath: primaryAsset.storagePath,
+              mimeType: primaryAsset.mimeType,
+              format: primaryAsset.format,
+              fileSizeBytes: primaryAsset.fileSizeBytes,
+              width: primaryAsset.width,
+              height: primaryAsset.height,
+              assets: renderedAssets,
               captions: { instagram: caption, facebook: caption, threads: caption, tiktok: caption },
               platforms: ['instagram', 'facebook', 'threads', 'tiktok'],
             }),
@@ -992,9 +1007,10 @@ export default function AdminSocialStudio() {
           created += 1;
         }
       }
-      setVideoAutopilot({ running: false, message: `Prepared ${created} custom video draft${created === 1 ? '' : 's'}.`, jobs: [] });
-      await fetchDrafts(true);
-      toast.success(`${created} video format${created === 1 ? '' : 's'} added to drafts.`);
+      setVideoAutopilot({ running: false, message: `Prepared ${created} video draft${created === 1 ? '' : 's'}.`, jobs: [] });
+      await refreshAll();
+      setActiveTab('drafts');
+      toast.success(`✨ Video clip saved to drafts with ${formats.join(' & ')} formats!`);
     } catch (err) {
       setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.' }));
       toast.error(err.message || 'Custom video plan failed.');
@@ -2161,6 +2177,26 @@ export default function AdminSocialStudio() {
                             <Icon icon={uploadingAssetId === item.id ? 'solar:spinner-linear' : 'solar:upload-track-2-linear'} className={uploadingAssetId === item.id ? 'animate-spin' : ''} width="12" />
                             <span>{uploadingAssetId === item.id ? 'Uploading…' : 'Replace Media'}</span>
                           </button>
+
+                          {/* Quick Download Buttons for All Assets */}
+                          {assets.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {assets.map((ast, aIdx) => (
+                                <a
+                                  key={ast.id || aIdx}
+                                  href={ast.public_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-0.5 text-[9px] font-bold text-white hover:bg-brand hover:text-white transition-colors"
+                                  title={`Download ${ast.format?.replace(/_/g, ' ') || 'media'}`}
+                                >
+                                  <Icon icon="solar:download-minimalistic-bold" width="10" />
+                                  <span>{assets.length > 1 ? (ast.format?.includes('9_16') ? '9:16' : ast.format?.includes('1_1') ? '1:1' : `#${aIdx + 1}`) : 'Download'}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Title, Badges, Schedule Timing & Platforms */}
@@ -2192,7 +2228,7 @@ export default function AdminSocialStudio() {
                             )}
                           </div>
 
-                          {/* Platform Badges */}
+                          {/* Platform Badges with Quick Include/Exclude Toggle */}
                           <div className="flex flex-wrap gap-2 pt-1">
                             {variants.map(variant => {
                               const icon = {
@@ -2203,15 +2239,46 @@ export default function AdminSocialStudio() {
                                 youtube: 'mdi:youtube',
                               }[variant.platform] || 'solar:share-linear';
 
+                              const isExcluded = variant.status === 'cancelled';
+
                               return (
-                                <div
+                                <button
                                   key={variant.id}
-                                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-surface-2 px-2.5 py-1 text-xs"
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!canChangeQueueItem) return;
+                                    const nextStatus = isExcluded ? 'draft' : 'cancelled';
+                                    setDrafts(current => current.map(draft => draft.id === item.id
+                                      ? {
+                                          ...draft,
+                                          social_platform_variants: asRelationArray(draft.social_platform_variants).map(v => v.id === variant.id ? { ...v, status: nextStatus } : v),
+                                        }
+                                      : draft));
+                                    try {
+                                      await fetch('/api/social?task=update_variant_options', {
+                                        method: 'POST',
+                                        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ variantId: variant.id, status: nextStatus }),
+                                      });
+                                      toast.success(`${variant.platform} ${isExcluded ? 'included' : 'excluded from post'}`);
+                                    } catch (err) {
+                                      toast.error(`Failed to update ${variant.platform}: ${err.message}`);
+                                    }
+                                  }}
+                                  disabled={!canChangeQueueItem}
+                                  title={canChangeQueueItem ? `Click to ${isExcluded ? 'include' : 'exclude'} ${variant.platform}` : undefined}
+                                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-all ${
+                                    isExcluded
+                                      ? 'border-dashed border-rose-500/30 bg-rose-500/5 text-rose-300 opacity-50 hover:opacity-80'
+                                      : 'border-white/10 bg-surface-2 hover:border-brand/40 text-text-primary'
+                                  }`}
                                 >
-                                  <Icon icon={icon} width="14" className="text-brand" />
-                                  <span className="capitalize font-bold text-text-primary text-[11px]">{variant.platform}</span>
-                                  <span className="text-[10px] text-text-muted uppercase">({variant.status})</span>
-                                </div>
+                                  <Icon icon={icon} width="14" className={isExcluded ? 'text-rose-400' : 'text-brand'} />
+                                  <span className={`capitalize font-bold text-[11px] ${isExcluded ? 'line-through text-rose-300/80' : ''}`}>{variant.platform}</span>
+                                  <span className={`text-[9px] uppercase font-mono ${isExcluded ? 'text-rose-400 font-bold' : 'text-text-muted'}`}>
+                                    ({isExcluded ? 'off' : variant.status})
+                                  </span>
+                                </button>
                               );
                             })}
                           </div>

@@ -194,86 +194,137 @@ async function insertSocialEvent(input: {
 }
 
 /** Create a real Social Studio draft for a video rendered by MuviDB Studio. */
+/** Create a real Social Studio draft for a video rendered by MuviDB Studio. */
 export async function createEditorVideoDraft(input: {
   title: string;
-  publicUrl: string;
-  storagePath: string;
-  mimeType: string;
+  publicUrl?: string;
+  storagePath?: string;
+  mimeType?: string;
   format?: string;
-  fileSizeBytes: number;
-  width: number;
-  height: number;
+  fileSizeBytes?: number;
+  width?: number;
+  height?: number;
+  assets?: Array<{
+    publicUrl: string;
+    storagePath?: string;
+    mimeType?: string;
+    format?: string;
+    fileSizeBytes?: number;
+    width?: number;
+    height?: number;
+  }>;
   captions: Partial<Record<SocialPlatform, string>>;
   platforms: SocialPlatform[];
 }, actor: SocialActor) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   const title = String(input.title || '').trim().slice(0, 180) || 'MuviDB Studio video';
-  const url = String(input.publicUrl || '').trim();
   const bucket = getAssetBucket();
-  const isSupabaseAsset = url.startsWith('https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/');
-  const isR2Asset = /^https:\/\//i.test(url) && Boolean(input.storagePath);
-  if (!isSupabaseAsset && !isR2Asset) throw httpError(400, 'Editor video must be stored in MuviDB media storage');
+
+  const rawAssets = Array.isArray(input.assets) && input.assets.length > 0
+    ? input.assets
+    : [{
+        publicUrl: input.publicUrl || '',
+        storagePath: input.storagePath,
+        mimeType: input.mimeType || 'video/mp4',
+        format: input.format,
+        fileSizeBytes: input.fileSizeBytes || 0,
+        width: input.width || 1080,
+        height: input.height || 1920,
+      }];
+
+  const validAssets = rawAssets.filter(a => Boolean(a.publicUrl));
+  if (!validAssets.length) throw httpError(400, 'At least one valid video asset with public URL is required');
+
   const platforms = [...new Set(input.platforms)].filter((p): p is SocialPlatform => ['instagram', 'facebook', 'threads', 'tiktok'].includes(p));
   if (!platforms.length) throw httpError(400, 'Choose at least one social platform');
 
-  // Map format to valid PostgreSQL enum social_asset_format values:
-  // ('portrait_4_5', 'square_1_1', 'vertical_9_16', 'landscape_16_9', 'video_vertical_9_16')
-  let assetFormat: 'portrait_4_5' | 'square_1_1' | 'vertical_9_16' | 'landscape_16_9' | 'video_vertical_9_16';
-  const rawFmt = String(input.format || '').trim();
-  if (rawFmt === '1:1' || rawFmt === 'square_1_1' || rawFmt === 'video_square_1_1') {
-    assetFormat = 'square_1_1';
-  } else if (rawFmt === '4:5' || rawFmt === 'portrait_4_5') {
-    assetFormat = 'portrait_4_5';
-  } else if (rawFmt === '16:9' || rawFmt === 'landscape_16_9') {
-    assetFormat = 'landscape_16_9';
-  } else if (rawFmt === '9:16' || rawFmt === 'video_vertical_9_16' || rawFmt === 'vertical_9_16') {
-    assetFormat = 'video_vertical_9_16';
-  } else {
-    const ratio = (input.width || 1080) / Math.max(1, input.height || 1920);
-    if (ratio > 1.2) {
-      assetFormat = 'landscape_16_9';
-    } else if (ratio >= 0.95 && ratio <= 1.05) {
-      assetFormat = 'square_1_1';
-    } else if (ratio >= 0.75 && ratio < 0.95) {
-      assetFormat = 'portrait_4_5';
-    } else {
-      assetFormat = 'video_vertical_9_16';
-    }
-  }
+  const normalizeAssetFormat = (rawFmt?: string, width?: number, height?: number): 'portrait_4_5' | 'square_1_1' | 'vertical_9_16' | 'landscape_16_9' | 'video_vertical_9_16' => {
+    const f = String(rawFmt || '').trim();
+    if (f === '1:1' || f === 'square_1_1' || f === 'video_square_1_1') return 'square_1_1';
+    if (f === '4:5' || f === 'portrait_4_5') return 'portrait_4_5';
+    if (f === '16:9' || f === 'landscape_16_9') return 'landscape_16_9';
+    if (f === '9:16' || f === 'video_vertical_9_16' || f === 'vertical_9_16') return 'video_vertical_9_16';
+    const ratio = (width || 1080) / Math.max(1, height || 1920);
+    if (ratio > 1.2) return 'landscape_16_9';
+    if (ratio >= 0.95 && ratio <= 1.05) return 'square_1_1';
+    if (ratio >= 0.75 && ratio < 0.95) return 'portrait_4_5';
+    return 'video_vertical_9_16';
+  };
 
+  const primaryAsset = validAssets[0];
   const sourceId = crypto.randomUUID();
-  const snapshot = { kind: 'studio_video', capturedAt: new Date().toISOString(), title, publicUrl: url, width: input.width, height: input.height };
+  const snapshot = {
+    kind: 'studio_video',
+    capturedAt: new Date().toISOString(),
+    title,
+    publicUrl: primaryAsset.publicUrl,
+    width: primaryAsset.width || 1080,
+    height: primaryAsset.height || 1920,
+  };
+
   const { data: contentItem, error: itemError } = await supabase.from('social_content_items').insert({
-    content_type: 'studio_video', title, source_entity_type: 'studio_video', source_entity_id: sourceId,
-    source_snapshot: snapshot, status: 'generating', generation_method: 'studio_export', created_by: actor.id,
+    content_type: 'studio_video',
+    title,
+    source_entity_type: 'studio_video',
+    source_entity_id: sourceId,
+    source_snapshot: snapshot,
+    status: 'generating',
+    generation_method: 'studio_export',
+    created_by: actor.id,
   }).select('id').single();
   if (itemError) throw itemError;
 
-  const { data: asset, error: assetError } = await supabase.from('social_assets').insert({
-    content_item_id: contentItem.id,
-    format: assetFormat,
-    storage_bucket: isR2Asset ? 'external' : bucket,
-    storage_path: input.storagePath,
-    public_url: url,
-    mime_type: input.mimeType || 'video/mp4',
-    width: Math.max(1, Math.round(input.width || 1080)),
-    height: Math.max(1, Math.round(input.height || 1920)),
-    file_size_bytes: Math.max(0, Math.round(input.fileSizeBytes || 0)),
-    render_metadata: { source: 'opencut' },
-  }).select('id').single();
-  if (assetError) throw assetError;
+  const insertedAssets: Array<{ id: string; format: string; public_url: string }> = [];
+  for (const assetItem of validAssets) {
+    const assetFormat = normalizeAssetFormat(assetItem.format, assetItem.width, assetItem.height);
+    const isR2Asset = /^https:\/\//i.test(assetItem.publicUrl) && Boolean(assetItem.storagePath);
 
-  const variants = platforms.map(platform => ({
-    content_item_id: contentItem.id, platform, status: 'draft', title,
-    caption: String(input.captions?.[platform] || '').trim() || title,
-    hashtags: [], mentions: [], selected_asset_id: asset.id,
-    platform_options: { source: 'opencut', media_kind: 'video' },
-  }));
+    const { data: asset, error: assetError } = await supabase.from('social_assets').insert({
+      content_item_id: contentItem.id,
+      format: assetFormat,
+      storage_bucket: isR2Asset ? 'external' : bucket,
+      storage_path: assetItem.storagePath || '',
+      public_url: assetItem.publicUrl,
+      mime_type: assetItem.mimeType || 'video/mp4',
+      width: Math.max(1, Math.round(assetItem.width || 1080)),
+      height: Math.max(1, Math.round(assetItem.height || 1920)),
+      file_size_bytes: Math.max(0, Math.round(assetItem.fileSizeBytes || 0)),
+      render_metadata: { source: 'opencut', format: assetItem.format },
+    }).select('id,format,public_url').single();
+    if (assetError) throw assetError;
+    insertedAssets.push(asset);
+  }
+
+  // Create platform variants with smart asset assignment
+  const variants = platforms.map(platform => {
+    let chosenAsset = insertedAssets[0];
+    if (['tiktok', 'youtube'].includes(platform)) {
+      chosenAsset = insertedAssets.find(a => a.format === 'video_vertical_9_16' || a.format === 'vertical_9_16') || insertedAssets[0];
+    } else if (['facebook', 'threads', 'x', 'linkedin'].includes(platform)) {
+      chosenAsset = insertedAssets.find(a => a.format === 'square_1_1' || a.format === 'portrait_4_5') || insertedAssets[0];
+    } else if (platform === 'instagram') {
+      chosenAsset = insertedAssets.find(a => a.format === 'square_1_1' || a.format === 'portrait_4_5') || insertedAssets[0];
+    }
+
+    return {
+      content_item_id: contentItem.id,
+      platform,
+      status: 'draft',
+      title,
+      caption: String(input.captions?.[platform] || '').trim() || title,
+      hashtags: [],
+      mentions: [],
+      selected_asset_id: chosenAsset.id,
+      platform_options: { source: 'opencut', media_kind: 'video' },
+    };
+  });
+
   const { error: variantsError } = await supabase.from('social_platform_variants').insert(variants);
   if (variantsError) throw variantsError;
+
   await supabase.from('social_content_items').update({ status: 'draft' }).eq('id', contentItem.id);
-  await insertSocialEvent({ contentItemId: contentItem.id, eventType: 'studio_video_exported', eventData: { actor_id: actor.id, platforms } });
-  return { id: contentItem.id, title, status: 'draft', platforms };
+  await insertSocialEvent({ contentItemId: contentItem.id, eventType: 'studio_video_exported', eventData: { actor_id: actor.id, platforms, asset_count: insertedAssets.length } });
+  return { id: contentItem.id, title, status: 'draft', platforms, assetCount: insertedAssets.length };
 }
 
 async function recalculateContentStatus(contentItemId: string) {
@@ -1276,7 +1327,7 @@ export async function updateSocialVariantCaption(
 }
 
 export async function updateSocialVariantOptions(
-  input: { variantId: string; options: Record<string, unknown> },
+  input: { variantId: string; options?: Record<string, unknown>; status?: string },
   actor: SocialActor,
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
@@ -1291,40 +1342,59 @@ export async function updateSocialVariantOptions(
     throw httpError(409, 'Publishing has already started, so these settings can no longer be changed');
   }
 
-  const nextOptions = { ...(variant.platform_options || {}) } as Record<string, unknown>;
-  if (variant.platform === 'tiktok') {
-    const raw = (input.options?.tiktok || input.options || {}) as Record<string, unknown>;
-    const privacyLevels = ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'];
-    const postModes = ['DIRECT_POST', 'MEDIA_UPLOAD'];
-    nextOptions.tiktok = {
-      privacy_level: privacyLevels.includes(String(raw.privacy_level)) ? raw.privacy_level : 'SELF_ONLY',
-      post_mode: postModes.includes(String(raw.post_mode)) ? raw.post_mode : 'DIRECT_POST',
-      disable_comment: Boolean(raw.disable_comment),
-      disable_duet: Boolean(raw.disable_duet),
-      disable_stitch: Boolean(raw.disable_stitch),
-      auto_add_music: Boolean(raw.auto_add_music),
-      brand_content_toggle: Boolean(raw.brand_content_toggle),
-      brand_organic_toggle: Boolean(raw.brand_organic_toggle),
-      is_aigc: Boolean(raw.is_aigc),
-      photo_cover_index: Math.max(0, Math.floor(Number(raw.photo_cover_index) || 0)),
-      video_cover_timestamp_ms: Math.max(0, Math.floor(Number(raw.video_cover_timestamp_ms) || 0)),
-    };
-  } else {
-    throw httpError(400, 'Advanced publishing settings are not available for this platform yet');
+  const updates: Record<string, unknown> = {};
+
+  if (input.status && ['draft', 'cancelled', 'scheduled'].includes(input.status)) {
+    updates.status = input.status;
   }
 
-  const { error: updateError } = await supabase
-    .from('social_platform_variants')
-    .update({ platform_options: nextOptions })
-    .eq('id', variant.id);
-  if (updateError) throw updateError;
+  if (input.options && typeof input.options === 'object') {
+    const nextOptions = { ...(variant.platform_options || {}) } as Record<string, unknown>;
+    if (variant.platform === 'tiktok' && input.options.tiktok) {
+      const raw = (input.options.tiktok || {}) as Record<string, unknown>;
+      const privacyLevels = ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'];
+      const postModes = ['DIRECT_POST', 'MEDIA_UPLOAD'];
+      nextOptions.tiktok = {
+        privacy_level: privacyLevels.includes(String(raw.privacy_level)) ? raw.privacy_level : 'SELF_ONLY',
+        post_mode: postModes.includes(String(raw.post_mode)) ? raw.post_mode : 'DIRECT_POST',
+        disable_comment: Boolean(raw.disable_comment),
+        disable_duet: Boolean(raw.disable_duet),
+        disable_stitch: Boolean(raw.disable_stitch),
+        auto_add_music: Boolean(raw.auto_add_music),
+        brand_content_toggle: Boolean(raw.brand_content_toggle),
+        brand_organic_toggle: Boolean(raw.brand_organic_toggle),
+        is_aigc: Boolean(raw.is_aigc),
+        photo_cover_index: Math.max(0, Math.floor(Number(raw.photo_cover_index) || 0)),
+        video_cover_timestamp_ms: Math.max(0, Math.floor(Number(raw.video_cover_timestamp_ms) || 0)),
+      };
+    } else {
+      Object.assign(nextOptions, input.options);
+    }
+    updates.platform_options = nextOptions;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error: updateError } = await supabase
+      .from('social_platform_variants')
+      .update(updates)
+      .eq('id', variant.id);
+    if (updateError) throw updateError;
+  }
+
   await insertSocialEvent({
     contentItemId: variant.content_item_id,
     platformVariantId: variant.id,
     eventType: 'platform_options_edited',
-    eventData: { actor_id: actor.id, platform: variant.platform },
+    eventData: { actor_id: actor.id, platform: variant.platform, updates },
   });
-  return { success: true, id: variant.id, platform: variant.platform, platformOptions: nextOptions };
+
+  return {
+    success: true,
+    id: variant.id,
+    platform: variant.platform,
+    status: (updates.status as string) || variant.status,
+    platformOptions: updates.platform_options || variant.platform_options,
+  };
 }
 
 const NON_EDITABLE_CONTENT_STATUSES = ['publishing', 'partially_published', 'published'] as const;

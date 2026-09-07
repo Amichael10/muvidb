@@ -602,11 +602,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'update_variant_options') {
         const actor = await requireSocialStudioAdmin(req);
-        const { variantId, options } = req.body || {};
-        if (typeof variantId !== 'string' || !variantId || !options || typeof options !== 'object') {
-          return res.status(400).json({ error: 'variantId and options are required' });
+        const { variantId, options, status } = req.body || {};
+        if (typeof variantId !== 'string' || !variantId) {
+          return res.status(400).json({ error: 'variantId is required' });
         }
-        return res.status(200).json(await updateSocialVariantOptions({ variantId, options }, actor));
+        return res.status(200).json(await updateSocialVariantOptions({ variantId, options, status }, actor));
       }
 
       if (task === 'update_variant_asset') {
@@ -679,9 +679,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'create_editor_video_draft') {
         const actor = await requireSocialStudioAdmin(req);
-        const { title, publicUrl, storagePath, mimeType, format, fileSizeBytes, width, height, captions, platforms } = req.body || {};
+        const { title, publicUrl, storagePath, mimeType, format, fileSizeBytes, width, height, captions, platforms, assets } = req.body || {};
         return res.status(201).json(await createEditorVideoDraft({
-          title, publicUrl, storagePath, mimeType, format, fileSizeBytes, width, height,
+          title, publicUrl, storagePath, mimeType, format, fileSizeBytes, width, height, assets,
           captions: captions && typeof captions === 'object' ? captions : {},
           platforms: Array.isArray(platforms) ? platforms : [],
         }, actor));
