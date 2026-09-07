@@ -306,6 +306,14 @@ function normalizeSocialContentItem(item) {
   };
 }
 
+const VIDEO_COPY_ANGLES = [
+  { value: 'editorial', label: '🎬 Editorial & Critique' },
+  { value: 'high_drama', label: '🔥 High Drama' },
+  { value: 'audience_debate', label: '🗣️ Audience Debate' },
+  { value: 'streaming_alert', label: '🍿 Streaming Alert' },
+  { value: 'discovery', label: '🔎 Discovery' },
+];
+
 export default function AdminSocialStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'intake' ? 'intake' : 'calendar'); // 'calendar' | 'drafts' | 'composer' | 'intake' | 'channels' | 'video_plan'
@@ -354,8 +362,8 @@ export default function AdminSocialStudio() {
   const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
   const [videoPlan, setVideoPlan] = useState({ days: 7, startDate: new Date().toISOString().slice(0, 10), videoStart: '18:00', videoEnd: '20:00', clipLength: 30 });
   const [videoRows, setVideoRows] = useState([
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '' },
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
   ]);
   const [videoFilmOptions, setVideoFilmOptions] = useState([]);
   const [videoFilmSearch, setVideoFilmSearch] = useState({});
@@ -786,10 +794,20 @@ export default function AdminSocialStudio() {
     return existing || null;
   };
 
-  const generateRowCaption = async row => {
+  const generateRowCaption = async (row, customAngle = null, customEngine = null) => {
     const film = await resolveFilmForRow(row);
     if (!film) return toast.error('Choose a film before generating a caption.');
-    updateVideoRow(row.id, { caption: 'Analyzing video & selecting best viral scene…' });
+    const engine = customEngine || row.engine || 'gemini';
+    const angle = customAngle || row.angle || 'editorial';
+    const isManual = row.mode === 'manual';
+
+    updateVideoRow(row.id, {
+      generatingCaption: true,
+      caption: isManual 
+        ? `Generating ${engine.toUpperCase()} copy for ${row.start} – ${row.end}…` 
+        : `Selecting viral scene & generating copy with ${engine.toUpperCase()}…`,
+    });
+
     try {
       const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
       let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || '') };
@@ -816,24 +834,40 @@ export default function AdminSocialStudio() {
           task: 'recommend_clip_segment',
           data: {
             ...sourceMetadata,
+            mode: row.mode,
+            startTime: row.start,
+            endTime: row.end,
+            preferredProvider: engine,
+            angle: angle,
             targetLength: videoPlan.clipLength || 45,
           },
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Gemini caption generation failed');
-      const startSec = parseTimestampToSeconds(data.startTime ?? data.startTimeFormatted);
-      const endSec = parseTimestampToSeconds(data.endTime ?? data.endTimeFormatted) || (startSec + (videoPlan.clipLength || 45));
-      const formattedStart = data.startTimeFormatted || formatSecondsToTimestamp(startSec);
-      const formattedEnd = data.endTimeFormatted || formatSecondsToTimestamp(endSec);
-      updateVideoRow(row.id, {
+      if (!response.ok) throw new Error(data.error || `${engine.toUpperCase()} caption generation failed`);
+
+      const updates = {
+        generatingCaption: false,
         caption: data.caption || '',
-        start: formattedStart,
-        end: formattedEnd,
-      });
-      toast.success(`Gemini scene selected: ${formattedStart} – ${formattedEnd}`);
+        variations: Array.isArray(data.variations) ? data.variations : [],
+        selectedVariationKey: 'B',
+        engine: data.engine || engine,
+        angle: angle,
+      };
+
+      if (row.mode === 'gemini') {
+        const startSec = parseTimestampToSeconds(data.startTime ?? data.startTimeFormatted);
+        const endSec = parseTimestampToSeconds(data.endTime ?? data.endTimeFormatted) || (startSec + (videoPlan.clipLength || 45));
+        updates.start = data.startTimeFormatted || formatSecondsToTimestamp(startSec);
+        updates.end = data.endTimeFormatted || formatSecondsToTimestamp(endSec);
+        toast.success(`✨ Scene selected: ${updates.start} – ${updates.end}`);
+      } else {
+        toast.success(`✨ ${data.engine?.toUpperCase() || engine.toUpperCase()} caption generated for ${row.start} – ${row.end}`);
+      }
+
+      updateVideoRow(row.id, updates);
     } catch (err) {
-      updateVideoRow(row.id, { caption: '' });
+      updateVideoRow(row.id, { caption: '', generatingCaption: false });
       toast.error(err.message);
     }
   };
@@ -2635,14 +2669,103 @@ export default function AdminSocialStudio() {
                       return null;
                     })()}
 
+                    {/* AI Engine Switcher (Gemini / Cohere) */}
+                    <div className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-surface p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => updateVideoRow(row.id, { engine: 'gemini' })}
+                        className={`h-full rounded px-2.5 transition-all flex items-center gap-1 ${
+                          (row.engine || 'gemini') === 'gemini'
+                            ? 'bg-violet-600 text-white shadow-xs'
+                            : 'text-text-muted hover:text-white'
+                        }`}
+                      >
+                        <span>⚡ Gemini</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateVideoRow(row.id, { engine: 'cohere' })}
+                        className={`h-full rounded px-2.5 transition-all flex items-center gap-1 ${
+                          row.engine === 'cohere'
+                            ? 'bg-brand text-white shadow-xs'
+                            : 'text-text-muted hover:text-white'
+                        }`}
+                      >
+                        <span>🪄 Cohere</span>
+                      </button>
+                    </div>
+
+                    {/* Tone / Editorial Angle Selector */}
+                    <select
+                      value={row.angle || 'editorial'}
+                      onChange={e => updateVideoRow(row.id, { angle: e.target.value })}
+                      className="h-9 rounded-lg border border-white/10 bg-surface px-2.5 text-xs font-bold text-white outline-none focus:border-brand"
+                    >
+                      {VIDEO_COPY_ANGLES.map(a => (
+                        <option key={a.value} value={a.value}>
+                          {a.label}
+                        </option>
+                      ))}
+                    </select>
+
                     <button
                       type="button"
                       onClick={() => generateRowCaption(row)}
-                      className="h-9 rounded-lg border border-violet-400/40 bg-violet-500/15 px-3 text-xs font-bold text-violet-200 hover:bg-violet-500/25 transition-all"
+                      disabled={row.generatingCaption || !row.filmId}
+                      className="h-9 rounded-lg border border-violet-400/40 bg-violet-500/15 px-3 text-xs font-bold text-violet-200 hover:bg-violet-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50"
                     >
-                      ✨ Generate Caption with Gemini
+                      {row.generatingCaption ? (
+                        <>
+                          <Icon icon="solar:spinner-linear" className="animate-spin" width="14" />
+                          <span>Generating…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icon icon="solar:magic-stick-3-bold" width="14" />
+                          <span>Generate 3 Variations ({(row.engine || 'gemini').toUpperCase()})</span>
+                        </>
+                      )}
                     </button>
                   </div>
+
+                  {/* 3 Variations Pills (Option A / Option B / Option C) */}
+                  {Array.isArray(row.variations) && row.variations.length > 0 && (
+                    <div className="rounded-xl border border-white/10 bg-surface/60 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-text-muted">
+                        <span>Select Copy Variation</span>
+                        <span className="text-violet-400 font-mono text-[9px]">Engine: {row.engine || 'gemini'} · Tone: {row.angle || 'editorial'}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {row.variations.map(v => {
+                          const isSelected = (row.selectedVariationKey || 'B') === v.key || row.caption === v.text;
+                          return (
+                            <button
+                              key={v.key}
+                              type="button"
+                              onClick={() => {
+                                updateVideoRow(row.id, {
+                                  caption: v.text,
+                                  selectedVariationKey: v.key,
+                                });
+                                toast.success(`Switched to Option ${v.key} (${v.label})`);
+                              }}
+                              className={`rounded-lg border p-2 text-left transition-all ${
+                                isSelected
+                                  ? 'border-brand bg-brand/15 text-white ring-1 ring-brand shadow-xs'
+                                  : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-white'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs font-black">
+                                <span>Option {v.key}: {v.label}</span>
+                                {isSelected && <Icon icon="solar:check-circle-bold" className="text-brand" width="14" />}
+                              </div>
+                              <p className="mt-1 text-[10px] line-clamp-2 leading-relaxed opacity-90">{v.text}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <label className="block text-[10px] font-black uppercase text-text-muted">
                     Caption
@@ -2650,7 +2773,7 @@ export default function AdminSocialStudio() {
                       value={row.caption}
                       onChange={e => updateVideoRow(row.id, { caption: e.target.value })}
                       rows={2}
-                      placeholder="Write social caption or generate one with Gemini…"
+                      placeholder="Write social caption or generate one with AI…"
                       className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-xs text-white outline-none focus:border-brand"
                     />
                   </label>

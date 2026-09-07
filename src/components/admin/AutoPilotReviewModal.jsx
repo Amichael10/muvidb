@@ -86,6 +86,7 @@ export default function AutoPilotReviewModal({
 
   // AI Copywriting & 3 Variations State
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [preferredEngine, setPreferredEngine] = useState('cohere'); // 'cohere' | 'gemini'
   const [selectedAngle, setSelectedAngle] = useState('streaming_alert');
   const [variations, setVariations] = useState([]);
   const [selectedVariationKey, setSelectedVariationKey] = useState('A');
@@ -94,7 +95,7 @@ export default function AutoPilotReviewModal({
   const [aiError, setAiError] = useState('');
   const aiRequestIdRef = useRef(0);
 
-  const requestAICopy = async (cand, angle = selectedAngle) => {
+  const requestAICopy = async (cand, angle = selectedAngle, engine = preferredEngine) => {
     if (!cand || !cand.name) {
       setAiError('Select a film or professional before generating copy.');
       return;
@@ -113,7 +114,7 @@ export default function AutoPilotReviewModal({
           candidate: cand,
           series: slot.social_content_series,
           angle,
-          preferredProvider: 'cohere',
+          preferredProvider: engine || preferredEngine || 'cohere',
         }),
       });
 
@@ -757,13 +758,41 @@ export default function AutoPilotReviewModal({
 
               {/* Editorial Angle Selector & AI Generator */}
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">
-                    EDITORIAL ANGLE
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-text-muted">
+                      EDITORIAL ANGLE
+                    </span>
+                    <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreferredEngine('cohere');
+                          requestAICopy(candidate, selectedAngle, 'cohere');
+                        }}
+                        className={`rounded px-2 py-0.5 transition-all ${
+                          preferredEngine === 'cohere' ? 'bg-brand text-white shadow-xs' : 'text-text-muted hover:text-white'
+                        }`}
+                      >
+                        🪄 Cohere
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreferredEngine('gemini');
+                          requestAICopy(candidate, selectedAngle, 'gemini');
+                        }}
+                        className={`rounded px-2 py-0.5 transition-all ${
+                          preferredEngine === 'gemini' ? 'bg-violet-600 text-white shadow-xs' : 'text-text-muted hover:text-white'
+                        }`}
+                      >
+                        ⚡ Gemini
+                      </button>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => requestAICopy(candidate, selectedAngle)}
+                    onClick={() => requestAICopy(candidate, selectedAngle, preferredEngine)}
                     disabled={aiGenerating || !candidate}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1 text-xs font-bold text-white hover:bg-brand-hover transition-all disabled:opacity-50 shadow-sm"
                   >
@@ -772,7 +801,7 @@ export default function AutoPilotReviewModal({
                       className={aiGenerating ? 'animate-spin' : ''}
                       width="14"
                     />
-                    {aiGenerating ? 'Generating…' : 'Generate 3 Variations'}
+                    {aiGenerating ? 'Generating…' : `Generate 3 Variations (${preferredEngine.toUpperCase()})`}
                   </button>
                 </div>
 

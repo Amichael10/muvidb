@@ -94,21 +94,59 @@ async function recommendClipSegment(data: any, res: VercelResponse) {
   const synopsis = String(data?.synopsis || '').slice(0, 2000);
   const genre = String(data?.genre || '').slice(0, 200);
   const targetLength = Math.min(60, Math.max(15, Number(data?.targetLength || 45)));
+  const isManual = data?.mode === 'manual' || (Boolean(data?.startTime || data?.start) && data?.mode !== 'gemini');
+  const preferredProvider = String(data?.preferredProvider || data?.engine || 'gemini').toLowerCase() as any;
+  const requestedAngle = String(data?.angle || data?.tone || 'editorial').toLowerCase();
+
+  let startTime = parseTimestampToSeconds(data?.startTime ?? data?.start);
+  let endTime = parseTimestampToSeconds(data?.endTime ?? data?.end);
 
   // Calculate safety boundaries to avoid opening ads/intros and closing credits
   let minStart = 0;
   let maxEnd = duration;
   if (duration > 300) {
-    // For videos longer than 5 mins (e.g. full movies / long clips), skip the first 90s (adverts/intros) and last 8% (credits)
     minStart = Math.min(90, Math.floor(duration * 0.05));
     maxEnd = Math.max(minStart + targetLength + 10, Math.floor(duration * 0.92));
   } else if (duration > 90) {
-    // For shorter videos / trailers, skip the first 15s and last 10s
     minStart = 15;
     maxEnd = Math.max(minStart + targetLength, duration - 10);
   }
 
-  const prompt = `You are MuviDB's viral Nollywood short-form video producer.
+  let prompt = '';
+  if (isManual && (startTime > 0 || endTime > 0)) {
+    if (!endTime || endTime <= startTime) endTime = startTime + targetLength;
+    const startFmt = formatSecondsToTimestamp(startTime);
+    const endFmt = formatSecondsToTimestamp(endTime);
+
+    prompt = `You are MuviDB's expert Nollywood social media copywriter.
+The user has MANUALLY chosen an exact video scene segment from ${startFmt} to ${endFmt} (${Math.max(1, endTime - startTime)}s) from the Nollywood film "${title}".
+
+Movie Context:
+- Title: ${title}
+- Genre: ${genre || 'Drama/Comedy'}
+- Synopsis: ${synopsis || 'Exciting Nollywood release'}
+- Scene Timestamps: ${startFmt} – ${endFmt}
+- Target Tone / Angle: ${requestedAngle}
+- Context / Transcript: ${transcript || description || '(scene analysis)'}
+
+YOUR GOAL:
+Generate 3 viral social captions for this specific scene clip:
+1. Option A (Informative): Set up the premise, who is in the scene, and where to watch on MuviDB.
+2. Option B (Editorial / Hype): High-drama cinema critique, intense dialogue reaction, and standout acting praise.
+3. Option C (Conversational / Debate): Provocative question directly asking the audience how they would react in this character's shoes.
+
+Return ONLY valid JSON with this exact shape:
+{
+  "caption": "Primary caption (Option B or best match under 35 words with #Nollywood #MuviDB hashtags)",
+  "reason": "Why this scene hits hard at ${startFmt}",
+  "variations": [
+    { "key": "A", "label": "Informative", "text": "Option A caption text..." },
+    { "key": "B", "label": "Editorial", "text": "Option B caption text..." },
+    { "key": "C", "label": "Conversational", "text": "Option C caption text..." }
+  ]
+}`;
+  } else {
+    prompt = `You are MuviDB's viral Nollywood short-form video producer.
 Your mission is to recommend one exciting, high-retention ${targetLength}-second TikTok/Reels clip from this Nollywood film to blow up on social media.
 
 Movie Context:
@@ -117,6 +155,7 @@ Movie Context:
 - Synopsis: ${synopsis || 'Exciting Nollywood release'}
 - Video Duration: ${duration}s (${formatSecondsToTimestamp(duration)})
 - Allowed Window: Between ${minStart}s (${formatSecondsToTimestamp(minStart)}) and ${maxEnd}s (${formatSecondsToTimestamp(maxEnd)})
+- Target Tone / Angle: ${requestedAngle}
 - YouTube Description / Context: ${description || '(none provided)'}
 - Subtitles / Transcript Snippets: ${transcript || '(auto-segment analysis)'}
 
@@ -132,26 +171,39 @@ Return ONLY valid JSON with this exact shape:
   "startTime": "22:22" (or total seconds as number),
   "endTime": "23:07" (or total seconds as number),
   "reason": "Why this specific scene is viral/emotional/funny",
-  "caption": "Short punchy hook caption with 2-3 emojis and #Nollywood #MuviDB hashtags (under 35 words)"
+  "caption": "Short punchy hook caption with 2-3 emojis and #Nollywood #MuviDB hashtags (under 35 words)",
+  "variations": [
+    { "key": "A", "label": "Informative", "text": "Informative hook caption..." },
+    { "key": "B", "label": "Editorial", "text": "Editorial / Dramatic caption..." },
+    { "key": "C", "label": "Conversational", "text": "Audience debate question caption..." }
+  ]
 }`;
+  }
 
-  const { text, telemetry } = await generateAIContent(prompt, { preferredProvider: 'gemini' });
+  const { text, telemetry } = await generateAIContent(prompt, { preferredProvider: preferredProvider || 'gemini' });
   const parsed = parseJSON(text);
 
-  let startTime = parseTimestampToSeconds(parsed?.startTime);
-  if (!startTime || isNaN(startTime) || startTime < minStart || startTime >= maxEnd) {
-    // Fallback to golden section (around 25%-40% into the film)
-    startTime = Math.floor(minStart + (maxEnd - minStart) * 0.35);
-  }
-  let endTime = parseTimestampToSeconds(parsed?.endTime);
-  if (!endTime || isNaN(endTime) || endTime <= startTime || endTime > maxEnd) {
-    endTime = Math.min(maxEnd, startTime + targetLength);
+  if (!isManual) {
+    startTime = parseTimestampToSeconds(parsed?.startTime);
+    if (!startTime || isNaN(startTime) || startTime < minStart || startTime >= maxEnd) {
+      startTime = Math.floor(minStart + (maxEnd - minStart) * 0.35);
+    }
+    endTime = parseTimestampToSeconds(parsed?.endTime);
+    if (!endTime || isNaN(endTime) || endTime <= startTime || endTime > maxEnd) {
+      endTime = Math.min(maxEnd, startTime + targetLength);
+    }
   }
 
   const startTimeFormatted = formatSecondsToTimestamp(startTime);
   const endTimeFormatted = formatSecondsToTimestamp(endTime);
   const caption = String(parsed?.caption || `Wait for the reaction! 🍿 Watch ${title} now on MuviDB #Nollywood #AfricanCinema`).trim();
   const reason = String(parsed?.reason || 'High-stakes dramatic dialogue scene').trim();
+  const rawVars = Array.isArray(parsed?.variations) ? parsed.variations : [];
+  const variations = rawVars.length === 3 ? rawVars : [
+    { key: 'A', label: 'Informative', text: caption },
+    { key: 'B', label: 'Editorial', text: caption },
+    { key: 'C', label: 'Conversational', text: caption },
+  ];
 
   return res.status(200).json({
     startTime,
@@ -159,8 +211,9 @@ Return ONLY valid JSON with this exact shape:
     startTimeFormatted,
     endTimeFormatted,
     caption,
+    variations,
     reason,
-    engine: telemetry?.engine || 'gemini',
+    engine: telemetry?.engine || preferredProvider || 'gemini',
   });
 }
 

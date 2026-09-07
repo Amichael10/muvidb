@@ -183,6 +183,16 @@ const THEME_WORD_LIMITS = {
   birthday_spotlight: 45,
 };
 
+export const COMPOSER_COPY_ANGLES = [
+  { value: 'streaming_alert', label: '🍿 Streaming Alert' },
+  { value: 'editorial', label: '🎬 Editorial & Critique' },
+  { value: 'high_drama', label: '🔥 High Drama' },
+  { value: 'audience_debate', label: '🗣️ Audience Debate' },
+  { value: 'discovery', label: '🔎 Discovery' },
+  { value: 'dynamic_story', label: '⚡ Dynamic Story' },
+  { value: 'fun_relatable', label: '😂 Fun & Relatable' },
+];
+
 function clampWords(text, limit) {
   const words = String(text || '').trim().split(/\s+/).filter(Boolean);
   if (words.length <= limit) return String(text || '').trim();
@@ -515,6 +525,13 @@ export default function SocialDraftComposer({
   const fileInputRef = useRef(null);
   const searchToken = useRef(0);
 
+  // AI Copywriting & Multi-Tone Variations State
+  const [composerAiGenerating, setComposerAiGenerating] = useState(false);
+  const [composerAiEngine, setComposerAiEngine] = useState('cohere'); // 'cohere' | 'gemini'
+  const [composerAiAngle, setComposerAiAngle] = useState('editorial');
+  const [composerAiVariations, setComposerAiVariations] = useState([]);
+  const [composerSelectedVarKey, setComposerSelectedVarKey] = useState('B');
+
   const handleAttachRenderedVideo = async (renderedAsset) => {
     if (!renderedAsset?.public_url && !renderedAsset?.url && !renderedAsset?.publicUrl) return false;
     const videoUrl = renderedAsset.public_url || renderedAsset.url || renderedAsset.publicUrl;
@@ -623,6 +640,122 @@ export default function SocialDraftComposer({
 
   const handleCanvasCutVideo = async (cutData) => {
     setVideoStudioOpen(true);
+  };
+
+  const generateComposerCopy = async (customAngle = null, customEngine = null) => {
+    const engine = customEngine || composerAiEngine || 'cohere';
+    const angle = customAngle || composerAiAngle || 'editorial';
+
+    // Build candidate entity object
+    let cand = null;
+    if (selected) {
+      cand = {
+        id: selected.id,
+        type: activeTheme.entity === 'person' ? 'person' : activeTheme.entity === 'play' ? 'play' : 'movie',
+        name: selected.title || selected.name || '',
+        subtext: selected.year ? String(selected.year) : (selected.known_for || ''),
+        imageUrl: selected.photo_url || selected.poster_url || '',
+        category: activeTheme.category,
+        data: selected,
+      };
+    } else if (selectedFilms && selectedFilms.length > 0) {
+      cand = {
+        id: selectedFilms[0].id,
+        type: 'movie',
+        name: selectedFilms.map(f => f.title).join(', '),
+        category: 'Weekend Watchlist',
+        data: { films: selectedFilms },
+      };
+    } else if (result?.contentItem) {
+      cand = {
+        id: result.contentItem.id,
+        type: result.contentItem.content_type || 'movie',
+        name: result.contentItem.title || 'MuviDB Feature',
+        data: result.contentItem,
+      };
+    }
+
+    if (!cand || !cand.name) {
+      toast.error('Please pick a subject or movie first to generate copy.');
+      return;
+    }
+
+    setComposerAiGenerating(true);
+    try {
+      const res = await fetch('/api/social?task=ai_generate_copy', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidate: cand,
+          series: { slug: activeTheme.seriesSlug || 'filmography', name: activeTheme.name, category: activeTheme.category },
+          angle,
+          preferredProvider: engine,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Copy generation failed');
+
+      if (data.success && Array.isArray(data.variations) && data.variations.length > 0) {
+        setComposerAiVariations(data.variations);
+        const activeVar = data.variations.find(v => v.key === 'B') || data.variations[0];
+        setComposerSelectedVarKey(activeVar.key);
+
+        // Apply captions to current active platform variant
+        const platformKey = activeVariant?.platform || 'instagram';
+        const newCaption = activeVar.captions?.[platformKey] || data[platformKey] || '';
+        if (newCaption && activeVariant?.id) {
+          setCaptionDrafts(prev => ({
+            ...prev,
+            [activeVariant.id]: clampWords(newCaption, THEME_WORD_LIMITS[themeId] || 70),
+          }));
+        }
+        toast.success(`✨ Generated 3 variations with ${data.engine?.toUpperCase() || engine.toUpperCase()}!`);
+      } else if (data.instagram) {
+        const platformKey = activeVariant?.platform || 'instagram';
+        const newCaption = data[platformKey] || '';
+        if (newCaption && activeVariant?.id) {
+          setCaptionDrafts(prev => ({
+            ...prev,
+            [activeVariant.id]: clampWords(newCaption, THEME_WORD_LIMITS[themeId] || 70),
+          }));
+        }
+        toast.success(`✨ Copy generated with ${data.engine?.toUpperCase() || engine.toUpperCase()}!`);
+      }
+    } catch (err) {
+      toast.error(err.message || 'AI copy generation failed');
+    } finally {
+      setComposerAiGenerating(false);
+    }
+  };
+
+  const handleSelectComposerVariation = (varKey) => {
+    setComposerSelectedVarKey(varKey);
+    const targetVar = composerAiVariations.find(v => v.key === varKey);
+    if (targetVar?.captions && activeVariant?.id) {
+      const platformKey = activeVariant.platform || 'instagram';
+      const cap = targetVar.captions[platformKey] || targetVar.captions.instagram || '';
+      setCaptionDrafts(prev => ({
+        ...prev,
+        [activeVariant.id]: clampWords(cap, THEME_WORD_LIMITS[themeId] || 70),
+      }));
+      toast.success(`Switched to Option ${varKey} (${targetVar.label})`);
+    }
+  };
+
+  const handleApplyVariationToAllPlatforms = () => {
+    const targetVar = composerAiVariations.find(v => v.key === composerSelectedVarKey);
+    if (!targetVar?.captions || !result?.variants?.length) return;
+
+    const updatedMap = {};
+    for (const v of result.variants) {
+      const platformKey = v.platform || 'instagram';
+      const cap = targetVar.captions[platformKey] || targetVar.captions.instagram || '';
+      if (cap) {
+        updatedMap[v.id] = clampWords(cap, THEME_WORD_LIMITS[themeId] || 70);
+      }
+    }
+    setCaptionDrafts(prev => ({ ...prev, ...updatedMap }));
+    toast.success(`Applied Option ${composerSelectedVarKey} across all connected channels!`);
   };
 
   // Sync external theme changes (such as clicking from the 30-Day calendar)
@@ -2974,6 +3107,120 @@ export default function SocialDraftComposer({
                           {savingCaptionId === activeVariant?.id ? 'Saving…' : 'Save'}
                         </button>
                       </div>
+                    </div>
+
+                    {/* AI Copywriting Assistant Toolbar */}
+                    <div className="rounded-xl border border-brand/30 bg-gradient-to-r from-brand/10 via-surface-2 to-surface-2 p-3 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-brand">
+                            ✨ AI Copy Assistant
+                          </span>
+
+                          {/* Engine Toggle */}
+                          <div className="inline-flex rounded-lg border border-white/10 bg-surface p-0.5 text-[10px] font-bold">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setComposerAiEngine('cohere');
+                                generateComposerCopy(composerAiAngle, 'cohere');
+                              }}
+                              className={`rounded px-2 py-0.5 transition-all ${
+                                composerAiEngine === 'cohere' ? 'bg-brand text-white shadow-xs' : 'text-text-muted hover:text-white'
+                              }`}
+                            >
+                              🪄 Cohere
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setComposerAiEngine('gemini');
+                                generateComposerCopy(composerAiAngle, 'gemini');
+                              }}
+                              className={`rounded px-2 py-0.5 transition-all ${
+                                composerAiEngine === 'gemini' ? 'bg-violet-600 text-white shadow-xs' : 'text-text-muted hover:text-white'
+                              }`}
+                            >
+                              ⚡ Gemini
+                            </button>
+                          </div>
+
+                          {/* Tone / Angle Selector */}
+                          <select
+                            value={composerAiAngle}
+                            onChange={e => {
+                              setComposerAiAngle(e.target.value);
+                              generateComposerCopy(e.target.value, composerAiEngine);
+                            }}
+                            className="h-7 rounded-lg border border-white/10 bg-surface px-2 text-[11px] font-bold text-text-primary outline-none focus:border-brand"
+                          >
+                            {COMPOSER_COPY_ANGLES.map(a => (
+                              <option key={a.value} value={a.value}>
+                                {a.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => generateComposerCopy(composerAiAngle, composerAiEngine)}
+                          disabled={composerAiGenerating || (!selected && !selectedFilms.length && !result?.contentItem)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1 text-xs font-bold text-white hover:bg-brand-hover transition-all disabled:opacity-50 shadow-xs"
+                        >
+                          <Icon
+                            icon={composerAiGenerating ? 'solar:spinner-linear' : 'solar:magic-stick-3-bold'}
+                            className={composerAiGenerating ? 'animate-spin' : ''}
+                            width="14"
+                          />
+                          <span>{composerAiGenerating ? 'Writing…' : `Generate 3 Variations (${composerAiEngine.toUpperCase()})`}</span>
+                        </button>
+                      </div>
+
+                      {/* 3 Variations Selector */}
+                      {composerAiVariations.length > 0 && (
+                        <div className="space-y-2 pt-1 border-t border-white/10">
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-text-muted">
+                            <span>Select Copywriting Variation</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-brand font-mono text-[9px]">Engine: {composerAiEngine} · Tone: {composerAiAngle}</span>
+                              <button
+                                type="button"
+                                onClick={handleApplyVariationToAllPlatforms}
+                                className="text-[10px] font-bold text-brand hover:underline"
+                                title="Apply this variation to all connected channels"
+                              >
+                                🔗 Sync to all channels
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {composerAiVariations.map(v => {
+                              const platformKey = activeVariant?.platform || 'instagram';
+                              const captionPreview = v.captions?.[platformKey] || v.captions?.instagram || '';
+                              const isSelected = composerSelectedVarKey === v.key;
+                              return (
+                                <button
+                                  key={v.key}
+                                  type="button"
+                                  onClick={() => handleSelectComposerVariation(v.key)}
+                                  className={`rounded-lg border p-2 text-left transition-all ${
+                                    isSelected
+                                      ? 'border-brand bg-brand/15 text-white ring-1 ring-brand shadow-xs'
+                                      : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-white'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between text-xs font-black">
+                                    <span>Option {v.key} ({v.label})</span>
+                                    {isSelected && <Icon icon="solar:check-circle-bold" className="text-brand" width="14" />}
+                                  </div>
+                                  <p className="mt-1 text-[10px] line-clamp-2 leading-relaxed opacity-90">{captionPreview}</p>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Rich Formatting & Tag Helpers Toolbar */}
