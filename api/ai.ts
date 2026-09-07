@@ -92,12 +92,12 @@ function formatLayeredCaption(title: string, storyHook: string, data: any): stri
   const platform = rawPlatform.toLowerCase() === 'youtube' ? 'YouTube' : rawPlatform;
 
   // Layer 1: Availability
-  let layer1 = `${cleanTitle} is streaming now \n\nonly on ${channel} on ${platform} 📺`;
+  let layer1 = `${cleanTitle} is streaming now \n\nonly on ${channel} on youtube`;
   if (platform.toLowerCase() !== 'youtube' && !channel.toLowerCase().includes('youtube')) {
-    layer1 = `${cleanTitle} is streaming now \n\non ${platform} 📺`;
+    layer1 = `${cleanTitle} is streaming now \n\nonly on ${platform}`;
   }
 
-  // Layer 2: Story / Conflict
+  // Layer 2: Section of the video cut / caption specific
   const layer2 = storyHook.trim();
 
   // Layer 3: Starring
@@ -117,33 +117,10 @@ function formatLayeredCaption(title: string, storyHook: string, data: any): stri
     layer3 = `Starring:\n${lines.join('\n')}`;
   }
 
-  // Layer 4: Directed & Produced
-  const crewLines: string[] = [];
-  const dirList: Array<{ name: string; handle?: string }> = Array.isArray(data?.directors)
-    ? data.directors.map((d: any) => typeof d === 'string' ? { name: d } : { name: d.name || '', handle: d.instagram_handle || d.handle || '' }).filter((d: any) => Boolean(d.name))
-    : [];
-  const prodList: Array<{ name: string; handle?: string }> = Array.isArray(data?.producers)
-    ? data.producers.map((p: any) => typeof p === 'string' ? { name: p } : { name: p.name || '', handle: p.instagram_handle || p.handle || '' }).filter((p: any) => Boolean(p.name))
-    : [];
+  // Layer 4: Find out more CTA & Hashtags
+  const layer4 = `Find out more about the Cast & Crew on MuviDB.\n#MuviDB #AfricanCinema #Nollywood #YouTube #${hashtagTitle}`;
 
-  if (dirList.length > 0) {
-    const dirStr = dirList.map(d => `${d.name}${d.handle ? ` @${d.handle.replace(/^@/, '')}` : ''}`).join(', ');
-    crewLines.push(`Directed by ${dirStr}`);
-  }
-  if (prodList.length > 0) {
-    const prodStr = prodList.map(p => `${p.name}${p.handle ? ` @${p.handle.replace(/^@/, '')}` : ''}`).join(', ');
-    crewLines.push(`Executive producer ${prodStr}.`);
-  }
-  const layer4 = crewLines.join(' \n');
-
-  // Layer 5: CTA
-  const layer5 = 'Find out more about the Cast & Crew on MuviDB.';
-
-  // Layer 6: Hashtags
-  const platformHashtag = platform.replace(/[^a-zA-Z0-9]/g, '') || 'YouTube';
-  const layer6 = `#MuviDB #AfricanCinema #${hashtagTitle} #Nollywood #${platformHashtag}`;
-
-  return [layer1, layer2, layer3, layer4, layer5, layer6].filter(Boolean).join('\n\n');
+  return [layer1, layer2, layer3, layer4].filter(Boolean).join('\n\n');
 }
 
 async function recommendClipSegment(data: any, res: VercelResponse) {
