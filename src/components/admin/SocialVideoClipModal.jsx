@@ -391,43 +391,10 @@ export default function SocialVideoClipModal({
   };
 
   const uploadLocalClipToStorage = async (localClip, signal) => {
-    const clipResponse = await fetch(localClip.download_url, { signal });
-    if (!clipResponse.ok) throw new Error('The desktop clipper finished, but the rendered file could not be read.');
-    const clipBlob = await clipResponse.blob();
-    if (!clipBlob.size) throw new Error('The desktop clipper returned an empty video.');
-
     const cleanFileName = (localClip.file_name || `muvidb_clip_${Date.now()}.mp4`).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = `clips/${Date.now()}_${cleanFileName}`;
+    const token = localClip.token || localClip.job_id || (typeof localClip.download_url === 'string' ? localClip.download_url.split('/').pop() : null);
 
-    // 1. Direct High-Speed Supabase CDN Upload
-    if (supabase) {
-      try {
-        const { error: uploadErr } = await supabase.storage
-          .from('social-published-assets')
-          .upload(storagePath, clipBlob, { contentType: 'video/mp4', upsert: true });
-
-        if (!uploadErr) {
-          const { data: urlData } = supabase.storage
-            .from('social-published-assets')
-            .getPublicUrl(storagePath);
-
-          if (urlData?.publicUrl) {
-            if (localClip.cleanup_url) {
-              fetch(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
-            }
-            return {
-              ...localClip,
-              public_url: urlData.publicUrl,
-              size_mb: Number((clipBlob.size / (1024 * 1024)).toFixed(2)),
-            };
-          }
-        }
-      } catch (err) {
-        console.warn('Supabase storage direct upload failed, trying drive fallback...', err);
-      }
-    }
-
-    // 2. Google Drive Fallback
+    // 1. Create an R2 upload session
     const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', {
       method: 'POST',
       headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -435,13 +402,48 @@ export default function SocialVideoClipModal({
       body: JSON.stringify({
         fileName: cleanFileName,
         mimeType: 'video/mp4',
-        fileSize: clipBlob.size,
+        fileSize: localClip.size_bytes || 1024,
       }),
     });
     const session = await sessionResponse.json().catch(() => ({}));
     if (!sessionResponse.ok || !session.uploadUrl || !session.publicUrl) {
       throw new Error(session.error || 'MuviDB could not prepare the temporary video upload.');
     }
+
+    // 2. Direct high-speed upload from desktop Python process to R2 (bypasses browser PNA/loopback issues)
+    if (token) {
+      try {
+        const directUploadRes = await fetch(`${LOCAL_CLIPPER_URL}/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal,
+          body: JSON.stringify({
+            token,
+            upload_url: session.uploadUrl,
+            content_type: 'video/mp4',
+          }),
+        });
+        if (directUploadRes.ok) {
+          if (localClip.cleanup_url) {
+            fetch(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
+          }
+          return {
+            ...localClip,
+            public_url: session.publicUrl,
+            r2_key: session.key,
+            size_mb: localClip.size_mb || Number(((localClip.size_bytes || 0) / (1024 * 1024)).toFixed(2)),
+          };
+        }
+      } catch (err) {
+        console.warn('Direct desktop upload failed, falling back to browser download...', err);
+      }
+    }
+
+    // 3. Browser download & upload fallback
+    const clipResponse = await fetch(localClip.download_url, { signal });
+    if (!clipResponse.ok) throw new Error('The desktop clipper finished, but the rendered file could not be read.');
+    const clipBlob = await clipResponse.blob();
+    if (!clipBlob.size) throw new Error('The desktop clipper returned an empty video.');
 
     const driveResponse = await fetch(session.uploadUrl, {
       method: 'PUT',

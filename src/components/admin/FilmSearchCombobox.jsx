@@ -60,23 +60,22 @@ export default function FilmSearchCombobox({
   }, []);
 
   const fetchDefaultFilms = async () => {
-    if (films && films.length > 0) {
-      setSearchResults(films.slice(0, 50));
-      return;
-    }
     setIsSearching(true);
     try {
       const { data, error } = await supabase
         .from('films')
-        .select('id, title, year, release_date, poster_url, trailer_youtube_id, trailer_external_url, youtube_watch_url, created_at')
+        .select('id, title, year, release_date, poster_url, trailer_youtube_id, trailer_external_url, youtube_watch_url')
         .not('youtube_watch_url', 'is', null)
         .order('release_date', { ascending: false, nullsLast: true })
         .limit(40);
       if (!error && data) {
         setSearchResults(data);
+      } else if (films.length > 0) {
+        setSearchResults(films.slice(0, 40));
       }
     } catch (err) {
       console.error('Error loading default films:', err);
+      if (films.length > 0) setSearchResults(films.slice(0, 40));
     } finally {
       setIsSearching(false);
     }
@@ -331,7 +330,7 @@ export default function FilmSearchCombobox({
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      <div className="flex items-center gap-2 mt-1">
                         {ytReady ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
                             <Icon icon="mdi:youtube" width="11" /> YouTube Video Ready
@@ -339,24 +338,6 @@ export default function FilmSearchCombobox({
                         ) : (
                           <span className="text-[9px] text-text-muted">
                             Catalogue Entry
-                          </span>
-                        )}
-
-                        {film.isUltraFresh && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            🔥 New Upload
-                          </span>
-                        )}
-
-                        {film.isCurrentYear && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-brand/20 text-brand border border-brand/30">
-                            2026 Release
-                          </span>
-                        )}
-
-                        {film.isUsed === false && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                            ⭐ Unused
                           </span>
                         )}
                       </div>

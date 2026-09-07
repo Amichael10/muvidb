@@ -58,7 +58,7 @@ class PrivateNetworkAccessMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             response = Response(status_code=204)
             response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, HEAD"
             response.headers["Access-Control-Allow-Headers"] = "*"
             response.headers["Access-Control-Allow-Private-Network"] = "true"
             response.headers["Access-Control-Max-Age"] = "86400"
@@ -305,6 +305,8 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             "progress": 100,
             "result": {
                 "success": True,
+                "token": token,
+                "job_id": token,
                 "download_url": f"http://127.0.0.1:{PORT}/files/{token}",
                 "cleanup_url": f"http://127.0.0.1:{PORT}/files/{token}",
                 "file_name": final_name,
@@ -340,7 +342,7 @@ def create_clip(payload: ClipRequest):
     final_path = OUTPUT_DIR / final_name
     CLIP_JOBS[token] = {"status": "processing", "message": "Starting the clipper…", "progress": 5}
     CLIP_EXECUTOR.submit(process_clip, payload, token, final_name, final_path)
-    return {"success": False, "status": "processing", "job_id": token, "status_url": f"http://127.0.0.1:{PORT}/clip/{token}"}
+    return {"success": False, "status": "processing", "job_id": token, "token": token, "status_url": f"http://127.0.0.1:{PORT}/clip/{token}"}
 
 
 @app.post("/batch", status_code=202)
@@ -363,7 +365,7 @@ def create_batch(payload: BatchClipRequest):
         final_path = OUTPUT_DIR / final_name
         CLIP_JOBS[token] = {"status": "processing", "message": "Queued by daily autopilot…", "progress": 5}
         CLIP_EXECUTOR.submit(process_clip, clip, token, final_name, final_path)
-        jobs.append({"job_id": token, "status_url": f"http://127.0.0.1:{PORT}/clip/{token}"})
+        jobs.append({"job_id": token, "token": token, "status_url": f"http://127.0.0.1:{PORT}/clip/{token}"})
     return {"success": True, "status": "processing", "jobs": jobs}
 
 
@@ -407,23 +409,24 @@ def upload_clip_to_r2(payload: UploadRequest):
 
 
 def file_for_token(token: str) -> Path:
-    if not re.fullmatch(r"[A-Za-z0-9_-]{20,80}", token):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{10,80}", token):
         raise HTTPException(404, "Clip not found")
     matches = list(OUTPUT_DIR.glob(f"*_{token}.mp4"))
-    if len(matches) != 1:
+    if not matches:
         raise HTTPException(404, "Clip not found or already cleaned up")
     return matches[0]
 
 
 @app.get("/files/{token}")
-def download_clip(token: str):
+def download_clip(token: str, request: Request):
     path = file_for_token(token)
+    origin = request.headers.get("origin") or "*"
     return FileResponse(
         path,
         media_type="video/mp4",
         filename=path.name,
         headers={
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Private-Network": "true",
             "Access-Control-Expose-Headers": "*",
         },

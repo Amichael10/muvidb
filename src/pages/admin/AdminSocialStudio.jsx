@@ -125,7 +125,6 @@ function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Se
   const currentYear = new Date().getFullYear(); // e.g. 2026
   const now = Date.now();
   const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
-  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 
   const isVideoSource = value => {
     if (!value) return false;
@@ -139,49 +138,61 @@ function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Se
     const sourceUrl = f.youtube_watch_url || (f.trailer_youtube_id ? `https://www.youtube.com/watch?v=${f.trailer_youtube_id}` : f.trailer_external_url);
     const releaseTime = f.release_date ? new Date(f.release_date).getTime() : 0;
     const createdTime = f.created_at ? new Date(f.created_at).getTime() : 0;
-    const year = f.year || (f.release_date ? new Date(f.release_date).getFullYear() : null);
+    
+    let year = f.year ? Number(f.year) : 0;
+    if (!year && f.release_date) {
+      const d = new Date(f.release_date);
+      if (!isNaN(d.getFullYear())) year = d.getFullYear();
+    }
 
-    const isUsed = usedFilmIds.has(f.id) || (f.title && usedFilmTitles.has(f.title.toLowerCase().trim()));
-    const isUltraFresh = (createdTime > 0 && now - createdTime <= FORTY_EIGHT_HOURS) || (releaseTime > 0 && Math.abs(now - releaseTime) <= FORTY_EIGHT_HOURS);
-    const isRecentWeek = (createdTime > 0 && now - createdTime <= SEVEN_DAYS) || (releaseTime > 0 && Math.abs(now - releaseTime) <= SEVEN_DAYS);
-    const isCurrentYear = year === currentYear || (releaseTime > 0 && new Date(releaseTime).getFullYear() === currentYear);
+    const cleanTitle = (f.title || '').toLowerCase().trim();
+    const isUsed = usedFilmIds.has(f.id) || (cleanTitle && usedFilmTitles.has(cleanTitle));
+    
+    // Breaking / ultra fresh: released in past 48h (hours ago / yesterday / today) or uploaded in past 48h for current year
+    const isReleasedRecently = releaseTime > 0 && (now - releaseTime) >= -86400000 && (now - releaseTime) <= FORTY_EIGHT_HOURS;
+    const isUploadedRecently = createdTime > 0 && (now - createdTime) <= FORTY_EIGHT_HOURS && (year >= currentYear - 1);
+    const isUltraFresh = isReleasedRecently || isUploadedRecently;
 
     return {
       ...f,
       sourceUrl,
       isUsed,
       isUltraFresh,
-      isRecentWeek,
-      isCurrentYear,
       releaseTime,
       createdTime,
-      year,
+      year: year || 0,
     };
   }).filter(f => isVideoSource(f.sourceUrl));
 
-  // If there are 2026 / current-year films, strictly prioritize them and ignore older years unless not enough exist
-  const currentYearFilms = processed.filter(f => f.isCurrentYear);
-  const targetPool = currentYearFilms.length >= 5 ? currentYearFilms : processed;
+  if (!processed.length) return [];
 
-  return [...targetPool].sort((a, b) => {
-    // 1. Unused films take priority over previously used ones
+  // 1. Separate unused films from already used films
+  const unusedFilms = processed.filter(f => !f.isUsed);
+  const activePool = unusedFilms.length > 0 ? unusedFilms : processed;
+
+  // 2. Identify the latest year (e.g. 2026). If there are 2026/current-year films, strictly ignore older years
+  const maxYearInPool = Math.max(...activePool.map(f => f.year || 0), 0);
+  const targetYear = maxYearInPool > 0 ? maxYearInPool : currentYear;
+
+  const currentYearSubset = activePool.filter(f => f.year === targetYear || f.year === currentYear);
+  const filteredCandidates = currentYearSubset.length > 0 ? currentYearSubset : activePool;
+
+  // 3. Deterministic sort: Unused -> Ultra Fresh (yesterday/today) -> Release Date (Month/Day DESC) -> Uploaded DESC
+  return [...filteredCandidates].sort((a, b) => {
+    // Unused before used
     if (!a.isUsed && b.isUsed) return -1;
     if (a.isUsed && !b.isUsed) return 1;
 
-    // 2. Ultra fresh (today / yesterday / hours ago) take absolute top priority
+    // Ultra fresh (breaking / released hours ago or yesterday) takes absolute top priority
     if (a.isUltraFresh && !b.isUltraFresh) return -1;
     if (!a.isUltraFresh && b.isUltraFresh) return 1;
 
-    // 3. Past 7-day uploads/releases
-    if (a.isRecentWeek && !b.isRecentWeek) return -1;
-    if (!a.isRecentWeek && b.isRecentWeek) return 1;
-
-    // 4. By release date (month and date descending)
+    // By release date: latest month and date first (e.g. Sept 2026 > Aug 2026 > Jan 2026)
     if (a.releaseTime !== b.releaseTime) {
       return b.releaseTime - a.releaseTime;
     }
 
-    // 5. By DB upload timestamp (created_at descending)
+    // Secondary sort: most recent upload to DB (created_at DESC)
     return b.createdTime - a.createdTime;
   });
 }
@@ -679,10 +690,10 @@ export default function AdminSocialStudio() {
         .select('id,title,release_date,year,created_at,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
         .order('created_at', { ascending: false })
-        .limit(300),
+        .limit(500),
       supabase.from('social_content_items')
         .select('id,title,source_entity_id,source_snapshot')
-        .limit(500)
+        .limit(1000)
     ]).then(([{ data: filmsData }, { data: socialData }]) => {
       if (cancelled) return;
       const usedIds = new Set();
@@ -691,6 +702,7 @@ export default function AdminSocialStudio() {
         if (item.source_entity_id) usedIds.add(item.source_entity_id);
         if (item.source_snapshot?.film_id) usedIds.add(item.source_snapshot.film_id);
         if (item.source_snapshot?.filmId) usedIds.add(item.source_snapshot.filmId);
+        if (item.source_snapshot?.id) usedIds.add(item.source_snapshot.id);
         if (item.source_snapshot?.title) usedTitles.add(String(item.source_snapshot.title).toLowerCase().trim());
         if (item.title) {
           const cleanTitle = item.title.split('—')[0].split('-')[0].trim().toLowerCase();
@@ -725,9 +737,9 @@ export default function AdminSocialStudio() {
           supabase.from('films')
             .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
             .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
-            .order('created_at', { ascending: false }).limit(200),
+            .order('created_at', { ascending: false }).limit(500),
           supabase.from('social_content_items')
-            .select('id,title,source_entity_id,source_snapshot').limit(500)
+            .select('id,title,source_entity_id,source_snapshot').limit(1000)
         ]);
         const usedIds = new Set();
         const usedTitles = new Set();
@@ -735,6 +747,7 @@ export default function AdminSocialStudio() {
           if (item.source_entity_id) usedIds.add(item.source_entity_id);
           if (item.source_snapshot?.film_id) usedIds.add(item.source_snapshot.film_id);
           if (item.source_snapshot?.filmId) usedIds.add(item.source_snapshot.filmId);
+          if (item.source_snapshot?.id) usedIds.add(item.source_snapshot.id);
           if (item.source_snapshot?.title) usedTitles.add(String(item.source_snapshot.title).toLowerCase().trim());
           if (item.title) {
             const cleanTitle = item.title.split('—')[0].split('-')[0].trim().toLowerCase();
