@@ -2317,9 +2317,18 @@ export default function AdminSocialStudio() {
                   Automated video generation pipeline: Selects the latest verified Nollywood releases, extracts highlight moments with Gemini, and renders high-res 1:1 and 9:16 video clips locally.
                 </p>
               </div>
-              <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-[10px] font-black uppercase text-violet-300">
-                Local FFmpeg Clipper
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${
+                    clipperStatus === 'running'
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 shadow-sm shadow-emerald-500/20'
+                      : 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${clipperStatus === 'running' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                  {clipperStatus === 'running' ? 'Local Clipper Ready' : 'Local Clipper Offline'}
+                </span>
+              </div>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -2609,6 +2618,18 @@ export default function AdminSocialStudio() {
                 Post All Now
               </button>
             </div>
+            {clipperStatus !== 'running' && (
+              <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+                <Icon icon="solar:info-circle-bold" className="text-base text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-bold">Local FFmpeg Clipper is offline.</span> Start the clipper service by running{' '}
+                  <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[11px] text-amber-300">
+                    powershell scripts\start-local-social-clipper.ps1
+                  </code>{' '}
+                  in your terminal to enable video rendering.
+                </div>
+              </div>
+            )}
           </section>
         </div>
       )}
