@@ -815,28 +815,41 @@ export default function AdminSocialStudio() {
         }
         completed.push({ ...status, public_url: session.publicUrl, r2_key: session.key });
       }
-      for (const asset of completed) {
-        const dims = getDimensionsForAspectRatio(asset.aspect_ratio);
+      if (completed.length > 0) {
+        const primaryAsset = completed[0];
+        const dims = getDimensionsForAspectRatio(primaryAsset.aspect_ratio);
         await fetch('/api/social?task=create_editor_video_draft', {
           method: 'POST',
           headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            title: `${film.title} — ${asset.aspect_ratio} daily clip`,
-            publicUrl: asset.public_url,
-            storagePath: asset.r2_key,
+            title: `${film.title} — Highlight Clip`,
+            publicUrl: primaryAsset.public_url,
+            storagePath: primaryAsset.r2_key,
             mimeType: 'video/mp4',
-            format: asset.aspect_ratio,
-            fileSizeBytes: asset.size_bytes,
+            format: primaryAsset.aspect_ratio,
+            fileSizeBytes: primaryAsset.size_bytes,
             width: dims.width,
             height: dims.height,
+            assets: completed.map(asset => {
+              const d = getDimensionsForAspectRatio(asset.aspect_ratio);
+              return {
+                publicUrl: asset.public_url,
+                storagePath: asset.r2_key,
+                mimeType: 'video/mp4',
+                format: asset.aspect_ratio,
+                fileSizeBytes: asset.size_bytes,
+                width: d.width,
+                height: d.height,
+              };
+            }),
             captions: { instagram: recommendation.caption || '', facebook: recommendation.caption || '', threads: recommendation.caption || '', tiktok: recommendation.caption || '' },
             platforms: ['instagram', 'facebook', 'threads', 'tiktok'],
           }),
         });
       }
-      setVideoAutopilot({ running: false, message: `Prepared ${completed.length} video drafts for approval.`, jobs: completed });
+      setVideoAutopilot({ running: false, message: `Prepared 1 multi-ratio video draft for approval.`, jobs: completed });
       await fetchDrafts(true);
-      toast.success(`Prepared ${completed.length} daily video drafts for approval.`);
+      toast.success(`Prepared multi-ratio video draft for ${film.title}!`);
     } catch (err) {
       setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Daily video autopilot failed.' }));
       toast.error(err.message || 'Daily video autopilot failed.');
@@ -865,8 +878,9 @@ export default function AdminSocialStudio() {
       const date = new Date(baseDate); date.setDate(baseDate.getDate() + day);
       const dateString = date.toISOString().slice(0, 10);
       [
-        { time: videoPlan.videoStart, aspectRatios: ['9:16', '1:1'] },
-        { time: videoPlan.videoEnd, aspectRatios: ['9:16'] },
+        { time: '12:00', aspectRatios: ['9:16', '1:1'] },
+        { time: '16:00', aspectRatios: ['9:16', '1:1'] },
+        { time: '20:00', aspectRatios: ['9:16', '1:1'] },
       ].forEach((slot, slotIndex) => {
         const film = films[filmIdx % films.length];
         filmIdx += 1;
@@ -883,24 +897,31 @@ export default function AdminSocialStudio() {
         });
       });
     }
-    setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days prioritizing newest 2026 uploads & unused releases.`);
+    setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days (3 distinct movies per day, 9:16 & 1:1 multi-ratio).`);
   };
   const removeVideoRow = id => setVideoRows(rows => rows.length > 1 ? rows.filter(row => row.id !== id) : rows);
   const resolveFilmForRow = async row => {
-    if (row.film && row.film.id === row.filmId) return row.film;
-    const existing = videoFilmOptions.find(item => item.id === row.filmId);
-    if (existing && existing.synopsis) return existing;
+    if (row.film && row.film.id === row.filmId && row.film.credits) return row.film;
     if (!row.filmId) return null;
     try {
       const { data, error } = await supabase
         .from('films')
-        .select('id,title,release_date,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url')
+        .select(`
+          id,title,release_date,year,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,
+          youtube_channels(id,channel_name,channel_title),
+          film_platform_links(platform,web_url),
+          credits(
+            id,role,job,billing_order,character_name,
+            people(id,name,instagram_handle,slug)
+          )
+        `)
         .eq('id', row.filmId)
         .single();
       if (!error && data) return data;
     } catch {
       // fallback
     }
+    const existing = videoFilmOptions.find(item => item.id === row.filmId);
     return existing || null;
   };
 
@@ -920,7 +941,37 @@ export default function AdminSocialStudio() {
 
     try {
       const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
-      let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || '') };
+      const channelName = film.youtube_channels?.channel_title || film.youtube_channels?.channel_name || '';
+      const platform = film.film_platform_links?.[0]?.platform || 'YouTube';
+      
+      const rawCredits = asRelationArray(film.credits);
+      const cast = rawCredits
+        .filter(c => (c.role === 'cast' || c.job === 'Actor' || !c.role) && c.people?.name)
+        .sort((a, b) => (a.billing_order || 99) - (b.billing_order || 99))
+        .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+      
+      const directors = rawCredits
+        .filter(c => (c.job?.toLowerCase().includes('director') || c.role === 'director') && c.people?.name)
+        .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+
+      const producers = rawCredits
+        .filter(c => (c.job?.toLowerCase().includes('producer') || c.role === 'producer') && c.people?.name)
+        .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+
+      let sourceMetadata = {
+        title: film.title,
+        duration: 3600,
+        transcript: '',
+        description: '',
+        synopsis: film.synopsis || '',
+        genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || ''),
+        channelName,
+        platform,
+        cast,
+        directors,
+        producers,
+      };
+
       if (sourceUrl) {
         try {
           const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {

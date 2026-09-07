@@ -84,6 +84,68 @@ function formatSecondsToTimestamp(sec: number): string {
   return `${pad(minutes)}:${pad(seconds)}`;
 }
 
+function formatLayeredCaption(title: string, storyHook: string, data: any): string {
+  const cleanTitle = String(title || 'Film').trim();
+  const hashtagTitle = cleanTitle.replace(/[^a-zA-Z0-9]/g, '');
+  const channel = String(data?.channelName || data?.channel || 'YouTube').trim();
+  const rawPlatform = String(data?.platform || 'YouTube').trim();
+  const platform = rawPlatform.toLowerCase() === 'youtube' ? 'YouTube' : rawPlatform;
+
+  // Layer 1: Availability
+  let layer1 = `${cleanTitle} is streaming now \n\nonly on ${channel} on ${platform} 📺`;
+  if (platform.toLowerCase() !== 'youtube' && !channel.toLowerCase().includes('youtube')) {
+    layer1 = `${cleanTitle} is streaming now \n\non ${platform} 📺`;
+  }
+
+  // Layer 2: Story / Conflict
+  const layer2 = storyHook.trim();
+
+  // Layer 3: Starring
+  let layer3 = '';
+  const castList: Array<{ name: string; handle?: string }> = Array.isArray(data?.cast)
+    ? data.cast.map((c: any) => typeof c === 'string' ? { name: c } : { name: c.name || c.full_name || '', handle: c.instagram_handle || c.handle || '' }).filter((c: any) => Boolean(c.name))
+    : [];
+
+  if (castList.length > 0) {
+    const lines = castList.slice(0, 8).map((c, idx, arr) => {
+      const handleStr = c.handle ? ` @${c.handle.replace(/^@/, '')}` : '';
+      if (idx === arr.length - 1 && arr.length > 1) {
+        return `and ${c.name}${handleStr}.`;
+      }
+      return `${c.name}${handleStr}`;
+    });
+    layer3 = `Starring:\n${lines.join('\n')}`;
+  }
+
+  // Layer 4: Directed & Produced
+  const crewLines: string[] = [];
+  const dirList: Array<{ name: string; handle?: string }> = Array.isArray(data?.directors)
+    ? data.directors.map((d: any) => typeof d === 'string' ? { name: d } : { name: d.name || '', handle: d.instagram_handle || d.handle || '' }).filter((d: any) => Boolean(d.name))
+    : [];
+  const prodList: Array<{ name: string; handle?: string }> = Array.isArray(data?.producers)
+    ? data.producers.map((p: any) => typeof p === 'string' ? { name: p } : { name: p.name || '', handle: p.instagram_handle || p.handle || '' }).filter((p: any) => Boolean(p.name))
+    : [];
+
+  if (dirList.length > 0) {
+    const dirStr = dirList.map(d => `${d.name}${d.handle ? ` @${d.handle.replace(/^@/, '')}` : ''}`).join(', ');
+    crewLines.push(`Directed by ${dirStr}`);
+  }
+  if (prodList.length > 0) {
+    const prodStr = prodList.map(p => `${p.name}${p.handle ? ` @${p.handle.replace(/^@/, '')}` : ''}`).join(', ');
+    crewLines.push(`Executive producer ${prodStr}.`);
+  }
+  const layer4 = crewLines.join(' \n');
+
+  // Layer 5: CTA
+  const layer5 = 'Find out more about the Cast & Crew on MuviDB.';
+
+  // Layer 6: Hashtags
+  const platformHashtag = platform.replace(/[^a-zA-Z0-9]/g, '') || 'YouTube';
+  const layer6 = `#MuviDB #AfricanCinema #${hashtagTitle} #Nollywood #${platformHashtag}`;
+
+  return [layer1, layer2, layer3, layer4, layer5, layer6].filter(Boolean).join('\n\n');
+}
+
 async function recommendClipSegment(data: any, res: VercelResponse) {
   const title = String(data?.title || 'this Nollywood film').slice(0, 200);
   const rawDuration = Number(data?.duration);
@@ -93,10 +155,22 @@ async function recommendClipSegment(data: any, res: VercelResponse) {
   const description = String(data?.description || '').slice(0, 3000);
   const synopsis = String(data?.synopsis || '').slice(0, 2000);
   const genre = String(data?.genre || '').slice(0, 200);
+  const channelName = String(data?.channelName || data?.channel || '').slice(0, 100);
+  const platform = String(data?.platform || 'YouTube').slice(0, 50);
   const targetLength = Math.min(60, Math.max(15, Number(data?.targetLength || 45)));
   const isManual = data?.mode === 'manual' || (Boolean(data?.startTime || data?.start) && data?.mode !== 'gemini');
   const preferredProvider = String(data?.preferredProvider || data?.engine || 'gemini').toLowerCase() as any;
   const requestedAngle = String(data?.angle || data?.tone || 'editorial').toLowerCase();
+
+  const castNames = Array.isArray(data?.cast)
+    ? data.cast.map((c: any) => typeof c === 'string' ? c : `${c.name || ''}${c.instagram_handle ? ` (@${c.instagram_handle.replace(/^@/, '')})` : ''}`).filter(Boolean).join(', ')
+    : '';
+  const directorNames = Array.isArray(data?.directors)
+    ? data.directors.map((d: any) => typeof d === 'string' ? d : `${d.name || ''}${d.instagram_handle ? ` (@${d.instagram_handle.replace(/^@/, '')})` : ''}`).filter(Boolean).join(', ')
+    : '';
+  const producerNames = Array.isArray(data?.producers)
+    ? data.producers.map((p: any) => typeof p === 'string' ? p : `${p.name || ''}${p.instagram_handle ? ` (@${p.instagram_handle.replace(/^@/, '')})` : ''}`).filter(Boolean).join(', ')
+    : '';
 
   let startTime = parseTimestampToSeconds(data?.startTime ?? data?.start);
   let endTime = parseTimestampToSeconds(data?.endTime ?? data?.end);
@@ -123,59 +197,70 @@ The user has MANUALLY chosen an exact video scene segment from ${startFmt} to ${
 
 Movie Context:
 - Title: ${title}
+- Platform/Channel: ${channelName ? `${channelName} on ${platform}` : platform}
 - Genre: ${genre || 'Drama/Comedy'}
 - Synopsis: ${synopsis || 'Exciting Nollywood release'}
+- Cast: ${castNames || '(not listed)'}
+- Director: ${directorNames || '(not listed)'}
+- Producer: ${producerNames || '(not listed)'}
 - Scene Timestamps: ${startFmt} – ${endFmt}
-- Target Tone / Angle: ${requestedAngle}
-- Context / Transcript: ${transcript || description || '(scene analysis)'}
+- Target Angle: ${requestedAngle}
+- Transcript / Context: ${transcript || description || '(scene analysis)'}
 
 YOUR GOAL:
-Generate 3 viral social captions for this specific scene clip:
-1. Option A (Informative): Set up the premise, who is in the scene, and where to watch on MuviDB.
-2. Option B (Editorial / Hype): High-drama cinema critique, intense dialogue reaction, and standout acting praise.
-3. Option C (Conversational / Debate): Provocative question directly asking the audience how they would react in this character's shoes.
+Generate 3 viral Nollywood social media caption variations for this scene clip.
+Each variation must feature a 2-4 sentence narrative story/conflict hook with engaging emojis (🤝 😂 💀 🍿 🔥) describing the tension, humor, or twist in this specific scene.
+
+Variations:
+1. Option A (Informative): Clear premise setup, character introduction, and viewing destination.
+2. Option B (Editorial / Hype): Dramatic scene breakdown, hilarious observation, character banter, and punchline.
+3. Option C (Conversational / Debate): Provocative question asking how the audience would react in this character's shoes.
 
 Return ONLY valid JSON with this exact shape:
 {
-  "caption": "Primary caption (Option B or best match under 35 words with #Nollywood #MuviDB hashtags)",
+  "hookStory": "Primary 2-4 sentence narrative hook paragraph (Option B)",
   "reason": "Why this scene hits hard at ${startFmt}",
   "variations": [
-    { "key": "A", "label": "Informative", "text": "Option A caption text..." },
-    { "key": "B", "label": "Editorial", "text": "Option B caption text..." },
-    { "key": "C", "label": "Conversational", "text": "Option C caption text..." }
+    { "key": "A", "label": "Informative", "hookStory": "Option A story paragraph..." },
+    { "key": "B", "label": "Editorial", "hookStory": "Option B story paragraph..." },
+    { "key": "C", "label": "Conversational", "hookStory": "Option C story paragraph..." }
   ]
 }`;
   } else {
     prompt = `You are MuviDB's viral Nollywood short-form video producer.
-Your mission is to recommend one exciting, high-retention ${targetLength}-second TikTok/Reels clip from this Nollywood film to blow up on social media.
+Your mission is to recommend one exciting, high-retention ${targetLength}-second TikTok/Reels clip from this Nollywood film to blow up on social media, along with 3 layered captions.
 
 Movie Context:
 - Title: ${title}
+- Platform/Channel: ${channelName ? `${channelName} on ${platform}` : platform}
 - Genre: ${genre || 'Drama/Comedy'}
 - Synopsis: ${synopsis || 'Exciting Nollywood release'}
+- Cast: ${castNames || '(not listed)'}
+- Director: ${directorNames || '(not listed)'}
+- Producer: ${producerNames || '(not listed)'}
 - Video Duration: ${duration}s (${formatSecondsToTimestamp(duration)})
 - Allowed Window: Between ${minStart}s (${formatSecondsToTimestamp(minStart)}) and ${maxEnd}s (${formatSecondsToTimestamp(maxEnd)})
-- Target Tone / Angle: ${requestedAngle}
+- Target Angle: ${requestedAngle}
 - YouTube Description / Context: ${description || '(none provided)'}
 - Subtitles / Transcript Snippets: ${transcript || '(auto-segment analysis)'}
 
 CRITICAL RULES FOR SCENE SELECTION:
 1. Target an intensely emotional, hilarious, dramatic, or suspenseful scene that hooks viewers within the first 3 seconds.
-2. ABSOLUTELY DO NOT select the beginning of the video (00:00 to ${formatSecondsToTimestamp(minStart)}). Opening segments contain channel intros, sponsor advertisements, logos, or commercial banners.
-3. ABSOLUTELY DO NOT select the end of the video (${formatSecondsToTimestamp(maxEnd)} to ${formatSecondsToTimestamp(duration)}). End segments contain closing credits, cast/crew rolls, and YouTube outro subscribe screens.
+2. ABSOLUTELY DO NOT select the beginning of the video (00:00 to ${formatSecondsToTimestamp(minStart)}).
+3. ABSOLUTELY DO NOT select the end of the video (${formatSecondsToTimestamp(maxEnd)} to ${formatSecondsToTimestamp(duration)}).
 4. The startTime MUST be between ${minStart} and ${Math.max(minStart, maxEnd - targetLength)} (e.g. "22:22" or in seconds).
 5. The endTime should be startTime + approximately ${targetLength} seconds (max endTime <= ${maxEnd}).
 
 Return ONLY valid JSON with this exact shape:
 {
-  "startTime": "22:22" (or total seconds as number),
-  "endTime": "23:07" (or total seconds as number),
+  "startTime": "22:22",
+  "endTime": "23:07",
   "reason": "Why this specific scene is viral/emotional/funny",
-  "caption": "Short punchy hook caption with 2-3 emojis and #Nollywood #MuviDB hashtags (under 35 words)",
+  "hookStory": "2-4 sentence narrative scene breakdown with lively emojis (🤝 😂 💀 🍿 🔥) describing the conflict or comedy in this clip",
   "variations": [
-    { "key": "A", "label": "Informative", "text": "Informative hook caption..." },
-    { "key": "B", "label": "Editorial", "text": "Editorial / Dramatic caption..." },
-    { "key": "C", "label": "Conversational", "text": "Audience debate question caption..." }
+    { "key": "A", "label": "Informative", "hookStory": "Option A story paragraph..." },
+    { "key": "B", "label": "Editorial", "hookStory": "Option B story paragraph..." },
+    { "key": "C", "label": "Conversational", "hookStory": "Option C story paragraph..." }
   ]
 }`;
   }
@@ -196,21 +281,28 @@ Return ONLY valid JSON with this exact shape:
 
   const startTimeFormatted = formatSecondsToTimestamp(startTime);
   const endTimeFormatted = formatSecondsToTimestamp(endTime);
-  const caption = String(parsed?.caption || `Wait for the reaction! 🍿 Watch ${title} now on MuviDB #Nollywood #AfricanCinema`).trim();
+
+  const rawHook = String(parsed?.hookStory || parsed?.caption || `${title} brings intense drama and unforgettable performances that will leave you on the edge of your seat! 🍿🔥`).trim();
+  const primaryCaption = formatLayeredCaption(title, rawHook, data);
   const reason = String(parsed?.reason || 'High-stakes dramatic dialogue scene').trim();
+
   const rawVars = Array.isArray(parsed?.variations) ? parsed.variations : [];
-  const variations = rawVars.length === 3 ? rawVars : [
-    { key: 'A', label: 'Informative', text: caption },
-    { key: 'B', label: 'Editorial', text: caption },
-    { key: 'C', label: 'Conversational', text: caption },
-  ];
+  const variations = (rawVars.length === 3 ? rawVars : [
+    { key: 'A', label: 'Informative', hookStory: rawHook },
+    { key: 'B', label: 'Editorial', hookStory: rawHook },
+    { key: 'C', label: 'Conversational', hookStory: rawHook },
+  ]).map((v: any) => ({
+    key: v.key || 'A',
+    label: v.label || 'Variation',
+    text: formatLayeredCaption(title, String(v.hookStory || v.text || rawHook), data),
+  }));
 
   return res.status(200).json({
     startTime,
     endTime,
     startTimeFormatted,
     endTimeFormatted,
-    caption,
+    caption: primaryCaption,
     variations,
     reason,
     engine: telemetry?.engine || preferredProvider || 'gemini',
