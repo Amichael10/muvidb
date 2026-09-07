@@ -838,8 +838,9 @@ export default function AdminSocialStudio() {
     }
   };
 
-  const prepareCustomVideoPlan = async (action = 'draft') => {
-    const validRows = videoRows.filter(row => row.filmId && row.date && row.time);
+  const prepareCustomVideoPlan = async (action = 'draft', targetRows = null) => {
+    const rowsToProcess = targetRows ? (Array.isArray(targetRows) ? targetRows : [targetRows]) : videoRows;
+    const validRows = rowsToProcess.filter(row => row.filmId && row.date && row.time);
     if (!validRows.length) return toast.error('Add at least one video row with a film, date, and time.');
     setVideoAutopilot({ running: true, message: `Preparing ${validRows.length} planned video item${validRows.length === 1 ? '' : 's'}…`, jobs: [] });
     try {
@@ -2586,6 +2587,27 @@ export default function AdminSocialStudio() {
                       className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-xs text-white outline-none focus:border-brand"
                     />
                   </label>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <div className="text-[11px] text-text-muted">
+                      {row.filmId ? (
+                        <span>Ready to clip {getRowAspectRatios(row).join(' & ')} formats ({row.start} – {row.end})</span>
+                      ) : (
+                        <span className="text-amber-300/80">Select a film to enable rendering</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => prepareCustomVideoPlan('draft', row)}
+                        disabled={videoAutopilot.running || clipperStatus !== 'running' || !row.filmId}
+                        className="flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-xs font-bold text-white shadow-sm shadow-brand/20 transition-all hover:bg-brand-hover disabled:opacity-50"
+                      >
+                        <Icon icon="solar:clapperboard-play-bold" width="14" />
+                        <span>Render This Clip (Draft)</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
