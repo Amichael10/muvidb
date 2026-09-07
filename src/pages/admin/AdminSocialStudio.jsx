@@ -673,12 +673,33 @@ export default function AdminSocialStudio() {
           if (status.success) break;
           setVideoAutopilot(prev => ({ ...prev, message: `Rendering ${status.result?.aspect_ratio || 'video'}… ${status.progress || 0}%` }));
         }
-        const blob = await (await fetch(status.download_url)).blob();
-        const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: blob.size }) });
+        const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: status.size_bytes || 1024 }) });
         const session = await sessionResponse.json().catch(() => ({}));
         if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
-        const uploadResponse = await fetch(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob });
-        if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
+
+        let uploadSuccessful = false;
+        try {
+          const directUploadRes = await fetch('http://127.0.0.1:4317/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: job.job_id, upload_url: session.uploadUrl, content_type: 'video/mp4' }),
+          });
+          if (directUploadRes.ok) {
+            uploadSuccessful = true;
+          }
+        } catch {
+          // fallback to browser fetch
+        }
+
+        if (!uploadSuccessful) {
+          try {
+            const blob = await (await fetch(status.download_url)).blob();
+            const uploadResponse = await fetch(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob });
+            if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
+          } catch (err) {
+            throw new Error('Clipper download blocked by browser. Please restart your local clipper script to apply the CORS patch.');
+          }
+        }
         completed.push({ ...status, public_url: session.publicUrl, r2_key: session.key });
       }
       for (const asset of completed) {
@@ -886,20 +907,41 @@ export default function AdminSocialStudio() {
               message: `Rendering ${film.title} (${targetFormat})… ${status.progress || 0}%`,
             }));
           }
-          const blob = await (await fetch(status.download_url)).blob();
           const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', {
             method: 'POST',
             headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: blob.size }),
+            body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: status.size_bytes || 1024 }),
           });
           const session = await sessionResponse.json().catch(() => ({}));
           if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
-          const uploadResponse = await fetch(session.uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'video/mp4' },
-            body: blob,
-          });
-          if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
+
+          let uploadSuccessful = false;
+          try {
+            const directUploadRes = await fetch('http://127.0.0.1:4317/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: job.job_id, upload_url: session.uploadUrl, content_type: 'video/mp4' }),
+            });
+            if (directUploadRes.ok) {
+              uploadSuccessful = true;
+            }
+          } catch {
+            // fallback to browser fetch
+          }
+
+          if (!uploadSuccessful) {
+            try {
+              const blob = await (await fetch(status.download_url)).blob();
+              const uploadResponse = await fetch(session.uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'video/mp4' },
+                body: blob,
+              });
+              if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
+            } catch (err) {
+              throw new Error('Clipper download blocked by browser. Please restart your local clipper script to apply the CORS patch.');
+            }
+          }
 
           const dims = getDimensionsForAspectRatio(targetFormat);
           const draftResponse = await fetch('/api/social?task=create_editor_video_draft', {
@@ -910,7 +952,7 @@ export default function AdminSocialStudio() {
               publicUrl: session.publicUrl,
               storagePath: session.key,
               mimeType: 'video/mp4',
-              fileSizeBytes: blob.size,
+              fileSizeBytes: status.size_bytes || 1024,
               width: dims.width,
               height: dims.height,
               captions: { instagram: caption, facebook: caption, threads: caption, tiktok: caption },

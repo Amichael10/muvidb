@@ -46,22 +46,39 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
-app = FastAPI(title="MuviDB Local Clipper", version="2.0.0")
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+app = FastAPI(title="MuviDB Local Clipper", version="2.1.0")
+
+
+class PrivateNetworkAccessMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin") or "*"
+        if request.method == "OPTIONS":
+            response = Response(status_code=204)
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+            response.headers["Access-Control-Max-Age"] = "86400"
+            return response
+
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        response.headers["Access-Control-Expose-Headers"] = "*"
+        return response
+
+
+app.add_middleware(PrivateNetworkAccessMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-
-@app.middleware("http")
-async def private_network_access(request: Request, call_next):
-    response = await call_next(request)
-    if request.headers.get("access-control-request-private-network") == "true":
-        response.headers["Access-Control-Allow-Private-Network"] = "true"
-    return response
 
 
 class ClipRequest(BaseModel):
@@ -362,6 +379,33 @@ def clip_status(token: str):
     return {"success": False, "status": job["status"], "message": job["message"], "progress": job.get("progress", 5)}
 
 
+class UploadRequest(BaseModel):
+    token: str
+    upload_url: str
+    content_type: str = "video/mp4"
+
+
+@app.post("/upload")
+def upload_clip_to_r2(payload: UploadRequest):
+    """Directly stream upload the rendered MP4 file from the desktop clipper process to R2.
+    This bypasses browser mixed-content / Private Network Access restrictions and saves browser memory."""
+    path = file_for_token(payload.token)
+    try:
+        data = path.read_bytes()
+        req = urllib.request.Request(
+            payload.upload_url,
+            data=data,
+            headers={"Content-Type": payload.content_type},
+            method="PUT",
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            if resp.status not in (200, 201, 204):
+                raise HTTPException(502, f"R2 upload failed with status {resp.status}")
+        return {"success": True, "size_bytes": len(data), "file_name": path.name}
+    except Exception as exc:
+        raise HTTPException(500, f"Direct upload from desktop clipper failed: {exc}")
+
+
 def file_for_token(token: str) -> Path:
     if not re.fullmatch(r"[A-Za-z0-9_-]{20,80}", token):
         raise HTTPException(404, "Clip not found")
@@ -374,7 +418,16 @@ def file_for_token(token: str) -> Path:
 @app.get("/files/{token}")
 def download_clip(token: str):
     path = file_for_token(token)
-    return FileResponse(path, media_type="video/mp4", filename=path.name)
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        filename=path.name,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Private-Network": "true",
+            "Access-Control-Expose-Headers": "*",
+        },
+    )
 
 
 @app.delete("/files/{token}")
