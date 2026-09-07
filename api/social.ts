@@ -679,9 +679,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'create_editor_video_draft') {
         const actor = await requireSocialStudioAdmin(req);
-        const { title, publicUrl, storagePath, mimeType, fileSizeBytes, width, height, captions, platforms } = req.body || {};
+        const { title, publicUrl, storagePath, mimeType, format, fileSizeBytes, width, height, captions, platforms } = req.body || {};
         return res.status(201).json(await createEditorVideoDraft({
-          title, publicUrl, storagePath, mimeType, fileSizeBytes, width, height,
+          title, publicUrl, storagePath, mimeType, format, fileSizeBytes, width, height,
           captions: captions && typeof captions === 'object' ? captions : {},
           platforms: Array.isArray(platforms) ? platforms : [],
         }, actor));

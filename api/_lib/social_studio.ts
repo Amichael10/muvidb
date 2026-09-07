@@ -199,6 +199,7 @@ export async function createEditorVideoDraft(input: {
   publicUrl: string;
   storagePath: string;
   mimeType: string;
+  format?: string;
   fileSizeBytes: number;
   width: number;
   height: number;
@@ -215,6 +216,31 @@ export async function createEditorVideoDraft(input: {
   const platforms = [...new Set(input.platforms)].filter((p): p is SocialPlatform => ['instagram', 'facebook', 'threads', 'tiktok'].includes(p));
   if (!platforms.length) throw httpError(400, 'Choose at least one social platform');
 
+  // Map format to valid PostgreSQL enum social_asset_format values:
+  // ('portrait_4_5', 'square_1_1', 'vertical_9_16', 'landscape_16_9', 'video_vertical_9_16')
+  let assetFormat: 'portrait_4_5' | 'square_1_1' | 'vertical_9_16' | 'landscape_16_9' | 'video_vertical_9_16';
+  const rawFmt = String(input.format || '').trim();
+  if (rawFmt === '1:1' || rawFmt === 'square_1_1' || rawFmt === 'video_square_1_1') {
+    assetFormat = 'square_1_1';
+  } else if (rawFmt === '4:5' || rawFmt === 'portrait_4_5') {
+    assetFormat = 'portrait_4_5';
+  } else if (rawFmt === '16:9' || rawFmt === 'landscape_16_9') {
+    assetFormat = 'landscape_16_9';
+  } else if (rawFmt === '9:16' || rawFmt === 'video_vertical_9_16' || rawFmt === 'vertical_9_16') {
+    assetFormat = 'video_vertical_9_16';
+  } else {
+    const ratio = (input.width || 1080) / Math.max(1, input.height || 1920);
+    if (ratio > 1.2) {
+      assetFormat = 'landscape_16_9';
+    } else if (ratio >= 0.95 && ratio <= 1.05) {
+      assetFormat = 'square_1_1';
+    } else if (ratio >= 0.75 && ratio < 0.95) {
+      assetFormat = 'portrait_4_5';
+    } else {
+      assetFormat = 'video_vertical_9_16';
+    }
+  }
+
   const sourceId = crypto.randomUUID();
   const snapshot = { kind: 'studio_video', capturedAt: new Date().toISOString(), title, publicUrl: url, width: input.width, height: input.height };
   const { data: contentItem, error: itemError } = await supabase.from('social_content_items').insert({
@@ -224,10 +250,16 @@ export async function createEditorVideoDraft(input: {
   if (itemError) throw itemError;
 
   const { data: asset, error: assetError } = await supabase.from('social_assets').insert({
-    content_item_id: contentItem.id, format: input.width >= input.height ? 'video_square_1_1' : 'video_vertical_9_16', storage_bucket: isR2Asset ? 'external' : bucket,
-    storage_path: input.storagePath, public_url: url, mime_type: input.mimeType || 'video/webm',
-    width: Math.max(1, Math.round(input.width || 1080)), height: Math.max(1, Math.round(input.height || 1920)),
-    file_size_bytes: Math.max(0, Math.round(input.fileSizeBytes || 0)), render_metadata: { source: 'opencut' },
+    content_item_id: contentItem.id,
+    format: assetFormat,
+    storage_bucket: isR2Asset ? 'external' : bucket,
+    storage_path: input.storagePath,
+    public_url: url,
+    mime_type: input.mimeType || 'video/mp4',
+    width: Math.max(1, Math.round(input.width || 1080)),
+    height: Math.max(1, Math.round(input.height || 1920)),
+    file_size_bytes: Math.max(0, Math.round(input.fileSizeBytes || 0)),
+    render_metadata: { source: 'opencut' },
   }).select('id').single();
   if (assetError) throw assetError;
 

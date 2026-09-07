@@ -704,7 +704,22 @@ export default function AdminSocialStudio() {
       }
       for (const asset of completed) {
         const dims = getDimensionsForAspectRatio(asset.aspect_ratio);
-        await fetch('/api/social?task=create_editor_video_draft', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `${film.title} — ${asset.aspect_ratio} daily clip`, publicUrl: asset.public_url, storagePath: asset.r2_key, mimeType: 'video/mp4', fileSizeBytes: asset.size_bytes, width: dims.width, height: dims.height, captions: { instagram: recommendation.caption || '', facebook: recommendation.caption || '', threads: recommendation.caption || '', tiktok: recommendation.caption || '' }, platforms: ['instagram', 'facebook', 'threads', 'tiktok'] }) });
+        await fetch('/api/social?task=create_editor_video_draft', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `${film.title} — ${asset.aspect_ratio} daily clip`,
+            publicUrl: asset.public_url,
+            storagePath: asset.r2_key,
+            mimeType: 'video/mp4',
+            format: asset.aspect_ratio,
+            fileSizeBytes: asset.size_bytes,
+            width: dims.width,
+            height: dims.height,
+            captions: { instagram: recommendation.caption || '', facebook: recommendation.caption || '', threads: recommendation.caption || '', tiktok: recommendation.caption || '' },
+            platforms: ['instagram', 'facebook', 'threads', 'tiktok'],
+          }),
+        });
       }
       setVideoAutopilot({ running: false, message: `Prepared ${completed.length} video drafts for approval.`, jobs: completed });
       await fetchDrafts(true);
@@ -952,6 +967,7 @@ export default function AdminSocialStudio() {
               publicUrl: session.publicUrl,
               storagePath: session.key,
               mimeType: 'video/mp4',
+              format: targetFormat,
               fileSizeBytes: status.size_bytes || 1024,
               width: dims.width,
               height: dims.height,
