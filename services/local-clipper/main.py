@@ -174,9 +174,9 @@ def cookie_options() -> dict:
     if cookie_file and is_valid_netscape_cookie_file(cookie_file):
         return {"cookiefile": cookie_file}
 
-    # The same local-browser approach used by MuviDB's local credits harvester.
-    # Set YT_COOKIES_FROM_BROWSER=off to disable it or choose edge/firefox.
-    browser = os.getenv("YT_COOKIES_FROM_BROWSER", "chrome").strip().lower()
+    # Browser cookie extraction on modern Windows Chrome causes DPAPI decryption errors.
+    # Default to 'off' unless explicitly enabled by the user in environment.
+    browser = os.getenv("YT_COOKIES_FROM_BROWSER", "off").strip().lower()
     if browser and browser not in {"off", "none", "false", "0"}:
         return {"cookiesfrombrowser": (browser,)}
     return {}
@@ -262,13 +262,21 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
         if "youtube.com" not in url and "youtu.be" not in url:
             direct_stream_url = url
         else:
-            with yt_dlp.YoutubeDL(opts) as downloader:
-                try:
+            try:
+                with yt_dlp.YoutubeDL(opts) as downloader:
                     info = downloader.extract_info(url, download=False)
                     direct_stream_url = info.get("url")
                     direct_stream_headers = info.get("http_headers") or {}
-                except Exception as e:
-                    print(f"[Clipper] Direct stream extract fallback: {e}")
+            except Exception as e:
+                print(f"[Clipper] Direct stream extract with cookies failed: {e}. Retrying unauthenticated…")
+                try:
+                    clean_opts = {k: v for k, v in opts.items() if k not in ("cookiefile", "cookiesfrombrowser")}
+                    with yt_dlp.YoutubeDL(clean_opts) as clean_dl:
+                        info = clean_dl.extract_info(url, download=False)
+                        direct_stream_url = info.get("url")
+                        direct_stream_headers = info.get("http_headers") or {}
+                except Exception as e2:
+                    print(f"[Clipper] Direct stream clean extract failed: {e2}")
 
         CLIP_JOBS[token].update({"message": "Slicing & rendering optimized clip with FFmpeg…", "progress": 40})
         
@@ -314,8 +322,14 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "socket_timeout": 30,
                     **cookie_options(),
                 }
-                with yt_dlp.YoutubeDL(fallback_opts) as dl:
-                    dl.download([url])
+                try:
+                    with yt_dlp.YoutubeDL(fallback_opts) as dl:
+                        dl.download([url])
+                except Exception as dl_err:
+                    print(f"[Clipper] Fallback download with cookies failed: {dl_err}. Retrying without cookies…")
+                    clean_fallback_opts = {k: v for k, v in fallback_opts.items() if k not in ("cookiefile", "cookiesfrombrowser")}
+                    with yt_dlp.YoutubeDL(clean_fallback_opts) as clean_dl:
+                        clean_dl.download([url])
 
                 candidates = list(Path(workdir).glob("source.*"))
                 if not candidates:

@@ -929,11 +929,9 @@ export default function AdminSocialStudio() {
         .from('films')
         .select(`
           id,title,release_date,year,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,
-          youtube_channels(id,channel_name,channel_title),
-          film_platform_links(platform,web_url),
           credits(
             id,role,job,billing_order,character_name,
-            people(id,name,instagram_handle,slug)
+            people(id,name,instagram_url,twitter_url,slug)
           )
         `)
         .eq('id', row.filmId)
@@ -946,26 +944,35 @@ export default function AdminSocialStudio() {
     return existing || null;
   };
 
+  const extractSocialHandle = person => {
+    if (!person) return '';
+    const raw = person.instagram_url || person.twitter_url || '';
+    if (!raw) return '';
+    const clean = raw.replace(/^https?:\/\/(www\.)?(instagram\.com|twitter\.com|x\.com)\//i, '').replace(/[/?#].*$/, '').trim();
+    if (!clean) return '';
+    return clean.startsWith('@') ? clean : `@${clean}`;
+  };
+
   const resolveMetadataAndRecommendation = async (row, film, customEngine = null, customAngle = null) => {
     const engine = customEngine || row.engine || 'gemini';
     const angle = customAngle || row.angle || 'editorial';
     const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
-    const channelName = film.youtube_channels?.channel_title || film.youtube_channels?.channel_name || '';
-    const platform = film.film_platform_links?.[0]?.platform || 'YouTube';
+    const channelName = '';
+    const platform = 'YouTube';
     
     const rawCredits = asRelationArray(film.credits);
     const cast = rawCredits
       .filter(c => (c.role === 'cast' || c.job === 'Actor' || !c.role) && c.people?.name)
       .sort((a, b) => (a.billing_order || 99) - (b.billing_order || 99))
-      .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+      .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
     
     const directors = rawCredits
       .filter(c => (c.job?.toLowerCase().includes('director') || c.role === 'director') && c.people?.name)
-      .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+      .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
 
     const producers = rawCredits
       .filter(c => (c.job?.toLowerCase().includes('producer') || c.role === 'producer') && c.people?.name)
-      .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+      .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
 
     let sourceMetadata = {
       title: film.title,
