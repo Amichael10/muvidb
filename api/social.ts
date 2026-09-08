@@ -508,6 +508,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(result);
       }
 
+      if (task === 'generate_trivia_poll') {
+        await requireSocialStudioAdmin(req);
+        const { film } = req.body || {};
+        if (!film?.title) {
+          return res.status(400).json({ error: 'film with title is required' });
+        }
+        const { generateTriviaPollAI } = await import('./_lib/editorial/social_copy_ai.js');
+        const result = await generateTriviaPollAI(film);
+        if (!result) return res.status(500).json({ error: 'Failed to generate trivia poll' });
+        return res.status(200).json({ success: true, trivia: result });
+      }
+
       if (task === 'approve_slot') {
         const actor = await requireSocialStudioAdmin(req);
         const { approveEditorialSlot } = await import('./_lib/social_studio.js');

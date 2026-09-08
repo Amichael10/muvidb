@@ -196,15 +196,18 @@ async function withCohereRotation(fn: (client: any) => Promise<any>): Promise<an
 }
 
 function extractCohereText(response: any): string {
+  if (typeof response?.text === 'string' && response.text) return response.text;
   const content = response?.message?.content;
   if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-  const parts: string[] = [];
-  for (const part of content) {
-    if (typeof part === 'string') parts.push(part);
-    else if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text);
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const part of content) {
+      if (typeof part === 'string') parts.push(part);
+      else if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text);
+    }
+    if (parts.length) return parts.join('');
   }
-  return parts.join('');
+  return '';
 }
 
 /**
@@ -320,12 +323,23 @@ export async function generateAIContent(
         let lastErr: any;
         for (const model of models) {
           try {
-            const response = await client.chat({
-              model,
-              messages: [{ role: 'user', content: prompt }],
-              temperature: 0.4,
-            });
-            return { text: extractCohereText(response), engine: `cohere (${model})`, headers: null };
+            let response: any;
+            if (client.v2?.chat) {
+              response = await client.v2.chat({
+                model,
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.4,
+              });
+            } else {
+              response = await client.chat({
+                model,
+                message: prompt,
+                temperature: 0.4,
+              });
+            }
+            const text = extractCohereText(response);
+            if (!text.trim()) throw new Error(`Cohere model ${model} returned an empty response`);
+            return { text, engine: `cohere (${model})`, headers: null };
           } catch (err: any) {
             lastErr = err;
             if (isCohereQuotaError(err) || isCohereDeadKeyError(err)) throw err;

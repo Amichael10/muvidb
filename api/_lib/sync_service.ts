@@ -12,6 +12,7 @@ import {
   type YouTubeTitleDecision,
 } from './youtube_title_policy.js';
 import { notifyYouTubeUploads } from './youtube_upload_notify.js';
+import { syncSingleFilmRelatedAndEmbedding } from './film_related_sync.js';
 
 /** Film-length floor for channel_videos ingest + admin buffer (30 minutes). */
 export const CHANNEL_VIDEO_MIN_SEC = 1800;
@@ -748,6 +749,10 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                   } catch (e: any) {
                     console.warn(`[runVideosSync] Cohere synopsis enrichment error:`, e.message);
                   }
+
+                  // Compute Cohere embeddings and More Like This relationships in real-time
+                  Promise.allSettled(newlyAddedIds.map(id => syncSingleFilmRelatedAndEmbedding(id)))
+                    .catch(() => {});
                 }
               }
             }

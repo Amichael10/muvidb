@@ -106,15 +106,25 @@ export async function attachCreditsBatch(
 
   for (const name of uniqueNames) {
     try {
+      const aliasKey = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+      if (aliasKey) {
+        const { data: aliasRow } = await supabase
+          .from('person_aliases')
+          .select('person_id')
+          .eq('alias_key', aliasKey)
+          .limit(1)
+          .maybeSingle();
+        if (aliasRow?.person_id) {
+          personId.set(name, aliasRow.person_id);
+          continue;
+        }
+      }
+
       // Single shared matcher for every ingestion path (see migration
       // 20260723112408): exact name, else people.name_key — which is
       // order-insensitive and honorific-stripped, so "Kosoko Jide" and
       // "Prince Jide Kosoko" resolve to the existing "Jide Kosoko" instead of
       // creating rivals. Creates only on a genuine miss.
-      //
-      // The old tier-2 `ilike('%name%')` substring fallback is deliberately
-      // gone: it let a person named "Jide" match "Jide Kosoko" and silently
-      // attach that film's credits to the wrong profile.
       const { data: id, error } = await supabase.rpc('upsert_person_by_name', {
         p_name: name,
         p_extra: { nationality: 'Nigerian', source: 'enrichment' },

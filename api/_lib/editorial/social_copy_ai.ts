@@ -1,4 +1,4 @@
-﻿import { generateAIContent, parseJSON } from '../ai_service.js';
+import { generateAIContent, parseJSON } from '../ai_service.js';
 
 import { selectCaptionBankStarters } from './caption_bank.js';
 
@@ -12,6 +12,7 @@ export type SocialAngle =
   | 'behind_the_film'
   | 'credit_connection'
   | 'audience_debate'
+  | 'trivia_quiz'
   | 'fun_relatable';
 
 export type AICopyRequest = {
@@ -210,6 +211,8 @@ function getAngleInstructions(angle: SocialAngle): string {
       return 'ANGLE: CREDIT CONNECTION -> Connect multiple films through a shared actor, director, or key crew member.';
     case 'audience_debate':
       return 'ANGLE: AUDIENCE DEBATE -> Ask a specific, thought-provoking opinion question grounded in the film.';
+    case 'trivia_quiz':
+      return 'ANGLE: TRIVIA & QUIZ POLL -> Create an engaging, verified Nollywood trivia question with 4 multiple choice options (A, B, C, D) and ask the audience to guess in the comments.';
     case 'fun_relatable':
       return 'ANGLE: FUN & RELATABLE -> Conversational observation based on the premise or character dynamic. No forced slang.';
     case 'dynamic_story':
@@ -682,4 +685,62 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
     tiktok: fallbackVars[0].captions.tiktok,
     engine: 'muvidb_clean_fallback',
   };
+}
+
+export interface TriviaPollResult {
+  question: string;
+  options: { key: 'A' | 'B' | 'C' | 'D'; text: string; isCorrect: boolean }[];
+  explanation: string;
+  hook: string;
+  captions: PlatformCaptions;
+}
+
+/**
+ * Generates an interactive trivia poll grounded strictly on the movie's metadata and synopsis.
+ */
+export async function generateTriviaPollAI(
+  film: { id: string; title: string; synopsis?: string | null; year?: number | null; cast?: string[] },
+): Promise<TriviaPollResult | null> {
+  const prompt = `You are an African cinema editorial writer for MuviDB.
+Create an engaging 4-choice trivia poll question based strictly on this film:
+Title: ${film.title}
+Year: ${film.year || 'Nollywood'}
+Synopsis: ${film.synopsis || 'African Cinema Film'}
+Cast: ${(film.cast || []).slice(0, 8).join(', ')}
+
+Rules:
+1. Ground the question ONLY on the provided synopsis, title, year, or cast facts.
+2. Provide exactly 4 options (A, B, C, D) with exactly ONE correct answer.
+3. Keep the tone fun, interactive, and community-driven.
+4. Output formatted social media copy for Instagram, Threads, Facebook, and TikTok.
+
+Return ONLY a JSON object:
+{
+  "question": "Trivia question text?",
+  "options": [
+    { "key": "A", "text": "Option 1", "isCorrect": false },
+    { "key": "B", "text": "Option 2", "isCorrect": true },
+    { "key": "C", "text": "Option 3", "isCorrect": false },
+    { "key": "D", "text": "Option 4", "isCorrect": false }
+  ],
+  "explanation": "Brief 1-sentence explanation of the correct answer.",
+  "hook": "Opening social hook line",
+  "captions": {
+    "instagram": "Full Instagram post caption with question, options A-D, call to drop answer below, and #MuviDB #AfricanCinema hashtags",
+    "threads": "Engaging short Threads post with poll question and options",
+    "facebook": "Facebook post with the trivia challenge",
+    "tiktok": "TikTok caption prompting comments"
+  }
+}`;
+
+  try {
+    const { text } = await generateAIContent(prompt, { preferredProvider: 'cohere' });
+    const parsed = parseJSON(text);
+    if (parsed?.question && Array.isArray(parsed?.options) && parsed?.captions) {
+      return parsed as TriviaPollResult;
+    }
+  } catch (err: any) {
+    console.warn('[generateTriviaPollAI] Failed to generate trivia poll:', err?.message);
+  }
+  return null;
 }

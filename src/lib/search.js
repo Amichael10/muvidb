@@ -197,25 +197,71 @@ export async function searchAll(query) {
     .sort((a, b) => b._score - a._score)
     .slice(0, 48);
 
-  if (!confidentPersonMatch && films.length >= 3) {
+  if (!confidentPersonMatch) {
     try {
-      const res = await fetch('/api/semantic-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q: query,
-          mode: 'rerank',
-          limit: Math.min(films.length, 24),
-          candidates: films.slice(0, 40).map((f) => ({ id: f.id, title: f.title })),
-        }),
-      });
-      if (res.ok) {
-        const body = await res.json();
-        const order = new Map((body.films || []).map((r, i) => [r.id, (r.score ?? r._semantic ?? 0) * 500 - i]));
-        if (order.size) {
-          films = films
-            .map((f) => (order.has(f.id) ? { ...f, _score: Math.max(f._score, order.get(f.id)) } : f))
-            .sort((a, b) => b._score - a._score);
+      if (films.length >= 3) {
+        const res = await fetch('/api/semantic-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            q: query,
+            mode: 'rerank',
+            limit: Math.min(films.length, 24),
+            candidates: films.slice(0, 40).map((f) => ({
+              id: f.id,
+              title: f.title,
+              synopsis: f.synopsis,
+            })),
+          }),
+        });
+        if (res.ok) {
+          const body = await res.json();
+          const order = new Map((body.films || []).map((r, i) => [r.id, (r.score ?? r._semantic ?? 0) * 500 - i]));
+          if (order.size) {
+            films = films
+              .map((f) => (order.has(f.id) ? { ...f, _score: Math.max(f._score, order.get(f.id)) } : f))
+              .sort((a, b) => b._score - a._score);
+          }
+        }
+      } else if (films.length < 2 && fullQ.length >= 6) {
+        // Natural language / Pidgin sentence search: query semantic endpoint directly
+        const res = await fetch('/api/semantic-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            q: query,
+            mode: 'rerank',
+            limit: 20,
+            candidates: [],
+          }),
+        });
+        if (res.ok) {
+          const body = await res.json();
+          const semanticHits = Array.isArray(body.films) ? body.films : [];
+          if (semanticHits.length > 0) {
+            const hitIds = semanticHits.map((h) => h.id).filter(Boolean);
+            const { data: fullFilms } = await supabase
+              .from('films')
+              .select(FILM_FIELDS)
+              .in('id', hitIds);
+            const fullMap = new Map((fullFilms || []).map((f) => [f.id, f]));
+            const semResults = semanticHits
+              .map((h, i) => {
+                const full = fullMap.get(h.id);
+                if (!full) return null;
+                return {
+                  ...full,
+                  genres: full.genres || full.film_genres?.map((g) => g.genres?.name).filter(Boolean) || [],
+                  _score: (h.score || 0.8) * 400 - i,
+                  _semantic: h.score,
+                };
+              })
+              .filter(Boolean);
+            if (semResults.length > 0) {
+              const seen = new Set(films.map((f) => f.id));
+              films = [...films, ...semResults.filter((f) => !seen.has(f.id))].sort((a, b) => b._score - a._score);
+            }
+          }
         }
       }
     } catch {

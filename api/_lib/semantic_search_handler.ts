@@ -56,13 +56,29 @@ async function rerankSearch(
   res: VercelResponse,
   entity: 'films' | 'people',
 ) {
-  const candidates: Array<{ id: string; title?: string; name?: string }> = Array.isArray(
+  let candidates: Array<{ id: string; title?: string; name?: string; synopsis?: string; description?: string }> = Array.isArray(
     body.candidates,
   )
     ? body.candidates
     : [];
 
   const emptyKey = entity === 'people' ? 'people' : 'films';
+
+  // If few or no candidates provided, perform intelligent broad candidate retrieval
+  if (candidates.length < 2 && entity === 'films') {
+    const { data: popularFilms } = await supabase
+      .from('films')
+      .select('id, title, synopsis, poster_url, backdrop_url, year, runtime_minutes, release_type, language')
+      .eq('is_published', true)
+      .not('synopsis', 'is', null)
+      .order('view_count', { ascending: false, nullsFirst: false })
+      .limit(60);
+
+    if (popularFilms && popularFilms.length >= 2) {
+      candidates = popularFilms;
+    }
+  }
+
   if (candidates.length < 2) {
     return res.json({
       [emptyKey]: [],
@@ -79,10 +95,10 @@ async function rerankSearch(
           0,
           500,
         )
-      : q.slice(0, 500);
+      : `Match this film query in English, Nigerian Pidgin, or plot summary: ${q}`.slice(0, 500);
 
   const docs = candidates.map((c) =>
-    String(c.name || c.title || c.id).slice(0, 500),
+    [c.title || c.name, c.synopsis || c.description].filter(Boolean).join(' — ').slice(0, 800),
   );
   const ranked = await rerankWithCohere(query, docs, {
     topN: Math.min(Number(body.limit) || 20, candidates.length),

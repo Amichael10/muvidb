@@ -18,6 +18,7 @@ import PhotoUploadModal from '../components/professional/PhotoUploadModal';
 import VideoUploadModal from '../components/professional/VideoUploadModal';
 import RepresentationModal from '../components/professional/RepresentationModal';
 import ProVideoTheaterModal from '../components/professional/ProVideoTheaterModal';
+import ProIntelligenceAssistant from '../components/professional/ProIntelligenceAssistant';
 
 const OPEN_STATUSES = ['submitted', 'pending', 'in_review', 'needs_information'];
 
@@ -581,6 +582,7 @@ export default function ProDashboard() {
               { id: 'videos', label: 'Videos & Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
               { id: 'awards', label: 'Awards & Honors', icon: 'solar:cup-star-bold', count: awardsList.length },
               { id: 'representation', label: 'Representation & Guilds', icon: 'solar:users-group-two-rounded-bold' },
+              { id: 'intelligence', label: 'AI Intelligence', icon: 'solar:magic-stick-3-bold' },
               { id: 'requests', label: 'Requests & History', icon: 'solar:inbox-bold', count: openRequests.length },
             ].map((tab) => (
               <button
@@ -1125,6 +1127,11 @@ export default function ProDashboard() {
               ))}
             </div>
           </section>
+        )}
+
+        {/* Tab: Pro AI Industry Intelligence */}
+        {activeTab === 'intelligence' && (
+          <ProIntelligenceAssistant person={person} credits={credits} />
         )}
       </div>
 
