@@ -23,8 +23,14 @@ if ($LASTEXITCODE -ne 0) {
 $env:PYTHONPATH = $serviceRoot
 $cookiePath = Join-Path $repoRoot 'cookies.txt'
 if (Test-Path $cookiePath) {
-  $env:YT_COOKIES_FILE = $cookiePath
-  Write-Host "Using local cookies file: $cookiePath" -ForegroundColor DarkGray
+  $fileInfo = Get-Item $cookiePath
+  if ($fileInfo.Length -gt 20) {
+    $firstLines = Get-Content $cookiePath -Head 5 -ErrorAction SilentlyContinue
+    if ($firstLines -match 'Netscape|# HTTP Cookie' -or ($firstLines -match "`t")) {
+      $env:YT_COOKIES_FILE = $cookiePath
+      Write-Host "Using local cookies file: $cookiePath" -ForegroundColor DarkGray
+    }
+  }
 }
 
 Write-Host ''

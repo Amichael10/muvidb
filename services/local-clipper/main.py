@@ -133,19 +133,45 @@ def video_filter(aspect_ratio: str, fit_mode: str) -> str:
     )
 
 
+def is_valid_netscape_cookie_file(path_str: str) -> bool:
+    if not path_str:
+        return False
+    try:
+        p = Path(path_str)
+        if not p.is_file() or p.stat().st_size < 20:
+            return False
+        content = p.read_text(encoding="utf-8", errors="ignore")
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
+        if not lines:
+            return False
+        # Netscape header or tab-separated cookie rows
+        if any("netscape" in line.lower() or "http cookie file" in line.lower() for line in lines[:5]):
+            return True
+        for line in lines:
+            if not line.startswith("#") and "\t" in line:
+                parts = line.split("\t")
+                if len(parts) >= 6:
+                    return True
+        return False
+    except Exception:
+        return False
+
+
 def cookie_options() -> dict:
     cookie_file = os.getenv("YT_COOKIES_FILE", "").strip()
+    if cookie_file and not is_valid_netscape_cookie_file(cookie_file):
+        cookie_file = ""
+
     if not cookie_file:
         # Convenient local fallback: keep an exported Netscape cookie file in
         # the project root. The file is ignored by Git and never uploaded.
         candidates = [Path.cwd() / "cookies.txt", Path(__file__).resolve().parents[2] / "cookies.txt"]
         for candidate in candidates:
-            if candidate.is_file() and candidate.stat().st_size > 0:
-                first_line = candidate.read_text(encoding="utf-8", errors="ignore").splitlines()[:1]
-                if first_line and ("Netscape" in first_line[0] or first_line[0].startswith("#")):
-                    cookie_file = str(candidate)
-                    break
-    if cookie_file and Path(cookie_file).is_file():
+            if is_valid_netscape_cookie_file(str(candidate)):
+                cookie_file = str(candidate)
+                break
+
+    if cookie_file and is_valid_netscape_cookie_file(cookie_file):
         return {"cookiefile": cookie_file}
 
     # The same local-browser approach used by MuviDB's local credits harvester.
@@ -162,9 +188,9 @@ def health():
     return {
         "status": "ready" if shutil.which("ffmpeg") else "missing_dependency",
         "service": "muvidb-local-clipper",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "ffmpeg": bool(shutil.which("ffmpeg")),
-        "cookie_source": "file" if os.getenv("YT_COOKIES_FILE") else os.getenv("YT_COOKIES_FROM_BROWSER", "chrome"),
+        "cookie_source": "file" if is_valid_netscape_cookie_file(os.getenv("YT_COOKIES_FILE", "")) else os.getenv("YT_COOKIES_FROM_BROWSER", "chrome"),
     }
 
 
@@ -172,8 +198,18 @@ def health():
 def metadata(payload: MetadataRequest):
     """Return cookie-authenticated metadata and available English captions."""
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True, **cookie_options()}
-    with yt_dlp.YoutubeDL(opts) as downloader:
-        info = downloader.extract_info(str(payload.url), download=False)
+    info = {}
+    try:
+        with yt_dlp.YoutubeDL(opts) as downloader:
+            info = downloader.extract_info(str(payload.url), download=False)
+    except Exception as e:
+        print(f"[Clipper] Metadata extraction with cookie_options failed ({e}); retrying without cookies…")
+        try:
+            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True}) as fallback_dl:
+                info = fallback_dl.extract_info(str(payload.url), download=False)
+        except Exception as e2:
+            print(f"[Clipper] Fallback metadata extraction failed: {e2}")
+            return {"title": "", "duration": 3600, "description": "", "transcript": ""}
     transcript = ""
     subtitle_map = info.get("subtitles") or info.get("automatic_captions") or {}
     track = next((subtitle_map.get(key) for key in ("en", "en-US", "en-GB") if subtitle_map.get(key)), None)
