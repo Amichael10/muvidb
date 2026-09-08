@@ -438,15 +438,15 @@ export default function AdminSocialStudio() {
   const [videoPlan, setVideoPlan] = useState({
     days: 7,
     startDate: new Date().toISOString().slice(0, 10),
-    slot1Time: '12:00',
-    slot2Time: '16:00',
-    slot3Time: '20:00',
+    slot1Time: '09:00',
+    slot2Time: '12:00',
+    slot3Time: '15:30',
     clipLength: 30,
   });
   const [videoRows, setVideoRows] = useState([
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '09:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
     { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '12:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '16:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '15:30', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
   ]);
   const [videoFilmOptions, setVideoFilmOptions] = useState([]);
   const [videoFilmSearch, setVideoFilmSearch] = useState({});
@@ -946,111 +946,167 @@ export default function AdminSocialStudio() {
     return existing || null;
   };
 
+  const resolveMetadataAndRecommendation = async (row, film, customEngine = null, customAngle = null) => {
+    const engine = customEngine || row.engine || 'gemini';
+    const angle = customAngle || row.angle || 'editorial';
+    const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
+    const channelName = film.youtube_channels?.channel_title || film.youtube_channels?.channel_name || '';
+    const platform = film.film_platform_links?.[0]?.platform || 'YouTube';
+    
+    const rawCredits = asRelationArray(film.credits);
+    const cast = rawCredits
+      .filter(c => (c.role === 'cast' || c.job === 'Actor' || !c.role) && c.people?.name)
+      .sort((a, b) => (a.billing_order || 99) - (b.billing_order || 99))
+      .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+    
+    const directors = rawCredits
+      .filter(c => (c.job?.toLowerCase().includes('director') || c.role === 'director') && c.people?.name)
+      .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+
+    const producers = rawCredits
+      .filter(c => (c.job?.toLowerCase().includes('producer') || c.role === 'producer') && c.people?.name)
+      .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
+
+    let sourceMetadata = {
+      title: film.title,
+      duration: 3600,
+      transcript: '',
+      description: '',
+      synopsis: film.synopsis || '',
+      genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || ''),
+      channelName,
+      platform,
+      cast,
+      directors,
+      producers,
+    };
+
+    if (sourceUrl) {
+      try {
+        const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: sourceUrl }),
+        });
+        if (metadataResponse.ok) {
+          const meta = await metadataResponse.json();
+          sourceMetadata = { ...sourceMetadata, ...meta };
+        }
+      } catch {
+        // clipper offline fallback
+      }
+    }
+
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        task: 'recommend_clip_segment',
+        data: {
+          ...sourceMetadata,
+          mode: row.mode,
+          startTime: row.start,
+          endTime: row.end,
+          preferredProvider: engine,
+          angle: angle,
+          targetLength: videoPlan.clipLength || 30,
+        },
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `${engine.toUpperCase()} caption generation failed`);
+
+    const startSec = parseTimestampToSeconds(data.startTime ?? data.startTimeFormatted);
+    const endSec = parseTimestampToSeconds(data.endTime ?? data.endTimeFormatted) || (startSec + (videoPlan.clipLength || 30));
+
+    return {
+      caption: data.caption || '',
+      variations: Array.isArray(data.variations) ? data.variations : [],
+      selectedVariationKey: 'B',
+      engine: data.engine || engine,
+      angle: angle,
+      startTimeFormatted: data.startTimeFormatted || formatSecondsToTimestamp(startSec),
+      endTimeFormatted: data.endTimeFormatted || formatSecondsToTimestamp(endSec),
+      startSec,
+      endSec,
+      sourceUrl,
+      sourceMetadata,
+    };
+  };
+
   const generateRowCaption = async (row, customAngle = null, customEngine = null) => {
     const film = await resolveFilmForRow(row);
     if (!film) return toast.error('Choose a film before generating a caption.');
     const engine = customEngine || row.engine || 'gemini';
-    const angle = customAngle || row.angle || 'editorial';
     const isManual = row.mode === 'manual';
 
     updateVideoRow(row.id, {
       generatingCaption: true,
       caption: isManual 
         ? `Generating ${engine.toUpperCase()} copy for ${row.start} – ${row.end}…` 
-        : `Selecting viral scene & generating copy with ${engine.toUpperCase()}…`,
+        : `Selecting viral scene & generating 3 copy variations with ${engine.toUpperCase()}…`,
     });
 
     try {
-      const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
-      const channelName = film.youtube_channels?.channel_title || film.youtube_channels?.channel_name || '';
-      const platform = film.film_platform_links?.[0]?.platform || 'YouTube';
-      
-      const rawCredits = asRelationArray(film.credits);
-      const cast = rawCredits
-        .filter(c => (c.role === 'cast' || c.job === 'Actor' || !c.role) && c.people?.name)
-        .sort((a, b) => (a.billing_order || 99) - (b.billing_order || 99))
-        .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
-      
-      const directors = rawCredits
-        .filter(c => (c.job?.toLowerCase().includes('director') || c.role === 'director') && c.people?.name)
-        .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
-
-      const producers = rawCredits
-        .filter(c => (c.job?.toLowerCase().includes('producer') || c.role === 'producer') && c.people?.name)
-        .map(c => ({ name: c.people.name, instagram_handle: c.people.instagram_handle }));
-
-      let sourceMetadata = {
-        title: film.title,
-        duration: 3600,
-        transcript: '',
-        description: '',
-        synopsis: film.synopsis || '',
-        genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || ''),
-        channelName,
-        platform,
-        cast,
-        directors,
-        producers,
-      };
-
-      if (sourceUrl) {
-        try {
-          const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: sourceUrl }),
-          });
-          if (metadataResponse.ok) {
-            const meta = await metadataResponse.json();
-            sourceMetadata = { ...sourceMetadata, ...meta };
-          }
-        } catch {
-          // clipper offline fallback
-        }
-      }
-
-      const response = await fetch('/api/ai', {
-        method: 'POST',
-        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task: 'recommend_clip_segment',
-          data: {
-            ...sourceMetadata,
-            mode: row.mode,
-            startTime: row.start,
-            endTime: row.end,
-            preferredProvider: engine,
-            angle: angle,
-            targetLength: videoPlan.clipLength || 45,
-          },
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `${engine.toUpperCase()} caption generation failed`);
-
+      const res = await resolveMetadataAndRecommendation(row, film, customEngine, customAngle);
       const updates = {
         generatingCaption: false,
-        caption: data.caption || '',
-        variations: Array.isArray(data.variations) ? data.variations : [],
-        selectedVariationKey: 'B',
-        engine: data.engine || engine,
-        angle: angle,
+        caption: res.caption,
+        variations: res.variations,
+        selectedVariationKey: res.selectedVariationKey || 'B',
+        engine: res.engine,
+        angle: res.angle,
       };
 
       if (row.mode === 'gemini') {
-        const startSec = parseTimestampToSeconds(data.startTime ?? data.startTimeFormatted);
-        const endSec = parseTimestampToSeconds(data.endTime ?? data.endTimeFormatted) || (startSec + (videoPlan.clipLength || 45));
-        updates.start = data.startTimeFormatted || formatSecondsToTimestamp(startSec);
-        updates.end = data.endTimeFormatted || formatSecondsToTimestamp(endSec);
-        toast.success(`✨ Scene selected: ${updates.start} – ${updates.end}`);
+        updates.start = res.startTimeFormatted;
+        updates.end = res.endTimeFormatted;
+        toast.success(`✨ Scene selected (${updates.start} – ${updates.end}) & 3 variations generated!`);
       } else {
-        toast.success(`✨ ${data.engine?.toUpperCase() || engine.toUpperCase()} caption generated for ${row.start} – ${row.end}`);
+        toast.success(`✨ 3 ${res.engine.toUpperCase()} caption variations generated for ${row.start} – ${row.end}`);
       }
 
       updateVideoRow(row.id, updates);
     } catch (err) {
       updateVideoRow(row.id, { caption: '', generatingCaption: false });
       toast.error(err.message);
+    }
+  };
+
+  const generateAllRowCaptions = async () => {
+    const validRows = videoRows.filter(r => r.filmId);
+    if (!validRows.length) return toast.error('Add at least one video row with a chosen film.');
+    
+    setVideoAutopilot({ running: true, message: `Auto-generating captions & scenes for ${validRows.length} clips…`, jobs: [] });
+    let completed = 0;
+    try {
+      for (const row of validRows) {
+        const film = await resolveFilmForRow(row);
+        if (!film) continue;
+        updateVideoRow(row.id, { generatingCaption: true });
+        try {
+          const res = await resolveMetadataAndRecommendation(row, film);
+          updateVideoRow(row.id, {
+            generatingCaption: false,
+            caption: res.caption,
+            variations: res.variations,
+            selectedVariationKey: res.selectedVariationKey || 'B',
+            engine: res.engine,
+            angle: res.angle,
+            start: res.startTimeFormatted,
+            end: res.endTimeFormatted,
+          });
+          completed += 1;
+        } catch (e) {
+          console.warn(`Failed caption for ${film.title}:`, e);
+          updateVideoRow(row.id, { generatingCaption: false });
+        }
+      }
+      toast.success(`✨ Generated AI captions & highlight scenes for ${completed} clips!`);
+    } catch (err) {
+      toast.error(err.message || 'Auto-caption generation encountered an error.');
+    } finally {
+      setVideoAutopilot(prev => ({ ...prev, running: false, message: '' }));
     }
   };
 
@@ -1061,49 +1117,38 @@ export default function AdminSocialStudio() {
     setVideoAutopilot({ running: true, message: `Preparing ${validRows.length} planned video item${validRows.length === 1 ? '' : 's'}…`, jobs: [] });
     try {
       let created = 0;
+      const processedIds = [];
       for (const row of validRows) {
         const film = await resolveFilmForRow(row);
         if (!film) continue;
-        const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
+        let sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
         let start = parseTimestampToSeconds(row.start);
         let end = parseTimestampToSeconds(row.end);
-        if (end <= start) {
-          end = start + (videoPlan.clipLength || 45);
-        }
         let caption = row.caption || '';
-        if (row.mode === 'gemini' || !caption) {
-          let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: film.genre || '' };
-          if (sourceUrl) {
-            try {
-              const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: sourceUrl }),
-              });
-              if (metadataResponse.ok) {
-                const meta = await metadataResponse.json();
-                sourceMetadata = { ...sourceMetadata, ...meta };
-              }
-            } catch { /* clipper fallback */ }
+        let variations = Array.isArray(row.variations) ? row.variations : [];
+
+        // Auto-generate scene & 3 variations if missing or if in gemini mode without caption
+        if (row.mode === 'gemini' || !caption || variations.length === 0) {
+          setVideoAutopilot(prev => ({
+            ...prev,
+            message: `Selecting highlight moment & generating copy for ${film.title}…`,
+          }));
+          try {
+            const res = await resolveMetadataAndRecommendation(row, film);
+            sourceUrl = res.sourceUrl || sourceUrl;
+            if (row.mode === 'gemini') {
+              start = res.startSec || start;
+              end = res.endSec || end;
+            }
+            caption = caption || res.caption || '';
+            variations = res.variations.length > 0 ? res.variations : variations;
+          } catch (aiErr) {
+            console.warn('Fallback recommendation during video prepare:', aiErr);
           }
-          const recommendationResponse = await fetch('/api/ai', {
-            method: 'POST',
-            headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              task: 'recommend_clip_segment',
-              data: {
-                ...sourceMetadata,
-                targetLength: videoPlan.clipLength || 45,
-              },
-            }),
-          });
-          const recommendation = await recommendationResponse.json().catch(() => ({}));
-          if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
-          if (row.mode === 'gemini') {
-            start = parseTimestampToSeconds(recommendation.startTime ?? recommendation.startTimeFormatted) || start;
-            end = parseTimestampToSeconds(recommendation.endTime ?? recommendation.endTimeFormatted) || end;
-          }
-          caption = caption || recommendation.caption || '';
+        }
+
+        if (end <= start) {
+          end = start + (videoPlan.clipLength || 30);
         }
 
         const formats = getRowAspectRatios(row);
@@ -1205,6 +1250,16 @@ export default function AdminSocialStudio() {
               assets: renderedAssets,
               captions: { instagram: caption, facebook: caption, threads: caption, tiktok: caption },
               platforms: ['instagram', 'facebook', 'threads', 'tiktok'],
+              sourceEntityId: film.id,
+              sourceType: 'film',
+              sourceSnapshot: {
+                filmId: film.id,
+                film_id: film.id,
+                title: film.title,
+                year: film.year,
+                release_date: film.release_date,
+              },
+              variations: variations,
             }),
           });
           const draft = await draftResponse.json().catch(() => ({}));
@@ -1221,12 +1276,19 @@ export default function AdminSocialStudio() {
             if (!response.ok) throw new Error(result.error || `Could not ${action} video.`);
           }
           created += 1;
+          processedIds.push(row.id);
         }
       }
+
+      // Remove completed rows from the video plan list
+      if (processedIds.length > 0) {
+        setVideoRows(prev => prev.filter(r => !processedIds.includes(r.id)));
+      }
+
       setVideoAutopilot({ running: false, message: `Prepared ${created} video draft${created === 1 ? '' : 's'}.`, jobs: [] });
       await refreshAll();
       setActiveTab('drafts');
-      toast.success(`✨ Video clip saved to drafts with ${formats.join(' & ')} formats!`);
+      toast.success(`✨ Video clip saved to drafts! Removed from video plan.`);
     } catch (err) {
       setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.' }));
       toast.error(err.message || 'Custom video plan failed.');
@@ -2625,6 +2687,7 @@ export default function AdminSocialStudio() {
                 >
                   <option value="7">7 days (21 clips)</option>
                   <option value="14">14 days (42 clips)</option>
+                  <option value="21">21 days (63 clips)</option>
                   <option value="30">30 days (90 clips)</option>
                 </select>
               </label>
@@ -2640,7 +2703,7 @@ export default function AdminSocialStudio() {
               </label>
 
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Slot 1 Time
+                Slot 1 Time (WAT)
                 <input
                   type="time"
                   value={videoPlan.slot1Time}
@@ -2650,7 +2713,7 @@ export default function AdminSocialStudio() {
               </label>
 
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Slot 2 Time
+                Slot 2 Time (WAT)
                 <input
                   type="time"
                   value={videoPlan.slot2Time}
@@ -2660,7 +2723,7 @@ export default function AdminSocialStudio() {
               </label>
 
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Slot 3 Time
+                Slot 3 Time (WAT)
                 <input
                   type="time"
                   value={videoPlan.slot3Time}
@@ -2696,9 +2759,18 @@ export default function AdminSocialStudio() {
 
               <button
                 type="button"
+                onClick={generateAllRowCaptions}
+                disabled={videoAutopilot.running || videoRows.length === 0}
+                className="rounded-xl border border-violet-500/40 bg-violet-500/15 px-4 py-2.5 text-xs font-black text-violet-200 hover:bg-violet-500/25 disabled:opacity-50 transition-all flex items-center gap-1.5"
+              >
+                <span>✨ Auto-Generate All Captions & Scenes ({videoRows.length})</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={runDailyVideoAutopilot}
                 disabled={videoAutopilot.running}
-                className="rounded-xl border border-violet-500/40 bg-violet-500/15 px-4 py-2.5 text-xs font-black text-violet-200 hover:bg-violet-500/25 disabled:opacity-50 transition-all"
+                className="rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-xs font-bold text-text-muted hover:text-white hover:border-white/20 disabled:opacity-50 transition-all"
               >
                 {videoAutopilot.running ? 'Processing…' : '⚡ Auto-Generate Today’s Clips'}
               </button>

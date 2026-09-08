@@ -2,9 +2,10 @@ name: Social Studio Publisher
 
 on:
   schedule:
-    # MuviDB normally publishes twice daily. GitHub cron uses UTC; Lagos is UTC+1.
-    - cron: "0 8 * * *"   # 09:00 Africa/Lagos
-    - cron: "30 14 * * *" # 15:30 Africa/Lagos
+    # MuviDB publishes 3 times daily: 09:00, 12:00, and 15:30 WAT (Africa/Lagos is UTC+1)
+    - cron: "0 8 * * *"   # 09:00 WAT (08:00 UTC)
+    - cron: "0 11 * * *"  # 12:00 WAT (11:00 UTC)
+    - cron: "30 14 * * *" # 15:30 WAT (14:30 UTC)
   workflow_dispatch:
 
 # Never let two queue drainers publish the same batch concurrently. The
