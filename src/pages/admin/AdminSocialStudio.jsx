@@ -166,19 +166,13 @@ function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Se
 
   if (!processed.length) return [];
 
-  // 1. Separate unused films from already used films
-  const unusedFilms = processed.filter(f => !f.isUsed);
-  const activePool = unusedFilms.length > 0 ? unusedFilms : processed;
-
-  // 2. Identify the latest year (e.g. 2026). If there are 2026/current-year films, strictly ignore older years
-  const maxYearInPool = Math.max(...activePool.map(f => f.year || 0), 0);
-  const targetYear = maxYearInPool > 0 ? maxYearInPool : currentYear;
-
-  const currentYearSubset = activePool.filter(f => f.year === targetYear || f.year === currentYear);
-  const filteredCandidates = currentYearSubset.length > 0 ? currentYearSubset : activePool;
-
-  // 3. Deterministic sort: Unused -> Ultra Fresh (yesterday/today) -> Release Date (Month/Day DESC) -> Uploaded DESC
-  return [...filteredCandidates].sort((a, b) => {
+  // Deterministic sort:
+  // 1. Unused before used
+  // 2. Ultra fresh (breaking / released today/yesterday) at the absolute top
+  // 3. Year DESC (2026 films before 2025 before 2024...)
+  // 4. Release Date DESC (Month/Day latest first within year)
+  // 5. Uploaded/Created Time DESC
+  return [...processed].sort((a, b) => {
     // Unused before used
     if (!a.isUsed && b.isUsed) return -1;
     if (a.isUsed && !b.isUsed) return 1;
@@ -186,6 +180,11 @@ function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Se
     // Ultra fresh (breaking / released hours ago or yesterday) takes absolute top priority
     if (a.isUltraFresh && !b.isUltraFresh) return -1;
     if (!a.isUltraFresh && b.isUltraFresh) return 1;
+
+    // Year descending: 2026 > 2025 > 2024
+    if ((a.year || 0) !== (b.year || 0)) {
+      return (b.year || 0) - (a.year || 0);
+    }
 
     // By release date: latest month and date first (e.g. Sept 2026 > Aug 2026 > Jan 2026)
     if (a.releaseTime !== b.releaseTime) {
@@ -436,10 +435,18 @@ export default function AdminSocialStudio() {
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [seedingCalendar, setSeedingCalendar] = useState(false);
   const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
-  const [videoPlan, setVideoPlan] = useState({ days: 7, startDate: new Date().toISOString().slice(0, 10), videoStart: '18:00', videoEnd: '20:00', clipLength: 30 });
+  const [videoPlan, setVideoPlan] = useState({
+    days: 7,
+    startDate: new Date().toISOString().slice(0, 10),
+    slot1Time: '12:00',
+    slot2Time: '16:00',
+    slot3Time: '20:00',
+    clipLength: 30,
+  });
   const [videoRows, setVideoRows] = useState([
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '18:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
-    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '12:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '16:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
+    { id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), time: '20:00', aspectRatios: ['9:16', '1:1'], filmId: '', mode: 'gemini', start: '01:30', end: '02:00', caption: '', engine: 'gemini', angle: 'editorial', variations: [], selectedVariationKey: 'B' },
   ]);
   const [videoFilmOptions, setVideoFilmOptions] = useState([]);
   const [videoFilmSearch, setVideoFilmSearch] = useState({});
@@ -689,8 +696,9 @@ export default function AdminSocialStudio() {
       supabase.from('films')
         .select('id,title,release_date,year,created_at,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
+        .order('release_date', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
-        .limit(500),
+        .limit(1000),
       supabase.from('social_content_items')
         .select('id,title,source_entity_id,source_snapshot')
         .limit(1000)
@@ -737,7 +745,8 @@ export default function AdminSocialStudio() {
           supabase.from('films')
             .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
             .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
-            .order('created_at', { ascending: false }).limit(500),
+            .order('release_date', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false }).limit(1000),
           supabase.from('social_content_items')
             .select('id,title,source_entity_id,source_snapshot').limit(1000)
         ]);
@@ -859,14 +868,19 @@ export default function AdminSocialStudio() {
   const updateVideoRow = (id, patch) => setVideoRows(rows => rows.map(row => row.id === id ? { ...row, ...patch } : row));
   const addVideoRow = () => setVideoRows(rows => [...rows, {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    date: videoPlan.startDate,
-    time: '20:00',
+    date: videoPlan.startDate || new Date().toISOString().slice(0, 10),
+    time: videoPlan.slot1Time || '12:00',
     aspectRatios: ['9:16', '1:1'],
     filmId: videoFilmOptions[0]?.id || '',
+    film: videoFilmOptions[0] || null,
     mode: 'gemini',
     start: '01:30',
-    end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 45)),
+    end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 30)),
     caption: '',
+    engine: 'gemini',
+    angle: 'editorial',
+    variations: [],
+    selectedVariationKey: 'B',
   }]);
   const buildVideoPlanRows = () => {
     const baseDate = new Date(`${videoPlan.startDate}T12:00:00`);
@@ -874,30 +888,37 @@ export default function AdminSocialStudio() {
     if (!films.length) return toast.error('No films with usable video sources are available yet.');
     const rows = [];
     let filmIdx = 0;
+    const dailySlots = [
+      videoPlan.slot1Time || '12:00',
+      videoPlan.slot2Time || '16:00',
+      videoPlan.slot3Time || '20:00',
+    ];
     for (let day = 0; day < videoPlan.days; day += 1) {
       const date = new Date(baseDate); date.setDate(baseDate.getDate() + day);
       const dateString = date.toISOString().slice(0, 10);
-      [
-        { time: '12:00', aspectRatios: ['9:16', '1:1'] },
-        { time: '16:00', aspectRatios: ['9:16', '1:1'] },
-        { time: '20:00', aspectRatios: ['9:16', '1:1'] },
-      ].forEach((slot, slotIndex) => {
+      dailySlots.forEach((slotTime, slotIndex) => {
         const film = films[filmIdx % films.length];
         filmIdx += 1;
         rows.push({
           id: `${Date.now()}-${day}-${slotIndex}`,
           date: dateString,
-          time: slot.time,
-          aspectRatios: slot.aspectRatios,
+          time: slotTime,
+          aspectRatios: ['9:16', '1:1'],
           filmId: film?.id || '',
+          film: film || null,
           mode: 'gemini',
           start: '01:30',
-          end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 45)),
+          end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 30)),
           caption: '',
+          engine: 'gemini',
+          angle: 'editorial',
+          variations: [],
+          selectedVariationKey: 'B',
         });
       });
     }
-    setVideoRows(rows); toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days (3 distinct movies per day, 9:16 & 1:1 multi-ratio).`);
+    setVideoRows(rows);
+    toast.success(`Built ${rows.length} video rows across ${videoPlan.days} days (3 distinct movies per day, 9:16 & 1:1 multi-ratio).`);
   };
   const removeVideoRow = id => setVideoRows(rows => rows.length > 1 ? rows.filter(row => row.id !== id) : rows);
   const resolveFilmForRow = async row => {
@@ -2594,16 +2615,17 @@ export default function AdminSocialStudio() {
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Days
+                Plan Duration
                 <select
                   value={videoPlan.days}
                   onChange={e => setVideoPlan(p => ({ ...p, days: Number(e.target.value) }))}
                   className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none"
                 >
-                  <option value="7">7 days</option>
-                  <option value="30">30 days</option>
+                  <option value="7">7 days (21 clips)</option>
+                  <option value="14">14 days (42 clips)</option>
+                  <option value="30">30 days (90 clips)</option>
                 </select>
               </label>
 
@@ -2618,21 +2640,31 @@ export default function AdminSocialStudio() {
               </label>
 
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                1:1 Time
+                Slot 1 Time
                 <input
                   type="time"
-                  value={videoPlan.videoStart}
-                  onChange={e => setVideoPlan(p => ({ ...p, videoStart: e.target.value }))}
+                  value={videoPlan.slot1Time}
+                  onChange={e => setVideoPlan(p => ({ ...p, slot1Time: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
                 />
               </label>
 
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                9:16 Time
+                Slot 2 Time
                 <input
                   type="time"
-                  value={videoPlan.videoEnd}
-                  onChange={e => setVideoPlan(p => ({ ...p, videoEnd: e.target.value }))}
+                  value={videoPlan.slot2Time}
+                  onChange={e => setVideoPlan(p => ({ ...p, slot2Time: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Slot 3 Time
+                <input
+                  type="time"
+                  value={videoPlan.slot3Time}
+                  onChange={e => setVideoPlan(p => ({ ...p, slot3Time: e.target.value }))}
                   className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
                 />
               </label>
