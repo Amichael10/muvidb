@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { attachGenresBatch } from './film_enrichment.js';
 
 const INTAKE_SOCIAL_PLATFORMS = ['instagram', 'facebook', 'threads', 'tiktok'] as const;
 
@@ -365,6 +366,13 @@ export async function approveSocialIntake(input: { intakeId: string; payload?: R
       const { data: created, error: filmError } = await supabase.from('films').insert({ ...filmPatch, slug }).select('id').single();
       if (filmError) throw filmError;
       appliedEntityId = created.id;
+    }
+    if (appliedEntityId && genres.length > 0) {
+      try {
+        await attachGenresBatch([{ filmId: appliedEntityId, genres }]);
+      } catch (gErr: any) {
+        console.warn(`[social_intake] attachGenresBatch warning: ${gErr?.message}`);
+      }
     }
     appliedEntityType = 'film';
   } else if (kind === 'critic_review') {

@@ -252,6 +252,10 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
+            'writesubtitles': False,
+            'writeautomaticsub': False,
+            'allsubtitles': False,
+            'embedsubtitles': False,
             'extractor_args': {
                 'youtube': {
                     'player_client': ['web', 'mweb', 'android', 'ios', 'tv_embedded'],
@@ -261,7 +265,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
             },
-            'format': 'bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best[height<=1080]/best',
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
             'download_ranges': yt_dlp.utils.download_range_func(None, [(start_sec, end_sec)]),
             'force_keyframes_at_cuts': True,
             'outtmpl': raw_output,
@@ -292,9 +296,10 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
 
         cmd = [
             "ffmpeg", "-y", "-i", raw_output,
+            "-sn",
             "-vf", vf,
-            "-c:v", "libx264", "-preset", "ultrafast", "-threads", "2", "-crf", "23",
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:v", "libx264", "-preset", "veryfast", "-threads", "2", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             processed_output
         ]

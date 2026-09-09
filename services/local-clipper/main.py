@@ -116,12 +116,12 @@ def require_dependencies() -> None:
 
 def video_filter(aspect_ratio: str, fit_mode: str) -> str:
     dimensions = {
-        "1:1": (720, 720),
-        "4:5": (720, 900),
-        "9:16": (540, 960),
-        "16:9": (960, 540),
+        "1:1": (1080, 1080),
+        "4:5": (1080, 1350),
+        "9:16": (1080, 1920),
+        "16:9": (1920, 1080),
     }
-    width, height = dimensions.get(aspect_ratio, (720, 720))
+    width, height = dimensions.get(aspect_ratio, (1920, 1080))
     if fit_mode == "contain":
         return (
             f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
@@ -332,7 +332,11 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "format": "18/best[ext=mp4]/best",
+            "writesubtitles": False,
+            "writeautomaticsub": False,
+            "allsubtitles": False,
+            "embedsubtitles": False,
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
             "extractor_args": {
                 "youtube": {
             # web_safari/web_embedded are less likely to trigger YouTube's
@@ -341,7 +345,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             "player_client": ["web_safari", "web_embedded", "android", "web"]
                 }
             },
-            "socket_timeout": 20,
+            "socket_timeout": 30,
             **cookie_options(),
         }
 
@@ -377,10 +381,11 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 command.extend(["-headers", "\r\n".join(f"{key}: {value}" for key, value in direct_stream_headers.items())])
             command.extend(["-i", direct_stream_url,
                 "-t", str(duration),
+                "-sn",
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
                 "-pix_fmt", "yuv420p", "-r", "30",
-                "-c:a", "aac", "-b:a", "64k",
+                "-c:a", "aac", "-b:a", "192k",
                 "-movflags", "+faststart", str(final_path)])
             try:
                 rendered = subprocess.run(command, capture_output=True, text=True, timeout=120)
@@ -398,7 +403,11 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "quiet": True,
                     "no_warnings": True,
                     "noplaylist": True,
-                    "format": "18/bv*[height<=720]+ba/b",
+                    "writesubtitles": False,
+                    "writeautomaticsub": False,
+                    "allsubtitles": False,
+                    "embedsubtitles": False,
+                    "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
                     "extractor_args": {
                         "youtube": {
                             "player_client": ["web_safari", "web_embedded", "android", "web"]
@@ -407,7 +416,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "outtmpl": raw_template,
                     "merge_output_format": "mp4",
                     "retries": 3,
-                    "socket_timeout": 30,
+                    "socket_timeout": 45,
                     **cookie_options(),
                 }
                 try:
@@ -426,10 +435,11 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 cmd = [
                     "ffmpeg", "-y", "-ss", str(start), "-i", str(candidates[0]),
                     "-t", str(duration),
+                    "-sn",
                     "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
                     "-pix_fmt", "yuv420p", "-r", "30",
-                    "-c:a", "aac", "-b:a", "64k",
+                    "-c:a", "aac", "-b:a", "192k",
                     "-movflags", "+faststart", str(final_path),
                 ]
                 subprocess.run(cmd, capture_output=True, text=True, timeout=180)

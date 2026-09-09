@@ -3,7 +3,7 @@ import { ADAPTERS, upsertShowtimes, sweepStaleCinemas } from './cinema-adapters/
 import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
 import { detectAndNormalizeSeries, normalizeSeriesTitle } from './series_utils.js';
 import { mirrorIfExternal } from './image_mirror.js';
-import { enrichFilmsFromAI, attachCreditsBatch, type EnrichedFilm } from './film_enrichment.js';
+import { enrichFilmsFromAI, attachCreditsBatch, attachGenresBatch, type EnrichedFilm } from './film_enrichment.js';
 import { enrichMissingSynopsesConcurrent, synopsisNeedsRewrite } from './cohere_enrichment.js';
 import { pickTmdbMatch } from './tmdb_match.js';
 import {
@@ -139,6 +139,7 @@ async function repairLinkedYouTubeFilms(
 
   let repaired = 0;
   const creditEntries: { filmId: string; people: { name: string; role: string }[] }[] = [];
+  const genreEntries: { filmId: string; genres: string[] }[] = [];
   const synopsisFallbackIds: string[] = [];
 
   for (const video of candidates) {
@@ -183,9 +184,17 @@ async function repairLinkedYouTubeFilms(
       ...(ai?.director ? [{ name: ai.director, role: 'director' }] : []),
     ];
     if (people.length) creditEntries.push({ filmId, people });
+    if (ai?.genres?.length) genreEntries.push({ filmId, genres: ai.genres });
   }
 
   const creditsAdded = creditEntries.length ? await attachCreditsBatch(creditEntries) : 0;
+  if (genreEntries.length) {
+    try {
+      await attachGenresBatch(genreEntries);
+    } catch (e: any) {
+      console.warn(`[runVideosSync] repair genre attach failed: ${e.message}`);
+    }
+  }
   const synopsisGenerated = synopsisFallbackIds.length
     ? await enrichMissingSynopsesConcurrent(synopsisFallbackIds, { replaceNoisy: true })
     : 0;
@@ -712,6 +721,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                       poster_url: mirroredMoviePoster,
                       backdrop_url: mirroredMovieBackdrop,
                       synopsis: ai?.synopsis || tmdb?.synopsis || null,
+                      genres: ai?.genres?.length ? ai.genres : null,
                       tmdb_id: tmdb?.tmdb_id || null,
                       tmdb_rating: tmdb?.tmdb_rating || null,
                       needs_review: !(ai?.synopsis || tmdb?.synopsis),
@@ -805,6 +815,22 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                   if (added) console.log(`  🎭 Linked ${added} cast/crew credits from AI enrichment`);
                 } catch (e: any) {
                   console.warn(`[runVideosSync] credit attach failed: ${e.message}`);
+                }
+              }
+
+              // Attach AI-extracted genres to each film and film_genres junction table
+              const genreEntries = eligibleVideos
+                .map((v: any) => {
+                  const ai = aiMap.get(v.video_id);
+                  return { filmId: existingFilmsMap.get(v.video_id), genres: ai?.genres || [] };
+                })
+                .filter((e: any) => e.filmId && e.genres.length);
+              if (genreEntries.length) {
+                try {
+                  const addedGenres = await attachGenresBatch(genreEntries);
+                  if (addedGenres) console.log(`  🏷️ Linked ${addedGenres} film_genres from AI description extraction`);
+                } catch (e: any) {
+                  console.warn(`[runVideosSync] genre attach failed: ${e.message}`);
                 }
               }
             }

@@ -187,26 +187,28 @@ export default function SocialVideoClipModal({
       try {
         const vid = new URL(raw).searchParams.get('v');
         if (vid) {
-          return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+          return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1&cc_load_policy=0&iv_load_policy=3`;
         }
       } catch {
         const m = raw.match(/v=([a-zA-Z0-9_-]+)/);
         if (m) {
-          return `https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1`;
+          return `https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1&cc_load_policy=0&iv_load_policy=3`;
         }
       }
     }
     if (raw.includes('youtu.be/')) {
       const vid = raw.split('youtu.be/')[1]?.split('?')[0];
       if (vid) {
-        return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+        return `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1&cc_load_policy=0&iv_load_policy=3`;
       }
     }
     if (raw.includes('youtube.com/embed/')) {
-      return raw.includes('enablejsapi=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}autoplay=1&enablejsapi=1`;
+      let url = raw.includes('enablejsapi=1') ? raw : `${raw}${raw.includes('?') ? '&' : '?'}autoplay=1&enablejsapi=1`;
+      if (!url.includes('cc_load_policy=')) url += '&cc_load_policy=0&iv_load_policy=3';
+      return url;
     }
     if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) {
-      return `https://www.youtube.com/embed/${raw}?autoplay=1&enablejsapi=1`;
+      return `https://www.youtube.com/embed/${raw}?autoplay=1&enablejsapi=1&cc_load_policy=0&iv_load_policy=3`;
     }
     return raw;
   };
@@ -306,7 +308,7 @@ export default function SocialVideoClipModal({
         vid = videoUrl.split('embed/')[1]?.split('?')[0];
       }
       if (vid) {
-        setVideoUrl(`https://www.youtube.com/embed/${vid}?autoplay=1&start=${Math.max(0, Math.floor(startTime))}&end=${Math.max(1, Math.floor(endTime))}&enablejsapi=1`);
+        setVideoUrl(`https://www.youtube.com/embed/${vid}?autoplay=1&start=${Math.max(0, Math.floor(startTime))}&end=${Math.max(1, Math.floor(endTime))}&enablejsapi=1&cc_load_policy=0&iv_load_policy=3`);
       }
     } else if (videoRef.current) {
       videoRef.current.currentTime = startTime;
@@ -341,7 +343,7 @@ export default function SocialVideoClipModal({
           vid = videoUrl.split('watch?v=')[1]?.split('&')[0];
         }
         if (vid) {
-          fullUrl = `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1`;
+          fullUrl = `https://www.youtube.com/embed/${vid}?autoplay=1&enablejsapi=1&cc_load_policy=0&iv_load_policy=3`;
         }
       }
 
@@ -371,7 +373,7 @@ export default function SocialVideoClipModal({
           vid = videoUrl.split('watch?v=')[1]?.split('&')[0];
         }
         if (vid) {
-          clippedUrl = `https://www.youtube.com/embed/${vid}?autoplay=1&start=${Math.max(0, Math.floor(startTime))}&end=${Math.max(1, Math.floor(endTime))}&enablejsapi=1`;
+          clippedUrl = `https://www.youtube.com/embed/${vid}?autoplay=1&start=${Math.max(0, Math.floor(startTime))}&end=${Math.max(1, Math.floor(endTime))}&enablejsapi=1&cc_load_policy=0&iv_load_policy=3`;
         }
       }
 

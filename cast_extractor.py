@@ -363,6 +363,11 @@ Format each line EXACTLY like this:
 Format each line EXACTLY like this:
 - Crew Name - Specific Role (e.g. - Mary Makeup - Makeup Artist, Wardrobe Designer - Costumier)
 
+# Genres
+(Extract any film genres mentioned in the text or description like Drama, Comedy, Romance, Action, Thriller, Horror, Epic, Crime, Family, Adventure, Fantasy, Mystery, Sci-Fi, Documentary)
+Format each line EXACTLY like this:
+- Genre Name (e.g. - Drama, - Epic, - Comedy)
+
 # Crew
 (ALL other crew roles like Gaffer, Sound Designer, Production Manager, Continuity, Lighting, Photographer, Still Photographer, etc.)
 Format each line EXACTLY like this:
@@ -531,6 +536,47 @@ class SupabaseSync:
         }
         requests.post(f"{self.url}/rest/v1/credits", headers=self.headers, json=payload)
 
+    def link_genres(self, film_id: str, raw_genres: list[str]):
+        if not raw_genres: return
+        res = requests.get(f"{self.url}/rest/v1/genres", headers=self.headers)
+        if res.status_code != 200: return
+        db_genres = res.json() or []
+        genre_map = {g.get("name", "").lower().strip(): g.get("id") for g in db_genres}
+        
+        matched_ids = []
+        canonical_names = []
+        for raw in raw_genres:
+            clean = raw.strip()
+            if not clean: continue
+            gid = genre_map.get(clean.lower())
+            if not gid:
+                if "epic" in clean.lower(): gid = genre_map.get("epic") or genre_map.get("drama")
+                elif "comedy" in clean.lower(): gid = genre_map.get("comedy")
+                elif "romance" in clean.lower(): gid = genre_map.get("romance")
+                elif "thriller" in clean.lower(): gid = genre_map.get("thriller")
+                elif "action" in clean.lower(): gid = genre_map.get("action")
+                elif "drama" in clean.lower(): gid = genre_map.get("drama")
+                elif "horror" in clean.lower(): gid = genre_map.get("horror")
+                elif "crime" in clean.lower(): gid = genre_map.get("crime")
+                elif "family" in clean.lower(): gid = genre_map.get("family")
+            if gid and gid not in matched_ids:
+                matched_ids.append(gid)
+                name = next((g["name"] for g in db_genres if g["id"] == gid), clean)
+                if name not in canonical_names: canonical_names.append(name)
+
+        for gid in matched_ids:
+            check = requests.get(f"{self.url}/rest/v1/film_genres?film_id=eq.{film_id}&genre_id=eq.{gid}", headers=self.headers)
+            if check.status_code == 200 and not check.json():
+                requests.post(f"{self.url}/rest/v1/film_genres", headers=self.headers, json={"film_id": film_id, "genre_id": gid})
+
+        if canonical_names:
+            f_res = requests.get(f"{self.url}/rest/v1/films?id=eq.{film_id}&select=genres", headers=self.headers)
+            if f_res.status_code == 200 and f_res.json():
+                curr = f_res.json()[0].get("genres") or []
+                merged = list(set(curr + canonical_names))
+                if len(merged) > len(curr):
+                    requests.patch(f"{self.url}/rest/v1/films?id=eq.{film_id}", headers=self.headers, json={"genres": merged})
+
     def process(self, youtube_url: str, markdown: str):
         if not self.enabled: return
         
@@ -558,11 +604,17 @@ class SupabaseSync:
         }
 
         linked_count = 0
+        extracted_genres = []
         for section in sections:
             lines = section.strip().split('\n')
             if not lines: continue
             
             header = lines[0].strip()
+            if header == "Genres":
+                genre_lines = [l.strip('- ').strip() for l in lines[1:] if l.strip() and not l.startswith('(')]
+                extracted_genres.extend(genre_lines)
+                continue
+
             role = role_map.get(header)
             if not role: continue
 
@@ -616,6 +668,10 @@ class SupabaseSync:
                 if person_id:
                     self.link_credit(film_id, person_id, specific_role, char, idx)
                     linked_count += 1
+
+        if extracted_genres:
+            self.link_genres(film_id, extracted_genres)
+            print(f"  OK: Linked genres: {', '.join(extracted_genres)}")
 
         print(f"  OK: Successfully linked {linked_count} credits to the database.")
 
