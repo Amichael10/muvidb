@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { extractInstagramHandle } from './outreach_generator';
+
+vi.mock('./ai_service.js', () => ({
+  generateAIContent: vi.fn().mockResolvedValue({
+    text: 'Hey Shammah, we just listed your work on The Bride Price on MuviDB! Check out your official filmography page: https://muvidb.com/people/shammah-agah and claim your verified badge at https://muvidb.com/claim/shammah-agah',
+  }),
+}));
 
 describe('outreach_generator', () => {
   it('extracts clean instagram handles from diverse URLs and raw strings', () => {
@@ -24,5 +30,5 @@ describe('outreach_generator', () => {
     expect(pitch).toBeDefined();
     expect(pitch.length).toBeGreaterThan(30);
     expect(pitch.toLowerCase()).toContain('shammah');
-  }, 20000);
+  });
 });

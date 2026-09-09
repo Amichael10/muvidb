@@ -1,36 +1,84 @@
 import os
 import tempfile
+import base64
+from typing import Optional, Tuple
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 import yt_dlp
 
-app = FastAPI(title="MuviDB Media Extractor Microservice", version="1.0.0")
+app = FastAPI(title="MuviDB Media Extractor Microservice", version="1.6.0")
 
 AUTH_SECRET = os.getenv("EXTRACTOR_SECRET", "").strip()
 
 class ExtractRequest(BaseModel):
     url: str
+    cookies: Optional[str] = None
 
-def get_cookie_file():
+class ClipRequest(BaseModel):
+    url: str
+    start_time: float
+    end_time: float
+    aspect_ratio: str = "9:16"  # "9:16", "1:1", "16:9", "4:5"
+    fit_mode: str = "cover"     # "cover", "contain"
+    title: str = "clip"
+    cookies: Optional[str] = None
+
+
+def decode_if_base64(raw: str) -> str:
+    """Decodes base64 string if it appears to be base64 encoded cookies."""
+    trimmed = raw.strip()
+    if not trimmed:
+        return ""
+    if "# Netscape" in trimmed or "\t" in trimmed:
+        return trimmed
+    try:
+        decoded = base64.b64decode(trimmed).decode("utf-8")
+        if "# Netscape" in decoded or "\t" in decoded or "youtube.com" in decoded or "instagram.com" in decoded:
+            return decoded
+    except Exception:
+        pass
+    return trimmed
+
+
+def get_cookie_file(custom_cookies: Optional[str] = None) -> Tuple[Optional[str], bool]:
+    """
+    Returns (path_to_cookie_file, is_temporary_file).
+    Temporary files MUST be deleted in finally blocks, while static files must NOT.
+    """
+    # 1. Check custom cookies provided in API request payload
+    if custom_cookies:
+        content = decode_if_base64(custom_cookies)
+        if content:
+            tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt", encoding="utf-8")
+            tmp.write(content)
+            tmp.close()
+            return tmp.name, True
+
+    # 2. Check static file paths on disk
     possible_paths = [
         os.path.join(os.path.dirname(__file__), "cookies.txt"),
         "cookies.txt",
         "/app/cookies.txt",
         os.path.join(os.path.dirname(__file__), "..", "..", "cookies.txt"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "scratch", "cookies.txt"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "scratch", "youtube_cookies.txt"),
     ]
     for p in possible_paths:
         if os.path.exists(p):
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     content = f.read().strip()
-                if content and ("youtube.com" in content or "instagram.com" in content or "Netscape" in content):
-                    return os.path.abspath(p)
+                if content and ("youtube.com" in content or "instagram.com" in content or "Netscape" in content or ".google.com" in content):
+                    return os.path.abspath(p), False
             except Exception:
                 pass
 
+    # 3. Check environment variables
     cookies_raw = (
         os.getenv("COOKIES_TXT", "").strip() or
         os.getenv("YOUTUBE_COOKIES", "").strip() or
+        os.getenv("YT_COOKIES", "").strip() or
+        os.getenv("YT_COOKIES_BASE64", "").strip() or
         os.getenv("INSTAGRAM_COOKIES", "").strip() or
         os.getenv("FACEBOOK_COOKIES", "").strip() or
         os.getenv("FB_COOKIES", "").strip()
@@ -38,39 +86,43 @@ def get_cookie_file():
     session_id = os.getenv("INSTAGRAM_SESSION_ID", "").strip()
 
     if cookies_raw:
-        tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt")
-        tmp.write(cookies_raw)
-        tmp.close()
-        return tmp.name
+        content = decode_if_base64(cookies_raw)
+        if content:
+            tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt", encoding="utf-8")
+            tmp.write(content)
+            tmp.close()
+            return tmp.name, True
 
     if session_id:
         # Generate Netscape cookie file for instagram.com
-        tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt")
+        tmp = tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".txt", encoding="utf-8")
         content = f"# Netscape HTTP Cookie File\n.instagram.com\tTRUE\t/\tTRUE\t2147483647\tsessionid\t{session_id}\n"
         tmp.write(content)
         tmp.close()
-        return tmp.name
+        return tmp.name, True
 
-    return None
+    return None, False
+
 
 @app.get("/")
 @app.get("/health")
 def health_check():
+    cookie_path, is_temp = get_cookie_file()
+    if is_temp and cookie_path and os.path.exists(cookie_path):
+        try:
+            os.remove(cookie_path)
+        except Exception:
+            pass
+
+    browser = os.getenv("YT_COOKIES_FROM_BROWSER", "off").strip().lower()
     return {
         "status": "ok",
         "service": "media-extractor",
-        "version": "1.5.2",
-        "has_cookies": bool(
-            os.getenv("COOKIES_TXT") or 
-            os.getenv("YOUTUBE_COOKIES") or
-            os.getenv("INSTAGRAM_COOKIES") or 
-            os.getenv("FACEBOOK_COOKIES") or 
-            os.getenv("FB_COOKIES") or 
-            os.getenv("INSTAGRAM_SESSION_ID") or
-            os.path.exists("cookies.txt") or
-            os.path.exists("/app/cookies.txt")
-        )
+        "version": "1.6.0",
+        "has_cookies": bool(cookie_path) or (browser != "off"),
+        "cookie_source": "file_or_env" if cookie_path else (f"browser:{browser}" if browser != "off" else "none"),
     }
+
 
 @app.post("/extract")
 def extract_media(req: ExtractRequest, authorization: str = Header(None)):
@@ -92,19 +144,23 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web', 'mweb', 'android', 'ios'],
+                'player_client': ['web', 'mweb', 'android', 'ios', 'tv_embedded'],
             }
         },
         'format': 'best[ext=mp4][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]/bestvideo[ext=mp4]/bestvideo/best',
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
         }
     }
 
-    cookie_path = get_cookie_file()
+    cookie_path, is_temp_cookie = get_cookie_file(req.cookies)
+    browser = os.getenv("YT_COOKIES_FROM_BROWSER", "off").strip().lower()
+
     if cookie_path:
         ydl_opts['cookiefile'] = cookie_path
+    elif browser != "off":
+        ydl_opts['cookiesfrombrowser'] = (browser,)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -150,20 +206,12 @@ def extract_media(req: ExtractRequest, authorization: str = Header(None)):
             "error": str(e)
         }
     finally:
-        if cookie_path and os.path.exists(cookie_path):
+        # ONLY delete if it was a temporary file, never delete persistent disk cookie files!
+        if is_temp_cookie and cookie_path and os.path.exists(cookie_path):
             try:
                 os.remove(cookie_path)
             except Exception:
                 pass
-
-
-class ClipRequest(BaseModel):
-    url: str
-    start_time: float
-    end_time: float
-    aspect_ratio: str = "9:16"  # "9:16", "1:1", "16:9", "4:5"
-    fit_mode: str = "cover"     # "cover", "contain"
-    title: str = "clip"
 
 
 @app.post("/clip")
@@ -194,8 +242,8 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
     else:
         vf = "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080"
 
-    cookie_path = get_cookie_file()
-    is_youtube = "youtube.com" in url or "youtu.be" in url
+    cookie_path, is_temp_cookie = get_cookie_file(req.cookies)
+    browser = os.getenv("YT_COOKIES_FROM_BROWSER", "off").strip().lower()
 
     with tempfile.TemporaryDirectory() as tmpdir:
         raw_output = os.path.join(tmpdir, "raw.mp4")
@@ -206,11 +254,11 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             'no_warnings': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web', 'mweb', 'android', 'ios'],
+                    'player_client': ['web', 'mweb', 'android', 'ios', 'tv_embedded'],
                 }
             },
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
             },
             'format': 'bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best[height<=1080]/best',
@@ -220,6 +268,8 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
         }
         if cookie_path:
             ydl_opts['cookiefile'] = cookie_path
+        elif browser != "off":
+            ydl_opts['cookiesfrombrowser'] = (browser,)
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -227,7 +277,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
         except Exception as e:
             return {"success": False, "error": f"Download failed: {str(e)}"}
         finally:
-            if cookie_path and os.path.exists(cookie_path) and tempfile.gettempdir() in cookie_path:
+            if is_temp_cookie and cookie_path and os.path.exists(cookie_path):
                 try:
                     os.remove(cookie_path)
                 except Exception:
@@ -284,4 +334,3 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             }
         else:
             return {"success": False, "error": "Supabase storage credentials not configured on extractor"}
-

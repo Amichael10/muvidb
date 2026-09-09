@@ -585,17 +585,22 @@ function parseAiJson(text: string): Record<string, any> {
 async function extractRemoteMedia(url: string) {
   const extractorUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
   const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
+  const cookies = (process.env.YOUTUBE_COOKIES || process.env.COOKIES_TXT || process.env.YT_COOKIES || '').trim() || undefined;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (extractorSecret) headers.Authorization = `Bearer ${extractorSecret}`;
   const response = await fetch(`${extractorUrl}/extract`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ url }),
-    signal: AbortSignal.timeout(25_000),
+    body: JSON.stringify({ url, cookies }),
+    signal: AbortSignal.timeout(45_000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success || !data.video_url) {
-    throw new Error(data.error || data.detail || 'The video could not be prepared');
+    const rawErr = String(data.error || data.detail || 'The video could not be prepared');
+    if (rawErr.includes('Sign in to confirm') || rawErr.includes('bot')) {
+      throw new Error('YouTube bot detection blocked this video download. Please ensure fresh cookies are configured.');
+    }
+    throw new Error(rawErr);
   }
   return data as {
     video_url: string;
