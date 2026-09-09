@@ -154,23 +154,9 @@ export default function PersonHeroMediaShowcase({
   const hasPhotos = photos.length > 0;
   const hasMedia = hasVideos || hasPhotos;
 
-  // If completely NO media and NO trailers/photos found in filmography, collapse gracefully
+  // If completely NO media and NO trailers/photos found in filmography, let PersonDetail handle unified portrait layout
   if (!hasMedia) {
-    return (
-      <div className={`flex flex-col sm:flex-row gap-6 items-start ${className}`}>
-        <div className="relative aspect-[3/4] w-48 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-[#161616] shadow-2xl">
-          <img
-            src={photoUrl || '/images/person-placeholder.png'}
-            alt={personName}
-            className="h-full w-full object-cover"
-            loading="eager"
-          />
-          <div className="absolute bottom-3 left-3 z-10 flex h-8 w-8 select-none items-center justify-center rounded-full border border-white/40 bg-white/80 p-1 backdrop-blur-md shadow-lg">
-            <img src="/images/muvidb-icon-watermark.png" alt="" className="h-full w-full object-contain" />
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const openGallery = (tab = 'all', category = 'all') => {

@@ -33,17 +33,33 @@ const PLATFORM_STYLES = {
   docuth:   { label: 'Docuth',   bg: 'bg-zinc-800/40',    text: 'text-zinc-200',    dot: 'bg-zinc-400'   },
 }
 
-function PlatformBadge({ releaseType }) {
+function PlatformBadge({ releaseType, film }) {
   if (!releaseType) return null
-  const key = releaseType.toLowerCase()
-  // Scrape-only platforms — never surface to the public.
-  if (key === 'showmax' || key === 'mubi') return null
+  const key = String(releaseType).toLowerCase().trim()
+  // Scrape-only or unreleased platforms — never surface to the public.
+  if (key === 'showmax' || key === 'mubi' || key === 'unreleased' || key === 'unknown') return null
+
+  // Cinema verification check:
+  // Only show the Cinema badge if there is verified theatrical data:
+  // active in cinemas, box office records, or verified cinema ticket links.
+  if (key === 'cinema' || key === 'theatrical') {
+    const isVerifiedCinema = Boolean(
+      film?.is_in_cinemas ||
+      (film?.box_office_domestic && Number(film.box_office_domestic) > 0) ||
+      film?.box_office_source ||
+      film?.streaming_links?.box_office ||
+      film?.streaming_links?.cinema ||
+      film?.streaming_links?.showtimes
+    )
+    if (!isVerifiedCinema) {
+      // Empty badge for movies we are not sure were ever in cinema
+      return null
+    }
+  }
+
   const style = PLATFORM_STYLES[key]
-  if (!style) return (
-    <span className="text-xs font-bold uppercase tracking-wider text-text-secondary bg-surface-2 px-2 py-0.5 rounded">
-      {releaseType}
-    </span>
-  )
+  if (!style) return null
+
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${style.text} ${style.bg} px-2 py-0.5 rounded`}>
       <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
@@ -695,256 +711,537 @@ const PersonDetail = () => {
     return String(num)
   }
 
+  // Clean names for alias deduplication & filtering
+  const cleanForCompare = (str) => {
+    return String(str || '')
+      .toLowerCase()
+      .replace(/^(chief|alhaji|alhaja|dr\.?|doctor|pastor|evang\.?|evangelist|prince|princess|king|queen|sir|lady|engr\.?|amb\.?|hon\.?)\s+/i, '')
+      .replace(/\s*\((?:mon|oon|mfr|cfr|gcfr|con|jp|san|ofr|fna)\)/gi, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim()
+  }
+
+  const personNameClean = cleanForCompare(person.name)
+
+  const uniqueAliases = Array.from(
+    new Set(
+      (person.person_aliases || [])
+        .map(a => (typeof a === 'string' ? a : a.alias || '').trim())
+        .filter(Boolean)
+    )
+  ).filter(alias => {
+    const aliasClean = cleanForCompare(alias)
+    if (!aliasClean) return false
+    if (aliasClean === personNameClean) return false
+    return true
+  })
+
+  // Check whether this person has secondary media (showreels, trailers, stills)
+  const hasMediaShowcase = (() => {
+    const highlights = person.instagram_highlights || person.youtube_stats?.instagram_highlights || []
+    if (Array.isArray(highlights) && highlights.length > 0) return true
+    const filmPool = [...(knownFor || []), ...(person.credits || [])]
+    const hasTrailer = filmPool.some(c => {
+      const f = c.films || c
+      return Boolean(f?.trailer_youtube_id || f?.trailer_url || f?.trailer)
+    })
+    if (hasTrailer) return true
+    const hasBackdrop = filmPool.some(c => {
+      const f = c.films || c
+      return Boolean(f?.backdrop_url)
+    })
+    return hasBackdrop
+  })()
+
   return (
     <div className="min-h-screen bg-bg overflow-x-hidden">
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-10 pt-20 border-x border-border relative z-10 space-y-8">
-          {/* Header: Breadcrumb & Title */}
-          <div>
-            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-text-secondary mb-3 flex-wrap">
-              <Link to="/" className="hover:text-brand transition-colors">Home</Link>
-              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
-              <Link to="/people" className="hover:text-brand transition-colors">People</Link>
-              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
-              <span className="text-text-primary truncate max-w-[240px]">{formatPersonName(person.name)}</span>
-            </nav>
-
-            <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="max-w-7xl mx-auto px-4 py-8 pt-20 border-x border-border relative z-10">
+          
+          {hasMediaShowcase ? (
+            /* ─── SHOWCASE HERO (For actors with trailers / showreels / photo gallery) ─── */
+            <div className="space-y-6">
+              {/* Header: Breadcrumb, Name, Roles & Aliases */}
               <div>
-                <div className="flex items-center gap-3 flex-wrap mb-1">
-                  <h1 className="text-3xl md:text-5xl font-heading font-black text-text-primary tracking-tight">
-                    {formatPersonName(person.name)}
-                  </h1>
-                  {person.is_verified && (
-                    <span className="bg-brand/10 text-brand text-xs font-bold px-3 py-1 rounded-lg border border-brand/20">
-                      Verified
+                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-text-secondary mb-2 flex-wrap">
+                  <Link to="/" className="hover:text-brand transition-colors">Home</Link>
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+                  <Link to="/people" className="hover:text-brand transition-colors">People</Link>
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+                  <span className="text-text-primary truncate max-w-[240px]">{formatPersonName(person.name)}</span>
+                </nav>
+
+                <div className="flex items-start justify-between flex-wrap gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h1 className="text-3xl md:text-5xl font-heading font-black text-text-primary tracking-tight">
+                        {formatPersonName(person.name)}
+                      </h1>
+                      {person.is_verified && (
+                        <span className="bg-brand/10 text-brand text-xs font-bold px-3 py-1 rounded-lg border border-brand/20">
+                          Verified
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Roles */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-text-secondary pt-0.5">
+                      {heroRoles.map((role, idx) => (
+                        <span key={role} className="flex items-center gap-2">
+                          <span className="text-brand uppercase tracking-wider text-[11px] font-black">{formatRole(role)}</span>
+                          {idx < heroRoles.length - 1 && <span className="w-1 h-1 rounded-full bg-border" />}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Distinct Aliases / Monikers */}
+                    {uniqueAliases.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted pt-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-text-muted/80">Also known as:</span>
+                        {uniqueAliases.slice(0, 4).map(alias => (
+                          <span key={alias} className="inline-block rounded-md border border-border/80 bg-surface-2/80 px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+                            {alias}
+                          </span>
+                        ))}
+                        {uniqueAliases.length > 4 && (
+                          <span className="text-[10px] text-text-muted">+{uniqueAliases.length - 4} more</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setShowEdit(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-secondary hover:border-brand/40 hover:text-brand transition shrink-0"
+                  >
+                    <Icon icon="solar:pen-2-linear" width="14" />
+                    Suggest edit
+                  </button>
+                </div>
+              </div>
+
+              {/* 3-Pane IMDb-Style Hero Media Showcase */}
+              <PersonHeroMediaShowcase
+                photoUrl={person.photo_url || person.photo}
+                personName={person.name}
+                highlights={person.instagram_highlights || person.youtube_stats?.instagram_highlights}
+                credits={person.credits || []}
+                knownFor={knownFor}
+              />
+
+              {/* Bio & Stats Section */}
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start pt-2">
+                <div className="lg:col-span-8 space-y-6">
+                  {(person.biography || person.bio) && (
+                    <Biography text={toSentenceCase(person.biography || person.bio)} />
+                  )}
+
+                  <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider">
+                    {person.nationality && (() => {
+                      const countryName = nationalityToCountryName(person.nationality);
+                      const label = toTitleCase(person.nationality);
+                      return countryName ? (
+                        <Link
+                          to={`/browse?country=${encodeURIComponent(countryName)}`}
+                          className="text-text-muted hover:text-brand transition-colors"
+                        >
+                          Nationality: <span className="underline underline-offset-2 decoration-border hover:decoration-brand">{label}</span>
+                        </Link>
+                      ) : (
+                        <span className="text-text-muted">Nationality: {label}</span>
+                      );
+                    })()}
+                    {person.date_of_birth && (
+                      <span className="text-text-muted">
+                        Born: {formatDateOfBirth(person.date_of_birth)}
+                      </span>
+                    )}
+                    {person.date_of_death && (
+                      <span className="text-text-muted">
+                        Died: {formatDateOfBirth(person.date_of_death)}
+                      </span>
+                    )}
+                    {!person.date_of_death && person.is_deceased && person.death_year && (
+                      <span className="text-text-muted">
+                        Died: {person.death_month ? `${new Date(2000, person.death_month - 1).toLocaleString('default', { month: 'short' })} ` : ''}{person.death_year}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-row items-center gap-3 pt-1 w-full overflow-x-auto no-scrollbar pb-1">
+                    <button
+                      onClick={handleFollow}
+                      disabled={followLoading}
+                      className={`px-6 py-3 rounded-lg font-bold text-xs transition-all disabled:opacity-50 min-h-[44px] flex-shrink-0 ${
+                        isFollowing
+                          ? 'bg-surface border border-brand text-brand hover:bg-brand/5'
+                          : 'bg-brand text-white hover:shadow-brand/20 hover:scale-[1.02]'
+                      }`}
+                    >
+                      {isFollowing ? 'Following' : 'Follow'}
+                    </button>
+
+                    {!person.claimed_by && !person.is_deceased && !person.date_of_death && (
+                      <Link
+                        to={`/claim?person=${encodeURIComponent(person.slug || person.id)}`}
+                        className="inline-flex min-h-[44px] flex-shrink-0 items-center rounded-lg border border-border bg-surface px-6 py-3 text-xs font-bold text-text-primary transition-all hover:border-brand hover:text-brand"
+                      >
+                        Claim this profile
+                      </Link>
+                    )}
+
+                    {getPersonYoutubeChannelUrl(person) && (
+                      <a
+                        href={getPersonYoutubeChannelUrl(person)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-xs transition-all border border-border text-text-primary bg-surface hover:border-brand hover:text-brand min-h-[44px] flex-shrink-0"
+                      >
+                        Official Channel
+                      </a>
+                    )}
+                    
+                    {person.claimed_by ? (
+                      <button onClick={() => setPassportOpen(true)} className="inline-flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded-lg border border-brand/40 bg-brand/5 px-5 py-3 text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white">
+                        <Icon icon="solar:passport-linear" width="17" /> Share Career Passport
+                      </button>
+                    ) : (
+                      <ShareAction
+                        title={person.name}
+                        text={`Check out ${person.name}'s profile on MuviDB`}
+                        className="!w-auto"
+                        containerClassName="w-auto flex-shrink-0"
+                      />
+                    )}
+
+                    {(person.instagram_url || person.facebook_url || person.twitter_url) && (
+                      <div className="h-6 w-[1px] bg-border mx-2 self-center flex-shrink-0" />
+                    )}
+
+                    {person.instagram_url && (
+                      <a
+                        href={person.instagram_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-[44px] h-[44px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all flex-shrink-0"
+                        aria-label="Instagram"
+                      >
+                        <Icon icon="ri:instagram-line" className="text-lg" />
+                      </a>
+                    )}
+
+                    {person.facebook_url && (
+                      <a
+                        href={person.facebook_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-[44px] h-[44px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all flex-shrink-0"
+                        aria-label="Facebook"
+                      >
+                        <Icon icon="ri:facebook-box-line" className="text-lg" />
+                      </a>
+                    )}
+
+                    {person.twitter_url && (
+                      <a
+                        href={person.twitter_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-[44px] h-[44px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all flex-shrink-0"
+                        aria-label="X (Twitter)"
+                      >
+                        <Icon icon="ri:twitter-x-fill" className="text-lg" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-4 space-y-4">
+                  {/* Credits & Followers pills */}
+                  <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden bg-surface shadow-sm w-full">
+                    <div className="flex-1 px-4 py-3 text-center border-r border-border">
+                      <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{totalFilms}</p>
+                      <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Credits</p>
+                    </div>
+                    <div className="flex-1 px-4 py-3 text-center">
+                      <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{followerCount.toLocaleString()}</p>
+                      <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Followers</p>
+                    </div>
+                  </div>
+
+                  {/* Impact Card */}
+                  {showImpactCard && (
+                    <div className="border border-border rounded-2xl bg-surface overflow-hidden shadow-lg">
+                      <div className="flex flex-col items-start px-6 pt-5 pb-4 gap-1 border-b border-border min-w-0">
+                        <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Reported Film Box Office</p>
+                        {hasBoxOffice
+                          ? <p className="text-brand text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtMoney(displayBoxOffice)}</p>
+                          : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
+                      </div>
+
+                      <div className="flex flex-col items-start px-6 pt-5 pb-5 gap-1 min-w-0">
+                        <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">YouTube Views</p>
+                        {hasYtViews
+                          ? <p className="text-text-primary text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtViews(displayYtViews)}</p>
+                          : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ─── UNIFIED SINGLE-PORTRAIT HERO (For classic / single-photo filmmakers e.g. Hubert Ogunde) ─── */
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+              {/* Portrait Photo */}
+              <div className="md:col-span-4 lg:col-span-3 flex justify-center md:justify-start">
+                <div className="group relative aspect-[3/4] w-52 sm:w-60 md:w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#1c1c1c] to-[#121212] p-1.5 shadow-2xl transition-all duration-300 hover:border-brand/40">
+                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-black">
+                    <img
+                      src={person.photo_url || person.photo || '/images/person-placeholder.png'}
+                      alt={person.name}
+                      className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                      loading="eager"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+
+                    {/* Bottom-left MuviDB icon seal */}
+                    <div className="absolute bottom-3 left-3 z-10 flex h-8 w-8 select-none items-center justify-center rounded-full border border-white/40 bg-white/85 p-1 backdrop-blur-md shadow-xl">
+                      <img src="/images/muvidb-icon-watermark.png" alt="" className="h-full w-full object-contain" />
+                    </div>
+
+                    {/* Primary Portrait Badge */}
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className="rounded-full bg-black/65 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white/90 backdrop-blur-md border border-white/10">
+                        Official Headshot
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Bio & Details */}
+              <div className="md:col-span-8 lg:col-span-6 space-y-4">
+                <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-text-secondary mb-1 flex-wrap">
+                  <Link to="/" className="hover:text-brand transition-colors">Home</Link>
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+                  <Link to="/people" className="hover:text-brand transition-colors">People</Link>
+                  <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
+                  <span className="text-text-primary truncate max-w-[240px]">{formatPersonName(person.name)}</span>
+                </nav>
+
+                <div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h1 className="text-3xl md:text-5xl font-heading font-black text-text-primary tracking-tight">
+                      {formatPersonName(person.name)}
+                    </h1>
+                    {person.is_verified && (
+                      <span className="bg-brand/10 text-brand text-xs font-bold px-3 py-1 rounded-lg border border-brand/20">
+                        Verified
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Roles */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-text-secondary pt-1">
+                    {heroRoles.map((role, idx) => (
+                      <span key={role} className="flex items-center gap-2">
+                        <span className="text-brand uppercase tracking-wider text-[11px] font-black">{formatRole(role)}</span>
+                        {idx < heroRoles.length - 1 && <span className="w-1 h-1 rounded-full bg-border" />}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Distinct Aliases / Monikers */}
+                  {uniqueAliases.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted pt-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-muted/80">Also known as:</span>
+                      {uniqueAliases.slice(0, 4).map(alias => (
+                        <span key={alias} className="inline-block rounded-md border border-border/80 bg-surface-2/80 px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+                          {alias}
+                        </span>
+                      ))}
+                      {uniqueAliases.length > 4 && (
+                        <span className="text-[10px] text-text-muted">+{uniqueAliases.length - 4} more</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Biography */}
+                {(person.biography || person.bio) && (
+                  <div className="pt-1">
+                    <Biography text={toSentenceCase(person.biography || person.bio)} />
+                  </div>
+                )}
+
+                {/* Vital Facts */}
+                <div className="flex flex-wrap gap-4 sm:gap-6 text-[10px] font-bold tracking-wider pt-1">
+                  {person.nationality && (() => {
+                    const countryName = nationalityToCountryName(person.nationality);
+                    const label = toTitleCase(person.nationality);
+                    return countryName ? (
+                      <Link
+                        to={`/browse?country=${encodeURIComponent(countryName)}`}
+                        className="text-text-muted hover:text-brand transition-colors"
+                      >
+                        Nationality: <span className="underline underline-offset-2 decoration-border hover:decoration-brand">{label}</span>
+                      </Link>
+                    ) : (
+                      <span className="text-text-muted">Nationality: {label}</span>
+                    );
+                  })()}
+                  {person.date_of_birth && (
+                    <span className="text-text-muted">
+                      Born: {formatDateOfBirth(person.date_of_birth)}
+                    </span>
+                  )}
+                  {person.date_of_death && (
+                    <span className="text-text-muted">
+                      Died: {formatDateOfBirth(person.date_of_death)}
+                    </span>
+                  )}
+                  {!person.date_of_death && person.is_deceased && person.death_year && (
+                    <span className="text-text-muted">
+                      Died: {person.death_month ? `${new Date(2000, person.death_month - 1).toLocaleString('default', { month: 'short' })} ` : ''}{person.death_year}
                     </span>
                   )}
                 </div>
 
-                {person.person_aliases?.length > 0 && (
-                  <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
-                    <span>Also known as</span>
-                    {person.person_aliases.map(({ alias }) => (
-                      <span key={alias} className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-text-primary">{alias}</span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-text-secondary">
-                  {heroRoles.map(role => (
-                    <span key={role} className="text-text-secondary">
-                      {formatRole(role)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowEdit(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-secondary hover:border-brand/40 hover:text-brand transition"
-                >
-                  <Icon icon="solar:pen-2-linear" width="14" />
-                  Suggest edit
-                </button>
-                {showEdit && (
-                  <SuggestEditModal
-                    target="person"
-                    targetId={personId}
-                    targetName={formatPersonName(person.name)}
-                    current={{
-                      name: person.name,
-                      known_for_department: person.known_for_department,
-                      bio: person.bio,
-                      date_of_birth: person.date_of_birth,
-                      birthplace: person.birthplace,
-                      nationality: person.nationality,
-                      instagram_url: person.instagram_url,
-                      twitter_url: person.twitter_url,
-                      tiktok_url: person.tiktok_url,
-                      facebook_url: person.facebook_url,
-                      youtube_handle: person.youtube_handle,
-                    }}
-                    onClose={() => setShowEdit(false)}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 3-Pane IMDb-Style Hero Media Showcase */}
-          <PersonHeroMediaShowcase
-            photoUrl={person.photo_url || person.photo}
-            personName={person.name}
-            highlights={person.instagram_highlights || person.youtube_stats?.instagram_highlights}
-            credits={person.credits || []}
-            knownFor={knownFor}
-          />
-
-          {/* Actor Quick Stats & Bio Section */}
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
-            <div className="lg:col-span-8 space-y-6">
-              {(person.biography || person.bio) && (
-                <Biography text={toSentenceCase(person.biography || person.bio)} />
-              )}
-
-              <div className="flex flex-wrap gap-6 text-[10px] font-bold tracking-wider justify-center md:justify-start">
-                {person.nationality && (() => {
-                  const countryName = nationalityToCountryName(person.nationality);
-                  const label = toTitleCase(person.nationality);
-                  return countryName ? (
-                    <Link
-                      to={`/browse?country=${encodeURIComponent(countryName)}`}
-                      className="text-text-muted hover:text-brand transition-colors"
-                    >
-                      Nationality: <span className="underline underline-offset-2 decoration-border hover:decoration-brand">{label}</span>
-                    </Link>
-                  ) : (
-                    <span className="text-text-muted">Nationality: {label}</span>
-                  );
-                })()}
-                {person.date_of_birth && (
-                  <span className="text-text-muted">
-                    Born: {formatDateOfBirth(person.date_of_birth)}
-                  </span>
-                )}
-                {person.date_of_death && (
-                  <span className="text-text-muted">
-                    Died: {formatDateOfBirth(person.date_of_death)}
-                  </span>
-                )}
-                {!person.date_of_death && person.is_deceased && person.death_year && (
-                  <span className="text-text-muted">
-                    Died: {person.death_month ? `${new Date(2000, person.death_month - 1).toLocaleString('default', { month: 'short' })} ` : ''}{person.death_year}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-row items-center gap-3 pt-2 justify-center md:justify-start w-full overflow-x-auto no-scrollbar pb-1">
-                <button
-                  onClick={handleFollow}
-                  disabled={followLoading}
-                  className={`px-6 py-3 rounded-lg font-bold text-xs transition-all disabled:opacity-50 min-h-[44px] flex-shrink-0 ${
-                    isFollowing
-                      ? 'bg-surface border border-brand text-brand hover:bg-brand/5'
-                      : 'bg-brand text-white hover:shadow-brand/20 hover:scale-[1.02]'
-                  }`}
-                >
-                  {isFollowing ? 'Following' : 'Follow'}
-                </button>
-
-                {!person.claimed_by && !person.is_deceased && !person.date_of_death && (
-                  <Link
-                    to={`/claim?person=${encodeURIComponent(person.slug || person.id)}`}
-                    className="inline-flex min-h-[44px] flex-shrink-0 items-center rounded-lg border border-border bg-surface px-6 py-3 text-xs font-bold text-text-primary transition-all hover:border-brand hover:text-brand"
+                {/* Action Buttons */}
+                <div className="flex flex-wrap items-center gap-3 pt-3">
+                  <button
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                    className={`px-6 py-2.5 rounded-lg font-bold text-xs transition-all disabled:opacity-50 min-h-[40px] ${
+                      isFollowing
+                        ? 'bg-surface border border-brand text-brand hover:bg-brand/5'
+                        : 'bg-brand text-white hover:shadow-brand/20 hover:scale-[1.02]'
+                    }`}
                   >
-                    Claim this profile
-                  </Link>
-                )}
-
-                {getPersonYoutubeChannelUrl(person) && (
-                  <a
-                    href={getPersonYoutubeChannelUrl(person)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-xs transition-all border border-border text-text-primary bg-surface hover:border-brand hover:text-brand min-h-[44px] flex-shrink-0"
-                  >
-                    Official Channel
-                  </a>
-                )}
-                
-                {person.claimed_by ? (
-                  <button onClick={() => setPassportOpen(true)} className="inline-flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded-lg border border-brand/40 bg-brand/5 px-5 py-3 text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white">
-                    <Icon icon="solar:passport-linear" width="17" /> Share Career Passport
+                    {isFollowing ? 'Following' : 'Follow'}
                   </button>
-                ) : (
+
+                  {!person.claimed_by && !person.is_deceased && !person.date_of_death && (
+                    <Link
+                      to={`/claim?person=${encodeURIComponent(person.slug || person.id)}`}
+                      className="inline-flex min-h-[40px] items-center rounded-lg border border-border bg-surface px-5 py-2.5 text-xs font-bold text-text-primary transition-all hover:border-brand hover:text-brand"
+                    >
+                      Claim profile
+                    </Link>
+                  )}
+
+                  <button
+                    onClick={() => setShowEdit(true)}
+                    className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-border bg-surface px-4 py-2.5 text-xs font-bold text-text-secondary hover:border-brand hover:text-brand transition"
+                  >
+                    <Icon icon="solar:pen-2-linear" width="14" />
+                    Suggest edit
+                  </button>
+
                   <ShareAction
                     title={person.name}
                     text={`Check out ${person.name}'s profile on MuviDB`}
                     className="!w-auto"
-                    containerClassName="w-auto flex-shrink-0"
+                    containerClassName="w-auto"
                   />
-                )}
 
-                {(person.instagram_url || person.facebook_url || person.twitter_url) && (
-                  <div className="h-6 w-[1px] bg-border mx-2 self-center flex-shrink-0" />
-                )}
+                  {person.instagram_url && (
+                    <a
+                      href={person.instagram_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-[40px] h-[40px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all"
+                      aria-label="Instagram"
+                    >
+                      <Icon icon="ri:instagram-line" className="text-base" />
+                    </a>
+                  )}
 
-                {person.instagram_url && (
-                  <a
-                    href={person.instagram_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-[44px] h-[44px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all flex-shrink-0"
-                    aria-label="Instagram"
-                  >
-                    <Icon icon="ri:instagram-line" className="text-lg" />
-                  </a>
-                )}
+                  {person.facebook_url && (
+                    <a
+                      href={person.facebook_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-[40px] h-[40px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all"
+                      aria-label="Facebook"
+                    >
+                      <Icon icon="ri:facebook-box-line" className="text-base" />
+                    </a>
+                  )}
 
-                {person.facebook_url && (
-                  <a
-                    href={person.facebook_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-[44px] h-[44px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all flex-shrink-0"
-                    aria-label="Facebook"
-                  >
-                    <Icon icon="ri:facebook-box-line" className="text-lg" />
-                  </a>
-                )}
-
-                {person.twitter_url && (
-                  <a
-                    href={person.twitter_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-[44px] h-[44px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all flex-shrink-0"
-                    aria-label="X (Twitter)"
-                  >
-                    <Icon icon="ri:twitter-x-fill" className="text-lg" />
-                  </a>
-                )}
-              </div>
-            </div>
-
-            <div className="lg:col-span-4 space-y-4">
-              {/* Credits & Followers pills */}
-              <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden bg-surface shadow-sm w-full">
-                <div className="flex-1 px-4 py-3 text-center border-r border-border">
-                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{totalFilms}</p>
-                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Credits</p>
-                </div>
-                <div className="flex-1 px-4 py-3 text-center">
-                  <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{followerCount.toLocaleString()}</p>
-                  <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Followers</p>
+                  {person.twitter_url && (
+                    <a
+                      href={person.twitter_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-[40px] h-[40px] rounded-lg border border-border flex items-center justify-center text-text-muted hover:border-brand hover:text-brand hover:bg-brand/5 transition-all"
+                      aria-label="X (Twitter)"
+                    >
+                      <Icon icon="ri:twitter-x-fill" className="text-base" />
+                    </a>
+                  )}
                 </div>
               </div>
 
-              {/* Impact Card */}
-              {showImpactCard && (
-                <div className="border border-border rounded-2xl bg-surface overflow-hidden shadow-lg">
-                  {/* Box Office */}
-                  <div className="flex flex-col items-start px-6 pt-5 pb-4 gap-1 border-b border-border min-w-0">
-                    <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Reported Film Box Office</p>
-                    {hasBoxOffice
-                      ? <p className="text-brand text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtMoney(displayBoxOffice)}</p>
-                      : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
+              {/* Stats Card */}
+              <div className="md:col-span-12 lg:col-span-3 space-y-4">
+                <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden bg-surface shadow-sm w-full">
+                  <div className="flex-1 px-4 py-3 text-center border-r border-border">
+                    <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{totalFilms}</p>
+                    <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Credits</p>
                   </div>
-
-                  {/* YouTube Views */}
-                  <div className="flex flex-col items-start px-6 pt-5 pb-5 gap-1 min-w-0">
-                    <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">YouTube Views</p>
-                    {hasYtViews
-                      ? <p className="text-text-primary text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtViews(displayYtViews)}</p>
-                      : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
+                  <div className="flex-1 px-4 py-3 text-center">
+                    <p className="text-text-primary text-xl font-black font-heading tracking-tight leading-none">{followerCount.toLocaleString()}</p>
+                    <p className="text-text-muted text-[9px] font-bold uppercase tracking-widest mt-0.5">Followers</p>
                   </div>
                 </div>
-              )}
+
+                {/* Impact Card */}
+                {showImpactCard && (
+                  <div className="border border-border rounded-2xl bg-surface overflow-hidden shadow-lg">
+                    <div className="flex flex-col items-start px-6 pt-5 pb-4 gap-1 border-b border-border min-w-0">
+                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">Reported Film Box Office</p>
+                      {hasBoxOffice
+                        ? <p className="text-brand text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtMoney(displayBoxOffice)}</p>
+                        : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
+                    </div>
+
+                    <div className="flex flex-col items-start px-6 pt-5 pb-5 gap-1 min-w-0">
+                      <p className="text-text-muted text-[9px] font-black uppercase tracking-[0.2em]">YouTube Views</p>
+                      {hasYtViews
+                        ? <p className="text-text-primary text-2xl font-black font-heading tracking-tight leading-none truncate max-w-full">{fmtViews(displayYtViews)}</p>
+                        : <p className="text-text-muted text-xl font-black font-heading leading-none">—</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {showEdit && (
+            <SuggestEditModal
+              target="person"
+              targetId={personId}
+              targetName={formatPersonName(person.name)}
+              current={{
+                name: person.name,
+                known_for_department: person.known_for_department,
+                bio: person.bio,
+                date_of_birth: person.date_of_birth,
+                birthplace: person.birthplace,
+                nationality: person.nationality,
+                instagram_url: person.instagram_url,
+                twitter_url: person.twitter_url,
+                tiktok_url: person.tiktok_url,
+                facebook_url: person.facebook_url,
+                youtube_handle: person.youtube_handle,
+              }}
+              onClose={() => setShowEdit(false)}
+            />
+          )}
+
         </div>
       </div>
 
@@ -1145,7 +1442,7 @@ const PersonDetail = () => {
                               {year}
                             </span>
                           )}
-                          <PlatformBadge releaseType={film.release_type || (credit.video ? 'youtube' : '')} />
+                          <PlatformBadge releaseType={film.release_type || (credit.video ? 'youtube' : '')} film={film} />
                         </div>
                         <h3 className="text-sm sm:text-base font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
                           {formatFilmTitle(title)}
