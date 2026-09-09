@@ -25,12 +25,10 @@ export default function LikedScore({
   variant = 'inline',
   className = '',
 }) {
-  const pct = percent != null ? Math.round(Number(percent)) : null;
+  const pct = percent != null && !isNaN(percent) ? Math.round(Number(percent)) : null;
   const star =
-    starRating != null
+    starRating != null && !isNaN(starRating) && Number(starRating) > 0
       ? Number(starRating).toFixed(1)
-      : pct != null
-      ? score10FromLikedPercent(pct).toFixed(1)
       : null;
 
   if (pct == null && star == null && criticScore == null) return null;

@@ -61,6 +61,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleFetchYoutube } = await import('./_lib/fetch_youtube_handler.js');
       return handleFetchYoutube(req, res);
     }
+    if (key === 'outreach') {
+      const { handleOutreach } = await import('./_lib/outreach_handler.js');
+      return handleOutreach(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {

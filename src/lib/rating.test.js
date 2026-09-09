@@ -8,27 +8,30 @@ import {
 
 describe('rating utilities', () => {
   describe('pctLiked', () => {
-    it('maps 0-10 scores onto the logistic curve', () => {
-      expect(pctLiked(7.1)).toBe(50);
-      expect(pctLiked(8.5)).toBeGreaterThan(80);
-      expect(pctLiked(5.0)).toBeLessThan(20);
+    it('maps 0-10 scores onto the calibrated logistic curve', () => {
+      expect(pctLiked(4.2)).toBe(50);
+      expect(pctLiked(5.0)).toBe(61);
+      expect(pctLiked(8.0)).toBeGreaterThan(85);
+      expect(pctLiked(2.0)).toBeLessThan(30);
     });
 
-    it('clamps to [5, 97]', () => {
-      expect(pctLiked(0)).toBe(5);
-      expect(pctLiked(10)).toBe(97);
+    it('stays within [5, 97]', () => {
+      expect(pctLiked(0)).toBe(9);
+      expect(pctLiked(10)).toBe(96);
     });
   });
 
   describe('score10FromLikedPercent', () => {
     it('inverts the logistic curve back to 0-10 score', () => {
       const score = score10FromLikedPercent(50);
-      expect(score).toBeCloseTo(7.1, 1);
+      expect(score).toBeCloseTo(4.2, 1);
+      const score60 = score10FromLikedPercent(60);
+      expect(score60).toBeCloseTo(4.9, 1);
     });
 
     it('handles high and low percent bounds', () => {
       expect(score10FromLikedPercent(95)).toBeGreaterThan(8.5);
-      expect(score10FromLikedPercent(10)).toBeLessThan(5.5);
+      expect(score10FromLikedPercent(10)).toBeLessThan(2.0);
     });
   });
 

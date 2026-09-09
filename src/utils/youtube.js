@@ -6,6 +6,21 @@
 // Sends all YouTube requests through /api/youtube
 // ─────────────────────────────────────────
 const youtubeFetch = async (endpoint, params = {}) => {
+  const apiKey = (typeof process !== 'undefined' && process.env)
+    ? (process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY)
+    : null
+
+  // If running in Node/scripts and API key is in environment, call Google API directly
+  if (typeof window === 'undefined' && apiKey) {
+    const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`)
+    url.searchParams.set('key', apiKey)
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) url.searchParams.set(key, String(value))
+    })
+    const res = await fetch(url.toString())
+    return res.json()
+  }
+
   const searchParams = new URLSearchParams({ provider: 'youtube', endpoint })
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
@@ -583,3 +598,110 @@ export const fetchVideoDetailsForImport = async (urlOrId) => {
     return { ok: false, error: error.message || 'Could not reach YouTube.' }
   }
 }
+
+// ─────────────────────────────────────────
+// FUNCTION: Search YouTube Channels
+// Supports channel name keywords, @handle, UC... ID, or YouTube URLs
+// Returns full channel metadata ready for DB insertion/editing
+// ─────────────────────────────────────────
+export const searchYouTubeChannels = async (query) => {
+  if (!query || !query.trim()) return []
+  const input = query.trim()
+
+  try {
+    let channelId = null
+    let handle = null
+
+    // Check if input is a YouTube URL
+    if (input.includes('youtube.com/channel/')) {
+      channelId = input.split('youtube.com/channel/')[1].split('/')[0].split('?')[0]
+    } else if (input.includes('youtube.com/@')) {
+      handle = input.split('youtube.com/@')[1].split('/')[0].split('?')[0]
+    } else if (input.startsWith('UC') && input.length >= 22) {
+      channelId = input
+    } else if (input.startsWith('@')) {
+      handle = input.slice(1)
+    }
+
+    let channelsList = []
+
+    // 1. Direct ID or Handle lookup
+    if (channelId || handle) {
+      const params = {
+        part: 'snippet,statistics,brandingSettings,contentDetails',
+      }
+      if (channelId) params.id = channelId
+      else if (handle) params.forHandle = `@${handle}`
+
+      const data = await youtubeFetch('channels', params)
+      if (data?.items?.length) {
+        channelsList = data.items
+      }
+    }
+
+    // 2. Search query fallback / general search
+    if (!channelsList.length) {
+      const searchData = await youtubeFetch('search', {
+        part: 'snippet',
+        type: 'channel',
+        q: input,
+        maxResults: 12,
+      })
+
+      if (searchData?.items?.length) {
+        const foundIds = searchData.items.map(item => item.snippet?.channelId || item.id?.channelId).filter(Boolean)
+        if (foundIds.length) {
+          const detailData = await youtubeFetch('channels', {
+            part: 'snippet,statistics,brandingSettings,contentDetails',
+            id: foundIds.join(','),
+          })
+          if (detailData?.items?.length) {
+            channelsList = detailData.items
+          }
+        }
+      }
+    }
+
+    return channelsList.map(c => {
+      const snippet = c.snippet || {}
+      const stats = c.statistics || {}
+      const branding = c.brandingSettings || {}
+      const rawHandle = snippet.customUrl || ''
+      const cleanHandle = rawHandle ? (rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`) : ''
+      const channelUrl = rawHandle
+        ? `https://www.youtube.com/${rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle}`
+        : `https://www.youtube.com/channel/${c.id}`
+
+      // Get high-res banner if available
+      const bannerUrl = branding.image?.bannerExternalUrl || ''
+      
+      // Get best logo
+      const thumbs = snippet.thumbnails || {}
+      const thumbnailUrl = thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || ''
+
+      // Country
+      let country = 'Nigeria'
+      if (snippet.country) {
+        country = snippet.country === 'NG' ? 'Nigeria' : snippet.country
+      }
+
+      return {
+        id: c.id,
+        channel_id: c.id,
+        name: snippet.title || '',
+        channel_handle: cleanHandle,
+        channel_url: channelUrl,
+        description: snippet.description || '',
+        thumbnail_url: thumbnailUrl,
+        banner_url: bannerUrl,
+        country: country,
+        subscriber_count: stats.subscriberCount ? parseInt(stats.subscriberCount, 10) : null,
+        video_count: stats.videoCount ? parseInt(stats.videoCount, 10) : 0,
+      }
+    })
+  } catch (err) {
+    console.error('searchYouTubeChannels error:', err)
+    return []
+  }
+}
+

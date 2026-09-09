@@ -2,7 +2,7 @@ import { searchPeopleByName } from '../../lib/peopleSearch';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { formatViewCount } from '../../utils/youtube';
+import { formatViewCount, searchYouTubeChannels } from '../../utils/youtube';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 import SyncStatusOverlay from '../../components/admin/SyncStatusOverlay';
@@ -12,20 +12,22 @@ import { deleteChannelWithAssociatedFilms } from '../../utils/channelCascadeDele
 
 const CATEGORIES = [
   'Movies', 'Comedy', 'Series', 'Yoruba', 'Faith',
-  'Celebrity', 'Network', 'Music', 'Studio', 'skit_maker',
+  'Celebrity', 'Network', 'Music', 'Studio', 'skit_maker', 'actor'
 ];
 
 const EMPTY_FORM = {
   name: '',
   channel_handle: '',
   channel_url: '',
+  channel_id: '',
   description: '',
-  category: '',
+  category: 'Movies',
   country: 'Nigeria',
   subscriber_count: '',
   thumbnail_url: '',
   banner_url: '',
   is_featured: false,
+  sync_enabled: true,
 };
 
 // --- People Search Component ---
@@ -69,19 +71,22 @@ function PeopleSearch({ value, onChange }) {
   return (
     <div ref={ref} className="relative flex-1">
       <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
-        Channel Owner (Star)
+        Channel Owner (Star / Actor)
       </label>
 
       {value ? (
-        <div className="flex items-center gap-3 bg-surface-2 border border-brand/20 rounded-lg px-4 py-3 shadow-inner">
+        <div className="flex items-center gap-3 bg-surface-2 border border-brand/30 rounded-xl px-4 py-2.5 shadow-inner">
           {value.photo_url
             ? <img src={value.photo_url} alt="" className="w-8 h-8 rounded-full object-cover border border-border" />
             : <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-brand font-bold text-xs">{value.name?.charAt(0)}</div>
           }
           <div className="flex-1 min-w-0">
             <span className="text-text-primary text-xs font-bold block truncate">{value.name}</span>
+            <span className="text-brand text-[10px] font-medium block">Linked Star Profile</span>
           </div>
-          <button type="button" onClick={() => onChange(null)} className="text-text-muted hover:text-red-500">✕</button>
+          <button type="button" onClick={() => onChange(null)} className="text-text-muted hover:text-red-500 p-1" title="Unlink star">
+            <Icon icon="solar:close-circle-bold" width="16" />
+          </button>
         </div>
       ) : (
         <div className="relative group">
@@ -90,18 +95,27 @@ function PeopleSearch({ value, onChange }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             onFocus={() => results.length > 0 && setOpen(true)}
-            placeholder="Search Star..."
-            className="w-full h-10 bg-surface-2 border border-border rounded-lg px-4 text-text-primary text-xs focus:border-brand focus:outline-none transition-all"
+            placeholder="Search star from database..."
+            className="w-full h-11 bg-surface-2 border border-border rounded-xl px-4 pl-10 text-text-primary text-xs focus:border-brand focus:outline-none transition-all"
           />
+          <Icon icon="solar:user-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-sm" />
+          {loading && <Icon icon="solar:refresh-linear" className="absolute right-3 top-1/2 -translate-y-1/2 text-brand animate-spin text-sm" />}
           {open && results.length > 0 && (
-            <div className="absolute z-[110] left-0 right-0 mt-2 bg-surface border border-border rounded-lg overflow-hidden shadow-2xl">
+            <div className="absolute z-[120] left-0 right-0 mt-2 bg-surface border border-border rounded-xl overflow-hidden shadow-2xl max-h-56 overflow-y-auto custom-scrollbar">
               {results.map(p => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => select(p)}
-                  className="w-full flex items-center gap-3 px-4 py-2 hover:bg-surface-2 text-left transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2 text-left transition-colors border-b border-border/50 last:border-0"
                 >
+                  {p.photo_url ? (
+                    <img src={p.photo_url} alt="" className="w-7 h-7 rounded-full object-cover border border-border shrink-0" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-surface-3 flex items-center justify-center text-brand font-bold text-xs shrink-0">
+                      {p.name?.charAt(0)}
+                    </div>
+                  )}
                   <p className="text-text-primary text-xs font-bold truncate">{p.name}</p>
                 </button>
               ))}
@@ -162,11 +176,17 @@ function CompanySearch({ value, onChange }) {
       </label>
 
       {value ? (
-        <div className="flex items-center gap-3 bg-surface-2 border border-brand/20 rounded-lg px-4 py-3 shadow-inner">
+        <div className="flex items-center gap-3 bg-surface-2 border border-brand/30 rounded-xl px-4 py-2.5 shadow-inner">
+          <div className="w-8 h-8 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+            <Icon icon="solar:buildings-bold" width="16" />
+          </div>
           <div className="flex-1 min-w-0">
             <span className="text-text-primary text-xs font-bold block truncate">{value.name}</span>
+            <span className="text-brand text-[10px] font-medium block">Linked Company</span>
           </div>
-          <button type="button" onClick={() => onChange(null)} className="text-text-muted hover:text-red-500">✕</button>
+          <button type="button" onClick={() => onChange(null)} className="text-text-muted hover:text-red-500 p-1" title="Unlink company">
+            <Icon icon="solar:close-circle-bold" width="16" />
+          </button>
         </div>
       ) : (
         <div className="relative group">
@@ -175,17 +195,19 @@ function CompanySearch({ value, onChange }) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             onFocus={() => results.length > 0 && setOpen(true)}
-            placeholder="Search Company..."
-            className="w-full h-10 bg-surface-2 border border-border rounded-lg px-4 text-text-primary text-xs focus:border-brand focus:outline-none transition-all"
+            placeholder="Search company from database..."
+            className="w-full h-11 bg-surface-2 border border-border rounded-xl px-4 pl-10 text-text-primary text-xs focus:border-brand focus:outline-none transition-all"
           />
+          <Icon icon="solar:buildings-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-sm" />
+          {loading && <Icon icon="solar:refresh-linear" className="absolute right-3 top-1/2 -translate-y-1/2 text-brand animate-spin text-sm" />}
           {open && results.length > 0 && (
-            <div className="absolute z-[110] left-0 right-0 mt-2 bg-surface border border-border rounded-lg overflow-hidden shadow-2xl">
+            <div className="absolute z-[120] left-0 right-0 mt-2 bg-surface border border-border rounded-xl overflow-hidden shadow-2xl max-h-56 overflow-y-auto custom-scrollbar">
               {results.map(c => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => select(c)}
-                  className="w-full flex items-center gap-3 px-4 py-2 hover:bg-surface-2 text-left transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2 text-left transition-colors border-b border-border/50 last:border-0"
                 >
                   <p className="text-text-primary text-xs font-bold truncate">{c.name}</p>
                 </button>
@@ -198,20 +220,32 @@ function CompanySearch({ value, onChange }) {
   );
 }
 
-// --- Channel Modal Component ---
-function ChannelModal({ channel, onSave, onClose }) {
+// --- Interactive Channel Modal Component ---
+function ChannelModal({ channel, existingChannelIds = [], onSave, onClose }) {
+  // Step: 'search' | 'form'
+  const isEditing = Boolean(channel?.id);
+  const [step, setStep] = useState(isEditing ? 'form' : 'search');
+
+  // Search Step State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Form Step State
   const [form, setForm] = useState(channel ? {
     name: channel.name || '',
     channel_handle: channel.channel_handle || '',
     channel_url: channel.channel_url || '',
+    channel_id: channel.channel_id || '',
     description: channel.description || '',
-    category: channel.category || '',
+    category: channel.category || 'Movies',
     country: channel.country || 'Nigeria',
     subscriber_count: channel.subscriber_count ?? '',
     thumbnail_url: channel.thumbnail_url || '',
     banner_url: channel.banner_url || '',
     is_featured: channel.is_featured || false,
-    channel_id: channel.channel_id || '',
+    sync_enabled: channel.sync_enabled !== false,
   } : { ...EMPTY_FORM });
 
   const [owner, setOwner] = useState(
@@ -229,6 +263,45 @@ function ChannelModal({ channel, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Auto-search suggestions
+  const SUGGESTIONS = ['SceneOne TV', 'ApataTV+', 'Yorubahood', 'BAM Real Media', 'Nollywood Picturestv', 'NevadabridgeTV'];
+
+  const executeSearch = async (termToSearch) => {
+    const q = (termToSearch !== undefined ? termToSearch : searchQuery).trim();
+    if (!q) return;
+    setSearching(true);
+    setError('');
+    setHasSearched(true);
+    try {
+      const results = await searchYouTubeChannels(q);
+      setSearchResults(results || []);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to search YouTube API');
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectYouTubeChannel = (yt) => {
+    setForm({
+      name: yt.name || '',
+      channel_handle: yt.channel_handle || '',
+      channel_url: yt.channel_url || `https://www.youtube.com/channel/${yt.channel_id}`,
+      channel_id: yt.channel_id || '',
+      description: yt.description || '',
+      category: form.category || 'Movies',
+      country: yt.country || 'Nigeria',
+      subscriber_count: yt.subscriber_count ?? '',
+      thumbnail_url: yt.thumbnail_url || '',
+      banner_url: yt.banner_url || '',
+      is_featured: form.is_featured || false,
+      sync_enabled: true,
+    });
+    setStep('form');
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
@@ -237,29 +310,48 @@ function ChannelModal({ channel, onSave, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.name.trim()) { setError('Name is required'); return; }
+    if (!form.name.trim()) { setError('Channel Name is required'); return; }
+    if (!form.channel_id.trim()) { setError('Channel ID is required'); return; }
+
     setSaving(true);
 
+    const formattedName = toTitleCase(form.name.trim());
+    const cleanHandle = form.channel_handle ? (form.channel_handle.startsWith('@') ? form.channel_handle.trim() : `@${form.channel_handle.trim()}`) : '';
+    const generatedSlug = cleanHandle.replace(/^@/, '').toLowerCase() || formattedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
     const payload = {
-      ...form,
-      name: form.name ? toTitleCase(form.name.trim()) : '',
+      name: formattedName,
+      channel_handle: cleanHandle,
+      channel_id: form.channel_id.trim(),
+      channel_url: form.channel_url?.trim() || `https://www.youtube.com/channel/${form.channel_id.trim()}`,
       description: form.description ? toSentenceCase(form.description.trim()) : '',
+      category: form.category || 'Movies',
+      country: form.country?.trim() || 'Nigeria',
       subscriber_count: form.subscriber_count === '' ? null : Number(form.subscriber_count),
+      thumbnail_url: form.thumbnail_url?.trim() || null,
+      banner_url: form.banner_url?.trim() || null,
+      is_featured: !!form.is_featured,
+      sync_enabled: form.sync_enabled !== false,
       owner_person_id: owner?.id ?? null,
-      owner_name:      owner?.name ?? null,
+      owner_name: owner?.name ?? null,
       owner_company_id: company?.id ?? null,
-      banner_url: form.banner_url || null,
+      slug: generatedSlug,
     };
 
     let err;
-    if (channel) {
+    if (channel?.id) {
       ({ error: err } = await supabase.from('channels').update(payload).eq('id', channel.id));
     } else {
       ({ error: err } = await supabase.from('channels').insert(payload));
     }
 
     setSaving(false);
-    if (err) { setError(err.message); return; }
+    if (err) {
+      setError(err.message);
+      return;
+    }
+
+    toast.success(channel?.id ? `Updated ${payload.name}` : `Channel "${payload.name}" registered successfully!`);
     onSave();
   };
 
@@ -278,94 +370,457 @@ function ChannelModal({ channel, onSave, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-overlay backdrop-blur-md z-[100] flex items-center justify-center p-4">
-      <div className="bg-surface border border-border rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in duration-300">
-        <div className="px-8 py-6 border-b border-border flex items-center justify-between bg-surface-2/50">
-          <div>
-            <p className="text-brand text-[10px] font-black uppercase tracking-widest mb-1">Source Config</p>
-            <h2 className="text-xl font-bold text-text-primary tracking-tight">
-              {channel ? 'Modify Channel' : 'Initialize New Source'}
-            </h2>
-          </div>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface border border-border hover:bg-surface-2 transition-all">✕</button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-4 rounded-lg">{error}</div>}
-
-          <div className="flex flex-col md:flex-row gap-6">
-            <PeopleSearch value={owner} onChange={setOwner} />
-            <CompanySearch value={company} onChange={setCompany} />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Channel Name</label>
-              <input name="name" value={form.name} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" />
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+      <div className="bg-surface border border-border rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in duration-300 max-h-[92vh]">
+        
+        {/* Modal Header */}
+        <div className="px-8 py-5 border-b border-border flex items-center justify-between bg-surface-2/40">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+              <Icon icon="solar:videocamera-record-bold" width="22" />
             </div>
             <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Category</label>
-              <select name="category" value={form.category} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none">
-                <option value="">Select Category</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Country</label>
-              <input name="country" value={form.country} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" placeholder="e.g. Nigeria" />
+              <p className="text-brand text-[10px] font-black uppercase tracking-widest">
+                {isEditing ? 'Channel Editor' : step === 'search' ? 'YouTube Channel Search' : 'Channel Registration'}
+              </p>
+              <h2 className="text-lg font-bold text-text-primary tracking-tight">
+                {isEditing ? `Edit "${channel.name}"` : step === 'search' ? 'Add Channel via YouTube API' : 'Review & Save Channel'}
+              </h2>
             </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Handle (@...)</label>
-              <input name="channel_handle" value={form.channel_handle} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" />
-            </div>
-            <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Channel ID</label>
-              <input name="channel_id" value={form.channel_id} onChange={handleChange} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" placeholder="UC..." />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Channel Logo URL</label>
-              <div className="flex gap-2">
-                <input name="thumbnail_url" value={form.thumbnail_url} onChange={handleChange} className="flex-1 bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" placeholder="https://..." />
-                {form.thumbnail_url && <img src={form.thumbnail_url} alt="" className="w-10 h-10 rounded border border-border" />}
-              </div>
-            </div>
-            <div>
-              <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Backdrop Asset URL</label>
-              <div className="flex gap-2">
-                <input name="banner_url" value={form.banner_url} onChange={handleChange} className="flex-1 bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none" placeholder="https://..." />
-                {form.banner_url && <img src={form.banner_url} alt="" className="w-10 h-10 rounded border border-border object-cover" />}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">Description</label>
-            <textarea name="description" value={form.description} onChange={handleChange} rows={3} className="w-full bg-surface-2 border border-border rounded-lg px-4 py-2.5 text-sm focus:border-brand outline-none resize-none" />
-          </div>
-
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <input type="checkbox" name="is_featured" checked={form.is_featured} onChange={handleChange} className="w-4 h-4 rounded border-border text-brand focus:ring-brand bg-surface-2" />
-            <span className="text-xs font-bold text-text-primary uppercase tracking-widest">Feature this channel</span>
-          </label>
-        </form>
-
-        <div className="p-8 border-t border-border bg-surface-2/50 flex gap-3">
-          {channel && (
-            <button type="button" onClick={handleDelete} disabled={saving} className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all flex items-center justify-center">
-               <Icon icon="solar:trash-bin-trash-bold" width="20" />
-            </button>
-          )}
-          <button type="button" onClick={onClose} className="flex-1 py-3 bg-surface border border-border rounded-lg text-xs font-bold text-text-muted hover:bg-surface-2 transition-all">Cancel</button>
-          <button onClick={handleSubmit} disabled={saving} className="flex-[2] py-3 bg-brand text-white rounded-lg text-xs font-bold hover:opacity-90 shadow-lg shadow-brand/20 transition-all disabled:opacity-50">
-            {saving ? 'Processing...' : channel ? 'Update Source' : 'Confirm Registration'}
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-surface border border-border hover:bg-surface-2 text-text-muted hover:text-text-primary transition-all"
+          >
+            ✕
           </button>
         </div>
+
+        {/* STEP 1: YouTube Channel Search */}
+        {step === 'search' ? (
+          <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+            <div className="text-center max-w-xl mx-auto space-y-2">
+              <h3 className="text-base font-bold text-text-primary">Search and auto-import any YouTube channel</h3>
+              <p className="text-xs text-text-muted leading-relaxed">
+                Type the channel name, handle (e.g. <span className="text-brand font-mono">@SceneOneTV</span>), or channel link. We'll automatically retrieve the Channel ID, Logo, Backdrop Banner, and Subscriber Stats.
+              </p>
+            </div>
+
+            {/* Search Input Box */}
+            <form
+              onSubmit={(e) => { e.preventDefault(); executeSearch(); }}
+              className="relative max-w-2xl mx-auto group"
+            >
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search channel name, @handle, or paste YouTube link..."
+                className="w-full h-14 bg-surface-2 border border-border rounded-2xl px-6 pl-13 pr-32 text-text-primary text-sm font-medium focus:border-brand focus:outline-none shadow-xl transition-all"
+                autoFocus
+              />
+              <Icon
+                icon="solar:magnifer-linear"
+                className="absolute left-5 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-xl pointer-events-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setSearchResults([]); setHasSearched(false); }}
+                  className="absolute right-28 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-xs p-1"
+                >
+                  ✕
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={searching || !searchQuery.trim()}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 h-9 px-5 bg-brand text-white text-xs font-black uppercase tracking-wider rounded-xl hover:opacity-90 transition-all shadow-md shadow-brand/20 disabled:opacity-40 flex items-center gap-2"
+              >
+                {searching ? (
+                  <>
+                    <Icon icon="solar:refresh-linear" className="animate-spin text-sm" />
+                    <span>Searching</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="solar:magnifer-bold" width="14" />
+                    <span>Search</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Suggestions */}
+            {!hasSearched && (
+              <div className="max-w-2xl mx-auto flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[10px] text-text-muted font-black uppercase tracking-wider mr-1">Popular:</span>
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => { setSearchQuery(s); executeSearch(s); }}
+                    className="px-3 py-1 rounded-lg bg-surface-2 border border-border/80 text-[11px] font-bold text-text-muted hover:text-brand hover:border-brand/40 transition-all"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Results Grid */}
+            {searching ? (
+              <div className="space-y-3 max-w-2xl mx-auto pt-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-24 bg-surface-2 rounded-2xl animate-pulse border border-border" />
+                ))}
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="space-y-3 max-w-2xl mx-auto pt-2">
+                <p className="text-[11px] font-black uppercase tracking-widest text-text-muted">
+                  Found {searchResults.length} Channels on YouTube:
+                </p>
+                {searchResults.map((yt) => {
+                  const isExisting = existingChannelIds.includes(yt.channel_id);
+                  return (
+                    <div
+                      key={yt.channel_id}
+                      onClick={() => handleSelectYouTubeChannel(yt)}
+                      className="bg-surface-2/60 border border-border hover:border-brand/60 rounded-2xl p-4 transition-all group cursor-pointer shadow-md hover:shadow-xl hover:bg-surface-2 flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <img
+                          src={yt.thumbnail_url}
+                          alt=""
+                          className="w-14 h-14 rounded-2xl object-cover border border-border shrink-0 shadow-inner group-hover:scale-105 transition-transform"
+                        />
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-text-primary truncate group-hover:text-brand transition-colors">
+                              {yt.name}
+                            </h4>
+                            {isExisting && (
+                              <span className="shrink-0 inline-flex items-center gap-1 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded px-2 py-0.5 text-[9px] font-black uppercase tracking-wider">
+                                Already Monitored
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] font-mono text-brand font-semibold">{yt.channel_handle || yt.channel_id}</p>
+                          <div className="flex items-center gap-3 text-[10px] text-text-muted font-bold">
+                            <span>{formatViewCount(yt.subscriber_count)} Subscribers</span>
+                            {yt.video_count > 0 && <span>• {yt.video_count} Videos</span>}
+                            <span>• {yt.country}</span>
+                          </div>
+                          {yt.description && (
+                            <p className="text-[11px] text-text-muted/80 line-clamp-1 italic font-normal">
+                              "{yt.description}"
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleSelectYouTubeChannel(yt); }}
+                        className="h-10 px-5 bg-brand text-white rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-md shadow-brand/20 shrink-0 flex items-center gap-2 group-hover:scale-105"
+                      >
+                        <span>Add</span>
+                        <Icon icon="solar:arrow-right-linear" width="16" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : hasSearched && !searching && (
+              <div className="text-center py-12 bg-surface-2/40 rounded-2xl border border-dashed border-border max-w-2xl mx-auto space-y-2">
+                <Icon icon="solar:magnifer-linear" className="text-4xl text-text-muted/40 mx-auto mb-2" />
+                <h4 className="text-sm font-bold text-text-primary">No Channels Found</h4>
+                <p className="text-xs text-text-muted">
+                  Try searching with the exact YouTube @handle or pasting the full YouTube channel link.
+                </p>
+              </div>
+            )}
+
+            {/* Manual Entry Footer Link */}
+            <div className="text-center pt-4 border-t border-border/60 max-w-2xl mx-auto">
+              <button
+                type="button"
+                onClick={() => setStep('form')}
+                className="text-xs font-bold text-text-muted hover:text-brand transition-colors inline-flex items-center gap-1"
+              >
+                <span>Or skip YouTube search and enter details manually</span>
+                <Icon icon="solar:arrow-right-linear" width="14" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* STEP 2: Full Editable Form */
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+              
+              {/* Back to search button (if not editing an existing db channel) */}
+              {!isEditing && (
+                <div className="flex items-center justify-between bg-surface-2/60 border border-brand/20 rounded-xl px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <Icon icon="solar:check-circle-bold" className="text-green-500 text-base" />
+                    <span className="text-xs font-bold text-text-primary">
+                      Imported from YouTube: <span className="text-brand">{form.name}</span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep('search')}
+                    className="text-[11px] font-bold text-text-muted hover:text-brand flex items-center gap-1 transition-colors"
+                  >
+                    <Icon icon="solar:arrow-left-linear" width="14" />
+                    <span>Search different channel</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Banner Preview if banner_url exists */}
+              {form.banner_url && (
+                <div className="relative h-28 rounded-2xl overflow-hidden border border-border shadow-inner group">
+                  <img src={form.banner_url} alt="Banner Preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-4">
+                    <div className="flex items-center gap-3">
+                      {form.thumbnail_url && (
+                        <img src={form.thumbnail_url} alt="" className="w-10 h-10 rounded-xl border-2 border-surface object-cover shadow-lg" />
+                      )}
+                      <div>
+                        <p className="text-white text-xs font-bold leading-tight">{form.name || 'Channel Banner'}</p>
+                        <p className="text-brand text-[10px] font-mono">{form.channel_handle || form.channel_id}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold p-4 rounded-xl flex items-center gap-2">
+                  <Icon icon="solar:danger-triangle-bold" className="text-base shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Link Relations (Owner & Production Company) */}
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wider text-text-muted">1. Entity Relations</p>
+                <div className="flex flex-col md:flex-row gap-4 bg-surface-2/30 p-4 rounded-2xl border border-border/80">
+                  <PeopleSearch value={owner} onChange={setOwner} />
+                  <CompanySearch value={company} onChange={setCompany} />
+                </div>
+              </div>
+
+              {/* Core Information */}
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wider text-text-muted">2. Channel Information</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Channel Name *
+                    </label>
+                    <input
+                      name="name"
+                      value={form.name}
+                      onChange={handleChange}
+                      placeholder="e.g. ApataTV+"
+                      className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-bold focus:border-brand outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Category
+                    </label>
+                    <select
+                      name="category"
+                      value={form.category}
+                      onChange={handleChange}
+                      className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-bold focus:border-brand outline-none"
+                    >
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Country
+                    </label>
+                    <input
+                      name="country"
+                      value={form.country}
+                      onChange={handleChange}
+                      className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-bold focus:border-brand outline-none"
+                      placeholder="e.g. Nigeria"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* YouTube Identifiers */}
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wider text-text-muted">3. YouTube Identifiers</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Handle (@...)
+                    </label>
+                    <input
+                      name="channel_handle"
+                      value={form.channel_handle}
+                      onChange={handleChange}
+                      placeholder="@handle"
+                      className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-mono focus:border-brand outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Channel ID (UC...) *
+                    </label>
+                    <input
+                      name="channel_id"
+                      value={form.channel_id}
+                      onChange={handleChange}
+                      placeholder="UC..."
+                      className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-mono focus:border-brand outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Subscribers
+                    </label>
+                    <input
+                      type="number"
+                      name="subscriber_count"
+                      value={form.subscriber_count}
+                      onChange={handleChange}
+                      placeholder="e.g. 250000"
+                      className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary font-bold focus:border-brand outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Media Asset URLs */}
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wider text-text-muted">4. Visual Assets</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Channel Logo URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        name="thumbnail_url"
+                        value={form.thumbnail_url}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                        className="flex-1 bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary focus:border-brand outline-none"
+                      />
+                      {form.thumbnail_url && (
+                        <img src={form.thumbnail_url} alt="" className="w-10 h-10 rounded-xl border border-border object-cover shrink-0" />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                      Backdrop Banner URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        name="banner_url"
+                        value={form.banner_url}
+                        onChange={handleChange}
+                        placeholder="https://..."
+                        className="flex-1 bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary focus:border-brand outline-none"
+                      />
+                      {form.banner_url && (
+                        <img src={form.banner_url} alt="" className="w-14 h-10 rounded-xl border border-border object-cover shrink-0" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-text-muted text-[10px] font-black uppercase tracking-widest mb-2">
+                  Channel Description / Bio
+                </label>
+                <textarea
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  rows={3}
+                  placeholder="Official Nollywood channel description..."
+                  className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-xs text-text-primary focus:border-brand outline-none resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* Toggles */}
+              <div className="flex flex-wrap items-center gap-6 pt-2">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    name="is_featured"
+                    checked={form.is_featured}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-border text-brand focus:ring-brand bg-surface-2"
+                  />
+                  <span className="text-xs font-bold text-text-primary tracking-wide">★ Feature this channel on Hub</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    name="sync_enabled"
+                    checked={form.sync_enabled}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-border text-brand focus:ring-brand bg-surface-2"
+                  />
+                  <span className="text-xs font-bold text-text-primary tracking-wide">Enable Daily Video Sync</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="p-6 border-t border-border bg-surface-2/50 flex gap-3 shrink-0">
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={saving}
+                  className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center justify-center"
+                  title="Cascade delete channel"
+                >
+                  <Icon icon="solar:trash-bin-trash-bold" width="20" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3 bg-surface border border-border rounded-xl text-xs font-bold text-text-muted hover:bg-surface-2 hover:text-text-primary transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-[2] py-3 bg-brand text-white rounded-xl text-xs font-bold hover:opacity-90 shadow-lg shadow-brand/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <Icon icon="solar:refresh-linear" className="animate-spin text-sm" />
+                    <span>Saving Channel...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="solar:check-circle-bold" width="16" />
+                    <span>{isEditing ? 'Update Channel' : 'Confirm Registration'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -382,12 +837,8 @@ function DiscoveryHub({ onMonitor }) {
     if (!query.trim()) return;
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`/api/admin/search-channels?query=${encodeURIComponent(query)}`, {
-        headers: { 'Authorization': `Bearer ${session?.access_token || ''}` }
-      });
-      const data = await res.json();
-      setResults(data.items || []);
+      const data = await searchYouTubeChannels(query.trim());
+      setResults(data || []);
     } catch (err) {
       toast.error('Discovery search failed');
     } finally {
@@ -426,18 +877,20 @@ function DiscoveryHub({ onMonitor }) {
       ) : results.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {results.map((c) => (
-            <div key={c.id} className="bg-surface border border-border rounded-2xl p-6 hover:border-brand/30 transition-all group shadow-xl">
-              <div className="flex items-center gap-4 mb-6">
-                <img src={c.thumbnail} alt="" className="w-16 h-16 rounded-full border-2 border-surface-2 shadow-inner" />
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-text-primary truncate">{c.name}</h3>
-                  <p className="text-[10px] text-brand font-black uppercase tracking-widest mb-1">{c.handle}</p>
-                  <p className="text-[10px] text-text-muted font-bold">{formatViewCount(c.subscriberCount)} Subscribers</p>
+            <div key={c.id} className="bg-surface border border-border rounded-2xl p-6 hover:border-brand/30 transition-all group shadow-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <img src={c.thumbnail_url} alt="" className="w-16 h-16 rounded-full border-2 border-surface-2 shadow-inner object-cover" />
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-text-primary truncate">{c.name}</h3>
+                    <p className="text-[10px] text-brand font-black uppercase tracking-widest mb-1">{c.channel_handle}</p>
+                    <p className="text-[10px] text-text-muted font-bold">{formatViewCount(c.subscriber_count)} Subscribers</p>
+                  </div>
                 </div>
+                <p className="text-xs text-text-muted line-clamp-2 mb-6 h-8 font-medium leading-relaxed">
+                  {c.description || 'No description provided.'}
+                </p>
               </div>
-              <p className="text-xs text-text-muted line-clamp-2 mb-6 h-8 font-medium leading-relaxed">
-                {c.description || 'No description provided.'}
-              </p>
               <button
                 onClick={() => onMonitor(c)}
                 className="w-full py-3 bg-surface-2 border border-border rounded-xl text-xs font-bold text-text-primary hover:bg-brand hover:text-white hover:border-brand transition-all flex items-center justify-center gap-2"
@@ -639,14 +1092,18 @@ export default function AdminChannels() {
   const startMonitoring = (discoveryResult) => {
     setEditingChannel({
       name: discoveryResult.name,
-      channel_handle: discoveryResult.handle,
-      channel_url: `https://youtube.com/channel/${discoveryResult.id}`,
-      channel_id: discoveryResult.id,
+      channel_handle: discoveryResult.channel_handle || discoveryResult.handle,
+      channel_url: discoveryResult.channel_url || `https://youtube.com/channel/${discoveryResult.id}`,
+      channel_id: discoveryResult.channel_id || discoveryResult.id,
       description: discoveryResult.description,
-      subscriber_count: discoveryResult.subscriberCount,
-      thumbnail_url: discoveryResult.thumbnail,
+      subscriber_count: discoveryResult.subscriber_count || discoveryResult.subscriberCount,
+      thumbnail_url: discoveryResult.thumbnail_url || discoveryResult.thumbnail,
+      banner_url: discoveryResult.banner_url || '',
+      country: discoveryResult.country || 'Nigeria',
     });
   };
+
+  const existingChannelIds = useMemo(() => channels.map(c => c.channel_id).filter(Boolean), [channels]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto pb-32">
@@ -665,7 +1122,7 @@ export default function AdminChannels() {
               onClick={() => setActiveTab('discovery')}
               className={`text-xs font-black uppercase tracking-widest pb-4 border-b-2 transition-all ${activeTab === 'discovery' ? 'border-brand text-brand' : 'border-transparent text-text-muted hover:text-text-primary'}`}
             >
-              Discovery
+              Discovery Hub
             </button>
           </div>
         </div>
@@ -684,8 +1141,8 @@ export default function AdminChannels() {
               onClick={() => setEditingChannel(true)}
               className="h-12 px-8 bg-brand text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-brand/20 flex items-center gap-2"
             >
-              <Icon icon="solar:add-circle-linear" width="18" />
-              Direct Entry
+              <Icon icon="solar:add-circle-bold" width="18" />
+              Add New Channel
             </button>
           </div>
         )}
@@ -865,6 +1322,7 @@ export default function AdminChannels() {
       {editingChannel !== null && (
         <ChannelModal
           channel={typeof editingChannel === 'object' ? editingChannel : null}
+          existingChannelIds={existingChannelIds}
           onSave={() => { setEditingChannel(null); fetchChannels(); }}
           onClose={() => setEditingChannel(null)}
         />

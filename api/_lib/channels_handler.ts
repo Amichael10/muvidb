@@ -36,35 +36,91 @@ export async function handleChannels(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: e.message });
     }
 
-    if (!ytQuery) return res.status(400).json({ error: 'Query is required' });
+    const searchQuery = (ytQuery || req.query.q || req.query.search) as string;
+    if (!searchQuery?.trim()) return res.status(400).json({ error: 'Query is required' });
 
     try {
-      const searchData = await ytGet('search', {
-        part: 'snippet',
-        q: ytQuery as string,
-        type: 'channel',
-        maxResults: '12'
+      let channelId: string | null = null;
+      let handle: string | null = null;
+      const input = searchQuery.trim();
+
+      if (input.includes('youtube.com/channel/')) {
+        channelId = input.split('youtube.com/channel/')[1].split('/')[0].split('?')[0];
+      } else if (input.includes('youtube.com/@')) {
+        handle = input.split('youtube.com/@')[1].split('/')[0].split('?')[0];
+      } else if (input.startsWith('UC') && input.length >= 22) {
+        channelId = input;
+      } else if (input.startsWith('@')) {
+        handle = input.slice(1);
+      }
+
+      let channelsList: any[] = [];
+
+      if (channelId || handle) {
+        const params: Record<string, string> = {
+          part: 'snippet,statistics,brandingSettings,contentDetails',
+        };
+        if (channelId) params.id = channelId;
+        else if (handle) params.forHandle = `@${handle}`;
+
+        const data = await ytGet('channels', params);
+        if (data.items?.length) channelsList = data.items;
+      }
+
+      if (!channelsList.length) {
+        const searchData = await ytGet('search', {
+          part: 'snippet',
+          q: input,
+          type: 'channel',
+          maxResults: '12'
+        });
+
+        if (searchData.items?.length) {
+          const channelIds = searchData.items.map((i: any) => i.snippet?.channelId || i.id?.channelId).filter(Boolean).join(',');
+          if (channelIds) {
+            const channelData = await ytGet('channels', {
+              part: 'snippet,statistics,brandingSettings,contentDetails',
+              id: channelIds
+            });
+            if (channelData.items?.length) channelsList = channelData.items;
+          }
+        }
+      }
+
+      const results = channelsList.map((c: any) => {
+        const snippet = c.snippet || {};
+        const stats = c.statistics || {};
+        const branding = c.brandingSettings || {};
+        const rawHandle = snippet.customUrl || '';
+        const cleanHandle = rawHandle ? (rawHandle.startsWith('@') ? rawHandle : `@${rawHandle}`) : '';
+        const channelUrl = rawHandle
+          ? `https://www.youtube.com/${rawHandle.startsWith('@') ? rawHandle : '@' + rawHandle}`
+          : `https://www.youtube.com/channel/${c.id}`;
+
+        let country = 'Nigeria';
+        if (snippet.country) {
+          country = snippet.country === 'NG' ? 'Nigeria' : snippet.country;
+        }
+
+        return {
+          id: c.id,
+          channel_id: c.id,
+          name: snippet.title || '',
+          handle: cleanHandle,
+          channel_handle: cleanHandle,
+          channel_url: channelUrl,
+          description: snippet.description || '',
+          thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || '',
+          thumbnail_url: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || '',
+          banner_url: branding.image?.bannerExternalUrl || '',
+          country: country,
+          subscriberCount: parseInt(stats.subscriberCount || '0', 10),
+          subscriber_count: stats.subscriberCount ? parseInt(stats.subscriberCount, 10) : null,
+          videoCount: parseInt(stats.videoCount || '0', 10),
+          video_count: stats.videoCount ? parseInt(stats.videoCount, 10) : 0,
+          uploadsPlaylistId: c.contentDetails?.relatedPlaylists?.uploads
+        };
       });
-
-      if (!searchData.items?.length) return res.status(200).json({ items: [] });
-
-      const channelIds = searchData.items.map((i: any) => i.snippet.channelId).join(',');
-      
-      const channelData = await ytGet('channels', {
-        part: 'snippet,statistics,contentDetails',
-        id: channelIds
-      });
-
-      const results = channelData.items.map((c: any) => ({
-        id: c.id,
-        name: c.snippet.title,
-        handle: c.snippet.customUrl || '',
-        description: c.snippet.description,
-        thumbnail: c.snippet.thumbnails?.medium?.url || c.snippet.thumbnails?.default?.url,
-        subscriberCount: parseInt(c.statistics?.subscriberCount || '0'),
-        videoCount: parseInt(c.statistics?.videoCount || '0'),
-        uploadsPlaylistId: c.contentDetails?.relatedPlaylists?.uploads
-      }));
 
       return res.status(200).json({ items: results });
     } catch (err: any) {

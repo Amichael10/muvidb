@@ -121,11 +121,28 @@ function getDimensionsForAspectRatio(aspectRatio) {
   }
 }
 
-function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Set(), usedFilmTitles = new Set()) {
-  const currentYear = new Date().getFullYear(); // e.g. 2026
+function getFilmReleaseRecencyLabel(releaseTime, releaseDateStr) {
+  if (!releaseTime || releaseTime <= 0) return '';
   const now = Date.now();
-  const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+  const diffMs = now - releaseTime;
+  
+  // If release date is today or future of today (e.g. today's timezone)
+  const isTimeDetailed = typeof releaseDateStr === 'string' && releaseDateStr.includes('T');
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
+  if (isTimeDetailed && diffHours >= 0 && diffHours < 6) return `⚡ Released ${Math.max(1, Math.round(diffHours))}h ago`;
+  if (diffMs <= 0 || diffDays === 0) return '📅 Released Today';
+  if (diffDays === 1) return '📅 Released Yesterday';
+  if (diffDays === 2) return '📅 Released 2 days ago';
+  if (diffDays < 7) return `📅 Released ${diffDays} days ago`;
+  if (diffDays < 30) return `📅 Released ${Math.floor(diffDays / 7)}w ago`;
+  
+  const d = new Date(releaseTime);
+  return `📅 Released ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+}
+
+function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Set(), usedFilmTitles = new Set()) {
   const isVideoSource = value => {
     if (!value) return false;
     try {
@@ -136,29 +153,37 @@ function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Se
 
   const processed = (rawFilms || []).map(f => {
     const sourceUrl = f.youtube_watch_url || (f.trailer_youtube_id ? `https://www.youtube.com/watch?v=${f.trailer_youtube_id}` : f.trailer_external_url);
-    const releaseTime = f.release_date ? new Date(f.release_date).getTime() : 0;
-    const createdTime = f.created_at ? new Date(f.created_at).getTime() : 0;
+    
+    let releaseTime = 0;
+    if (f.release_date) {
+      const d = new Date(f.release_date);
+      if (!isNaN(d.getTime())) releaseTime = d.getTime();
+    }
     
     let year = f.year ? Number(f.year) : 0;
-    if (!year && f.release_date) {
-      const d = new Date(f.release_date);
-      if (!isNaN(d.getFullYear())) year = d.getFullYear();
+    if (!year && releaseTime > 0) {
+      year = new Date(releaseTime).getFullYear();
     }
+    
+    // If no release date, fallback to Jan 1 of release year
+    if (!releaseTime && year > 1900) {
+      releaseTime = new Date(year, 0, 1).getTime();
+    }
+    
+    // Tertiary fallback if no release info at all
+    const createdTime = f.created_at ? new Date(f.created_at).getTime() : 0;
+    const finalReleaseTime = releaseTime || createdTime || 0;
 
     const cleanTitle = (f.title || '').toLowerCase().trim();
     const isUsed = usedFilmIds.has(f.id) || (cleanTitle && usedFilmTitles.has(cleanTitle));
-    
-    // Breaking / ultra fresh: released in past 48h (hours ago / yesterday / today) or uploaded in past 48h for current year
-    const isReleasedRecently = releaseTime > 0 && (now - releaseTime) >= -86400000 && (now - releaseTime) <= FORTY_EIGHT_HOURS;
-    const isUploadedRecently = createdTime > 0 && (now - createdTime) <= FORTY_EIGHT_HOURS && (year >= currentYear - 1);
-    const isUltraFresh = isReleasedRecently || isUploadedRecently;
+    const recencyLabel = getFilmReleaseRecencyLabel(finalReleaseTime, f.release_date);
 
     return {
       ...f,
       sourceUrl,
       isUsed,
-      isUltraFresh,
-      releaseTime,
+      releaseTime: finalReleaseTime,
+      recencyLabel,
       createdTime,
       year: year || 0,
     };
@@ -166,33 +191,26 @@ function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Se
 
   if (!processed.length) return [];
 
-  // Deterministic sort:
-  // 1. Unused before used
-  // 2. Ultra fresh (breaking / released today/yesterday) at the absolute top
-  // 3. Year DESC (2026 films before 2025 before 2024...)
-  // 4. Release Date DESC (Month/Day latest first within year)
-  // 5. Uploaded/Created Time DESC
+  // Pure release date descending sort:
+  // 1. Unused films before used films
+  // 2. Released last few hours -> Released today -> Released yesterday -> Released 2 days ago -> and backward in time
+  // 3. Tie-breaker: created_at DESC (if two films were released on the same day)
   return [...processed].sort((a, b) => {
-    // Unused before used
+    // 1. Unused before used
     if (!a.isUsed && b.isUsed) return -1;
     if (a.isUsed && !b.isUsed) return 1;
 
-    // Ultra fresh (breaking / released hours ago or yesterday) takes absolute top priority
-    if (a.isUltraFresh && !b.isUltraFresh) return -1;
-    if (!a.isUltraFresh && b.isUltraFresh) return 1;
-
-    // Year descending: 2026 > 2025 > 2024
-    if ((a.year || 0) !== (b.year || 0)) {
-      return (b.year || 0) - (a.year || 0);
-    }
-
-    // By release date: latest month and date first (e.g. Sept 2026 > Aug 2026 > Jan 2026)
+    // 2. Strict release date recency (newest release to oldest release)
     if (a.releaseTime !== b.releaseTime) {
       return b.releaseTime - a.releaseTime;
     }
 
-    // Secondary sort: most recent upload to DB (created_at DESC)
-    return b.createdTime - a.createdTime;
+    // 3. Same-day release tie breaker: created_at DESC
+    if (a.createdTime !== b.createdTime) {
+      return b.createdTime - a.createdTime;
+    }
+
+    return (b.year || 0) - (a.year || 0);
   });
 }
 
@@ -696,7 +714,7 @@ export default function AdminSocialStudio() {
       supabase.from('films')
         .select('id,title,release_date,year,created_at,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
-        .order('release_date', { ascending: false, nullsFirst: false })
+        .order('release_date', { ascending: false, nullsLast: true })
         .order('created_at', { ascending: false })
         .limit(1000),
       supabase.from('social_content_items')
@@ -745,7 +763,7 @@ export default function AdminSocialStudio() {
           supabase.from('films')
             .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
             .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
-            .order('release_date', { ascending: false, nullsFirst: false })
+            .order('release_date', { ascending: false, nullsLast: true })
             .order('created_at', { ascending: false }).limit(1000),
           supabase.from('social_content_items')
             .select('id,title,source_entity_id,source_snapshot').limit(1000)
@@ -893,22 +911,26 @@ export default function AdminSocialStudio() {
       videoPlan.slot2Time || '16:00',
       videoPlan.slot3Time || '20:00',
     ];
+    const defaultStarts = ['18:00', '38:00', '58:00'];
     for (let day = 0; day < videoPlan.days; day += 1) {
       const date = new Date(baseDate); date.setDate(baseDate.getDate() + day);
       const dateString = date.toISOString().slice(0, 10);
       dailySlots.forEach((slotTime, slotIndex) => {
         const film = films[filmIdx % films.length];
         filmIdx += 1;
+        const defaultStart = defaultStarts[slotIndex % defaultStarts.length];
+        const defaultStartSec = parseTimestampToSeconds(defaultStart);
         rows.push({
           id: `${Date.now()}-${day}-${slotIndex}`,
+          slotIndex,
           date: dateString,
           time: slotTime,
           aspectRatios: ['9:16', '1:1'],
           filmId: film?.id || '',
           film: film || null,
           mode: 'gemini',
-          start: '01:30',
-          end: formatSecondsToTimestamp(90 + (videoPlan.clipLength || 30)),
+          start: defaultStart,
+          end: formatSecondsToTimestamp(defaultStartSec + (videoPlan.clipLength || 30)),
           caption: '',
           engine: 'gemini',
           angle: 'editorial',
@@ -1004,6 +1026,7 @@ export default function AdminSocialStudio() {
       }
     }
 
+    const isManual = row.mode === 'manual';
     const response = await fetch('/api/ai', {
       method: 'POST',
       headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -1012,8 +1035,9 @@ export default function AdminSocialStudio() {
         data: {
           ...sourceMetadata,
           mode: row.mode,
-          startTime: row.start,
-          endTime: row.end,
+          startTime: isManual ? row.start : undefined,
+          endTime: isManual ? row.end : undefined,
+          slotIndex: row.slotIndex ?? 0,
           preferredProvider: engine,
           angle: angle,
           targetLength: videoPlan.clipLength || 30,

@@ -194,9 +194,48 @@ def health():
     }
 
 
+def parse_vtt_with_timestamps(raw_vtt: str, max_chars: int = 15000) -> str:
+    lines = raw_vtt.splitlines()
+    entries = []
+    current_time_tag = ""
+    last_text = ""
+    time_pattern = re.compile(r"(\d{1,2}:\d{2}(?::\d{2})?)(?:\.\d+)?\s*-->")
+
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean or line_clean.startswith("WEBVTT") or line_clean.startswith("NOTE"):
+            continue
+
+        match = time_pattern.search(line_clean)
+        if match:
+            raw_time = match.group(1)
+            if raw_time.startswith("00:"):
+                raw_time = raw_time[3:]
+            current_time_tag = f"[{raw_time}]"
+            continue
+
+        text = re.sub(r"<[^>]+>", "", line_clean).strip()
+        if not text or re.fullmatch(r"\d+", text):
+            continue
+
+        text = unescape(text)
+        if text != last_text:
+            if current_time_tag:
+                entries.append(f"{current_time_tag} {text}")
+                current_time_tag = ""
+            else:
+                entries.append(text)
+            last_text = text
+
+    result = " ".join(entries)
+    if len(result) > max_chars:
+        result = result[:max_chars]
+    return result
+
+
 @app.post("/metadata")
 def metadata(payload: MetadataRequest):
-    """Return cookie-authenticated metadata and available English captions."""
+    """Return cookie-authenticated metadata, chapters, heatmap peaks, and timestamped English captions."""
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True, **cookie_options()}
     info = {}
     try:
@@ -209,7 +248,16 @@ def metadata(payload: MetadataRequest):
                 info = fallback_dl.extract_info(str(payload.url), download=False)
         except Exception as e2:
             print(f"[Clipper] Fallback metadata extraction failed: {e2}")
-            return {"title": "", "duration": 3600, "description": "", "transcript": ""}
+            return {
+                "title": "",
+                "duration": 3600,
+                "description": "",
+                "transcript": "",
+                "chapters": [],
+                "heatmap_peaks": [],
+                "description_chapters": []
+            }
+
     transcript = ""
     subtitle_map = info.get("subtitles") or info.get("automatic_captions") or {}
     track = next((subtitle_map.get(key) for key in ("en", "en-US", "en-GB") if subtitle_map.get(key)), None)
@@ -217,17 +265,57 @@ def metadata(payload: MetadataRequest):
         subtitle_url = next((entry.get("url") for entry in track if entry.get("ext") in {"vtt", "srv3"}), track[0].get("url"))
         try:
             raw = urllib.request.urlopen(subtitle_url, timeout=15).read().decode("utf-8", "ignore")
-            lines = []
-            for line in raw.splitlines():
-                line = re.sub(r"<[^>]+>", "", line).strip()
-                if not line or line.startswith("WEBVTT") or "-->" in line or re.fullmatch(r"\d+", line):
-                    continue
-                if not lines or lines[-1] != line:
-                    lines.append(unescape(line))
-            transcript = " ".join(lines)[:12000]
+            transcript = parse_vtt_with_timestamps(raw, max_chars=16000)
         except Exception as exc:
             print(f"[Clipper] Caption fetch skipped: {exc}")
-    return {"title": info.get("title") or "", "duration": info.get("duration") or 0, "description": info.get("description") or "", "transcript": transcript}
+
+    # Extract native YouTube chapters
+    chapters = []
+    raw_chapters = info.get("chapters") or []
+    for ch in raw_chapters:
+        st = ch.get("start_time")
+        et = ch.get("end_time")
+        ch_title = ch.get("title") or ""
+        if st is not None:
+            chapters.append({
+                "start_time": float(st),
+                "end_time": float(et) if et is not None else float(st) + 60,
+                "title": ch_title
+            })
+
+    # Extract description timestamp markers (e.g., "12:30 The fight", "1:15:00 Climax")
+    desc = info.get("description") or ""
+    desc_chapters = []
+    for match in re.finditer(r"(?:^|\n)\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—:]?\s*([^\n\r]+)", desc):
+        tc_str = match.group(1)
+        tc_title = match.group(2).strip()
+        if len(tc_title) > 2 and not tc_title.startswith("http"):
+            desc_chapters.append({"timestamp": tc_str, "title": tc_title[:100]})
+
+    # Extract heatmap highlights (most replayed segments on YouTube)
+    heatmap_peaks = []
+    raw_heatmap = info.get("heatmap") or []
+    if raw_heatmap:
+        sorted_heatmap = sorted(raw_heatmap, key=lambda x: x.get("value", 0), reverse=True)
+        for pt in sorted_heatmap[:6]:
+            st = pt.get("start_time")
+            et = pt.get("end_time")
+            if st is not None:
+                heatmap_peaks.append({
+                    "start_time": float(st),
+                    "end_time": float(et) if et is not None else float(st) + 30,
+                    "intensity": round(float(pt.get("value", 0)), 3)
+                })
+
+    return {
+        "title": info.get("title") or "",
+        "duration": info.get("duration") or 0,
+        "description": desc,
+        "transcript": transcript,
+        "chapters": chapters,
+        "heatmap_peaks": heatmap_peaks,
+        "description_chapters": desc_chapters[:15]
+    }
 
 
 def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: Path) -> None:

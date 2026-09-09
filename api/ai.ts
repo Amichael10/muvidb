@@ -128,7 +128,7 @@ async function recommendClipSegment(data: any, res: VercelResponse) {
   const rawDuration = Number(data?.duration);
   // Default to 1 hour (3600s) if duration is missing/invalid, assuming full movie context
   const duration = (!rawDuration || isNaN(rawDuration) || rawDuration <= 60) ? 3600 : rawDuration;
-  const transcript = String(data?.transcript || '').slice(0, 12000);
+  const transcript = String(data?.transcript || '').slice(0, 16000);
   const description = String(data?.description || '').slice(0, 3000);
   const synopsis = String(data?.synopsis || '').slice(0, 2000);
   const genre = String(data?.genre || '').slice(0, 200);
@@ -138,6 +138,7 @@ async function recommendClipSegment(data: any, res: VercelResponse) {
   const isManual = data?.mode === 'manual' || (Boolean(data?.startTime || data?.start) && data?.mode !== 'gemini');
   const preferredProvider = String(data?.preferredProvider || data?.engine || 'gemini').toLowerCase() as any;
   const requestedAngle = String(data?.angle || data?.tone || 'editorial').toLowerCase();
+  const slotIndex = Number(data?.slotIndex ?? data?.dailySlotIndex ?? 0);
 
   const castNames = Array.isArray(data?.cast)
     ? data.cast.map((c: any) => typeof c === 'string' ? c : `${c.name || ''}${c.instagram_handle ? ` (@${c.instagram_handle.replace(/^@/, '')})` : ''}`).filter(Boolean).join(', ')
@@ -149,15 +150,32 @@ async function recommendClipSegment(data: any, res: VercelResponse) {
     ? data.producers.map((p: any) => typeof p === 'string' ? p : `${p.name || ''}${p.instagram_handle ? ` (@${p.instagram_handle.replace(/^@/, '')})` : ''}`).filter(Boolean).join(', ')
     : '';
 
+  // Format chapters if present
+  const chaptersList = Array.isArray(data?.chapters) && data.chapters.length > 0
+    ? data.chapters.map((c: any) => `- ${formatSecondsToTimestamp(c.start_time)}: ${c.title}`).join('\n')
+    : (Array.isArray(data?.description_chapters) && data.description_chapters.length > 0
+      ? data.description_chapters.map((c: any) => `- ${c.timestamp}: ${c.title}`).join('\n')
+      : '');
+
+  // Format heatmap peaks if present
+  const heatmapList = Array.isArray(data?.heatmap_peaks) && data.heatmap_peaks.length > 0
+    ? data.heatmap_peaks.map((h: any) => `- ${formatSecondsToTimestamp(h.start_time)} to ${formatSecondsToTimestamp(h.end_time)} (Audience Replay Intensity: ${h.intensity})`).join('\n')
+    : '';
+
   let startTime = parseTimestampToSeconds(data?.startTime ?? data?.start);
   let endTime = parseTimestampToSeconds(data?.endTime ?? data?.end);
 
-  // Calculate safety boundaries to avoid opening ads/intros and closing credits
+  // Calculate intelligent safety boundaries:
+  // For feature films (>20 min / 1200s), NEVER select the first 15% (opening logos, intro bumpers, slow establishing shots)
+  // or the last 10% (closing credits).
   let minStart = 0;
   let maxEnd = duration;
-  if (duration > 300) {
-    minStart = Math.min(90, Math.floor(duration * 0.05));
-    maxEnd = Math.max(minStart + targetLength + 10, Math.floor(duration * 0.92));
+  if (duration >= 1200) {
+    minStart = Math.max(300, Math.floor(duration * 0.15)); // At least 5 mins in
+    maxEnd = Math.max(minStart + targetLength + 60, Math.floor(duration * 0.88));
+  } else if (duration > 300) {
+    minStart = Math.max(45, Math.floor(duration * 0.10));
+    maxEnd = Math.max(minStart + targetLength + 10, Math.floor(duration * 0.90));
   } else if (duration > 90) {
     minStart = 15;
     maxEnd = Math.max(minStart + targetLength, duration - 10);
@@ -205,7 +223,7 @@ Return ONLY valid JSON with this exact shape:
 }`;
   } else {
     prompt = `You are MuviDB's viral Nollywood short-form video producer.
-Your mission is to recommend one exciting, high-retention ${targetLength}-second TikTok/Reels clip from this Nollywood film to blow up on social media, along with 3 layered captions.
+Your mission is to find the absolute HIGHEST-RETENTION, MOST EMOTIONALLY CHARGED or HILARIOUS ${targetLength}-second clip from this Nollywood film for TikTok, Instagram Reels, and YouTube Shorts.
 
 Movie Context:
 - Title: ${title}
@@ -216,23 +234,36 @@ Movie Context:
 - Director: ${directorNames || '(not listed)'}
 - Producer: ${producerNames || '(not listed)'}
 - Video Duration: ${duration}s (${formatSecondsToTimestamp(duration)})
-- Allowed Window: Between ${minStart}s (${formatSecondsToTimestamp(minStart)}) and ${maxEnd}s (${formatSecondsToTimestamp(maxEnd)})
+- Allowed Search Window: Between ${minStart}s (${formatSecondsToTimestamp(minStart)}) and ${maxEnd}s (${formatSecondsToTimestamp(maxEnd)})
 - Target Angle: ${requestedAngle}
-- YouTube Description / Context: ${description || '(none provided)'}
-- Subtitles / Transcript Snippets: ${transcript || '(auto-segment analysis)'}
+${chaptersList ? `\nYouTube Chapters / Key Scenes:\n${chaptersList}` : ''}
+${heatmapList ? `\nYouTube Most Replayed Moments (Audience Peaks):\n${heatmapList}` : ''}
+- YouTube Description / Summary: ${description || '(none provided)'}
+- Subtitles & Timestamped Dialogue:
+${transcript || '(Analyze movie synopsis/context to estimate the strongest dramatic/comedy act peak)'}
 
 CRITICAL RULES FOR SCENE SELECTION:
-1. Target an intensely emotional, hilarious, dramatic, or suspenseful scene that hooks viewers within the first 3 seconds.
-2. ABSOLUTELY DO NOT select the beginning of the video (00:00 to ${formatSecondsToTimestamp(minStart)}).
-3. ABSOLUTELY DO NOT select the end of the video (${formatSecondsToTimestamp(maxEnd)} to ${formatSecondsToTimestamp(duration)}).
-4. The startTime MUST be between ${minStart} and ${Math.max(minStart, maxEnd - targetLength)} (e.g. "22:22" or in seconds).
-5. The endTime should be startTime + approximately ${targetLength} seconds (max endTime <= ${maxEnd}).
+1. STRICT ANTI-TRANSITION RULE:
+   - ABSOLUTELY FORBIDDEN to pick transition states, establishing shots, scenic b-roll, cars driving/arriving, silent walking into rooms, opening logos, channel subscribe bumpers, or montage sequences.
+   - The clip MUST NOT start with silence or slow awkward pacing.
+2. HIGH-VOLTAGE EMOTIONAL OR COMIC MOMENT:
+   - The clip MUST capture peak drama or laugh-out-loud comedy:
+     * An explosive shouting match or dramatic confrontation between lead characters.
+     * A hilarious Nollywood clapback, sassy insult, or witty banter.
+     * A shocking secret confession, sudden betrayal, or intense romantic confrontation.
+3. IMMEDIATE HOOK:
+   - The clip MUST hook the viewer within the first 2 seconds directly on a spoken line of dialogue or dramatic action.
+4. TIME CONSTRAINTS:
+   - startTime MUST be within the allowed window: ${formatSecondsToTimestamp(minStart)} to ${formatSecondsToTimestamp(maxEnd - targetLength)}.
+   - endTime MUST be startTime + ${targetLength} seconds.
 
 Return ONLY valid JSON with this exact shape:
 {
-  "startTime": "22:22",
-  "endTime": "23:07",
-  "reason": "Why this specific scene is viral/emotional/funny",
+  "startTime": "24:15",
+  "endTime": "24:45",
+  "sceneType": "Comedic Clapback | High-Stakes Confrontation | Shocking Betrayal | Tearful Confession",
+  "openingQuote": "First dialogue line spoken at startTime",
+  "reason": "Why this specific 50-second moment is emotionally charged or hilarious for social media",
   "hookStory": "2-4 sentence narrative scene breakdown with lively emojis (🤝 😂 💀 🍿 🔥) describing the conflict or comedy in this clip",
   "variations": [
     { "key": "A", "label": "Informative", "hookStory": "Option A story paragraph..." },
@@ -247,8 +278,14 @@ Return ONLY valid JSON with this exact shape:
 
   if (!isManual) {
     startTime = parseTimestampToSeconds(parsed?.startTime);
+    // If Gemini returned an invalid/out-of-bounds start, fallback to narrative-aware story zones:
+    // Slot 0: ~28% (Inciting conflict/First confrontation)
+    // Slot 1: ~52% (Midpoint peak confrontation/twist)
+    // Slot 2: ~72% (Act 2 climax/explosive showdown)
     if (!startTime || isNaN(startTime) || startTime < minStart || startTime >= maxEnd) {
-      startTime = Math.floor(minStart + (maxEnd - minStart) * 0.35);
+      const slotRatios = [0.28, 0.52, 0.72];
+      const ratio = slotRatios[Math.abs(slotIndex) % slotRatios.length];
+      startTime = Math.floor(minStart + (maxEnd - minStart) * ratio);
     }
     endTime = parseTimestampToSeconds(parsed?.endTime);
     if (!endTime || isNaN(endTime) || endTime <= startTime || endTime > maxEnd) {
@@ -261,7 +298,7 @@ Return ONLY valid JSON with this exact shape:
 
   const rawHook = String(parsed?.hookStory || parsed?.caption || `${title} brings intense drama and unforgettable performances that will leave you on the edge of your seat! 🍿🔥`).trim();
   const primaryCaption = formatLayeredCaption(title, rawHook, data);
-  const reason = String(parsed?.reason || 'High-stakes dramatic dialogue scene').trim();
+  const reason = String(parsed?.reason || parsed?.sceneType || 'High-stakes dramatic dialogue scene').trim();
 
   const rawVars = Array.isArray(parsed?.variations) ? parsed.variations : [];
   const variations = (rawVars.length === 3 ? rawVars : [
@@ -282,6 +319,8 @@ Return ONLY valid JSON with this exact shape:
     caption: primaryCaption,
     variations,
     reason,
+    sceneType: parsed?.sceneType || '',
+    openingQuote: parsed?.openingQuote || '',
     engine: telemetry?.engine || preferredProvider || 'gemini',
   });
 }

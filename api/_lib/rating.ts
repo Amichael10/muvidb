@@ -19,7 +19,7 @@
  *  without the fake-perfect problem the old 9.8s had. */
 export function pctLiked(score10: number): number {
   const x = Math.max(0, Math.min(10, score10));
-  const p = 100 / (1 + Math.exp(-1.15 * (x - 7.1)));
+  const p = 100 / (1 + Math.exp(-0.55 * (x - 4.2)));
   return Math.round(Math.max(5, Math.min(97, p)));
 }
 
@@ -117,8 +117,7 @@ export function blendReactionLikedPercent(
  */
 export function score10FromLikedPercent(likedPct: number): number {
   const p = Math.max(5.1, Math.min(96.9, likedPct));
-  // Invert p = 100 / (1 + exp(-1.15 * (x - 7.1)))
-  const x = 7.1 - (1 / 1.15) * Math.log((100 - p) / p);
+  const x = 4.2 - (1 / 0.55) * Math.log((100 - p) / p);
   return Math.round(Math.max(1.0, Math.min(9.7, x)) * 10) / 10;
 }
 
@@ -197,9 +196,6 @@ export function computeCompositeRating(params: {
     baseScore10 = Number(film.audience_rating);
     totalVotes += film.audience_rating_count || 20;
     primarySource = 'youtube';
-  } else if (film?.liked_percent != null && Number(film.liked_percent) > 0) {
-    baseScore10 = score10FromLikedPercent(Number(film.liked_percent));
-    primarySource = 'blended';
   }
 
   // YouTube Stats adjustment (if available)

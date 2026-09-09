@@ -62,6 +62,11 @@ export default function FilmSearchCombobox({
   const fetchDefaultFilms = async () => {
     setIsSearching(true);
     try {
+      if (Array.isArray(films) && films.length > 0) {
+        setSearchResults(films.slice(0, 60));
+        setIsSearching(false);
+        return;
+      }
       const { data, error } = await supabase
         .from('films')
         .select('id, title, year, release_date, poster_url, trailer_youtube_id, trailer_external_url, youtube_watch_url')
@@ -330,7 +335,18 @@ export default function FilmSearchCombobox({
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {film.recencyLabel && (
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold border ${
+                            film.recencyLabel.includes('Just now') || film.recencyLabel.includes('h ago')
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : film.recencyLabel.includes('Today')
+                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                              : 'bg-white/10 text-white/80 border-white/15'
+                          }`}>
+                            {film.recencyLabel}
+                          </span>
+                        )}
                         {ytReady ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">
                             <Icon icon="mdi:youtube" width="11" /> YouTube Video Ready
