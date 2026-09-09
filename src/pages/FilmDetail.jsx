@@ -1197,7 +1197,7 @@ export default function FilmDetail() {
           </div>
 
           {/* SIDEBAR (30%) — Watch first, then facts / platforms / related */}
-          <div className="space-y-0 divide-y divide-border h-full">
+          <div className="space-y-0 divide-y divide-border h-full lg:sticky lg:top-20 self-start">
             <div className="hidden lg:block p-8 space-y-3">
               <WatchOptions film={film} isFullWidth />
               <button

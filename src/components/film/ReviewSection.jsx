@@ -38,6 +38,7 @@ const ReviewCard = ({
     onDelete
 }) => {
     const [timeRemaining, setTimeRemaining] = useState(null);
+    const [expanded, setExpanded] = useState(false);
     
     // Check if the review is still editable (within 5 minutes of creation).
     // NB: this is UX only — the real enforcement is the RLS policy on the DB.
@@ -68,73 +69,86 @@ const ReviewCard = ({
     
     const isOwner = currentUser?.id === review.user_id;
     const { isEditable } = getEditStatus();
+    const isLongText = (review.body || '').length > 180;
 
     return (
-        <div className="bg-surface border border-border rounded-xl p-6 transition-all duration-300 hover:shadow-md group relative overflow-hidden">
-            <div className="flex items-start justify-between relative z-10">
-                <div className="flex items-center gap-4">
-                    <div className="relative">
-                        {avatarUrl ? (
-                            <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-surface-2 group-hover:border-brand/30 transition-all shadow-sm" />
-                        ) : (
-                            <div className="w-12 h-12 rounded-full bg-brand/5 border-2 border-brand/10 flex items-center justify-center text-brand font-black text-xs">
-                                {initials}
-                            </div>
-                        )}
-                        {isOwner && isEditable && (
-                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-brand rounded-full border-2 border-surface flex items-center justify-center animate-pulse">
-                                <Icon icon="solar:info-circle-bold" className="text-[10px] text-white" />
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <p className="text-text-primary font-bold text-sm tracking-tight">{userName}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            <p className="text-text-muted text-[10px] font-black uppercase tracking-widest px-0.5">
-                                {new Date(review.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </p>
-                            {isOwner && isEditable && timeRemaining > 0 && (
-                                <span className="text-brand text-[8px] font-bold bg-brand/5 px-2 py-0.5 rounded italic">
-                                    Edit window: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
-                                </span>
+        <div className="bg-surface border border-border rounded-xl p-5 transition-all duration-300 hover:shadow-md hover:border-brand/30 group relative flex flex-col justify-between h-full">
+            <div>
+                <div className="flex items-start justify-between relative z-10 gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative shrink-0">
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-surface-2 group-hover:border-brand/30 transition-all shadow-sm" />
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-brand/5 border-2 border-brand/10 flex items-center justify-center text-brand font-black text-xs">
+                                    {initials}
+                                </div>
+                            )}
+                            {isOwner && isEditable && (
+                                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-brand rounded-full border-2 border-surface flex items-center justify-center animate-pulse">
+                                    <Icon icon="solar:info-circle-bold" className="text-[8px] text-white" />
+                                </div>
                             )}
                         </div>
+                        <div className="min-w-0">
+                            <p className="text-text-primary font-bold text-sm tracking-tight truncate">{userName}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-text-muted text-[10px] font-black uppercase tracking-widest">
+                                    {new Date(review.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </p>
+                                {isOwner && isEditable && timeRemaining > 0 && (
+                                    <span className="text-brand text-[8px] font-bold bg-brand/5 px-1.5 py-0.5 rounded italic">
+                                        {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-brand font-black text-base tracking-tighter flex items-center gap-1 bg-brand/5 border border-brand/15 px-2 py-0.5 rounded-lg">
+                            <Icon icon="solar:star-bold" className="text-xs" />
+                            {review.rating}<span className="text-[10px] text-text-muted">/10</span>
+                        </div>
+                        {isOwner && isEditable && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => onEdit(review)}
+                                    className="w-7 h-7 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-brand hover:text-white transition-all shadow-sm"
+                                    title="Edit"
+                                >
+                                    <Icon icon="solar:pen-linear" width="12" />
+                                </button>
+                                <button
+                                    onClick={() => onDelete(review.id)}
+                                    className="w-7 h-7 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                                    title="Delete"
+                                >
+                                    <Icon icon="solar:trash-bin-trash-linear" width="12" />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="text-brand font-black text-lg tracking-tighter flex items-center gap-1">
-                        <Icon icon="solar:star-bold" className="text-sm" />
-                        {review.rating}<span className="text-[10px] text-text-muted">/10</span>
+                {review.body && (
+                    <div className="mt-4 relative">
+                        <div className="absolute -left-1.5 top-0 w-0.5 h-full bg-brand/10 rounded-full" />
+                        <p className={`text-text-secondary text-xs sm:text-sm leading-relaxed pl-3 italic opacity-95 ${!expanded && isLongText ? 'line-clamp-3' : ''}`}>
+                            {review.body}
+                        </p>
+                        {isLongText && (
+                            <button
+                                type="button"
+                                onClick={() => setExpanded(!expanded)}
+                                className="text-[11px] font-bold text-brand hover:underline mt-1.5 pl-3 block"
+                            >
+                                {expanded ? 'Show less' : 'Read more'}
+                            </button>
+                        )}
                     </div>
-                    {isOwner && isEditable && (
-                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
-                            <button
-                                onClick={() => onEdit(review)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-brand hover:text-white transition-all shadow-sm"
-                                title="Edit (5 min limit)"
-                            >
-                                <Icon icon="solar:pen-linear" width="14" />
-                            </button>
-                            <button
-                                onClick={() => onDelete(review.id)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-2 text-text-secondary hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                                title="Delete (5 min limit)"
-                            >
-                                <Icon icon="solar:trash-bin-trash-linear" width="14" />
-                            </button>
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
-            {review.body && (
-                <div className="mt-5 relative">
-                    <div className="absolute -left-1.5 top-0 w-0.5 h-full bg-brand/10 rounded-full" />
-                    <p className="text-text-secondary text-sm leading-[1.6] pl-4 italic opacity-90">
-                        {review.body}
-                    </p>
-                </div>
-            )}
         </div>
     )
 }
@@ -142,47 +156,64 @@ const ReviewCard = ({
 // Third-party review (YouTube comment) — clearly badged, author NOT clickable
 // (they're not our users), no edit/delete, links out to the original comment.
 const ExternalReviewCard = ({ review }) => {
+    const [expanded, setExpanded] = useState(false);
     const name = review.author_name || 'YouTube viewer';
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const isLongText = (review.body || '').length > 180;
+
     return (
-        <div className="bg-surface border border-border rounded-xl p-6 transition-all duration-300 hover:shadow-md relative overflow-hidden">
-            <div className="flex items-start justify-between">
-                <div className="flex items-center gap-4">
-                    {review.author_avatar_url ? (
-                        <img src={review.author_avatar_url} alt="" referrerPolicy="no-referrer"
-                            className="w-12 h-12 rounded-full object-cover border-2 border-surface-2" />
-                    ) : (
-                        <div className="w-12 h-12 rounded-full bg-red-500/5 border-2 border-red-500/10 flex items-center justify-center text-red-500 font-black text-xs">
-                            {initials}
+        <div className="bg-surface border border-border rounded-xl p-5 transition-all duration-300 hover:shadow-md hover:border-red-500/30 relative flex flex-col justify-between h-full">
+            <div>
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        {review.author_avatar_url ? (
+                            <img src={review.author_avatar_url} alt="" referrerPolicy="no-referrer"
+                                className="w-10 h-10 rounded-full object-cover border-2 border-surface-2 shrink-0" />
+                        ) : (
+                            <div className="w-10 h-10 rounded-full bg-red-500/5 border-2 border-red-500/10 flex items-center justify-center text-red-500 font-black text-xs shrink-0">
+                                {initials}
+                            </div>
+                        )}
+                        <div className="min-w-0">
+                            {/* plain text — deliberately not a link */}
+                            <p className="text-text-primary font-bold text-sm tracking-tight truncate">{name}</p>
+                            <span className="inline-flex items-center gap-1 mt-0.5 text-[8px] font-black uppercase tracking-widest text-red-500/90 bg-red-500/5 border border-red-500/10 px-1.5 py-0.5 rounded">
+                                <Icon icon="mdi:youtube" className="text-[10px]" /> via YouTube
+                            </span>
                         </div>
-                    )}
-                    <div>
-                        {/* plain text — deliberately not a link */}
-                        <p className="text-text-primary font-bold text-sm tracking-tight">{name}</p>
-                        <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-widest text-red-500/90 bg-red-500/5 border border-red-500/10 px-2 py-0.5 rounded-xl">
-                            <Icon icon="mdi:youtube" className="text-xs" /> via YouTube
-                        </span>
                     </div>
+                    {/* Like count */}
+                    {review.likes > 0 && (
+                        <span className="text-text-muted text-[10px] font-bold flex items-center gap-1 shrink-0 bg-surface-2/60 px-2 py-0.5 rounded-lg border border-border">
+                            <Icon icon="solar:like-bold" className="text-xs text-text-secondary" /> {review.likes.toLocaleString()}
+                        </span>
+                    )}
                 </div>
-                {/* No per-comment score — the commenter never rated the film.
-                    Their sentiment only feeds the movie's aggregate rating. */}
-                {review.likes > 0 && (
-                    <span className="text-text-muted text-[11px] font-bold flex items-center gap-1 shrink-0">
-                        <Icon icon="solar:like-bold" className="text-xs" /> {review.likes.toLocaleString()}
-                    </span>
+                {review.body && (
+                    <div className="mt-4 relative">
+                        <div className="absolute -left-1.5 top-0 w-0.5 h-full bg-red-500/10 rounded-full" />
+                        <p className={`text-text-secondary text-xs sm:text-sm leading-relaxed pl-3 opacity-95 ${!expanded && isLongText ? 'line-clamp-3' : ''}`}>
+                            {review.body}
+                        </p>
+                        {isLongText && (
+                            <button
+                                type="button"
+                                onClick={() => setExpanded(!expanded)}
+                                className="text-[11px] font-bold text-red-400 hover:underline mt-1.5 pl-3 block"
+                            >
+                                {expanded ? 'Show less' : 'Read more'}
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
-            {review.body && (
-                <div className="mt-5 relative">
-                    <div className="absolute -left-1.5 top-0 w-0.5 h-full bg-red-500/10 rounded-full" />
-                    <p className="text-text-secondary text-sm leading-[1.6] pl-4 opacity-90">{review.body}</p>
-                </div>
-            )}
             {review.source_url && (
-                <a href={review.source_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 mt-4 text-[10px] font-bold text-text-muted hover:text-red-500 transition-colors">
-                    View on YouTube <Icon icon="solar:arrow-right-up-linear" />
-                </a>
+                <div className="mt-3 pt-2 border-t border-border/40">
+                    <a href={review.source_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-text-muted hover:text-red-500 transition-colors">
+                        View comment on YouTube <Icon icon="solar:arrow-right-up-linear" />
+                    </a>
+                </div>
             )}
         </div>
     );
@@ -304,6 +335,8 @@ const ReviewSection = ({ filmId, currentUser }) => {
 
     const [showForm, setShowForm] = useState(false)
     const [editingReview, setEditingReview] = useState(null)
+    const [activeTab, setActiveTab] = useState('all') // 'all' | 'community' | 'audience'
+    const [visibleLimit, setVisibleLimit] = useState(6)
 
     const handleSubmit = async (rating, body) => {
         const success = await submitReview(rating, body)
@@ -329,9 +362,6 @@ const ReviewSection = ({ filmId, currentUser }) => {
         ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
         : null
 
-    // Movie's audience rating = likes-weighted mean of comment sentiment.
-    // (Same formula the sync stores on the film; recomputed here so the header
-    // reflects exactly what's shown.)
     const audienceRating = (() => {
         if (!externalReviews.length) return null
         let num = 0, den = 0
@@ -341,40 +371,68 @@ const ReviewSection = ({ filmId, currentUser }) => {
             den += w
         }
         if (!den) return null
-        // Bayesian shrinkage toward the global mean so a few glowing comments
-        // don't read as near-perfect, then hard-cap at 9.7. Must match the
-        // formula the sync stores (comment_reviews.ts scoreRating).
         const n = externalReviews.length
         const adjusted = (n * (num / den) + 10 * 8.0) / (n + 10)
         return Math.min(9.7, adjusted).toFixed(1)
     })()
 
+    // Normalize reviews into a combined list for flexible display
+    const communityItems = reviews
+        .filter(r => editingReview?.id !== r.id)
+        .map(r => ({ type: 'community', data: r, id: `comm_${r.id}` }))
+
+    const audienceItems = externalReviews.map(r => ({
+        type: 'audience',
+        data: r,
+        id: `ext_${r.id}`
+    }))
+
+    const allItems = [...communityItems, ...audienceItems]
+
+    const displayedList = (() => {
+        if (activeTab === 'community') return communityItems
+        if (activeTab === 'audience') return audienceItems
+        return allItems
+    })()
+
+    const visibleItems = displayedList.slice(0, visibleLimit)
+    const totalCount = allItems.length
+
     return (
-        <div className="space-y-8 pt-2">
+        <div className="space-y-6 pt-2">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-6">
                 <div>
                     <h3 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none">
-                        Reviews
+                        Reviews & Reactions
                     </h3>
-                    <p className="text-text-muted text-xs font-bold tracking-wide mt-1.5 flex items-center gap-2">
-                        {reviews.length} User Review{reviews.length !== 1 ? 's' : ''} 
+                    <div className="text-text-muted text-xs font-bold tracking-wide mt-2 flex flex-wrap items-center gap-2.5">
+                        <span>{totalCount} total reaction{totalCount !== 1 ? 's' : ''}</span>
                         {averageRating && (
                             <>
                                 <span className="w-1 h-1 rounded-full bg-border" />
                                 <span className="text-brand flex items-center gap-1">
                                     <Icon icon="solar:star-bold" className="text-sm" />
-                                    {averageRating} Average
+                                    {averageRating} MuviDB Avg
                                 </span>
                             </>
                         )}
-                    </p>
+                        {audienceRating && (
+                            <>
+                                <span className="w-1 h-1 rounded-full bg-border" />
+                                <span className="text-red-400 flex items-center gap-1">
+                                    <Icon icon="mdi:youtube" className="text-sm" />
+                                    {audienceRating} Audience Avg
+                                </span>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 {!userReview && !showForm && !editingReview && (
                     <button
                         onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
-                        className="bg-brand text-white font-bold px-8 py-3.5 rounded-xl text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2"
+                        className="bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs sm:text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2 shrink-0"
                     >
                         <Icon icon="solar:pen-new-square-linear" width="16" />
                         <span>{currentUser ? 'Write a Review' : 'Sign in to review'}</span>
@@ -395,72 +453,135 @@ const ReviewSection = ({ filmId, currentUser }) => {
                 </div>
             )}
 
+            {/* Filter Tabs (when both community and external exist) */}
+            {totalCount > 0 && (communityItems.length > 0 && audienceItems.length > 0) && (
+                <div className="flex items-center gap-2 border-b border-border/60 pb-3 overflow-x-auto">
+                    <button
+                        onClick={() => { setActiveTab('all'); setVisibleLimit(6); }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            activeTab === 'all'
+                                ? 'bg-brand text-white shadow-sm shadow-brand/20'
+                                : 'bg-surface-2 text-text-secondary hover:text-text-primary hover:bg-surface-3'
+                        }`}
+                    >
+                        <span>All Reviews</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                            activeTab === 'all' ? 'bg-white/20 text-white' : 'bg-surface-3 text-text-muted'
+                        }`}>
+                            {totalCount}
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('community'); setVisibleLimit(6); }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            activeTab === 'community'
+                                ? 'bg-brand text-white shadow-sm shadow-brand/20'
+                                : 'bg-surface-2 text-text-secondary hover:text-text-primary hover:bg-surface-3'
+                        }`}
+                    >
+                        <Icon icon="solar:user-bold" className="text-xs" />
+                        <span>MuviDB Members</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                            activeTab === 'community' ? 'bg-white/20 text-white' : 'bg-surface-3 text-text-muted'
+                        }`}>
+                            {communityItems.length}
+                        </span>
+                    </button>
+
+                    <button
+                        onClick={() => { setActiveTab('audience'); setVisibleLimit(6); }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            activeTab === 'audience'
+                                ? 'bg-red-500 text-white shadow-sm shadow-red-500/20'
+                                : 'bg-surface-2 text-text-secondary hover:text-text-primary hover:bg-surface-3'
+                        }`}
+                    >
+                        <Icon icon="mdi:youtube" className="text-xs" />
+                        <span>YouTube Audience</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                            activeTab === 'audience' ? 'bg-white/20 text-white' : 'bg-surface-3 text-text-muted'
+                        }`}>
+                            {audienceItems.length}
+                        </span>
+                    </button>
+                </div>
+            )}
+
             {/* Feed Context */}
-            <div className="space-y-6">
+            <div>
                 {loading ? (
-                    <div className="space-y-3">
-                        {[1].map(i => (
-                            <div key={i} className="bg-surface-2 rounded-lg h-28 animate-pulse border border-border" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="bg-surface-2 rounded-xl h-36 animate-pulse border border-border" />
                         ))}
                     </div>
-                ) : reviews.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6">
-                        {reviews.map(review => (
-                            editingReview?.id === review.id ? null : (
-                                <div key={review.id} className="page-fade-in">
-                                    <ReviewCard
-                                        review={review}
-                                        currentUser={currentUser}
-                                        onEdit={handleEdit}
-                                        onDelete={handleDelete}
-                                    />
+                ) : displayedList.length > 0 ? (
+                    <div className="space-y-6">
+                        {/* 2-column Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {visibleItems.map(item => (
+                                <div key={item.id} className="page-fade-in flex flex-col">
+                                    {item.type === 'community' ? (
+                                        <ReviewCard
+                                            review={item.data}
+                                            currentUser={currentUser}
+                                            onEdit={handleEdit}
+                                            onDelete={handleDelete}
+                                        />
+                                    ) : (
+                                        <ExternalReviewCard review={item.data} />
+                                    )}
                                 </div>
-                            )
-                        ))}
+                            ))}
+                        </div>
+
+                        {/* Pagination / Show More Controls */}
+                        {displayedList.length > 6 && (
+                            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                                {displayedList.length > visibleLimit && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setVisibleLimit(prev => Math.min(displayedList.length, prev + 6))}
+                                        className="px-5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-primary text-xs font-bold transition-all flex items-center gap-2 hover:border-brand/40 shadow-sm"
+                                    >
+                                        <span>Show more reviews (+{displayedList.length - visibleLimit} remaining)</span>
+                                        <Icon icon="solar:alt-arrow-down-linear" className="text-sm" />
+                                    </button>
+                                )}
+                                {visibleLimit > 6 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setVisibleLimit(6)
+                                            document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })
+                                        }}
+                                        className="px-5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-muted hover:text-text-primary text-xs font-bold transition-all flex items-center gap-2"
+                                    >
+                                        <span>Show less</span>
+                                        <Icon icon="solar:alt-arrow-up-linear" className="text-sm" />
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
-                ) : externalReviews.length === 0 ? (
-                    <div className="bg-surface-2/40 border border-dashed border-border rounded-lg py-8 px-4 text-center">
+                ) : (
+                    <div className="bg-surface-2/40 border border-dashed border-border rounded-xl py-8 px-4 text-center">
                         <Icon icon="solar:clapperboard-play-linear" className="text-3xl mx-auto mb-3 opacity-25 text-brand" />
-                        <h4 className="text-text-primary text-base font-bold tracking-tight">No reviews yet</h4>
+                        <h4 className="text-text-primary text-base font-bold tracking-tight">No reviews in this category yet</h4>
                         <p className="text-text-muted text-xs mt-1 max-w-xs mx-auto">Be the first to share your thoughts.</p>
                         {!showForm && (
                             <button
                                 onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
-                                className="mt-5 text-brand font-bold text-xs hover:text-brand/80 transition-colors flex items-center justify-center gap-2 mx-auto"
+                                className="mt-4 text-brand font-bold text-xs hover:text-brand/80 transition-colors flex items-center justify-center gap-2 mx-auto"
                             >
                                 <Icon icon="solar:add-circle-linear" width="16" />
                                 Write a Review
                             </button>
                         )}
                     </div>
-                ) : null}
+                )}
             </div>
-
-            {/* What viewers are saying — mined from YouTube comments */}
-            {externalReviews.length > 0 && (
-                <div className="space-y-6 pt-4">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border pb-4">
-                        <Icon icon="mdi:youtube" className="text-red-500 text-xl" />
-                        <h3 className="text-text-primary text-lg font-bold tracking-tight">What viewers are saying</h3>
-                        {audienceRating && (
-                            <span className="text-brand flex items-center gap-1 text-sm font-black">
-                                <Icon icon="solar:star-bold" className="text-sm" />
-                                {audienceRating}<span className="text-[10px] text-text-muted">/10</span>
-                            </span>
-                        )}
-                        <span className="text-text-muted text-[10px] font-black uppercase tracking-widest">
-                            · from {externalReviews.length} YouTube comment{externalReviews.length !== 1 ? 's' : ''}
-                        </span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-6">
-                        {externalReviews.map(r => (
-                            <div key={r.id} className="page-fade-in">
-                                <ExternalReviewCard review={r} />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
